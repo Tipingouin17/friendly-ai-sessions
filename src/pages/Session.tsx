@@ -53,17 +53,29 @@ const Session = () => {
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
 
+  // Initialize conversation ID from location state
   useEffect(() => {
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
-    if (state?.newConversationId && state.replace) {
+    
+    // Check if we have a conversation ID in the state
+    if (state?.newConversationId) {
       setCurrentConversationId(state.newConversationId);
-      setMessages([]);
-      setWelcomeMessageSent(false);
-      setParticipantMessages({});
-      window.history.replaceState({}, '');
-      queryClient.invalidateQueries({ queryKey: ['conversation', state.newConversationId] });
+      if (state.replace) {
+        setMessages([]);
+        setWelcomeMessageSent(false);
+        setParticipantMessages({});
+        window.history.replaceState({}, '');
+        queryClient.invalidateQueries({ queryKey: ['conversation', state.newConversationId] });
+      }
+    } else {
+      // If there's no conversation ID in state, check if we have one in the URL
+      const params = new URLSearchParams(location.search);
+      const conversationId = params.get('id');
+      if (conversationId) {
+        setCurrentConversationId(Number(conversationId));
+      }
     }
-  }, [location.state, queryClient]);
+  }, [location, queryClient]);
 
   // Query for conversation data
   const { data: conversation, isLoading, error } = useQuery({
@@ -188,19 +200,22 @@ const Session = () => {
     );
   }
 
-  if (!conversation) {
+  if (!conversation || !currentConversationId) {
     return (
       <div className="min-h-screen pt-16 bg-[#FFC107]/10">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-lg p-8">
-            Please start a new conversation from the facilitators page.
+            <div className="text-center">
+              <p className="text-lg mb-4">No active conversation found.</p>
+              <Button onClick={() => navigate('/my-facilitators')} className="bg-primary text-white">
+                Start a New Conversation
+              </Button>
+            </div>
           </div>
         </div>
       </div>
     );
   }
-
-  const totalParticipants = conversation?.participants || 1;
 
   return (
     <div className="min-h-screen pt-16 bg-[#FFC107]/10">
@@ -210,14 +225,14 @@ const Session = () => {
             title={conversation?.sessions?.facilitator?.title}
             objective={conversation?.sessions?.objective}
             profilePicture={conversation?.sessions?.facilitator?.profile_picture}
-            participantCount={totalParticipants}
+            participantCount={conversation?.participants}
           />
           <MessageList 
             messages={messages} 
             participantColors={participantColors}
           />
           <div className="flex items-center justify-center gap-2 p-2 border-t">
-            {Array.from({ length: totalParticipants }, (_, i) => i + 1).map((num) => (
+            {Array.from({ length: conversation?.participants || 1 }, (_, i) => i + 1).map((num) => (
               <button
                 key={num}
                 onClick={() => handleParticipantSwitch(num)}

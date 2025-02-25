@@ -1,9 +1,10 @@
-
 export interface Message {
   id: string;
   content: string;
   sender: "user" | "assistant";
   timestamp: Date;
+  participant?: string;
+  color?: string;
 }
 
 export interface SpeechRecognition extends EventTarget {

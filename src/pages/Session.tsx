@@ -90,7 +90,7 @@ const Session = () => {
 
     if (allParticipantsResponded) {
       // Create messages for all participants
-      const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => ({
+      const participantResponses: Message[] = Object.entries(updatedMessages).map(([participant, content], index) => ({
         id: Date.now().toString() + index,
         content,
         sender: "user",
@@ -173,7 +173,6 @@ const Session = () => {
             onSendMessage={handleSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
-            currentParticipant={currentParticipant}
           />
         </div>
       </div>

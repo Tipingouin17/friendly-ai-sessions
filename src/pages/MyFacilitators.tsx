@@ -42,7 +42,8 @@ const MyFacilitators = () => {
   };
   return <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-4xl font-bold text-center mb-4">MyFacilitator</h1>
+        <h1 className="text-4xl font-bold text-center mb-4">
+      </h1>
         <p className="text-lg text-muted-foreground text-center mb-4">Unleash the full potential of MyFacilitator with intelligent guidance and support!</p>
         <p className="text-lg text-muted-foreground text-center mb-12">
       </p>

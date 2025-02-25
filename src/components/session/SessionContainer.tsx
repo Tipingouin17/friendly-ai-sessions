@@ -53,9 +53,9 @@ const SessionContainer = ({
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
-      <div className="container mx-auto flex-1 max-w-4xl flex flex-col pt-16 pb-0">
-        <div className="flex-1 bg-white rounded-t-3xl shadow-lg overflow-hidden flex flex-col relative">
+    <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
+      <div className="container mx-auto h-full max-w-4xl flex flex-col pt-16">
+        <div className="flex-1 bg-white rounded-t-3xl shadow-lg flex flex-col relative">
           <ChatHeader 
             title={facilitator?.title}
             objective={objective}
@@ -65,11 +65,13 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0}
           />
-          <MessageList 
-            messages={transformedMessages} 
-            participantColors={participantColors}
-          />
-          <div className="sticky bottom-0 left-0 right-0 border-t border-gray-100 bg-white/80 backdrop-blur-sm">
+          <div className="flex-1 overflow-hidden">
+            <MessageList 
+              messages={transformedMessages} 
+              participantColors={participantColors}
+            />
+          </div>
+          <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
             <ParticipantSelector
               participantCount={participantCount}
               currentParticipant={currentParticipant}

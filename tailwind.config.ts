@@ -26,19 +26,19 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#9b87f5",
-          foreground: "#ffffff",
+          DEFAULT: "#FFC107", // Yellow color from the screenshot
+          foreground: "#1A1F2C",
         },
         secondary: {
-          DEFAULT: "#7E69AB",
-          foreground: "#ffffff",
+          DEFAULT: "#FFD54F",
+          foreground: "#1A1F2C",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "#E5DEFF",
+          DEFAULT: "#FEF7CD",
           foreground: "#1A1F2C",
         },
       },

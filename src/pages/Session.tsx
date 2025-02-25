@@ -15,6 +15,7 @@ const participantColors = {
 };
 
 const fetchConversation = async (id: number) => {
+  console.log('Fetching conversation with ID:', id);
   const { data, error } = await supabase
     .from('conversations')
     .select(`
@@ -36,7 +37,11 @@ const fetchConversation = async (id: number) => {
     .eq('id', id)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching conversation:', error);
+    throw error;
+  }
+  console.log('Fetched conversation:', data);
   return data;
 };
 
@@ -53,10 +58,15 @@ const Session = () => {
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
 
+  // Initialize conversation ID from location state or URL params
   useEffect(() => {
+    console.log('Location state:', location.state);
+    console.log('Location search:', location.search);
+    
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
     
     if (state?.newConversationId) {
+      console.log('Setting conversation ID from state:', state.newConversationId);
       setCurrentConversationId(state.newConversationId);
       if (state.replace) {
         setMessages([]);
@@ -69,19 +79,26 @@ const Session = () => {
       const params = new URLSearchParams(location.search);
       const conversationId = params.get('id');
       if (conversationId) {
+        console.log('Setting conversation ID from URL:', conversationId);
         setCurrentConversationId(Number(conversationId));
+      } else {
+        console.log('No conversation ID found in state or URL');
+        // If no conversation ID is found, redirect to my-facilitators
+        navigate('/my-facilitators');
       }
     }
-  }, [location, queryClient]);
+  }, [location, queryClient, navigate]);
 
+  // Query for conversation data
   const { data: conversation, isLoading, error } = useQuery({
     queryKey: ['conversation', currentConversationId],
     queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
-    enabled: !!currentConversationId
+    enabled: !!currentConversationId,
   });
 
   useEffect(() => {
     if (error) {
+      console.error('Error in conversation query:', error);
       toast({
         title: "Error",
         description: "Failed to load the session. Please try again.",
@@ -93,6 +110,7 @@ const Session = () => {
 
   useEffect(() => {
     if (conversation?.sessions?.welcome_message && !welcomeMessageSent) {
+      console.log('Setting welcome message:', conversation.sessions.welcome_message);
       setMessages([{
         id: Date.now().toString(),
         content: conversation.sessions.welcome_message,
@@ -189,6 +207,9 @@ const Session = () => {
   }
 
   if (!conversation || !currentConversationId) {
+    console.log('No conversation found, showing empty state');
+    console.log('Current conversation:', conversation);
+    console.log('Current conversation ID:', currentConversationId);
     return <EmptyState />;
   }
 

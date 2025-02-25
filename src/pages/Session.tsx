@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Message } from "@/types/chat";
@@ -57,8 +56,8 @@ const Session = () => {
   const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
-  // Initialize conversation ID from location state or URL params
   useEffect(() => {
     console.log('Location state:', location.state);
     console.log('Location search:', location.search);
@@ -83,13 +82,11 @@ const Session = () => {
         setCurrentConversationId(Number(conversationId));
       } else {
         console.log('No conversation ID found in state or URL');
-        // If no conversation ID is found, redirect to my-facilitators
         navigate('/my-facilitators');
       }
     }
   }, [location, queryClient, navigate]);
 
-  // Query for conversation data
   const { data: conversation, isLoading, error } = useQuery({
     queryKey: ['conversation', currentConversationId],
     queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
@@ -124,6 +121,55 @@ const Session = () => {
   const handleParticipantSwitch = (participantNumber: number) => {
     setCurrentParticipant(participantNumber);
     setInputMessage(participantMessages[`P${participantNumber}`] || "");
+  };
+
+  const handleGenerateReport = async () => {
+    if (!currentConversationId) return;
+    
+    setIsGeneratingReport(true);
+    try {
+      const response = await supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages,
+          conversationId: currentConversationId,
+          generateReport: true
+        }
+      });
+
+      if (response.error) {
+        console.error('Edge function error:', response.error);
+        throw new Error(response.error.message || 'Failed to generate report');
+      }
+
+      if (!response.data) {
+        throw new Error('No response data received');
+      }
+
+      const reportResponse: Message = {
+        id: response.data.id || Date.now().toString(),
+        content: response.data.content,
+        sender: "assistant",
+        timestamp: new Date(),
+        isReport: true
+      };
+      
+      setMessages(prev => [...prev, reportResponse]);
+      
+      toast({
+        title: "Report Generated",
+        description: "The conversation report has been generated successfully.",
+      });
+
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate the report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -161,7 +207,6 @@ const Session = () => {
           name: msg.participant,
           conversation_id: currentConversationId,
           user_id: null,
-          // Make sure we only pass the facilitator ID, not the whole object
           facilitator_id: conversation?.sessions?.facilitator?.id || null
         }));
 
@@ -235,6 +280,8 @@ const Session = () => {
       setInputMessage={setInputMessage}
       onSendMessage={handleSendMessage}
       setIsRecording={setIsRecording}
+      onGenerateReport={handleGenerateReport}
+      isGeneratingReport={isGeneratingReport}
     />
   );
 };

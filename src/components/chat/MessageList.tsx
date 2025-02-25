@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Message } from '@/types/chat';
+import { cn } from '@/lib/utils';
 
 interface MessageListProps {
   messages: Message[];
@@ -18,11 +19,13 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
           }`}
         >
           <div
-            className={`max-w-[80%] p-4 rounded-2xl ${
+            className={cn(
+              "max-w-[80%] p-4 rounded-2xl",
               message.sender === "assistant"
                 ? "bg-accent text-accent-foreground"
-                : "text-primary-foreground"
-            }`}
+                : "text-primary-foreground",
+              message.isReport && "bg-green-50 border border-green-200 w-full max-w-full"
+            )}
             style={{
               backgroundColor: message.sender === "user" && message.participant 
                 ? participantColors[message.participant]
@@ -32,6 +35,11 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
             {message.sender === "user" && message.participant && (
               <div className="text-xs opacity-75 mb-1">
                 {message.participant}
+              </div>
+            )}
+            {message.isReport && (
+              <div className="font-semibold mb-2 text-green-700">
+                Session Report
               </div>
             )}
             {message.content}

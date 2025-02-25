@@ -1,14 +1,55 @@
+
 import { useState, useRef, useEffect } from "react";
-import { Mic, Send, StopCircle, Eraser } from "lucide-react";
+import { Mic, Send, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+
+// Add TypeScript interface for SpeechRecognition
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionResult {
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+  length: number;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
 
 interface Message {
   id: string;
   content: string;
   sender: "user" | "assistant";
   timestamp: Date;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
 }
 
 const Session = () => {
@@ -22,7 +63,6 @@ const Session = () => {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-  const [isDictating, setIsDictating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -43,7 +83,7 @@ const Session = () => {
 
         recognitionRef.current.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
-          setIsDictating(false);
+          setIsRecording(false);
           toast({
             title: "Error",
             description: "There was an error with speech recognition. Please try again.",
@@ -86,28 +126,12 @@ const Session = () => {
   };
 
   const handleStartRecording = () => {
-    setIsRecording(true);
-    toast({
-      title: "Recording started",
-      description: "Your voice is being recorded...",
-    });
-  };
-
-  const handleStopRecording = () => {
-    setIsRecording(false);
-    toast({
-      title: "Recording stopped",
-      description: "Processing your message...",
-    });
-  };
-
-  const handleStartDictation = () => {
     if (recognitionRef.current) {
       recognitionRef.current.start();
-      setIsDictating(true);
+      setIsRecording(true);
       toast({
-        title: "Voice dictation started",
-        description: "Start speaking...",
+        title: "Recording started",
+        description: "Your voice is being recorded...",
       });
     } else {
       toast({
@@ -118,22 +142,14 @@ const Session = () => {
     }
   };
 
-  const handleStopDictation = () => {
+  const handleStopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    setIsDictating(false);
+    setIsRecording(false);
     toast({
-      title: "Voice dictation stopped",
-      description: "Dictation complete.",
-    });
-  };
-
-  const handleClearChat = () => {
-    setMessages([messages[0]]);
-    toast({
-      title: "Chat cleared",
-      description: "All messages have been cleared except the welcome message.",
+      title: "Recording stopped",
+      description: "Processing your message...",
     });
   };
 
@@ -189,29 +205,14 @@ const Session = () => {
               >
                 {isRecording ? <StopCircle /> : <Mic />}
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={isDictating ? handleStopDictation : handleStartDictation}
-                className={isDictating ? "bg-primary/10 text-primary" : ""}
-              >
-                {isDictating ? <StopCircle /> : <Mic />}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleClearChat}
-              >
-                <Eraser />
-              </Button>
             </div>
-            <div className="flex gap-4">
+            <div className="relative">
               <Textarea
                 ref={textareaRef}
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Type your message here..."
-                className="min-h-[80px]"
+                className="min-h-[80px] pr-12"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -221,7 +222,8 @@ const Session = () => {
               />
               <Button
                 onClick={handleSendMessage}
-                className="self-end"
+                className="absolute bottom-2 right-2"
+                size="icon"
                 disabled={!inputMessage.trim()}
               >
                 <Send className="h-4 w-4" />

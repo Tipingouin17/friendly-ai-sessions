@@ -2,14 +2,7 @@
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-
-interface Workshop {
-  id: number;
-  title: string;
-  icon: string;
-  scope: string;
-  objective: string;
-}
+import { Workshop } from "@/types/facilitator";
 
 interface WorkshopSelectionProps {
   workshops: Workshop[];
@@ -51,7 +44,15 @@ export const WorkshopSelection = ({ workshops, selectedWorkshop, onSelect }: Wor
               }`}
               onClick={() => onSelect(workshop.id)}
             >
-              <div className="mb-4 text-4xl">{workshop.icon}</div>
+              <div className="mb-4">
+                {workshop.profile_picture ? (
+                  <img src={workshop.profile_picture} alt={workshop.title} className="w-16 h-16 mx-auto" />
+                ) : (
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                    🎯
+                  </div>
+                )}
+              </div>
               <h3 className="mb-2 text-lg font-semibold">{workshop.title}</h3>
               <div className="space-y-2">
                 <div>

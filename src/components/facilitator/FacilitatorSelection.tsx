@@ -2,13 +2,7 @@
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-
-interface Facilitator {
-  id: number;
-  name: string;
-  avatar: string;
-  description: string;
-}
+import { Facilitator } from "@/types/facilitator";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -50,9 +44,13 @@ export const FacilitatorSelection = ({ facilitators, selectedFacilitator, onSele
               }`}
               onClick={() => onSelect(facilitator.id)}
             >
-              <img src={facilitator.avatar} alt={facilitator.name} className="mx-auto mb-4 h-24 w-24 rounded-full" />
-              <h3 className="mb-2 text-lg font-semibold">{facilitator.name}</h3>
-              <p className="text-sm text-gray-600">{facilitator.description}</p>
+              <img 
+                src={facilitator.profile_picture} 
+                alt={facilitator.title} 
+                className="mx-auto mb-4 h-24 w-24 rounded-full" 
+              />
+              <h3 className="mb-2 text-lg font-semibold">{facilitator.title}</h3>
+              <p className="text-sm text-gray-600">{facilitator.details}</p>
             </div>
           ))}
           {startIndex + itemsToShow >= facilitators.length && (
@@ -78,10 +76,10 @@ export const FacilitatorSelection = ({ facilitators, selectedFacilitator, onSele
       {selectedFacilitator && (
         <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <h3 className="mb-2 text-lg font-semibold">
-            {facilitators.find(f => f.id === selectedFacilitator)?.name}
+            {facilitators.find(f => f.id === selectedFacilitator)?.title}
           </h3>
           <p className="text-gray-600">
-            {facilitators.find(f => f.id === selectedFacilitator)?.description}
+            {facilitators.find(f => f.id === selectedFacilitator)?.details}
           </p>
         </div>
       )}

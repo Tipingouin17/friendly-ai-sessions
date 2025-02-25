@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
-import { Step, Facilitator, Workshop } from "@/types/facilitator";
+import { Step } from "@/types/facilitator";
 import { Stepper } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -122,8 +122,13 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        // Redirect to the session page using the conversation ID
-        navigate(`/session/${data.id}`);
+        // Instead of redirecting, navigate to the session page with state
+        navigate('/session', { 
+          state: { 
+            newConversationId: data.id,
+            replace: true
+          } 
+        });
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error);

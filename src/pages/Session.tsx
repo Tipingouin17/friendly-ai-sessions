@@ -1,15 +1,13 @@
-
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 
-// Define participant colors for visual distinction
 const participantColors = {
   P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
   P5: "#6EE7B7", P6: "#5EEAD4", P7: "#67E8F9", P8: "#7DD3FC",
@@ -42,8 +40,8 @@ const fetchConversation = async (id: number) => {
 };
 
 const Session = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentParticipant, setCurrentParticipant] = useState(1);
@@ -51,11 +49,24 @@ const Session = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const state = location.state as { newConversationId?: number; replace?: boolean } | null;
+    if (state?.newConversationId && state.replace) {
+      setCurrentConversationId(state.newConversationId);
+      setMessages([]);
+      setWelcomeMessageSent(false);
+      setParticipantMessages({});
+      window.history.replaceState({}, '');
+      queryClient.invalidateQueries({ queryKey: ['conversation', state.newConversationId] });
+    }
+  }, [location.state, queryClient]);
 
   const { data: conversation, isLoading, error } = useQuery({
-    queryKey: ['conversation', id],
-    queryFn: () => fetchConversation(Number(id)),
-    enabled: !!id
+    queryKey: ['conversation', currentConversationId],
+    queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
+    enabled: !!currentConversationId
   });
 
   useEffect(() => {
@@ -89,14 +100,12 @@ const Session = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
-    // Save the current participant's message
     const currentParticipantKey = `P${currentParticipant}`;
     setParticipantMessages(prev => ({
       ...prev,
       [currentParticipantKey]: inputMessage
     }));
 
-    // Check if all participants have provided input
     const updatedMessages = {
       ...participantMessages,
       [currentParticipantKey]: inputMessage
@@ -105,7 +114,6 @@ const Session = () => {
     const allParticipantsResponded = Object.keys(updatedMessages).length === totalParticipants;
 
     if (allParticipantsResponded) {
-      // Create messages for all participants
       const participantResponses: Message[] = Object.entries(updatedMessages).map(([participant, content], index) => ({
         id: Date.now().toString() + index,
         content,
@@ -115,11 +123,9 @@ const Session = () => {
         color: participantColors[participant as keyof typeof participantColors]
       }));
 
-      // Add participant messages to the UI
       setMessages(prev => [...prev, ...participantResponses]);
 
       try {
-        // Prepare messages for the AI
         const messagesForAI = participantResponses.map(msg => ({
           role: "user",
           content: msg.content,
@@ -129,12 +135,10 @@ const Session = () => {
           facilitator_id: conversation?.sessions?.facilitator
         }));
 
-        // Save participant messages to the database
         await supabase
           .from('messages')
           .insert(messagesForAI);
 
-        // Get AI response
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
             messages: [...messages, ...messagesForAI],
@@ -144,7 +148,6 @@ const Session = () => {
 
         if (response.error) throw new Error(response.error.message);
 
-        // Add AI response to the UI
         const aiResponse: Message = {
           id: response.data.id,
           content: response.data.content,
@@ -161,10 +164,8 @@ const Session = () => {
         });
       }
 
-      // Clear all participant messages
       setParticipantMessages({});
     } else {
-      // Move to next participant
       const nextParticipant = currentParticipant < totalParticipants ? currentParticipant + 1 : 1;
       setCurrentParticipant(nextParticipant);
     }
@@ -178,6 +179,18 @@ const Session = () => {
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-lg p-8">
             Loading...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!conversation) {
+    return (
+      <div className="min-h-screen pt-16 bg-[#FFC107]/10">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-lg p-8">
+            Please start a new conversation from the facilitators page.
           </div>
         </div>
       </div>

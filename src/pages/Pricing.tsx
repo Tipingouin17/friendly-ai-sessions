@@ -1,8 +1,8 @@
-
 import { Check, X, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface Plan {
   id: number;
@@ -26,6 +26,7 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 
 const Pricing = () => {
+  const navigate = useNavigate();
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
@@ -48,6 +49,10 @@ const Pricing = () => {
       </div>
     );
   }
+
+  const handleContactUs = () => {
+    navigate('/contact');
+  };
 
   const allFeatures = [
     'no_of_facilitator',
@@ -100,8 +105,14 @@ const Pricing = () => {
               <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
               <p className="text-muted-foreground mb-4">{plan.plan_type}</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold">${plan.price}</span>
-                <span className="text-muted-foreground">/month</span>
+                {plan.title === "Enterprise" ? (
+                  <span className="text-2xl font-bold">Custom Pricing</span>
+                ) : (
+                  <>
+                    <span className="text-4xl font-bold">${plan.price}</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </>
+                )}
               </div>
               <ul className="space-y-4 mb-8">
                 {(plan.plan_details as string[])?.map((feature, index) => (
@@ -114,8 +125,9 @@ const Pricing = () => {
               <Button 
                 className="w-full" 
                 variant={plan.is_popular ? "default" : "outline"}
+                onClick={plan.title === "Enterprise" ? handleContactUs : undefined}
               >
-                Get Started
+                {plan.title === "Enterprise" ? "Contact Us" : "Get Started"}
               </Button>
             </div>
           ))}
@@ -137,7 +149,9 @@ const Pricing = () => {
                       }`}
                     >
                       <span className="block text-lg font-semibold text-gray-900">{plan.title}</span>
-                      <span className="block text-sm text-gray-500 mt-1">{plan.plan_type}</span>
+                      <span className="block text-sm text-gray-500 mt-1">
+                        {plan.title === "Enterprise" ? "Custom Pricing" : `$${plan.price}/month`}
+                      </span>
                     </th>
                   ))}
                 </tr>

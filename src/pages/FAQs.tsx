@@ -1,5 +1,7 @@
 
 import { ChevronDown } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Accordion,
   AccordionContent,
@@ -7,29 +9,38 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
+interface FAQ {
+  id: number;
+  title: string;
+  description: string;
+  status: boolean;
+}
+
 const FAQs = () => {
-  const faqs = [
-    {
-      question: "What is AI Facilitation?",
-      answer: "AI Facilitation combines artificial intelligence with traditional facilitation methods to provide personalized guidance and support. Our AI facilitators are designed to understand your unique needs and adapt their approach accordingly."
-    },
-    {
-      question: "How does the free trial work?",
-      answer: "You can start your free trial immediately without any credit card required. This gives you full access to our AI facilitation platform for a limited time, allowing you to experience the benefits firsthand."
-    },
-    {
-      question: "Is my data secure?",
-      answer: "Yes, we take data security very seriously. All communications with our AI facilitators are encrypted, and we follow strict privacy protocols to ensure your information remains confidential."
-    },
-    {
-      question: "Can I customize my AI facilitator?",
-      answer: "Absolutely! Our AI facilitators can be customized to match your specific needs, preferences, and goals. You can adjust their communication style, focus areas, and more."
-    },
-    {
-      question: "What types of sessions are available?",
-      answer: "We offer a wide range of session types including personal development, business strategy, team facilitation, creative workshops, and more. Each type is tailored to achieve specific outcomes."
+  const { data: faqs = [], isLoading } = useQuery({
+    queryKey: ['faqs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('faqs')
+        .select('*')
+        .eq('status', true)
+        .order('id', { ascending: true });
+      
+      if (error) throw error;
+      return data;
     }
-  ];
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <h1 className="text-4xl font-bold text-center mb-8">Frequently Asked Questions</h1>
+          <p className="text-lg text-muted-foreground text-center">Loading FAQs...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -40,17 +51,23 @@ const FAQs = () => {
         </p>
         
         <Accordion type="single" collapsible className="w-full">
-          {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
+          {faqs.map((faq) => (
+            <AccordionItem key={faq.id} value={`item-${faq.id}`}>
               <AccordionTrigger className="text-left">
-                {faq.question}
+                {faq.title}
               </AccordionTrigger>
               <AccordionContent>
-                {faq.answer}
+                {faq.description}
               </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
+
+        {faqs.length === 0 && (
+          <p className="text-center text-muted-foreground mt-8">
+            No FAQs available at the moment.
+          </p>
+        )}
       </div>
     </div>
   );

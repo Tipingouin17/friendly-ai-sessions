@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
+import { Button } from "@/components/ui/button";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

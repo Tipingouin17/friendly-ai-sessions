@@ -53,9 +53,9 @@ const SessionContainer = ({
   }));
 
   return (
-    <div className="min-h-screen pt-16 bg-[#FFC107]/10">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white">
+      <div className="container mx-auto h-screen max-w-4xl flex flex-col pt-16">
+        <div className="flex-1 bg-white rounded-t-3xl shadow-lg overflow-hidden flex flex-col">
           <ChatHeader 
             title={facilitator?.title}
             objective={objective}
@@ -69,19 +69,21 @@ const SessionContainer = ({
             messages={transformedMessages} 
             participantColors={participantColors}
           />
-          <ParticipantSelector
-            participantCount={participantCount}
-            currentParticipant={currentParticipant}
-            onParticipantSwitch={onParticipantSwitch}
-            participantNames={participantNames}
-          />
-          <ChatInput
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            onSendMessage={onSendMessage}
-            isRecording={isRecording}
-            setIsRecording={setIsRecording}
-          />
+          <div className="border-t border-gray-100 bg-white/80 backdrop-blur-sm">
+            <ParticipantSelector
+              participantCount={participantCount}
+              currentParticipant={currentParticipant}
+              onParticipantSwitch={onParticipantSwitch}
+              participantNames={participantNames}
+            />
+            <ChatInput
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              onSendMessage={onSendMessage}
+              isRecording={isRecording}
+              setIsRecording={setIsRecording}
+            />
+          </div>
         </div>
       </div>
     </div>

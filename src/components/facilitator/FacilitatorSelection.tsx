@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";
+import { CreateFacilitatorModal } from "./CreateFacilitatorModal";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -18,6 +19,7 @@ export const FacilitatorSelection = ({
   isLoading = false 
 }: FacilitatorSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const itemsToShow = 4;
 
   const handlePrevious = () => {
@@ -63,14 +65,15 @@ export const FacilitatorSelection = ({
               <p className="text-sm text-gray-600">{facilitator.details}</p>
             </div>
           ))}
-          {startIndex + itemsToShow >= facilitators.length && (
-            <div className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all">
-              <div className="text-center">
-                <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
-                <span className="text-sm text-gray-600">Add New Facilitator</span>
-              </div>
+          <div 
+            className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <div className="text-center">
+              <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
+              <span className="text-sm text-gray-600">Add New Facilitator</span>
             </div>
-          )}
+          </div>
         </div>
 
         <Button
@@ -93,6 +96,15 @@ export const FacilitatorSelection = ({
           </p>
         </div>
       )}
+
+      <CreateFacilitatorModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        onSuccess={() => {
+          // This will trigger a refetch of the facilitators list
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

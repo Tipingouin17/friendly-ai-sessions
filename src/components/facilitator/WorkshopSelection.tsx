@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Workshop } from "@/types/facilitator";
+import { CreateWorkshopModal } from "./CreateWorkshopModal";
 
 interface WorkshopSelectionProps {
   workshops: Workshop[];
@@ -18,6 +19,7 @@ export const WorkshopSelection = ({
   isLoading = false 
 }: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const itemsToShow = 4;
 
   const handlePrevious = () => {
@@ -76,14 +78,15 @@ export const WorkshopSelection = ({
               </div>
             </div>
           ))}
-          {startIndex + itemsToShow >= workshops.length && (
-            <div className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all">
-              <div className="text-center">
-                <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
-                <span className="text-sm text-gray-600">Add New Workshop</span>
-              </div>
+          <div 
+            className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <div className="text-center">
+              <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
+              <span className="text-sm text-gray-600">Add New Workshop</span>
             </div>
-          )}
+          </div>
         </div>
 
         <Button
@@ -106,6 +109,16 @@ export const WorkshopSelection = ({
           </p>
         </div>
       )}
+
+      <CreateWorkshopModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        facilitatorId={workshops[0]?.facilitator || 0}
+        onSuccess={() => {
+          // This will trigger a refetch of the workshops list
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

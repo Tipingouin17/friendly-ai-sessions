@@ -1,14 +1,13 @@
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import ChatHeader from "@/components/chat/ChatHeader";
-import MessageList from "@/components/chat/MessageList";
-import ChatInput from "@/components/chat/ChatInput";
-import { Button } from "@/components/ui/button";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
+import LoadingState from "@/components/session/LoadingState";
+import EmptyState from "@/components/session/EmptyState";
+import SessionContainer from "@/components/session/SessionContainer";
 
 const participantColors = {
   P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
@@ -54,11 +53,9 @@ const Session = () => {
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
 
-  // Initialize conversation ID from location state
   useEffect(() => {
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
     
-    // Check if we have a conversation ID in the state
     if (state?.newConversationId) {
       setCurrentConversationId(state.newConversationId);
       if (state.replace) {
@@ -69,7 +66,6 @@ const Session = () => {
         queryClient.invalidateQueries({ queryKey: ['conversation', state.newConversationId] });
       }
     } else {
-      // If there's no conversation ID in state, check if we have one in the URL
       const params = new URLSearchParams(location.search);
       const conversationId = params.get('id');
       if (conversationId) {
@@ -78,7 +74,6 @@ const Session = () => {
     }
   }, [location, queryClient]);
 
-  // Query for conversation data
   const { data: conversation, isLoading, error } = useQuery({
     queryKey: ['conversation', currentConversationId],
     queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
@@ -190,73 +185,28 @@ const Session = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen pt-16 bg-[#FFC107]/10">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-3xl shadow-lg p-8">
-            Loading...
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (!conversation || !currentConversationId) {
-    return (
-      <div className="min-h-screen pt-16 bg-[#FFC107]/10">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-3xl shadow-lg p-8">
-            <div className="text-center">
-              <p className="text-lg mb-4">No active conversation found.</p>
-              <Button onClick={() => navigate('/my-facilitators')} className="bg-primary text-white">
-                Start a New Conversation
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <EmptyState />;
   }
 
   return (
-    <div className="min-h-screen pt-16 bg-[#FFC107]/10">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-          <ChatHeader 
-            title={conversation?.sessions?.facilitator?.title}
-            objective={conversation?.sessions?.objective}
-            profilePicture={conversation?.sessions?.facilitator?.profile_picture}
-            participantCount={conversation?.participants}
-          />
-          <MessageList 
-            messages={messages} 
-            participantColors={participantColors}
-          />
-          <div className="flex items-center justify-center gap-2 p-2 border-t">
-            {Array.from({ length: conversation?.participants || 1 }, (_, i) => i + 1).map((num) => (
-              <button
-                key={num}
-                onClick={() => handleParticipantSwitch(num)}
-                className={`px-3 py-1 rounded ${
-                  currentParticipant === num 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                P{num}
-              </button>
-            ))}
-          </div>
-          <ChatInput
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            onSendMessage={handleSendMessage}
-            isRecording={isRecording}
-            setIsRecording={setIsRecording}
-          />
-        </div>
-      </div>
-    </div>
+    <SessionContainer
+      facilitator={conversation.sessions.facilitator}
+      objective={conversation.sessions.objective}
+      participantCount={conversation.participants || 1}
+      messages={messages}
+      participantColors={participantColors}
+      currentParticipant={currentParticipant}
+      inputMessage={inputMessage}
+      isRecording={isRecording}
+      onParticipantSwitch={handleParticipantSwitch}
+      setInputMessage={setInputMessage}
+      onSendMessage={handleSendMessage}
+      setIsRecording={setIsRecording}
+    />
   );
 };
 

@@ -12,7 +12,12 @@ export const Navigation = () => {
             <Link to="/" className="text-xl font-bold text-primary">AI Facilitator</Link>
           </div>
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-600 hover:text-primary">My Facilitators</a>
+            <Link 
+              to="/my-facilitators" 
+              className={`${location.pathname === '/my-facilitators' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}
+            >
+              My Facilitators
+            </Link>
             <Link 
               to="/" 
               className={`${location.pathname === '/' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}

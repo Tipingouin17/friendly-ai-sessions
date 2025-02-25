@@ -4,7 +4,6 @@ import { Mic, Send, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { SpeechRecognition } from '@/types/chat';
 
 interface ChatInputProps {
   inputMessage: string;

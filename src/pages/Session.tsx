@@ -1,76 +1,31 @@
-import { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Message } from "@/types/chat";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useConversation } from "@/hooks/useConversation";
+import { useSessionState } from "@/hooks/useSessionState";
+import { participantColors } from "@/utils/sessionHelpers";
 import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
 import SessionContainer from "@/components/session/SessionContainer";
-
-const participantColors = {
-  P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
-  P5: "#6EE7B7", P6: "#5EEAD4", P7: "#67E8F9", P8: "#7DD3FC",
-};
-
-const fetchConversation = async (id: number) => {
-  console.log('Fetching conversation with ID:', id);
-  const { data, error } = await supabase
-    .from('conversations')
-    .select(`
-      *,
-      sessions:sessions_id (
-        id,
-        title,
-        objective,
-        welcome_message,
-        facilitator,
-        facilitator:facilitators (
-          id,
-          title,
-          profile_picture,
-          details
-        )
-      )
-    `)
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching conversation:', error);
-    throw error;
-  }
-  console.log('Fetched conversation:', data);
-  return data;
-};
 
 const Session = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [currentParticipant, setCurrentParticipant] = useState(1);
-  const [inputMessage, setInputMessage] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
-  const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
+  // Handle conversation ID from URL or state
   useEffect(() => {
-    console.log('Location state:', location.state);
-    console.log('Location search:', location.search);
-    
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
     
     if (state?.newConversationId) {
       console.log('Setting conversation ID from state:', state.newConversationId);
       setCurrentConversationId(state.newConversationId);
       if (state.replace) {
-        setMessages([]);
-        setWelcomeMessageSent(false);
-        setParticipantMessages({});
         window.history.replaceState({}, '');
         queryClient.invalidateQueries({ queryKey: ['conversation', state.newConversationId] });
       }
@@ -87,12 +42,16 @@ const Session = () => {
     }
   }, [location, queryClient, navigate]);
 
-  const { data: conversation, isLoading, error } = useQuery({
-    queryKey: ['conversation', currentConversationId],
-    queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
-    enabled: !!currentConversationId,
+  // Fetch conversation data
+  const { data: conversation, isLoading, error } = useConversation(currentConversationId);
+
+  // Initialize session state
+  const sessionState = useSessionState({
+    conversationId: currentConversationId,
+    welcomeMessage: conversation?.sessions?.welcome_message
   });
 
+  // Handle conversation fetch error
   useEffect(() => {
     if (error) {
       console.error('Error in conversation query:', error);
@@ -105,100 +64,34 @@ const Session = () => {
     }
   }, [error, navigate, toast]);
 
-  useEffect(() => {
-    if (conversation?.sessions?.welcome_message && !welcomeMessageSent) {
-      console.log('Setting welcome message:', conversation.sessions.welcome_message);
-      setMessages([{
-        id: Date.now().toString(),
-        content: conversation.sessions.welcome_message,
-        sender: "assistant",
-        timestamp: new Date(),
-      }]);
-      setWelcomeMessageSent(true);
-    }
-  }, [conversation, welcomeMessageSent]);
-
-  const handleParticipantSwitch = (participantNumber: number) => {
-    setCurrentParticipant(participantNumber);
-    setInputMessage(participantMessages[`P${participantNumber}`] || "");
-  };
-
-  const handleGenerateReport = async () => {
-    if (!currentConversationId) return;
-    
-    setIsGeneratingReport(true);
-    try {
-      const response = await supabase.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages,
-          conversationId: currentConversationId,
-          generateReport: true
-        }
-      });
-
-      if (response.error) {
-        console.error('Edge function error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate report');
-      }
-
-      if (!response.data) {
-        throw new Error('No response data received');
-      }
-
-      const reportResponse: Message = {
-        id: response.data.id || Date.now().toString(),
-        content: response.data.content,
-        sender: "assistant",
-        timestamp: new Date(),
-        isReport: true
-      };
-      
-      setMessages(prev => [...prev, reportResponse]);
-      
-      toast({
-        title: "Report Generated",
-        description: "The conversation report has been generated successfully.",
-      });
-
-    } catch (error) {
-      console.error('Error generating report:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate the report. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingReport(false);
-    }
-  };
-
+  // Handle message sending
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !currentConversationId) return;
+    if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
-    const currentParticipantKey = `P${currentParticipant}`;
-    setParticipantMessages(prev => ({
+    const currentParticipantKey = `P${sessionState.currentParticipant}`;
+    sessionState.setParticipantMessages(prev => ({
       ...prev,
-      [currentParticipantKey]: inputMessage
+      [currentParticipantKey]: sessionState.inputMessage
     }));
 
     const updatedMessages = {
-      ...participantMessages,
-      [currentParticipantKey]: inputMessage
+      ...sessionState.participantMessages,
+      [currentParticipantKey]: sessionState.inputMessage
     };
     const totalParticipants = conversation?.participants || 1;
     const allParticipantsResponded = Object.keys(updatedMessages).length === totalParticipants;
 
     if (allParticipantsResponded) {
-      const participantResponses: Message[] = Object.entries(updatedMessages).map(([participant, content], index) => ({
+      const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => ({
         id: Date.now().toString() + index,
         content,
-        sender: "user",
+        sender: "user" as const,
         participant,
         timestamp: new Date(),
         color: participantColors[participant as keyof typeof participantColors]
       }));
 
-      setMessages(prev => [...prev, ...participantResponses]);
+      sessionState.setMessages(prev => [...prev, ...participantResponses]);
 
       try {
         const messagesForAI = participantResponses.map(msg => ({
@@ -210,33 +103,25 @@ const Session = () => {
           facilitator_id: conversation?.sessions?.facilitator?.id || null
         }));
 
-        await supabase
-          .from('messages')
-          .insert(messagesForAI);
+        await supabase.from('messages').insert(messagesForAI);
 
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
-            messages: [...messages, ...messagesForAI],
+            messages: [...sessionState.messages, ...messagesForAI],
             conversationId: currentConversationId
           }
         });
 
-        if (response.error) {
-          console.error('Edge function error:', response.error);
-          throw new Error(response.error.message || 'Failed to get AI response');
-        }
+        if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
+        if (!response.data) throw new Error('No response data received from AI');
 
-        if (!response.data) {
-          throw new Error('No response data received from AI');
-        }
-
-        const aiResponse: Message = {
+        const aiResponse = {
           id: response.data.id || Date.now().toString(),
           content: response.data.content,
-          sender: "assistant",
+          sender: "assistant" as const,
           timestamp: new Date(),
         };
-        setMessages(prev => [...prev, aiResponse]);
+        sessionState.setMessages(prev => [...prev, aiResponse]);
       } catch (error) {
         console.error('Error getting AI response:', error);
         toast({
@@ -246,42 +131,35 @@ const Session = () => {
         });
       }
 
-      setParticipantMessages({});
+      sessionState.setParticipantMessages({});
     } else {
-      const nextParticipant = currentParticipant < totalParticipants ? currentParticipant + 1 : 1;
-      setCurrentParticipant(nextParticipant);
+      const nextParticipant = sessionState.currentParticipant < totalParticipants ? 
+        sessionState.currentParticipant + 1 : 1;
+      sessionState.setCurrentParticipant(nextParticipant);
     }
 
-    setInputMessage("");
+    sessionState.setInputMessage("");
   };
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (!conversation || !currentConversationId) {
-    console.log('No conversation found, showing empty state');
-    console.log('Current conversation:', conversation);
-    console.log('Current conversation ID:', currentConversationId);
-    return <EmptyState />;
-  }
+  if (isLoading) return <LoadingState />;
+  if (!conversation || !currentConversationId) return <EmptyState />;
 
   return (
     <SessionContainer
       facilitator={conversation.sessions.facilitator}
       objective={conversation.sessions.objective}
       participantCount={conversation.participants || 1}
-      messages={messages}
+      messages={sessionState.messages}
       participantColors={participantColors}
-      currentParticipant={currentParticipant}
-      inputMessage={inputMessage}
-      isRecording={isRecording}
-      onParticipantSwitch={handleParticipantSwitch}
-      setInputMessage={setInputMessage}
+      currentParticipant={sessionState.currentParticipant}
+      inputMessage={sessionState.inputMessage}
+      isRecording={sessionState.isRecording}
+      onParticipantSwitch={sessionState.setCurrentParticipant}
+      setInputMessage={sessionState.setInputMessage}
       onSendMessage={handleSendMessage}
-      setIsRecording={setIsRecording}
-      onGenerateReport={handleGenerateReport}
-      isGeneratingReport={isGeneratingReport}
+      setIsRecording={sessionState.setIsRecording}
+      onGenerateReport={sessionState.handleGenerateReport}
+      isGeneratingReport={sessionState.isGeneratingReport}
     />
   );
 };

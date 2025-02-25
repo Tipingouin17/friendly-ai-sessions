@@ -79,7 +79,7 @@ const MyFacilitators = () => {
               {steps.map(({ step, title }) => (
                 <StepperItem
                   key={step}
-                  step={step - 1}
+                  step={step}
                   className="[&:not(:last-child)]:flex-1"
                 >
                   <StepperTrigger>

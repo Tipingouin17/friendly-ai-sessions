@@ -7,9 +7,10 @@ import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelect
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { Step, Facilitator, Workshop } from "@/types/facilitator";
-import { Stepper, StepperIndicator, StepperItem, StepperSeparator, StepperTitle, StepperTrigger } from "@/components/ui/stepper";
+import { Stepper } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
 
 const steps = [{
   step: 1,
@@ -56,6 +57,7 @@ const MyFacilitators = () => {
   const [language, setLanguage] = useState("English");
   const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useQuery({
     queryKey: ['facilitators'],
@@ -84,7 +86,16 @@ const MyFacilitators = () => {
   };
 
   const handleSubmit = async () => {
-    if (selectedFacilitator && selectedWorkshop) {
+    try {
+      if (!selectedWorkshop) {
+        toast({
+          title: "Error",
+          description: "Please select a workshop",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('conversations')
         .insert({
@@ -99,54 +110,78 @@ const MyFacilitators = () => {
         .select()
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.error('Error creating conversation:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create conversation. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data) {
+        toast({
+          title: "Success",
+          description: "Session created successfully!",
+        });
         navigate(`/session/${data.id}`);
       }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-4xl font-bold text-center mb-4">Select Your AI Facilitator</h1>
-        <p className="text-lg text-muted-foreground text-center mb-12">
-          Choose a facilitator and workshop type to begin your session
-        </p>
-
+    <div className="min-h-screen pt-16 bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <div className="mb-8">
-            <Stepper value={currentStep - 1} onValueChange={step => setCurrentStep(step + 1 as Step)} className="max-w-2xl mx-auto">
-              {steps.map(({ step, title }) => (
-                <StepperItem key={step} step={step - 1} className="[&:not(:last-child)]:flex-1">
-                  <StepperTrigger>
-                    <StepperIndicator />
-                    <StepperTitle>{title}</StepperTitle>
-                  </StepperTrigger>
-                  {step < steps.length && <StepperSeparator />}
-                </StepperItem>
-              ))}
-            </Stepper>
-          </div>
+          <Stepper value={currentStep} className="mb-8">
+            {steps.map((step, index) => (
+              <div key={step.step} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    step.step <= currentStep
+                      ? "bg-primary text-white"
+                      : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {step.step}
+                </div>
+                <span className="ml-3 text-sm font-medium">{step.title}</span>
+                {index < steps.length - 1 && (
+                  <div className="flex-1 h-px bg-gray-200 mx-4" />
+                )}
+              </div>
+            ))}
+          </Stepper>
 
-          <div className="mb-8">
+          <div className="space-y-8">
             {currentStep === 1 && (
-              <FacilitatorSelection 
-                facilitators={facilitators} 
-                selectedFacilitator={selectedFacilitator} 
-                onSelect={setSelectedFacilitator} 
+              <FacilitatorSelection
+                facilitators={facilitators}
+                selectedFacilitator={selectedFacilitator}
+                setSelectedFacilitator={setSelectedFacilitator}
+                isLoading={isFacilitatorsLoading}
               />
             )}
 
             {currentStep === 2 && (
-              <WorkshopSelection 
-                workshops={workshops} 
-                selectedWorkshop={selectedWorkshop} 
-                onSelect={setSelectedWorkshop} 
+              <WorkshopSelection
+                workshops={workshops}
+                selectedWorkshop={selectedWorkshop}
+                setSelectedWorkshop={setSelectedWorkshop}
+                isLoading={isWorkshopsLoading}
               />
             )}
 
             {currentStep === 3 && (
-              <WorkshopSetup 
+              <WorkshopSetup
                 participantCount={participantCount}
                 setParticipantCount={setParticipantCount}
                 description={description}
@@ -159,21 +194,33 @@ const MyFacilitators = () => {
             )}
           </div>
 
-          <div className="flex justify-between">
-            {currentStep > 1 ? (
-              <Button variant="outline" onClick={handlePrevious}>
-                <ChevronLeft className="w-4 h-4 mr-2" /> Previous
-              </Button>
-            ) : (
-              <div></div>
-            )}
+          <div className="flex justify-between mt-8">
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              disabled={currentStep === 1}
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Previous
+            </Button>
+
             {currentStep < 3 ? (
-              <Button onClick={handleNext}>
-                Next <ChevronRight className="w-4 h-4 ml-2" />
+              <Button
+                onClick={handleNext}
+                disabled={
+                  (currentStep === 1 && !selectedFacilitator) ||
+                  (currentStep === 2 && !selectedWorkshop)
+                }
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={!agreed}>
-                Let's Begin!
+              <Button
+                onClick={handleSubmit}
+                disabled={!agreed || !description.trim()}
+              >
+                Start Session
               </Button>
             )}
           </div>

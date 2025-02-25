@@ -4,12 +4,12 @@ import { Link } from "react-router-dom";
 export const Footer = () => {
   return (
     <footer className="bg-white border-t border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
-            <h3 className="font-semibold mb-4">About Us</h3>
+            <h3 className="font-semibold mb-4">About</h3>
             <p className="text-sm text-gray-600">
-              AI Facilitator helps teams and individuals achieve their goals through innovative AI-powered facilitation.
+              AI Facilitator helps teams achieve their goals through AI-powered facilitation.
             </p>
           </div>
           <div>
@@ -26,29 +26,9 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/faqs" className="text-sm text-gray-600 hover:text-primary">
-                  FAQs
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-4">Support</h3>
-            <ul className="space-y-2">
-              <li>
                 <Link to="/contact" className="text-sm text-gray-600 hover:text-primary">
-                  Contact Us
+                  Contact
                 </Link>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-primary">
-                  Help Center
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-primary">
-                  Privacy Policy
-                </a>
               </li>
             </ul>
           </div>
@@ -65,15 +45,10 @@ export const Footer = () => {
                   LinkedIn
                 </a>
               </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-primary">
-                  Facebook
-                </a>
-              </li>
             </ul>
           </div>
         </div>
-        <div className="mt-8 pt-8 border-t border-gray-100">
+        <div className="mt-8 pt-4 border-t border-gray-100">
           <p className="text-center text-sm text-gray-600">
             © {new Date().getFullYear()} AI Facilitator. All rights reserved.
           </p>

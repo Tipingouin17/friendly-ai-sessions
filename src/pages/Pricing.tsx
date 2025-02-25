@@ -1,5 +1,5 @@
 
-import { Check } from "lucide-react";
+import { Check, X, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ interface Plan {
   price: number;
   plan_type: string;
   plan_details: string[];
+  plan_table_details: Record<string, boolean | string | number>;
   is_popular: boolean;
   stripe_plan_id: string;
 }
@@ -38,6 +39,29 @@ const Pricing = () => {
     );
   }
 
+  const allFeatures = new Set<string>();
+  plans.forEach((plan) => {
+    if (plan.plan_table_details) {
+      Object.keys(plan.plan_table_details).forEach((feature) => {
+        allFeatures.add(feature);
+      });
+    }
+  });
+
+  const renderValue = (value: boolean | string | number | null) => {
+    if (typeof value === 'boolean') {
+      return value ? (
+        <Check className="h-5 w-5 text-primary mx-auto" />
+      ) : (
+        <X className="h-5 w-5 text-gray-300 mx-auto" />
+      );
+    }
+    if (value === null || value === undefined) {
+      return <Minus className="h-5 w-5 text-gray-300 mx-auto" />;
+    }
+    return <span className="text-center">{value}</span>;
+  };
+
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="max-w-7xl mx-auto px-4">
@@ -46,7 +70,7 @@ const Pricing = () => {
           Choose the perfect plan for your needs
         </p>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-8 mb-16">
           {plans.map((plan) => (
             <div 
               key={plan.id} 
@@ -84,6 +108,41 @@ const Pricing = () => {
               </Button>
             </div>
           ))}
+        </div>
+
+        {/* Comparison Table */}
+        <div className="mt-16">
+          <h2 className="text-3xl font-bold text-center mb-8">Compare Plans</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse bg-white rounded-lg overflow-hidden">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="py-4 px-6 text-left font-medium text-gray-500">Features</th>
+                  {plans.map((plan) => (
+                    <th key={plan.id} className="py-4 px-6 text-center font-medium text-gray-500">
+                      {plan.title}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {Array.from(allFeatures).map((feature) => (
+                  <tr key={feature} className="hover:bg-gray-50">
+                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                      {feature.split('_').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ')}
+                    </td>
+                    {plans.map((plan) => (
+                      <td key={`${plan.id}-${feature}`} className="py-4 px-6 text-sm text-gray-500">
+                        {renderValue(plan.plan_table_details?.[feature])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

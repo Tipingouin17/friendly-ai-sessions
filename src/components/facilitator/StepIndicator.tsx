@@ -9,41 +9,47 @@ interface StepIndicatorProps {
 
 export const StepIndicator = ({ currentStep }: StepIndicatorProps) => {
   return (
-    <div className="flex flex-col gap-8 max-w-xl mx-auto mb-12">
+    <div className="flex flex-col gap-12 max-w-2xl mx-auto mb-16">
       <div className={cn(
-        "flex items-center gap-4",
-        currentStep >= 1 ? "text-[#FFC107]" : "text-gray-400"
+        "flex items-center gap-6",
+        currentStep >= 1 ? "text-[#FFB800]" : "text-gray-400"
       )}>
-        <div className="w-16 h-16 rounded-full bg-[#FFC107] text-white flex items-center justify-center text-2xl font-semibold">
+        <div className={cn(
+          "w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold",
+          currentStep >= 1 ? "bg-[#FFB800]" : "bg-gray-200",
+          "text-white"
+        )}>
           1
         </div>
-        <span className="text-2xl font-semibold">Choose your facilitator</span>
+        <span className="text-3xl font-semibold">Choose your facilitator</span>
       </div>
 
       <div className={cn(
-        "flex items-center gap-4",
-        currentStep >= 2 ? "text-[#FFC107]" : "text-gray-400"
+        "flex items-center gap-6",
+        currentStep >= 2 ? "text-[#FFB800]" : "text-gray-400"
       )}>
         <div className={cn(
-          "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold",
-          currentStep >= 2 ? "bg-[#FFC107] text-white" : "bg-gray-200 text-gray-400"
+          "w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold",
+          currentStep >= 2 ? "bg-[#FFB800]" : "bg-gray-200",
+          currentStep >= 2 ? "text-white" : "text-gray-400"
         )}>
           2
         </div>
-        <span className="text-2xl font-semibold">Select workshop type</span>
+        <span className="text-3xl font-semibold">Select workshop type</span>
       </div>
 
       <div className={cn(
-        "flex items-center gap-4",
-        currentStep >= 3 ? "text-[#FFC107]" : "text-gray-400"
+        "flex items-center gap-6",
+        currentStep >= 3 ? "text-[#FFB800]" : "text-gray-400"
       )}>
         <div className={cn(
-          "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold",
-          currentStep >= 3 ? "bg-[#FFC107] text-white" : "bg-gray-200 text-gray-400"
+          "w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold",
+          currentStep >= 3 ? "bg-[#FFB800]" : "bg-gray-200",
+          currentStep >= 3 ? "text-white" : "text-gray-400"
         )}>
           3
         </div>
-        <span className="text-2xl font-semibold">Describe participants</span>
+        <span className="text-3xl font-semibold">Describe participants</span>
       </div>
     </div>
   );

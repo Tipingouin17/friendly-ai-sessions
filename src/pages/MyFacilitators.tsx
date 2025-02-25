@@ -37,17 +37,17 @@ const MyFacilitators = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-4xl font-bold text-center mb-4">MyFacilitator</h1>
-        <p className="text-lg text-muted-foreground text-center mb-12">
+    <div className="min-h-screen pt-24 pb-16 bg-[#FEF7E4]">
+      <div className="max-w-5xl mx-auto px-4">
+        <h1 className="text-5xl font-bold text-center mb-6">MyFacilitator</h1>
+        <p className="text-xl text-gray-600 text-center mb-16">
           Follow these simple steps to set up your workshop session
         </p>
 
         <StepIndicator currentStep={currentStep} />
 
-        <div className="bg-white rounded-3xl shadow-lg p-8">
-          <div className="mb-8">
+        <div className="bg-white rounded-[2rem] shadow-lg p-10">
+          <div className="mb-10">
             {currentStep === 1 && (
               <FacilitatorSelection
                 facilitators={facilitators}
@@ -80,18 +80,29 @@ const MyFacilitators = () => {
 
           <div className="flex justify-between">
             {currentStep > 1 ? (
-              <Button variant="outline" onClick={handlePrevious}>
-                <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+              <Button 
+                variant="outline" 
+                onClick={handlePrevious}
+                className="text-lg px-6 py-3 h-auto"
+              >
+                <ChevronLeft className="w-5 h-5 mr-2" /> Previous
               </Button>
             ) : (
               <div></div>
             )}
             {currentStep < 3 ? (
-              <Button onClick={handleNext}>
-                Next <ChevronRight className="w-4 h-4 ml-2" />
+              <Button 
+                onClick={handleNext}
+                className="text-lg px-6 py-3 h-auto"
+              >
+                Next <ChevronRight className="w-5 h-5 ml-2" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={!agreed}>
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!agreed}
+                className="text-lg px-6 py-3 h-auto"
+              >
                 Let's Begin!
               </Button>
             )}

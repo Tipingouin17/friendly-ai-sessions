@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Json } from "@/integrations/supabase/types";
 
 interface Plan {
   id: number;
   title: string;
   price: number;
   plan_type: string;
-  plan_details: string[];
-  plan_table_details: Record<string, boolean | string | number>;
+  plan_details: Json;
+  plan_table_details: Json;
   is_popular: boolean;
   stripe_plan_id: string;
 }
@@ -24,6 +25,25 @@ const FEATURE_LABELS: Record<string, string> = {
   saved_sessions: "Save Sessions",
   session_reports: "Session Reports",
   data_export: "Data Export"
+};
+
+const allFeatures = Object.keys(FEATURE_LABELS);
+
+const renderValue = (value: boolean | string | number | null | undefined) => {
+  if (typeof value === 'boolean') {
+    return value ? (
+      <Check className="h-5 w-5 text-primary mx-auto" />
+    ) : (
+      <X className="h-5 w-5 text-muted-foreground mx-auto" />
+    );
+  }
+  if (value === 'unlimited' || value === 'Unlimited') {
+    return '∞';
+  }
+  if (value === null || value === undefined) {
+    return <Minus className="h-5 w-5 text-muted-foreground mx-auto" />;
+  }
+  return value;
 };
 
 const Pricing = () => {

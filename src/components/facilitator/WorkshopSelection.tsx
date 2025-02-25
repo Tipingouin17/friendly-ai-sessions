@@ -8,9 +8,15 @@ interface WorkshopSelectionProps {
   workshops: Workshop[];
   selectedWorkshop: number | null;
   onSelect: (id: number) => void;
+  isLoading?: boolean;
 }
 
-export const WorkshopSelection = ({ workshops, selectedWorkshop, onSelect }: WorkshopSelectionProps) => {
+export const WorkshopSelection = ({ 
+  workshops, 
+  selectedWorkshop, 
+  onSelect,
+  isLoading = false 
+}: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 4;
 
@@ -21,6 +27,10 @@ export const WorkshopSelection = ({ workshops, selectedWorkshop, onSelect }: Wor
   const handleNext = () => {
     setStartIndex(Math.min(workshops.length - itemsToShow, startIndex + 1));
   };
+
+  if (isLoading) {
+    return <div>Loading workshops...</div>;
+  }
 
   return (
     <div className="relative">

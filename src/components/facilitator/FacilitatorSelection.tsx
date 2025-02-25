@@ -8,9 +8,15 @@ interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
   selectedFacilitator: number | null;
   onSelect: (id: number) => void;
+  isLoading?: boolean;
 }
 
-export const FacilitatorSelection = ({ facilitators, selectedFacilitator, onSelect }: FacilitatorSelectionProps) => {
+export const FacilitatorSelection = ({ 
+  facilitators, 
+  selectedFacilitator, 
+  onSelect,
+  isLoading = false 
+}: FacilitatorSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 4;
 
@@ -21,6 +27,10 @@ export const FacilitatorSelection = ({ facilitators, selectedFacilitator, onSele
   const handleNext = () => {
     setStartIndex(Math.min(facilitators.length - itemsToShow, startIndex + 1));
   };
+
+  if (isLoading) {
+    return <div>Loading facilitators...</div>;
+  }
 
   return (
     <div className="relative">

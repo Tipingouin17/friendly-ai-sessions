@@ -166,7 +166,7 @@ const MyFacilitators = () => {
               <FacilitatorSelection
                 facilitators={facilitators}
                 selectedFacilitator={selectedFacilitator}
-                setSelectedFacilitator={setSelectedFacilitator}
+                onSelect={setSelectedFacilitator}
                 isLoading={isFacilitatorsLoading}
               />
             )}
@@ -175,7 +175,7 @@ const MyFacilitators = () => {
               <WorkshopSelection
                 workshops={workshops}
                 selectedWorkshop={selectedWorkshop}
-                setSelectedWorkshop={setSelectedWorkshop}
+                onSelect={setSelectedWorkshop}
                 isLoading={isWorkshopsLoading}
               />
             )}

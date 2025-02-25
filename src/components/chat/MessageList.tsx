@@ -21,8 +21,8 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 bg-gradient-to-b from-gray-50 to-white">
-      <div className="space-y-4">
+    <div className="flex-1 overflow-y-auto">
+      <div className="px-4 py-6 space-y-4 min-h-full">
         {messages.map((message, index) => {
           const isFirstMessageOfGroup = index === 0 || 
             messages[index - 1].sender !== message.sender || 

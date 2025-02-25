@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
@@ -41,6 +42,7 @@ const fetchConversation = async (id: number) => {
 
 const Session = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -63,6 +65,7 @@ const Session = () => {
     }
   }, [location.state, queryClient]);
 
+  // Query for conversation data
   const { data: conversation, isLoading, error } = useQuery({
     queryKey: ['conversation', currentConversationId],
     queryFn: () => currentConversationId ? fetchConversation(currentConversationId) : null,
@@ -98,7 +101,7 @@ const Session = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !currentConversationId) return;
 
     const currentParticipantKey = `P${currentParticipant}`;
     setParticipantMessages(prev => ({
@@ -130,7 +133,7 @@ const Session = () => {
           role: "user",
           content: msg.content,
           name: msg.participant,
-          conversation_id: Number(id),
+          conversation_id: currentConversationId,
           user_id: null,
           facilitator_id: conversation?.sessions?.facilitator
         }));
@@ -142,7 +145,7 @@ const Session = () => {
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
             messages: [...messages, ...messagesForAI],
-            conversationId: Number(id)
+            conversationId: currentConversationId
           }
         });
 

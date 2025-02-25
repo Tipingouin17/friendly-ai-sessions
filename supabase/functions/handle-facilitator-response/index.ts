@@ -43,8 +43,6 @@ serve(async (req) => {
       throw new Error('Failed to fetch conversation configuration')
     }
 
-    console.log('Retrieved conversation config:', configData)
-
     // Get conversation and session details
     const { data: conversation, error: conversationError } = await supabaseClient
       .from('conversations')
@@ -56,10 +54,8 @@ serve(async (req) => {
           gpt_version,
           max_tokens,
           randomness,
-          facilitator,
           facilitator:facilitators (
-            id,
-            title
+            id
           )
         )
       `)
@@ -90,8 +86,6 @@ serve(async (req) => {
       }
     })
 
-    console.log('Formatted messages:', formattedMessages)
-
     // Get system prompt from conversation config or session
     const systemMessage = configData?.find(config => config.role === 'system')
     const systemPrompt = {
@@ -106,8 +100,6 @@ serve(async (req) => {
       temperature: Number(conversation.sessions.randomness) || 0.7,
       max_tokens: Number(conversation.sessions.max_tokens) || 1000,
     }
-
-    console.log('Sending request to OpenAI:', openAIBody)
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -132,14 +124,12 @@ serve(async (req) => {
       throw new Error('No response from AI')
     }
 
-    console.log('Received AI response:', aiData.choices[0].message)
-
     // Save the AI response to the database
     const newMessage = {
       content: aiData.choices[0].message.content,
       role: "assistant",
       conversation_id: conversationId,
-      facilitator_id: conversation.sessions.facilitator
+      facilitator_id: conversation.sessions.facilitator?.id || null
     }
 
     const { data: savedMessage, error: saveError } = await supabaseClient

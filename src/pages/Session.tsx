@@ -161,7 +161,8 @@ const Session = () => {
           name: msg.participant,
           conversation_id: currentConversationId,
           user_id: null,
-          facilitator_id: conversation?.sessions?.facilitator
+          // Make sure we only pass the facilitator ID, not the whole object
+          facilitator_id: conversation?.sessions?.facilitator?.id || null
         }));
 
         await supabase

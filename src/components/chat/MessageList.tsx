@@ -4,9 +4,10 @@ import { Message } from '@/types/chat';
 
 interface MessageListProps {
   messages: Message[];
+  participantColors?: {[key: string]: string};
 }
 
-const MessageList = ({ messages }: MessageListProps) => {
+const MessageList = ({ messages, participantColors = {} }: MessageListProps) => {
   return (
     <div className="h-[calc(100vh-400px)] overflow-y-auto p-6 space-y-4">
       {messages.map((message) => (
@@ -20,9 +21,19 @@ const MessageList = ({ messages }: MessageListProps) => {
             className={`max-w-[80%] p-4 rounded-2xl ${
               message.sender === "assistant"
                 ? "bg-accent text-accent-foreground"
-                : "bg-primary text-primary-foreground"
+                : "text-primary-foreground"
             }`}
+            style={{
+              backgroundColor: message.sender === "user" && message.participant 
+                ? participantColors[message.participant]
+                : undefined
+            }}
           >
+            {message.sender === "user" && message.participant && (
+              <div className="text-xs opacity-75 mb-1">
+                {message.participant}
+              </div>
+            )}
             {message.content}
           </div>
         </div>

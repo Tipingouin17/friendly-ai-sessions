@@ -1,7 +1,12 @@
 
 import React from 'react';
 
-const ChatHeader = () => {
+interface ChatHeaderProps {
+  title?: string;
+  objective?: string;
+}
+
+const ChatHeader = ({ title = "Serious Game Master", objective = "Mission Cohesion: Team Dynamics" }: ChatHeaderProps) => {
   return (
     <div className="p-6 border-b border-gray-100">
       <div className="flex items-center gap-4">
@@ -11,8 +16,8 @@ const ChatHeader = () => {
           className="w-12 h-12 rounded-full"
         />
         <div>
-          <h2 className="text-xl font-semibold">Serious Game Master</h2>
-          <p className="text-sm text-muted-foreground">Mission Cohesion: Team Dynamics</p>
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">{objective}</p>
         </div>
       </div>
     </div>

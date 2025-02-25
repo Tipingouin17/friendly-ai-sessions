@@ -51,7 +51,7 @@ export const FacilitatorSelection = ({
           {facilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => (
             <div
               key={facilitator.id}
-              className={`w-1/4 shrink-0 cursor-pointer rounded-xl border p-4 transition-all ${
+              className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
                 selectedFacilitator === facilitator.id ? 'border-primary' : 'border-gray-200'
               }`}
               onClick={() => onSelect(facilitator.id)}
@@ -59,19 +59,17 @@ export const FacilitatorSelection = ({
               <img 
                 src={facilitator.profile_picture} 
                 alt={facilitator.title} 
-                className="mx-auto mb-4 h-24 w-24 rounded-full" 
+                className="mb-4 h-24 w-24 rounded-full" 
               />
-              <h3 className="text-lg font-semibold text-center">{facilitator.title}</h3>
+              <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
             </div>
           ))}
           <div 
-            className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all"
+            className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
             onClick={() => setIsCreateModalOpen(true)}
           >
-            <div className="text-center">
-              <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
-              <span className="text-sm text-gray-600">Add New Facilitator</span>
-            </div>
+            <Plus className="mb-2 h-12 w-12 text-gray-400" />
+            <span className="text-center text-sm text-gray-600">Add New Facilitator</span>
           </div>
         </div>
 

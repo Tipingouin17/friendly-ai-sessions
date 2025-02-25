@@ -64,25 +64,23 @@ export const WorkshopSelection = ({
           {workshops.slice(startIndex, startIndex + itemsToShow).map((workshop) => (
             <div
               key={workshop.id}
-              className={`w-1/4 shrink-0 cursor-pointer rounded-xl border p-4 transition-all ${
+              className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
                 selectedWorkshop === workshop.id ? 'border-primary' : 'border-gray-200'
               }`}
               onClick={() => onSelect(workshop.id)}
             >
-              <div className="mb-4 flex justify-center">
+              <div className="mb-4">
                 {getIcon(workshop.icon_type)}
               </div>
-              <h3 className="text-lg font-semibold text-center">{workshop.title}</h3>
+              <h3 className="text-center text-lg font-semibold leading-tight">{workshop.title}</h3>
             </div>
           ))}
           <div 
-            className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all"
+            className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
             onClick={() => setIsCreateModalOpen(true)}
           >
-            <div className="text-center">
-              <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
-              <span className="text-sm text-gray-600">Add New Workshop</span>
-            </div>
+            <Plus className="mb-2 h-12 w-12 text-gray-400" />
+            <span className="text-center text-sm text-gray-600">Add New Workshop</span>
           </div>
         </div>
 

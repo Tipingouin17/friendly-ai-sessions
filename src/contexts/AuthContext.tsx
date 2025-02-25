@@ -1,58 +1,29 @@
 
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from '@/components/ui/use-toast';
+import { createContext, useContext, ReactNode } from 'react';
 import { User, AuthContextType } from '@/types/auth';
+
+const mockUser: User = {
+  id: '1',
+  email: 'demo@example.com',
+  name: 'Demo User',
+};
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const navigate = useNavigate();
-
-  const login = (email: string, password: string) => {
-    // This is a mock authentication - in a real app, you'd validate against a backend
-    if (email && password) {
-      setUser({
-        id: '1',
-        email,
-        name: email.split('@')[0],
-      });
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
-      navigate('/my-facilitators');
-    }
-  };
-
-  const signup = (email: string, password: string, name: string) => {
-    // This is a mock signup - in a real app, you'd create a user in your backend
-    if (email && password && name) {
-      setUser({
-        id: '1',
-        email,
-        name,
-      });
-      toast({
-        title: "Welcome!",
-        description: "Your account has been created successfully.",
-      });
-      navigate('/my-facilitators');
-    }
-  };
-
-  const logout = () => {
-    setUser(null);
-    toast({
-      title: "Logged out",
-      description: "You have been logged out successfully.",
-    });
-    navigate('/');
-  };
+  // Mock functions that do nothing since we're always "logged in"
+  const login = () => {};
+  const signup = () => {};
+  const logout = () => {};
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user: mockUser, 
+      login, 
+      signup, 
+      logout, 
+      isAuthenticated: true 
+    }}>
       {children}
     </AuthContext.Provider>
   );

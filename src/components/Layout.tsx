@@ -9,7 +9,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const hideFooterPaths = ['/my-facilitators'];
+  const hideFooterPaths = ['/my-facilitators', '/session'];
 
   return (
     <div className="min-h-screen flex flex-col">

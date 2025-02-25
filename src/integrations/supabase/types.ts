@@ -9,30 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      categories: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          icon: string | null
-          id: number
-          name: string
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: never
-          name: string
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: never
-          name?: string
-        }
-        Relationships: []
-      }
       configurations: {
         Row: {
           created_at: string | null
@@ -188,61 +164,40 @@ export type Database = {
       facilitators: {
         Row: {
           created_at: string | null
-          description: string | null
           details: string | null
-          expertise_level: string | null
           id: number
           is_promoted: boolean | null
-          languages: string[] | null
-          last_active: string | null
           lock: boolean | null
           order: number | null
           plan_id: number | null
           profile_picture: string | null
-          rating: number | null
-          specialties: string[] | null
           title: string | null
-          total_sessions: number | null
           user_id: string | null
           vst: string | null
         }
         Insert: {
           created_at?: string | null
-          description?: string | null
           details?: string | null
-          expertise_level?: string | null
           id?: number
           is_promoted?: boolean | null
-          languages?: string[] | null
-          last_active?: string | null
           lock?: boolean | null
           order?: number | null
           plan_id?: number | null
           profile_picture?: string | null
-          rating?: number | null
-          specialties?: string[] | null
           title?: string | null
-          total_sessions?: number | null
           user_id?: string | null
           vst?: string | null
         }
         Update: {
           created_at?: string | null
-          description?: string | null
           details?: string | null
-          expertise_level?: string | null
           id?: number
           is_promoted?: boolean | null
-          languages?: string[] | null
-          last_active?: string | null
           lock?: boolean | null
           order?: number | null
           plan_id?: number | null
           profile_picture?: string | null
-          rating?: number | null
-          specialties?: string[] | null
           title?: string | null
-          total_sessions?: number | null
           user_id?: string | null
           vst?: string | null
         }
@@ -279,50 +234,6 @@ export type Database = {
           title?: string | null
         }
         Relationships: []
-      }
-      feedback: {
-        Row: {
-          content: string | null
-          conversation_id: number | null
-          created_at: string | null
-          facilitator_knowledge: number | null
-          id: number
-          material_quality: number | null
-          rating: number | null
-          session_pace: number | null
-          user_id: string | null
-        }
-        Insert: {
-          content?: string | null
-          conversation_id?: number | null
-          created_at?: string | null
-          facilitator_knowledge?: number | null
-          id?: never
-          material_quality?: number | null
-          rating?: number | null
-          session_pace?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          content?: string | null
-          conversation_id?: number | null
-          created_at?: string | null
-          facilitator_knowledge?: number | null
-          id?: never
-          material_quality?: number | null
-          rating?: number | null
-          session_pace?: number | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       messages: {
         Row: {
@@ -457,147 +368,62 @@ export type Database = {
       }
       sessions: {
         Row: {
-          category_id: number | null
           created_at: string | null
-          duration_minutes: number | null
           facilitator: number | null
           gpt_version: string | null
           icon_type: string | null
           id: number
-          learning_outcomes: string[] | null
           lock: boolean | null
           max_tokens: string | null
           objective: string | null
           output_format: string | null
-          prerequisites: string[] | null
           prompt: string | null
           randomness: number | null
           scope: string | null
-          session_type: Database["public"]["Enums"]["session_type"] | null
-          skill_level: string | null
           status: boolean | null
-          tags: string[] | null
           title: string | null
           welcome_message: string | null
         }
         Insert: {
-          category_id?: number | null
           created_at?: string | null
-          duration_minutes?: number | null
           facilitator?: number | null
           gpt_version?: string | null
           icon_type?: string | null
           id?: number
-          learning_outcomes?: string[] | null
           lock?: boolean | null
           max_tokens?: string | null
           objective?: string | null
           output_format?: string | null
-          prerequisites?: string[] | null
           prompt?: string | null
           randomness?: number | null
           scope?: string | null
-          session_type?: Database["public"]["Enums"]["session_type"] | null
-          skill_level?: string | null
           status?: boolean | null
-          tags?: string[] | null
           title?: string | null
           welcome_message?: string | null
         }
         Update: {
-          category_id?: number | null
           created_at?: string | null
-          duration_minutes?: number | null
           facilitator?: number | null
           gpt_version?: string | null
           icon_type?: string | null
           id?: number
-          learning_outcomes?: string[] | null
           lock?: boolean | null
           max_tokens?: string | null
           objective?: string | null
           output_format?: string | null
-          prerequisites?: string[] | null
           prompt?: string | null
           randomness?: number | null
           scope?: string | null
-          session_type?: Database["public"]["Enums"]["session_type"] | null
-          skill_level?: string | null
           status?: boolean | null
-          tags?: string[] | null
           title?: string | null
           welcome_message?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "sessions_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "sessions_facilitator_fkey"
             columns: ["facilitator"]
             isOneToOne: false
             referencedRelation: "facilitators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sessions_history: {
-        Row: {
-          created_at: string | null
-          duration_minutes: number | null
-          ended_at: string | null
-          facilitator_id: number | null
-          feedback_score: number | null
-          feedback_text: string | null
-          id: number
-          language: string | null
-          participant_count: number | null
-          session_id: number | null
-          started_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          duration_minutes?: number | null
-          ended_at?: string | null
-          facilitator_id?: number | null
-          feedback_score?: number | null
-          feedback_text?: string | null
-          id?: never
-          language?: string | null
-          participant_count?: number | null
-          session_id?: number | null
-          started_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          duration_minutes?: number | null
-          ended_at?: string | null
-          facilitator_id?: number | null
-          feedback_score?: number | null
-          feedback_text?: string | null
-          id?: never
-          language?: string | null
-          participant_count?: number | null
-          session_id?: number | null
-          started_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sessions_history_facilitator_id_fkey"
-            columns: ["facilitator_id"]
-            isOneToOne: false
-            referencedRelation: "facilitators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessions_history_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -611,12 +437,6 @@ export type Database = {
     }
     Enums: {
       session_status: "draft" | "active" | "completed" | "archived"
-      session_type:
-        | "workshop"
-        | "training"
-        | "consultation"
-        | "coaching"
-        | "team_building"
     }
     CompositeTypes: {
       [_ in never]: never

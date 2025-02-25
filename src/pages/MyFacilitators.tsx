@@ -6,12 +6,36 @@ import { useNavigate } from "react-router-dom";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
-import { StepIndicator } from "@/components/facilitator/StepIndicator";
+import { Stepper } from "@/components/facilitator/StepIndicator";
 import { Step } from "@/types/facilitator";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
-import { useFacilitators } from "@/hooks/useFacilitators";
-import { useWorkshops } from "@/hooks/useWorkshops";
+
+const fetchFacilitators = async () => {
+  const { data, error } = await supabase
+    .from('facilitators')
+    .select('*')
+    .order('order', { ascending: true });
+  
+  if (error) throw error;
+  return data;
+};
+
+const fetchSessions = async (facilitatorId: number | null) => {
+  const query = supabase
+    .from('sessions')
+    .select('*, facilitator:facilitators!inner(*)')
+    .eq('status', true);
+
+  if (facilitatorId) {
+    query.eq('facilitator', facilitatorId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+};
 
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -21,11 +45,19 @@ const MyFacilitators = () => {
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("English");
   const [agreed, setAgreed] = useState(false);
-  
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { facilitators, isLoading: isFacilitatorsLoading } = useFacilitators();
-  const { workshops, isLoading: isWorkshopsLoading } = useWorkshops(selectedFacilitator);
+
+  const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useQuery({
+    queryKey: ['facilitators'],
+    queryFn: fetchFacilitators
+  });
+
+  const { data: workshops = [], isLoading: isWorkshopsLoading } = useQuery({
+    queryKey: ['workshops', selectedFacilitator],
+    queryFn: () => fetchSessions(selectedFacilitator),
+    enabled: currentStep === 2
+  });
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -53,8 +85,7 @@ const MyFacilitators = () => {
         return;
       }
 
-      // Create the conversation
-      const { data: conversation, error: conversationError } = await supabase
+      const { data, error } = await supabase
         .from('conversations')
         .insert({
           participant_description: description,
@@ -63,35 +94,30 @@ const MyFacilitators = () => {
           sessions_id: selectedWorkshop,
           accept_terms_and_conditions: agreed,
           is_saved: false,
-          is_session_ended: false,
-          status: 'active'
+          is_session_ended: false
         })
         .select('id')
         .single();
 
-      if (conversationError) throw conversationError;
-
-      // Create session history entry
-      const { error: historyError } = await supabase
-        .from('sessions_history')
-        .insert({
-          session_id: selectedWorkshop,
-          facilitator_id: selectedFacilitator,
-          participant_count: participantCount,
-          language
+      if (error) {
+        console.error('Error creating conversation:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create conversation. Please try again.",
+          variant: "destructive",
         });
-
-      if (historyError) {
-        console.error('Error creating session history:', historyError);
+        return;
       }
 
-      navigate('/session', { 
-        replace: true,
-        state: { 
-          newConversationId: conversation.id,
-          replace: true
-        }
-      });
+      if (data?.id) {
+        navigate('/session', { 
+          replace: true,
+          state: { 
+            newConversationId: data.id,
+            replace: true
+          }
+        });
+      }
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       toast({
@@ -106,7 +132,7 @@ const MyFacilitators = () => {
     <div className="min-h-screen pt-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <StepIndicator currentStep={currentStep} />
+          <Stepper value={currentStep} />
 
           <div className="space-y-8">
             {currentStep === 1 && (

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -16,6 +17,12 @@ interface Message {
   facilitator_id?: number;
 }
 
+interface VST {
+  voice: string;
+  style: string;
+  tone: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -27,23 +34,34 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { messages, conversationId } = await req.json()
+    const { messages, conversationId, generateReport = false } = await req.json()
 
     console.log('Processing request for conversation:', conversationId)
-    console.log('Received messages:', messages)
+    console.log('Generate report:', generateReport)
 
-    // Get conversation config
-    const { data: configData, error: configError } = await supabaseClient
+    // Get configuration including secret message
+    const { data: config, error: configError } = await supabaseClient
+      .from('configurations')
+      .select('secret_message')
+      .single()
+
+    if (configError) {
+      console.error('Error fetching configuration:', configError)
+      throw new Error('Failed to fetch configuration')
+    }
+
+    // Get conversation config with ordered messages
+    const { data: configData, error: conversationConfigError } = await supabaseClient
       .from('conversations_config')
       .select('*')
       .order('order', { ascending: true })
 
-    if (configError) {
-      console.error('Error fetching conversation config:', configError)
+    if (conversationConfigError) {
+      console.error('Error fetching conversation config:', conversationConfigError)
       throw new Error('Failed to fetch conversation configuration')
     }
 
-    // Get conversation and session details
+    // Get conversation and session details including facilitator VST
     const { data: conversation, error: conversationError } = await supabaseClient
       .from('conversations')
       .select(`
@@ -55,7 +73,9 @@ serve(async (req) => {
           max_tokens,
           randomness,
           facilitator:facilitators (
-            id
+            id,
+            vst,
+            title
           )
         )
       `)
@@ -67,36 +87,53 @@ serve(async (req) => {
       throw new Error('Conversation not found')
     }
 
-    // Format messages for the AI using the correct role structure
-    const formattedMessages = messages.map((m: Message) => {
-      // If the message already has a role defined, use it
-      if (m.role) {
-        return {
-          role: m.role,
-          content: m.content,
-          name: m.name
-        }
-      }
-      
-      // Otherwise, determine the role based on sender
-      return {
-        role: m.sender === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-        name: m.name
-      }
-    })
+    // Parse facilitator's VST
+    const vstData: VST = conversation.sessions.facilitator.vst ? 
+      JSON.parse(conversation.sessions.facilitator.vst) : 
+      { voice: "professional", style: "supportive", tone: "friendly" }
 
-    // Get system prompt from conversation config or session
-    const systemMessage = configData?.find(config => config.role === 'system')
-    const systemPrompt = {
-      role: "system",
-      content: systemMessage?.content || conversation.sessions.prompt || "You are a helpful assistant."
-    }
+    // Format messages for the AI using the correct role structure and sequence
+    const formattedMessages = messages.map((m: Message) => ({
+      role: m.role || (m.sender === 'assistant' ? 'assistant' : 'user'),
+      content: m.content,
+      name: m.name
+    }))
+
+    // Construct system message combining VST, config, and secret message
+    const systemInstructions = [
+      config.secret_message,
+      `You are ${conversation.sessions.facilitator.title}.`,
+      `Voice: ${vstData.voice}`,
+      `Style: ${vstData.style}`,
+      `Tone: ${vstData.tone}`,
+      conversation.sessions.prompt || "You are a helpful assistant."
+    ].filter(Boolean).join('\n\n')
+
+    // If generating a report, modify the system message
+    const finalSystemMessage = generateReport ? 
+      `${systemInstructions}\n\nPlease generate a comprehensive report summarizing this conversation. Include:\n- Key discussion points\n- Participant contributions\n- Important insights\n- Recommendations` :
+      systemInstructions
+
+    // Get conversation structure from config
+    const conversationStructure = configData
+      .filter(config => config.content)
+      .map(config => ({
+        role: config.role || 'system',
+        content: config.content,
+        parameters: config.parameters
+      }))
 
     // Prepare the OpenAI request
     const openAIBody = {
       model: "gpt-4o-mini",
-      messages: [systemPrompt, ...formattedMessages],
+      messages: [
+        { role: "system", content: finalSystemMessage },
+        ...conversationStructure.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        ...formattedMessages
+      ],
       temperature: Number(conversation.sessions.randomness) || 0.7,
       max_tokens: Number(conversation.sessions.max_tokens) || 1000,
     }
@@ -143,8 +180,19 @@ serve(async (req) => {
       throw saveError
     }
 
+    // If this was a report generation, update the conversation
+    if (generateReport) {
+      await supabaseClient
+        .from('conversations')
+        .update({ is_session_ended: true })
+        .eq('id', conversationId)
+    }
+
     return new Response(
-      JSON.stringify(savedMessage),
+      JSON.stringify({
+        ...savedMessage,
+        is_report: generateReport
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

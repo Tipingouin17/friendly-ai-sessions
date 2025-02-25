@@ -110,7 +110,7 @@ const Session = () => {
           name: msg.participant,
           conversation_id: Number(id),
           user_id: null, // Add user_id if you have authentication
-          facilitator_id: conversation?.sessions?.facilitator?.id
+          facilitator_id: conversation?.sessions?.facilitator // No need to access .id
         }));
 
         // Save participant messages to the database

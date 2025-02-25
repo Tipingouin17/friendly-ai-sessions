@@ -6,9 +6,31 @@ import { useNavigate } from "react-router-dom";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
-import { StepIndicator } from "@/components/facilitator/StepIndicator";
 import { facilitators, workshops } from "@/data/facilitator-data";
 import { Step } from "@/types/facilitator";
+import {
+  Stepper,
+  StepperIndicator,
+  StepperItem,
+  StepperSeparator,
+  StepperTitle,
+  StepperTrigger,
+} from "@/components/ui/stepper";
+
+const steps = [
+  {
+    step: 1,
+    title: "Choose your facilitator",
+  },
+  {
+    step: 2,
+    title: "Select workshop type",
+  },
+  {
+    step: 3,
+    title: "Describe participants",
+  },
+];
 
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -48,13 +70,26 @@ const MyFacilitators = () => {
         </p>
 
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <div className="flex justify-between items-start mb-8">
-            <div className="flex-1">
-              {currentStep === 1 && <h2 className="text-2xl font-semibold mb-6">Select your Facilitator</h2>}
-              {currentStep === 2 && <h2 className="text-2xl font-semibold mb-6">Select your Workshop</h2>}
-              {currentStep === 3 && <h2 className="text-2xl font-semibold mb-6">Set your Workshop</h2>}
-            </div>
-            <StepIndicator currentStep={currentStep} />
+          <div className="mb-8">
+            <Stepper 
+              value={currentStep - 1} 
+              onValueChange={(step) => setCurrentStep((step + 1) as Step)}
+              className="max-w-2xl mx-auto"
+            >
+              {steps.map(({ step, title }) => (
+                <StepperItem
+                  key={step}
+                  step={step - 1}
+                  className="[&:not(:last-child)]:flex-1"
+                >
+                  <StepperTrigger>
+                    <StepperIndicator />
+                    <StepperTitle>{title}</StepperTitle>
+                  </StepperTrigger>
+                  {step < steps.length && <StepperSeparator />}
+                </StepperItem>
+              ))}
+            </Stepper>
           </div>
 
           <div className="mb-8">

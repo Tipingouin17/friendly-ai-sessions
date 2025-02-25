@@ -8,7 +8,7 @@ import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
-const fetchConversation = async (id: string) => {
+const fetchConversation = async (id: number) => {
   const { data, error } = await supabase
     .from('conversations')
     .select(`
@@ -16,7 +16,11 @@ const fetchConversation = async (id: string) => {
       sessions:sessions_id (
         title,
         objective,
-        welcome_message
+        welcome_message,
+        facilitator:facilitators (
+          title,
+          profile_picture
+        )
       )
     `)
     .eq('id', id)
@@ -34,7 +38,7 @@ const Session = () => {
 
   const { data: conversation, isLoading } = useQuery({
     queryKey: ['conversation', id],
-    queryFn: () => fetchConversation(id!),
+    queryFn: () => fetchConversation(Number(id)),
     enabled: !!id
   });
 
@@ -101,7 +105,11 @@ const Session = () => {
     <div className="min-h-screen pt-16 bg-[#FFC107]/10">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-          <ChatHeader title={conversation?.sessions?.title} objective={conversation?.sessions?.objective} />
+          <ChatHeader 
+            title={conversation?.sessions?.facilitator?.title} 
+            objective={conversation?.sessions?.objective}
+            profilePicture={conversation?.sessions?.facilitator?.profile_picture}
+          />
           <MessageList messages={messages} />
           <ChatInput
             inputMessage={inputMessage}

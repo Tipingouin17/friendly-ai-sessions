@@ -19,6 +19,7 @@ export interface Workshop {
   profile_picture?: string;
   welcome_message?: string;
   status?: boolean;
+  facilitator?: number;  // ID of the linked facilitator
 }
 
 export interface Conversation {

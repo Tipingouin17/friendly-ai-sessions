@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -32,12 +32,17 @@ const fetchFacilitators = async () => {
   return data;
 };
 
-const fetchSessions = async () => {
-  const { data, error } = await supabase
+const fetchSessions = async (facilitatorId: number | null) => {
+  const query = supabase
     .from('sessions')
-    .select('*')
+    .select('*, facilitator:facilitators!inner(*)')
     .eq('status', true);
-  
+
+  if (facilitatorId) {
+    query.eq('facilitator', facilitatorId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data;
 };
@@ -58,8 +63,9 @@ const MyFacilitators = () => {
   });
 
   const { data: workshops = [], isLoading: isWorkshopsLoading } = useQuery({
-    queryKey: ['workshops'],
-    queryFn: fetchSessions
+    queryKey: ['workshops', selectedFacilitator],
+    queryFn: () => fetchSessions(selectedFacilitator),
+    enabled: currentStep === 2
   });
 
   const handleNext = () => {
@@ -71,6 +77,9 @@ const MyFacilitators = () => {
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => (prev === 3 ? 2 : 1) as Step);
+      if (currentStep === 2) {
+        setSelectedWorkshop(null);
+      }
     }
   };
 

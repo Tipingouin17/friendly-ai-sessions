@@ -3,8 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 interface WorkshopSetupProps {
   participantCount: number;
@@ -27,33 +25,6 @@ export const WorkshopSetup = ({
   agreed,
   setAgreed
 }: WorkshopSetupProps) => {
-  const { toast } = useToast();
-
-  const handleDescriptionChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newDescription = e.target.value;
-    setDescription(newDescription);
-    
-    try {
-      // Update the participant description in the active conversation
-      const { error } = await supabase
-        .from('conversations')
-        .update({ participant_description: newDescription })
-        .eq('is_session_ended', false)
-        .single();
-
-      if (error) {
-        console.error('Error updating participant description:', error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to save participant description",
-        });
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -81,7 +52,7 @@ export const WorkshopSetup = ({
         <label className="block text-sm font-medium mb-2">Description of the participants</label>
         <Textarea 
           value={description} 
-          onChange={handleDescriptionChange} 
+          onChange={(e) => setDescription(e.target.value)} 
           placeholder="Describe your participants..." 
           className="min-h-[100px]" 
         />

@@ -4,8 +4,6 @@ import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import ParticipantSelector from "./ParticipantSelector";
-import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
 import { Message } from "@/types/chat";
 
 interface SessionContainerProps {
@@ -53,18 +51,10 @@ const SessionContainer = ({
             objective={objective}
             profilePicture={facilitator?.profile_picture}
             participantCount={participantCount}
+            onGenerateReport={onGenerateReport}
+            isGeneratingReport={isGeneratingReport}
+            canGenerateReport={messages.length > 0}
           />
-          <div className="p-4 border-b border-gray-100 flex justify-end">
-            <Button
-              onClick={onGenerateReport}
-              disabled={isGeneratingReport || messages.length === 0}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              {isGeneratingReport ? "Generating Report..." : "Generate Report"}
-            </Button>
-          </div>
           <MessageList 
             messages={messages} 
             participantColors={participantColors}

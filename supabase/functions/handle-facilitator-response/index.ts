@@ -92,6 +92,12 @@ serve(async (req) => {
       body: JSON.stringify(openAIBody),
     })
 
+    if (!openAIResponse.ok) {
+      const errorData = await openAIResponse.text()
+      console.error('OpenAI API error:', errorData)
+      throw new Error(`OpenAI API error: ${errorData}`)
+    }
+
     const aiData = await openAIResponse.json()
 
     if (!aiData.choices?.[0]?.message) {

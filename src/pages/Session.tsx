@@ -175,10 +175,17 @@ const Session = () => {
           }
         });
 
-        if (response.error) throw new Error(response.error.message);
+        if (response.error) {
+          console.error('Edge function error:', response.error);
+          throw new Error(response.error.message || 'Failed to get AI response');
+        }
+
+        if (!response.data) {
+          throw new Error('No response data received from AI');
+        }
 
         const aiResponse: Message = {
-          id: response.data.id,
+          id: response.data.id || Date.now().toString(),
           content: response.data.content,
           sender: "assistant",
           timestamp: new Date(),
@@ -188,7 +195,7 @@ const Session = () => {
         console.error('Error getting AI response:', error);
         toast({
           title: "Error",
-          description: "Failed to get facilitator's response. Please try again.",
+          description: error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.",
           variant: "destructive",
         });
       }

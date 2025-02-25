@@ -24,6 +24,7 @@ interface SessionContainerProps {
   onSendMessage: () => void;
   setIsRecording: (isRecording: boolean) => void;
   onGenerateReport?: () => void;
+  participantNames?: { [key: number]: string };
 }
 
 const SessionContainer = ({
@@ -41,7 +42,16 @@ const SessionContainer = ({
   onSendMessage,
   setIsRecording,
   onGenerateReport,
+  participantNames = {}
 }: SessionContainerProps) => {
+  // Transform messages to use actual names instead of P1, P2, etc.
+  const transformedMessages = messages.map(message => ({
+    ...message,
+    participant: message.participant && message.participant.startsWith('P')
+      ? participantNames[parseInt(message.participant.slice(1))] || message.participant
+      : message.participant
+  }));
+
   return (
     <div className="min-h-screen pt-16 bg-[#FFC107]/10">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -56,13 +66,14 @@ const SessionContainer = ({
             canGenerateReport={messages.length > 0}
           />
           <MessageList 
-            messages={messages} 
+            messages={transformedMessages} 
             participantColors={participantColors}
           />
           <ParticipantSelector
             participantCount={participantCount}
             currentParticipant={currentParticipant}
             onParticipantSwitch={onParticipantSwitch}
+            participantNames={participantNames}
           />
           <ChatInput
             inputMessage={inputMessage}

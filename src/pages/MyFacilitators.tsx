@@ -97,7 +97,7 @@ const MyFacilitators = () => {
       }
 
       // Create the conversation
-      const { data: conversationData, error: conversationError } = await supabase
+      const { data, error } = await supabase
         .from('conversations')
         .insert({
           participant_description: description,
@@ -111,8 +111,8 @@ const MyFacilitators = () => {
         .select('id')
         .single();
 
-      if (conversationError) {
-        console.error('Error creating conversation:', conversationError);
+      if (error) {
+        console.error('Error creating conversation:', error);
         toast({
           title: "Error",
           description: "Failed to create conversation. Please try again.",
@@ -121,9 +121,9 @@ const MyFacilitators = () => {
         return;
       }
 
-      if (conversationData) {
-        // Navigate to the session page
-        navigate(`/session/${conversationData.id}`);
+      if (data?.id) {
+        // Redirect to the session page using the conversation ID
+        navigate(`/session/${data.id}`);
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error);

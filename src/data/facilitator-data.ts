@@ -52,7 +52,7 @@ export const workshops: Workshop[] = [
     title: "Mission Cohesion",
     scope: "Team dynamics and collaboration workshop",
     objective: "Enhance communication and team synergy through interactive exercises",
-    profile_picture: "🎯",
+    icon_type: "brain",
     status: true
   },
   {
@@ -60,7 +60,7 @@ export const workshops: Workshop[] = [
     title: "Innovation Sprint",
     scope: "Creative problem-solving workshop",
     objective: "Generate and develop innovative solutions to challenges",
-    profile_picture: "💡",
+    icon_type: "puzzle",
     status: true
   },
   {
@@ -68,7 +68,7 @@ export const workshops: Workshop[] = [
     title: "Leadership Lab",
     scope: "Leadership development workshop",
     objective: "Develop essential leadership skills through practical scenarios",
-    profile_picture: "👥",
+    icon_type: "graduation-cap",
     status: true
   },
   {
@@ -76,7 +76,7 @@ export const workshops: Workshop[] = [
     title: "Agile Excellence",
     scope: "Agile methodology workshop",
     objective: "Master agile principles and practices through hands-on experience",
-    profile_picture: "🔄",
+    icon_type: "book-open",
     status: true
   },
   {
@@ -84,7 +84,7 @@ export const workshops: Workshop[] = [
     title: "Strategy Summit",
     scope: "Strategic planning workshop",
     objective: "Develop and align on strategic initiatives and goals",
-    profile_picture: "🎯",
+    icon_type: "microscope",
     status: true
   },
   {
@@ -92,7 +92,7 @@ export const workshops: Workshop[] = [
     title: "Cultural Bridge",
     scope: "Cross-cultural communication workshop",
     objective: "Build understanding and effectiveness across cultural differences",
-    profile_picture: "🌍",
+    icon_type: "book-open",
     status: true
   }
 ];

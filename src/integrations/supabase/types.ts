@@ -362,12 +362,12 @@ export type Database = {
           created_at: string | null
           facilitator: number | null
           gpt_version: string | null
+          icon_type: string | null
           id: number
           lock: boolean | null
           max_tokens: string | null
           objective: string | null
           output_format: string | null
-          profile_picture: string | null
           prompt: string | null
           randomness: number | null
           scope: string | null
@@ -379,12 +379,12 @@ export type Database = {
           created_at?: string | null
           facilitator?: number | null
           gpt_version?: string | null
+          icon_type?: string | null
           id?: number
           lock?: boolean | null
           max_tokens?: string | null
           objective?: string | null
           output_format?: string | null
-          profile_picture?: string | null
           prompt?: string | null
           randomness?: number | null
           scope?: string | null
@@ -396,12 +396,12 @@ export type Database = {
           created_at?: string | null
           facilitator?: number | null
           gpt_version?: string | null
+          icon_type?: string | null
           id?: number
           lock?: boolean | null
           max_tokens?: string | null
           objective?: string | null
           output_format?: string | null
-          profile_picture?: string | null
           prompt?: string | null
           randomness?: number | null
           scope?: string | null

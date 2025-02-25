@@ -1,5 +1,4 @@
-
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Mic, Send, StopCircle, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +24,41 @@ const Session = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+
+        recognitionRef.current.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
+          setInputMessage(transcript);
+        };
+
+        recognitionRef.current.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          setIsDictating(false);
+          toast({
+            title: "Error",
+            description: "There was an error with speech recognition. Please try again.",
+            variant: "destructive",
+          });
+        };
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleSendMessage = () => {
     if (!inputMessage.trim()) return;
@@ -68,15 +102,31 @@ const Session = () => {
   };
 
   const handleStartDictation = () => {
-    setIsDictating(true);
-    toast({
-      title: "Voice dictation started",
-      description: "Start speaking...",
-    });
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setIsDictating(true);
+      toast({
+        title: "Voice dictation started",
+        description: "Start speaking...",
+      });
+    } else {
+      toast({
+        title: "Speech Recognition Not Available",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleStopDictation = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsDictating(false);
+    toast({
+      title: "Voice dictation stopped",
+      description: "Dictation complete.",
+    });
   };
 
   const handleClearChat = () => {

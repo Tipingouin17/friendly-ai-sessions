@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -9,7 +8,7 @@ const corsHeaders = {
 
 interface Message {
   content: string;
-  role: string;
+  role?: string;
   name?: string;
   sender?: string;
   conversation_id: number;
@@ -32,6 +31,19 @@ serve(async (req) => {
 
     console.log('Processing request for conversation:', conversationId)
     console.log('Received messages:', messages)
+
+    // Get conversation config
+    const { data: configData, error: configError } = await supabaseClient
+      .from('conversations_config')
+      .select('*')
+      .order('order', { ascending: true })
+
+    if (configError) {
+      console.error('Error fetching conversation config:', configError)
+      throw new Error('Failed to fetch conversation configuration')
+    }
+
+    console.log('Retrieved conversation config:', configData)
 
     // Get conversation and session details
     const { data: conversation, error: conversationError } = await supabaseClient
@@ -59,21 +71,32 @@ serve(async (req) => {
       throw new Error('Conversation not found')
     }
 
-    console.log('Retrieved conversation data:', conversation)
-
-    // Format messages for the AI - ensure all messages have the required 'role' field
-    const formattedMessages = messages.map((m: Message) => ({
-      role: m.sender === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-      name: m.name
-    }))
+    // Format messages for the AI using the correct role structure
+    const formattedMessages = messages.map((m: Message) => {
+      // If the message already has a role defined, use it
+      if (m.role) {
+        return {
+          role: m.role,
+          content: m.content,
+          name: m.name
+        }
+      }
+      
+      // Otherwise, determine the role based on sender
+      return {
+        role: m.sender === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+        name: m.name
+      }
+    })
 
     console.log('Formatted messages:', formattedMessages)
 
-    // Add system prompt from the session
+    // Get system prompt from conversation config or session
+    const systemMessage = configData?.find(config => config.role === 'system')
     const systemPrompt = {
       role: "system",
-      content: conversation.sessions.prompt || "You are a helpful assistant."
+      content: systemMessage?.content || conversation.sessions.prompt || "You are a helpful assistant."
     }
 
     // Prepare the OpenAI request

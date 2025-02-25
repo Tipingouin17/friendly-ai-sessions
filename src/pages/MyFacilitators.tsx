@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useNavigate } from "react-router-dom";
 
 type Step = 1 | 2 | 3;
 
@@ -52,6 +52,7 @@ const MyFacilitators = () => {
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("English");
   const [agreed, setAgreed] = useState(false);
+  const navigate = useNavigate();
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -66,15 +67,7 @@ const MyFacilitators = () => {
   };
 
   const handleSubmit = () => {
-    // Handle form submission
-    console.log({
-      facilitator: selectedFacilitator,
-      workshop: selectedWorkshop,
-      participantCount,
-      description,
-      language,
-      agreed,
-    });
+    navigate("/session");
   };
 
   return (

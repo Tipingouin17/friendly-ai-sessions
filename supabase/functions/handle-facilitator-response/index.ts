@@ -117,7 +117,7 @@ serve(async (req) => {
       conversation.sessions.prompt || "You are a helpful assistant."
     ].filter(Boolean).join('\n\n')
 
-    // If generating a report, modify the system message
+    // If generating a report, add report instructions to the system message
     const finalSystemMessage = generateReport ? 
       `${systemInstructions}\n\nPlease generate a comprehensive report summarizing this conversation. Include:\n- Key discussion points\n- Participant contributions\n- Important insights\n- Recommendations` :
       systemInstructions
@@ -127,26 +127,25 @@ serve(async (req) => {
       .filter(config => config.content)
       .map(config => ({
         role: config.role || 'system',
-        content: config.content,
-        parameters: config.parameters
+        content: config.content
       }))
+
+    // Prepare messages array for OpenAI, ensuring all roles are valid
+    const aiMessages = [
+      { role: "system", content: finalSystemMessage },
+      ...conversationStructure.filter(msg => ['system', 'assistant', 'user'].includes(msg.role)),
+      ...formattedMessages.filter(msg => ['system', 'assistant', 'user'].includes(msg.role))
+    ]
 
     // Prepare the OpenAI request
     const openAIBody = {
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: finalSystemMessage },
-        ...conversationStructure.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        ...formattedMessages
-      ],
+      messages: aiMessages,
       temperature: Number(conversation.sessions.randomness) || 0.7,
       max_tokens: Number(conversation.sessions.max_tokens) || 1000,
     }
 
-    console.log('OpenAI request body:', openAIBody)
+    console.log('OpenAI request messages:', aiMessages)
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {

@@ -88,23 +88,13 @@ const ChatInput = ({
 
   return (
     <div className="p-6 border-t border-gray-100">
-      <div className="flex gap-4 mb-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={isRecording ? handleStopRecording : handleStartRecording}
-          className={isRecording ? "bg-red-50 text-red-600" : ""}
-        >
-          {isRecording ? <StopCircle /> : <Mic />}
-        </Button>
-      </div>
       <div className="relative">
         <Textarea
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder="Type your message here..."
-          className="min-h-[80px] pr-12"
+          className="min-h-[80px] pr-24"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -112,14 +102,24 @@ const ChatInput = ({
             }
           }}
         />
-        <Button
-          onClick={onSendMessage}
-          className="absolute bottom-2 right-2"
-          size="icon"
-          disabled={!inputMessage.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            className={`h-8 w-8 ${isRecording ? "text-red-600" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
+          <Button
+            onClick={onSendMessage}
+            size="icon"
+            disabled={!inputMessage.trim()}
+            className="h-8 w-8"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

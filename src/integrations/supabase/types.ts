@@ -258,6 +258,7 @@ export type Database = {
       }
       faqs: {
         Row: {
+          category: string | null
           created_at: string | null
           description: string | null
           id: number
@@ -265,6 +266,7 @@ export type Database = {
           title: string | null
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           description?: string | null
           id?: number
@@ -272,6 +274,7 @@ export type Database = {
           title?: string | null
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           description?: string | null
           id?: number

@@ -15,7 +15,7 @@ interface FAQ {
   title: string;
   description: string;
   status: boolean;
-  category?: string;
+  category: string;
 }
 
 const fetchFAQs = async () => {

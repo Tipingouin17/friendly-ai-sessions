@@ -11,6 +11,7 @@ interface Message {
   content: string;
   role: string;
   name?: string;
+  sender?: string;
   conversation_id: number;
   user_id?: string | null;
   facilitator_id?: number;
@@ -30,6 +31,7 @@ serve(async (req) => {
     const { messages, conversationId } = await req.json()
 
     console.log('Processing request for conversation:', conversationId)
+    console.log('Received messages:', messages)
 
     // Get conversation and session details
     const { data: conversation, error: conversationError } = await supabaseClient
@@ -59,12 +61,14 @@ serve(async (req) => {
 
     console.log('Retrieved conversation data:', conversation)
 
-    // Format messages for the AI
+    // Format messages for the AI - ensure all messages have the required 'role' field
     const formattedMessages = messages.map((m: Message) => ({
-      role: m.role,
+      role: m.sender === 'assistant' ? 'assistant' : 'user',
       content: m.content,
       name: m.name
     }))
+
+    console.log('Formatted messages:', formattedMessages)
 
     // Add system prompt from the session
     const systemPrompt = {
@@ -74,7 +78,7 @@ serve(async (req) => {
 
     // Prepare the OpenAI request
     const openAIBody = {
-      model: "gpt-4o-mini", // Using the recommended model
+      model: "gpt-4o-mini",
       messages: [systemPrompt, ...formattedMessages],
       temperature: Number(conversation.sessions.randomness) || 0.7,
       max_tokens: Number(conversation.sessions.max_tokens) || 1000,

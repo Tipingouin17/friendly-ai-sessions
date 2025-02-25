@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
-import { Stepper } from "@/components/facilitator/StepIndicator";
+import { StepIndicator } from "@/components/facilitator/StepIndicator";
 import { Step } from "@/types/facilitator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -106,7 +106,7 @@ const MyFacilitators = () => {
     <div className="min-h-screen pt-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <Stepper value={currentStep} />
+          <StepIndicator currentStep={currentStep} />
 
           <div className="space-y-8">
             {currentStep === 1 && (

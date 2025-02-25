@@ -1,10 +1,9 @@
 
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { Mic, Send, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { SpeechRecognition } from '@/types/chat';
 
 interface ChatInputProps {
   inputMessage: string;
@@ -21,105 +20,55 @@ const ChatInput = ({
   isRecording,
   setIsRecording
 }: ChatInputProps) => {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-
-        recognitionRef.current.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join('');
-          setInputMessage(transcript);
-        };
-
-        recognitionRef.current.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          setIsRecording(false);
-          toast({
-            title: "Error",
-            description: "There was an error with speech recognition. Please try again.",
-            variant: "destructive",
-          });
-        };
-      }
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [setInputMessage, setIsRecording]);
-
   const handleStartRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.start();
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       setIsRecording(true);
       toast({
         title: "Recording started",
-        description: "Your voice is being recorded...",
+        description: "Speak now...",
       });
     } else {
       toast({
-        title: "Speech Recognition Not Available",
-        description: "Your browser doesn't support speech recognition.",
+        title: "Not supported",
+        description: "Speech recognition is not supported in your browser.",
         variant: "destructive",
       });
     }
   };
 
-  const handleStopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsRecording(false);
-    toast({
-      title: "Recording stopped",
-      description: "Processing your message...",
-    });
-  };
-
   return (
-    <div className="p-6 border-t border-gray-100">
-      <div className="flex gap-4 mb-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={isRecording ? handleStopRecording : handleStartRecording}
-          className={isRecording ? "bg-red-50 text-red-600" : ""}
-        >
-          {isRecording ? <StopCircle /> : <Mic />}
-        </Button>
-      </div>
+    <div className="p-4 bg-white">
       <div className="relative">
         <Textarea
-          ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder="Type your message here..."
-          className="min-h-[80px] pr-12"
+          className="pr-24 min-h-[80px] resize-none"
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               onSendMessage();
             }
           }}
         />
-        <Button
-          onClick={onSendMessage}
-          className="absolute bottom-2 right-2"
-          size="icon"
-          disabled={!inputMessage.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={isRecording ? () => setIsRecording(false) : handleStartRecording}
+            className={isRecording ? "text-red-500" : ""}
+          >
+            {isRecording ? <StopCircle /> : <Mic />}
+          </Button>
+          <Button
+            size="icon"
+            onClick={onSendMessage}
+            disabled={!inputMessage.trim()}
+            className="bg-[#FFC107] hover:bg-[#FFB000]"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

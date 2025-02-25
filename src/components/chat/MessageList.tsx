@@ -9,7 +9,7 @@ interface MessageListProps {
 
 const MessageList = ({ messages, participantColors = {} }: MessageListProps) => {
   return (
-    <div className="h-[calc(100vh-400px)] overflow-y-auto p-6 space-y-4">
+    <div className="space-y-4">
       {messages.map((message) => (
         <div
           key={message.id}
@@ -20,8 +20,8 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
           <div
             className={`max-w-[80%] p-4 rounded-2xl ${
               message.sender === "assistant"
-                ? "bg-accent text-accent-foreground"
-                : "text-primary-foreground"
+                ? "bg-[#FFC107]/10 text-gray-800"
+                : "text-gray-800"
             }`}
             style={{
               backgroundColor: message.sender === "user" && message.participant 

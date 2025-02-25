@@ -40,23 +40,13 @@ const MyFacilitators = () => {
     <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-4xl font-bold text-center mb-4">MyFacilitator</h1>
-        <p className="text-lg text-muted-foreground text-center mb-4">
-          Welcome to our Facilitator Page, where you can discover the power of AI-driven facilitation tailored to your specific needs.
-        </p>
         <p className="text-lg text-muted-foreground text-center mb-12">
-          Unleash the full potential of MyFacilitator and enhance your sessions with intelligent guidance and support.
+          Follow these simple steps to set up your workshop session
         </p>
+
+        <StepIndicator currentStep={currentStep} />
 
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <div className="flex justify-between items-start mb-8">
-            <div className="flex-1">
-              {currentStep === 1 && <h2 className="text-2xl font-semibold mb-6">Select your Facilitator</h2>}
-              {currentStep === 2 && <h2 className="text-2xl font-semibold mb-6">Select your Workshop</h2>}
-              {currentStep === 3 && <h2 className="text-2xl font-semibold mb-6">Set your Workshop</h2>}
-            </div>
-            <StepIndicator currentStep={currentStep} />
-          </div>
-
           <div className="mb-8">
             {currentStep === 1 && (
               <FacilitatorSelection

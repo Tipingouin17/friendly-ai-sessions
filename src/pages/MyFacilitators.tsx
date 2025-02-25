@@ -107,7 +107,7 @@ const MyFacilitators = () => {
           is_saved: false,
           is_session_ended: false
         })
-        .select()
+        .select('*')
         .single();
 
       if (error) {
@@ -125,6 +125,7 @@ const MyFacilitators = () => {
           title: "Success",
           description: "Session created successfully!",
         });
+        // Ensure we navigate to the correct path with the new conversation ID
         navigate(`/session/${data.id}`);
       }
     } catch (error) {

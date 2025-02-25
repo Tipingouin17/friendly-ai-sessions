@@ -72,13 +72,7 @@ export const WorkshopSelection = ({
               <div className="mb-4 flex justify-center">
                 {getIcon(workshop.icon_type)}
               </div>
-              <h3 className="mb-2 text-lg font-semibold text-center">{workshop.title}</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-semibold">Scope:</span>
-                  <p className="text-sm text-gray-600">{workshop.scope}</p>
-                </div>
-              </div>
+              <h3 className="text-lg font-semibold text-center">{workshop.title}</h3>
             </div>
           ))}
           <div 
@@ -107,9 +101,20 @@ export const WorkshopSelection = ({
           <h3 className="mb-2 text-lg font-semibold">
             {workshops.find(w => w.id === selectedWorkshop)?.title}
           </h3>
-          <p className="text-gray-600">
-            {workshops.find(w => w.id === selectedWorkshop)?.objective}
-          </p>
+          <div className="space-y-4">
+            <div>
+              <span className="font-semibold">Scope:</span>
+              <p className="text-gray-600">
+                {workshops.find(w => w.id === selectedWorkshop)?.scope}
+              </p>
+            </div>
+            <div>
+              <span className="font-semibold">Objective:</span>
+              <p className="text-gray-600">
+                {workshops.find(w => w.id === selectedWorkshop)?.objective}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

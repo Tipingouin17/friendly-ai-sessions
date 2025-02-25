@@ -1,5 +1,7 @@
 
-import { Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface Facilitator {
   id: number;
@@ -15,27 +17,74 @@ interface FacilitatorSelectionProps {
 }
 
 export const FacilitatorSelection = ({ facilitators, selectedFacilitator, onSelect }: FacilitatorSelectionProps) => {
+  const [startIndex, setStartIndex] = useState(0);
+  const itemsToShow = 4;
+
+  const handlePrevious = () => {
+    setStartIndex(Math.max(0, startIndex - 1));
+  };
+
+  const handleNext = () => {
+    setStartIndex(Math.min(facilitators.length - itemsToShow, startIndex + 1));
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {facilitators.map((facilitator) => (
-        <div
-          key={facilitator.id}
-          className={`p-4 border rounded-xl cursor-pointer transition-all ${
-            selectedFacilitator === facilitator.id ? 'border-primary' : 'border-gray-200'
-          }`}
-          onClick={() => onSelect(facilitator.id)}
+    <div className="relative">
+      <div className="flex items-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-0 z-10 -translate-x-1/2"
+          onClick={handlePrevious}
+          disabled={startIndex === 0}
         >
-          <img src={facilitator.avatar} alt={facilitator.name} className="w-24 h-24 rounded-full mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">{facilitator.name}</h3>
-          <p className="text-sm text-gray-600">{facilitator.description}</p>
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+
+        <div className="mx-12 flex gap-4 overflow-hidden">
+          {facilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => (
+            <div
+              key={facilitator.id}
+              className={`w-1/4 shrink-0 cursor-pointer rounded-xl border p-4 transition-all ${
+                selectedFacilitator === facilitator.id ? 'border-primary' : 'border-gray-200'
+              }`}
+              onClick={() => onSelect(facilitator.id)}
+            >
+              <img src={facilitator.avatar} alt={facilitator.name} className="mx-auto mb-4 h-24 w-24 rounded-full" />
+              <h3 className="mb-2 text-lg font-semibold">{facilitator.name}</h3>
+              <p className="text-sm text-gray-600">{facilitator.description}</p>
+            </div>
+          ))}
+          {startIndex + itemsToShow >= facilitators.length && (
+            <div className="flex w-1/4 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all">
+              <div className="text-center">
+                <Plus className="mx-auto mb-2 h-12 w-12 text-gray-400" />
+                <span className="text-sm text-gray-600">Add New Facilitator</span>
+              </div>
+            </div>
+          )}
         </div>
-      ))}
-      <div className="p-4 border border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-primary transition-all">
-        <div className="text-center">
-          <Plus className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-          <span className="text-sm text-gray-600">Add New Facilitator</span>
-        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 z-10 translate-x-1/2"
+          onClick={handleNext}
+          disabled={startIndex >= facilitators.length - itemsToShow}
+        >
+          <ChevronRight className="h-6 w-6" />
+        </Button>
       </div>
+      {selectedFacilitator && (
+        <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <h3 className="mb-2 text-lg font-semibold">
+            {facilitators.find(f => f.id === selectedFacilitator)?.name}
+          </h3>
+          <p className="text-gray-600">
+            {facilitators.find(f => f.id === selectedFacilitator)?.description}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

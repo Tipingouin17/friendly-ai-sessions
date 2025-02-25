@@ -79,6 +79,7 @@ export type Database = {
         Row: {
           accept_terms_and_conditions: boolean | null
           created_at: string | null
+          ended_at: string | null
           id: number
           is_saved: boolean
           is_session_ended: boolean | null
@@ -86,11 +87,14 @@ export type Database = {
           participant_description: string | null
           participants: number | null
           sessions_id: number | null
+          status: Database["public"]["Enums"]["session_status"] | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
           accept_terms_and_conditions?: boolean | null
           created_at?: string | null
+          ended_at?: string | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null
@@ -98,11 +102,14 @@ export type Database = {
           participant_description?: string | null
           participants?: number | null
           sessions_id?: number | null
+          status?: Database["public"]["Enums"]["session_status"] | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           accept_terms_and_conditions?: boolean | null
           created_at?: string | null
+          ended_at?: string | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null
@@ -110,6 +117,8 @@ export type Database = {
           participant_description?: string | null
           participants?: number | null
           sessions_id?: number | null
+          status?: Database["public"]["Enums"]["session_status"] | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -427,7 +436,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      session_status: "draft" | "active" | "completed" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never

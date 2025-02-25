@@ -15,6 +15,16 @@ interface Plan {
   stripe_plan_id: string;
 }
 
+const FEATURE_LABELS: Record<string, string> = {
+  no_of_facilitator: "Number of Facilitators",
+  no_of_sessions: "Number of Sessions",
+  max_participants: "Maximum Participants",
+  customisable_sessions: "Customizable Sessions",
+  saved_sessions: "Save Sessions",
+  session_reports: "Session Reports",
+  data_export: "Data Export"
+};
+
 const Pricing = () => {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['plans'],
@@ -39,14 +49,15 @@ const Pricing = () => {
     );
   }
 
-  const allFeatures = new Set<string>();
-  plans.forEach((plan) => {
-    if (plan.plan_table_details) {
-      Object.keys(plan.plan_table_details).forEach((feature) => {
-        allFeatures.add(feature);
-      });
-    }
-  });
+  const allFeatures = [
+    'no_of_facilitator',
+    'no_of_sessions',
+    'max_participants',
+    'customisable_sessions',
+    'saved_sessions',
+    'session_reports',
+    'data_export'
+  ];
 
   const renderValue = (value: boolean | string | number | null) => {
     if (typeof value === 'boolean') {
@@ -113,28 +124,37 @@ const Pricing = () => {
         {/* Comparison Table */}
         <div className="mt-16">
           <h2 className="text-3xl font-bold text-center mb-8">Compare Plans</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-white rounded-lg overflow-hidden">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-4 px-6 text-left font-medium text-gray-500">Features</th>
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full border-collapse bg-white">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-4 px-6 text-left font-medium text-gray-500 bg-gray-50">Features</th>
                   {plans.map((plan) => (
-                    <th key={plan.id} className="py-4 px-6 text-center font-medium text-gray-500">
-                      {plan.title}
+                    <th 
+                      key={plan.id} 
+                      className={`py-4 px-6 text-center font-medium ${
+                        plan.is_popular ? 'bg-primary/5' : 'bg-gray-50'
+                      }`}
+                    >
+                      <span className="block text-lg font-semibold text-gray-900">{plan.title}</span>
+                      <span className="block text-sm text-gray-500 mt-1">{plan.plan_type}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {Array.from(allFeatures).map((feature) => (
+                {allFeatures.map((feature) => (
                   <tr key={feature} className="hover:bg-gray-50">
                     <td className="py-4 px-6 text-sm font-medium text-gray-900">
-                      {feature.split('_').map(word => 
-                        word.charAt(0).toUpperCase() + word.slice(1)
-                      ).join(' ')}
+                      {FEATURE_LABELS[feature]}
                     </td>
                     {plans.map((plan) => (
-                      <td key={`${plan.id}-${feature}`} className="py-4 px-6 text-sm text-gray-500">
+                      <td 
+                        key={`${plan.id}-${feature}`} 
+                        className={`py-4 px-6 text-sm text-center ${
+                          plan.is_popular ? 'bg-primary/5' : ''
+                        }`}
+                      >
                         {renderValue(plan.plan_table_details?.[feature])}
                       </td>
                     ))}

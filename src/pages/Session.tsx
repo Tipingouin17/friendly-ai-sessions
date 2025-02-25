@@ -99,19 +99,47 @@ const Session = () => {
         color: participantColors[participant as keyof typeof participantColors]
       }));
 
-      // Add all participant messages
+      // Add participant messages to the UI
       setMessages(prev => [...prev, ...participantResponses]);
 
-      // Add facilitator response
-      setTimeout(() => {
+      try {
+        // Prepare messages for the AI
+        const messagesForAI = participantResponses.map(msg => ({
+          role: "user",
+          content: msg.content,
+          name: msg.participant,
+          conversation_id: Number(id),
+          user_id: null, // Add user_id if you have authentication
+          facilitator_id: conversation?.sessions?.facilitator?.id
+        }));
+
+        // Save participant messages to the database
+        await supabase
+          .from('messages')
+          .insert(messagesForAI);
+
+        // Get AI response
+        const response = await supabase.functions.invoke('handle-facilitator-response', {
+          body: {
+            messages: [...messages, ...messagesForAI],
+            conversationId: Number(id)
+          }
+        });
+
+        if (response.error) throw new Error(response.error.message);
+
+        // Add AI response to the UI
         const aiResponse: Message = {
-          id: Date.now().toString(),
-          content: "Thank you for your inputs. Let me analyze your responses and provide guidance.",
+          id: response.data.id,
+          content: response.data.content,
           sender: "assistant",
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, aiResponse]);
-      }, 1000);
+      } catch (error) {
+        console.error('Error getting AI response:', error);
+        // Add error handling UI feedback here
+      }
 
       // Clear all participant messages
       setParticipantMessages({});

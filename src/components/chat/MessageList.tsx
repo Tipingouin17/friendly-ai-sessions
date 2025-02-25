@@ -2,6 +2,7 @@
 import React from 'react';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { getParticipantColor } from '@/utils/sessionHelpers';
 
 interface MessageListProps {
   messages: Message[];
@@ -15,6 +16,11 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
         const isFirstMessageOfGroup = index === 0 || 
           messages[index - 1].sender !== message.sender || 
           messages[index - 1].participant !== message.participant;
+
+        // Get color from either the provided colors map or generate one from the name
+        const messageColor = message.sender === "user" && message.participant
+          ? (participantColors[message.participant] || getParticipantColor(message.participant))
+          : message.sender === "assistant" ? "#FFFFFF" : undefined;
 
         return (
           <div
@@ -34,9 +40,7 @@ const MessageList = ({ messages, participantColors = {} }: MessageListProps) => 
                 message.isReport && "bg-green-50 border border-green-200 w-full max-w-full rounded-tl-2xl"
               )}
               style={{
-                backgroundColor: message.sender === "user" && message.participant 
-                  ? participantColors[message.participant]
-                  : message.sender === "assistant" ? "#FFFFFF" : undefined,
+                backgroundColor: messageColor
               }}
             >
               {(message.sender === "user" && message.participant && isFirstMessageOfGroup) && (

@@ -122,12 +122,13 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        // Instead of redirecting, navigate to the session page with state
+        // Navigate to the session page with state
         navigate('/session', { 
+          replace: true,
           state: { 
             newConversationId: data.id,
             replace: true
-          } 
+          }
         });
       }
     } catch (error) {

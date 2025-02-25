@@ -61,8 +61,7 @@ export const FacilitatorSelection = ({
                 alt={facilitator.title} 
                 className="mx-auto mb-4 h-24 w-24 rounded-full" 
               />
-              <h3 className="mb-2 text-lg font-semibold">{facilitator.title}</h3>
-              <p className="text-sm text-gray-600">{facilitator.details}</p>
+              <h3 className="text-lg font-semibold text-center">{facilitator.title}</h3>
             </div>
           ))}
           <div 
@@ -101,7 +100,6 @@ export const FacilitatorSelection = ({
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         onSuccess={() => {
-          // This will trigger a refetch of the facilitators list
           window.location.reload();
         }}
       />

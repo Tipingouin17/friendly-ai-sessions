@@ -1,5 +1,5 @@
 
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Workshop } from "@/types/facilitator";
@@ -11,6 +11,14 @@ interface WorkshopSelectionProps {
   onSelect: (id: number) => void;
   isLoading?: boolean;
 }
+
+const iconMap = {
+  'book-open': BookOpen,
+  'graduation-cap': GraduationCap,
+  'brain': Brain,
+  'puzzle': Puzzle,
+  'microscope': Microscope
+};
 
 export const WorkshopSelection = ({ 
   workshops, 
@@ -28,6 +36,11 @@ export const WorkshopSelection = ({
 
   const handleNext = () => {
     setStartIndex(Math.min(workshops.length - itemsToShow, startIndex + 1));
+  };
+
+  const getIcon = (iconType: string = 'book-open') => {
+    const IconComponent = iconMap[iconType as keyof typeof iconMap] || BookOpen;
+    return <IconComponent className="w-12 h-12 text-primary" />;
   };
 
   if (isLoading) {
@@ -56,24 +69,14 @@ export const WorkshopSelection = ({
               }`}
               onClick={() => onSelect(workshop.id)}
             >
-              <div className="mb-4">
-                {workshop.profile_picture ? (
-                  <img src={workshop.profile_picture} alt={workshop.title} className="w-16 h-16 mx-auto" />
-                ) : (
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                    🎯
-                  </div>
-                )}
+              <div className="mb-4 flex justify-center">
+                {getIcon(workshop.icon_type)}
               </div>
-              <h3 className="mb-2 text-lg font-semibold">{workshop.title}</h3>
+              <h3 className="mb-2 text-lg font-semibold text-center">{workshop.title}</h3>
               <div className="space-y-2">
                 <div>
                   <span className="font-semibold">Scope:</span>
                   <p className="text-sm text-gray-600">{workshop.scope}</p>
-                </div>
-                <div>
-                  <span className="font-semibold">Objective:</span>
-                  <p className="text-sm text-gray-600">{workshop.objective}</p>
                 </div>
               </div>
             </div>
@@ -115,7 +118,6 @@ export const WorkshopSelection = ({
         onOpenChange={setIsCreateModalOpen}
         facilitatorId={workshops[0]?.facilitator || 0}
         onSuccess={() => {
-          // This will trigger a refetch of the workshops list
           window.location.reload();
         }}
       />

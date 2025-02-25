@@ -16,10 +16,10 @@ export interface Workshop {
   title: string;
   scope: string;
   objective: string;
-  profile_picture?: string;
+  icon_type?: string;
   welcome_message?: string;
   status?: boolean;
-  facilitator?: number;  // ID of the linked facilitator
+  facilitator?: number;
 }
 
 export interface Conversation {

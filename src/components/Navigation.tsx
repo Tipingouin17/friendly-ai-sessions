@@ -2,6 +2,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UserCircle, Settings, BookOpen, ChevronDown } from "lucide-react";
 
 export const Navigation = () => {
   const location = useLocation();
@@ -50,9 +57,33 @@ export const Navigation = () => {
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">Hi, {user?.name}</span>
-                <Button variant="outline" onClick={logout}>
-                  Log out
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      My Account <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile" className="flex items-center gap-2">
+                        <UserCircle className="h-4 w-4" /> Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" /> Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/past-workshops" className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4" /> Past Workshops
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={logout}>
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               <div className="flex items-center gap-4">

@@ -16,6 +16,9 @@ import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import PastWorkshops from "./pages/PastWorkshops";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +45,30 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Session />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/past-workshops" 
+                element={
+                  <ProtectedRoute>
+                    <PastWorkshops />
                   </ProtectedRoute>
                 } 
               />

@@ -25,6 +25,7 @@ interface SessionContainerProps {
   setIsRecording: (isRecording: boolean) => void;
   onGenerateReport?: () => void;
   participantNames?: { [key: number]: string };
+  onLikeMessage?: (messageId: string) => void;
 }
 
 const SessionContainer = ({
@@ -42,7 +43,8 @@ const SessionContainer = ({
   onSendMessage,
   setIsRecording,
   onGenerateReport,
-  participantNames = {}
+  participantNames = {},
+  onLikeMessage
 }: SessionContainerProps) => {
   // Transform messages to use actual names instead of P1, P2, etc.
   const transformedMessages = messages.map(message => ({
@@ -69,6 +71,8 @@ const SessionContainer = ({
             <MessageList 
               messages={transformedMessages} 
               participantColors={participantColors}
+              currentParticipant={`P${currentParticipant}`}
+              onLikeMessage={onLikeMessage}
             />
           </div>
           <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">

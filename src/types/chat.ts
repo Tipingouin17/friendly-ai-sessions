@@ -6,6 +6,7 @@ export interface Message {
   participant?: string;
   color?: string;
   isReport?: boolean;
+  likes?: string[]; // Array of participant identifiers who liked the message
 }
 
 export interface SpeechRecognition extends EventTarget {

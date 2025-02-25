@@ -1,18 +1,18 @@
 
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
 
 // Define participant colors for visual distinction
 const participantColors = {
   P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
   P5: "#6EE7B7", P6: "#5EEAD4", P7: "#67E8F9", P8: "#7DD3FC",
-  // ... add more colors as needed
 };
 
 const fetchConversation = async (id: number) => {
@@ -43,30 +43,43 @@ const fetchConversation = async (id: number) => {
 
 const Session = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentParticipant, setCurrentParticipant] = useState(1);
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
+  const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
 
-  const { data: conversation, isLoading } = useQuery({
+  const { data: conversation, isLoading, error } = useQuery({
     queryKey: ['conversation', id],
     queryFn: () => fetchConversation(Number(id)),
     enabled: !!id
   });
 
   useEffect(() => {
-    if (conversation?.sessions?.welcome_message) {
-      setMessages([
-        {
-          id: "1",
-          content: conversation.sessions.welcome_message,
-          sender: "assistant",
-          timestamp: new Date(),
-        },
-      ]);
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load the session. Please try again.",
+        variant: "destructive",
+      });
+      navigate('/my-facilitators');
     }
-  }, [conversation]);
+  }, [error, navigate, toast]);
+
+  useEffect(() => {
+    if (conversation?.sessions?.welcome_message && !welcomeMessageSent) {
+      setMessages([{
+        id: Date.now().toString(),
+        content: conversation.sessions.welcome_message,
+        sender: "assistant",
+        timestamp: new Date(),
+      }]);
+      setWelcomeMessageSent(true);
+    }
+  }, [conversation, welcomeMessageSent]);
 
   const handleParticipantSwitch = (participantNumber: number) => {
     setCurrentParticipant(participantNumber);
@@ -112,8 +125,8 @@ const Session = () => {
           content: msg.content,
           name: msg.participant,
           conversation_id: Number(id),
-          user_id: null, // Add user_id if you have authentication
-          facilitator_id: conversation?.sessions?.facilitator?.id
+          user_id: null,
+          facilitator_id: conversation?.sessions?.facilitator
         }));
 
         // Save participant messages to the database
@@ -141,7 +154,11 @@ const Session = () => {
         setMessages(prev => [...prev, aiResponse]);
       } catch (error) {
         console.error('Error getting AI response:', error);
-        // Add error handling UI feedback here
+        toast({
+          title: "Error",
+          description: "Failed to get facilitator's response. Please try again.",
+          variant: "destructive",
+        });
       }
 
       // Clear all participant messages

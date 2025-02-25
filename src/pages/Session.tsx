@@ -21,10 +21,13 @@ const fetchConversation = async (id: number) => {
     .select(`
       *,
       sessions:sessions_id (
+        id,
         title,
         objective,
         welcome_message,
+        facilitator,
         facilitator:facilitators (
+          id,
           title,
           profile_picture,
           details
@@ -110,7 +113,7 @@ const Session = () => {
           name: msg.participant,
           conversation_id: Number(id),
           user_id: null, // Add user_id if you have authentication
-          facilitator_id: conversation?.sessions?.facilitator // No need to access .id
+          facilitator_id: conversation?.sessions?.facilitator?.id
         }));
 
         // Save participant messages to the database

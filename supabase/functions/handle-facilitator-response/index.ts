@@ -87,10 +87,18 @@ serve(async (req) => {
       throw new Error('Conversation not found')
     }
 
-    // Parse facilitator's VST
-    const vstData: VST = conversation.sessions.facilitator.vst ? 
-      JSON.parse(conversation.sessions.facilitator.vst) : 
-      { voice: "professional", style: "supportive", tone: "friendly" }
+    // Parse facilitator's VST with proper error handling
+    let vstData: VST
+    try {
+      vstData = conversation.sessions.facilitator.vst ? 
+        JSON.parse(conversation.sessions.facilitator.vst) : 
+        { voice: "professional", style: "supportive", tone: "friendly" }
+    } catch (error) {
+      console.error('Error parsing VST:', error)
+      console.log('Raw VST value:', conversation.sessions.facilitator.vst)
+      // Fallback to default values if parsing fails
+      vstData = { voice: "professional", style: "supportive", tone: "friendly" }
+    }
 
     // Format messages for the AI using the correct role structure and sequence
     const formattedMessages = messages.map((m: Message) => ({
@@ -137,6 +145,8 @@ serve(async (req) => {
       temperature: Number(conversation.sessions.randomness) || 0.7,
       max_tokens: Number(conversation.sessions.max_tokens) || 1000,
     }
+
+    console.log('OpenAI request body:', openAIBody)
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {

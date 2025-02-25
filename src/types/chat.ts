@@ -5,6 +5,7 @@ export interface Message {
   timestamp: Date;
   participant?: string;
   color?: string;
+  isReport?: boolean;
 }
 
 export interface SpeechRecognition extends EventTarget {

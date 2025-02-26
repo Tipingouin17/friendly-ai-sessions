@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useFacilitators } from "@/hooks/useFacilitators";
 import { useWorkshops } from "@/hooks/useWorkshops";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useAuth } from "@/hooks/useAuth";
 
 const steps = [{
   step: 1,
@@ -35,6 +36,7 @@ const MyFacilitators = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: user } = useCurrentUser();
+  const { canUseFeature } = useAuth();
 
   const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useFacilitators();
   const { data: workshops = [], isLoading: isWorkshopsLoading } = useWorkshops(selectedFacilitator);
@@ -56,12 +58,22 @@ const MyFacilitators = () => {
 
   const handleSubmit = async () => {
     try {
-      if (!selectedWorkshop || !user?.id) {
+      if (!selectedWorkshop) {
         toast({
           title: "Error",
-          description: !selectedWorkshop ? "Please select a workshop" : "Please log in to continue",
+          description: "Please select a workshop",
           variant: "destructive",
         });
+        return;
+      }
+
+      if (!canUseFeature('max_participants') || participantCount > 2) {
+        toast({
+          title: "Upgrade Required",
+          description: "Your current plan doesn't support this many participants. Please upgrade to continue.",
+          variant: "destructive",
+        });
+        navigate('/pricing');
         return;
       }
 

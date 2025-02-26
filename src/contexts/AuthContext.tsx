@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, AuthContextType } from '@/types/auth';
@@ -7,32 +6,89 @@ import { useToast } from '@/components/ui/use-toast';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const FEATURE_RESTRICTIONS = {
+  free: {
+    max_participants: 2,
+    can_save_sessions: false,
+    can_export_data: false,
+    max_facilitators: 1,
+  },
+  basic: {
+    max_participants: 5,
+    can_save_sessions: true,
+    can_export_data: false,
+    max_facilitators: 3,
+  },
+  premium: {
+    max_participants: 10,
+    can_save_sessions: true,
+    can_export_data: true,
+    max_facilitators: -1, // unlimited
+  },
+  admin: {
+    max_participants: -1,
+    can_save_sessions: true,
+    can_export_data: true,
+    max_facilitators: -1,
+  },
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const fetchUserProfile = async (userId: string) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select(`
+        role,
+        current_plan_id,
+        plans:current_plan_id (
+          id,
+          title,
+          plan_type,
+          price
+        )
+      `)
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+
+    return profile;
+  };
+
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
         setUser({
           id: session.user.id,
           email: session.user.email!,
-          name: session.user.user_metadata.name
+          name: session.user.user_metadata.name,
+          role: profile?.role || 'free',
+          plan: profile?.plans || null,
         });
       }
       setIsLoading(false);
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
         setUser({
           id: session.user.id,
           email: session.user.email!,
-          name: session.user.user_metadata.name
+          name: session.user.user_metadata.name,
+          role: profile?.role || 'free',
+          plan: profile?.plans || null,
         });
       } else {
         setUser(null);
@@ -44,6 +100,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  const canUseFeature = (feature: keyof typeof FEATURE_RESTRICTIONS['free']) => {
+    if (!user?.role) return false;
+    return FEATURE_RESTRICTIONS[user.role][feature];
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -119,8 +180,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user, 
       login, 
       signup, 
-      logout, 
-      isAuthenticated: !!user 
+      logout,
+      isAuthenticated: !!user,
+      canUseFeature
     }}>
       {children}
     </AuthContext.Provider>

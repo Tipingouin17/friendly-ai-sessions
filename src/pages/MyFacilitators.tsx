@@ -9,11 +9,8 @@ import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { Step } from "@/types/facilitator";
 import { Stepper } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
-import { useFacilitators } from "@/hooks/useFacilitators";
-import { useWorkshops } from "@/hooks/useWorkshops";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useAuth } from '@/contexts/AuthContext';
 
 const steps = [{
   step: 1,
@@ -26,6 +23,31 @@ const steps = [{
   title: "Describe participants"
 }];
 
+const fetchFacilitators = async () => {
+  const { data, error } = await supabase
+    .from('facilitators')
+    .select('*')
+    .order('order', { ascending: true });
+  
+  if (error) throw error;
+  return data;
+};
+
+const fetchSessions = async (facilitatorId: number | null) => {
+  const query = supabase
+    .from('sessions')
+    .select('*, facilitator:facilitators!inner(*)')
+    .eq('status', true);
+
+  if (facilitatorId) {
+    query.eq('facilitator', facilitatorId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+};
+
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [selectedFacilitator, setSelectedFacilitator] = useState<number | null>(null);
@@ -36,11 +58,17 @@ const MyFacilitators = () => {
   const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: user } = useCurrentUser();
-  const { canUseFeature } = useAuth();
 
-  const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useFacilitators();
-  const { data: workshops = [], isLoading: isWorkshopsLoading } = useWorkshops(selectedFacilitator);
+  const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useQuery({
+    queryKey: ['facilitators'],
+    queryFn: fetchFacilitators
+  });
+
+  const { data: workshops = [], isLoading: isWorkshopsLoading } = useQuery({
+    queryKey: ['workshops', selectedFacilitator],
+    queryFn: () => fetchSessions(selectedFacilitator),
+    enabled: currentStep === 2
+  });
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -68,16 +96,7 @@ const MyFacilitators = () => {
         return;
       }
 
-      if (!canUseFeature('max_participants') || participantCount > 2) {
-        toast({
-          title: "Upgrade Required",
-          description: "Your current plan doesn't support this many participants. Please upgrade to continue.",
-          variant: "destructive",
-        });
-        navigate('/pricing');
-        return;
-      }
-
+      // Create the conversation
       const { data, error } = await supabase
         .from('conversations')
         .insert({
@@ -87,9 +106,7 @@ const MyFacilitators = () => {
           sessions_id: selectedWorkshop,
           accept_terms_and_conditions: agreed,
           is_saved: false,
-          is_session_ended: false,
-          user_id: user.id,
-          status: 'active'
+          is_session_ended: false
         })
         .select('id')
         .single();
@@ -105,10 +122,12 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        navigate(`/session/${data.id}`, { 
+        // Navigate to the session page with state
+        navigate('/session', { 
           replace: true,
           state: { 
             newConversationId: data.id,
+            replace: true
           }
         });
       }

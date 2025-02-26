@@ -1,42 +1,31 @@
 
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { Label } from '@/components/ui/label';
 
 const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { signup, isAuthenticated } = useAuth();
+  const { signup } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    try {
-      await signup(email, password, name);
-    } catch (error) {
-      console.error('Signup error:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    signup(email, password, name);
   };
 
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-gray-50">
+    <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
       <div className="max-w-md mx-auto px-4">
         <div className="bg-white rounded-3xl shadow-lg p-8">
           <h1 className="text-2xl font-bold text-center mb-6">Create an Account</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium mb-2">
+                Full Name
+              </label>
               <Input
                 id="name"
                 type="text"
@@ -46,8 +35,10 @@ const Signup = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-2">
+                Email
+              </label>
               <Input
                 id="email"
                 type="email"
@@ -57,8 +48,10 @@ const Signup = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium mb-2">
+                Password
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -68,12 +61,8 @@ const Signup = () => {
                 required
               />
             </div>
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? "Creating account..." : "Sign up"}
+            <Button type="submit" className="w-full">
+              Sign up
             </Button>
           </form>
           <p className="text-center mt-4 text-sm text-gray-600">

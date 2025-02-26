@@ -20,10 +20,6 @@ export interface Workshop {
   welcome_message?: string;
   status?: boolean;
   facilitator?: number;
-  sessions?: {
-    title: string;
-    facilitator: number;
-  };
 }
 
 export interface Conversation {
@@ -35,17 +31,5 @@ export interface Conversation {
   is_saved: boolean;
   is_session_ended: boolean;
   sessions_id?: number;
-  user_id: string;
-  sessions?: {
-    id: number;
-    title: string;
-    objective: string;
-    welcome_message?: string;
-    facilitator: {
-      id: number;
-      title: string;
-      profile_picture: string;
-      details: string;
-    };
-  };
+  user_id?: string;
 }

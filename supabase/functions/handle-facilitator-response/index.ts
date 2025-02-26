@@ -17,12 +17,6 @@ interface Message {
   facilitator_id?: number;
 }
 
-interface VST {
-  voice: string;
-  style: string;
-  tone: string;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -50,29 +44,19 @@ serve(async (req) => {
       throw new Error('Failed to fetch configuration')
     }
 
-    // Get conversation config with ordered messages
-    const { data: configData, error: conversationConfigError } = await supabaseClient
-      .from('conversations_config')
-      .select('*')
-      .order('order', { ascending: true })
-
-    if (conversationConfigError) {
-      console.error('Error fetching conversation config:', conversationConfigError)
-      throw new Error('Failed to fetch conversation configuration')
-    }
-
     // Get conversation and session details including facilitator VST
     const { data: conversation, error: conversationError } = await supabaseClient
       .from('conversations')
       .select(`
         *,
-        sessions:sessions_id (
+        sessions!conversations_sessions_id_fkey (
           id,
           prompt,
           gpt_version,
           max_tokens,
           randomness,
-          facilitator:facilitators (
+          facilitator,
+          facilitator_details:facilitators (
             id,
             vst,
             title
@@ -88,64 +72,50 @@ serve(async (req) => {
     }
 
     // Parse facilitator's VST with proper error handling
-    let vstData: VST
+    let vstData = {
+      voice: "professional",
+      style: "supportive",
+      tone: "friendly"
+    }
     try {
-      vstData = conversation.sessions.facilitator.vst ? 
-        JSON.parse(conversation.sessions.facilitator.vst) : 
-        { voice: "professional", style: "supportive", tone: "friendly" }
+      if (conversation.sessions.facilitator_details.vst) {
+        const vstLines = conversation.sessions.facilitator_details.vst.split('\n')
+        vstData = {
+          voice: vstLines.find(line => line.startsWith('Voice:'))?.split(':')[1]?.trim() || vstData.voice,
+          style: vstLines.find(line => line.startsWith('Style:'))?.split(':')[1]?.trim() || vstData.style,
+          tone: vstLines.find(line => line.startsWith('Tone:'))?.split(':')[1]?.trim() || vstData.tone
+        }
+      }
     } catch (error) {
       console.error('Error parsing VST:', error)
-      console.log('Raw VST value:', conversation.sessions.facilitator.vst)
-      // Fallback to default values if parsing fails
-      vstData = { voice: "professional", style: "supportive", tone: "friendly" }
+      console.log('Raw VST value:', conversation.sessions.facilitator_details.vst)
     }
 
-    // Format messages for the AI using the correct role structure and sequence
+    // Format messages for OpenAI
     const formattedMessages = messages.map((m: Message) => ({
       role: m.role || (m.sender === 'assistant' ? 'assistant' : 'user'),
       content: m.content,
       name: m.name
     }))
 
-    // Construct system message combining VST, config, and secret message
+    // Construct system message
     const systemInstructions = [
       config.secret_message,
-      `You are ${conversation.sessions.facilitator.title}.`,
+      `You are ${conversation.sessions.facilitator_details.title}.`,
       `Voice: ${vstData.voice}`,
       `Style: ${vstData.style}`,
       `Tone: ${vstData.tone}`,
       conversation.sessions.prompt || "You are a helpful assistant."
     ].filter(Boolean).join('\n\n')
 
-    // If generating a report, add report instructions to the system message
     const finalSystemMessage = generateReport ? 
       `${systemInstructions}\n\nPlease generate a comprehensive report summarizing this conversation. Include:\n- Key discussion points\n- Participant contributions\n- Important insights\n- Recommendations` :
       systemInstructions
 
-    // Get conversation structure from config
-    const conversationStructure = configData
-      .filter(config => config.content)
-      .map(config => ({
-        role: config.role || 'system',
-        content: config.content
-      }))
-
-    // Prepare messages array for OpenAI, ensuring all roles are valid
     const aiMessages = [
       { role: "system", content: finalSystemMessage },
-      ...conversationStructure.filter(msg => ['system', 'assistant', 'user'].includes(msg.role)),
       ...formattedMessages.filter(msg => ['system', 'assistant', 'user'].includes(msg.role))
     ]
-
-    // Prepare the OpenAI request
-    const openAIBody = {
-      model: "gpt-4o-mini",
-      messages: aiMessages,
-      temperature: Number(conversation.sessions.randomness) || 0.7,
-      max_tokens: Number(conversation.sessions.max_tokens) || 1000,
-    }
-
-    console.log('OpenAI request messages:', aiMessages)
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -154,7 +124,12 @@ serve(async (req) => {
         'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(openAIBody),
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: aiMessages,
+        temperature: Number(conversation.sessions.randomness) || 0.7,
+        max_tokens: Number(conversation.sessions.max_tokens) || 1000,
+      }),
     })
 
     if (!openAIResponse.ok) {
@@ -164,23 +139,17 @@ serve(async (req) => {
     }
 
     const aiData = await openAIResponse.json()
-
-    if (!aiData.choices?.[0]?.message) {
-      console.error('Invalid AI response:', aiData)
-      throw new Error('No response from AI')
-    }
+    const aiContent = aiData.choices[0].message.content
 
     // Save the AI response to the database
-    const newMessage = {
-      content: aiData.choices[0].message.content,
-      role: "assistant",
-      conversation_id: conversationId,
-      facilitator_id: conversation.sessions.facilitator?.id || null
-    }
-
     const { data: savedMessage, error: saveError } = await supabaseClient
       .from('messages')
-      .insert(newMessage)
+      .insert({
+        content: aiContent,
+        role: 'assistant',
+        conversation_id: conversationId,
+        facilitator_id: conversation.sessions.facilitator_details.id
+      })
       .select()
       .single()
 
@@ -189,7 +158,7 @@ serve(async (req) => {
       throw saveError
     }
 
-    // If this was a report generation, update the conversation
+    // If this was a report generation, update the conversation status
     if (generateReport) {
       await supabaseClient
         .from('conversations')
@@ -205,7 +174,7 @@ serve(async (req) => {
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-      },
+      }
     )
 
   } catch (error) {
@@ -215,7 +184,7 @@ serve(async (req) => {
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
-      },
+      }
     )
   }
 })

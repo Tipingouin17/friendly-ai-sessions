@@ -22,7 +22,7 @@ interface Workshop {
   } | null;
 }
 
-const fetchPastWorkshops = async () => {
+const fetchPastWorkshops = async (): Promise<Workshop[]> => {
   const { data, error } = await supabase
     .from('conversations')
     .select(`
@@ -37,7 +37,13 @@ const fetchPastWorkshops = async () => {
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
-  return (data as Workshop[]) || [];
+  if (!data) return [];
+  
+  // Ensure the data matches our Workshop type
+  return data.map(item => ({
+    ...item,
+    sessions: item.sessions || null
+  }));
 };
 
 const WorkshopCard = ({ workshop }: { workshop: Workshop }) => (

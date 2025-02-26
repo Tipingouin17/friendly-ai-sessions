@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversation } from "@/hooks/useConversation";
@@ -17,7 +17,6 @@ const Session = () => {
   const { toast } = useToast();
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
 
-  // Handle conversation ID from URL or state
   useEffect(() => {
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
     
@@ -41,44 +40,42 @@ const Session = () => {
     }
   }, [location, queryClient, navigate]);
 
-const { data: conversation, isLoading, error } = useQuery({
-  queryKey: ['conversation', conversationId],
-  queryFn: async () => {
-    if (!conversationId) throw new Error('Conversation ID is required');
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        sessions!sessions_id (
-          id,
-          title,
-          objective,
-          welcome_message,
-          facilitator (
+  const { data: conversation, isLoading, error } = useQuery({
+    queryKey: ['conversation', currentConversationId],
+    queryFn: async () => {
+      if (!currentConversationId) throw new Error('Conversation ID is required');
+      
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          *,
+          sessions!sessions_id (
             id,
             title,
-            profile_picture,
-            details
+            objective,
+            welcome_message,
+            facilitator (
+              id,
+              title,
+              profile_picture,
+              details
+            )
           )
-        )
-      `)
-      .eq('id', conversationId)
-      .single();
+        `)
+        .eq('id', currentConversationId)
+        .single();
 
-    if (error) throw error;
-    return data;
-  },
-  enabled: !!conversationId
-});
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentConversationId
+  });
 
-  // Initialize session state
   const sessionState = useSessionState({
     conversationId: currentConversationId,
     welcomeMessage: conversation?.sessions?.welcome_message
   });
 
-  // Handle conversation fetch error
   useEffect(() => {
     if (error) {
       console.error('Error in conversation query:', error);
@@ -91,7 +88,6 @@ const { data: conversation, isLoading, error } = useQuery({
     }
   }, [error, navigate, toast]);
 
-  // Handle message sending
   const handleSendMessage = async () => {
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 

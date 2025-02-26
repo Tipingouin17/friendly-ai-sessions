@@ -3,9 +3,10 @@ import { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { FeatureRestrictions } from '@/types/auth';
 
 interface PlanRestrictedFeatureProps {
-  feature: string;
+  feature: keyof FeatureRestrictions;
   children: ReactNode;
   fallback?: ReactNode;
 }

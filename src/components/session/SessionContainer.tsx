@@ -50,10 +50,9 @@ const SessionContainer = ({
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
       const participantNumber = parseInt(message.participant.slice(1));
-      const participantName = participantNames[participantNumber];
       return {
         ...message,
-        participant: participantName || `Participant ${participantNumber}`
+        participant: participantNames[participantNumber] || `Anonymous ${participantNumber}`
       };
     }
     return message;

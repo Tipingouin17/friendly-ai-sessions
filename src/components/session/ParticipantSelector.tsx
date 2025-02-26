@@ -25,7 +25,7 @@ const ParticipantSelector = ({
               value={num.toString()}
               className="min-w-[100px]"
             >
-              {participantNames[num] || `Participant ${num}`}
+              {participantNames[num] || `Anonymous ${num}`}
             </TabsTrigger>
           ))}
         </TabsList>

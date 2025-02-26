@@ -27,11 +27,17 @@ const fetchPastWorkshops = async (): Promise<Workshop[]> => {
   const { data, error } = await supabase
     .from('conversations')
     .select(`
-      *,
-      sessions!inner:sessions_id (
-        title,
-        facilitator
-      )
+      id,
+      created_at,
+      ended_at,
+      updated_at,
+      participants,
+      sessions_id,
+      is_saved,
+      is_session_ended,
+      participant_description,
+      status,
+      sessions:sessions_id(title, facilitator)
     `)
     .eq('is_session_ended', true)
     .order('ended_at', { ascending: false })
@@ -40,9 +46,19 @@ const fetchPastWorkshops = async (): Promise<Workshop[]> => {
   if (error) throw error;
   if (!data) return [];
   
+  // Transform the data to match Workshop interface
   return data.map(item => ({
-    ...item,
-    sessions: item.sessions || null
+    id: item.id,
+    created_at: item.created_at,
+    ended_at: item.ended_at,
+    updated_at: item.updated_at,
+    participants: item.participants,
+    sessions_id: item.sessions_id,
+    is_saved: item.is_saved,
+    is_session_ended: item.is_session_ended,
+    participant_description: item.participant_description,
+    status: item.status,
+    sessions: item.sessions
   }));
 };
 

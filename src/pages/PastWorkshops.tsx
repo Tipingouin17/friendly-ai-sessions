@@ -23,30 +23,35 @@ interface Workshop {
   } | null;
 }
 
+type ApiResponse = {
+  id: number;
+  created_at: string;
+  ended_at: string | null;
+  updated_at: string;
+  participants: number;
+  sessions_id: number;
+  is_saved: boolean;
+  is_session_ended: boolean;
+  participant_description: string | null;
+  status: 'draft' | 'active' | 'completed' | 'archived';
+  sessions: {
+    title: string;
+    facilitator: number;
+  } | null;
+}
+
 const fetchPastWorkshops = async (): Promise<Workshop[]> => {
   const { data, error } = await supabase
     .from('conversations')
-    .select(`
-      id,
-      created_at,
-      ended_at,
-      updated_at,
-      participants,
-      sessions_id,
-      is_saved,
-      is_session_ended,
-      participant_description,
-      status,
-      sessions:sessions_id(title, facilitator)
-    `)
+    .select('*, sessions!sessions_id(title, facilitator)')
     .eq('is_session_ended', true)
     .order('ended_at', { ascending: false })
-    .order('updated_at', { ascending: false });
+    .order('updated_at', { ascending: false })
+    .returns<ApiResponse[]>();
 
   if (error) throw error;
   if (!data) return [];
   
-  // Transform the data to match Workshop interface
   return data.map(item => ({
     id: item.id,
     created_at: item.created_at,
@@ -56,7 +61,7 @@ const fetchPastWorkshops = async (): Promise<Workshop[]> => {
     sessions_id: item.sessions_id,
     is_saved: item.is_saved,
     is_session_ended: item.is_session_ended,
-    participant_description: item.participant_description,
+    participant_description: item.participant_description || undefined,
     status: item.status,
     sessions: item.sessions
   }));

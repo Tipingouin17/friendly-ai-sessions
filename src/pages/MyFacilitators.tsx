@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -104,11 +105,10 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        navigate('/session', { 
+        navigate(`/session/${data.id}`, { 
           replace: true,
           state: { 
             newConversationId: data.id,
-            replace: true
           }
         });
       }

@@ -1,27 +1,10 @@
-
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-
-interface Workshop {
-  id: number;
-  created_at: string;
-  ended_at: string | null;
-  updated_at: string;
-  participants: number;
-  sessions_id: number;
-  is_saved: boolean;
-  is_session_ended: boolean;
-  participant_description?: string;
-  status: 'draft' | 'active' | 'completed' | 'archived';
-  sessions: {
-    title: string;
-    facilitator: number;
-  } | null;
-}
+import { Workshop } from "@/types/database";
 
 const fetchPastWorkshops = async () => {
   const { data, error } = await supabase
@@ -34,8 +17,7 @@ const fetchPastWorkshops = async () => {
       )
     `)
     .eq('is_session_ended', true)
-    .order('ended_at', { ascending: false })
-    .order('updated_at', { ascending: false });
+    .order('ended_at', { ascending: false });
 
   if (error) throw error;
   return data as Workshop[];
@@ -121,7 +103,7 @@ const EmptyState = () => (
 );
 
 const PastWorkshops = () => {
-  const { data: workshops, isLoading, error } = useQuery({
+  const { data: workshops, isLoading, error } = useQuery<Workshop[]>({
     queryKey: ['past-workshops'],
     queryFn: fetchPastWorkshops,
   });

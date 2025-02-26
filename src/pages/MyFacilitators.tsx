@@ -96,7 +96,21 @@ const MyFacilitators = () => {
         return;
       }
 
-      // Create the conversation
+      const {
+        data: { user },
+        error: userError
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create a session",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create the conversation with user_id
       const { data, error } = await supabase
         .from('conversations')
         .insert({
@@ -106,7 +120,8 @@ const MyFacilitators = () => {
           sessions_id: selectedWorkshop,
           accept_terms_and_conditions: agreed,
           is_saved: false,
-          is_session_ended: false
+          is_session_ended: false,
+          user_id: user.id // This was missing before
         })
         .select('id')
         .single();
@@ -122,7 +137,6 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        // Navigate to the session page with state
         navigate('/session', { 
           replace: true,
           state: { 

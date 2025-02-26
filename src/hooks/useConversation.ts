@@ -1,9 +1,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ConversationWithSession } from "@/types/database";
 
 export const useConversation = (conversationId: number | null) => {
-  return useQuery({
+  return useQuery<ConversationWithSession | null>({
     queryKey: ['conversation', conversationId],
     queryFn: () => fetchConversation(conversationId),
     enabled: !!conversationId,
@@ -24,7 +25,7 @@ const fetchConversation = async (id: number | null) => {
         objective,
         welcome_message,
         facilitator,
-        facilitator:facilitators (
+        facilitator_details:facilitators (
           id,
           title,
           profile_picture,
@@ -33,7 +34,7 @@ const fetchConversation = async (id: number | null) => {
       )
     `)
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching conversation:', error);

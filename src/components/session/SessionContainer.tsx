@@ -46,20 +46,15 @@ const SessionContainer = ({
   participantNames = {},
   onLikeMessage
 }: SessionContainerProps) => {
-  // Transform messages to use actual names instead of P1, P2, etc.
+  // Transform messages to use actual names
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
       const participantNumber = parseInt(message.participant.slice(1));
       const name = participantNames[participantNumber];
-      if (name) {
-        return {
-          ...message,
-          participant: name
-        };
-      }
+      // Only return the name if it exists
       return {
         ...message,
-        participant: `Anonymous ${participantNumber}`
+        participant: name || message.participant // Keep original P1, P2 if no name exists
       };
     }
     return message;
@@ -78,13 +73,15 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0}
           />
-          <ParticipantSelector
-            participantCount={participantCount}
-            currentParticipant={currentParticipant}
-            onParticipantSwitch={onParticipantSwitch}
-            participantNames={participantNames}
-          />
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+              <ParticipantSelector
+                participantCount={participantCount}
+                currentParticipant={currentParticipant}
+                onParticipantSwitch={onParticipantSwitch}
+                participantNames={participantNames}
+              />
+            </div>
             <MessageList 
               messages={transformedMessages} 
               participantColors={participantColors}

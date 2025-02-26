@@ -16,7 +16,7 @@ const ParticipantSelector = ({
   participantNames = {}
 }: ParticipantSelectorProps) => {
   return (
-    <div className="px-4 py-2 border-t border-gray-100 bg-white">
+    <div className="px-4 py-2 bg-white">
       <Tabs value={currentParticipant.toString()} onValueChange={(value) => onParticipantSwitch(parseInt(value))}>
         <TabsList className="w-full justify-start">
           {Array.from({ length: participantCount }, (_, i) => i + 1).map((num) => (
@@ -25,7 +25,7 @@ const ParticipantSelector = ({
               value={num.toString()}
               className="min-w-[100px]"
             >
-              {participantNames[num] ?? `Anonymous ${num}`}
+              {participantNames[num] || `P${num}`}
             </TabsTrigger>
           ))}
         </TabsList>

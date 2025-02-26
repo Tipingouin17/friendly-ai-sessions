@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,11 +9,23 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    signup(email, password, name);
+    setIsLoading(true);
+    try {
+      await signup(email, password, name);
+      navigate('/login', { 
+        state: { message: 'Please check your email to verify your account.' }
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,8 +73,8 @@ const Signup = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Sign up
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Creating account...' : 'Sign up'}
             </Button>
           </form>
           <p className="text-center mt-4 text-sm text-gray-600">

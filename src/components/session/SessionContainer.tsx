@@ -78,12 +78,6 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0}
           />
-          <ParticipantSelector
-            participantCount={participantCount}
-            currentParticipant={currentParticipant}
-            onParticipantSwitch={onParticipantSwitch}
-            participantNames={participantNames}
-          />
           <div className="flex-1 overflow-hidden">
             <MessageList 
               messages={transformedMessages} 
@@ -92,6 +86,12 @@ const SessionContainer = ({
               onLikeMessage={onLikeMessage}
             />
           </div>
+          <ParticipantSelector
+            participantCount={participantCount}
+            currentParticipant={currentParticipant}
+            onParticipantSwitch={onParticipantSwitch}
+            participantNames={participantNames}
+          />
           <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
             <ChatInput
               inputMessage={inputMessage}

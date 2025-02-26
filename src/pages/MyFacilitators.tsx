@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useFacilitators } from "@/hooks/useFacilitators";
 import { useWorkshops } from "@/hooks/useWorkshops";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const steps = [{
   step: 1,
@@ -34,6 +34,7 @@ const MyFacilitators = () => {
   const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { data: user } = useCurrentUser();
 
   const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useFacilitators();
   const { data: workshops = [], isLoading: isWorkshopsLoading } = useWorkshops(selectedFacilitator);
@@ -55,10 +56,10 @@ const MyFacilitators = () => {
 
   const handleSubmit = async () => {
     try {
-      if (!selectedWorkshop) {
+      if (!selectedWorkshop || !user?.id) {
         toast({
           title: "Error",
-          description: "Please select a workshop",
+          description: !selectedWorkshop ? "Please select a workshop" : "Please log in to continue",
           variant: "destructive",
         });
         return;
@@ -73,7 +74,9 @@ const MyFacilitators = () => {
           sessions_id: selectedWorkshop,
           accept_terms_and_conditions: agreed,
           is_saved: false,
-          is_session_ended: false
+          is_session_ended: false,
+          user_id: user.id,
+          status: 'active'
         })
         .select('id')
         .single();

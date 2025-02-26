@@ -1,13 +1,12 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, AuthContextType } from '@/types/auth';
+import { User, AuthContextType, UserRole, FeatureRestrictions } from '@/types/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const FEATURE_RESTRICTIONS = {
+const FEATURE_RESTRICTIONS: Record<UserRole, FeatureRestrictions> = {
   free: {
     max_participants: 2,
     can_save_sessions: false,
@@ -24,7 +23,7 @@ const FEATURE_RESTRICTIONS = {
     max_participants: 10,
     can_save_sessions: true,
     can_export_data: true,
-    max_facilitators: -1, // unlimited
+    max_facilitators: -1,
   },
   admin: {
     max_participants: -1,
@@ -66,7 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Check active sessions and sets the user
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await fetchUserProfile(session.user.id);
@@ -81,7 +79,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await fetchUserProfile(session.user.id);
@@ -103,9 +100,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const canUseFeature = (feature: keyof typeof FEATURE_RESTRICTIONS['free']) => {
+  const canUseFeature = (feature: keyof FeatureRestrictions): boolean => {
     if (!user?.role) return false;
-    return FEATURE_RESTRICTIONS[user.role][feature];
+    const restriction = FEATURE_RESTRICTIONS[user.role][feature];
+    if (typeof restriction === 'boolean') return restriction;
+    return restriction > 0;
   };
 
   const login = async (email: string, password: string) => {

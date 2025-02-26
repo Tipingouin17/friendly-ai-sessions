@@ -1,4 +1,3 @@
-
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,7 +37,7 @@ const fetchPastWorkshops = async () => {
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
-  return data as Workshop[];
+  return (data as Workshop[]) || [];
 };
 
 const WorkshopCard = ({ workshop }: { workshop: Workshop }) => (

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,8 +41,36 @@ const Session = () => {
     }
   }, [location, queryClient, navigate]);
 
-  // Fetch conversation data
-  const { data: conversation, isLoading, error } = useConversation(currentConversationId);
+const { data: conversation, isLoading, error } = useQuery({
+  queryKey: ['conversation', conversationId],
+  queryFn: async () => {
+    if (!conversationId) throw new Error('Conversation ID is required');
+    
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        sessions!sessions_id (
+          id,
+          title,
+          objective,
+          welcome_message,
+          facilitator (
+            id,
+            title,
+            profile_picture,
+            details
+          )
+        )
+      `)
+      .eq('id', conversationId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+  enabled: !!conversationId
+});
 
   // Initialize session state
   const sessionState = useSessionState({

@@ -4,17 +4,56 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleSave = () => {
-    // In a real app, this would update the user profile
-    setIsEditing(false);
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        email: email,
+        data: { name: name }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been successfully updated.",
+      });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-24 pb-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <Card className="p-6">
+            <p className="text-center text-gray-500">Please log in to view your profile.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -28,8 +67,9 @@ const Profile = () => {
               <Button 
                 variant="outline"
                 onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                disabled={isLoading}
               >
-                {isEditing ? 'Save Changes' : 'Edit Profile'}
+                {isLoading ? "Saving..." : isEditing ? 'Save Changes' : 'Edit Profile'}
               </Button>
             </div>
 
@@ -37,19 +77,35 @@ const Profile = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Name</label>
                 {isEditing ? (
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                  <Input 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name"
+                  />
                 ) : (
-                  <p className="text-gray-700">{user?.name}</p>
+                  <p className="text-gray-700">{user.name || "Not set"}</p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Email</label>
                 {isEditing ? (
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <Input 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="Enter your email"
+                  />
                 ) : (
-                  <p className="text-gray-700">{user?.email}</p>
+                  <p className="text-gray-700">{user.email}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Member Since</label>
+                <p className="text-gray-700">
+                  {new Date().toLocaleDateString()}
+                </p>
               </div>
             </div>
           </div>

@@ -9,8 +9,9 @@ import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { Step } from "@/types/facilitator";
 import { Stepper } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
+import { useFacilitators } from "@/hooks/useFacilitators";
+import { useWorkshops } from "@/hooks/useWorkshops";
 
 const steps = [{
   step: 1,
@@ -23,31 +24,6 @@ const steps = [{
   title: "Describe participants"
 }];
 
-const fetchFacilitators = async () => {
-  const { data, error } = await supabase
-    .from('facilitators')
-    .select('*')
-    .order('order', { ascending: true });
-  
-  if (error) throw error;
-  return data;
-};
-
-const fetchSessions = async (facilitatorId: number | null) => {
-  const query = supabase
-    .from('sessions')
-    .select('*, facilitator:facilitators!inner(*)')
-    .eq('status', true);
-
-  if (facilitatorId) {
-    query.eq('facilitator', facilitatorId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
-};
-
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [selectedFacilitator, setSelectedFacilitator] = useState<number | null>(null);
@@ -59,16 +35,8 @@ const MyFacilitators = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useQuery({
-    queryKey: ['facilitators'],
-    queryFn: fetchFacilitators
-  });
-
-  const { data: workshops = [], isLoading: isWorkshopsLoading } = useQuery({
-    queryKey: ['workshops', selectedFacilitator],
-    queryFn: () => fetchSessions(selectedFacilitator),
-    enabled: currentStep === 2
-  });
+  const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useFacilitators();
+  const { data: workshops = [], isLoading: isWorkshopsLoading } = useWorkshops(selectedFacilitator);
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -96,7 +64,6 @@ const MyFacilitators = () => {
         return;
       }
 
-      // Create the conversation
       const { data, error } = await supabase
         .from('conversations')
         .insert({
@@ -122,7 +89,6 @@ const MyFacilitators = () => {
       }
 
       if (data?.id) {
-        // Navigate to the session page with state
         navigate('/session', { 
           replace: true,
           state: { 

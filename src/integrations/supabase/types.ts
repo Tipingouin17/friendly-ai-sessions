@@ -113,7 +113,7 @@ export type Database = {
           sessions_id: number | null
           status: Database["public"]["Enums"]["session_status"] | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           accept_terms_and_conditions?: boolean | null
@@ -128,7 +128,7 @@ export type Database = {
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           accept_terms_and_conditions?: boolean | null
@@ -143,11 +143,18 @@ export type Database = {
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "conversations_sessions_id_fkey"
+            columns: ["sessions_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_conversations_sessions"
             columns: ["sessions_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -187,6 +194,7 @@ export type Database = {
       }
       facilitators: {
         Row: {
+          config_history: Json | null
           created_at: string | null
           description: string | null
           details: string | null
@@ -204,9 +212,11 @@ export type Database = {
           title: string | null
           total_sessions: number | null
           user_id: string | null
+          version: number | null
           vst: string | null
         }
         Insert: {
+          config_history?: Json | null
           created_at?: string | null
           description?: string | null
           details?: string | null
@@ -224,9 +234,11 @@ export type Database = {
           title?: string | null
           total_sessions?: number | null
           user_id?: string | null
+          version?: number | null
           vst?: string | null
         }
         Update: {
+          config_history?: Json | null
           created_at?: string | null
           description?: string | null
           details?: string | null
@@ -244,6 +256,7 @@ export type Database = {
           title?: string | null
           total_sessions?: number | null
           user_id?: string | null
+          version?: number | null
           vst?: string | null
         }
         Relationships: [
@@ -336,6 +349,7 @@ export type Database = {
           id: number
           name: string | null
           role: string | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -346,6 +360,7 @@ export type Database = {
           id?: number
           name?: string | null
           role?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -356,9 +371,17 @@ export type Database = {
           id?: number
           name?: string | null
           role?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_messages_conversations"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -433,6 +456,8 @@ export type Database = {
           price: number | null
           stripe_plan_id: string | null
           title: string | null
+          valid_from: string | null
+          valid_until: string | null
         }
         Insert: {
           created_at?: string | null
@@ -444,6 +469,8 @@ export type Database = {
           price?: number | null
           stripe_plan_id?: string | null
           title?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Update: {
           created_at?: string | null
@@ -455,6 +482,8 @@ export type Database = {
           price?: number | null
           stripe_plan_id?: string | null
           title?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Relationships: []
       }
@@ -462,6 +491,7 @@ export type Database = {
         Row: {
           category_id: number | null
           created_at: string | null
+          difficulty_level: string | null
           duration_minutes: number | null
           facilitator: number | null
           gpt_version: string | null
@@ -486,6 +516,7 @@ export type Database = {
         Insert: {
           category_id?: number | null
           created_at?: string | null
+          difficulty_level?: string | null
           duration_minutes?: number | null
           facilitator?: number | null
           gpt_version?: string | null
@@ -510,6 +541,7 @@ export type Database = {
         Update: {
           category_id?: number | null
           created_at?: string | null
+          difficulty_level?: string | null
           duration_minutes?: number | null
           facilitator?: number | null
           gpt_version?: string | null
@@ -550,6 +582,7 @@ export type Database = {
       }
       sessions_history: {
         Row: {
+          completion_status: string | null
           created_at: string | null
           duration_minutes: number | null
           ended_at: string | null
@@ -561,8 +594,10 @@ export type Database = {
           participant_count: number | null
           session_id: number | null
           started_at: string | null
+          success_rate: number | null
         }
         Insert: {
+          completion_status?: string | null
           created_at?: string | null
           duration_minutes?: number | null
           ended_at?: string | null
@@ -574,8 +609,10 @@ export type Database = {
           participant_count?: number | null
           session_id?: number | null
           started_at?: string | null
+          success_rate?: number | null
         }
         Update: {
+          completion_status?: string | null
           created_at?: string | null
           duration_minutes?: number | null
           ended_at?: string | null
@@ -587,6 +624,7 @@ export type Database = {
           participant_count?: number | null
           session_id?: number | null
           started_at?: string | null
+          success_rate?: number | null
         }
         Relationships: [
           {

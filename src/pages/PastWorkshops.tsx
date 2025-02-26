@@ -1,3 +1,4 @@
+
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +28,7 @@ const fetchPastWorkshops = async (): Promise<Workshop[]> => {
     .from('conversations')
     .select(`
       *,
-      sessions:sessions_id (
+      sessions!inner:sessions_id (
         title,
         facilitator
       )
@@ -39,7 +40,6 @@ const fetchPastWorkshops = async (): Promise<Workshop[]> => {
   if (error) throw error;
   if (!data) return [];
   
-  // Ensure the data matches our Workshop type
   return data.map(item => ({
     ...item,
     sessions: item.sessions || null

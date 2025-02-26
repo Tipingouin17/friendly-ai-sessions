@@ -1,8 +1,10 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserCircle, Settings, BookOpen, ChevronDown } from "lucide-react";
+
 export const Navigation = () => {
   const location = useLocation();
   const {
@@ -10,7 +12,9 @@ export const Navigation = () => {
     user,
     logout
   } = useAuth();
-  return <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
@@ -32,7 +36,8 @@ export const Navigation = () => {
             <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
               Contact Us
             </Link>
-            {isAuthenticated ? <div className="flex items-center gap-4">
+            {isAuthenticated ? (
+              <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">Hi, {user?.name}</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -61,16 +66,20 @@ export const Navigation = () => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div> : <div className="flex items-center gap-4">
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
                 <Link to="/login">
                   <Button variant="outline">Log in</Button>
                 </Link>
                 <Link to="/signup">
                   <Button>Sign up</Button>
                 </Link>
-              </div>}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </nav>;
+    </nav>
+  );
 };

@@ -18,7 +18,7 @@ const fetchConversation = async (id: number | null) => {
     .from('conversations')
     .select(`
       *,
-      sessions:sessions_id (
+      sessions:sessions_id!conversations_sessions_id_fkey (
         id,
         title,
         objective,
@@ -33,7 +33,7 @@ const fetchConversation = async (id: number | null) => {
       )
     `)
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching conversation:', error);

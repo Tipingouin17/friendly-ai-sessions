@@ -19,7 +19,7 @@ const fetchConversation = async (id: number | null) => {
     .from('conversations')
     .select(`
       *,
-      sessions:sessions_id (
+      sessions!conversations_sessions_id_fkey (
         id,
         title,
         objective,

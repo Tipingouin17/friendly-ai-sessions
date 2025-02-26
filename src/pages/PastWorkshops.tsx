@@ -1,3 +1,4 @@
+
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ const fetchPastWorkshops = async () => {
     .from('conversations')
     .select(`
       *,
-      sessions:sessions_id (
+      sessions!conversations_sessions_id_fkey (
         title,
         facilitator
       )

@@ -1,7 +1,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Conversation } from "@/types/database";
 
 export const useConversation = (conversationId: number | null) => {
   return useQuery({
@@ -11,7 +10,7 @@ export const useConversation = (conversationId: number | null) => {
   });
 };
 
-const fetchConversation = async (id: number | null): Promise<Conversation | null> => {
+const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
   console.log('Fetching conversation with ID:', id);
@@ -34,13 +33,12 @@ const fetchConversation = async (id: number | null): Promise<Conversation | null
       )
     `)
     .eq('id', id)
-    .maybeSingle();
+    .single();
 
   if (error) {
     console.error('Error fetching conversation:', error);
     throw error;
   }
-
   console.log('Fetched conversation:', data);
   return data;
 };

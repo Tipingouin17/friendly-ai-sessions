@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useFacilitators } from "@/hooks/useFacilitators";
 import { useWorkshops } from "@/hooks/useWorkshops";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from '@/contexts/AuthContext';
 
 const steps = [{
   step: 1,

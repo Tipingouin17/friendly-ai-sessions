@@ -487,6 +487,38 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          current_plan_id: number | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_plan_id?: number | null
+          id: string
+          role?: Database["public"]["Enums"]["user_role"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_plan_id?: number | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_current_plan_id_fkey"
+            columns: ["current_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           category_id: number | null
@@ -658,6 +690,7 @@ export type Database = {
         | "consultation"
         | "coaching"
         | "team_building"
+      user_role: "free" | "basic" | "premium" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, AuthContextType } from '@/types/auth';
@@ -40,9 +41,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const fetchUserProfile = async (userId: string) => {
-    const { data: profile, error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select(`
+        id,
         role,
         current_plan_id,
         plans:current_plan_id (
@@ -53,14 +55,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         )
       `)
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching user profile:', error);
       return null;
     }
 
-    return profile;
+    return data;
   };
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ParticipantSelectorProps {
   participantCount: number;
@@ -16,17 +16,20 @@ const ParticipantSelector = ({
   participantNames = {}
 }: ParticipantSelectorProps) => {
   return (
-    <div className="flex gap-2 p-4 border-t border-gray-100 bg-white">
-      {Array.from({ length: participantCount }, (_, i) => i + 1).map((num) => (
-        <Button
-          key={num}
-          onClick={() => onParticipantSwitch(num)}
-          variant={currentParticipant === num ? "default" : "outline"}
-          className="min-w-[60px]"
-        >
-          {participantNames[num] || `P${num}`}
-        </Button>
-      ))}
+    <div className="px-4 py-2 border-t border-gray-100 bg-white">
+      <Tabs value={currentParticipant.toString()} onValueChange={(value) => onParticipantSwitch(parseInt(value))}>
+        <TabsList className="w-full justify-start">
+          {Array.from({ length: participantCount }, (_, i) => i + 1).map((num) => (
+            <TabsTrigger 
+              key={num} 
+              value={num.toString()}
+              className="min-w-[100px]"
+            >
+              {participantNames[num] || `Participant ${num}`}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   );
 };

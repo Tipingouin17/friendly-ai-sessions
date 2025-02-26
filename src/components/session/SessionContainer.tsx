@@ -47,12 +47,17 @@ const SessionContainer = ({
   onLikeMessage
 }: SessionContainerProps) => {
   // Transform messages to use actual names instead of P1, P2, etc.
-  const transformedMessages = messages.map(message => ({
-    ...message,
-    participant: message.participant && message.participant.startsWith('P')
-      ? participantNames[parseInt(message.participant.slice(1))] || message.participant
-      : message.participant
-  }));
+  const transformedMessages = messages.map(message => {
+    if (message.participant && message.participant.startsWith('P')) {
+      const participantNumber = parseInt(message.participant.slice(1));
+      const participantName = participantNames[participantNumber];
+      return {
+        ...message,
+        participant: participantName || `Participant ${participantNumber}`
+      };
+    }
+    return message;
+  });
 
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
@@ -67,6 +72,12 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0}
           />
+          <ParticipantSelector
+            participantCount={participantCount}
+            currentParticipant={currentParticipant}
+            onParticipantSwitch={onParticipantSwitch}
+            participantNames={participantNames}
+          />
           <div className="flex-1 overflow-hidden">
             <MessageList 
               messages={transformedMessages} 
@@ -76,12 +87,6 @@ const SessionContainer = ({
             />
           </div>
           <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
-            <ParticipantSelector
-              participantCount={participantCount}
-              currentParticipant={currentParticipant}
-              onParticipantSwitch={onParticipantSwitch}
-              participantNames={participantNames}
-            />
             <ChatInput
               inputMessage={inputMessage}
               setInputMessage={setInputMessage}

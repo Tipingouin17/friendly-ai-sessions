@@ -6,7 +6,10 @@ import { ConversationWithSession } from "@/types/database";
 export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null>({
     queryKey: ['conversation', conversationId],
-    queryFn: () => fetchConversation(conversationId),
+    queryFn: async () => {
+      const data = await fetchConversation(conversationId);
+      return data as ConversationWithSession | null;
+    },
     enabled: !!conversationId,
   });
 };

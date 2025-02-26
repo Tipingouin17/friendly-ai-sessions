@@ -48,7 +48,7 @@ const Session = () => {
   // Initialize session state
   const sessionState = useSessionState({
     conversationId: currentConversationId,
-    welcomeMessage: conversation?.sessions?.welcome_message
+    welcomeMessage: conversation?.sessions?.welcome_message ?? null
   });
 
   // Handle conversation fetch error
@@ -78,7 +78,7 @@ const Session = () => {
       ...sessionState.participantMessages,
       [currentParticipantKey]: sessionState.inputMessage
     };
-    const totalParticipants = conversation?.participants || 1;
+    const totalParticipants = conversation?.participants ?? 1;
     const allParticipantsResponded = Object.keys(updatedMessages).length === totalParticipants;
 
     if (allParticipantsResponded) {
@@ -100,7 +100,7 @@ const Session = () => {
           name: msg.participant,
           conversation_id: currentConversationId,
           user_id: null,
-          facilitator_id: conversation?.sessions?.facilitator?.id || null
+          facilitator_id: conversation?.sessions?.facilitator_details?.id ?? null
         }));
 
         await supabase.from('messages').insert(messagesForAI);
@@ -146,9 +146,9 @@ const Session = () => {
 
   return (
     <SessionContainer
-      facilitator={conversation.sessions.facilitator}
-      objective={conversation.sessions.objective}
-      participantCount={conversation.participants || 1}
+      facilitator={conversation.sessions?.facilitator_details ?? {}}
+      objective={conversation.sessions?.objective ?? null}
+      participantCount={conversation.participants ?? 1}
       messages={sessionState.messages}
       participantColors={participantColors}
       currentParticipant={sessionState.currentParticipant}

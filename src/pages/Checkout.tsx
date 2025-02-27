@@ -43,10 +43,14 @@ const Checkout = () => {
     queryFn: async () => {
       if (!planId) throw new Error('No plan selected');
       
+      // Convert planId from string to number before passing it to the query
+      const numericPlanId = parseInt(planId, 10);
+      if (isNaN(numericPlanId)) throw new Error('Invalid plan ID');
+      
       const { data, error } = await supabase
         .from('plans')
         .select('*')
-        .eq('id', planId)
+        .eq('id', numericPlanId)
         .single();
       
       if (error) throw error;

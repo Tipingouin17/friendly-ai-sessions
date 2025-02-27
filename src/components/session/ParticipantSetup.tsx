@@ -3,21 +3,22 @@ import React, { useState } from 'react';
 import { ParticipantInfo } from '@/types/chat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UserRound, ChevronRight, UserPlus, Save } from 'lucide-react';
+import { UserRound, ChevronRight, Save } from 'lucide-react';
+import Avatar from 'boring-avatars';
 
-const AVATAR_OPTIONS = [
-  '/avatars/avatar-1.png',
-  '/avatars/avatar-2.png',
-  '/avatars/avatar-3.png',
-  '/avatars/avatar-4.png',
-  '/avatars/avatar-5.png',
-  '/avatars/avatar-6.png',
-  '/avatars/avatar-7.png',
-  '/avatars/avatar-8.png',
+// Avatar palette presets
+const AVATAR_PALETTES = [
+  ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'],
+  ['#FFAD08', '#EDD75A', '#73B06F', '#0C8F8F', '#405059'],
+  ['#2E94B9', '#FFC89D', '#FC766A', '#5B84B1', '#5F4B8B'],
+  ['#F4B674', '#C574B5', '#F54768', '#342D7E', '#0E7A6C'],
+  ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
+  ['#FFD5C2', '#F28F3B', '#C8553D', '#588B8B', '#1B98E0'],
+  ['#94C9A9', '#FFC09F', '#FFEE93', '#FCB0B3', '#B0DEFF'],
+  ['#71A2B6', '#C6CDF7', '#D8BFD8', '#E4D3B0', '#D9D9F3'],
 ];
 
-// Use placeholder images for now - in production these would be actual avatar images
-const DEFAULT_AVATAR = '/placeholder.svg';
+const AVATAR_VARIANTS = ['marble', 'beam', 'pixel', 'sunset', 'ring', 'bauhaus'];
 
 interface ParticipantSetupProps {
   participantCount: number;
@@ -35,18 +36,23 @@ const ParticipantSetup = ({
     Array.from({ length: participantCount }, (_, i) => ({
       id: i + 1,
       name: `Anonymous ${i + 1}`,
-      avatar: DEFAULT_AVATAR
+      avatar: ''
     }))
   );
-  const [selectedAvatar, setSelectedAvatar] = useState(DEFAULT_AVATAR);
-  const [nameInput, setNameInput] = useState('');
 
+  // Now we'll use a selectedAvatar state with format "variant:index" for easy tracking
+  const [selectedAvatar, setSelectedAvatar] = useState('marble:0');
+  const [nameInput, setNameInput] = useState('');
+  
   const handleNext = () => {
     // Update current participant info
+    const [variant, paletteIndex] = selectedAvatar.split(':');
+    const avatarUrl = `/api/avatar?name=${nameInput || 'Anonymous'}&variant=${variant}&palette=${paletteIndex}`;
+    
     setParticipants(prev => 
       prev.map(p => 
         p.id === currentStep 
-          ? { ...p, name: nameInput || `Anonymous ${currentStep}`, avatar: selectedAvatar } 
+          ? { ...p, name: nameInput || `Anonymous ${currentStep}`, avatar: avatarUrl } 
           : p
       )
     );
@@ -56,19 +62,18 @@ const ParticipantSetup = ({
       setCurrentStep(prev => prev + 1);
       // Reset inputs for next participant
       setNameInput('');
-      setSelectedAvatar(DEFAULT_AVATAR);
+      setSelectedAvatar('marble:0');
     } else {
       // All participants are set up, complete the process
-      onComplete(participants.map((p, i) => 
-        p.id === participantCount 
-          ? { ...p, name: nameInput || `Anonymous ${p.id}`, avatar: selectedAvatar }
-          : p
-      ));
+      onComplete(participants.map((p, i) => {
+        if (p.id === participantCount) {
+          const [variant, paletteIndex] = selectedAvatar.split(':');
+          const avatarUrl = `/api/avatar?name=${nameInput || 'Anonymous'}&variant=${variant}&palette=${paletteIndex}`;
+          return { ...p, name: nameInput || `Anonymous ${p.id}`, avatar: avatarUrl };
+        }
+        return p;
+      }));
     }
-  };
-
-  const selectAvatar = (avatar: string) => {
-    setSelectedAvatar(avatar);
   };
 
   return (
@@ -94,21 +99,65 @@ const ParticipantSetup = ({
           className="mb-4"
         />
         
-        <label className="block text-gray-700 mb-2">Choose Avatar</label>
+        <label className="block text-gray-700 mb-2">Choose Avatar Style</label>
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {AVATAR_VARIANTS.map((variant, variantIndex) => {
+            const selected = selectedAvatar.startsWith(variant);
+            return (
+              <button
+                key={variant}
+                onClick={() => setSelectedAvatar(`${variant}:0`)}
+                className={`p-2 rounded-lg transition-all flex flex-col items-center ${selected ? 'ring-2 ring-purple-500 bg-purple-50' : 'hover:bg-gray-100'}`}
+              >
+                <Avatar
+                  size={40}
+                  name={nameInput || `Participant ${currentStep}`}
+                  variant={variant as any}
+                  colors={AVATAR_PALETTES[0]}
+                />
+                <span className="text-xs mt-1 text-gray-600">{variant}</span>
+              </button>
+            );
+          })}
+        </div>
+        
+        <label className="block text-gray-700 mb-2">Choose Color Palette</label>
         <div className="grid grid-cols-4 gap-3 mb-6">
-          {[DEFAULT_AVATAR, ...AVATAR_OPTIONS].map((avatar, index) => (
-            <button
-              key={index}
-              onClick={() => selectAvatar(avatar)}
-              className={`p-1 rounded-lg transition-all ${selectedAvatar === avatar ? 'ring-2 ring-purple-500 bg-purple-50' : 'hover:bg-gray-100'}`}
-            >
-              <img 
-                src={avatar} 
-                alt={`Avatar option ${index}`} 
-                className="w-12 h-12 object-cover rounded-full"
+          {AVATAR_PALETTES.map((palette, paletteIndex) => {
+            const [activeVariant] = selectedAvatar.split(':');
+            const selected = selectedAvatar === `${activeVariant}:${paletteIndex}`;
+            
+            return (
+              <button
+                key={paletteIndex}
+                onClick={() => setSelectedAvatar(`${activeVariant}:${paletteIndex}`)}
+                className={`p-2 rounded-lg transition-all ${selected ? 'ring-2 ring-purple-500 bg-purple-50' : 'hover:bg-gray-100'}`}
+              >
+                <Avatar
+                  size={40}
+                  name={nameInput || `Participant ${currentStep}`}
+                  variant={activeVariant as any}
+                  colors={palette}
+                />
+              </button>
+            );
+          })}
+        </div>
+        
+        <div className="rounded-lg p-3 bg-gray-50 border border-gray-200 mb-4 flex justify-center">
+          <div className="text-center">
+            <div className="mb-2">
+              <Avatar
+                size={80}
+                name={nameInput || `Participant ${currentStep}`}
+                variant={selectedAvatar.split(':')[0] as any}
+                colors={AVATAR_PALETTES[parseInt(selectedAvatar.split(':')[1])]}
               />
-            </button>
-          ))}
+            </div>
+            <p className="text-gray-700 font-medium">
+              {nameInput || `Participant ${currentStep}`}
+            </p>
+          </div>
         </div>
       </div>
       

@@ -76,80 +76,94 @@ const Profile = () => {
             </Card>
             
             {/* Account Information */}
-            <Card>
-              <CardHeader>
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b pb-6">
                 <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Account Information</CardTitle>
+                  <User className="h-6 w-6 text-amber-400" />
+                  <CardTitle className="text-2xl">Account Information</CardTitle>
                 </div>
-                <CardDescription>Your personal information and account details</CardDescription>
+                <CardDescription className="text-base mt-1">Your personal information and account details</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-6">
+              <CardContent className="pt-6">
+                <div className="grid md:grid-cols-2 gap-y-8 gap-x-12">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Email Address</h3>
-                    <p className="text-lg">{user?.email}</p>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2">Email Address</h3>
+                    <p className="text-xl font-medium">{user?.email}</p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">User ID</h3>
-                    <p className="text-sm bg-gray-100 p-2 rounded font-mono break-all">{user?.id}</p>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2">User ID</h3>
+                    <p className="text-sm bg-gray-100 p-3 rounded font-mono break-all">{user?.id}</p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Account Created</h3>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2">Account Created</h3>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <p>Not available</p>
+                      <Calendar className="h-5 w-5 text-gray-400" />
+                      <p className="text-lg">Not available</p>
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Account Status</h3>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2">Account Status</h3>
                     <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full bg-green-400"></div>
-                      <p>Active</p>
+                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                      <p className="text-lg font-medium">Active</p>
                     </div>
                   </div>
                 </div>
               </CardContent>
               <Separator />
-              <CardFooter className="pt-6 flex flex-wrap gap-4">
-                <Button variant="outline" size="sm" className="gap-2" onClick={handleChangePassword}>
-                  <Key size={16} />
+              <CardFooter className="py-6 flex flex-wrap gap-4 justify-start">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="gap-2 rounded-full px-6" 
+                  onClick={handleChangePassword}
+                >
+                  <Key size={18} />
                   Change Password
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={handleLogout}>
-                  <LogOut size={16} />
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="gap-2 rounded-full px-6 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-100" 
+                  onClick={handleLogout}
+                >
+                  <LogOut size={18} />
                   Log Out
                 </Button>
               </CardFooter>
             </Card>
             
             {/* Security Settings */}
-            <Card>
-              <CardHeader>
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b pb-6">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <CardTitle>Security Settings</CardTitle>
+                  <Shield className="h-6 w-6 text-amber-400" />
+                  <CardTitle className="text-2xl">Security Settings</CardTitle>
                 </div>
-                <CardDescription>Manage your account security preferences</CardDescription>
+                <CardDescription className="text-base mt-1">Manage your account security preferences</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2">
-                    <div>
-                      <h3 className="font-medium">Two-Factor Authentication</h3>
-                      <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
+              <CardContent className="pt-6">
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1">Two-Factor Authentication</h3>
+                        <p className="text-gray-500">Add an extra layer of security to your account</p>
+                      </div>
+                      <Button variant="outline" size="lg" className="rounded-full px-6">Set Up</Button>
                     </div>
-                    <Button variant="outline" size="sm">Set Up</Button>
                   </div>
                   
                   <Separator />
                   
-                  <div className="flex justify-between items-center py-2">
-                    <div>
-                      <h3 className="font-medium">Recent Login Activity</h3>
-                      <p className="text-sm text-gray-500">View your recent login history</p>
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1">Recent Login Activity</h3>
+                        <p className="text-gray-500">View your recent login history</p>
+                      </div>
+                      <Button variant="outline" size="lg" className="rounded-full px-6">View Activity</Button>
                     </div>
-                    <Button variant="outline" size="sm">View Activity</Button>
                   </div>
                 </div>
               </CardContent>

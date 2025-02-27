@@ -10,6 +10,7 @@ export interface Plan {
   plan_table_details: Json;
   is_popular: boolean;
   stripe_plan_id: string;
+  currency?: string;
 }
 
 export const FEATURE_LABELS: Record<string, string> = {

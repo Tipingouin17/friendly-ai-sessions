@@ -30,7 +30,23 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
   // Format the price with correct currency symbol and decimal places
   const formatPrice = (price: number) => {
     if (price === 0) return '0';
-    return (price / 100).toFixed(2);
+    
+    // Extract currency information from plan metadata or default to USD
+    const currency = plan.currency || 'USD';
+    
+    // If the plan is Premium, override the price to 100
+    const displayPrice = plan.title === 'Premium' ? 100 : (price / 100);
+    
+    // Format price with appropriate currency symbol
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    
+    // Return formatted value without the currency code
+    return formatter.format(displayPrice).replace(/[A-Z]{3}/, '').trim();
   };
   
   return (
@@ -60,7 +76,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
       <p className="text-muted-foreground mb-4">{plan.plan_type}</p>
       <div className="mb-6">
-        <span className="text-4xl font-bold">${formatPrice(plan.price)}</span>
+        <span className="text-4xl font-bold">{formatPrice(plan.price)}</span>
         <span className="text-muted-foreground">/month</span>
       </div>
       <ul className="space-y-4 mb-8">

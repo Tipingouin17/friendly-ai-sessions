@@ -25,21 +25,27 @@ const Pricing = () => {
       
       if (error) throw error;
       
-      // Convert prices to Stripe format if they're not already
-      // Stripe stores prices in cents (e.g., $10.99 is stored as 1099)
+      // Process the data to include currency information and ensure correct price format
       const processedData = data.map(plan => {
-        // If price is already in cents (larger numbers), leave as is
-        // If price is in dollars (smaller numbers), convert to cents
-        const price = plan.price;
-        // Assuming if price < 100, it's in dollars and needs conversion
-        // This logic can be adjusted based on your actual data
+        // Set currency based on Stripe metadata or default to USD
+        const currency = plan.currency || 'USD';
+        
+        // Convert price to Stripe format (cents) if needed
+        let price = plan.price;
         if (price < 100 && price > 0) {
-          return {
-            ...plan,
-            price: price * 100 // Convert to cents for Stripe
-          };
+          price = price * 100; // Convert to cents for Stripe
         }
-        return plan;
+        
+        // If the plan is Premium, set price to 10000 cents (100 dollars)
+        if (plan.title === 'Premium') {
+          price = 10000; // $100 in cents
+        }
+        
+        return {
+          ...plan,
+          price,
+          currency
+        };
       });
       
       return processedData as Plan[];

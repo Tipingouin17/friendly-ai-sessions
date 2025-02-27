@@ -55,7 +55,23 @@ export const PlanInfo = () => {
   // Format the price with correct currency symbol and decimal places
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined) return 'Free';
-    return `$${(price / 100).toFixed(2)}/month`;
+    
+    // Extract currency information from plan metadata or default to USD
+    const currency = plan?.currency || 'USD';
+    
+    // If the plan is Premium, override the price to 100
+    const displayPrice = plan?.title === 'Premium' ? 100 : (price / 100);
+    
+    // Format price with appropriate currency symbol
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    
+    // Return formatted value with /month appended
+    return `${formatter.format(displayPrice).replace(/[A-Z]{3}/, '').trim()}/month`;
   };
   
   return (

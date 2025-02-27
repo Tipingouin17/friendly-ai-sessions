@@ -31,11 +31,9 @@ const Pricing = () => {
         // Use the currency from database or fallback to USD
         const currency = plan.currency || 'USD';
         
-        // Convert price to Stripe format (cents) if needed
-        let price = plan.price || 0;
-        if (price < 100 && price > 0) {
-          price = price * 100; // Convert to cents for Stripe
-        }
+        // Preserve the original price as it comes from the database
+        // We'll handle the formatting in the display component
+        const price = plan.price || 0;
         
         // Construct the plan object with number_of_questions_per_session defaulting to 10
         // if not present in the database
@@ -55,7 +53,7 @@ const Pricing = () => {
             session_reports: plan.session_reports,
             data_export: plan.data_export,
             // Add default value for questions per session
-            number_of_questions_per_session: 10
+            number_of_questions_per_session: plan.number_of_questions_per_session || 10
           },
           is_popular: plan.is_popular,
           stripe_plan_id: plan.stripe_plan_id,

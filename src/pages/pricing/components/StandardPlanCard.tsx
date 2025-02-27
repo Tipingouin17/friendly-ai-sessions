@@ -41,7 +41,15 @@ export const StandardPlanCard = ({
   // Format price in a clean way for the large display
   const formatDisplayPrice = (price: number) => {
     if (price === 0) return 'Free';
-    return Math.floor(price / 100).toString();
+    
+    // Ensure the price is properly formatted
+    // If the price is already in cents (greater than or equal to 100), divide by 100
+    const formattedPrice = price >= 100 ? price / 100 : price;
+    
+    // Return integer if it's a whole number, otherwise include decimals
+    return Number.isInteger(formattedPrice) 
+      ? formattedPrice.toString() 
+      : formattedPrice.toFixed(2);
   };
 
   // Determine if this plan should be highlighted as popular

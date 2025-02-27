@@ -7,13 +7,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Plan } from './pricing/types';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Stepper, StepperItem, StepperContent, StepperTrigger, StepperIndicator, StepperTitle, StepperDescription, StepperSeparator } from '@/components/ui/stepper';
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, CreditCard, User, Package, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, CreditCard, User, Package, ArrowLeft, ArrowRight, Loader2, Shield } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 // Initialize Stripe (replace with your publishable key)
 const stripePromise = loadStripe('pk_test_your_publishable_key');
@@ -24,7 +24,6 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const [activeStep, setActiveStep] = useState(0);
   const [billingDetails, setBillingDetails] = useState({
     name: '',
     email: user?.email || '',
@@ -84,16 +83,6 @@ const Checkout = () => {
     }
   };
 
-  // Next step handler
-  const handleNextStep = () => {
-    setActiveStep(prev => prev + 1);
-  };
-
-  // Previous step handler
-  const handlePreviousStep = () => {
-    setActiveStep(prev => prev - 1);
-  };
-
   // If no plan is selected, redirect back to pricing
   useEffect(() => {
     if (!planId) {
@@ -120,7 +109,7 @@ const Checkout = () => {
   if (planError || !plan) {
     return (
       <div className="min-h-screen pt-24 pb-16">
-        <div className="container max-w-3xl mx-auto px-4">
+        <div className="container max-w-6xl mx-auto px-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl font-bold text-center">Error</CardTitle>
@@ -140,8 +129,8 @@ const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-gray-50">
-      <div className="container max-w-3xl mx-auto px-4">
+    <div className="min-h-screen pt-16 pb-16 bg-gray-50">
+      <div className="container max-w-6xl mx-auto px-4">
         <Button 
           variant="ghost" 
           className="mb-6" 
@@ -150,35 +139,28 @@ const Checkout = () => {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Pricing
         </Button>
         
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">
-              Upgrade to {plan.title} Plan
-            </CardTitle>
-            <CardDescription className="text-center">
-              Complete the following steps to upgrade your subscription
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Stepper 
-              value={activeStep.toString()} 
-              onValueChange={(value) => setActiveStep(parseInt(value))}
-              className="w-full"
-            >
-              {/* Step 1: Plan Summary */}
-              <StepperItem value="0" className="mb-8">
-                <StepperTrigger className="flex items-center gap-2">
-                  <StepperIndicator>
-                    <Package className="h-4 w-4" />
-                  </StepperIndicator>
-                  <div className="flex flex-col text-left">
-                    <StepperTitle>Plan Details</StepperTitle>
-                    <StepperDescription>Review your selected plan</StepperDescription>
-                  </div>
-                </StepperTrigger>
-                
-                <StepperContent className="mt-4">
-                  <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left column: Plan details and summary */}
+          <div className="lg:col-span-2">
+            <Card className="mb-8">
+              <CardHeader className="border-b">
+                <CardTitle className="text-2xl font-bold">
+                  Complete Your Order
+                </CardTitle>
+                <CardDescription>
+                  You're upgrading to the {plan.title} Plan
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="pt-6">
+                <div className="space-y-8">
+                  {/* Plan Details Section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Package className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-semibold">Plan Details</h3>
+                    </div>
+                    
                     <div className="bg-primary/5 p-6 rounded-lg">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-bold">{plan.title} Plan</h3>
@@ -188,44 +170,23 @@ const Checkout = () => {
                       <ul className="space-y-2">
                         {(plan.plan_details as string[])?.map((feature, index) => (
                           <li key={index} className="flex items-center gap-2">
-                            <Check className="h-5 w-5 text-primary" />
+                            <Check className="h-5 w-5 text-primary flex-shrink-0" />
                             <span>{feature}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                    
-                    <div className="flex justify-between">
-                      <Button 
-                        variant="outline" 
-                        onClick={handleBackToPricing}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleNextStep}>
-                        Continue <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Billing Information Section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <User className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-semibold">Billing Information</h3>
                     </div>
-                  </div>
-                </StepperContent>
-              </StepperItem>
-              
-              <StepperSeparator />
-              
-              {/* Step 2: Billing Information */}
-              <StepperItem value="1" className="mb-8">
-                <StepperTrigger className="flex items-center gap-2">
-                  <StepperIndicator>
-                    <User className="h-4 w-4" />
-                  </StepperIndicator>
-                  <div className="flex flex-col text-left">
-                    <StepperTitle>Billing Information</StepperTitle>
-                    <StepperDescription>Enter your billing details</StepperDescription>
-                  </div>
-                </StepperTrigger>
-                
-                <StepperContent className="mt-4">
-                  <div className="space-y-6">
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="name">Full Name</Label>
@@ -299,49 +260,71 @@ const Checkout = () => {
                         />
                       </div>
                     </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Payment Information Section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-semibold">Payment Method</h3>
+                    </div>
                     
+                    <Elements stripe={stripePromise}>
+                      <CheckoutForm 
+                        plan={plan}
+                        billingDetails={billingDetails}
+                        onCancel={handleBackToPricing}
+                      />
+                    </Elements>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Right column: Order summary */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24">
+              <Card>
+                <CardHeader className="border-b">
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
                     <div className="flex justify-between">
-                      <Button 
-                        variant="outline" 
-                        onClick={handlePreviousStep}
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                      </Button>
-                      <Button onClick={handleNextStep}>
-                        Continue <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                      <span>{plan.title} Plan</span>
+                      <span>${plan.price}/mo</span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Billing</span>
+                      <span>Monthly</span>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <span>${plan.price}/month</span>
+                    </div>
+                    
+                    <div className="pt-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                        <Shield className="h-4 w-4" />
+                        <span>Secure payment processing</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Your payment information is encrypted and secure. We never store your full credit card details.
+                      </div>
                     </div>
                   </div>
-                </StepperContent>
-              </StepperItem>
-              
-              <StepperSeparator />
-              
-              {/* Step 3: Payment */}
-              <StepperItem value="2">
-                <StepperTrigger className="flex items-center gap-2">
-                  <StepperIndicator>
-                    <CreditCard className="h-4 w-4" />
-                  </StepperIndicator>
-                  <div className="flex flex-col text-left">
-                    <StepperTitle>Payment</StepperTitle>
-                    <StepperDescription>Complete your subscription</StepperDescription>
-                  </div>
-                </StepperTrigger>
-                
-                <StepperContent className="mt-4">
-                  <Elements stripe={stripePromise}>
-                    <CheckoutForm 
-                      plan={plan}
-                      billingDetails={billingDetails}
-                      onBack={handlePreviousStep}
-                    />
-                  </Elements>
-                </StepperContent>
-              </StepperItem>
-            </Stepper>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -351,11 +334,11 @@ const Checkout = () => {
 const CheckoutForm = ({ 
   plan, 
   billingDetails,
-  onBack 
+  onCancel 
 }: { 
   plan: Plan; 
   billingDetails: any;
-  onBack: () => void;
+  onCancel: () => void;
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -417,10 +400,8 @@ const CheckoutForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-4 border rounded-lg">
-        <h3 className="font-medium mb-4">Payment Information</h3>
-        
         <div className="p-4 border rounded-md bg-white">
           <CardElement 
             options={{
@@ -442,49 +423,36 @@ const CheckoutForm = ({
         </div>
       </div>
 
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between mb-2">
-          <span>Plan</span>
-          <span>{plan.title}</span>
-        </div>
-        <div className="flex justify-between mb-2">
-          <span>Billing</span>
-          <span>Monthly</span>
-        </div>
-        <div className="flex justify-between border-t pt-2 mt-2 font-bold">
-          <span>Total</span>
-          <span>${plan.price}/month</span>
-        </div>
-      </div>
-
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg">
           {error}
         </div>
       )}
 
-      <div className="flex justify-between">
-        <Button 
-          type="button"
-          variant="outline" 
-          onClick={onBack}
-          disabled={loading}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
+      <div className="flex flex-col gap-3 pt-2">
         <Button 
           type="submit" 
           disabled={!stripe || loading}
-          className="min-w-32"
+          className="w-full py-6"
         >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
+              Processing payment...
             </>
           ) : (
-            <>Pay ${plan.price}</>
+            <>Complete purchase - ${plan.price}/month</>
           )}
+        </Button>
+        
+        <Button 
+          type="button"
+          variant="outline" 
+          onClick={onCancel}
+          disabled={loading}
+          className="w-full"
+        >
+          Cancel
         </Button>
       </div>
     </form>

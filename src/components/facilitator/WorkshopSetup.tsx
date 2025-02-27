@@ -80,7 +80,7 @@ export const WorkshopSetup = ({
         </div>
         
         {limitReached && (
-          <Alert variant="warning" className="mt-2">
+          <Alert variant="destructive" className="mt-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               You've reached your plan's participant limit. 

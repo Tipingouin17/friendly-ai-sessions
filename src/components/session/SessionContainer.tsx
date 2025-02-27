@@ -104,7 +104,6 @@ const SessionContainer = ({
             onGenerateReport={handleGenerateReport}
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0 && canGenerateReports}
-            onUpgradePlan={!canGenerateReports ? handleUpgradePlan : undefined}
           />
           <div className="flex-1 overflow-hidden">
             <MessageList 

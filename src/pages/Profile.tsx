@@ -23,7 +23,8 @@ const Profile = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Account Created</label>
                   <div className="mt-1">
-                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                    {/* User type doesn't have created_at, so we'll just show 'N/A' */}
+                    N/A
                   </div>
                 </div>
               </div>

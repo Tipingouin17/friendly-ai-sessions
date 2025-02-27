@@ -18,6 +18,7 @@ export interface PlanLimits {
   maxParticipants: number;
   maxFacilitators: number;
   maxSessions: number;
+  maxQuestionsPerSession: number;
   currentFacilitatorCount: number;
   currentSessionCount: number;
 }
@@ -77,6 +78,9 @@ export const usePlanLimits = (): PlanLimits => {
   const maxSessions = planRestrictions?.no_of_sessions === null ? Infinity : (planRestrictions?.no_of_sessions || 0);
   const maxParticipants = planRestrictions?.max_participants === null ? Infinity : (planRestrictions?.max_participants || 0);
   
+  // Get the maximum questions per session
+  const maxQuestionsPerSession = planRestrictions?.number_of_questions_per_session === null ? Infinity : (planRestrictions?.number_of_questions_per_session || 10);
+  
   // Check if the user can create custom facilitators based on the new column
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
   
@@ -90,6 +94,7 @@ export const usePlanLimits = (): PlanLimits => {
     maxParticipants,
     maxFacilitators,
     maxSessions,
+    maxQuestionsPerSession,
     currentFacilitatorCount: counts?.facilitatorCount || 0,
     currentSessionCount: counts?.sessionCount || 0,
     canCreateCustomSessions: !!planRestrictions?.customisable_sessions,

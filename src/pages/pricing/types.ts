@@ -15,6 +15,7 @@ export interface Plan {
     saved_sessions: boolean | null;
     session_reports: boolean | null;
     data_export: boolean | null;
+    number_of_questions_per_session?: number | string | null;
   };
   is_popular: boolean;
   stripe_plan_id: string;
@@ -28,7 +29,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   customisable_sessions: "Customizable Sessions",
   saved_sessions: "Save Sessions",
   session_reports: "Session Reports",
-  data_export: "Data Export"
+  data_export: "Data Export",
+  number_of_questions_per_session: "Questions Per Session"
 };
 
 export const allFeatures = Object.keys(FEATURE_LABELS);

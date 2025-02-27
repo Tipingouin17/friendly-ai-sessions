@@ -415,6 +415,7 @@ export type Database = {
           max_participants: number | null
           no_of_facilitator: number | null
           no_of_sessions: number | null
+          number_of_questions_per_session: number
           plan_id: number | null
           saved_sessions: boolean | null
           session_reports: boolean | null
@@ -428,6 +429,7 @@ export type Database = {
           max_participants?: number | null
           no_of_facilitator?: number | null
           no_of_sessions?: number | null
+          number_of_questions_per_session?: number
           plan_id?: number | null
           saved_sessions?: boolean | null
           session_reports?: boolean | null
@@ -441,6 +443,7 @@ export type Database = {
           max_participants?: number | null
           no_of_facilitator?: number | null
           no_of_sessions?: number | null
+          number_of_questions_per_session?: number
           plan_id?: number | null
           saved_sessions?: boolean | null
           session_reports?: boolean | null

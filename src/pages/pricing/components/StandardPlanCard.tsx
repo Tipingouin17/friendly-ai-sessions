@@ -94,6 +94,20 @@ export const StandardPlanCard = ({
         : `Up to ${plan.plan_table_details.max_participants} participants per session`;
       features.push(participants);
     }
+    
+    // Number of questions per session
+    if (plan.plan_table_details.number_of_questions_per_session) {
+      // Check if it's a numeric value greater than 999999 or explicitly "unlimited"
+      const isUnlimited = 
+        (typeof plan.plan_table_details.number_of_questions_per_session === 'number' && 
+         plan.plan_table_details.number_of_questions_per_session > 999999) || 
+        plan.plan_table_details.number_of_questions_per_session === 'unlimited';
+        
+      const questions = isUnlimited
+        ? 'Unlimited questions per session' 
+        : `Up to ${plan.plan_table_details.number_of_questions_per_session} questions per session`;
+      features.push(questions);
+    }
 
     // Customizable sessions
     if (plan.plan_table_details.customisable_sessions) {

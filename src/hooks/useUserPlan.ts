@@ -16,6 +16,7 @@ export interface UserPlanDetails {
     saved_sessions: boolean | null;
     session_reports: boolean | null;
     data_export: boolean | null;
+    number_of_questions_per_session?: number | null;
   } | null;
   isLoading: boolean;
   error: Error | null;
@@ -57,7 +58,8 @@ export const useUserPlan = (): UserPlanDetails => {
           customisable_facilitators: freePlan.customisable_facilitators,
           saved_sessions: freePlan.saved_sessions,
           session_reports: freePlan.session_reports,
-          data_export: freePlan.data_export
+          data_export: freePlan.data_export,
+          number_of_questions_per_session: freePlan.number_of_questions_per_session
         };
         
         return {
@@ -94,7 +96,8 @@ export const useUserPlan = (): UserPlanDetails => {
         customisable_facilitators: planFeatures.customisable_facilitators,
         saved_sessions: planFeatures.saved_sessions,
         session_reports: planFeatures.session_reports,
-        data_export: planFeatures.data_export
+        data_export: planFeatures.data_export,
+        number_of_questions_per_session: planFeatures.number_of_questions_per_session
       };
       
       return {

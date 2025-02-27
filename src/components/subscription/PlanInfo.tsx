@@ -16,6 +16,7 @@ export const PlanInfo = () => {
     maxFacilitators,
     maxSessions,
     maxParticipants,
+    maxQuestionsPerSession,
     canCreateCustomSessions,
     canExportData,
     canSaveSessions,
@@ -110,6 +111,13 @@ export const PlanInfo = () => {
           <div className="flex justify-between text-sm">
             <span>Max Participants Per Session</span>
             <span>{maxParticipants === Infinity ? 'Unlimited' : maxParticipants}</span>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Questions Per Session</span>
+            <span>{maxQuestionsPerSession === Infinity ? 'Unlimited' : maxQuestionsPerSession}</span>
           </div>
         </div>
         

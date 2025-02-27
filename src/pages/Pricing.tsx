@@ -52,7 +52,8 @@ const Pricing = () => {
             customisable_facilitators: plan.customisable_facilitators,
             saved_sessions: plan.saved_sessions,
             session_reports: plan.session_reports,
-            data_export: plan.data_export
+            data_export: plan.data_export,
+            number_of_questions_per_session: plan.number_of_questions_per_session
           },
           is_popular: plan.is_popular,
           stripe_plan_id: plan.stripe_plan_id,

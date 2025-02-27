@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -657,7 +656,7 @@ const CheckoutForm = ({
       })}
 
       <div className="p-4 border rounded-lg">
-        <Label htmlFor="card-element" className="block mb-2">
+        <Label htmlFor="card-element" className="text-left block mb-2">
           Card Details <span className="text-destructive">*</span>
         </Label>
         <div className={`p-4 border rounded-md bg-white ${hasFieldError('card') ? 'border-destructive ring-2 ring-destructive' : ''}`}>

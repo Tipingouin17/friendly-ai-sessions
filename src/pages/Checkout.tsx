@@ -144,10 +144,10 @@ const Checkout = () => {
           <div className="lg:col-span-2">
             <Card className="mb-8">
               <CardHeader className="border-b">
-                <CardTitle className="text-2xl font-bold">
+                <CardTitle className="text-2xl font-bold text-left">
                   Complete Your Order
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-left">
                   You're upgrading to the {plan.title} Plan
                 </CardDescription>
               </CardHeader>
@@ -169,8 +169,8 @@ const Checkout = () => {
                       
                       <ul className="space-y-2">
                         {(plan.plan_details as string[])?.map((feature, index) => (
-                          <li key={index} className="flex items-center gap-2">
-                            <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                          <li key={index} className="flex items-start gap-2">
+                            <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                             <span>{feature}</span>
                           </li>
                         ))}
@@ -189,17 +189,18 @@ const Checkout = () => {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
+                        <Label htmlFor="name" className="text-left block">Full Name</Label>
                         <Input 
                           id="name" 
                           name="name" 
                           value={billingDetails.name} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email" className="text-left block">Email</Label>
                         <Input 
                           id="email" 
                           name="email" 
@@ -207,56 +208,62 @@ const Checkout = () => {
                           value={billingDetails.email} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="address.line1">Address</Label>
+                        <Label htmlFor="address.line1" className="text-left block">Address</Label>
                         <Input 
                           id="address.line1" 
                           name="address.line1" 
                           value={billingDetails.address.line1} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.city">City</Label>
+                        <Label htmlFor="address.city" className="text-left block">City</Label>
                         <Input 
                           id="address.city" 
                           name="address.city" 
                           value={billingDetails.address.city} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.state">State/Province</Label>
+                        <Label htmlFor="address.state" className="text-left block">State/Province</Label>
                         <Input 
                           id="address.state" 
                           name="address.state" 
                           value={billingDetails.address.state} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.postal_code">Postal Code</Label>
+                        <Label htmlFor="address.postal_code" className="text-left block">Postal Code</Label>
                         <Input 
                           id="address.postal_code" 
                           name="address.postal_code" 
                           value={billingDetails.address.postal_code} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.country">Country</Label>
+                        <Label htmlFor="address.country" className="text-left block">Country</Label>
                         <Input 
                           id="address.country" 
                           name="address.country" 
                           value={billingDetails.address.country} 
                           onChange={handleBillingDetailsChange} 
                           required 
+                          className="text-left"
                         />
                       </div>
                     </div>
@@ -289,7 +296,7 @@ const Checkout = () => {
             <div className="sticky top-24">
               <Card>
                 <CardHeader className="border-b">
-                  <CardTitle>Order Summary</CardTitle>
+                  <CardTitle className="text-left">Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-4">

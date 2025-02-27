@@ -264,6 +264,13 @@ export type Database = {
             foreignKeyName: "facilitators_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
+            referencedRelation: "plan_features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facilitators_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["id"]
           },
@@ -446,6 +453,13 @@ export type Database = {
             foreignKeyName: "plan_restrictions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
+            referencedRelation: "plan_features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_restrictions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["id"]
           },
@@ -513,6 +527,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_current_plan_id_fkey"
+            columns: ["current_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plan_features"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_current_plan_id_fkey"
             columns: ["current_plan_id"]
@@ -680,7 +701,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      plan_features: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          customisable_facilitators: boolean | null
+          customisable_sessions: boolean | null
+          data_export: boolean | null
+          id: number | null
+          is_popular: boolean | null
+          max_participants: number | null
+          no_of_facilitator: number | null
+          no_of_sessions: number | null
+          number_of_questions_per_session: number | null
+          plan_type: string | null
+          price: number | null
+          saved_sessions: boolean | null
+          session_reports: boolean | null
+          stripe_plan_id: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

@@ -4,6 +4,7 @@ import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoIcon } from "lucide-react";
+import { Json } from "@/integrations/supabase/types";
 
 interface ComparisonTableProps {
   plans: Plan[];
@@ -37,6 +38,18 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
       default:
         return "";
     }
+  };
+
+  // Helper function to safely access properties from JSON objects
+  const getFeatureValue = (details: Json | null, feature: string) => {
+    if (!details) return null;
+    
+    // Ensure details is an object before trying to access properties
+    if (typeof details === 'object' && details !== null) {
+      return (details as Record<string, any>)[feature];
+    }
+    
+    return null;
   };
   
   return (
@@ -92,17 +105,17 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                   const isCurrentPlanFeature = plan.id === currentPlanId && isHighlightedFeature(feature);
                   
                   // For facilitators and sessions, show current usage if this is current plan
-                  let featureValue = plan.plan_table_details?.[feature];
+                  let featureValue = getFeatureValue(plan.plan_table_details, feature);
                   
                   // Add current usage info for important metrics in the current plan
                   let usageInfo = null;
                   if (plan.id === currentPlanId && feature === 'no_of_facilitator' && planRestrictions) {
-                    const facilitatorValue = plan.plan_table_details?.no_of_facilitator;
+                    const facilitatorValue = getFeatureValue(plan.plan_table_details, 'no_of_facilitator');
                     if (typeof facilitatorValue === 'number' || facilitatorValue === 'unlimited') {
                       usageInfo = "Current: Used in Facilitator Setup";
                     }
                   } else if (plan.id === currentPlanId && feature === 'no_of_sessions' && planRestrictions) {
-                    const sessionsValue = plan.plan_table_details?.no_of_sessions;
+                    const sessionsValue = getFeatureValue(plan.plan_table_details, 'no_of_sessions');
                     if (typeof sessionsValue === 'number' || sessionsValue === 'unlimited') {
                       usageInfo = "Current: Used in Workshop Creation";
                     }

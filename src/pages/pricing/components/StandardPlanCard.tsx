@@ -1,7 +1,9 @@
+
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Plan } from "../types";
 import { useNavigate } from "react-router-dom";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 interface StandardPlanCardProps {
   plan: Plan;
@@ -10,15 +12,17 @@ interface StandardPlanCardProps {
 
 export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCardProps) => {
   const navigate = useNavigate();
+  const { currentPlanId } = useUserPlan();
   
   const handleGetStarted = () => {
-    // Handle plan selection
+    // If it's the current plan, navigate to profile
     if (isCurrentPlan) {
-      // If it's the current plan, navigate to profile
       navigate('/profile');
+    } else if (plan.price === 0) {
+      // For free plan, update directly (in a real app, this would go through an API)
+      navigate(`/checkout?plan=${plan.id}`);
     } else {
-      // Otherwise, handle plan upgrade logic
-      // For now, just navigate to a hypothetical checkout page
+      // For paid plans, redirect to checkout
       navigate(`/checkout?plan=${plan.id}`);
     }
   };
@@ -64,6 +68,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       <Button 
         className="w-full" 
         variant={isCurrentPlan ? "outline" : (plan.is_popular ? "default" : "outline")}
+        onClick={handleGetStarted}
       >
         {isCurrentPlan ? "Current Plan" : "Get Started"}
       </Button>

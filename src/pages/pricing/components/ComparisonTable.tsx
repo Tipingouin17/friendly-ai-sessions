@@ -3,7 +3,7 @@ import { Plan, FEATURE_LABELS, allFeatures } from "../types";
 import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { InfoIcon, DollarSign, Euro, PoundSterling } from "lucide-react";
+import { InfoIcon, DollarSign, Euro, PoundSterling, Infinity } from "lucide-react";
 
 interface ComparisonTableProps {
   plans: Plan[];
@@ -44,7 +44,14 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     if (!plan.plan_table_details) return null;
     
     // Access the feature value directly from plan_table_details object
-    return (plan.plan_table_details as Record<string, any>)[feature];
+    const value = (plan.plan_table_details as Record<string, any>)[feature];
+    
+    // If the value is a number and greater than 999999, return 'unlimited'
+    if (typeof value === 'number' && value > 999999) {
+      return 'unlimited';
+    }
+    
+    return value;
   };
   
   // Function to determine if a plan should be highlighted as popular
@@ -73,10 +80,8 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     // Free plan
     if (plan.price === 0) return "Free";
     
-    const price = plan.price / 100; // Convert cents to dollars
-    
-    // Return formatted price
-    return price.toString();
+    // Return formatted price (no division by 100)
+    return plan.price.toString();
   };
   
   return (

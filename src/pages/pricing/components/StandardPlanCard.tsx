@@ -42,8 +42,8 @@ export const StandardPlanCard = ({
   const formatDisplayPrice = (price: number) => {
     if (price === 0) return 'Free';
     
-    // Convert cents to euros/dollars
-    const formattedPrice = price / 100;
+    // No conversion - display the price as is (already in dollars/euros)
+    const formattedPrice = price;
     
     // Return with 2 decimal places if it has decimals, otherwise as integer
     return Number.isInteger(formattedPrice) 

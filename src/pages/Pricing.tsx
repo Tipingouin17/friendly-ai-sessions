@@ -37,7 +37,8 @@ const Pricing = () => {
           price = price * 100; // Convert to cents for Stripe
         }
         
-        // Construct the plan object
+        // Construct the plan object with number_of_questions_per_session defaulting to 10
+        // if not present in the database
         return {
           id: plan.id,
           title: plan.title,
@@ -53,7 +54,8 @@ const Pricing = () => {
             saved_sessions: plan.saved_sessions,
             session_reports: plan.session_reports,
             data_export: plan.data_export,
-            number_of_questions_per_session: plan.number_of_questions_per_session
+            // Add default value for questions per session
+            number_of_questions_per_session: 10
           },
           is_popular: plan.is_popular,
           stripe_plan_id: plan.stripe_plan_id,

@@ -264,13 +264,6 @@ export type Database = {
             foreignKeyName: "facilitators_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
-            referencedRelation: "plan_features"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "facilitators_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["id"]
           },
@@ -453,13 +446,6 @@ export type Database = {
             foreignKeyName: "plan_restrictions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
-            referencedRelation: "plan_features"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "plan_restrictions_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["id"]
           },
@@ -471,7 +457,6 @@ export type Database = {
           currency: string | null
           id: number
           is_popular: boolean | null
-          plan_details: Json | null
           plan_type: string | null
           price: number | null
           stripe_plan_id: string | null
@@ -484,7 +469,6 @@ export type Database = {
           currency?: string | null
           id?: number
           is_popular?: boolean | null
-          plan_details?: Json | null
           plan_type?: string | null
           price?: number | null
           stripe_plan_id?: string | null
@@ -497,52 +481,6 @@ export type Database = {
           currency?: string | null
           id?: number
           is_popular?: boolean | null
-          plan_details?: Json | null
-          plan_type?: string | null
-          price?: number | null
-          stripe_plan_id?: string | null
-          title?: string | null
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Relationships: []
-      }
-      plans_backup2: {
-        Row: {
-          created_at: string | null
-          currency: string | null
-          id: number | null
-          is_popular: boolean | null
-          plan_details: Json | null
-          plan_table_details: Json | null
-          plan_type: string | null
-          price: number | null
-          stripe_plan_id: string | null
-          title: string | null
-          valid_from: string | null
-          valid_until: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          currency?: string | null
-          id?: number | null
-          is_popular?: boolean | null
-          plan_details?: Json | null
-          plan_table_details?: Json | null
-          plan_type?: string | null
-          price?: number | null
-          stripe_plan_id?: string | null
-          title?: string | null
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          currency?: string | null
-          id?: number | null
-          is_popular?: boolean | null
-          plan_details?: Json | null
-          plan_table_details?: Json | null
           plan_type?: string | null
           price?: number | null
           stripe_plan_id?: string | null
@@ -575,13 +513,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "profiles_current_plan_id_fkey"
-            columns: ["current_plan_id"]
-            isOneToOne: false
-            referencedRelation: "plan_features"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "profiles_current_plan_id_fkey"
             columns: ["current_plan_id"]
@@ -749,27 +680,7 @@ export type Database = {
       }
     }
     Views: {
-      plan_features: {
-        Row: {
-          currency: string | null
-          customisable_facilitators: boolean | null
-          customisable_sessions: boolean | null
-          data_export: boolean | null
-          id: number | null
-          is_popular: boolean | null
-          max_participants: number | null
-          no_of_facilitator: number | null
-          no_of_sessions: number | null
-          plan_details: Json | null
-          plan_type: string | null
-          price: number | null
-          saved_sessions: boolean | null
-          session_reports: boolean | null
-          stripe_plan_id: string | null
-          title: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never

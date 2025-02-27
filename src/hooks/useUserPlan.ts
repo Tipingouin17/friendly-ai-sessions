@@ -59,7 +59,8 @@ export const useUserPlan = (): UserPlanDetails => {
           saved_sessions: freePlan.saved_sessions,
           session_reports: freePlan.session_reports,
           data_export: freePlan.data_export,
-          number_of_questions_per_session: freePlan.number_of_questions_per_session
+          // Use default value of 10 if the field doesn't exist in the database
+          number_of_questions_per_session: 10
         };
         
         return {
@@ -97,7 +98,8 @@ export const useUserPlan = (): UserPlanDetails => {
         saved_sessions: planFeatures.saved_sessions,
         session_reports: planFeatures.session_reports,
         data_export: planFeatures.data_export,
-        number_of_questions_per_session: planFeatures.number_of_questions_per_session
+        // Use default value of 10 if the field doesn't exist in the database
+        number_of_questions_per_session: 10
       };
       
       return {

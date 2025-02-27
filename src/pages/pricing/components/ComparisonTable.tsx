@@ -3,7 +3,7 @@ import { Plan, FEATURE_LABELS, allFeatures } from "../types";
 import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, DollarSign, Euro, PoundSterling } from "lucide-react";
 
 interface ComparisonTableProps {
   plans: Plan[];
@@ -52,10 +52,26 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     return plan.is_popular || plan.id === 2; // Basic plan (id=2) should be highlighted by default
   };
   
+  // Get appropriate currency icon based on plan currency
+  const getCurrencyIcon = (currency: string) => {
+    switch (currency.toUpperCase()) {
+      case 'EUR':
+        return <Euro className="h-4 w-4 text-primary inline" />;
+      case 'GBP':
+        return <PoundSterling className="h-4 w-4 text-primary inline" />;
+      case 'USD':
+      default:
+        return <DollarSign className="h-4 w-4 text-primary inline" />;
+    }
+  };
+  
   // Format price with currency
   const formatPrice = (plan: Plan) => {
     // Enterprise plan (id 4) has custom pricing
     if (plan.id === 4) return "Custom Pricing";
+    
+    // Free plan
+    if (plan.price === 0) return "Free";
     
     const price = plan.price / 100; // Convert cents to dollars
     const currency = plan.currency || 'USD';
@@ -65,11 +81,11 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     });
     
-    // Return formatted price with /month
-    return `${formatter.format(price).replace(/[A-Z]{3}/, '')}/month`;
+    // Return formatted price
+    return formatter.format(price).replace(/[A-Z]{3}/, '').trim();
   };
   
   return (
@@ -90,9 +106,17 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                   }`}
                 >
                   <span className="block text-lg font-semibold text-gray-900">{plan.title}</span>
-                  <span className="block text-sm text-gray-500 mt-1">
-                    {formatPrice(plan)}
-                  </span>
+                  {plan.price === 0 ? (
+                    <span className="block text-sm text-gray-500 mt-1">Free</span>
+                  ) : plan.id === 4 ? (
+                    <span className="block text-sm text-gray-500 mt-1">Custom Pricing</span>
+                  ) : (
+                    <div className="text-sm text-gray-500 mt-1 flex items-center justify-center">
+                      {getCurrencyIcon(plan.currency || 'USD')}
+                      <span className="ml-1">{formatPrice(plan)}</span>
+                      <span className="ml-1">/month</span>
+                    </div>
+                  )}
                   {plan.id === currentPlanId && (
                     <span className="inline-block bg-green-500 text-white text-xs px-2 py-1 rounded mt-1">
                       Current

@@ -29,18 +29,18 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
   const getCurrencyIcon = (currency: string) => {
     switch (currency.toUpperCase()) {
       case 'EUR':
-        return <Euro className="h-6 w-6 text-primary inline mr-1" />;
+        return <Euro className="h-5 w-5 text-primary inline" />;
       case 'GBP':
-        return <PoundSterling className="h-6 w-6 text-primary inline mr-1" />;
+        return <PoundSterling className="h-5 w-5 text-primary inline" />;
       case 'USD':
       default:
-        return <DollarSign className="h-6 w-6 text-primary inline mr-1" />;
+        return <DollarSign className="h-5 w-5 text-primary inline" />;
     }
   };
   
   // Format the price with correct currency symbol and decimal places
   const formatPrice = (price: number) => {
-    if (price === 0) return '0';
+    if (price === 0) return 'Free';
     
     // Extract currency information from plan metadata or default to USD
     const currency = plan.currency || 'USD';
@@ -50,7 +50,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     });
     
     // Return formatted value without the currency code
@@ -87,12 +87,18 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       
       <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
       <p className="text-muted-foreground mb-4">{plan.plan_type || `${plan.title} Plan`}</p>
-      <div className="mb-6">
-        <div className="flex items-center justify-center">
-          {plan.price > 0 && getCurrencyIcon(plan.currency || 'USD')}
-          <span className="text-4xl font-bold">{formatPrice(plan.price)}</span>
-        </div>
-        <div className="text-center text-muted-foreground">/month</div>
+      <div className="mb-6 text-center">
+        {plan.price === 0 ? (
+          <div className="text-4xl font-bold">Free</div>
+        ) : (
+          <>
+            <div className="flex items-center justify-center">
+              {getCurrencyIcon(plan.currency || 'USD')}
+              <span className="text-4xl font-bold ml-1">{formatPrice(plan.price)}</span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">/month</div>
+          </>
+        )}
       </div>
       <ul className="space-y-4 mb-8">
         {(plan.plan_details as string[])?.map((feature, index) => (

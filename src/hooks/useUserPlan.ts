@@ -48,6 +48,18 @@ export const useUserPlan = (): UserPlanDetails => {
           
         if (planError) throw planError;
         
+        // Create the plan restrictions object from the plan features
+        const planRestrictions = {
+          no_of_facilitator: freePlan.no_of_facilitator,
+          no_of_sessions: freePlan.no_of_sessions,
+          max_participants: freePlan.max_participants,
+          customisable_sessions: freePlan.customisable_sessions,
+          customisable_facilitators: freePlan.customisable_facilitators,
+          saved_sessions: freePlan.saved_sessions,
+          session_reports: freePlan.session_reports,
+          data_export: freePlan.data_export
+        };
+        
         return {
           currentPlanId: freePlan.id,
           plan: {
@@ -55,22 +67,12 @@ export const useUserPlan = (): UserPlanDetails => {
             title: freePlan.title,
             price: freePlan.price,
             plan_type: freePlan.plan_type,
-            plan_details: freePlan.plan_details,
-            plan_table_details: null, // This field is now removed
+            plan_table_details: planRestrictions,
             is_popular: freePlan.is_popular,
             stripe_plan_id: freePlan.stripe_plan_id,
             currency: freePlan.currency
           },
-          planRestrictions: {
-            no_of_facilitator: freePlan.no_of_facilitator,
-            no_of_sessions: freePlan.no_of_sessions,
-            max_participants: freePlan.max_participants,
-            customisable_sessions: freePlan.customisable_sessions,
-            customisable_facilitators: freePlan.customisable_facilitators,
-            saved_sessions: freePlan.saved_sessions,
-            session_reports: freePlan.session_reports,
-            data_export: freePlan.data_export
-          }
+          planRestrictions
         };
       }
       
@@ -83,6 +85,18 @@ export const useUserPlan = (): UserPlanDetails => {
       
       if (planError) throw planError;
       
+      // Create the plan restrictions object from the plan features
+      const planRestrictions = {
+        no_of_facilitator: planFeatures.no_of_facilitator,
+        no_of_sessions: planFeatures.no_of_sessions,
+        max_participants: planFeatures.max_participants,
+        customisable_sessions: planFeatures.customisable_sessions,
+        customisable_facilitators: planFeatures.customisable_facilitators,
+        saved_sessions: planFeatures.saved_sessions,
+        session_reports: planFeatures.session_reports,
+        data_export: planFeatures.data_export
+      };
+      
       return {
         currentPlanId: profileData.current_plan_id,
         plan: {
@@ -90,22 +104,12 @@ export const useUserPlan = (): UserPlanDetails => {
           title: planFeatures.title,
           price: planFeatures.price,
           plan_type: planFeatures.plan_type,
-          plan_details: planFeatures.plan_details,
-          plan_table_details: null, // This field is now removed
+          plan_table_details: planRestrictions,
           is_popular: planFeatures.is_popular,
           stripe_plan_id: planFeatures.stripe_plan_id,
           currency: planFeatures.currency
         },
-        planRestrictions: {
-          no_of_facilitator: planFeatures.no_of_facilitator,
-          no_of_sessions: planFeatures.no_of_sessions,
-          max_participants: planFeatures.max_participants,
-          customisable_sessions: planFeatures.customisable_sessions,
-          customisable_facilitators: planFeatures.customisable_facilitators,
-          saved_sessions: planFeatures.saved_sessions,
-          session_reports: planFeatures.session_reports,
-          data_export: planFeatures.data_export
-        }
+        planRestrictions
       };
     },
     enabled: !!user,

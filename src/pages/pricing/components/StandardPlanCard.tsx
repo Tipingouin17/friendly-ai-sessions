@@ -61,6 +61,25 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
   // Basic plan (id=2) should be highlighted as popular by default
   const isPlanPopular = plan.is_popular || plan.id === 2;
   
+  // Get the currency symbol only
+  const getCurrencySymbol = (currency: string) => {
+    switch (currency.toUpperCase()) {
+      case 'EUR':
+        return '€';
+      case 'GBP':
+        return '£';
+      case 'USD':
+      default:
+        return '$';
+    }
+  };
+  
+  // Format price in a clean way for the large display
+  const formatDisplayPrice = (price: number) => {
+    if (price === 0) return 'Free';
+    return Math.floor(price / 100).toString();
+  };
+  
   return (
     <div 
       className={`glass-card p-8 rounded-2xl hover-lift relative ${
@@ -87,30 +106,32 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       
       <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
       <p className="text-muted-foreground mb-4">{plan.plan_type || `${plan.title} Plan`}</p>
-      <div className="mb-6 text-center">
+      <div className="mb-8 text-center">
         {plan.price === 0 ? (
-          <div className="text-4xl font-bold">Free</div>
+          <div className="text-6xl font-bold">Free</div>
         ) : (
           <>
             <div className="flex items-center justify-center">
-              {getCurrencyIcon(plan.currency || 'USD')}
-              <span className="text-4xl font-bold ml-1">{formatPrice(plan.price)}</span>
+              <span className="text-yellow-500 text-2xl mr-1">
+                {getCurrencySymbol(plan.currency || 'USD')}
+              </span>
+              <span className="text-6xl font-bold">{formatDisplayPrice(plan.price)}</span>
             </div>
-            <div className="text-sm text-muted-foreground mt-1">/month</div>
+            <div className="text-muted-foreground mt-1">/month</div>
           </>
         )}
       </div>
       <ul className="space-y-4 mb-8">
         {(plan.plan_details as string[])?.map((feature, index) => (
-          <li key={index} className="flex items-center gap-2">
-            <Check className="h-5 w-5 text-primary" />
+          <li key={index} className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
             <span>{feature}</span>
           </li>
         ))}
       </ul>
       <Button 
-        className="w-full" 
-        variant={isCurrentPlan ? "outline" : (isPlanPopular ? "default" : "outline")}
+        className={`w-full ${isPlanPopular || !isCurrentPlan ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : ''}`}
+        variant={isCurrentPlan ? "outline" : "default"}
         onClick={handleGetStarted}
       >
         {isCurrentPlan ? "Current Plan" : "Get Started"}

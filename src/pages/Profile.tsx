@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlanInfo } from '@/components/subscription/PlanInfo';
@@ -8,43 +7,37 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Edit, Key, LogOut, User, Shield, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
 const Profile = () => {
-  const { user, logout } = useAuth();
-  const { toast } = useToast();
-  
+  const {
+    user,
+    logout
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase();
+    return name.split(' ').map(part => part[0]).join('').toUpperCase();
   };
-  
   const handleEditProfile = () => {
     toast({
       title: "Edit Profile",
-      description: "This feature will be available soon.",
+      description: "This feature will be available soon."
     });
   };
-  
   const handleChangePassword = () => {
     toast({
       title: "Change Password",
-      description: "This feature will be available soon.",
+      description: "This feature will be available soon."
     });
   };
-  
   const handleLogout = () => {
     logout();
     toast({
       title: "Logged Out",
-      description: "You have been successfully logged out.",
+      description: "You have been successfully logged out."
     });
   };
-
-  return (
-    <div className="min-h-screen pt-24 pb-16 bg-gray-50">
+  return <div className="min-h-screen pt-24 pb-16 bg-gray-50">
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
         
@@ -82,23 +75,23 @@ const Profile = () => {
                   <User className="h-6 w-6 text-amber-400" />
                   <CardTitle className="text-2xl">Account Information</CardTitle>
                 </div>
-                <CardDescription className="text-base mt-1">Your personal information and account details</CardDescription>
+                <CardDescription className="text-base mt-1 text-left">Your personal information and account details</CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid md:grid-cols-2 gap-y-8 gap-x-12">
                   <div>
-                    <h3 className="text-lg text-gray-500 font-medium mb-2">Email Address</h3>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Email Address</h3>
                     <p className="text-xl font-medium">{user?.email}</p>
                   </div>
                   <div>
-                    <h3 className="text-lg text-gray-500 font-medium mb-2">Account Created</h3>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Account Created</h3>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-gray-400" />
                       <p className="text-lg">Not available</p>
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-lg text-gray-500 font-medium mb-2">Account Status</h3>
+                    <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Account Status</h3>
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full bg-green-500"></div>
                       <p className="text-lg font-medium">Active</p>
@@ -108,21 +101,11 @@ const Profile = () => {
               </CardContent>
               <Separator />
               <CardFooter className="py-6 flex flex-wrap gap-4 justify-start">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="gap-2 rounded-full px-6" 
-                  onClick={handleChangePassword}
-                >
+                <Button variant="outline" size="lg" className="gap-2 rounded-full px-6" onClick={handleChangePassword}>
                   <Key size={18} />
                   Change Password
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="gap-2 rounded-full px-6 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-100" 
-                  onClick={handleLogout}
-                >
+                <Button variant="outline" size="lg" className="gap-2 rounded-full px-6 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-100" onClick={handleLogout}>
                   <LogOut size={18} />
                   Log Out
                 </Button>
@@ -136,14 +119,14 @@ const Profile = () => {
                   <Shield className="h-6 w-6 text-amber-400" />
                   <CardTitle className="text-2xl">Security Settings</CardTitle>
                 </div>
-                <CardDescription className="text-base mt-1">Manage your account security preferences</CardDescription>
+                <CardDescription className="text-base mt-1 text-left">Manage your account security preferences</CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-8">
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-xl font-semibold mb-1">Two-Factor Authentication</h3>
+                        <h3 className="text-xl font-semibold mb-1 text-left">Two-Factor Authentication</h3>
                         <p className="text-gray-500">Add an extra layer of security to your account</p>
                       </div>
                       <Button variant="outline" size="lg" className="rounded-full px-6">Set Up</Button>
@@ -155,7 +138,7 @@ const Profile = () => {
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-xl font-semibold mb-1">Recent Login Activity</h3>
+                        <h3 className="text-xl font-semibold mb-1 text-left">Recent Login Activity</h3>
                         <p className="text-gray-500">View your recent login history</p>
                       </div>
                       <Button variant="outline" size="lg" className="rounded-full px-6">View Activity</Button>
@@ -185,8 +168,6 @@ const Profile = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Profile;

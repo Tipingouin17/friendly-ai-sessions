@@ -46,8 +46,8 @@ const useStepItem = () => {
 // Components
 interface StepperProps extends React.HTMLAttributes<HTMLDivElement> {
   defaultValue?: number;
-  value?: number;
-  onValueChange?: (value: number) => void;
+  value?: string | number;
+  onValueChange?: (value: string) => void;
   orientation?: "horizontal" | "vertical";
 }
 
@@ -63,12 +63,12 @@ const Stepper = React.forwardRef<HTMLDivElement, StepperProps>(
         if (value === undefined) {
           setInternalStep(step);
         }
-        onValueChange?.(step);
+        onValueChange?.(step.toString());
       },
       [value, onValueChange],
     );
 
-    const currentStep = value ?? activeStep;
+    const currentStep = value !== undefined ? (typeof value === 'string' ? parseInt(value) : value) : activeStep;
 
     return (
       <StepperContext.Provider
@@ -95,7 +95,8 @@ Stepper.displayName = "Stepper";
 
 // StepperItem
 interface StepperItemProps extends React.HTMLAttributes<HTMLDivElement> {
-  step: number;
+  step?: number;
+  value: string;
   completed?: boolean;
   disabled?: boolean;
   loading?: boolean;
@@ -103,18 +104,19 @@ interface StepperItemProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const StepperItem = React.forwardRef<HTMLDivElement, StepperItemProps>(
   (
-    { step, completed = false, disabled = false, loading = false, className, children, ...props },
+    { step, value, completed = false, disabled = false, loading = false, className, children, ...props },
     ref,
   ) => {
     const { activeStep } = useStepper();
-
+    const stepNumber = step || parseInt(value, 10);
+    
     const state: StepState =
-      completed || step < activeStep ? "completed" : activeStep === step ? "active" : "inactive";
+      completed || stepNumber < activeStep ? "completed" : activeStep === stepNumber ? "active" : "inactive";
 
-    const isLoading = loading && step === activeStep;
+    const isLoading = loading && stepNumber === activeStep;
 
     return (
-      <StepItemContext.Provider value={{ step, state, isDisabled: disabled, isLoading }}>
+      <StepItemContext.Provider value={{ step: stepNumber, state, isDisabled: disabled, isLoading }}>
         <div
           ref={ref}
           className={cn(
@@ -132,6 +134,26 @@ const StepperItem = React.forwardRef<HTMLDivElement, StepperItemProps>(
   },
 );
 StepperItem.displayName = "StepperItem";
+
+// StepperContent - Adding this component
+const StepperContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => {
+    const { state } = useStepItem();
+    
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "mt-2 transition-all",
+          state === "active" ? "block" : "hidden",
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+StepperContent.displayName = "StepperContent";
 
 // StepperTrigger
 interface StepperTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -247,6 +269,7 @@ StepperSeparator.displayName = "StepperSeparator";
 
 export {
   Stepper,
+  StepperContent,
   StepperDescription,
   StepperIndicator,
   StepperItem,

@@ -1,55 +1,19 @@
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { Step } from "@/types/facilitator";
-import { Stepper } from "@/components/ui/stepper";
+import { Stepper, StepperItem, StepperTrigger, StepperIndicator, StepperContent, StepperSeparator } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-
-const steps = [{
-  step: 1,
-  title: "Choose your facilitator"
-}, {
-  step: 2,
-  title: "Select workshop type"
-}, {
-  step: 3,
-  title: "Describe participants"
-}];
-
-const fetchFacilitators = async () => {
-  const { data, error } = await supabase
-    .from('facilitators')
-    .select('*')
-    .order('order', { ascending: true });
-  
-  if (error) throw error;
-  return data;
-};
-
-const fetchSessions = async (facilitatorId: number | null) => {
-  const query = supabase
-    .from('sessions')
-    .select('*, facilitator:facilitators!inner(*)')
-    .eq('status', true);
-
-  if (facilitatorId) {
-    query.eq('facilitator', facilitatorId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
-};
 
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -64,6 +28,7 @@ const MyFacilitators = () => {
   
   const { 
     hasReachedSessionLimit, 
+    hasReachedFacilitatorLimit,
     maxSessions, 
     currentSessionCount,
     isLoading: limitsLoading 
@@ -178,15 +143,25 @@ const MyFacilitators = () => {
     navigate('/pricing');
   };
 
+  // Determine if steps should be disabled based on limits
+  const isStep1Disabled = hasReachedFacilitatorLimit;
+  const isStep2Disabled = hasReachedSessionLimit || !selectedFacilitator;
+  const isStep3Disabled = hasReachedSessionLimit || !selectedWorkshop;
+
   return (
     <div className="min-h-screen pt-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {hasReachedSessionLimit && (
+        {/* Plan limit alert at the top */}
+        {(hasReachedSessionLimit || hasReachedFacilitatorLimit) && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Plan Limit Reached</AlertTitle>
             <AlertDescription className="flex justify-between items-center">
-              <span>You've used {currentSessionCount} out of {maxSessions} sessions available in your plan.</span>
+              <span>
+                {hasReachedSessionLimit ? 
+                  `You've used ${currentSessionCount} out of ${maxSessions} sessions available in your plan.` : 
+                  "You've reached your facilitator limit in your current plan."}
+              </span>
               <Button onClick={handleUpgradePlan} size="sm">
                 Upgrade Plan
               </Button>
@@ -195,46 +170,64 @@ const MyFacilitators = () => {
         )}
         
         <div className="bg-white rounded-3xl shadow-lg p-8">
-          <Stepper value={currentStep} className="mb-8">
-            {steps.map((step, index) => (
-              <div key={step.step} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    step.step <= currentStep
-                      ? "bg-primary text-white"
-                      : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  {step.step}
-                </div>
-                <span className="ml-3 text-sm font-medium">{step.title}</span>
-                {index < steps.length - 1 && (
-                  <div className="flex-1 h-px bg-gray-200 mx-4" />
-                )}
-              </div>
-            ))}
+          <Stepper value={currentStep.toString()} onValueChange={(value) => setCurrentStep(parseInt(value) as Step)} className="mb-8">
+            <div className="flex items-center gap-2 w-full">
+              <StepperItem value="1" disabled={isStep1Disabled}>
+                <StepperTrigger className="flex flex-col items-center gap-2">
+                  <StepperIndicator>
+                    {isStep1Disabled && <Lock className="h-3 w-3" />}
+                  </StepperIndicator>
+                  <div className="text-sm font-medium">Choose Facilitator</div>
+                </StepperTrigger>
+              </StepperItem>
+              
+              <StepperSeparator />
+              
+              <StepperItem value="2" disabled={isStep2Disabled}>
+                <StepperTrigger className="flex flex-col items-center gap-2">
+                  <StepperIndicator>
+                    {isStep2Disabled && selectedFacilitator === null && <Lock className="h-3 w-3" />}
+                  </StepperIndicator>
+                  <div className="text-sm font-medium">Select Workshop</div>
+                </StepperTrigger>
+              </StepperItem>
+              
+              <StepperSeparator />
+              
+              <StepperItem value="3" disabled={isStep3Disabled}>
+                <StepperTrigger className="flex flex-col items-center gap-2">
+                  <StepperIndicator>
+                    {isStep3Disabled && selectedWorkshop === null && <Lock className="h-3 w-3" />}
+                  </StepperIndicator>
+                  <div className="text-sm font-medium">Setup Participants</div>
+                </StepperTrigger>
+              </StepperItem>
+            </div>
           </Stepper>
 
           <div className="space-y-8">
-            {currentStep === 1 && (
+            {/* Step 1: Facilitator Selection - Blur when limit reached */}
+            <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'} ${hasReachedFacilitatorLimit ? 'opacity-50 pointer-events-none' : ''}`}>
               <FacilitatorSelection
                 facilitators={facilitators}
                 selectedFacilitator={selectedFacilitator}
                 onSelect={setSelectedFacilitator}
                 isLoading={isFacilitatorsLoading}
               />
-            )}
+            </div>
 
-            {currentStep === 2 && (
+            {/* Step 2: Workshop Selection - Blur when limit reached */}
+            <div className={`transition-all ${currentStep === 2 ? 'block' : 'hidden'} ${hasReachedSessionLimit ? 'opacity-50 pointer-events-none' : ''}`}>
               <WorkshopSelection
                 workshops={workshops}
                 selectedWorkshop={selectedWorkshop}
                 onSelect={setSelectedWorkshop}
                 isLoading={isWorkshopsLoading}
               />
-            )}
+            </div>
 
-            {currentStep === 3 && (
+            {/* Step 3: Workshop Setup - Blur when limit reached */}
+            <div className={`transition-all ${currentStep === 3 ? 'block' : 'hidden'} ${hasReachedSessionLimit ? 'opacity-50 pointer-events-none' : ''}`}>
               <WorkshopSetup
                 participantCount={participantCount}
                 setParticipantCount={setParticipantCount}
@@ -245,7 +238,7 @@ const MyFacilitators = () => {
                 agreed={agreed}
                 setAgreed={setAgreed}
               />
-            )}
+            </div>
           </div>
 
           <div className="flex justify-between mt-8">
@@ -262,8 +255,8 @@ const MyFacilitators = () => {
               <Button
                 onClick={handleNext}
                 disabled={
-                  (currentStep === 1 && !selectedFacilitator) ||
-                  (currentStep === 2 && !selectedWorkshop)
+                  (currentStep === 1 && (!selectedFacilitator || hasReachedFacilitatorLimit)) ||
+                  (currentStep === 2 && (!selectedWorkshop || hasReachedSessionLimit))
                 }
               >
                 Next
@@ -282,6 +275,32 @@ const MyFacilitators = () => {
       </div>
     </div>
   );
+};
+
+// Helper functions for fetching data
+const fetchFacilitators = async () => {
+  const { data, error } = await supabase
+    .from('facilitators')
+    .select('*')
+    .order('order', { ascending: true });
+  
+  if (error) throw error;
+  return data;
+};
+
+const fetchSessions = async (facilitatorId: number | null) => {
+  const query = supabase
+    .from('sessions')
+    .select('*, facilitator:facilitators!inner(*)')
+    .eq('status', true);
+
+  if (facilitatorId) {
+    query.eq('facilitator', facilitatorId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
 };
 
 export default MyFacilitators;

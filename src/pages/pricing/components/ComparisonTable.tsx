@@ -51,6 +51,25 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     return null;
   };
   
+  // Format price with currency
+  const formatPrice = (plan: Plan) => {
+    if (plan.title === "Enterprise") return "Custom Pricing";
+    
+    const price = plan.price / 100; // Convert cents to dollars
+    const currency = plan.currency || 'USD';
+    
+    // Format with appropriate currency symbol
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    
+    // Return formatted price with /month
+    return `${formatter.format(price).replace(/[A-Z]{3}/, '')}/month`;
+  };
+  
   return (
     <div className="mt-16">
       <h2 className="text-3xl font-bold text-center mb-8">Compare Plans</h2>
@@ -70,7 +89,7 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                 >
                   <span className="block text-lg font-semibold text-gray-900">{plan.title}</span>
                   <span className="block text-sm text-gray-500 mt-1">
-                    {plan.title === "Enterprise" ? "Custom Pricing" : `$${plan.price/100}/month`}
+                    {formatPrice(plan)}
                   </span>
                   {plan.id === currentPlanId && (
                     <span className="inline-block bg-green-500 text-white text-xs px-2 py-1 rounded mt-1">

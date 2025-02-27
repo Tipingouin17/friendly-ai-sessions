@@ -42,10 +42,10 @@ export const StandardPlanCard = ({
   const formatDisplayPrice = (price: number) => {
     if (price === 0) return 'Free';
     
-    // Always divide by 100 to convert from cents to dollars/euros
+    // Convert cents to euros/dollars
     const formattedPrice = price / 100;
     
-    // Return integer if it's a whole number, otherwise include decimals
+    // Return with 2 decimal places if it has decimals, otherwise as integer
     return Number.isInteger(formattedPrice) 
       ? formattedPrice.toString() 
       : formattedPrice.toFixed(2);
@@ -140,23 +140,35 @@ export const StandardPlanCard = ({
 
   // Get features for this plan
   const planFeatures = getFeatureList();
-  return <div className={`glass-card p-8 rounded-2xl hover-lift relative ${isPlanPopular ? 'ring-2 ring-primary' : ''} ${isCurrentPlan ? 'ring-2 ring-green-500' : ''}`}>
-      {isPlanPopular && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+  
+  return (
+    <div className={`glass-card p-8 rounded-2xl hover-lift relative min-h-[700px] flex flex-col ${isPlanPopular ? 'ring-2 ring-primary' : ''} ${isCurrentPlan ? 'ring-2 ring-green-500' : ''}`}>
+      {isPlanPopular && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
           <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
             Most Popular
           </span>
-        </div>}
+        </div>
+      )}
       
-      {isCurrentPlan && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+      {isCurrentPlan && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
           <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-medium">
             Current Plan
           </span>
-        </div>}
+        </div>
+      )}
       
-      <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
-      <p className="text-muted-foreground mb-4">{plan.plan_type || `${plan.title} Plan`}</p>
-      <div className="mb-8 text-center">
-        {plan.price === 0 ? <div className="text-6xl font-bold">Free</div> : <>
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
+        <p className="text-muted-foreground">{plan.plan_type || `${plan.title} Plan`}</p>
+      </div>
+
+      <div className="text-center mb-8">
+        {plan.price === 0 ? (
+          <div className="text-6xl font-bold">Free</div>
+        ) : (
+          <>
             <div className="flex items-center justify-center">
               <span className="text-yellow-500 text-2xl mr-1">
                 {getCurrencySymbol(plan.currency || 'USD')}
@@ -164,16 +176,28 @@ export const StandardPlanCard = ({
               <span className="text-6xl font-bold">{formatDisplayPrice(plan.price)}</span>
             </div>
             <div className="text-muted-foreground mt-1">/month</div>
-          </>}
+          </>
+        )}
       </div>
-      <ul className="space-y-4 mb-8 h-64 overflow-y-auto">
-        {planFeatures.map((feature, index) => <li key={index} className="flex items-start gap-2">
-            <Check className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-            <span className="text-left">{feature}</span>
-          </li>)}
-      </ul>
-      <Button className={`w-full ${isPlanPopular || !isCurrentPlan ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : ''}`} variant={isCurrentPlan ? "outline" : "default"} onClick={handleGetStarted}>
+
+      <div className="flex-grow">
+        <ul className="space-y-4 text-left">
+          {planFeatures.map((feature, index) => (
+            <li key={index} className="flex items-start gap-2">
+              <Check className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <Button 
+        className={`w-full mt-8 ${isPlanPopular || !isCurrentPlan ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : ''}`} 
+        variant={isCurrentPlan ? "outline" : "default"} 
+        onClick={handleGetStarted}
+      >
         {isCurrentPlan ? "Current Plan" : "Get Started"}
       </Button>
-    </div>;
+    </div>
+  );
 };

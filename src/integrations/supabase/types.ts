@@ -462,48 +462,6 @@ export type Database = {
           },
         ]
       }
-      plan_restrictions_backup: {
-        Row: {
-          created_at: string | null
-          customisable_facilitators: boolean | null
-          customisable_sessions: boolean | null
-          data_export: boolean | null
-          id: number | null
-          max_participants: number | null
-          no_of_facilitator: number | null
-          no_of_sessions: number | null
-          plan_id: number | null
-          saved_sessions: boolean | null
-          session_reports: boolean | null
-        }
-        Insert: {
-          created_at?: string | null
-          customisable_facilitators?: boolean | null
-          customisable_sessions?: boolean | null
-          data_export?: boolean | null
-          id?: number | null
-          max_participants?: number | null
-          no_of_facilitator?: number | null
-          no_of_sessions?: number | null
-          plan_id?: number | null
-          saved_sessions?: boolean | null
-          session_reports?: boolean | null
-        }
-        Update: {
-          created_at?: string | null
-          customisable_facilitators?: boolean | null
-          customisable_sessions?: boolean | null
-          data_export?: boolean | null
-          id?: number | null
-          max_participants?: number | null
-          no_of_facilitator?: number | null
-          no_of_sessions?: number | null
-          plan_id?: number | null
-          saved_sessions?: boolean | null
-          session_reports?: boolean | null
-        }
-        Relationships: []
-      }
       plans: {
         Row: {
           created_at: string | null

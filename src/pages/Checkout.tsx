@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plan } from './pricing/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -390,11 +390,11 @@ const CheckoutForm = ({
 
     try {
       // Step 1: Create a subscription via the Supabase Edge Function
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-subscription`, {
+      const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`,
         },
         body: JSON.stringify({ 
           planId: plan.id,
@@ -434,11 +434,11 @@ const CheckoutForm = ({
       }
 
       // Step 3: Confirm the subscription with our backend
-      const confirmResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/confirm-subscription`, {
+      const confirmResponse = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/confirm-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`,
         },
         body: JSON.stringify({ 
           subscriptionId,

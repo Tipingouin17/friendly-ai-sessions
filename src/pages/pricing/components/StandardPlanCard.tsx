@@ -1,7 +1,7 @@
 
 import { Check, DollarSign, Euro, PoundSterling } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Plan } from "../types";
+import { Plan, FEATURE_LABELS } from "../types";
 import { useNavigate } from "react-router-dom";
 
 interface StandardPlanCardProps {
@@ -24,43 +24,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       navigate(`/checkout?plan=${plan.id}`);
     }
   };
-  
-  // Get appropriate currency icon based on plan currency
-  const getCurrencyIcon = (currency: string) => {
-    switch (currency.toUpperCase()) {
-      case 'EUR':
-        return <Euro className="h-5 w-5 text-primary inline" />;
-      case 'GBP':
-        return <PoundSterling className="h-5 w-5 text-primary inline" />;
-      case 'USD':
-      default:
-        return <DollarSign className="h-5 w-5 text-primary inline" />;
-    }
-  };
-  
-  // Format the price with correct currency symbol and decimal places
-  const formatPrice = (price: number) => {
-    if (price === 0) return 'Free';
-    
-    // Extract currency information from plan metadata or default to USD
-    const currency = plan.currency || 'USD';
-    
-    // Format price with appropriate currency symbol
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-    
-    // Return formatted value without the currency code
-    return formatter.format(price / 100).replace(/[A-Z]{3}/, '').trim();
-  };
-  
-  // Determine if this plan should be highlighted as popular
-  // Basic plan (id=2) should be highlighted as popular by default
-  const isPlanPopular = plan.is_popular || plan.id === 2;
-  
+
   // Get the currency symbol only
   const getCurrencySymbol = (currency: string) => {
     switch (currency.toUpperCase()) {
@@ -79,6 +43,66 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
     if (price === 0) return 'Free';
     return Math.floor(price / 100).toString();
   };
+  
+  // Determine if this plan should be highlighted as popular
+  // Basic plan (id=2) should be highlighted as popular by default
+  const isPlanPopular = plan.is_popular || plan.id === 2;
+  
+  // Generate feature list based on plan features instead of plan_details
+  const getFeatureList = () => {
+    if (!plan.plan_table_details) return [];
+    
+    const features = [];
+    
+    // Number of facilitators
+    if (plan.plan_table_details.no_of_facilitator) {
+      const facilitators = plan.plan_table_details.no_of_facilitator === 'unlimited' 
+        ? 'Unlimited facilitators' 
+        : `${plan.plan_table_details.no_of_facilitator} facilitators`;
+      features.push(facilitators);
+    }
+    
+    // Number of sessions
+    if (plan.plan_table_details.no_of_sessions) {
+      const sessions = plan.plan_table_details.no_of_sessions === 'unlimited' 
+        ? 'Unlimited sessions per month' 
+        : `${plan.plan_table_details.no_of_sessions} sessions per month`;
+      features.push(sessions);
+    }
+    
+    // Max participants
+    if (plan.plan_table_details.max_participants) {
+      const participants = plan.plan_table_details.max_participants === 'unlimited' 
+        ? 'Unlimited participants per session' 
+        : `Up to ${plan.plan_table_details.max_participants} participants per session`;
+      features.push(participants);
+    }
+    
+    // Customizable sessions
+    if (plan.plan_table_details.customisable_sessions) {
+      features.push('Create customized sessions');
+    }
+    
+    // Saved sessions
+    if (plan.plan_table_details.saved_sessions) {
+      features.push('Save sessions for later');
+    }
+    
+    // Session reports
+    if (plan.plan_table_details.session_reports) {
+      features.push('Detailed session reports');
+    }
+    
+    // Data export
+    if (plan.plan_table_details.data_export) {
+      features.push('Export session data');
+    }
+    
+    return features;
+  };
+  
+  // Get features for this plan
+  const planFeatures = getFeatureList();
   
   return (
     <div 
@@ -122,7 +146,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
         )}
       </div>
       <ul className="space-y-4 mb-8">
-        {(plan.plan_details as string[])?.map((feature, index) => (
+        {planFeatures.map((feature, index) => (
           <li key={index} className="flex items-start gap-2">
             <Check className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
             <span>{feature}</span>

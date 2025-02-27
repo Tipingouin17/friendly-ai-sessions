@@ -43,8 +43,7 @@ const Pricing = () => {
           title: plan.title,
           price: price,
           plan_type: plan.plan_type,
-          plan_details: plan.plan_details,
-          // Create plan_table_details from the structured fields for backward compatibility
+          // Create plan_table_details from the structured fields
           plan_table_details: {
             no_of_facilitator: plan.no_of_facilitator,
             no_of_sessions: plan.no_of_sessions,

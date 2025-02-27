@@ -6,8 +6,16 @@ export interface Plan {
   title: string;
   price: number;
   plan_type: string;
-  plan_details: Json;
-  plan_table_details: Json;
+  plan_table_details: {
+    no_of_facilitator: number | string | null;
+    no_of_sessions: number | string | null;
+    max_participants: number | string | null;
+    customisable_sessions: boolean | null;
+    customisable_facilitators: boolean | null;
+    saved_sessions: boolean | null;
+    session_reports: boolean | null;
+    data_export: boolean | null;
+  };
   is_popular: boolean;
   stripe_plan_id: string;
   currency?: string;

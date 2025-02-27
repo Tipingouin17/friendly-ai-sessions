@@ -469,7 +469,6 @@ export type Database = {
           id: number
           is_popular: boolean | null
           plan_details: Json | null
-          plan_table_details: Json | null
           plan_type: string | null
           price: number | null
           stripe_plan_id: string | null
@@ -483,7 +482,6 @@ export type Database = {
           id?: number
           is_popular?: boolean | null
           plan_details?: Json | null
-          plan_table_details?: Json | null
           plan_type?: string | null
           price?: number | null
           stripe_plan_id?: string | null
@@ -497,7 +495,6 @@ export type Database = {
           id?: number
           is_popular?: boolean | null
           plan_details?: Json | null
-          plan_table_details?: Json | null
           plan_type?: string | null
           price?: number | null
           stripe_plan_id?: string | null

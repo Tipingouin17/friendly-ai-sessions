@@ -56,7 +56,7 @@ const Pricing = () => {
   }
 
   if (error || !plans) {
-    return <ErrorState />;
+    return <ErrorState error={error as Error} />;
   }
 
   // Filter out Enterprise plan from standard plans display

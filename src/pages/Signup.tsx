@@ -40,7 +40,7 @@ const Signup = () => {
               <Input id="name" type="text" placeholder="Enter your full name" value={name} onChange={e => setName(e.target.value)} required />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">
+              <label htmlFor="email" className="block text-sm font-medium mb-2 text-left">
                 Email
               </label>
               <Input id="email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} required />

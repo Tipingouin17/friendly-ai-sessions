@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { usePlanLimits } from "./usePlanLimits";
+import { useNavigate } from "react-router-dom";
 
 interface UseSessionStateProps {
   conversationId: number | null;
@@ -17,7 +19,11 @@ export const useSessionState = ({ conversationId, welcomeMessage }: UseSessionSt
   const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
   const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const { canSaveSessions, canGenerateReports } = usePlanLimits();
 
   useEffect(() => {
     if (welcomeMessage && !welcomeMessageSent) {
@@ -33,6 +39,15 @@ export const useSessionState = ({ conversationId, welcomeMessage }: UseSessionSt
 
   const handleGenerateReport = async () => {
     if (!conversationId) return;
+    
+    if (!canGenerateReports) {
+      toast({
+        title: "Feature Not Available",
+        description: "Report generation is not available in your current plan. Please upgrade to generate session reports.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsGeneratingReport(true);
     try {
@@ -73,6 +88,50 @@ export const useSessionState = ({ conversationId, welcomeMessage }: UseSessionSt
       setIsGeneratingReport(false);
     }
   };
+  
+  const handleSaveSession = async () => {
+    if (!conversationId) return;
+    
+    if (!canSaveSessions) {
+      toast({
+        title: "Feature Not Available",
+        description: "Session saving is not available in your current plan. Please upgrade to save sessions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ 
+          is_saved: true 
+        })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Session Saved",
+        description: "Your session has been saved successfully.",
+      });
+
+    } catch (error) {
+      console.error('Error saving session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save the session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleUpgradePlan = () => {
+    navigate('/pricing');
+  };
 
   return {
     messages,
@@ -86,6 +145,11 @@ export const useSessionState = ({ conversationId, welcomeMessage }: UseSessionSt
     participantMessages,
     setParticipantMessages,
     isGeneratingReport,
-    handleGenerateReport
+    handleGenerateReport,
+    handleSaveSession,
+    isSaving,
+    canSaveSessions,
+    canGenerateReports,
+    handleUpgradePlan
   };
 };

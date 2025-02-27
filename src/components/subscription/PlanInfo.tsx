@@ -1,0 +1,124 @@
+
+import React from 'react';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export const PlanInfo = () => {
+  const { plan, isLoading: planLoading } = useUserPlan();
+  const { 
+    currentFacilitatorCount,
+    currentSessionCount,
+    maxFacilitators,
+    maxSessions,
+    maxParticipants,
+    canCreateCustomSessions,
+    canExportData,
+    canSaveSessions,
+    canGenerateReports,
+    isLoading: limitsLoading
+  } = usePlanLimits();
+  const navigate = useNavigate();
+  
+  const isLoading = planLoading || limitsLoading;
+  
+  const getProgressValue = (current: number, max: number) => {
+    if (max === Infinity) return 0; // Don't show progress for unlimited
+    return Math.min(100, (current / max) * 100);
+  };
+  
+  const handleUpgrade = () => {
+    navigate('/pricing');
+  };
+  
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-full" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex justify-between">
+          <span>Your Plan: {plan?.title || 'Free'}</span>
+          {plan?.price ? <span>${plan.price}/month</span> : <span>Free</span>}
+        </CardTitle>
+        <CardDescription>
+          {plan?.plan_type || 'Standard subscription'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Facilitators</span>
+            <span>{currentFacilitatorCount} / {maxFacilitators === Infinity ? 'Unlimited' : maxFacilitators}</span>
+          </div>
+          {maxFacilitators !== Infinity && (
+            <Progress value={getProgressValue(currentFacilitatorCount, maxFacilitators)} />
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Sessions</span>
+            <span>{currentSessionCount} / {maxSessions === Infinity ? 'Unlimited' : maxSessions}</span>
+          </div>
+          {maxSessions !== Infinity && (
+            <Progress value={getProgressValue(currentSessionCount, maxSessions)} />
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Max Participants Per Session</span>
+            <span>{maxParticipants === Infinity ? 'Unlimited' : maxParticipants}</span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 pt-2 text-sm">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${canCreateCustomSessions ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>Customizable Sessions</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${canSaveSessions ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>Session Saving</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${canGenerateReports ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>Session Reports</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${canExportData ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>Data Export</span>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button 
+          onClick={handleUpgrade} 
+          className="w-full"
+          variant={plan?.title === 'Premium' ? 'outline' : 'default'}
+        >
+          {plan?.title === 'Premium' ? 'Manage Subscription' : 'Upgrade Plan'}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};

@@ -11,6 +11,9 @@ import { Stepper } from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const steps = [{
   step: 1,
@@ -58,6 +61,13 @@ const MyFacilitators = () => {
   const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const { 
+    hasReachedSessionLimit, 
+    maxSessions, 
+    currentSessionCount,
+    isLoading: limitsLoading 
+  } = usePlanLimits();
 
   const { data: facilitators = [], isLoading: isFacilitatorsLoading } = useQuery({
     queryKey: ['facilitators'],
@@ -86,6 +96,15 @@ const MyFacilitators = () => {
   };
 
   const handleSubmit = async () => {
+    if (hasReachedSessionLimit) {
+      toast({
+        title: "Plan Limit Reached",
+        description: "You've reached your plan's session limit. Please upgrade to create more sessions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       if (!selectedWorkshop) {
         toast({
@@ -121,7 +140,7 @@ const MyFacilitators = () => {
           accept_terms_and_conditions: agreed,
           is_saved: false,
           is_session_ended: false,
-          user_id: user.id // This was missing before
+          user_id: user.id
         })
         .select('id')
         .single();
@@ -154,10 +173,27 @@ const MyFacilitators = () => {
       });
     }
   };
+  
+  const handleUpgradePlan = () => {
+    navigate('/pricing');
+  };
 
   return (
     <div className="min-h-screen pt-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {hasReachedSessionLimit && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Plan Limit Reached</AlertTitle>
+            <AlertDescription className="flex justify-between items-center">
+              <span>You've used {currentSessionCount} out of {maxSessions} sessions available in your plan.</span>
+              <Button onClick={handleUpgradePlan} size="sm">
+                Upgrade Plan
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="bg-white rounded-3xl shadow-lg p-8">
           <Stepper value={currentStep} className="mb-8">
             {steps.map((step, index) => (
@@ -236,7 +272,7 @@ const MyFacilitators = () => {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!agreed || !description.trim()}
+                disabled={!agreed || !description.trim() || hasReachedSessionLimit}
               >
                 Start Session
               </Button>

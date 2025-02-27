@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface WorkshopSetupProps {
   participantCount: number;
@@ -25,15 +29,42 @@ export const WorkshopSetup = ({
   agreed,
   setAgreed
 }: WorkshopSetupProps) => {
+  const navigate = useNavigate();
+  const { 
+    maxParticipants,
+    hasReachedParticipantLimit,
+    isLoading
+  } = usePlanLimits();
+  
+  const handleIncrement = () => {
+    if (participantCount < maxParticipants) {
+      setParticipantCount(participantCount + 1);
+    }
+  };
+  
+  const handleDecrement = () => {
+    setParticipantCount(Math.max(1, participantCount - 1));
+  };
+  
+  const handleUpgradePlan = () => {
+    navigate('/pricing');
+  };
+  
+  const limitReached = participantCount >= maxParticipants;
+
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium mb-2">Number of participants</label>
+        <label className="block text-sm font-medium mb-2">
+          Number of participants 
+          {!isLoading && <span className="text-muted-foreground ml-1">(Max: {maxParticipants === Infinity ? 'Unlimited' : maxParticipants})</span>}
+        </label>
         <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={() => setParticipantCount(Math.max(1, participantCount - 1))}
+            onClick={handleDecrement}
+            disabled={participantCount <= 1}
           >
             -
           </Button>
@@ -41,11 +72,28 @@ export const WorkshopSetup = ({
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={() => setParticipantCount(participantCount + 1)}
+            onClick={handleIncrement}
+            disabled={limitReached}
           >
             +
           </Button>
         </div>
+        
+        {limitReached && (
+          <Alert variant="warning" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              You've reached your plan's participant limit. 
+              <Button 
+                variant="link" 
+                className="p-0 h-auto ml-1" 
+                onClick={handleUpgradePlan}
+              >
+                Upgrade for more participants.
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div>

@@ -1,115 +1,39 @@
 
-import { useAuth } from "@/contexts/AuthContext";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import React from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { PlanInfo } from '@/components/subscription/PlanInfo';
 
 const Profile = () => {
   const { user } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
-
-  const handleSave = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        email: email,
-        data: { name: name }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been successfully updated.",
-      });
-      setIsEditing(false);
-    } catch (error: any) {
-      toast({
-        title: "Update failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen pt-24 pb-16">
-        <div className="max-w-4xl mx-auto px-4">
-          <Card className="p-6">
-            <p className="text-center text-gray-500">Please log in to view your profile.</p>
-          </Card>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-4xl font-bold mb-8">My Profile</h1>
+    <div className="min-h-screen pt-24 bg-gray-50">
+      <div className="container mx-auto px-4">
+        <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
         
-        <Card className="p-6">
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold">Personal Information</h2>
-              <Button 
-                variant="outline"
-                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                disabled={isLoading}
-              >
-                {isLoading ? "Saving..." : isEditing ? 'Save Changes' : 'Edit Profile'}
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Name</label>
-                {isEditing ? (
-                  <Input 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name"
-                  />
-                ) : (
-                  <p className="text-gray-700">{user.name || "Not set"}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                {isEditing ? (
-                  <Input 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    placeholder="Enter your email"
-                  />
-                ) : (
-                  <p className="text-gray-700">{user.email}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Member Since</label>
-                <p className="text-gray-700">
-                  {new Date().toLocaleDateString()}
-                </p>
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-2">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Account Information</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Email</label>
+                  <div className="mt-1 text-lg">{user?.email}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Account Created</label>
+                  <div className="mt-1">
+                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </Card>
+          
+          <div>
+            <PlanInfo />
+          </div>
+        </div>
       </div>
     </div>
   );

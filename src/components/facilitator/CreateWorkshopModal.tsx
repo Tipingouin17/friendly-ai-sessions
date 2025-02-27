@@ -7,6 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 interface CreateWorkshopModalProps {
   open: boolean;
@@ -27,9 +31,25 @@ export const CreateWorkshopModal = ({
   const [profilePicture, setProfilePicture] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const { 
+    canCreateCustomSessions,
+    isLoading: limitsLoading
+  } = usePlanLimits();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!canCreateCustomSessions) {
+      toast({
+        title: "Feature Not Available",
+        description: "Custom session creation is not available in your current plan. Please upgrade to create custom sessions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -66,65 +86,99 @@ export const CreateWorkshopModal = ({
     }
   };
 
+  const handleUpgradePlan = () => {
+    onOpenChange(false);
+    navigate('/pricing');
+  };
+
+  if (limitsLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create New Workshop</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter workshop title"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="scope">Scope</Label>
-            <Textarea
-              id="scope"
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-              placeholder="Enter workshop scope"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="objective">Objective</Label>
-            <Textarea
-              id="objective"
-              value={objective}
-              onChange={(e) => setObjective(e.target.value)}
-              placeholder="Enter workshop objective"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="profilePicture">Workshop Image URL</Label>
-            <Input
-              id="profilePicture"
-              value={profilePicture}
-              onChange={(e) => setProfilePicture(e.target.value)}
-              placeholder="Enter workshop image URL"
-            />
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              Create Workshop
+        
+        {!canCreateCustomSessions ? (
+          <div className="space-y-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Feature Not Available</AlertTitle>
+              <AlertDescription>
+                Custom workshop creation is not available in your current plan. 
+                Please upgrade to a plan that includes customizable sessions.
+              </AlertDescription>
+            </Alert>
+            <Button onClick={handleUpgradePlan} className="w-full">
+              Upgrade Plan
             </Button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter workshop title"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="scope">Scope</Label>
+              <Textarea
+                id="scope"
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                placeholder="Enter workshop scope"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="objective">Objective</Label>
+              <Textarea
+                id="objective"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="Enter workshop objective"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profilePicture">Workshop Image URL</Label>
+              <Input
+                id="profilePicture"
+                value={profilePicture}
+                onChange={(e) => setProfilePicture(e.target.value)}
+                placeholder="Enter workshop image URL"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                Create Workshop
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

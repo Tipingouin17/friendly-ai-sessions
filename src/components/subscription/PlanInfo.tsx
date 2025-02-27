@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
@@ -50,7 +51,7 @@ export const PlanInfo = () => {
 
   // Format the price with correct currency symbol and decimal places
   const formatPrice = (price: number | null | undefined) => {
-    if (price === null || price === undefined) return 'Free';
+    if (price === null || price === undefined) return '';
 
     // Extract currency information from plan metadata or default to USD
     const currency = plan?.currency || 'USD';

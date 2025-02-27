@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -15,8 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-// Initialize Stripe with a real publishable key
-// Note: This should be your actual publishable key from Stripe
+// Initialize Stripe with a valid publishable key
+// This is a test publishable key, not a secret key so it's safe to use in client-side code
 const stripePromise = loadStripe('pk_test_51OcXwYGWmQRsACOr1hLGJ9uYXTPTilQwhNFZcC6jtXPMkj00jUPbIQgxOjXZkmKn1cPDZpIhNKGGPHuFJtVqelZ500vbDgQTDl');
 
 const Checkout = () => {
@@ -533,6 +534,9 @@ const CheckoutForm = ({
     setLoading(true);
 
     try {
+      console.log("Creating subscription with plan ID:", plan.id);
+      console.log("Using stripe plan ID:", plan.stripe_plan_id);
+      
       // Step 1: Create a subscription via the Supabase Edge Function
       const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, {
         method: 'POST',
@@ -542,6 +546,7 @@ const CheckoutForm = ({
         },
         body: JSON.stringify({ 
           planId: plan.id,
+          stripePlanId: plan.stripe_plan_id, // Make sure to include the Stripe plan ID
           userId: user.id,
           billingDetails,
           returnUrl: window.location.origin + '/profile',
@@ -558,7 +563,7 @@ const CheckoutForm = ({
       // Step 2: Confirm the payment with Stripe
       const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
-          card: cardElement!,
+          card: elements.getElement(CardElement)!,
           billing_details: {
             name: billingDetails.name,
             email: billingDetails.email,

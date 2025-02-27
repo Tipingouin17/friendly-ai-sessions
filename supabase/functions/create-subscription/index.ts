@@ -17,7 +17,10 @@ serve(async (req) => {
   }
 
   try {
-    const { planId, userId, billingDetails, returnUrl } = await req.json();
+    const { planId, stripePlanId, userId, billingDetails, returnUrl } = await req.json();
+    
+    console.log("Received request with planId:", planId);
+    console.log("Stripe plan ID:", stripePlanId);
     
     // Get supabase client
     const supabaseClient = createClient(
@@ -37,8 +40,7 @@ serve(async (req) => {
       throw new Error(`Error fetching plan: ${planError.message}`);
     }
 
-    // Get the Stripe plan ID
-    const stripePlanId = planData.stripe_plan_id;
+    // Use the provided Stripe plan ID (price ID)
     if (!stripePlanId) {
       throw new Error('This plan does not have a valid Stripe plan ID');
     }
@@ -50,6 +52,8 @@ serve(async (req) => {
       address: billingDetails.address,
     });
 
+    console.log("Created Stripe customer:", customer.id);
+
     // Create a subscription
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
@@ -59,10 +63,14 @@ serve(async (req) => {
       expand: ['latest_invoice.payment_intent'],
     });
 
+    console.log("Created subscription:", subscription.id);
+
     // Get the client secret for the payment intent
     const invoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
     const clientSecret = paymentIntent.client_secret;
+
+    console.log("Payment intent created, returning client secret");
 
     // Return the client secret and subscription ID
     return new Response(
@@ -77,6 +85,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    console.error("Error in create-subscription:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

@@ -52,12 +52,18 @@ export const PlanInfo = () => {
     );
   }
   
+  // Format the price with correct currency symbol and decimal places
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return 'Free';
+    return `$${(price / 100).toFixed(2)}/month`;
+  };
+  
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex justify-between">
           <span>Your Plan: {plan?.title || 'Free'}</span>
-          {plan?.price ? <span>${plan.price}/month</span> : <span>Free</span>}
+          {plan?.price ? <span>{formatPrice(plan.price)}</span> : <span>Free</span>}
         </CardTitle>
         <CardDescription>
           {plan?.plan_type || 'Standard subscription'}

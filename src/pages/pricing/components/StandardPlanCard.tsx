@@ -27,6 +27,12 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
     }
   };
   
+  // Format the price with correct currency symbol and decimal places
+  const formatPrice = (price: number) => {
+    if (price === 0) return '0';
+    return (price / 100).toFixed(2);
+  };
+  
   return (
     <div 
       className={`glass-card p-8 rounded-2xl hover-lift relative ${
@@ -54,7 +60,7 @@ export const StandardPlanCard = ({ plan, isCurrentPlan = false }: StandardPlanCa
       <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
       <p className="text-muted-foreground mb-4">{plan.plan_type}</p>
       <div className="mb-6">
-        <span className="text-4xl font-bold">${plan.price}</span>
+        <span className="text-4xl font-bold">${formatPrice(plan.price)}</span>
         <span className="text-muted-foreground">/month</span>
       </div>
       <ul className="space-y-4 mb-8">

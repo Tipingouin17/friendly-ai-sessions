@@ -51,8 +51,8 @@ export const useUserPlan = (): UserPlanDetails => {
         
         // Create the plan restrictions object from the plan features
         const planRestrictions = {
-          facilitator_limit: freePlan.facilitator_limit,
-          session_limit: freePlan.session_limit,
+          facilitator_limit: freePlan.no_of_facilitator, // Using the view column name
+          session_limit: freePlan.no_of_sessions, // Using the view column name
           max_participants: freePlan.max_participants,
           customisable_sessions: freePlan.customisable_sessions,
           customisable_facilitators: freePlan.customisable_facilitators,
@@ -60,21 +60,34 @@ export const useUserPlan = (): UserPlanDetails => {
           session_reports: freePlan.session_reports,
           data_export: freePlan.data_export,
           // Use default value of 10 if the field doesn't exist in the database
-          question_limit: 10
+          question_limit: freePlan.number_of_questions_per_session || 10
+        };
+        
+        // Create a compatible plan object for the UI
+        const planForUI: Plan = {
+          id: freePlan.id,
+          title: freePlan.title,
+          price: freePlan.price,
+          plan_type: freePlan.plan_type,
+          plan_table_details: {
+            no_of_facilitator: freePlan.no_of_facilitator,
+            no_of_sessions: freePlan.no_of_sessions,
+            max_participants: freePlan.max_participants,
+            customisable_sessions: freePlan.customisable_sessions,
+            customisable_facilitators: freePlan.customisable_facilitators,
+            saved_sessions: freePlan.saved_sessions,
+            session_reports: freePlan.session_reports,
+            data_export: freePlan.data_export,
+            number_of_questions_per_session: freePlan.number_of_questions_per_session
+          },
+          is_popular: freePlan.is_popular,
+          stripe_plan_id: freePlan.stripe_plan_id,
+          currency: freePlan.currency
         };
         
         return {
           currentPlanId: freePlan.id,
-          plan: {
-            id: freePlan.id,
-            title: freePlan.title,
-            price: freePlan.price,
-            plan_type: freePlan.plan_type,
-            plan_table_details: planRestrictions,
-            is_popular: freePlan.is_popular,
-            stripe_plan_id: freePlan.stripe_plan_id,
-            currency: freePlan.currency
-          },
+          plan: planForUI,
           planRestrictions
         };
       }
@@ -90,8 +103,8 @@ export const useUserPlan = (): UserPlanDetails => {
       
       // Create the plan restrictions object from the plan features
       const planRestrictions = {
-        facilitator_limit: planFeatures.facilitator_limit,
-        session_limit: planFeatures.session_limit,
+        facilitator_limit: planFeatures.no_of_facilitator, // Using the view column name
+        session_limit: planFeatures.no_of_sessions, // Using the view column name
         max_participants: planFeatures.max_participants,
         customisable_sessions: planFeatures.customisable_sessions,
         customisable_facilitators: planFeatures.customisable_facilitators,
@@ -99,21 +112,34 @@ export const useUserPlan = (): UserPlanDetails => {
         session_reports: planFeatures.session_reports,
         data_export: planFeatures.data_export,
         // Use default value of 10 if the field doesn't exist in the database
-        question_limit: 10
+        question_limit: planFeatures.number_of_questions_per_session || 10
+      };
+
+      // Create a compatible plan object for the UI
+      const planForUI: Plan = {
+        id: planFeatures.id,
+        title: planFeatures.title,
+        price: planFeatures.price,
+        plan_type: planFeatures.plan_type,
+        plan_table_details: {
+          no_of_facilitator: planFeatures.no_of_facilitator,
+          no_of_sessions: planFeatures.no_of_sessions,
+          max_participants: planFeatures.max_participants,
+          customisable_sessions: planFeatures.customisable_sessions,
+          customisable_facilitators: planFeatures.customisable_facilitators,
+          saved_sessions: planFeatures.saved_sessions,
+          session_reports: planFeatures.session_reports,
+          data_export: planFeatures.data_export,
+          number_of_questions_per_session: planFeatures.number_of_questions_per_session
+        },
+        is_popular: planFeatures.is_popular,
+        stripe_plan_id: planFeatures.stripe_plan_id,
+        currency: planFeatures.currency
       };
       
       return {
         currentPlanId: profileData.current_plan_id,
-        plan: {
-          id: planFeatures.id,
-          title: planFeatures.title,
-          price: planFeatures.price,
-          plan_type: planFeatures.plan_type,
-          plan_table_details: planRestrictions,
-          is_popular: planFeatures.is_popular,
-          stripe_plan_id: planFeatures.stripe_plan_id,
-          currency: planFeatures.currency
-        },
+        plan: planForUI,
         planRestrictions
       };
     },

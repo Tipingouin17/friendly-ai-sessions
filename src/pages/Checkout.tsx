@@ -181,13 +181,13 @@ const Checkout = () => {
                   <Separator />
                   
                   {/* Billing Information Section */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
                       <User className="h-5 w-5 text-primary" />
                       <h3 className="text-lg font-semibold">Billing Information</h3>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div className="space-y-2">
                         <Label htmlFor="name">Full Name</Label>
                         <Input 
@@ -265,8 +265,8 @@ const Checkout = () => {
                   <Separator />
                   
                   {/* Payment Information Section */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5 text-primary" />
                       <h3 className="text-lg font-semibold">Payment Method</h3>
                     </div>
@@ -400,7 +400,7 @@ const CheckoutForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 mt-4">
       <div className="p-4 border rounded-lg">
         <div className="p-4 border rounded-md bg-white">
           <CardElement 

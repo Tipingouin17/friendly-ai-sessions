@@ -79,7 +79,7 @@ const Pricing = () => {
           </p>
         </div>
 
-        {plans.length > 0 && <ComparisonTable plans={plans} />}
+        {standardPlans.length > 0 && <ComparisonTable plans={standardPlans} />}
       </div>
     </div>
   );

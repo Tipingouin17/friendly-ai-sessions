@@ -1,3 +1,4 @@
+
 import { Check, DollarSign, Euro, PoundSterling } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Plan, FEATURE_LABELS } from "../types";
@@ -54,19 +55,43 @@ export const StandardPlanCard = ({
 
     // Number of facilitators
     if (plan.plan_table_details.no_of_facilitator) {
-      const facilitators = plan.plan_table_details.no_of_facilitator === 'unlimited' ? 'Unlimited facilitators' : `${plan.plan_table_details.no_of_facilitator} facilitators`;
+      // Check if it's a numeric value greater than 999999 or explicitly "unlimited"
+      const isUnlimited = 
+        (typeof plan.plan_table_details.no_of_facilitator === 'number' && 
+         plan.plan_table_details.no_of_facilitator > 999999) || 
+        plan.plan_table_details.no_of_facilitator === 'unlimited';
+        
+      const facilitators = isUnlimited 
+        ? 'Unlimited facilitators' 
+        : `${plan.plan_table_details.no_of_facilitator} facilitators`;
       features.push(facilitators);
     }
 
     // Number of sessions
     if (plan.plan_table_details.no_of_sessions) {
-      const sessions = plan.plan_table_details.no_of_sessions === 'unlimited' ? 'Unlimited sessions per month' : `${plan.plan_table_details.no_of_sessions} sessions per month`;
+      // Check if it's a numeric value greater than 999999 or explicitly "unlimited"
+      const isUnlimited = 
+        (typeof plan.plan_table_details.no_of_sessions === 'number' && 
+         plan.plan_table_details.no_of_sessions > 999999) || 
+        plan.plan_table_details.no_of_sessions === 'unlimited';
+        
+      const sessions = isUnlimited
+        ? 'Unlimited sessions per month' 
+        : `${plan.plan_table_details.no_of_sessions} sessions per month`;
       features.push(sessions);
     }
 
     // Max participants
     if (plan.plan_table_details.max_participants) {
-      const participants = plan.plan_table_details.max_participants === 'unlimited' ? 'Unlimited participants per session' : `Up to ${plan.plan_table_details.max_participants} participants per session`;
+      // Check if it's a numeric value greater than 999999 or explicitly "unlimited"
+      const isUnlimited = 
+        (typeof plan.plan_table_details.max_participants === 'number' && 
+         plan.plan_table_details.max_participants > 999999) || 
+        plan.plan_table_details.max_participants === 'unlimited';
+        
+      const participants = isUnlimited
+        ? 'Unlimited participants per session' 
+        : `Up to ${plan.plan_table_details.max_participants} participants per session`;
       features.push(participants);
     }
 

@@ -4,7 +4,6 @@ import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoIcon } from "lucide-react";
-import { Json } from "@/integrations/supabase/types";
 
 interface ComparisonTableProps {
   plans: Plan[];
@@ -40,13 +39,13 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     }
   };
 
-  // Helper function to safely access properties from JSON objects
-  const getFeatureValue = (details: Json | null, feature: string) => {
-    if (!details) return null;
+  // Helper function to safely access properties from plan table details
+  const getFeatureValue = (plan: Plan, feature: string) => {
+    if (!plan.plan_table_details) return null;
     
-    // Ensure details is an object before trying to access properties
-    if (typeof details === 'object' && details !== null) {
-      return (details as Record<string, any>)[feature];
+    // Ensure plan_table_details is an object before trying to access properties
+    if (typeof plan.plan_table_details === 'object' && plan.plan_table_details !== null) {
+      return (plan.plan_table_details as Record<string, any>)[feature];
     }
     
     return null;
@@ -71,7 +70,7 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                 >
                   <span className="block text-lg font-semibold text-gray-900">{plan.title}</span>
                   <span className="block text-sm text-gray-500 mt-1">
-                    {plan.title === "Enterprise" ? "Custom Pricing" : `$${plan.price}/month`}
+                    {plan.title === "Enterprise" ? "Custom Pricing" : `$${plan.price/100}/month`}
                   </span>
                   {plan.id === currentPlanId && (
                     <span className="inline-block bg-green-500 text-white text-xs px-2 py-1 rounded mt-1">
@@ -104,18 +103,18 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                   // Highlight the cell if it's the current plan and this is a highlighted feature
                   const isCurrentPlanFeature = plan.id === currentPlanId && isHighlightedFeature(feature);
                   
-                  // For facilitators and sessions, show current usage if this is current plan
-                  let featureValue = getFeatureValue(plan.plan_table_details, feature);
+                  // Get the feature value from the plan's table details
+                  const featureValue = getFeatureValue(plan, feature);
                   
                   // Add current usage info for important metrics in the current plan
                   let usageInfo = null;
                   if (plan.id === currentPlanId && feature === 'no_of_facilitator' && planRestrictions) {
-                    const facilitatorValue = getFeatureValue(plan.plan_table_details, 'no_of_facilitator');
+                    const facilitatorValue = getFeatureValue(plan, 'no_of_facilitator');
                     if (typeof facilitatorValue === 'number' || facilitatorValue === 'unlimited') {
                       usageInfo = "Current: Used in Facilitator Setup";
                     }
                   } else if (plan.id === currentPlanId && feature === 'no_of_sessions' && planRestrictions) {
-                    const sessionsValue = getFeatureValue(plan.plan_table_details, 'no_of_sessions');
+                    const sessionsValue = getFeatureValue(plan, 'no_of_sessions');
                     if (typeof sessionsValue === 'number' || sessionsValue === 'unlimited') {
                       usageInfo = "Current: Used in Workshop Creation";
                     }

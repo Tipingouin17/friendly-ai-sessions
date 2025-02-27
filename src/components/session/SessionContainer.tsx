@@ -4,7 +4,7 @@ import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import ParticipantSelector from "./ParticipantSelector";
-import { Message } from "@/types/chat";
+import { Message, ParticipantInfo } from "@/types/chat";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +30,7 @@ interface SessionContainerProps {
   onGenerateReport?: () => void;
   participantNames?: { [key: number]: string };
   onLikeMessage?: (messageId: string) => void;
+  participants?: ParticipantInfo[];
 }
 
 const SessionContainer = ({
@@ -49,7 +50,8 @@ const SessionContainer = ({
   setIsRecording,
   onGenerateReport,
   participantNames = {},
-  onLikeMessage
+  onLikeMessage,
+  participants = []
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   const { toast } = useToast();
@@ -59,6 +61,16 @@ const SessionContainer = ({
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
       const participantNumber = parseInt(message.participant.slice(1));
+      const participant = participants.find(p => p.id === participantNumber);
+      
+      if (participant) {
+        return {
+          ...message,
+          participant: participant.name,
+          avatar: participant.avatar
+        };
+      }
+      
       const name = participantNames[participantNumber];
       if (name) {
         return {
@@ -114,6 +126,7 @@ const SessionContainer = ({
               currentParticipant={`P${currentParticipant}`}
               onLikeMessage={onLikeMessage}
               isWaitingForResponse={isWaitingForResponse}
+              participants={participants}
             />
           </div>
           <ParticipantSelector
@@ -121,6 +134,7 @@ const SessionContainer = ({
             currentParticipant={currentParticipant}
             onParticipantSwitch={onParticipantSwitch}
             participantNames={participantNames}
+            participants={participants}
           />
           <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
             <ChatInput

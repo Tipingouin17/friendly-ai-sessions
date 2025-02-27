@@ -10,6 +10,8 @@ import { participantColors } from "@/utils/sessionHelpers";
 import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
 import SessionContainer from "@/components/session/SessionContainer";
+import ParticipantSetup from "@/components/session/ParticipantSetup";
+import { ParticipantInfo } from "@/types/chat";
 
 const Session = () => {
   const location = useLocation();
@@ -18,7 +20,9 @@ const Session = () => {
   const { toast } = useToast();
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
-
+  const [setupComplete, setSetupComplete] = useState(false);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  
   // Handle conversation ID from URL or state
   useEffect(() => {
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
@@ -65,6 +69,12 @@ const Session = () => {
     }
   }, [error, navigate, toast]);
 
+  // Handle participant setup completion
+  const handleSetupComplete = (setupParticipants: ParticipantInfo[]) => {
+    setParticipants(setupParticipants);
+    setSetupComplete(true);
+  };
+
   // Handle message sending
   const handleSendMessage = async () => {
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
@@ -83,14 +93,20 @@ const Session = () => {
     const allParticipantsResponded = Object.keys(updatedMessages).length === totalParticipants;
 
     if (allParticipantsResponded) {
-      const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => ({
-        id: Date.now().toString() + index,
-        content,
-        sender: "user" as const,
-        participant,
-        timestamp: new Date(),
-        color: participantColors[participant as keyof typeof participantColors]
-      }));
+      const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => {
+        const participantNumber = parseInt(participant.slice(1));
+        const participantInfo = participants.find(p => p.id === participantNumber);
+        
+        return {
+          id: Date.now().toString() + index,
+          content,
+          sender: "user" as const,
+          participant,
+          timestamp: new Date(),
+          color: participantColors[participant as keyof typeof participantColors],
+          avatar: participantInfo?.avatar
+        };
+      });
 
       sessionState.setMessages(prev => [...prev, ...participantResponses]);
       setIsWaitingForResponse(true);
@@ -122,6 +138,7 @@ const Session = () => {
           content: response.data.content,
           sender: "assistant" as const,
           timestamp: new Date(),
+          avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
         };
         sessionState.setMessages(prev => [...prev, aiResponse]);
       } catch (error) {
@@ -145,8 +162,42 @@ const Session = () => {
     sessionState.setInputMessage("");
   };
 
+  const handleLikeMessage = (messageId: string) => {
+    const currentParticipantId = `P${sessionState.currentParticipant}`;
+    
+    sessionState.setMessages(prev => 
+      prev.map(message => {
+        if (message.id === messageId) {
+          const currentLikes = message.likes || [];
+          const alreadyLiked = currentLikes.includes(currentParticipantId);
+          
+          return {
+            ...message,
+            likes: alreadyLiked 
+              ? currentLikes.filter(id => id !== currentParticipantId) 
+              : [...currentLikes, currentParticipantId]
+          };
+        }
+        return message;
+      })
+    );
+  };
+
   if (isLoading) return <LoadingState />;
   if (!conversation || !currentConversationId) return <EmptyState />;
+
+  // If setup is not complete, show the participant setup screen
+  if (!setupComplete) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-12">
+        <ParticipantSetup 
+          participantCount={conversation.participants ?? 1}
+          onComplete={handleSetupComplete}
+          facilitatorTitle={conversation.sessions?.facilitator_details?.title}
+        />
+      </div>
+    );
+  }
 
   return (
     <SessionContainer
@@ -165,6 +216,8 @@ const Session = () => {
       setIsRecording={sessionState.setIsRecording}
       onGenerateReport={sessionState.handleGenerateReport}
       isGeneratingReport={sessionState.isGeneratingReport}
+      onLikeMessage={handleLikeMessage}
+      participants={participants}
     />
   );
 };

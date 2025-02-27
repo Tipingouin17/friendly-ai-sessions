@@ -1,3 +1,4 @@
+
 export interface Message {
   id: string;
   content: string;
@@ -7,6 +8,13 @@ export interface Message {
   color?: string;
   isReport?: boolean;
   likes?: string[]; // Array of participant identifiers who liked the message
+  avatar?: string; // Added for participant avatar
+}
+
+export interface ParticipantInfo {
+  id: number;
+  name: string;
+  avatar: string;
 }
 
 export interface SpeechRecognition extends EventTarget {

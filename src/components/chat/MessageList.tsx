@@ -1,9 +1,11 @@
 
 import React, { useEffect, useRef } from 'react';
-import { Message } from '@/types/chat';
+import { Message, ParticipantInfo } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import { Heart } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserRound } from 'lucide-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -11,6 +13,7 @@ interface MessageListProps {
   currentParticipant?: string;
   onLikeMessage?: (messageId: string) => void;
   isWaitingForResponse?: boolean;
+  participants?: ParticipantInfo[];
 }
 
 const MessageList = ({ 
@@ -18,7 +21,8 @@ const MessageList = ({
   participantColors = {},
   currentParticipant,
   onLikeMessage,
-  isWaitingForResponse = false
+  isWaitingForResponse = false,
+  participants = []
 }: MessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +52,13 @@ const MessageList = ({
 
           const isLikedByCurrentParticipant = message.likes?.includes(currentParticipant || '');
           const likeCount = message.likes?.length || 0;
+
+          // Get participant info if this is a user message
+          let participantInfo = null;
+          if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
+            const participantNumber = parseInt(message.participant.slice(1));
+            participantInfo = participants.find(p => p.id === participantNumber);
+          }
 
           return (
             <div
@@ -80,6 +91,14 @@ const MessageList = ({
                     )}
                   </button>
                 )}
+                {message.sender === "assistant" && isFirstMessageOfGroup && (
+                  <Avatar className="w-8 h-8 mb-1">
+                    <AvatarImage src={message.avatar || undefined} alt="Facilitator" />
+                    <AvatarFallback>
+                      <UserRound className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <div
                   className={cn(
                     "max-w-[80%] px-4 py-2 rounded-2xl shadow-sm",
@@ -101,7 +120,7 @@ const MessageList = ({
                         opacity: 0.8
                       }}
                     >
-                      {message.participant}
+                      {participantInfo?.name || message.participant}
                     </div>
                   )}
                   {message.isReport && (
@@ -133,6 +152,14 @@ const MessageList = ({
                       <span className="text-xs text-gray-500">{likeCount}</span>
                     )}
                   </button>
+                )}
+                {message.sender === "user" && isFirstMessageOfGroup && (
+                  <Avatar className="w-8 h-8 mb-1">
+                    <AvatarImage src={participantInfo?.avatar || undefined} alt={participantInfo?.name || "User"} />
+                    <AvatarFallback>
+                      <UserRound className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
                 )}
               </div>
             </div>

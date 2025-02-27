@@ -37,11 +37,6 @@ const Pricing = () => {
           price = price * 100; // Convert to cents for Stripe
         }
         
-        // If the plan is Premium, set price to 10000 cents (100 dollars)
-        if (plan.title === 'Premium') {
-          price = 10000; // $100 in cents
-        }
-        
         // Construct the plan object
         return {
           id: plan.id,

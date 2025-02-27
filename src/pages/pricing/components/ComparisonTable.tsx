@@ -49,7 +49,8 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
   
   // Format price with currency
   const formatPrice = (plan: Plan) => {
-    if (plan.title === "Enterprise") return "Custom Pricing";
+    // Enterprise plan (id 4) has custom pricing
+    if (plan.id === 4) return "Custom Pricing";
     
     const price = plan.price / 100; // Convert cents to dollars
     const currency = plan.currency || 'USD';

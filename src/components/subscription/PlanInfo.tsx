@@ -59,9 +59,6 @@ export const PlanInfo = () => {
     // Extract currency information from plan metadata or default to USD
     const currency = plan?.currency || 'USD';
     
-    // If the plan is Premium, override the price to 100
-    const displayPrice = plan?.title === 'Premium' ? 100 : (price / 100);
-    
     // Format price with appropriate currency symbol
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -71,8 +68,11 @@ export const PlanInfo = () => {
     });
     
     // Return formatted value with /month appended
-    return `${formatter.format(displayPrice).replace(/[A-Z]{3}/, '').trim()}/month`;
+    return `${formatter.format(price / 100).replace(/[A-Z]{3}/, '').trim()}/month`;
   };
+  
+  // Check if the plan is the highest tier (Premium or Enterprise)
+  const isHighestTier = plan?.id === 3 || plan?.id === 4;
   
   return (
     <Card className="w-full">
@@ -136,9 +136,9 @@ export const PlanInfo = () => {
         <Button 
           onClick={handleUpgrade} 
           className="w-full"
-          variant={plan?.title === 'Premium' ? 'outline' : 'default'}
+          variant={isHighestTier ? "outline" : "default"}
         >
-          {plan?.title === 'Premium' ? 'Manage Subscription' : 'Upgrade Plan'}
+          {isHighestTier ? "Manage Subscription" : "Upgrade Plan"}
         </Button>
       </CardFooter>
     </Card>

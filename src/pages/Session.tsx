@@ -17,6 +17,7 @@ const Session = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
 
   // Handle conversation ID from URL or state
   useEffect(() => {
@@ -92,6 +93,7 @@ const Session = () => {
       }));
 
       sessionState.setMessages(prev => [...prev, ...participantResponses]);
+      setIsWaitingForResponse(true);
 
       try {
         const messagesForAI = participantResponses.map(msg => ({
@@ -129,6 +131,8 @@ const Session = () => {
           description: error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.",
           variant: "destructive",
         });
+      } finally {
+        setIsWaitingForResponse(false);
       }
 
       sessionState.setParticipantMessages({});
@@ -154,6 +158,7 @@ const Session = () => {
       currentParticipant={sessionState.currentParticipant}
       inputMessage={sessionState.inputMessage}
       isRecording={sessionState.isRecording}
+      isWaitingForResponse={isWaitingForResponse}
       onParticipantSwitch={sessionState.setCurrentParticipant}
       setInputMessage={sessionState.setInputMessage}
       onSendMessage={handleSendMessage}

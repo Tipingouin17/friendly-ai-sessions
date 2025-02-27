@@ -22,6 +22,7 @@ interface SessionContainerProps {
   inputMessage: string;
   isRecording: boolean;
   isGeneratingReport?: boolean;
+  isWaitingForResponse?: boolean;
   onParticipantSwitch: (num: number) => void;
   setInputMessage: (message: string) => void;
   onSendMessage: () => void;
@@ -41,6 +42,7 @@ const SessionContainer = ({
   inputMessage,
   isRecording,
   isGeneratingReport,
+  isWaitingForResponse = false,
   onParticipantSwitch,
   setInputMessage,
   onSendMessage,
@@ -111,6 +113,7 @@ const SessionContainer = ({
               participantColors={participantColors}
               currentParticipant={`P${currentParticipant}`}
               onLikeMessage={onLikeMessage}
+              isWaitingForResponse={isWaitingForResponse}
             />
           </div>
           <ParticipantSelector

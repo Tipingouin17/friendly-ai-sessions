@@ -10,13 +10,15 @@ interface MessageListProps {
   participantColors?: {[key: string]: string};
   currentParticipant?: string;
   onLikeMessage?: (messageId: string) => void;
+  isWaitingForResponse?: boolean;
 }
 
 const MessageList = ({ 
   messages, 
   participantColors = {},
   currentParticipant,
-  onLikeMessage 
+  onLikeMessage,
+  isWaitingForResponse = false
 }: MessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +28,7 @@ const MessageList = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isWaitingForResponse]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -136,6 +138,21 @@ const MessageList = ({
             </div>
           );
         })}
+        
+        {/* Thinking indicator */}
+        {isWaitingForResponse && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] px-4 py-3 rounded-2xl shadow-sm bg-white text-gray-800 rounded-tl-none border border-gray-100 mt-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></div>
+                <span className="text-sm text-gray-500 ml-1">Facilitator is thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
     </div>

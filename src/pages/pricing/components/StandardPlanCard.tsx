@@ -166,7 +166,10 @@ export const StandardPlanCard = ({
 
       <div className="text-center mb-8">
         {plan.price === 0 ? (
-          <div className="text-6xl font-bold">Free</div>
+          <div>
+            <div className="text-6xl font-bold">Free</div>
+            <div className="text-muted-foreground mt-1">/month</div>
+          </div>
         ) : (
           <>
             <div className="flex items-center justify-center">

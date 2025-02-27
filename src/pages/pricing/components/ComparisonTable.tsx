@@ -54,9 +54,9 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     return value;
   };
   
-  // Function to determine if a plan should be highlighted as popular
+  // Function to determine if a plan should be highlighted as popular - use ONLY is_popular flag
   const isPlanPopular = (plan: Plan) => {
-    return plan.is_popular || plan.id === 2; // Basic plan (id=2) should be highlighted by default
+    return plan.is_popular;
   };
   
   // Get appropriate currency icon based on plan currency

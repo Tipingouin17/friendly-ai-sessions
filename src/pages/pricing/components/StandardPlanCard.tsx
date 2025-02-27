@@ -51,9 +51,8 @@ export const StandardPlanCard = ({
       : formattedPrice.toFixed(2);
   };
 
-  // Determine if this plan should be highlighted as popular
-  // Basic plan (id=2) should be highlighted as popular by default
-  const isPlanPopular = plan.is_popular || plan.id === 2;
+  // Determine if this plan should be highlighted as popular - use ONLY the is_popular flag from the database
+  const isPlanPopular = plan.is_popular;
 
   // Generate feature list based on plan features instead of plan_details
   const getFeatureList = () => {

@@ -35,11 +35,11 @@ export const FacilitatorSelection = ({
   // Get facilitators accessible by the current plan
   const accessibleFacilitators = facilitators.filter((facilitator, index) => {
     // For unlimited plans, show all facilitators
-    if (!planRestrictions || planRestrictions.no_of_facilitator === null) {
+    if (!planRestrictions || planRestrictions.facilitator_limit === null) {
       return true;
     }
     // For limited plans, only show facilitators up to the plan limit
-    return index < (planRestrictions.no_of_facilitator || 0);
+    return index < (planRestrictions.facilitator_limit || 0);
   });
 
   const lockedFacilitators = facilitators.filter(facilitator => 

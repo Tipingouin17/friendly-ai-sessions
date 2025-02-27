@@ -33,3 +33,18 @@ export interface Conversation {
   sessions_id?: number;
   user_id?: string;
 }
+
+// Update the plan restriction interface to match our new column names
+export interface PlanRestriction {
+  id: number;
+  facilitator_limit: number | null;
+  session_limit: number | null;
+  max_participants: number | null;
+  question_limit: number;
+  customisable_facilitators: boolean;
+  customisable_sessions?: boolean;
+  saved_sessions?: boolean;
+  session_reports?: boolean;
+  data_export?: boolean;
+  plan_id?: number;
+}

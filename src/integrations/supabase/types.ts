@@ -451,6 +451,7 @@ export type Database = {
       plans: {
         Row: {
           created_at: string | null
+          currency: string | null
           id: number
           is_popular: boolean | null
           plan_details: Json | null
@@ -464,6 +465,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          currency?: string | null
           id?: number
           is_popular?: boolean | null
           plan_details?: Json | null
@@ -477,6 +479,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          currency?: string | null
           id?: number
           is_popular?: boolean | null
           plan_details?: Json | null

@@ -42,9 +42,8 @@ export const StandardPlanCard = ({
   const formatDisplayPrice = (price: number) => {
     if (price === 0) return 'Free';
     
-    // Ensure the price is properly formatted
-    // If the price is already in cents (greater than or equal to 100), divide by 100
-    const formattedPrice = price >= 100 ? price / 100 : price;
+    // Always divide by 100 to convert from cents to dollars/euros
+    const formattedPrice = price / 100;
     
     // Return integer if it's a whole number, otherwise include decimals
     return Number.isInteger(formattedPrice) 
@@ -148,7 +147,7 @@ export const StandardPlanCard = ({
           </span>
         </div>}
       
-      {isCurrentPlan && <div className="absolute -top-4 right-4">
+      {isCurrentPlan && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
           <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-medium">
             Current Plan
           </span>
@@ -167,7 +166,7 @@ export const StandardPlanCard = ({
             <div className="text-muted-foreground mt-1">/month</div>
           </>}
       </div>
-      <ul className="space-y-4 mb-8">
+      <ul className="space-y-4 mb-8 h-64 overflow-y-auto">
         {planFeatures.map((feature, index) => <li key={index} className="flex items-start gap-2">
             <Check className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
             <span className="text-left">{feature}</span>

@@ -74,18 +74,9 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     if (plan.price === 0) return "Free";
     
     const price = plan.price / 100; // Convert cents to dollars
-    const currency = plan.currency || 'USD';
-    
-    // Format with appropriate currency symbol
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
     
     // Return formatted price
-    return formatter.format(price).replace(/[A-Z]{3}/, '').trim();
+    return price.toString();
   };
   
   return (

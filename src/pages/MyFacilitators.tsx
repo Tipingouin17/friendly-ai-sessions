@@ -7,7 +7,14 @@ import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelect
 import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { Step } from "@/types/facilitator";
-import { Stepper, StepperItem, StepperTrigger, StepperIndicator, StepperContent, StepperSeparator } from "@/components/ui/stepper";
+import { 
+  Stepper, 
+  StepperItem, 
+  StepperTrigger, 
+  StepperIndicator, 
+  StepperContent, 
+  StepperSeparator 
+} from "@/components/ui/stepper";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";

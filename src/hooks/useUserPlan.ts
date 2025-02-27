@@ -41,49 +41,71 @@ export const useUserPlan = (): UserPlanDetails => {
       if (!profileData?.current_plan_id) {
         // If no plan found, return default free plan (id 1)
         const { data: freePlan, error: planError } = await supabase
-          .from('plans')
+          .from('plan_features')
           .select('*')
           .eq('title', 'Free')
           .single();
           
         if (planError) throw planError;
         
-        const { data: freePlanRestrictions, error: restrictionsError } = await supabase
-          .from('plan_restrictions')
-          .select('*')
-          .eq('plan_id', freePlan.id)
-          .single();
-          
-        if (restrictionsError) throw restrictionsError;
-        
         return {
           currentPlanId: freePlan.id,
-          plan: freePlan,
-          planRestrictions: freePlanRestrictions
+          plan: {
+            id: freePlan.id,
+            title: freePlan.title,
+            price: freePlan.price,
+            plan_type: freePlan.plan_type,
+            plan_details: freePlan.plan_details,
+            plan_table_details: null, // This field is now removed
+            is_popular: freePlan.is_popular,
+            stripe_plan_id: freePlan.stripe_plan_id,
+            currency: freePlan.currency
+          },
+          planRestrictions: {
+            no_of_facilitator: freePlan.no_of_facilitator,
+            no_of_sessions: freePlan.no_of_sessions,
+            max_participants: freePlan.max_participants,
+            customisable_sessions: freePlan.customisable_sessions,
+            customisable_facilitators: freePlan.customisable_facilitators,
+            saved_sessions: freePlan.saved_sessions,
+            session_reports: freePlan.session_reports,
+            data_export: freePlan.data_export
+          }
         };
       }
       
-      // Get the plan and its restrictions
-      const { data: plan, error: planError } = await supabase
-        .from('plans')
+      // Get the plan features from the view
+      const { data: planFeatures, error: planError } = await supabase
+        .from('plan_features')
         .select('*')
         .eq('id', profileData.current_plan_id)
         .single();
       
       if (planError) throw planError;
       
-      const { data: planRestrictions, error: restrictionsError } = await supabase
-        .from('plan_restrictions')
-        .select('*')
-        .eq('plan_id', profileData.current_plan_id)
-        .single();
-      
-      if (restrictionsError) throw restrictionsError;
-      
       return {
         currentPlanId: profileData.current_plan_id,
-        plan,
-        planRestrictions
+        plan: {
+          id: planFeatures.id,
+          title: planFeatures.title,
+          price: planFeatures.price,
+          plan_type: planFeatures.plan_type,
+          plan_details: planFeatures.plan_details,
+          plan_table_details: null, // This field is now removed
+          is_popular: planFeatures.is_popular,
+          stripe_plan_id: planFeatures.stripe_plan_id,
+          currency: planFeatures.currency
+        },
+        planRestrictions: {
+          no_of_facilitator: planFeatures.no_of_facilitator,
+          no_of_sessions: planFeatures.no_of_sessions,
+          max_participants: planFeatures.max_participants,
+          customisable_sessions: planFeatures.customisable_sessions,
+          customisable_facilitators: planFeatures.customisable_facilitators,
+          saved_sessions: planFeatures.saved_sessions,
+          session_reports: planFeatures.session_reports,
+          data_export: planFeatures.data_export
+        }
       };
     },
     enabled: !!user,

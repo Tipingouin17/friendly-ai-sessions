@@ -43,12 +43,8 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
   const getFeatureValue = (plan: Plan, feature: string) => {
     if (!plan.plan_table_details) return null;
     
-    // Ensure plan_table_details is an object before trying to access properties
-    if (typeof plan.plan_table_details === 'object' && plan.plan_table_details !== null) {
-      return (plan.plan_table_details as Record<string, any>)[feature];
-    }
-    
-    return null;
+    // Access the feature value directly from plan_table_details object
+    return (plan.plan_table_details as Record<string, any>)[feature];
   };
   
   // Format price with currency

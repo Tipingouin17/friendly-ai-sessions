@@ -18,8 +18,9 @@ const Pricing = () => {
   const { data: plans, isLoading, error } = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
+      // Query the plan_features view instead of the plans table
       const { data, error } = await supabase
-        .from('plans')
+        .from('plan_features')
         .select('*')
         .order('price', { ascending: true });
       
@@ -41,9 +42,26 @@ const Pricing = () => {
           price = 10000; // $100 in cents
         }
         
+        // Construct the plan object
         return {
-          ...plan,
-          price,
+          id: plan.id,
+          title: plan.title,
+          price: price,
+          plan_type: plan.plan_type,
+          plan_details: plan.plan_details,
+          // Create plan_table_details from the structured fields for backward compatibility
+          plan_table_details: {
+            no_of_facilitator: plan.no_of_facilitator,
+            no_of_sessions: plan.no_of_sessions,
+            max_participants: plan.max_participants,
+            customisable_sessions: plan.customisable_sessions,
+            customisable_facilitators: plan.customisable_facilitators,
+            saved_sessions: plan.saved_sessions,
+            session_reports: plan.session_reports,
+            data_export: plan.data_export
+          },
+          is_popular: plan.is_popular,
+          stripe_plan_id: plan.stripe_plan_id,
           currency
         };
       });

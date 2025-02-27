@@ -27,11 +27,11 @@ const Pricing = () => {
       
       // Process the data to include currency information and ensure correct price format
       const processedData = data.map(plan => {
-        // Set currency based on Stripe metadata or default to USD
-        const currency = plan.currency || 'USD';
+        // Set default currency since it doesn't exist in the database schema
+        const defaultCurrency = 'USD';
         
         // Convert price to Stripe format (cents) if needed
-        let price = plan.price;
+        let price = plan.price || 0;
         if (price < 100 && price > 0) {
           price = price * 100; // Convert to cents for Stripe
         }
@@ -44,7 +44,7 @@ const Pricing = () => {
         return {
           ...plan,
           price,
-          currency
+          currency: defaultCurrency // Add currency property to each plan
         };
       });
       

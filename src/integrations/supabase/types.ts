@@ -401,6 +401,7 @@ export type Database = {
       plan_restrictions: {
         Row: {
           created_at: string | null
+          customisable_facilitators: boolean
           customisable_sessions: boolean | null
           data_export: boolean | null
           id: number
@@ -413,6 +414,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          customisable_facilitators: boolean
           customisable_sessions?: boolean | null
           data_export?: boolean | null
           id?: number
@@ -425,6 +427,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          customisable_facilitators?: boolean
           customisable_sessions?: boolean | null
           data_export?: boolean | null
           id?: number

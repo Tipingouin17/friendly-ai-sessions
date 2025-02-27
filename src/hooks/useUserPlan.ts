@@ -12,6 +12,7 @@ export interface UserPlanDetails {
     no_of_sessions: number | null;
     max_participants: number | null;
     customisable_sessions: boolean | null;
+    customisable_facilitators: boolean | null;
     saved_sessions: boolean | null;
     session_reports: boolean | null;
     data_export: boolean | null;

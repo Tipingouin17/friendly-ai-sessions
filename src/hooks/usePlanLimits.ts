@@ -10,6 +10,7 @@ export interface PlanLimits {
   hasReachedSessionLimit: boolean;
   hasReachedParticipantLimit: boolean;
   canCreateCustomSessions: boolean;
+  canCreateCustomFacilitators: boolean;
   canExportData: boolean;
   canSaveSessions: boolean;
   canGenerateReports: boolean;
@@ -76,8 +77,14 @@ export const usePlanLimits = (): PlanLimits => {
   const maxSessions = planRestrictions?.no_of_sessions === null ? Infinity : (planRestrictions?.no_of_sessions || 0);
   const maxParticipants = planRestrictions?.max_participants === null ? Infinity : (planRestrictions?.max_participants || 0);
   
+  // Check if the user can create custom facilitators based on the new column
+  const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
+  
+  // Check both the count limit and whether custom facilitators are allowed
+  const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators);
+  
   return {
-    hasReachedFacilitatorLimit: (counts?.facilitatorCount || 0) >= maxFacilitators,
+    hasReachedFacilitatorLimit,
     hasReachedSessionLimit: (counts?.sessionCount || 0) >= maxSessions,
     hasReachedParticipantLimit: false, // This will be checked when selecting participants
     maxParticipants,
@@ -86,6 +93,7 @@ export const usePlanLimits = (): PlanLimits => {
     currentFacilitatorCount: counts?.facilitatorCount || 0,
     currentSessionCount: counts?.sessionCount || 0,
     canCreateCustomSessions: !!planRestrictions?.customisable_sessions,
+    canCreateCustomFacilitators,
     canExportData: !!planRestrictions?.data_export,
     canSaveSessions: !!planRestrictions?.saved_sessions,
     canGenerateReports: !!planRestrictions?.session_reports,

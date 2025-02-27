@@ -25,7 +25,12 @@ export const FacilitatorSelection = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const itemsToShow = 4;
   const { planRestrictions } = useUserPlan();
-  const { hasReachedFacilitatorLimit, maxFacilitators } = usePlanLimits();
+  const { 
+    hasReachedFacilitatorLimit, 
+    maxFacilitators, 
+    currentFacilitatorCount,
+    canCreateCustomFacilitators 
+  } = usePlanLimits();
 
   // Get facilitators accessible by the current plan
   const accessibleFacilitators = facilitators.filter((facilitator, index) => {
@@ -59,6 +64,9 @@ export const FacilitatorSelection = ({
   if (isLoading) {
     return <div>Loading facilitators...</div>;
   }
+  
+  // Determine if the "Add New Facilitator" button should be disabled
+  const isCreateDisabled = hasReachedFacilitatorLimit || !canCreateCustomFacilitators;
 
   return (
     <div className="relative">
@@ -119,20 +127,41 @@ export const FacilitatorSelection = ({
             </TooltipProvider>
           )}
           
-          {/* Create new facilitator button */}
-          <div 
-            className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all ${
-              hasReachedFacilitatorLimit ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            onClick={() => !hasReachedFacilitatorLimit && setIsCreateModalOpen(true)}
-          >
-            <Plus className="mb-2 h-12 w-12 text-gray-400" />
-            <span className="text-center text-sm text-gray-600">
-              {hasReachedFacilitatorLimit 
-                ? `Limited to ${maxFacilitators} facilitators` 
-                : "Add New Facilitator"}
-            </span>
-          </div>
+          {/* Create new facilitator button - show/hide based on customisable_facilitators permission */}
+          {canCreateCustomFacilitators ? (
+            <div 
+              className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all ${
+                hasReachedFacilitatorLimit ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onClick={() => !hasReachedFacilitatorLimit && setIsCreateModalOpen(true)}
+            >
+              <Plus className="mb-2 h-12 w-12 text-gray-400" />
+              <span className="text-center text-sm text-gray-600">
+                {hasReachedFacilitatorLimit 
+                  ? `Limited to ${maxFacilitators} facilitators` 
+                  : "Add New Facilitator"}
+              </span>
+            </div>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex w-1/4 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 p-6 opacity-50 cursor-not-allowed">
+                    <div className="relative">
+                      <Plus className="mb-2 h-12 w-12 text-gray-400" />
+                      <Lock className="absolute top-0 right-0 h-6 w-6 text-gray-500 transform translate-x-1/4 -translate-y-1/4" />
+                    </div>
+                    <span className="text-center text-sm text-gray-600">
+                      Custom Facilitators Locked
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Upgrade your plan to create custom facilitators.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
 
         <Button

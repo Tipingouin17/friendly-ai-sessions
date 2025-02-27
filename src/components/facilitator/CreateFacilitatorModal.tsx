@@ -11,6 +11,8 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
+import { Progress } from "@/components/ui/progress";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 interface CreateFacilitatorModalProps {
   open: boolean;
@@ -30,12 +32,19 @@ export const CreateFacilitatorModal = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  const { plan } = useUserPlan();
+  
   const { 
     hasReachedFacilitatorLimit, 
     maxFacilitators, 
     currentFacilitatorCount,
     isLoading: limitsLoading
   } = usePlanLimits();
+
+  const getUsagePercentage = () => {
+    if (maxFacilitators === Infinity) return 0;
+    return Math.min(100, (currentFacilitatorCount / maxFacilitators) * 100);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +71,8 @@ export const CreateFacilitatorModal = ({
           details,
           profile_picture: profilePicture || undefined,
           lock: false,
-          user_id: user!.id
+          user_id: user!.id,
+          plan_id: plan?.id // Associate the facilitator with the current plan
         });
 
       if (error) throw error;
@@ -125,9 +135,16 @@ export const CreateFacilitatorModal = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="text-sm text-muted-foreground mb-2">
-              Using {currentFacilitatorCount} of {maxFacilitators} facilitators
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="facilitator-limit">Facilitator Usage</Label>
+                <span className="text-sm text-muted-foreground">
+                  {currentFacilitatorCount} of {maxFacilitators === Infinity ? "Unlimited" : maxFacilitators}
+                </span>
+              </div>
+              <Progress value={getUsagePercentage()} className="h-2" id="facilitator-limit" />
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
               <Input

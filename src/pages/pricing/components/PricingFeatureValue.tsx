@@ -1,5 +1,5 @@
 
-import { Check, X, Minus } from "lucide-react";
+import { Check, X, Minus, Infinity } from "lucide-react";
 
 interface PricingFeatureValueProps {
   value: boolean | string | number | null | undefined;
@@ -13,11 +13,25 @@ export const PricingFeatureValue = ({ value }: PricingFeatureValueProps) => {
       <X className="h-5 w-5 text-muted-foreground mx-auto" />
     );
   }
+  
   if (value === 'unlimited' || value === 'Unlimited') {
-    return <span>∞</span>;
+    return (
+      <div className="flex flex-col items-center">
+        <Infinity className="h-5 w-5 text-primary mx-auto" />
+        <span className="text-xs text-gray-700 mt-1">Unlimited</span>
+      </div>
+    );
   }
+  
   if (value === null || value === undefined) {
     return <Minus className="h-5 w-5 text-muted-foreground mx-auto" />;
   }
+  
+  if (typeof value === 'number') {
+    return (
+      <span className="text-lg font-semibold text-gray-900">{value}</span>
+    );
+  }
+  
   return <span>{value}</span>;
 };

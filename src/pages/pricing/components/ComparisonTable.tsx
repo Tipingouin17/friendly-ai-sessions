@@ -2,13 +2,42 @@
 import { Plan, FEATURE_LABELS, allFeatures } from "../types";
 import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoIcon } from "lucide-react";
 
 interface ComparisonTableProps {
   plans: Plan[];
 }
 
 export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
-  const { currentPlanId } = useUserPlan();
+  const { currentPlanId, planRestrictions } = useUserPlan();
+  
+  // Helper function to determine if a feature is particularly important to highlight
+  const isHighlightedFeature = (feature: string) => {
+    return ['no_of_facilitator', 'no_of_sessions'].includes(feature);
+  };
+
+  // Helper function to get tooltip content for each feature
+  const getTooltipContent = (feature: string) => {
+    switch (feature) {
+      case 'no_of_facilitator':
+        return "The maximum number of facilitators you can create or use in your account. Each facilitator can conduct different types of workshops.";
+      case 'no_of_sessions':
+        return "The maximum number of workshop sessions you can create per month.";
+      case 'max_participants':
+        return "The maximum number of participants allowed in each session.";
+      case 'customisable_sessions':
+        return "Create and customize your own workshop sessions.";
+      case 'saved_sessions':
+        return "Save sessions to review or continue later.";
+      case 'session_reports':
+        return "Generate detailed reports after each session.";
+      case 'data_export':
+        return "Export your session data for analysis.";
+      default:
+        return "";
+    }
+  };
   
   return (
     <div className="mt-16">
@@ -42,22 +71,62 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {allFeatures.map((feature) => (
-              <tr key={feature} className="hover:bg-gray-50">
+              <tr key={feature} className={`hover:bg-gray-50 ${isHighlightedFeature(feature) ? 'bg-gray-50' : ''}`}>
                 <td className="py-4 px-6 text-sm font-medium text-gray-900">
-                  {FEATURE_LABELS[feature]}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-help">
+                          {FEATURE_LABELS[feature]}
+                          <InfoIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>{getTooltipContent(feature)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </td>
-                {plans.map((plan) => (
-                  <td 
-                    key={`${plan.id}-${feature}`} 
-                    className={`py-4 px-6 text-sm text-center ${
-                      plan.is_popular ? 'bg-primary/5' : ''
-                    } ${
-                      plan.id === currentPlanId ? 'bg-green-100' : ''
-                    }`}
-                  >
-                    <PricingFeatureValue value={plan.plan_table_details?.[feature]} />
-                  </td>
-                ))}
+                {plans.map((plan) => {
+                  // Highlight the cell if it's the current plan and this is a highlighted feature
+                  const isCurrentPlanFeature = plan.id === currentPlanId && isHighlightedFeature(feature);
+                  
+                  // For facilitators and sessions, show current usage if this is current plan
+                  let featureValue = plan.plan_table_details?.[feature];
+                  
+                  // Add current usage info for important metrics in the current plan
+                  let usageInfo = null;
+                  if (plan.id === currentPlanId && feature === 'no_of_facilitator' && planRestrictions) {
+                    const facilitatorValue = plan.plan_table_details?.no_of_facilitator;
+                    if (typeof facilitatorValue === 'number' || facilitatorValue === 'unlimited') {
+                      usageInfo = "Current: Used in Facilitator Setup";
+                    }
+                  } else if (plan.id === currentPlanId && feature === 'no_of_sessions' && planRestrictions) {
+                    const sessionsValue = plan.plan_table_details?.no_of_sessions;
+                    if (typeof sessionsValue === 'number' || sessionsValue === 'unlimited') {
+                      usageInfo = "Current: Used in Workshop Creation";
+                    }
+                  }
+                  
+                  return (
+                    <td 
+                      key={`${plan.id}-${feature}`} 
+                      className={`py-4 px-6 text-sm text-center ${
+                        plan.is_popular ? 'bg-primary/5' : ''
+                      } ${
+                        isCurrentPlanFeature ? 'bg-green-100 font-medium' : 
+                        plan.id === currentPlanId ? 'bg-green-50' : ''
+                      }`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <PricingFeatureValue value={featureValue} />
+                        {usageInfo && (
+                          <span className="text-xs text-gray-500 mt-1">{usageInfo}</span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

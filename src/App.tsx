@@ -15,7 +15,7 @@ import Settings from './pages/Settings';
 import Pricing from './pages/Pricing';
 import MyFacilitators from './pages/MyFacilitators';
 import PastWorkshops from './pages/PastWorkshops';
-import ProtectedRoute from './components/ProtectedRoute';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from '@/components/ui/toaster';
 import Checkout from './pages/Checkout';
 

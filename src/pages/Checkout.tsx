@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/button';
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, CreditCard, User, Package, ArrowLeft, ArrowRight, Loader2, Shield } from 'lucide-react';
+import { Check, CreditCard, User, Package, ArrowLeft, ArrowRight, Loader2, Shield, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Initialize Stripe with a real publishable key
 // Note: This should be your actual publishable key from Stripe
@@ -207,6 +208,13 @@ const Checkout = () => {
 
   const planFeatures = getFeatureList();
 
+  // Helper for required field label
+  const RequiredLabel = ({ htmlFor, children }: { htmlFor: string, children: React.ReactNode }) => (
+    <Label htmlFor={htmlFor} className="text-left block">
+      {children} <span className="text-destructive">*</span>
+    </Label>
+  );
+
   return (
     <div className="min-h-screen pt-16 pb-16 bg-gray-50">
       <div className="container max-w-6xl mx-auto px-4">
@@ -264,11 +272,12 @@ const Checkout = () => {
                     <div className="flex items-center gap-2">
                       <User className="h-5 w-5 text-primary" />
                       <h3 className="text-lg font-semibold">Billing Information</h3>
+                      <span className="text-sm text-muted-foreground">(Fields marked with <span className="text-destructive">*</span> are required)</span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name" className="text-left block">Full Name</Label>
+                        <RequiredLabel htmlFor="name">Full Name</RequiredLabel>
                         <Input 
                           id="name" 
                           name="name" 
@@ -276,10 +285,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="email" className="text-left block">Email</Label>
+                        <RequiredLabel htmlFor="email">Email</RequiredLabel>
                         <Input 
                           id="email" 
                           name="email" 
@@ -288,10 +298,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="address.line1" className="text-left block">Address</Label>
+                        <RequiredLabel htmlFor="address.line1">Address</RequiredLabel>
                         <Input 
                           id="address.line1" 
                           name="address.line1" 
@@ -299,10 +310,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.city" className="text-left block">City</Label>
+                        <RequiredLabel htmlFor="address.city">City</RequiredLabel>
                         <Input 
                           id="address.city" 
                           name="address.city" 
@@ -310,10 +322,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.state" className="text-left block">State/Province</Label>
+                        <RequiredLabel htmlFor="address.state">State/Province</RequiredLabel>
                         <Input 
                           id="address.state" 
                           name="address.state" 
@@ -321,10 +334,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.postal_code" className="text-left block">Postal Code</Label>
+                        <RequiredLabel htmlFor="address.postal_code">Postal Code</RequiredLabel>
                         <Input 
                           id="address.postal_code" 
                           name="address.postal_code" 
@@ -332,10 +346,11 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.country" className="text-left block">Country</Label>
+                        <RequiredLabel htmlFor="address.country">Country</RequiredLabel>
                         <Input 
                           id="address.country" 
                           name="address.country" 
@@ -343,6 +358,7 @@ const Checkout = () => {
                           onChange={handleBillingDetailsChange} 
                           required 
                           className="text-left"
+                          aria-required="true"
                         />
                       </div>
                     </div>
@@ -355,6 +371,7 @@ const Checkout = () => {
                     <div className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5 text-primary" />
                       <h3 className="text-lg font-semibold">Payment Method</h3>
+                      <span className="text-sm text-muted-foreground">(Required)</span>
                     </div>
                     
                     <Elements stripe={stripePromise}>
@@ -430,6 +447,7 @@ const CheckoutForm = ({
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -447,24 +465,73 @@ const CheckoutForm = ({
       return;
     }
 
+    // Clear previous errors
+    setError(null);
+    setFieldErrors({});
+    
     // Validate form fields
-    if (!billingDetails.name || !billingDetails.email || !billingDetails.address.line1 || 
-        !billingDetails.address.city || !billingDetails.address.state || 
-        !billingDetails.address.postal_code || !billingDetails.address.country) {
-      setError("Please fill in all billing information fields.");
+    const newFieldErrors: Record<string, string> = {};
+    
+    // Check for empty required fields
+    if (!billingDetails.name) {
+      newFieldErrors['name'] = "Full name is required";
+    }
+    
+    if (!billingDetails.email) {
+      newFieldErrors['email'] = "Email is required";
+    } else if (!/^\S+@\S+\.\S+$/.test(billingDetails.email)) {
+      newFieldErrors['email'] = "Please enter a valid email address";
+    }
+    
+    if (!billingDetails.address.line1) {
+      newFieldErrors['address.line1'] = "Address is required";
+    }
+    
+    if (!billingDetails.address.city) {
+      newFieldErrors['address.city'] = "City is required";
+    }
+    
+    if (!billingDetails.address.state) {
+      newFieldErrors['address.state'] = "State/Province is required";
+    }
+    
+    if (!billingDetails.address.postal_code) {
+      newFieldErrors['address.postal_code'] = "Postal code is required";
+    }
+    
+    if (!billingDetails.address.country) {
+      newFieldErrors['address.country'] = "Country is required";
+    }
+    
+    // Check if card details are filled
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      newFieldErrors['card'] = "Payment form not loaded properly";
+    }
+    
+    // If there are field errors, show them and return
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      
+      // Scroll to the first error field
+      const firstErrorField = Object.keys(newFieldErrors)[0];
+      const errorElement = document.getElementById(firstErrorField);
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        errorElement.focus();
+      }
+      
+      // Show toast for form validation errors
+      toast({
+        title: "Please check your information",
+        description: "There are some required fields that need to be filled out.",
+        variant: "destructive",
+      });
+      
       return;
     }
 
     setLoading(true);
-    setError(null);
-
-    // Get card element
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      setError("Payment form not loaded properly. Please refresh and try again.");
-      setLoading(false);
-      return;
-    }
 
     try {
       // Step 1: Create a subscription via the Supabase Edge Function
@@ -492,7 +559,7 @@ const CheckoutForm = ({
       // Step 2: Confirm the payment with Stripe
       const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
-          card: cardElement,
+          card: cardElement!,
           billing_details: {
             name: billingDetails.name,
             email: billingDetails.email,
@@ -508,6 +575,17 @@ const CheckoutForm = ({
       });
 
       if (paymentError) {
+        // If it's a card error, it's likely due to the card details
+        if (paymentError.type === 'card_error') {
+          setFieldErrors({ card: paymentError.message || 'Card error' });
+          
+          // Scroll to card element
+          const cardContainer = document.querySelector('.p-4.border.rounded-md.bg-white');
+          if (cardContainer) {
+            cardContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        
         throw new Error(paymentError.message || 'Payment failed');
       }
 
@@ -549,11 +627,42 @@ const CheckoutForm = ({
     }
   };
 
+  // Helper to determine if a specific field has error
+  const hasFieldError = (fieldName: string) => {
+    return fieldName in fieldErrors;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+      {/* Field error indicators for billing details section */}
+      {Object.keys(fieldErrors).length > 0 && Object.keys(fieldErrors).some(key => key !== 'card') && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please correct the highlighted fields below.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* Display field errors under each input field */}
+      {Object.entries(fieldErrors).map(([field, message]) => {
+        // Only show errors for fields other than 'card' here
+        if (field !== 'card') {
+          const inputField = document.getElementById(field);
+          if (inputField) {
+            inputField.classList.add('border-destructive', 'focus-visible:ring-destructive');
+          }
+        }
+        return null;
+      })}
+
       <div className="p-4 border rounded-lg">
-        <div className="p-4 border rounded-md bg-white">
+        <Label htmlFor="card-element" className="block mb-2">
+          Card Details <span className="text-destructive">*</span>
+        </Label>
+        <div className={`p-4 border rounded-md bg-white ${hasFieldError('card') ? 'border-destructive ring-2 ring-destructive' : ''}`}>
           <CardElement 
+            id="card-element"
             options={{
               style: {
                 base: {
@@ -571,12 +680,17 @@ const CheckoutForm = ({
             }} 
           />
         </div>
+        {hasFieldError('card') && (
+          <p className="mt-1 text-sm text-destructive">{fieldErrors['card']}</p>
+        )}
       </div>
 
+      {/* General error alert */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       <div className="flex flex-col gap-3 pt-2">

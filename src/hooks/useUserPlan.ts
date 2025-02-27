@@ -8,15 +8,15 @@ export interface UserPlanDetails {
   currentPlanId: number | null;
   plan: Plan | null;
   planRestrictions: {
-    no_of_facilitator: number | null;
-    no_of_sessions: number | null;
+    facilitator_limit: number | null;
+    session_limit: number | null;
     max_participants: number | null;
     customisable_sessions: boolean | null;
     customisable_facilitators: boolean | null;
     saved_sessions: boolean | null;
     session_reports: boolean | null;
     data_export: boolean | null;
-    number_of_questions_per_session?: number | null;
+    question_limit?: number | null;
   } | null;
   isLoading: boolean;
   error: Error | null;
@@ -51,8 +51,8 @@ export const useUserPlan = (): UserPlanDetails => {
         
         // Create the plan restrictions object from the plan features
         const planRestrictions = {
-          no_of_facilitator: freePlan.no_of_facilitator,
-          no_of_sessions: freePlan.no_of_sessions,
+          facilitator_limit: freePlan.facilitator_limit,
+          session_limit: freePlan.session_limit,
           max_participants: freePlan.max_participants,
           customisable_sessions: freePlan.customisable_sessions,
           customisable_facilitators: freePlan.customisable_facilitators,
@@ -60,7 +60,7 @@ export const useUserPlan = (): UserPlanDetails => {
           session_reports: freePlan.session_reports,
           data_export: freePlan.data_export,
           // Use default value of 10 if the field doesn't exist in the database
-          number_of_questions_per_session: 10
+          question_limit: 10
         };
         
         return {
@@ -90,8 +90,8 @@ export const useUserPlan = (): UserPlanDetails => {
       
       // Create the plan restrictions object from the plan features
       const planRestrictions = {
-        no_of_facilitator: planFeatures.no_of_facilitator,
-        no_of_sessions: planFeatures.no_of_sessions,
+        facilitator_limit: planFeatures.facilitator_limit,
+        session_limit: planFeatures.session_limit,
         max_participants: planFeatures.max_participants,
         customisable_sessions: planFeatures.customisable_sessions,
         customisable_facilitators: planFeatures.customisable_facilitators,
@@ -99,7 +99,7 @@ export const useUserPlan = (): UserPlanDetails => {
         session_reports: planFeatures.session_reports,
         data_export: planFeatures.data_export,
         // Use default value of 10 if the field doesn't exist in the database
-        number_of_questions_per_session: 10
+        question_limit: 10
       };
       
       return {

@@ -213,7 +213,6 @@ export type Database = {
           total_sessions: number | null
           user_id: string | null
           version: number | null
-          vst: string | null
         }
         Insert: {
           config_history?: Json | null
@@ -235,7 +234,6 @@ export type Database = {
           total_sessions?: number | null
           user_id?: string | null
           version?: number | null
-          vst?: string | null
         }
         Update: {
           config_history?: Json | null
@@ -257,7 +255,6 @@ export type Database = {
           total_sessions?: number | null
           user_id?: string | null
           version?: number | null
-          vst?: string | null
         }
         Relationships: [
           {
@@ -411,13 +408,13 @@ export type Database = {
           customisable_facilitators: boolean
           customisable_sessions: boolean | null
           data_export: boolean | null
+          facilitator_limit: number | null
           id: number
           max_participants: number | null
-          no_of_facilitator: number | null
-          no_of_sessions: number | null
-          number_of_questions_per_session: number
           plan_id: number | null
+          question_limit: number
           saved_sessions: boolean | null
+          session_limit: number | null
           session_reports: boolean | null
         }
         Insert: {
@@ -425,13 +422,13 @@ export type Database = {
           customisable_facilitators: boolean
           customisable_sessions?: boolean | null
           data_export?: boolean | null
+          facilitator_limit?: number | null
           id?: number
           max_participants?: number | null
-          no_of_facilitator?: number | null
-          no_of_sessions?: number | null
-          number_of_questions_per_session?: number
           plan_id?: number | null
+          question_limit?: number
           saved_sessions?: boolean | null
+          session_limit?: number | null
           session_reports?: boolean | null
         }
         Update: {
@@ -439,13 +436,13 @@ export type Database = {
           customisable_facilitators?: boolean
           customisable_sessions?: boolean | null
           data_export?: boolean | null
+          facilitator_limit?: number | null
           id?: number
           max_participants?: number | null
-          no_of_facilitator?: number | null
-          no_of_sessions?: number | null
-          number_of_questions_per_session?: number
           plan_id?: number | null
+          question_limit?: number
           saved_sessions?: boolean | null
+          session_limit?: number | null
           session_reports?: boolean | null
         }
         Relationships: [

@@ -74,14 +74,14 @@ export const usePlanLimits = (): PlanLimits => {
   const isLoading = planLoading || countsLoading;
   
   // Handle unlimited values (null in database means unlimited)
-  const maxFacilitators = planRestrictions?.no_of_facilitator === null ? Infinity : (planRestrictions?.no_of_facilitator || 0);
-  const maxSessions = planRestrictions?.no_of_sessions === null ? Infinity : (planRestrictions?.no_of_sessions || 0);
+  const maxFacilitators = planRestrictions?.facilitator_limit === null ? Infinity : (planRestrictions?.facilitator_limit || 0);
+  const maxSessions = planRestrictions?.session_limit === null ? Infinity : (planRestrictions?.session_limit || 0);
   const maxParticipants = planRestrictions?.max_participants === null ? Infinity : (planRestrictions?.max_participants || 0);
   
   // Get the maximum questions per session with a default of 10
-  const maxQuestionsPerSession = planRestrictions?.number_of_questions_per_session === null 
+  const maxQuestionsPerSession = planRestrictions?.question_limit === null 
     ? Infinity 
-    : (planRestrictions?.number_of_questions_per_session || 10);
+    : (planRestrictions?.question_limit || 10);
   
   // Check if the user can create custom facilitators based on the new column
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;

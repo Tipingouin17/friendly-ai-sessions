@@ -552,6 +552,51 @@ export type Database = {
         }
         Relationships: []
       }
+      plans_backup2: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          id: number | null
+          is_popular: boolean | null
+          plan_details: Json | null
+          plan_table_details: Json | null
+          plan_type: string | null
+          price: number | null
+          stripe_plan_id: string | null
+          title: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          id?: number | null
+          is_popular?: boolean | null
+          plan_details?: Json | null
+          plan_table_details?: Json | null
+          plan_type?: string | null
+          price?: number | null
+          stripe_plan_id?: string | null
+          title?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          id?: number | null
+          is_popular?: boolean | null
+          plan_details?: Json | null
+          plan_table_details?: Json | null
+          plan_type?: string | null
+          price?: number | null
+          stripe_plan_id?: string | null
+          title?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

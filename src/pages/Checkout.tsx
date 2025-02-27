@@ -15,8 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
-// Initialize Stripe (replace with your publishable key)
-const stripePromise = loadStripe('pk_test_your_publishable_key');
+// Initialize Stripe with a real publishable key
+// Note: This should be your actual publishable key from Stripe
+const stripePromise = loadStripe('pk_test_51OcXwYGWmQRsACOr1hLGJ9uYXTPTilQwhNFZcC6jtXPMkj00jUPbIQgxOjXZkmKn1cPDZpIhNKGGPHuFJtVqelZ500vbDgQTDl');
 
 const Checkout = () => {
   const [searchParams] = useSearchParams();
@@ -359,13 +360,27 @@ const CheckoutForm = ({
     event.preventDefault();
 
     if (!stripe || !elements) {
+      setError("Stripe has not loaded properly. Please refresh the page and try again.");
+      return;
+    }
+
+    if (!user) {
+      setError("You must be logged in to complete this purchase.");
+      return;
+    }
+
+    // Validate form fields
+    if (!billingDetails.name || !billingDetails.email || !billingDetails.address.line1 || 
+        !billingDetails.address.city || !billingDetails.address.state || 
+        !billingDetails.address.postal_code || !billingDetails.address.country) {
+      setError("Please fill in all billing information fields.");
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    // Create a payment method using the card element
+    // Get card element
     const cardElement = elements.getElement(CardElement);
     if (!cardElement) {
       setError("Payment form not loaded properly. Please refresh and try again.");
@@ -374,33 +389,83 @@ const CheckoutForm = ({
     }
 
     try {
-      // In a real implementation, we would:
-      // 1. Call a Supabase Edge Function to create a PaymentIntent on the server
-      // 2. Confirm the payment on the client side
-      // 3. Update the user's subscription in the database
+      // Step 1: Create a subscription via the Supabase Edge Function
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({ 
+          planId: plan.id,
+          userId: user.id,
+          billingDetails,
+          returnUrl: window.location.origin + '/profile',
+        }),
+      });
 
-      // For now, we'll simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create subscription');
+      }
 
-      // Update the user's plan in the database
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ current_plan_id: plan.id })
-        .eq('id', user?.id);
+      const { clientSecret, subscriptionId, customerId } = await response.json();
 
-      if (updateError) throw updateError;
+      // Step 2: Confirm the payment with Stripe
+      const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: billingDetails.name,
+            email: billingDetails.email,
+            address: {
+              line1: billingDetails.address.line1,
+              city: billingDetails.address.city,
+              state: billingDetails.address.state,
+              postal_code: billingDetails.address.postal_code,
+              country: billingDetails.address.country,
+            }
+          }
+        }
+      });
 
+      if (paymentError) {
+        throw new Error(paymentError.message || 'Payment failed');
+      }
+
+      // Step 3: Confirm the subscription with our backend
+      const confirmResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/confirm-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({ 
+          subscriptionId,
+          customerId,
+          userId: user.id,
+          planId: plan.id,
+          paymentIntentId: paymentIntent?.id
+        }),
+      });
+
+      if (!confirmResponse.ok) {
+        const errorData = await confirmResponse.json();
+        throw new Error(errorData.error || 'Failed to confirm subscription');
+      }
+
+      // Successfully subscribed
       toast({
         title: "Success",
-        description: `You've successfully upgraded to the ${plan.title} plan!`,
+        description: `You've successfully subscribed to the ${plan.title} plan!`,
       });
 
       // Navigate to profile page
       navigate('/profile');
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Payment error:', err);
-      setError(typeof err === 'string' ? err : 'An error occurred during payment processing. Please try again.');
+      setError(err.message || 'An error occurred during payment processing. Please try again.');
     } finally {
       setLoading(false);
     }

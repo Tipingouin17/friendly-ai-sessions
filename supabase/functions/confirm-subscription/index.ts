@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { subscriptionId, userId, planId } = await req.json();
+    const { subscriptionId, customerId, userId, planId, paymentIntentId } = await req.json();
     
     // Get supabase client
     const supabaseClient = createClient(
@@ -26,34 +26,53 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    // Verify the subscription is active
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    
-    if (subscription.status === 'active' || subscription.status === 'trialing') {
-      // Update the user's plan in the database
-      const { error: updateError } = await supabaseClient
-        .from('profiles')
-        .update({ 
-          current_plan_id: planId,
-          // In a real implementation, you might store the subscription ID and customer ID here
-        })
-        .eq('id', userId);
-
-      if (updateError) {
-        throw new Error(`Error updating user plan: ${updateError.message}`);
+    // Verify the payment intent status
+    if (paymentIntentId) {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded') {
+        throw new Error('Payment has not been completed');
       }
-
-      return new Response(
-        JSON.stringify({ success: true }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } else {
-      throw new Error(`Subscription status is ${subscription.status}`);
     }
+
+    // Update the customer metadata with the user ID for reference
+    await stripe.customers.update(customerId, {
+      metadata: { supabase_user_id: userId },
+    });
+
+    // Update the subscription metadata with the user ID for reference
+    await stripe.subscriptions.update(subscriptionId, {
+      metadata: { supabase_user_id: userId },
+    });
+
+    // Update the user's profile with the plan ID and subscription info
+    const { error: updateError } = await supabaseClient
+      .from('profiles')
+      .update({ 
+        current_plan_id: planId,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        subscription_status: 'active',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error updating user profile:', updateError);
+      throw new Error(`Failed to update user profile: ${updateError.message}`);
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        message: 'Subscription confirmed and user profile updated',
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error) {
+    console.error('Error in confirm-subscription:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

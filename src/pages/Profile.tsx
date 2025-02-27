@@ -91,10 +91,6 @@ const Profile = () => {
                     <p className="text-xl font-medium">{user?.email}</p>
                   </div>
                   <div>
-                    <h3 className="text-lg text-gray-500 font-medium mb-2">User ID</h3>
-                    <p className="text-sm bg-gray-100 p-3 rounded font-mono break-all">{user?.id}</p>
-                  </div>
-                  <div>
                     <h3 className="text-lg text-gray-500 font-medium mb-2">Account Created</h3>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-gray-400" />

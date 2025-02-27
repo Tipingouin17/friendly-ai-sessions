@@ -47,6 +47,11 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
     return (plan.plan_table_details as Record<string, any>)[feature];
   };
   
+  // Function to determine if a plan should be highlighted as popular
+  const isPlanPopular = (plan: Plan) => {
+    return plan.is_popular || plan.id === 2; // Basic plan (id=2) should be highlighted by default
+  };
+  
   // Format price with currency
   const formatPrice = (plan: Plan) => {
     // Enterprise plan (id 4) has custom pricing
@@ -70,7 +75,7 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
   return (
     <div className="mt-16">
       <h2 className="text-3xl font-bold text-center mb-8">Compare Plans</h2>
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border shadow-sm">
         <table className="w-full border-collapse bg-white">
           <thead>
             <tr className="border-b">
@@ -79,7 +84,7 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                 <th 
                   key={plan.id} 
                   className={`py-4 px-6 text-center font-medium ${
-                    plan.is_popular ? 'bg-primary/5' : 'bg-gray-50'
+                    isPlanPopular(plan) ? 'bg-primary/5' : 'bg-gray-50'
                   } ${
                     plan.id === currentPlanId ? 'bg-green-100' : ''
                   }`}
@@ -140,7 +145,7 @@ export const ComparisonTable = ({ plans }: ComparisonTableProps) => {
                     <td 
                       key={`${plan.id}-${feature}`} 
                       className={`py-4 px-6 text-sm text-center ${
-                        plan.is_popular ? 'bg-primary/5' : ''
+                        isPlanPopular(plan) ? 'bg-primary/5' : ''
                       } ${
                         isCurrentPlanFeature ? 'bg-green-100 font-medium' : 
                         plan.id === currentPlanId ? 'bg-green-50' : ''

@@ -22,7 +22,7 @@ const Pricing = () => {
       const { data, error } = await supabase
         .from('plan_features')
         .select('*')
-        .order('price', { ascending: true });
+        .order('id', { ascending: true }); // Order by ID to ensure proper sequence
       
       if (error) throw error;
       

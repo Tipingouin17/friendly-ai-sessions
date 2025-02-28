@@ -7,7 +7,7 @@ import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, DollarSign, Euro, PoundSterling } from 'lucide-react';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
 
@@ -24,6 +24,33 @@ export const CheckoutForm = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Format price with correct currency symbol
+  const formatPrice = (price: number, currency: string = 'USD') => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+    return formatter.format(price);
+  };
+
+  // Get appropriate currency icon
+  const CurrencyIcon = () => {
+    const currency = plan.currency?.toUpperCase() || 'USD';
+    switch (currency) {
+      case 'EUR':
+        return <Euro className="h-4 w-4 mr-1" />;
+      case 'GBP':
+        return <PoundSterling className="h-4 w-4 mr-1" />;
+      case 'USD':
+      default:
+        return <DollarSign className="h-4 w-4 mr-1" />;
+    }
+  };
+
+  const formattedPrice = formatPrice(plan.price, plan.currency);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -298,7 +325,7 @@ export const CheckoutForm = ({
               Processing payment...
             </>
           ) : (
-            <>Complete purchase - ${plan.price}/month</>
+            <>Complete purchase - {formattedPrice}/month</>
           )}
         </Button>
         

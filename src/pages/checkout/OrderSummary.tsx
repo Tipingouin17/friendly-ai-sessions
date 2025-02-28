@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Shield } from 'lucide-react';
+import { Shield, DollarSign, Euro, PoundSterling } from 'lucide-react';
 import { Plan } from '../pricing/types';
 
 interface OrderSummaryProps {
@@ -10,6 +10,33 @@ interface OrderSummaryProps {
 }
 
 export const OrderSummary = ({ plan }: OrderSummaryProps) => {
+  // Format price with correct currency symbol
+  const formatPrice = (price: number, currency: string = 'USD') => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+    return formatter.format(price);
+  };
+
+  // Get appropriate currency icon
+  const CurrencyIcon = () => {
+    const currency = plan.currency?.toUpperCase() || 'USD';
+    switch (currency) {
+      case 'EUR':
+        return <Euro className="h-4 w-4 text-primary" />;
+      case 'GBP':
+        return <PoundSterling className="h-4 w-4 text-primary" />;
+      case 'USD':
+      default:
+        return <DollarSign className="h-4 w-4 text-primary" />;
+    }
+  };
+
+  const formattedPrice = formatPrice(plan.price, plan.currency);
+
   return (
     <div className="sticky top-24">
       <Card>
@@ -20,7 +47,7 @@ export const OrderSummary = ({ plan }: OrderSummaryProps) => {
           <div className="space-y-4">
             <div className="flex justify-between">
               <span>{plan.title} Plan</span>
-              <span>${plan.price}/mo</span>
+              <span className="flex items-center">{formattedPrice}/mo</span>
             </div>
             
             <div className="flex justify-between text-sm text-muted-foreground">
@@ -32,7 +59,7 @@ export const OrderSummary = ({ plan }: OrderSummaryProps) => {
             
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>${plan.price}/month</span>
+              <span className="flex items-center">{formattedPrice}/month</span>
             </div>
             
             <div className="pt-4">

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,7 +47,7 @@ export const WorkshopSetup = ({
   const limitReached = participantCount >= maxParticipants;
   return <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium mb-2">
+        <label className="block text-sm font-medium mb-2 text-left">
           Number of participants 
           {!isLoading && <span className="text-muted-foreground ml-1">(Max: {maxParticipants === Infinity ? 'Unlimited' : maxParticipants})</span>}
         </label>
@@ -77,7 +78,7 @@ export const WorkshopSetup = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Facilitator's language</label>
+        <label className="block text-sm font-medium mb-2 text-left">Facilitator's language</label>
         <Select value={language} onValueChange={setLanguage}>
           <SelectTrigger>
             <SelectValue placeholder="Select a language" />
@@ -92,7 +93,7 @@ export const WorkshopSetup = ({
 
       <div className="flex items-center gap-2">
         <Checkbox id="terms" checked={agreed} onCheckedChange={checked => setAgreed(checked as boolean)} />
-        <label htmlFor="terms" className="text-sm">
+        <label htmlFor="terms" className="text-sm text-left">
           I agree to the{" "}
           <a href="#" className="text-primary hover:underline">
             terms and conditions

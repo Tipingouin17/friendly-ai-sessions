@@ -17,7 +17,7 @@ import MyFacilitators from './pages/MyFacilitators';
 import PastWorkshops from './pages/PastWorkshops';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from '@/components/ui/toaster';
-import Checkout from './pages/Checkout';
+import Checkout from './pages/checkout';
 
 function App() {
   return (

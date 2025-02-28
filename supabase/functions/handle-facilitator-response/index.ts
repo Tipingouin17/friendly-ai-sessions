@@ -1,189 +1,170 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.4.0'
+import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.1.0'
+import { cuid } from 'https://esm.sh/@paralleldrive/cuid2@2.0.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface Message {
-  content: string;
-  role?: string;
-  name?: string;
-  sender?: string;
-  conversation_id: number;
-  user_id?: string | null;
-  facilitator_id?: number;
-}
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY') || ''
 
-serve(async (req) => {
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const configuration = new Configuration({ apiKey: openaiApiKey })
+const openai = new OpenAIApi(configuration)
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
     const { messages, conversationId, generateReport = false } = await req.json()
+    
+    console.log(`Processing request for conversation: ${conversationId}\n`);
 
-    console.log('Processing request for conversation:', conversationId)
-    console.log('Generate report:', generateReport)
-
-    // Get configuration including secret message
-    const { data: config, error: configError } = await supabaseClient
-      .from('configurations')
-      .select('secret_message')
-      .single()
-
-    if (configError) {
-      console.error('Error fetching configuration:', configError)
-      throw new Error('Failed to fetch configuration')
+    // Check for required parameters
+    if (!messages || !conversationId) {
+      return new Response(
+        JSON.stringify({ error: 'Messages and conversationId are required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
-    // Get conversation and session details including facilitator VST
-    const { data: conversation, error: conversationError } = await supabaseClient
+    // First get the conversation to verify it exists and get related session data
+    const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .select(`
         *,
-        sessions!conversations_sessions_id_fkey (
-          id,
+        sessions:sessions_id (
+          id, 
+          title, 
+          objective,
           prompt,
+          output_format,
           gpt_version,
           max_tokens,
           randomness,
-          facilitator,
-          facilitator_details:facilitators (
-            id,
-            vst,
-            title
-          )
+          facilitator:facilitators (id, title, details)
         )
       `)
       .eq('id', conversationId)
       .single()
 
+    // Handle errors fetching conversation
     if (conversationError || !conversation) {
-      console.error('Error fetching conversation:', conversationError)
-      throw new Error('Conversation not found')
+      console.error('Error fetching conversation:', conversationError?.message || 'Conversation not found')
+      return new Response(
+        JSON.stringify({ error: 'Conversation not found' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
-    // Parse facilitator's VST with proper error handling
-    let vstData = {
-      voice: "professional",
-      style: "supportive",
-      tone: "friendly"
-    }
-    try {
-      if (conversation.sessions.facilitator_details.vst) {
-        const vstLines = conversation.sessions.facilitator_details.vst.split('\n')
-        vstData = {
-          voice: vstLines.find(line => line.startsWith('Voice:'))?.split(':')[1]?.trim() || vstData.voice,
-          style: vstLines.find(line => line.startsWith('Style:'))?.split(':')[1]?.trim() || vstData.style,
-          tone: vstLines.find(line => line.startsWith('Tone:'))?.split(':')[1]?.trim() || vstData.tone
+    // Transform messages for OpenAI format
+    const formattedMessages = messages.map(msg => {
+      if (msg.role) {
+        // Already in OpenAI format (from the database)
+        return {
+          role: msg.role,
+          content: msg.content,
+          name: msg.name
+        }
+      } else {
+        // Format UI messages to OpenAI format
+        return {
+          role: msg.sender === 'assistant' ? 'assistant' : 'user',
+          content: msg.content,
+          name: msg.participant || undefined
         }
       }
-    } catch (error) {
-      console.error('Error parsing VST:', error)
-      console.log('Raw VST value:', conversation.sessions.facilitator_details.vst)
-    }
-
-    // Format messages for OpenAI
-    const formattedMessages = messages.map((m: Message) => ({
-      role: m.role || (m.sender === 'assistant' ? 'assistant' : 'user'),
-      content: m.content,
-      name: m.name
-    }))
-
-    // Construct system message
-    const systemInstructions = [
-      config.secret_message,
-      `You are ${conversation.sessions.facilitator_details.title}.`,
-      `Voice: ${vstData.voice}`,
-      `Style: ${vstData.style}`,
-      `Tone: ${vstData.tone}`,
-      conversation.sessions.prompt || "You are a helpful assistant."
-    ].filter(Boolean).join('\n\n')
-
-    const finalSystemMessage = generateReport ? 
-      `${systemInstructions}\n\nPlease generate a comprehensive report summarizing this conversation. Include:\n- Key discussion points\n- Participant contributions\n- Important insights\n- Recommendations` :
-      systemInstructions
-
-    const aiMessages = [
-      { role: "system", content: finalSystemMessage },
-      ...formattedMessages.filter(msg => ['system', 'assistant', 'user'].includes(msg.role))
-    ]
-
-    // Call OpenAI API
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: aiMessages,
-        temperature: Number(conversation.sessions.randomness) || 0.7,
-        max_tokens: Number(conversation.sessions.max_tokens) || 1000,
-      }),
     })
 
-    if (!openAIResponse.ok) {
-      const errorData = await openAIResponse.text()
-      console.error('OpenAI API error:', errorData)
-      throw new Error(`OpenAI API error: ${errorData}`)
+    // Add system prompt if it's a report generation or use session prompt
+    let systemPrompt = ''
+    
+    if (generateReport) {
+      systemPrompt = `You are a helpful assistant that generates summarized reports of group conversations. 
+      Analyze the conversation and provide a structured report that includes:
+      1. Key discussion points
+      2. Main insights and takeaways
+      3. Action items or recommendations (if any)
+      Format the report in markdown with clear headings and bullet points.`
+    } else if (conversation.sessions?.prompt) {
+      systemPrompt = conversation.sessions.prompt
+    } else {
+      // Default system prompt if none specified
+      systemPrompt = `You are "${conversation.sessions?.facilitator?.title || 'a facilitator'}", ${conversation.sessions?.facilitator?.details || 'an AI assistant helping facilitate a conversation'}. 
+      Your objective is: ${conversation.sessions?.objective || 'to facilitate a productive conversation'}.
+      Be concise, helpful, and guide the conversation toward productive outcomes.`
     }
 
-    const aiData = await openAIResponse.json()
-    const aiContent = aiData.choices[0].message.content
+    // Add system message to the beginning
+    const messagesForAI = [
+      { role: 'system', content: systemPrompt },
+      ...formattedMessages
+    ]
 
-    // Save the AI response to the database
-    const { data: savedMessage, error: saveError } = await supabaseClient
+    // Get model settings
+    const model = conversation.sessions?.gpt_version || 'gpt-3.5-turbo'
+    const maxTokens = conversation.sessions?.max_tokens ? parseInt(conversation.sessions.max_tokens) : 1000
+    const temperature = conversation.sessions?.randomness || 0.7
+
+    // Make request to OpenAI
+    const response = await openai.createChatCompletion({
+      model,
+      messages: messagesForAI,
+      max_tokens: maxTokens,
+      temperature
+    })
+
+    // Extract the response content
+    const content = response.data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+    const messageId = cuid()
+
+    // Save to database
+    const { error: saveError } = await supabase
       .from('messages')
       .insert({
-        content: aiContent,
+        id: messageId,
         role: 'assistant',
+        content,
         conversation_id: conversationId,
-        facilitator_id: conversation.sessions.facilitator_details.id
+        facilitator_id: conversation.sessions?.facilitator?.id || null,
+        is_report: generateReport
       })
-      .select()
-      .single()
 
     if (saveError) {
-      console.error('Error saving message:', saveError)
-      throw saveError
-    }
-
-    // If this was a report generation, update the conversation status
-    if (generateReport) {
-      await supabaseClient
-        .from('conversations')
-        .update({ is_session_ended: true })
-        .eq('id', conversationId)
+      console.error('Error saving message to database:', saveError)
     }
 
     return new Response(
       JSON.stringify({
-        ...savedMessage,
+        id: messageId,
+        content,
         is_report: generateReport
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
-
   } catch (error) {
-    console.error('Function error:', error)
+    console.error('Error processing request:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'An error occurred' }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }

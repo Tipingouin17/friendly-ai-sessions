@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, DollarSign, Euro, PoundSterling } from 'lucide-react';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
+import { supabase } from '@/integrations/supabase/client';
 
 export const CheckoutForm = ({ 
   plan, 
@@ -51,6 +52,28 @@ export const CheckoutForm = ({
   };
 
   const formattedPrice = formatPrice(plan.price, plan.currency);
+
+  // Helper function to handle subscription confirmation and database update
+  const updateUserSubscription = async (planId: number) => {
+    if (!user) {
+      throw new Error("User must be logged in to update subscription");
+    }
+    
+    // Update the user's profile with the new plan ID
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ 
+        current_plan_id: planId, 
+        subscription_status: 'active',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id);
+      
+    if (updateError) {
+      console.error('Error updating user profile:', updateError);
+      throw new Error('Failed to update user profile with new subscription');
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -141,19 +164,24 @@ export const CheckoutForm = ({
       console.log("Creating subscription with plan ID:", plan.id);
       console.log("Using stripe plan ID:", plan.stripe_plan_id);
       
-      // For testing only - display a mock successful payment instead of real Stripe API
-      // Remove this in production
-      console.log("⚠️ Using mock payment flow for testing");
-      toast({
-        title: "Success",
-        description: `You've successfully subscribed to the ${plan.title} plan!`,
-      });
-      
-      // Navigate to profile page
-      navigate('/profile');
-      return;
-      
-      // Step 1: Create a subscription via the Supabase Edge Function
+      // IMPORTANT: For dev/testing environment, we'll use a direct update approach without Stripe
+      if (process.env.NODE_ENV === 'development' || !plan.stripe_plan_id) {
+        console.log("⚠️ Development mode: Skipping Stripe integration");
+        
+        // Directly update the user's subscription in the database
+        await updateUserSubscription(plan.id);
+        
+        toast({
+          title: "Success",
+          description: `You've successfully subscribed to the ${plan.title} plan!`,
+        });
+        
+        // Navigate to profile page
+        navigate('/profile');
+        return;
+      }
+
+      // Step 1: Create a payment intent or setup intent via the Supabase Edge Function
       const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, {
         method: 'POST',
         headers: {
@@ -162,7 +190,7 @@ export const CheckoutForm = ({
         },
         body: JSON.stringify({ 
           planId: plan.id,
-          stripePlanId: plan.stripe_plan_id, // Make sure to include the Stripe plan ID
+          stripePlanId: plan.stripe_plan_id,
           userId: user.id,
           billingDetails,
           returnUrl: window.location.origin + '/profile',

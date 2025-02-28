@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,7 +6,6 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
 interface WorkshopSetupProps {
   participantCount: number;
   setParticipantCount: (count: number) => void;
@@ -18,7 +16,6 @@ interface WorkshopSetupProps {
   agreed: boolean;
   setAgreed: (agreed: boolean) => void;
 }
-
 export const WorkshopSetup = ({
   participantCount,
   setParticipantCount,
@@ -30,80 +27,53 @@ export const WorkshopSetup = ({
   setAgreed
 }: WorkshopSetupProps) => {
   const navigate = useNavigate();
-  const { 
+  const {
     maxParticipants,
     hasReachedParticipantLimit,
     isLoading
   } = usePlanLimits();
-  
   const handleIncrement = () => {
     if (participantCount < maxParticipants) {
       setParticipantCount(participantCount + 1);
     }
   };
-  
   const handleDecrement = () => {
     setParticipantCount(Math.max(1, participantCount - 1));
   };
-  
   const handleUpgradePlan = () => {
     navigate('/pricing');
   };
-  
   const limitReached = participantCount >= maxParticipants;
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium mb-2">
           Number of participants 
           {!isLoading && <span className="text-muted-foreground ml-1">(Max: {maxParticipants === Infinity ? 'Unlimited' : maxParticipants})</span>}
         </label>
         <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handleDecrement}
-            disabled={participantCount <= 1}
-          >
+          <Button variant="outline" size="icon" onClick={handleDecrement} disabled={participantCount <= 1}>
             -
           </Button>
           <span className="text-xl font-semibold">{participantCount}</span>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handleIncrement}
-            disabled={limitReached}
-          >
+          <Button variant="outline" size="icon" onClick={handleIncrement} disabled={limitReached}>
             +
           </Button>
         </div>
         
-        {limitReached && (
-          <Alert variant="destructive" className="mt-2">
+        {limitReached && <Alert variant="destructive" className="mt-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               You've reached your plan's participant limit. 
-              <Button 
-                variant="link" 
-                className="p-0 h-auto ml-1" 
-                onClick={handleUpgradePlan}
-              >
+              <Button variant="link" className="p-0 h-auto ml-1" onClick={handleUpgradePlan}>
                 Upgrade for more participants.
               </Button>
             </AlertDescription>
-          </Alert>
-        )}
+          </Alert>}
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Description of the participants</label>
-        <Textarea 
-          value={description} 
-          onChange={(e) => setDescription(e.target.value)} 
-          placeholder="Describe your participants..." 
-          className="min-h-[100px]" 
-        />
+        <label className="block text-sm font-medium mb-2 text-left">Description of the participants</label>
+        <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your participants..." className="min-h-[100px]" />
       </div>
 
       <div>
@@ -121,11 +91,7 @@ export const WorkshopSetup = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <Checkbox 
-          id="terms" 
-          checked={agreed} 
-          onCheckedChange={checked => setAgreed(checked as boolean)} 
-        />
+        <Checkbox id="terms" checked={agreed} onCheckedChange={checked => setAgreed(checked as boolean)} />
         <label htmlFor="terms" className="text-sm">
           I agree to the{" "}
           <a href="#" className="text-primary hover:underline">
@@ -133,6 +99,5 @@ export const WorkshopSetup = ({
           </a>
         </label>
       </div>
-    </div>
-  );
+    </div>;
 };

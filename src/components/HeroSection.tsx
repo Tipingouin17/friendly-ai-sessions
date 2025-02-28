@@ -1,3 +1,4 @@
+
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 export const HeroSection = () => {
@@ -10,7 +11,7 @@ export const HeroSection = () => {
         <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
           Experience personalized AI facilitation that brings tailored and customizable guidance to businesses and individuals worldwide.
         </p>
-        <div className="space-y-4">
+        <div className="space-y-4 flex flex-col items-center">
           <Button size="lg" className="hover-lift">
             Try it for free now! <ArrowRight className="ml-2 h-4 w-4" />
           </Button>

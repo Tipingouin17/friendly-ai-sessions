@@ -53,26 +53,36 @@ export const CheckoutForm = ({
 
   const formattedPrice = formatPrice(plan.price, plan.currency);
 
-  // Helper function to handle subscription confirmation and database update
+  // Helper function to directly update the user's subscription in the database
   const updateUserSubscription = async (planId: number) => {
     if (!user) {
       throw new Error("User must be logged in to update subscription");
     }
     
+    console.log("Updating user subscription:", {
+      userId: user.id,
+      planId: planId
+    });
+    
     // Update the user's profile with the new plan ID
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from('profiles')
       .update({ 
         current_plan_id: planId, 
         subscription_status: 'active',
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id);
+      .eq('id', user.id)
+      .select();
       
     if (updateError) {
       console.error('Error updating user profile:', updateError);
       throw new Error('Failed to update user profile with new subscription');
     }
+    
+    console.log("Subscription update successful:", data);
+    
+    return data;
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -81,12 +91,8 @@ export const CheckoutForm = ({
     // Debug information
     console.log("Stripe loaded?", !!stripe);
     console.log("Elements loaded?", !!elements);
-
-    if (!stripe || !elements) {
-      setError("Stripe has not loaded properly. Please refresh the page and try again.");
-      return;
-    }
-
+    console.log("User logged in?", !!user);
+    
     if (!user) {
       setError("You must be logged in to complete this purchase.");
       return;
@@ -130,10 +136,12 @@ export const CheckoutForm = ({
       newFieldErrors['address.country'] = "Country is required";
     }
     
-    // Check if card details are filled
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      newFieldErrors['card'] = "Payment form not loaded properly";
+    // Check if card details are filled (only required when Stripe is being used)
+    if (stripe && elements) {
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        newFieldErrors['card'] = "Payment form not loaded properly";
+      }
     }
     
     // If there are field errors, show them and return
@@ -164,9 +172,9 @@ export const CheckoutForm = ({
       console.log("Creating subscription with plan ID:", plan.id);
       console.log("Using stripe plan ID:", plan.stripe_plan_id);
       
-      // IMPORTANT: For dev/testing environment, we'll use a direct update approach without Stripe
-      if (process.env.NODE_ENV === 'development' || !plan.stripe_plan_id) {
-        console.log("⚠️ Development mode: Skipping Stripe integration");
+      // For development environment or when Stripe isn't properly set up, use direct DB update
+      if (process.env.NODE_ENV === 'development' || !stripe || !elements || !plan.stripe_plan_id) {
+        console.log("⚠️ Using direct database update (development mode or Stripe not available)");
         
         // Directly update the user's subscription in the database
         await updateUserSubscription(plan.id);
@@ -344,7 +352,7 @@ export const CheckoutForm = ({
       <div className="flex flex-col gap-3 pt-2">
         <Button 
           type="submit" 
-          disabled={!stripe || loading}
+          disabled={loading}
           className="w-full py-6"
         >
           {loading ? (

@@ -111,6 +111,18 @@ const Checkout = () => {
     }
   }, [planId, navigate, toast]);
 
+  // If no user is logged in, redirect to login
+  useEffect(() => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to continue with your purchase",
+        variant: "destructive",
+      });
+      navigate('/login?redirect=/checkout?plan=' + planId);
+    }
+  }, [user, planId, navigate, toast]);
+
   // Loading state
   if (planLoading) {
     return <CheckoutLoadingState />;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +6,6 @@ import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AlertCircle, MapPin, Loader2, Search } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
 interface AddressAutocompleteProps {
   onAddressSelect: (address: {
     line1: string;
@@ -18,7 +16,6 @@ interface AddressAutocompleteProps {
   }) => void;
   value: string;
 }
-
 interface AddressSuggestion {
   description: string;
   place_id: string;
@@ -27,7 +24,6 @@ interface AddressSuggestion {
     secondary_text: string;
   };
 }
-
 interface PlaceDetails {
   address_components: Array<{
     long_name: string;
@@ -36,8 +32,10 @@ interface PlaceDetails {
   }>;
   formatted_address: string;
 }
-
-export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompleteProps) => {
+export const AddressAutocomplete = ({
+  onAddressSelect,
+  value
+}: AddressAutocompleteProps) => {
   const [inputValue, setInputValue] = useState(value);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,60 +48,50 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
   const fetchAddressSuggestions = async (query: string): Promise<AddressSuggestion[]> => {
     // In a real implementation, this would call a geocoding API like Google Places API
     console.log("Fetching suggestions for:", query);
-    
+
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     if (!query || query.length < 3) return [];
-    
+
     // Mock data based on input
     if (query.toLowerCase().includes('new york')) {
-      return [
-        {
-          description: "New York, NY, USA",
-          place_id: "place_id_1",
-          structured_formatting: {
-            main_text: "New York",
-            secondary_text: "NY, USA"
-          }
-        },
-        {
-          description: "New York Avenue, Washington DC, USA",
-          place_id: "place_id_2",
-          structured_formatting: {
-            main_text: "New York Avenue",
-            secondary_text: "Washington DC, USA"
-          }
+      return [{
+        description: "New York, NY, USA",
+        place_id: "place_id_1",
+        structured_formatting: {
+          main_text: "New York",
+          secondary_text: "NY, USA"
         }
-      ];
+      }, {
+        description: "New York Avenue, Washington DC, USA",
+        place_id: "place_id_2",
+        structured_formatting: {
+          main_text: "New York Avenue",
+          secondary_text: "Washington DC, USA"
+        }
+      }];
     }
-    
     if (query.toLowerCase().includes('san fran')) {
-      return [
-        {
-          description: "San Francisco, CA, USA",
-          place_id: "place_id_3",
-          structured_formatting: {
-            main_text: "San Francisco",
-            secondary_text: "CA, USA"
-          }
+      return [{
+        description: "San Francisco, CA, USA",
+        place_id: "place_id_3",
+        structured_formatting: {
+          main_text: "San Francisco",
+          secondary_text: "CA, USA"
         }
-      ];
+      }];
     }
-    
     if (query.toLowerCase().includes('london')) {
-      return [
-        {
-          description: "London, UK",
-          place_id: "place_id_4",
-          structured_formatting: {
-            main_text: "London",
-            secondary_text: "UK"
-          }
+      return [{
+        description: "London, UK",
+        place_id: "place_id_4",
+        structured_formatting: {
+          main_text: "London",
+          secondary_text: "UK"
         }
-      ];
+      }];
     }
-    
+
     // Return empty array for no results
     return [];
   };
@@ -112,52 +100,99 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
   const fetchPlaceDetails = async (placeId: string): Promise<PlaceDetails | null> => {
     // In a real implementation, this would call a geocoding API
     console.log("Fetching details for place ID:", placeId);
-    
+
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 700));
-    
+
     // Mock responses based on place ID
     switch (placeId) {
       case "place_id_1":
         return {
           formatted_address: "New York, NY, USA",
-          address_components: [
-            { long_name: "New York", short_name: "NY", types: ["locality"] },
-            { long_name: "New York", short_name: "NY", types: ["administrative_area_level_1"] },
-            { long_name: "10001", short_name: "10001", types: ["postal_code"] },
-            { long_name: "United States", short_name: "US", types: ["country"] }
-          ]
+          address_components: [{
+            long_name: "New York",
+            short_name: "NY",
+            types: ["locality"]
+          }, {
+            long_name: "New York",
+            short_name: "NY",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "10001",
+            short_name: "10001",
+            types: ["postal_code"]
+          }, {
+            long_name: "United States",
+            short_name: "US",
+            types: ["country"]
+          }]
         };
       case "place_id_2":
         return {
           formatted_address: "New York Avenue, Washington DC, USA",
-          address_components: [
-            { long_name: "New York Avenue", short_name: "New York Ave", types: ["route"] },
-            { long_name: "Washington", short_name: "DC", types: ["locality"] },
-            { long_name: "District of Columbia", short_name: "DC", types: ["administrative_area_level_1"] },
-            { long_name: "20001", short_name: "20001", types: ["postal_code"] },
-            { long_name: "United States", short_name: "US", types: ["country"] }
-          ]
+          address_components: [{
+            long_name: "New York Avenue",
+            short_name: "New York Ave",
+            types: ["route"]
+          }, {
+            long_name: "Washington",
+            short_name: "DC",
+            types: ["locality"]
+          }, {
+            long_name: "District of Columbia",
+            short_name: "DC",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "20001",
+            short_name: "20001",
+            types: ["postal_code"]
+          }, {
+            long_name: "United States",
+            short_name: "US",
+            types: ["country"]
+          }]
         };
       case "place_id_3":
         return {
           formatted_address: "San Francisco, CA, USA",
-          address_components: [
-            { long_name: "San Francisco", short_name: "SF", types: ["locality"] },
-            { long_name: "California", short_name: "CA", types: ["administrative_area_level_1"] },
-            { long_name: "94103", short_name: "94103", types: ["postal_code"] },
-            { long_name: "United States", short_name: "US", types: ["country"] }
-          ]
+          address_components: [{
+            long_name: "San Francisco",
+            short_name: "SF",
+            types: ["locality"]
+          }, {
+            long_name: "California",
+            short_name: "CA",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "94103",
+            short_name: "94103",
+            types: ["postal_code"]
+          }, {
+            long_name: "United States",
+            short_name: "US",
+            types: ["country"]
+          }]
         };
       case "place_id_4":
         return {
           formatted_address: "London, UK",
-          address_components: [
-            { long_name: "London", short_name: "London", types: ["locality"] },
-            { long_name: "Greater London", short_name: "Greater London", types: ["administrative_area_level_1"] },
-            { long_name: "SW1A 1AA", short_name: "SW1A 1AA", types: ["postal_code"] },
-            { long_name: "United Kingdom", short_name: "GB", types: ["country"] }
-          ]
+          address_components: [{
+            long_name: "London",
+            short_name: "London",
+            types: ["locality"]
+          }, {
+            long_name: "Greater London",
+            short_name: "Greater London",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "SW1A 1AA",
+            short_name: "SW1A 1AA",
+            types: ["postal_code"]
+          }, {
+            long_name: "United Kingdom",
+            short_name: "GB",
+            types: ["country"]
+          }]
         };
       default:
         return null;
@@ -169,12 +204,12 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
     const value = e.target.value;
     setInputValue(value);
     setError(null);
-    
+
     // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    
+
     // Set new timeout for debounce
     timeoutRef.current = setTimeout(async () => {
       if (value.length >= 3) {
@@ -200,10 +235,8 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
   const handleAddressSelect = async (suggestion: AddressSuggestion) => {
     setIsLoading(true);
     setOpen(false);
-    
     try {
       const placeDetails = await fetchPlaceDetails(suggestion.place_id);
-      
       if (placeDetails) {
         // Parse the address components to construct the address
         let addressLine1 = '';
@@ -211,37 +244,32 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
         let state = '';
         let postalCode = '';
         let country = '';
-        
+
         // Extract relevant fields from address components
         placeDetails.address_components.forEach(component => {
           const types = component.types;
-          
           if (types.includes('route')) {
             addressLine1 = component.long_name;
           }
-          
           if (types.includes('locality')) {
             city = component.long_name;
           }
-          
           if (types.includes('administrative_area_level_1')) {
             state = component.long_name;
           }
-          
           if (types.includes('postal_code')) {
             postalCode = component.long_name;
           }
-          
           if (types.includes('country')) {
             country = component.long_name;
           }
         });
-        
+
         // If we don't have a specific street address, use the formatted address as line1
         if (!addressLine1) {
           addressLine1 = placeDetails.formatted_address;
         }
-        
+
         // Update the parent component with the parsed address
         onAddressSelect({
           line1: addressLine1,
@@ -250,7 +278,7 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
           postal_code: postalCode,
           country
         });
-        
+
         // Update the input value
         setInputValue(placeDetails.formatted_address);
       }
@@ -267,9 +295,7 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
     setShouldShowManualEntry(true);
     setOpen(false);
   };
-
-  return (
-    <div className="space-y-2 w-full">
+  return <div className="space-y-2 w-full">
       <Label htmlFor="address-autocomplete" className="text-left block">
         Address <span className="text-destructive">*</span>
       </Label>
@@ -278,41 +304,23 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <div className="relative">
-              <Input
-                id="address-autocomplete"
-                placeholder="Start typing your address..."
-                value={inputValue}
-                onChange={handleInputChange}
-                className="w-full pr-10"
-                required
-                aria-required="true"
-              />
+              <Input id="address-autocomplete" placeholder="Start typing your address..." value={inputValue} onChange={handleInputChange} className="w-full pr-10" required aria-required="true" />
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                ) : (
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                )}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <Search className="h-4 w-4 text-muted-foreground" />}
               </div>
             </div>
           </PopoverTrigger>
-          <PopoverContent className="p-0 w-full" align="start">
+          <PopoverContent align="start" className="p-0 w-full bg-white">
             <Command>
               <CommandList>
                 <CommandGroup heading="Suggestions">
-                  {suggestions.map((suggestion) => (
-                    <CommandItem
-                      key={suggestion.place_id}
-                      onSelect={() => handleAddressSelect(suggestion)}
-                      className="flex items-center gap-2 py-2"
-                    >
+                  {suggestions.map(suggestion => <CommandItem key={suggestion.place_id} onSelect={() => handleAddressSelect(suggestion)} className="flex items-center gap-2 py-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">{suggestion.structured_formatting.main_text}</p>
                         <p className="text-sm text-muted-foreground">{suggestion.structured_formatting.secondary_text}</p>
                       </div>
-                    </CommandItem>
-                  ))}
+                    </CommandItem>)}
                 </CommandGroup>
                 <CommandGroup>
                   <CommandItem onSelect={handleManualEntry} className="text-primary">
@@ -325,25 +333,16 @@ export const AddressAutocomplete = ({ onAddressSelect, value }: AddressAutocompl
         </Popover>
       </div>
       
-      {!open && !shouldShowManualEntry && inputValue.length >= 3 && suggestions.length === 0 && !isLoading && (
-        <div className="text-sm">
+      {!open && !shouldShowManualEntry && inputValue.length >= 3 && suggestions.length === 0 && !isLoading && <div className="text-sm">
           <span className="text-muted-foreground">Your address doesn't appear? </span>
-          <Button 
-            variant="link" 
-            className="p-0 h-auto text-primary" 
-            onClick={handleManualEntry}
-          >
+          <Button variant="link" className="p-0 h-auto text-primary" onClick={handleManualEntry}>
             Enter manually
           </Button>
-        </div>
-      )}
+        </div>}
       
-      {error && (
-        <Alert variant="destructive" className="mt-2">
+      {error && <Alert variant="destructive" className="mt-2">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-    </div>
-  );
+        </Alert>}
+    </div>;
 };

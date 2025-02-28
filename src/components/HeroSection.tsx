@@ -1,4 +1,3 @@
-
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 export const HeroSection = () => {
@@ -8,7 +7,7 @@ export const HeroSection = () => {
           Revolutionize Facilitation with
           <span className="text-primary text-center"> AI Technology</span>
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+        <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-center">
           Experience personalized AI facilitation that brings tailored and customizable guidance to businesses and individuals worldwide.
         </p>
         <div className="space-y-4 flex flex-col items-center">

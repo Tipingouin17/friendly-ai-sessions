@@ -112,23 +112,22 @@ const Session = () => {
       setIsWaitingForResponse(true);
 
       try {
-        const messagesForAI = participantResponses.map(msg => ({
-          role: "user",
-          content: msg.content,
-          name: msg.participant,
-          conversation_id: currentConversationId,
-          user_id: null,
-          facilitator_id: conversation?.sessions?.facilitator_details?.id ?? null
-        }));
-
-        await supabase.from('messages').insert(messagesForAI);
+        // No need to store messages in the database for now
+        // Focus on getting the edge function working first
+        
+        console.log('Calling edge function with:', {
+          conversationId: currentConversationId,
+          messages: [...sessionState.messages, ...participantResponses]
+        });
 
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
-            messages: [...sessionState.messages, ...messagesForAI],
+            messages: [...sessionState.messages, ...participantResponses],
             conversationId: currentConversationId
           }
         });
+
+        console.log('Edge function response:', response);
 
         if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
         if (!response.data) throw new Error('No response data received from AI');

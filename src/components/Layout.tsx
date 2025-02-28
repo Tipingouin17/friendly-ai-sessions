@@ -12,7 +12,7 @@ export const Layout = ({ children }: LayoutProps) => {
   const hideFooterPaths = ['/my-facilitators', '/session'];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col text-left">
       <Navigation />
       <main className="flex-grow">
         {children}

@@ -26,7 +26,15 @@
   }
 
   body {
-    @apply bg-background text-foreground font-['Inter'];
+    @apply bg-background text-foreground font-['Inter'] text-left;
+  }
+
+  p, h1, h2, h3, h4, h5, h6, span, div, label {
+    @apply text-left;
+  }
+
+  .text-center {
+    text-align: center;
   }
 
   .glass-card {

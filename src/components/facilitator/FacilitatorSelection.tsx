@@ -31,20 +31,13 @@ export const FacilitatorSelection = ({
     currentFacilitatorCount,
     canCreateCustomFacilitators 
   } = usePlanLimits();
-
-  // Get facilitators accessible by the current plan
-  const accessibleFacilitators = facilitators.filter((facilitator, index) => {
-    // For unlimited plans, show all facilitators
-    if (!planRestrictions || planRestrictions.facilitator_limit === null) {
-      return true;
-    }
-    // For limited plans, only show facilitators up to the plan limit
-    return index < (planRestrictions.facilitator_limit || 0);
-  });
-
-  const lockedFacilitators = facilitators.filter(facilitator => 
-    !accessibleFacilitators.find(f => f.id === facilitator.id)
-  );
+  
+  // Filter facilitators based on your ability to USE them, not CREATE them
+  // All existing facilitators should be accessible for selection
+  const accessibleFacilitators = facilitators;
+  
+  // These are the facilitators you CANNOT CREATE MORE OF, but can still select
+  const lockedFacilitators = []; // No locked facilitators since all are accessible for selection
 
   // Adjust startIndex if needed when the accessible facilitators list changes
   useEffect(() => {
@@ -98,34 +91,6 @@ export const FacilitatorSelection = ({
               <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
             </div>
           ))}
-          
-          {/* Show locked facilitators if there are any */}
-          {lockedFacilitators.length > 0 && startIndex + itemsToShow > accessibleFacilitators.length && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex w-1/4 shrink-0 flex-col items-center justify-center rounded-xl border border-gray-200 p-6 opacity-60 cursor-not-allowed">
-                    <div className="relative">
-                      <img 
-                        src={lockedFacilitators[0].profile_picture} 
-                        alt="Locked facilitator" 
-                        className="mb-4 h-24 w-24 rounded-full filter grayscale" 
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Lock className="h-10 w-10 text-gray-500" />
-                      </div>
-                    </div>
-                    <h3 className="text-center text-lg font-semibold leading-tight text-gray-400">
-                      Locked Facilitator
-                    </h3>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Upgrade your plan to access more facilitators.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
           
           {/* Create new facilitator button - show/hide based on customisable_facilitators permission */}
           {canCreateCustomFacilitators ? (

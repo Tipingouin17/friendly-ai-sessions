@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+
 const MyFacilitators = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [selectedFacilitator, setSelectedFacilitator] = useState<number | null>(null);
@@ -139,9 +141,15 @@ const MyFacilitators = () => {
   };
 
   // Determine if steps should be disabled based on limits
-  const isStep1Disabled = hasReachedFacilitatorLimit;
-  const isStep2Disabled = hasReachedSessionLimit || !selectedFacilitator;
-  const isStep3Disabled = hasReachedSessionLimit || !selectedWorkshop;
+  // Important: We still allow selection of facilitators even with limits reached
+  // Only disable creating new sessions if you've hit your session limit
+  const isStep1Disabled = false; // Never disable selection of facilitators
+  const isStep2Disabled = !selectedFacilitator; // Only disable if no facilitator selected
+  const isStep3Disabled = !selectedWorkshop; // Only disable if no workshop selected
+  
+  // Only creation of new sessions should be blocked by session limit
+  const isSubmitDisabled = hasReachedSessionLimit || !selectedWorkshop || !description.trim() || !agreed;
+
   return <div className="min-h-screen pt-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Plan limit alert at the top */}
@@ -195,18 +203,18 @@ const MyFacilitators = () => {
           </Stepper>
 
           <div className="space-y-8">
-            {/* Step 1: Facilitator Selection - Blur when limit reached */}
-            <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'} ${hasReachedFacilitatorLimit ? 'opacity-50 pointer-events-none' : ''}`}>
+            {/* Step 1: Facilitator Selection - Allow selection even with limit reached */}
+            <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
               <FacilitatorSelection facilitators={facilitators} selectedFacilitator={selectedFacilitator} onSelect={setSelectedFacilitator} isLoading={isFacilitatorsLoading} />
             </div>
 
-            {/* Step 2: Workshop Selection - Blur when limit reached */}
-            <div className={`transition-all ${currentStep === 2 ? 'block' : 'hidden'} ${hasReachedSessionLimit ? 'opacity-50 pointer-events-none' : ''}`}>
+            {/* Step 2: Workshop Selection - Only blur if no facilitator selected */}
+            <div className={`transition-all ${currentStep === 2 ? 'block' : 'hidden'} ${!selectedFacilitator ? 'opacity-50 pointer-events-none' : ''}`}>
               <WorkshopSelection workshops={workshops} selectedWorkshop={selectedWorkshop} onSelect={setSelectedWorkshop} isLoading={isWorkshopsLoading} />
             </div>
 
-            {/* Step 3: Workshop Setup - Blur when limit reached */}
-            <div className={`transition-all ${currentStep === 3 ? 'block' : 'hidden'} ${hasReachedSessionLimit ? 'opacity-50 pointer-events-none' : ''}`}>
+            {/* Step 3: Workshop Setup - Only blur if no workshop selected */}
+            <div className={`transition-all ${currentStep === 3 ? 'block' : 'hidden'} ${!selectedWorkshop ? 'opacity-50 pointer-events-none' : ''}`}>
               <WorkshopSetup participantCount={participantCount} setParticipantCount={setParticipantCount} description={description} setDescription={setDescription} language={language} setLanguage={setLanguage} agreed={agreed} setAgreed={setAgreed} />
             </div>
           </div>
@@ -217,12 +225,23 @@ const MyFacilitators = () => {
               Previous
             </Button>
 
-            {currentStep < 3 ? <Button onClick={handleNext} disabled={currentStep === 1 && (!selectedFacilitator || hasReachedFacilitatorLimit) || currentStep === 2 && (!selectedWorkshop || hasReachedSessionLimit)}>
+            {currentStep < 3 ? (
+              <Button 
+                onClick={handleNext} 
+                disabled={(currentStep === 1 && !selectedFacilitator) || 
+                          (currentStep === 2 && !selectedWorkshop)}
+              >
                 Next
                 <ChevronRight className="w-4 h-4 ml-2" />
-              </Button> : <Button onClick={handleSubmit} disabled={!agreed || !description.trim() || hasReachedSessionLimit}>
-                Start Session
-              </Button>}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={isSubmitDisabled}
+              >
+                {hasReachedSessionLimit ? "Upgrade to Start Session" : "Start Session"}
+              </Button>
+            )}
           </div>
         </div>
       </div>

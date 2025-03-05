@@ -172,7 +172,8 @@ export const CheckoutForm = ({
       console.log("Creating subscription with plan ID:", plan.id);
       console.log("Using stripe plan ID:", plan.stripe_plan_id);
       
-      // For development environment or when Stripe isn't properly set up, use direct DB update
+      // Always use direct database update in development mode
+      // or if Stripe isn't properly configured
       if (process.env.NODE_ENV === 'development' || !stripe || !elements || !plan.stripe_plan_id) {
         console.log("⚠️ Using direct database update (development mode or Stripe not available)");
         

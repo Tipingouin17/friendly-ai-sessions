@@ -4,8 +4,9 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
 // Initialize Stripe with a valid publishable key
-// Using a valid Stripe test publishable key format
-const stripePromise = loadStripe('pk_test_51OcXwYGWmQRsACOr1hLGJ9uYXTPTilQwhNFZcC6jtXPMkj00jUPbIQgxOjXZkmKn1cPDZpIhNKGGPHuFJtVqelZ500vbDgQTDl', {
+// Use the proper Stripe test publishable key format that starts with pk_test_
+// This is a placeholder key - it needs to be replaced with a real Stripe test key
+const stripePromise = loadStripe('pk_test_51Ov1xjH5dusncBPeU9Cy97XPSXWQlTcK8VQJGwkbEJJbgzVZXqE7gvEwjD98JiW1DxIBphB0JMnDYNsxxp1OkPm100X0XG7Gl5', {
   stripeAccount: undefined, // Make sure no connected account is specified
 });
 

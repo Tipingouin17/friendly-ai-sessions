@@ -1,7 +1,21 @@
 import { Brain, Globe, LineChart } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 import { Button } from "./ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+
 export const Features = () => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleButtonClick = () => {
+    if (isAuthenticated) {
+      navigate("/my-facilitators");
+    } else {
+      navigate("/login");
+    }
+  };
+
   const features = [{
     title: "Customizable & Advanced AI capabilities",
     description: "State-of-the-art AI facilitator designed to meet unique needs and preferences.",
@@ -15,6 +29,7 @@ export const Features = () => {
     description: "Scalable solution powered by advanced algorithms and natural language processing.",
     Icon: LineChart
   }];
+
   return <>
       <div className="py-24 px-4 bg-[#FFC107]/10">
         <div className="max-w-6xl mx-auto">
@@ -30,8 +45,8 @@ export const Features = () => {
           </div>
 
           <div className="mt-16 text-center">
-            <Button size="lg" variant="default" className="hover-lift">
-              Try it for free now!
+            <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
+              {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"}
             </Button>
             <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
           </div>
@@ -47,8 +62,8 @@ export const Features = () => {
             At AI Facilitator, we believe that the future of facilitation lies in the power of AI.
             Our platform revolutionizes how sessions are conducted, empowering businesses and individuals to achieve greater outcomes.
           </p>
-          <Button size="lg" variant="default" className="hover-lift">
-            Try it for free now!
+          <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
+            {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"}
           </Button>
           <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
         </div>

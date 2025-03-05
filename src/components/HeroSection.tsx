@@ -1,6 +1,21 @@
+
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+
 export const HeroSection = () => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleButtonClick = () => {
+    if (isAuthenticated) {
+      navigate("/my-facilitators");
+    } else {
+      navigate("/login");
+    }
+  };
+
   return <div className="min-h-[90vh] flex items-center justify-center px-4 pt-16">
       <div className="max-w-4xl mx-auto text-center animate-fade-up">
         <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight text-center lg:text-6xl">
@@ -11,8 +26,8 @@ export const HeroSection = () => {
           Experience personalized AI facilitation that brings tailored and customizable guidance to businesses and individuals worldwide.
         </p>
         <div className="space-y-4 flex flex-col items-center">
-          <Button size="lg" className="hover-lift">
-            Try it for free now! <ArrowRight className="ml-2 h-4 w-4" />
+          <Button size="lg" className="hover-lift" onClick={handleButtonClick}>
+            {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
           <p className="text-sm text-muted-foreground">*no credit card required</p>
         </div>

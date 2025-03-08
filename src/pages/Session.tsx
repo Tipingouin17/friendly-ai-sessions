@@ -24,11 +24,15 @@ const Session = () => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [sessionLink, setSessionLink] = useState('');
-  const [copied, setCopied] = useState(false);
   const [showQrCodeView, setShowQrCodeView] = useState(true);
   const { maxParticipants } = usePlanLimits();
   
+  // Check if we're on a mobile device
+  const isMobile = window.innerWidth < 768;
+  
   useEffect(() => {
+    console.log("Session page loaded with state:", location.state);
+    
     const state = location.state as { 
       newConversationId?: number; 
       replace?: boolean; 
@@ -39,6 +43,7 @@ const Session = () => {
     } | null;
     
     if (state?.isGuest) {
+      console.log("Guest participant joining with data:", state);
       setShowQrCodeView(false);
       
       // If this is a guest joining, add their participant info
@@ -54,6 +59,7 @@ const Session = () => {
           if (exists) return prev;
           
           // Add the new participant
+          console.log("Adding participant with ID:", state.participantId);
           return [...prev, {
             id: state.participantId,
             name: state.participantName,
@@ -110,34 +116,17 @@ const Session = () => {
   }, [error, navigate, toast]);
 
   useEffect(() => {
-    const fetchParticipants = async () => {
-      if (currentConversationId) {
-        try {
-          if (conversation) {
-            const participantCount = conversation.participants || 0;
-            
-            // Only create placeholder participants if we don't have real ones
-            if (participants.length === 0) {
-              const placeholderParticipants: ParticipantInfo[] = Array.from({ length: participantCount }).map((_, index) => ({
-                id: index + 1,
-                name: `Participant ${index + 1}`,
-                avatar: null
-              }));
-              setParticipants(placeholderParticipants);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching participants:', error);
-        }
-      }
-    };
-
-    fetchParticipants();
-  }, [currentConversationId, conversation, participants.length]);
+    // If we're a mobile guest, disable QR code view
+    if (isMobile && location.state?.isGuest) {
+      setShowQrCodeView(false);
+    }
+  }, [isMobile, location.state]);
 
   // Set up subscription to listen for participant changes
   useEffect(() => {
     if (currentConversationId) {
+      console.log("Setting up realtime subscription for participants in Session page");
+      
       const channel = supabase
         .channel(`participants-${currentConversationId}`)
         .on('postgres_changes', { 
@@ -146,6 +135,8 @@ const Session = () => {
           table: 'conversations',
           filter: `id=eq.${currentConversationId}`
         }, (payload) => {
+          console.log("Received realtime update for participants in Session page:", payload);
+          
           if (payload.new && payload.new.current_participants !== undefined) {
             const currentCount = payload.new.current_participants;
             
@@ -295,18 +286,21 @@ const Session = () => {
   if (isLoading) return <LoadingState />;
   if (!conversation || !currentConversationId) return <EmptyState />;
 
-  if (showQrCodeView) {
+  // If we're on mobile and have participant info, skip QR code view
+  const shouldShowSession = !showQrCodeView || (isMobile && location.state?.isGuest);
+
+  if (!shouldShowSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-12">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-2 text-center">Join This Session</h2>
-          <p className="text-gray-600 mb-6 text-center">
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
+        <div className="bg-white p-4 sm:p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-xl sm:text-2xl font-bold mb-2 text-center">Join This Session</h2>
+          <p className="text-gray-600 mb-4 sm:mb-6 text-center text-sm sm:text-base">
             {conversation.sessions?.facilitator_details?.title 
               ? `Session with ${conversation.sessions.facilitator_details.title}` 
               : 'Scan the QR code to join this session'}
           </p>
           
-          <div className="flex flex-col items-center space-y-6">
+          <div className="flex flex-col items-center space-y-4 sm:space-y-6">
             <SessionJoinInfo 
               conversationId={currentConversationId} 
               currentParticipantCount={conversation.current_participants || 0}
@@ -315,7 +309,7 @@ const Session = () => {
             
             <Button 
               onClick={handleStartSession}
-              className="mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
+              className="mt-4 sm:mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
             >
               Start Session ({conversation.current_participants || 0}/{conversation.participants || maxParticipants})
             </Button>

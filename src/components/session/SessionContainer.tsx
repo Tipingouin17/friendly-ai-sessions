@@ -112,10 +112,13 @@ const SessionContainer = ({
     navigate('/pricing');
   };
 
+  // Check if we're on a mobile device
+  const isMobile = window.innerWidth < 768;
+
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
-      <div className="container mx-auto h-full max-w-4xl flex flex-col pt-16">
-        <div className="flex-1 bg-white rounded-t-3xl shadow-lg flex flex-col relative">
+      <div className="container mx-auto h-full max-w-4xl flex flex-col pt-4 sm:pt-16">
+        <div className="flex-1 bg-white rounded-t-lg sm:rounded-t-3xl shadow-lg flex flex-col relative">
           <ChatHeader 
             title={facilitator?.title}
             objective={objective}
@@ -125,8 +128,8 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0 && canGenerateReports}
           />
-          <div className="flex-1 overflow-hidden flex">
-            <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
+            <div className="flex-1 overflow-hidden order-2 sm:order-1">
               <MessageList 
                 messages={transformedMessages} 
                 participantColors={participantColors}
@@ -137,12 +140,14 @@ const SessionContainer = ({
               />
             </div>
             
-            <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 flex flex-col">
-              <SessionJoinInfo 
-                conversationId={conversationId || null} 
-                currentParticipantCount={currentParticipantCount || participants.length || 0}
-              />
-            </div>
+            {!isMobile && (
+              <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 order-1 sm:order-2">
+                <SessionJoinInfo 
+                  conversationId={conversationId || null} 
+                  currentParticipantCount={currentParticipantCount || participants.length || 0}
+                />
+              </div>
+            )}
           </div>
           <ParticipantSelector
             participantCount={participantCount}

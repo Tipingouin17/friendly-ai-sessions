@@ -43,6 +43,8 @@ const JoinSession = () => {
   useEffect(() => {
     // Set conversation-specific data once it's loaded
     if (conversation) {
+      console.log("Conversation data loaded:", conversation);
+      
       // Set the maximum participants for this specific session
       if (conversation.participants !== null && conversation.participants > 0) {
         setMaxParticipantsForSession(conversation.participants);
@@ -58,6 +60,8 @@ const JoinSession = () => {
   useEffect(() => {
     // Set up real-time subscription to track changes to participants
     if (conversationId) {
+      console.log("Setting up realtime subscription for conversation:", conversationId);
+      
       const channel = supabase
         .channel(`conversation-${conversationId}`)
         .on('postgres_changes', { 
@@ -66,6 +70,8 @@ const JoinSession = () => {
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
+          console.log("Received realtime update:", payload);
+          
           if (payload.new) {
             // Update max participants if available
             if (payload.new.participants !== null && payload.new.participants > 0) {
@@ -103,6 +109,8 @@ const JoinSession = () => {
   }, [conversationId, planMaxParticipants, toast, participantName, isJoining]);
 
   const navigateToSession = (name, participantId) => {
+    console.log(`Navigating to session with name: ${name}, participantId: ${participantId}`);
+    
     navigate(`/session?id=${conversationId}`, {
       state: { 
         participantName: name,
@@ -140,6 +148,8 @@ const JoinSession = () => {
     setIsJoining(true);
 
     try {
+      console.log("Current participant count before update:", currentParticipantCount);
+      
       // Increment the current participant count in the conversation
       const { data, error: updateError } = await supabase
         .from('conversations')
@@ -154,6 +164,8 @@ const JoinSession = () => {
         throw updateError;
       }
 
+      console.log("Update response:", data);
+      
       // Navigate to the session with the participant info
       // Use the returned current_participants value as the participant ID to ensure uniqueness
       const newParticipantId = data.current_participants;

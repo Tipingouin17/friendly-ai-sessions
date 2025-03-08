@@ -30,6 +30,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
   useEffect(() => {
     // Update the real participant count if it changes from props
     if (currentParticipantCount !== undefined) {
+      console.log("Updating participant count from props:", currentParticipantCount);
       setRealParticipantCount(currentParticipantCount);
     }
   }, [currentParticipantCount]);
@@ -37,6 +38,8 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
   useEffect(() => {
     // Set up a real-time subscription to track changes to the conversation
     if (conversationId) {
+      console.log("Setting up realtime subscription for conversation in SessionJoinInfo:", conversationId);
+      
       const fetchConversationDetails = async () => {
         try {
           const { data, error } = await supabase
@@ -51,6 +54,8 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
           }
             
           if (data) {
+            console.log("Fetched conversation details:", data);
+            
             // Use the participants field (max allowed participants) for the session
             if (data.participants !== null && data.participants > 0) {
               setMaxParticipantsForSession(data.participants);
@@ -69,7 +74,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
       fetchConversationDetails();
 
       // Setup subscription for real-time updates
-      const subscription = supabase
+      const channel = supabase
         .channel(`conversation-${conversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
@@ -77,6 +82,8 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
+          console.log("Received realtime update in SessionJoinInfo:", payload);
+          
           if (payload.new) {
             if (payload.new.participants !== null && payload.new.participants > 0) {
               setMaxParticipantsForSession(payload.new.participants);
@@ -96,7 +103,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
         .subscribe();
 
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
       };
     }
   }, [conversationId, onSessionFull]);

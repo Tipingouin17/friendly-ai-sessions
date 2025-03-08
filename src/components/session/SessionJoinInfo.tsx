@@ -1,16 +1,19 @@
 
 import React, { useEffect, useState } from 'react';
-import { QrCode, Link, Copy, Check } from 'lucide-react';
+import { QrCode, Link, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
+  currentParticipantCount?: number;
 }
 
-const SessionJoinInfo = ({ conversationId }: SessionJoinInfoProps) => {
+const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: SessionJoinInfoProps) => {
   const [copied, setCopied] = useState(false);
   const [sessionLink, setSessionLink] = useState('');
+  const { maxParticipants } = usePlanLimits();
   
   useEffect(() => {
     // Create the session join link
@@ -27,6 +30,9 @@ const SessionJoinInfo = ({ conversationId }: SessionJoinInfoProps) => {
   };
 
   if (!conversationId) return null;
+
+  const remainingSpots = maxParticipants - currentParticipantCount;
+  const isFull = remainingSpots <= 0;
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-gray-100">
@@ -54,19 +60,34 @@ const SessionJoinInfo = ({ conversationId }: SessionJoinInfoProps) => {
       </div>
       
       <div className="flex flex-col items-center space-y-2">
-        {/* QR Code - using a simple QR code API */}
-        <img 
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(sessionLink)}`}
-          alt="Session QR Code"
-          className="rounded-md border border-gray-200 bg-white p-1"
-          width={120}
-          height={120}
-        />
-        
-        <div className="w-full flex items-center gap-1 bg-gray-50 p-2 rounded text-xs text-gray-700 border border-gray-200">
-          <Link className="w-3 h-3 text-gray-500 flex-shrink-0" />
-          <span className="truncate">{sessionLink}</span>
-        </div>
+        {isFull ? (
+          <div className="text-center p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-xs">
+            <Users className="w-3.5 h-3.5 mx-auto mb-1" />
+            <p>Session is full</p>
+            <p>Max {maxParticipants} participants</p>
+          </div>
+        ) : (
+          <>
+            {/* QR Code - using a simple QR code API */}
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(sessionLink)}`}
+              alt="Session QR Code"
+              className="rounded-md border border-gray-200 bg-white p-1"
+              width={120}
+              height={120}
+            />
+            
+            <div className="w-full flex items-center gap-1 bg-gray-50 p-2 rounded text-xs text-gray-700 border border-gray-200">
+              <Link className="w-3 h-3 text-gray-500 flex-shrink-0" />
+              <span className="truncate">{sessionLink}</span>
+            </div>
+            
+            <div className="w-full text-xs text-center text-gray-600 flex items-center justify-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>{currentParticipantCount} of {maxParticipants} participants</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

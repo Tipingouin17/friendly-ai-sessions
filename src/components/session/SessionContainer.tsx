@@ -133,7 +133,10 @@ const SessionContainer = ({
             </div>
             
             <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 flex flex-col">
-              <SessionJoinInfo conversationId={conversationId || null} />
+              <SessionJoinInfo 
+                conversationId={conversationId || null} 
+                currentParticipantCount={participants.length || participantCount}
+              />
             </div>
           </div>
           <ParticipantSelector

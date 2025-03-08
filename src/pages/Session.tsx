@@ -14,27 +14,15 @@ import { useLocation } from "react-router-dom";
 const Session = () => {
   const { toast } = useToast();
   const location = useLocation();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(true); // Always set to true for admin-only view
   const [sessionStarted, setSessionStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Determine if user is admin based on location state
   useEffect(() => {
-    const locationState = location.state as { 
-      isGuest?: boolean; 
-      showMessaging?: boolean;
-      isAdmin?: boolean;
-    } | null;
-    
-    // User is considered admin if:
-    // 1. They're explicitly marked as admin in the state
-    // 2. They're not a guest (implying they created the session)
-    // 3. They're not accessing via the join flow
-    setIsAdmin(
-      Boolean(locationState?.isAdmin) || 
-      (locationState?.isGuest !== true)
-    );
-  }, [location]);
+    // Always consider the user as admin
+    setIsAdmin(true);
+  }, []);
 
   const handleSessionFull = () => {
     // Auto-start session when it's full
@@ -88,16 +76,10 @@ const Session = () => {
             />
           );
         }
-        
-        // For non-admins, show waiting screen until admin starts the session
-        if (!isAdmin && !shouldShowSession) {
-          return (
-            <ParticipantWaitingScreen
-              currentParticipantCount={props.conversation.current_participants || 0}
-              maxParticipants={props.conversation.participants || 0}
-              facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
-            />
-          );
+
+        // Always force admin view
+        if (props.sessionState.viewMode !== "admin") {
+          props.sessionState.setViewMode("admin");
         }
 
         return (
@@ -125,9 +107,9 @@ const Session = () => {
             currentUserParticipantId={props.currentUserParticipantId}
             hasAnswered={props.sessionState.hasAnswered}
             totalResponses={props.sessionState.totalResponses}
-            viewMode={props.sessionState.viewMode}
+            viewMode="admin"
             setViewMode={props.sessionState.setViewMode}
-            isAdmin={isAdmin}
+            isAdmin={true}
           />
         );
       }}

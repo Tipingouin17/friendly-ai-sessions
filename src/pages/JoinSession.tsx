@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserRound, ArrowRight, AlertCircle, Users } from "lucide-react";
+import { AlertCircle, ArrowRight, Users } from "lucide-react";
 import BoringAvatar from 'boring-avatars';
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 
@@ -81,32 +81,21 @@ const JoinSession = () => {
             // Update current participants count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
               setCurrentParticipantCount(payload.new.current_participants);
-              
-              // If session is full, show a toast and redirect to session
-              const effectiveMax = payload.new.participants || planMaxParticipants;
-              if (effectiveMax > 0 && payload.new.current_participants >= effectiveMax) {
-                toast({
-                  title: "Session is full",
-                  description: `This session has reached its maximum capacity of ${effectiveMax} participants.`,
-                  variant: "destructive",
-                });
-                
-                // Automatically join the session with a default name if one isn't provided
-                if (!isJoining) {
-                  const autoName = participantName.trim() || `Guest ${Math.floor(Math.random() * 1000)}`;
-                  navigateToSession(autoName, payload.new.current_participants);
-                }
-              }
             }
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Channel status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            console.log('Successfully subscribed to realtime updates');
+          }
+        });
 
       return () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [conversationId, planMaxParticipants, toast, participantName, isJoining]);
+  }, [conversationId]);
 
   const navigateToSession = (name, participantId) => {
     console.log(`Navigating to session with name: ${name}, participantId: ${participantId}`);
@@ -116,7 +105,7 @@ const JoinSession = () => {
         participantName: name,
         avatarSeed,
         isGuest: true,
-        participantId: participantId
+        participantId
       }
     });
   };
@@ -136,7 +125,7 @@ const JoinSession = () => {
       maxParticipantsForSession : planMaxParticipants;
 
     // Check if the session is full
-    if (currentParticipantCount >= effectiveMaxParticipants) {
+    if (currentParticipantCount >= effectiveMaxParticipants && effectiveMaxParticipants > 0) {
       toast({
         title: "Session is full",
         description: `This session has reached its maximum capacity of ${effectiveMaxParticipants} participants.`,
@@ -166,9 +155,8 @@ const JoinSession = () => {
 
       console.log("Update response:", data);
       
-      // Navigate to the session with the participant info
       // Use the returned current_participants value as the participant ID to ensure uniqueness
-      const newParticipantId = data.current_participants;
+      const newParticipantId = data?.current_participants || (currentParticipantCount + 1);
       navigateToSession(participantName, newParticipantId);
       
     } catch (error) {
@@ -212,7 +200,7 @@ const JoinSession = () => {
           )}
           
           {isFull && (
-            <Alert variant="warning" className="mt-4">
+            <Alert className="mt-4 border-amber-500 bg-amber-50 text-amber-900">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="flex items-center">
                 <span>This session is full ({effectiveMaxParticipants} participants maximum)</span>
@@ -253,7 +241,7 @@ const JoinSession = () => {
               <Button 
                 onClick={handleJoinSession} 
                 className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
-                disabled={isJoining || isFull}
+                disabled={isJoining}
               >
                 {isJoining ? (
                   <span className="flex items-center justify-center">
@@ -269,7 +257,7 @@ const JoinSession = () => {
               
               <div className="text-center text-xs text-gray-500 flex items-center justify-center gap-1">
                 <Users className="w-3.5 h-3.5" />
-                <span>{currentParticipantCount} of {effectiveMaxParticipants} participants</span>
+                <span>{currentParticipantCount} of {effectiveMaxParticipants || '∞'} participants</span>
                 {!isFull && effectiveMaxParticipants > 0 && (
                   <span className="text-green-600 font-medium">
                     ({effectiveMaxParticipants - currentParticipantCount} spots left)

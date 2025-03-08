@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
@@ -9,6 +9,16 @@ import { Message, ParticipantInfo } from "@/types/chat";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { QrCode } from "lucide-react";
 
 interface SessionContainerProps {
   facilitator: {
@@ -63,6 +73,7 @@ const SessionContainer = ({
   const { canGenerateReports } = usePlanLimits();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
@@ -115,6 +126,10 @@ const SessionContainer = ({
   // Check if we're on a mobile device
   const isMobile = window.innerWidth < 768;
 
+  // Generate join URL
+  const baseUrl = window.location.origin;
+  const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
+
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
       <div className="container mx-auto h-full max-w-4xl flex flex-col pt-4 sm:pt-16">
@@ -123,7 +138,7 @@ const SessionContainer = ({
             title={facilitator?.title}
             objective={objective}
             profilePicture={facilitator?.profile_picture}
-            participantCount={participantCount}
+            participantCount={currentParticipantCount || participants.length || participantCount}
             onGenerateReport={handleGenerateReport}
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0 && canGenerateReports}
@@ -145,10 +160,49 @@ const SessionContainer = ({
                 <SessionJoinInfo 
                   conversationId={conversationId || null} 
                   currentParticipantCount={currentParticipantCount || participants.length || 0}
+                  maxParticipants={conversation?.participants || 0}
                 />
               </div>
             )}
           </div>
+          
+          {isMobile && (
+            <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="absolute top-4 right-14 z-10"
+                  onClick={() => setIsQrDialogOpen(true)}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Join Session</DialogTitle>
+                  <DialogDescription>
+                    Share this link or QR code to invite others
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col items-center justify-center">
+                  <QrCode 
+                    size={200}
+                    className="w-40 h-40 my-4"
+                    data-url={joinUrl}
+                  />
+                  <p className="text-sm text-center text-gray-500 mb-2">
+                    {joinUrl}
+                  </p>
+                  <p className="text-xs text-center text-gray-500">
+                    {currentParticipantCount || participants.length || 0} 
+                    {conversation?.participants > 0 ? ` of ${conversation.participants}` : ''} participants
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          
           <ParticipantSelector
             participantCount={participantCount}
             currentParticipant={currentParticipant}

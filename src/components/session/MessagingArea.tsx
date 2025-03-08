@@ -3,6 +3,7 @@ import React from 'react';
 import MessageList from "@/components/chat/MessageList";
 import SessionJoinInfo from "@/components/session/SessionJoinInfo";
 import { Message, ParticipantInfo } from "@/types/chat";
+import ParticipantResponseStats from './ParticipantResponseStats';
 
 interface MessagingAreaProps {
   messages: Message[];
@@ -15,6 +16,7 @@ interface MessagingAreaProps {
   currentParticipantCount: number;
   maxParticipants: number;
   isMobile: boolean;
+  viewMode: "participant" | "admin";
 }
 
 const MessagingArea = ({
@@ -27,19 +29,97 @@ const MessagingArea = ({
   conversationId,
   currentParticipantCount,
   maxParticipants,
-  isMobile
+  isMobile,
+  viewMode
 }: MessagingAreaProps) => {
+  // Group messages by facilitator question for admin view
+  const groupedMessages = React.useMemo(() => {
+    if (viewMode !== "admin") return [];
+
+    const groups = [];
+    let currentGroup = { question: null, responses: [] };
+
+    // Loop through all messages to create question-answer groups
+    for (const message of messages) {
+      if (message.sender === "assistant" && !message.isReport) {
+        // If we have an existing group with responses, add it to our groups array
+        if (currentGroup.question && currentGroup.responses.length > 0) {
+          groups.push({ ...currentGroup });
+        }
+        
+        // Start a new group with this facilitator question
+        currentGroup = { 
+          question: message, 
+          responses: [] 
+        };
+      } else if (message.sender === "user" && currentGroup.question) {
+        // Add participant response to the current group
+        currentGroup.responses.push(message);
+      }
+    }
+    
+    // Add the last group if it has a question and responses
+    if (currentGroup.question && currentGroup.responses.length > 0) {
+      groups.push(currentGroup);
+    }
+    
+    return groups;
+  }, [messages, viewMode]);
+
   return (
     <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
       <div className="flex-1 overflow-hidden order-2 sm:order-1">
-        <MessageList 
-          messages={messages} 
-          participantColors={participantColors}
-          currentParticipant={`P${currentParticipant}`}
-          onLikeMessage={onLikeMessage}
-          isWaitingForResponse={isWaitingForResponse}
-          participants={participants}
-        />
+        {viewMode === "admin" ? (
+          <div className="h-full overflow-y-auto">
+            <div className="px-4 py-6 space-y-8">
+              {groupedMessages.map((group, groupIndex) => (
+                <div key={groupIndex} className="border border-gray-100 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 p-4 border-b border-gray-100">
+                    <div className="font-medium text-gray-800 mb-1">Question {groupIndex + 1}</div>
+                    <div className="text-gray-700">{group.question.content}</div>
+                  </div>
+                  
+                  <ParticipantResponseStats 
+                    responses={group.responses}
+                    totalParticipants={maxParticipants}
+                  />
+                  
+                  <div className="divide-y divide-gray-100">
+                    {group.responses.map((response, responseIndex) => (
+                      <div key={responseIndex} className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-2 h-2 rounded-full" 
+                            style={{ backgroundColor: participantColors[response.participant] || '#888' }} 
+                          />
+                          <div className="text-sm font-medium flex items-center gap-1">
+                            {response.isAnonymous ? 'Anonymous participant' : response.participant}
+                            {response.isAnonymous && <span className="text-xs text-gray-500">(anonymous)</span>}
+                          </div>
+                        </div>
+                        <div className="text-gray-700 pl-4">{response.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              {groupedMessages.length === 0 && (
+                <div className="text-center text-gray-500 py-8">
+                  No messages to display. Start the conversation to see responses here.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <MessageList 
+            messages={messages} 
+            participantColors={participantColors}
+            currentParticipant={`P${currentParticipant}`}
+            onLikeMessage={onLikeMessage}
+            isWaitingForResponse={isWaitingForResponse}
+            participants={participants}
+          />
+        )}
       </div>
       
       {!isMobile && (

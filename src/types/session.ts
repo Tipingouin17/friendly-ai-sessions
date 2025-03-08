@@ -18,6 +18,8 @@ export interface SessionContextProps {
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     hasAnswered: boolean;
     totalResponses: number;
+    viewMode: "participant" | "admin";
+    setViewMode: (mode: "participant" | "admin") => void;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };

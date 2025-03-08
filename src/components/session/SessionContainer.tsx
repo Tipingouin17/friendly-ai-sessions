@@ -8,6 +8,9 @@ import SessionHeader from "./SessionHeader";
 import MessagingArea from "./MessagingArea";
 import InputFooter from "./InputFooter";
 import JoinSessionDialog from "./JoinSessionDialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Eye, Users } from "lucide-react";
+import ViewModeToggle from "./ViewModeToggle";
 
 interface SessionContainerProps {
   facilitator: {
@@ -36,6 +39,8 @@ interface SessionContainerProps {
   currentUserParticipantId?: number | null;
   hasAnswered: boolean;
   totalResponses: number;
+  viewMode: "participant" | "admin";
+  setViewMode: (mode: "participant" | "admin") => void;
 }
 
 const SessionContainer = ({
@@ -61,7 +66,9 @@ const SessionContainer = ({
   currentParticipantCount,
   currentUserParticipantId,
   hasAnswered,
-  totalResponses
+  totalResponses,
+  viewMode,
+  setViewMode
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   
@@ -83,35 +90,81 @@ const SessionContainer = ({
     currentParticipantId: currentUserParticipantId
   });
   
-  // Process messages to handle participant names and anonymity
-  const transformedMessages = messages.map(message => {
-    if (message.participant && message.participant.startsWith('P')) {
-      const participantNumber = parseInt(message.participant.slice(1));
-      const participant = participants.find(p => p.id === participantNumber);
-      
-      // Don't modify the message content, just add participant details
-      if (participant) {
-        return {
-          ...message,
-          participant: participant.name,
-          avatar: participant.avatar
-        };
-      }
-      
-      const name = participantNames[participantNumber];
-      if (name) {
-        return {
-          ...message,
-          participant: name
-        };
-      }
-      return {
-        ...message,
-        participant: `Anonymous ${participantNumber}`
-      };
+  // Process messages based on view mode
+  const processedMessages = React.useMemo(() => {
+    if (viewMode === "admin") {
+      // Admin sees all messages
+      return messages.map(message => {
+        if (message.participant && message.participant.startsWith('P')) {
+          const participantNumber = parseInt(message.participant.slice(1));
+          const participant = participants.find(p => p.id === participantNumber);
+          
+          // Add participant details
+          if (participant) {
+            return {
+              ...message,
+              participant: participant.name,
+              avatar: participant.avatar,
+              isAnonymous: participant.is_anonymous
+            };
+          }
+          
+          const name = participantNames[participantNumber];
+          if (name) {
+            return {
+              ...message,
+              participant: name
+            };
+          }
+          return {
+            ...message,
+            participant: `Anonymous ${participantNumber}`
+          };
+        }
+        return message;
+      });
+    } else {
+      // Participant only sees facilitator messages and their own responses
+      return messages.filter(message => {
+        // Include all facilitator messages
+        if (message.sender === "assistant") return true;
+        
+        // Include only this participant's messages
+        if (message.participant === `P${currentParticipant}`) return true;
+        
+        // Exclude all other participant messages
+        return false;
+      }).map(message => {
+        // Process the message the same way
+        if (message.participant && message.participant.startsWith('P')) {
+          const participantNumber = parseInt(message.participant.slice(1));
+          const participant = participants.find(p => p.id === participantNumber);
+          
+          if (participant) {
+            return {
+              ...message,
+              participant: participant.name,
+              avatar: participant.avatar,
+              isAnonymous: participant.is_anonymous
+            };
+          }
+          
+          const name = participantNames[participantNumber];
+          if (name) {
+            return {
+              ...message,
+              participant: name
+            };
+          }
+          return {
+            ...message,
+            participant: `Anonymous ${participantNumber}`
+          };
+        }
+        return message;
+      });
     }
-    return message;
-  });
+  }, [messages, viewMode, participants, participantNames, currentParticipant]);
 
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
@@ -127,8 +180,14 @@ const SessionContainer = ({
             messagesCount={messages.length}
           />
           
+          <ViewModeToggle 
+            viewMode={viewMode} 
+            setViewMode={setViewMode}
+            isAdmin={true} // This would be determined by user role in a real app
+          />
+          
           <MessagingArea 
-            messages={transformedMessages}
+            messages={processedMessages}
             participantColors={participantColors}
             currentParticipant={currentParticipant}
             isWaitingForResponse={isWaitingForResponse}
@@ -138,6 +197,7 @@ const SessionContainer = ({
             currentParticipantCount={currentParticipantCount || participants.length || 0}
             maxParticipants={conversation?.participants || 0}
             isMobile={isMobile}
+            viewMode={viewMode}
           />
           
           {isMobile && (
@@ -165,6 +225,7 @@ const SessionContainer = ({
             toggleAnonymous={toggleAnonymous}
             hasAnswered={hasAnswered}
             totalResponses={totalResponses}
+            viewMode={viewMode}
           />
         </div>
       </div>

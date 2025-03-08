@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { SessionProvider } from "@/components/session/SessionProvider";
 import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
@@ -12,6 +12,14 @@ import { useLocation } from "react-router-dom";
 const Session = () => {
   const { toast } = useToast();
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin (in a real app, this would be based on user role)
+  useEffect(() => {
+    // For demo purposes, we're setting everyone as admin
+    // In a real app, you would check user permissions
+    setIsAdmin(true);
+  }, []);
 
   const handleSessionFull = () => {
     toast({
@@ -94,6 +102,8 @@ const Session = () => {
             currentUserParticipantId={currentUserParticipantId}
             hasAnswered={sessionState.hasAnswered}
             totalResponses={sessionState.totalResponses}
+            viewMode={sessionState.viewMode}
+            setViewMode={sessionState.setViewMode}
           />
         );
       }}

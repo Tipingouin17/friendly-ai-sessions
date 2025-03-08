@@ -17,6 +17,7 @@ type UseSessionInteractionsProps = {
     recordResponse: (participantId: number, hasResponded: boolean) => void;
     totalResponses: number;
     hasAnswered: boolean;
+    viewMode: "participant" | "admin";
   };
   conversation: any;
   participants: any[];
@@ -34,6 +35,9 @@ export const useSessionInteractions = ({
   const { toast } = useToast();
 
   const handleSendMessage = async () => {
+    // Don't allow sending in admin view
+    if (sessionState.viewMode === "admin") return;
+    
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
     // Get the current participant info

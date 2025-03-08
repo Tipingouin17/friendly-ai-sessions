@@ -22,6 +22,7 @@ interface InputFooterProps {
   toggleAnonymous: () => void;
   hasAnswered: boolean;
   totalResponses: number;
+  viewMode: "participant" | "admin";
 }
 
 const InputFooter = ({
@@ -38,13 +39,25 @@ const InputFooter = ({
   isAnonymous,
   toggleAnonymous,
   hasAnswered,
-  totalResponses
+  totalResponses,
+  viewMode
 }: InputFooterProps) => {
   // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);
   const participantName = participantInfo?.name || 
     participantNames[currentParticipant] || 
     `Participant ${currentParticipant}`;
+  
+  // In admin view, we don't need input controls
+  if (viewMode === "admin") {
+    return (
+      <div className="px-6 py-4 border-t border-gray-100 bg-white">
+        <div className="text-center text-gray-500">
+          <p>You're in admin view. Switch to participant view to send messages.</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <>

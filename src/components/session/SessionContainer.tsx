@@ -34,6 +34,7 @@ interface SessionContainerProps {
   participants?: ParticipantInfo[];
   conversationId?: number | null;
   conversation?: any;
+  currentParticipantCount?: number;
 }
 
 const SessionContainer = ({
@@ -56,7 +57,8 @@ const SessionContainer = ({
   onLikeMessage,
   participants = [],
   conversationId,
-  conversation
+  conversation,
+  currentParticipantCount
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   const { toast } = useToast();
@@ -138,7 +140,7 @@ const SessionContainer = ({
             <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 flex flex-col">
               <SessionJoinInfo 
                 conversationId={conversationId || null} 
-                currentParticipantCount={participants.length || participantCount}
+                currentParticipantCount={currentParticipantCount || participants.length || 0}
               />
             </div>
           </div>

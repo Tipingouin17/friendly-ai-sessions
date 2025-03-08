@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { QrCode, Link, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,13 +39,20 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
         try {
           const { data } = await supabase
             .from('conversations')
-            .select('participants')
+            .select('participants, current_participants')
             .eq('id', conversationId)
             .single();
             
           if (data) {
+            // Use the participants field (max allowed participants) for the session
             if (data.participants !== null) {
               setMaxParticipantsForSession(data.participants);
+            }
+            
+            // If there's a current_participants field, use it for real count
+            // Otherwise, keep using the prop value
+            if (data.current_participants !== undefined && data.current_participants !== null) {
+              setRealParticipantCount(data.current_participants);
             }
           }
         } catch (error) {
@@ -69,6 +75,10 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             if (payload.new.participants !== null) {
               setMaxParticipantsForSession(payload.new.participants);
             }
+            if (payload.new.current_participants !== undefined && 
+                payload.new.current_participants !== null) {
+              setRealParticipantCount(payload.new.current_participants);
+            }
           }
         })
         .subscribe();
@@ -89,7 +99,15 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
 
   // Use the session-specific max participants, fallback to plan limit if not set
   const effectiveMaxParticipants = maxParticipantsForSession || planMaxParticipants;
-  const remainingSpots = effectiveMaxParticipants - realParticipantCount;
+  
+  // For a new session, the real count should be the host (1) at minimum
+  // This prevents showing the session as full when it's newly created
+  const adjustedRealCount = Math.max(realParticipantCount, 1);
+  
+  // Calculate remaining spots - the host is counted as a participant
+  const remainingSpots = effectiveMaxParticipants - adjustedRealCount;
+  
+  // Only consider full if we've actually hit the limit
   const isFull = remainingSpots <= 0;
 
   return (
@@ -142,7 +160,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             
             <div className="w-full text-xs text-center text-gray-600 flex items-center justify-center gap-1">
               <Users className="w-3 h-3" />
-              <span>{realParticipantCount} of {effectiveMaxParticipants} participants</span>
+              <span>{adjustedRealCount} of {effectiveMaxParticipants} participants</span>
               {remainingSpots > 0 && (
                 <span className="text-green-600 font-medium">
                   ({remainingSpots} spots left)

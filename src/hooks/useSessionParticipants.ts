@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,9 +9,15 @@ export function useSessionParticipants(conversationId: number | null) {
   const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const { toast } = useToast();
   
-  const { data: conversation, error: fetchError, refetch, isLoading } = useConversation(conversationId);
+  const { 
+    data: conversation, 
+    error: fetchError, 
+    refetch, 
+    isLoading 
+  } = useConversation(conversationId);
 
   // Handle fetch errors
   useEffect(() => {
@@ -44,6 +50,17 @@ export function useSessionParticipants(conversationId: number | null) {
     }
   }, [conversation]);
 
+  // Retry function for reconnection attempts
+  const attemptReconnection = useCallback(() => {
+    if (connectionAttempts < 3 && conversationId) {
+      console.log(`Attempting reconnection (attempt ${connectionAttempts + 1}/3)`);
+      setConnectionAttempts(prev => prev + 1);
+      refetch();
+    } else if (connectionAttempts >= 3) {
+      setError("Unable to establish a stable connection after multiple attempts");
+    }
+  }, [connectionAttempts, conversationId, refetch]);
+
   // Set up real-time subscription
   useEffect(() => {
     if (conversationId) {
@@ -53,16 +70,12 @@ export function useSessionParticipants(conversationId: number | null) {
       let connectionTimeout = setTimeout(() => {
         if (!isConnected) {
           console.warn("Real-time connection not established after timeout");
-          toast({
-            title: "Connection issue",
-            description: "Having trouble connecting to the session. Please check your internet connection.",
-            variant: "destructive"
-          });
+          attemptReconnection();
         }
       }, 8000);
       
       const channel = supabase
-        .channel(`conversation-updates-${conversationId}`)
+        .channel(`conversation-updates-${conversationId}-${connectionAttempts}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -101,8 +114,8 @@ export function useSessionParticipants(conversationId: number | null) {
             clearTimeout(connectionTimeout);
           } else if (status === 'CHANNEL_ERROR') {
             console.error('Error subscribing to channel');
-            setError('Unable to establish real-time connection');
             setIsConnected(false);
+            attemptReconnection();
           }
         });
 
@@ -111,31 +124,24 @@ export function useSessionParticipants(conversationId: number | null) {
         supabase.removeChannel(channel);
       };
     }
-  }, [conversationId, refetch, toast]);
+  }, [conversationId, refetch, toast, isConnected, connectionAttempts, attemptReconnection]);
 
-  // Add a connection retry mechanism
+  // Connection recovery mechanism
   useEffect(() => {
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    // Only retry if we're still loading and don't have an error yet
-    if (!isConnected && isLoading && !error && conversationId && retryCount < maxRetries) {
-      const retryInterval = setInterval(() => {
-        console.log(`Retrying fetch attempt ${retryCount + 1} of ${maxRetries}`);
-        refetch();
-        retryCount++;
-        
-        if (retryCount >= maxRetries) {
-          clearInterval(retryInterval);
-          if (!conversation && !error) {
-            setError("Unable to load session after multiple attempts. Please check the session link.");
-          }
+    if (!isConnected && conversationId && !isLoading && !error) {
+      const recoveryInterval = setInterval(() => {
+        console.log("Checking connection status...");
+        if (!isConnected) {
+          console.log("Connection still not established, attempting recovery");
+          attemptReconnection();
+        } else {
+          clearInterval(recoveryInterval);
         }
-      }, 3000);
+      }, 10000);
       
-      return () => clearInterval(retryInterval);
+      return () => clearInterval(recoveryInterval);
     }
-  }, [isConnected, isLoading, error, conversation, conversationId, refetch]);
+  }, [isConnected, conversationId, isLoading, error, attemptReconnection]);
 
   return {
     currentParticipantCount,
@@ -143,6 +149,7 @@ export function useSessionParticipants(conversationId: number | null) {
     conversation,
     error,
     refetch,
-    isConnected
+    isConnected,
+    connectionAttempts
   };
 }

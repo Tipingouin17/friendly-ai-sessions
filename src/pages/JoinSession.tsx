@@ -1,6 +1,6 @@
 
 import { useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinForm from "@/components/session/JoinForm";
 import SessionFullAlert from "@/components/session/SessionFullAlert";
@@ -13,6 +13,7 @@ const JoinSession = () => {
   const conversationId = searchParams.get("id") ? Number(searchParams.get("id")) : null;
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Validate that we have a conversation ID
   useEffect(() => {
@@ -26,6 +27,14 @@ const JoinSession = () => {
   useEffect(() => {
     if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+    }
+  }, [conversationId, queryClient, retryCount]);
+  
+  const handleRetry = useCallback(() => {
+    if (conversationId) {
+      console.log("Retrying connection to session:", conversationId);
+      setRetryCount(prev => prev + 1);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
     }
   }, [conversationId, queryClient]);
@@ -47,7 +56,7 @@ const JoinSession = () => {
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
-    return <JoinSessionLoadingState />;
+    return <JoinSessionLoadingState onRetry={handleRetry} />;
   }
 
   // Show error state if invalid request or no conversation data
@@ -87,7 +96,17 @@ const JoinSession = () => {
           <div className="p-4 mb-4 border border-red-100 bg-red-50 rounded-md text-red-700">
             <div className="flex items-start">
               <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
-              <p>{error}</p>
+              <div>
+                <p>{error}</p>
+                <Button 
+                  onClick={handleRetry}
+                  className="mt-2 bg-red-100 hover:bg-red-200 text-red-800 text-sm py-1 px-2"
+                  variant="ghost"
+                  size="sm"
+                >
+                  Try Again
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}

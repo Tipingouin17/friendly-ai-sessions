@@ -34,4 +34,5 @@ export interface SessionContextProps {
     isAnonymous: boolean;
     toggleAnonymous: () => void;
   };
+  isSessionStartedInDB: boolean;
 }

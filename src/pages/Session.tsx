@@ -35,6 +35,9 @@ const Session = () => {
   }, [location]);
 
   const handleSessionFull = () => {
+    // Auto-start session when it's full
+    setSessionStarted(true);
+    
     toast({
       title: "Session is full",
       description: "The maximum number of participants has joined. Starting session automatically.",
@@ -57,28 +60,28 @@ const Session = () => {
           handleSendMessage,
           handleLikeMessage,
           showQrCodeView,
-          currentUserParticipantId
+          currentUserParticipantId,
+          // Check if session is marked as started in the database
+          isSessionStartedInDB
         } = props;
 
         if (isLoading) return <LoadingState />;
         if (!conversation || !currentConversationId) return <EmptyState />;
 
-        const isMobile = window.innerWidth < 768;
-        const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
-        
         // Check if we should automatically show session (all participants joined)
         const maxParticipants = conversation.participants || 0;
         const currentParticipants = conversation.current_participants || 0;
         const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
         
-        // Admin view gets QR code view for sharing
-        if (isAdmin && !sessionStarted && !showQrCodeView) {
-          // This is when admin is viewing the session but hasn't started it
-          setSessionStarted(true);
-        }
-
-        // Admin gets QR code view until they start the session
-        if (isAdmin && showQrCodeView) {
+        // Update sessionStarted state if it's already started in DB
+        useEffect(() => {
+          if (isSessionStartedInDB) {
+            setSessionStarted(true);
+          }
+        }, [isSessionStartedInDB]);
+        
+        // Admin view gets QR code view for sharing until session is started
+        if (isAdmin && !sessionStarted && showQrCodeView) {
           return (
             <QRCodeView
               conversationId={currentConversationId}
@@ -94,12 +97,8 @@ const Session = () => {
           );
         }
         
-        // Update the condition to check if session should be shown
-        const shouldShowSession = (isAdmin && sessionStarted) || 
-          (!isAdmin && !showQrCodeView) || 
-          (isMobile && locationState?.isGuest) || 
-          locationState?.showMessaging === true ||
-          isSessionFull;
+        // Simplified condition to check if session should be shown
+        const shouldShowSession = isSessionStartedInDB || sessionStarted || isSessionFull;
 
         // For non-admins, show waiting screen until admin starts the session
         // or other conditions to show the session are met

@@ -35,8 +35,31 @@ const SessionJoinInfo = ({
     if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
       console.log("Session is already full on component mount, calling onSessionFull");
       onSessionFull();
+      
+      // Automatically mark session as started in the database
+      if (conversationId) {
+        updateSessionStarted(conversationId, true);
+      }
     }
   }, []);
+  
+  // Update session_started in the database
+  const updateSessionStarted = async (convId: number, started: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ session_started: started })
+        .eq('id', convId);
+        
+      if (error) {
+        console.error("Error updating session_started:", error);
+      } else {
+        console.log("Successfully updated session_started to", started);
+      }
+    } catch (err) {
+      console.error("Exception updating session_started:", err);
+    }
+  };
   
   useEffect(() => {
     if (!conversationId) return;
@@ -64,6 +87,9 @@ const SessionJoinInfo = ({
           if (maxParticipants > 0 && newCount >= maxParticipants && onSessionFull) {
             console.log("Session became full with participant count:", newCount);
             onSessionFull();
+            
+            // Automatically mark session as started in the database
+            updateSessionStarted(conversationId, true);
           }
         }
       })

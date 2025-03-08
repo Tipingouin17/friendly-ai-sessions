@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export function useSessionInterface(conversationId: number | null) {
   const [sessionLink, setSessionLink] = useState('');
@@ -14,6 +15,29 @@ export function useSessionInterface(conversationId: number | null) {
     if (conversationId) {
       const baseUrl = window.location.origin;
       setSessionLink(`${baseUrl}/join-session?id=${conversationId}`);
+      
+      // Check if session is already marked as started in the database
+      const checkSessionStarted = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('conversations')
+            .select('session_started')
+            .eq('id', conversationId)
+            .maybeSingle();
+            
+          if (error) {
+            console.error("Error checking session_started:", error);
+          } else if (data && data.session_started) {
+            console.log("Session is already marked as started in DB");
+            setIsSessionStarted(true);
+            setShowQrCodeView(false);
+          }
+        } catch (err) {
+          console.error("Exception checking session_started:", err);
+        }
+      };
+      
+      checkSessionStarted();
     }
   }, [conversationId]);
   
@@ -25,9 +49,25 @@ export function useSessionInterface(conversationId: number | null) {
     }
   }, [isMobile, location.state]);
   
-  const handleStartSession = () => {
+  const handleStartSession = async () => {
     setShowQrCodeView(false);
     setIsSessionStarted(true);
+    
+    // Update the session_started flag in the database when admin starts session
+    if (conversationId) {
+      try {
+        const { error } = await supabase
+          .from('conversations')
+          .update({ session_started: true })
+          .eq('id', conversationId);
+          
+        if (error) {
+          console.error("Error updating session_started:", error);
+        }
+      } catch (err) {
+        console.error("Exception updating session_started:", err);
+      }
+    }
   };
   
   return {

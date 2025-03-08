@@ -25,6 +25,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     showMessaging?: boolean 
   } | null;
   
+  const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
+  
   const {
     currentConversationId,
     participants,
@@ -39,6 +41,13 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
 
   // Type assertion to ensure conversation is of the right type
   const typedConversation = conversation as ConversationWithSession | null;
+  
+  // Check if the session is marked as started in DB
+  useEffect(() => {
+    if (typedConversation?.session_started) {
+      setIsSessionStartedInDB(true);
+    }
+  }, [typedConversation]);
 
   // Determine the current participant ID based on user role
   const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
@@ -57,7 +66,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     setParticipants,
     conversation: typedConversation,
     refetch,
-    handleSessionFull
+    handleSessionFull,
+    onSessionStarted: () => setIsSessionStartedInDB(true)
   });
 
   // Set up session state
@@ -100,7 +110,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     showQrCodeView,
     sessionLink,
     currentUserParticipantId,
-    anonymousState
+    anonymousState,
+    isSessionStartedInDB
   };
 
   return (

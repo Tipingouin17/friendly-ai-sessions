@@ -11,6 +11,7 @@ type UseSessionRealtimeProps = {
   conversation: any | null;
   refetch: () => void;
   handleSessionFull?: () => void;
+  onSessionStarted?: () => void;
 };
 
 export const useSessionRealtime = ({
@@ -19,7 +20,8 @@ export const useSessionRealtime = ({
   setParticipants,
   conversation,
   refetch,
-  handleSessionFull
+  handleSessionFull,
+  onSessionStarted
 }: UseSessionRealtimeProps) => {
   useEffect(() => {
     if (currentConversationId) {
@@ -46,14 +48,22 @@ export const useSessionRealtime = ({
         }, (payload) => {
           console.log("Received realtime update for participants in Session page:", payload);
           
-          if (payload.new && payload.new.current_participants !== undefined) {
-            const currentCount = payload.new.current_participants;
+          if (payload.new) {
+            // Check for session_started flag
+            if (payload.new.session_started && onSessionStarted) {
+              console.log("Session started flag detected, triggering onSessionStarted");
+              onSessionStarted();
+            }
             
-            // Check if all participants have joined and trigger redirect
-            if (currentCount >= (payload.new.participants || 0) && (payload.new.participants || 0) > 0) {
-              console.log("All participants have joined, triggering session start");
-              if (handleSessionFull) {
-                handleSessionFull();
+            if (payload.new.current_participants !== undefined) {
+              const currentCount = payload.new.current_participants;
+              
+              // Check if all participants have joined and trigger redirect
+              if (currentCount >= (payload.new.participants || 0) && (payload.new.participants || 0) > 0) {
+                console.log("All participants have joined, triggering session start");
+                if (handleSessionFull) {
+                  handleSessionFull();
+                }
               }
             }
             
@@ -99,5 +109,5 @@ export const useSessionRealtime = ({
         supabase.removeChannel(participantsChannel);
       };
     }
-  }, [currentConversationId, participants, refetch, conversation, handleSessionFull, setParticipants]);
+  }, [currentConversationId, participants, refetch, conversation, handleSessionFull, onSessionStarted, setParticipants]);
 };

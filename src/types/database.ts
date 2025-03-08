@@ -22,6 +22,7 @@ export interface ConversationWithSession extends DbConversation {
     facilitator: number;
     facilitator_details: FacilitatorDetails;
   } | null;
+  session_started?: boolean;
 }
 
 export interface Workshop extends DbConversation {

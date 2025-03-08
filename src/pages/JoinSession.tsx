@@ -21,9 +21,10 @@ const JoinSession = () => {
   const [avatarSeed, setAvatarSeed] = useState(Math.random().toString());
   const [isJoining, setIsJoining] = useState(false);
   const [currentParticipantCount, setCurrentParticipantCount] = useState(0);
+  const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
   
-  // Fetch plan limits to check if there are available spots
-  const { maxParticipants } = usePlanLimits();
+  // Fetch plan limits as fallback
+  const { maxParticipants: planMaxParticipants } = usePlanLimits();
   
   // Fetch conversation data to show facilitator info
   const { data: conversation, isLoading, error } = useConversation(conversationId);
@@ -40,28 +41,21 @@ const JoinSession = () => {
   }, [error, navigate, toast]);
 
   useEffect(() => {
-    // Fetch the current number of participants in this session
-    const fetchParticipantCount = async () => {
-      if (!conversationId) return;
-      
-      try {
-        // Query to get the participant count from the conversation
-        const { data } = await supabase
-          .from('conversations')
-          .select('participants')
-          .eq('id', conversationId)
-          .single();
-          
-        if (data && data.participants !== null) {
-          setCurrentParticipantCount(data.participants);
-        }
-      } catch (error) {
-        console.error("Error fetching participant count:", error);
+    // Set conversation-specific data once it's loaded
+    if (conversation) {
+      // Set the maximum participants for this specific session
+      if (conversation.participants !== null && conversation.participants > 0) {
+        setMaxParticipantsForSession(conversation.participants);
       }
-    };
-    
-    fetchParticipantCount();
+      
+      // Set the current participants count
+      if (conversation.current_participants !== null && conversation.current_participants >= 0) {
+        setCurrentParticipantCount(conversation.current_participants);
+      }
+    }
+  }, [conversation]);
 
+  useEffect(() => {
     // Set up real-time subscription to track changes to participants
     if (conversationId) {
       const subscription = supabase
@@ -72,8 +66,16 @@ const JoinSession = () => {
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          if (payload.new && payload.new.participants !== null) {
-            setCurrentParticipantCount(payload.new.participants);
+          if (payload.new) {
+            // Update max participants if available
+            if (payload.new.participants !== null && payload.new.participants > 0) {
+              setMaxParticipantsForSession(payload.new.participants);
+            }
+            
+            // Update current participants count
+            if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
+              setCurrentParticipantCount(payload.new.current_participants);
+            }
           }
         })
         .subscribe();
@@ -94,11 +96,15 @@ const JoinSession = () => {
       return;
     }
 
+    // Use session-specific max or fall back to plan limit
+    const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
+      maxParticipantsForSession : planMaxParticipants;
+
     // Check if the session is full
-    if (currentParticipantCount >= maxParticipants) {
+    if (currentParticipantCount >= effectiveMaxParticipants) {
       toast({
         title: "Session is full",
-        description: `This session has reached its maximum capacity of ${maxParticipants} participants.`,
+        description: `This session has reached its maximum capacity of ${effectiveMaxParticipants} participants.`,
         variant: "destructive",
       });
       return;
@@ -107,11 +113,11 @@ const JoinSession = () => {
     setIsJoining(true);
 
     try {
-      // Increment the participant count in the conversation
+      // Increment the current participant count in the conversation
       const { error: updateError } = await supabase
         .from('conversations')
         .update({ 
-          participants: currentParticipantCount + 1 
+          current_participants: currentParticipantCount + 1 
         })
         .eq('id', conversationId);
         
@@ -149,7 +155,12 @@ const JoinSession = () => {
     );
   }
 
-  const isFull = currentParticipantCount >= maxParticipants;
+  // Use session-specific max participants or fall back to plan limit
+  const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
+    maxParticipantsForSession : planMaxParticipants;
+    
+  // Only consider full if the max is greater than 0 and we've reached it
+  const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
@@ -163,10 +174,10 @@ const JoinSession = () => {
           )}
           
           {isFull && (
-            <Alert variant="destructive" className="mt-4">
+            <Alert variant="warning" className="mt-4 bg-amber-50 border-amber-200 text-amber-800">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="flex items-center">
-                <span>This session is full ({maxParticipants} participants maximum)</span>
+                <span>This session is full ({effectiveMaxParticipants} participants maximum)</span>
               </AlertDescription>
             </Alert>
           )}
@@ -203,12 +214,12 @@ const JoinSession = () => {
 
               <Button 
                 onClick={handleJoinSession} 
-                className="w-full"
+                className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
                 disabled={isJoining || isFull}
               >
                 {isJoining ? (
                   <span className="flex items-center justify-center">
-                    <span className="w-4 h-4 border-t-2 border-white border-solid rounded-full animate-spin mr-2"></span>
+                    <span className="w-4 h-4 border-t-2 border-black border-solid rounded-full animate-spin mr-2"></span>
                     Joining...
                   </span>
                 ) : (
@@ -220,10 +231,10 @@ const JoinSession = () => {
               
               <div className="text-center text-xs text-gray-500 flex items-center justify-center gap-1">
                 <Users className="w-3.5 h-3.5" />
-                <span>{currentParticipantCount} of {maxParticipants} participants</span>
-                {!isFull && (
+                <span>{currentParticipantCount} of {effectiveMaxParticipants} participants</span>
+                {!isFull && effectiveMaxParticipants > 0 && (
                   <span className="text-green-600 font-medium">
-                    ({maxParticipants - currentParticipantCount} spots left)
+                    ({effectiveMaxParticipants - currentParticipantCount} spots left)
                   </span>
                 )}
               </div>
@@ -231,7 +242,10 @@ const JoinSession = () => {
           </>
         ) : (
           <div className="text-center">
-            <Button onClick={() => navigate("/")} className="mt-4">
+            <Button 
+              onClick={() => navigate("/")} 
+              className="mt-4 bg-[#FFC107] hover:bg-[#F5B800] text-black"
+            >
               Return Home
             </Button>
           </div>

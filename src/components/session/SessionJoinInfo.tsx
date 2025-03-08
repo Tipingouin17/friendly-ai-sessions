@@ -51,12 +51,11 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             
           if (data) {
             // Use the participants field (max allowed participants) for the session
-            if (data.participants !== null) {
+            if (data.participants !== null && data.participants > 0) {
               setMaxParticipantsForSession(data.participants);
             }
             
             // If there's a current_participants field, use it for real count
-            // Otherwise, keep using the prop value
             if (data.current_participants !== undefined && data.current_participants !== null) {
               setRealParticipantCount(data.current_participants);
             }
@@ -78,7 +77,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
           filter: `id=eq.${conversationId}`
         }, (payload) => {
           if (payload.new) {
-            if (payload.new.participants !== null) {
+            if (payload.new.participants !== null && payload.new.participants > 0) {
               setMaxParticipantsForSession(payload.new.participants);
             }
             if (payload.new.current_participants !== undefined && 
@@ -103,18 +102,19 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
 
   if (!conversationId) return null;
 
-  // Use the session-specific max participants, fallback to plan limit if not set
-  const effectiveMaxParticipants = maxParticipantsForSession || planMaxParticipants;
+  // Use the session-specific max participants if it's set and valid, fallback to plan limit
+  const effectiveMaxParticipants = (maxParticipantsForSession && maxParticipantsForSession > 0) 
+    ? maxParticipantsForSession 
+    : planMaxParticipants;
   
-  // For a new session, the real count should be at most the value from the database
-  // This prevents showing the session as full when it's newly created
+  // For a new session, ensure we don't exceed the max limit
   const adjustedRealCount = Math.min(realParticipantCount, effectiveMaxParticipants);
   
-  // Calculate remaining spots
-  const remainingSpots = effectiveMaxParticipants - adjustedRealCount;
+  // Calculate remaining spots - ensure max is greater than 0 to avoid division by zero issues
+  const remainingSpots = effectiveMaxParticipants > 0 ? effectiveMaxParticipants - adjustedRealCount : 0;
   
-  // Only consider full if we've actually hit the limit and have real participants
-  const isFull = remainingSpots <= 0 && realParticipantCount > 0;
+  // Only consider full if we've set a limit and the adjusted count reaches it
+  const isFull = effectiveMaxParticipants > 0 && remainingSpots <= 0;
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-gray-100 w-full">

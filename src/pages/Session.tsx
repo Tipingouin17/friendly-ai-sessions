@@ -252,7 +252,7 @@ const Session = () => {
             
             <Button 
               onClick={handleStartSession}
-              className="mt-6 w-full"
+              className="mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
             >
               Start Session ({conversation.current_participants || 0}/{conversation.participants || 0})
             </Button>

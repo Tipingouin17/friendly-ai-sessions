@@ -9,6 +9,7 @@ export const useConversation = (conversationId: number | null) => {
     queryFn: async () => {
       try {
         if (!conversationId) {
+          console.log('No conversation ID provided to useConversation');
           throw new Error("No conversation ID provided");
         }
         
@@ -16,6 +17,7 @@ export const useConversation = (conversationId: number | null) => {
         const data = await fetchConversation(conversationId);
         
         if (!data) {
+          console.log(`Conversation not found with ID: ${conversationId}`);
           throw new Error("Session not found or no longer available");
         }
         
@@ -26,9 +28,9 @@ export const useConversation = (conversationId: number | null) => {
       }
     },
     enabled: !!conversationId,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 10000, // 10 seconds
+    retry: 1, // Reduce retry attempts to fail faster when conversation doesn't exist
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    staleTime: 10000,
     refetchOnWindowFocus: true
   });
 };
@@ -60,7 +62,7 @@ const fetchConversation = async (id: number | null) => {
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching conversation:', error);
+      console.error('Error fetching conversation from Supabase:', error);
       throw new Error(error.message || "Could not load session data");
     }
     
@@ -69,7 +71,7 @@ const fetchConversation = async (id: number | null) => {
       return null;
     }
     
-    console.log('Fetched conversation:', data);
+    console.log('Successfully fetched conversation:', data);
     return data;
   } catch (error) {
     console.error('Exception in fetchConversation:', error);

@@ -1,4 +1,3 @@
-
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -11,18 +10,23 @@ import { Button } from "@/components/ui/button";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
-  const conversationId = searchParams.get("id") ? Number(searchParams.get("id")) : null;
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   
-  // Validate that we have a conversation ID
+  // Safely parse the conversation ID from URL
+  const idParam = searchParams.get("id");
+  const conversationId = idParam && !isNaN(Number(idParam)) ? Number(idParam) : null;
+  
+  // Validate that we have a valid conversation ID
   useEffect(() => {
     if (!conversationId) {
-      console.error("No conversation ID found in URL parameters");
+      console.error("No valid conversation ID found in URL parameters:", idParam);
       setInvalidRequest(true);
+    } else {
+      console.log("JoinSession: Using conversation ID:", conversationId);
     }
-  }, [conversationId]);
+  }, [conversationId, idParam]);
   
   // Force refresh conversation data when joining a session
   useEffect(() => {

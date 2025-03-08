@@ -30,12 +30,17 @@ export function useSessionParticipants(conversationId: number | null) {
   // Set conversation data
   useEffect(() => {
     if (conversation) {
-      console.log("Conversation data loaded:", conversation);
+      console.log("Conversation data loaded successfully:", conversation);
       
       // Check if session has ended
       if (conversation.is_session_ended) {
         setError("This session has ended and is no longer available");
         return;
+      }
+      
+      // Reset any previous connection errors since we have data
+      if (error && isConnected) {
+        setError(null);
       }
       
       // Set the maximum participants for this specific session
@@ -48,12 +53,12 @@ export function useSessionParticipants(conversationId: number | null) {
         setCurrentParticipantCount(conversation.current_participants);
       }
     }
-  }, [conversation]);
+  }, [conversation, error, isConnected]);
 
   // Retry function for reconnection attempts
   const attemptReconnection = useCallback(() => {
     if (connectionAttempts < 3 && conversationId) {
-      console.log(`Attempting reconnection (attempt ${connectionAttempts + 1}/3)`);
+      console.log(`Attempting reconnection (attempt ${connectionAttempts + 1}/3) for ID:`, conversationId);
       setConnectionAttempts(prev => prev + 1);
       refetch();
     } else if (connectionAttempts >= 3) {
@@ -63,19 +68,28 @@ export function useSessionParticipants(conversationId: number | null) {
 
   // Set up real-time subscription
   useEffect(() => {
-    if (conversationId) {
-      console.log("Setting up realtime subscription for conversation:", conversationId);
-      
-      // Initial connection status check
-      let connectionTimeout = setTimeout(() => {
-        if (!isConnected) {
-          console.warn("Real-time connection not established after timeout");
-          attemptReconnection();
-        }
-      }, 8000);
-      
+    if (!conversationId) {
+      console.log("No conversation ID provided, skipping realtime subscription");
+      return;
+    }
+    
+    console.log("Setting up realtime subscription for conversation:", conversationId);
+    
+    // Initial connection status check
+    let connectionTimeout = setTimeout(() => {
+      if (!isConnected) {
+        console.warn("Real-time connection not established after timeout");
+        attemptReconnection();
+      }
+    }, 8000);
+    
+    // Create a unique channel name including both the conversation ID and attempt count
+    const channelName = `conversation-updates-${conversationId}-${connectionAttempts}`;
+    console.log(`Creating channel: ${channelName}`);
+    
+    try {
       const channel = supabase
-        .channel(`conversation-updates-${conversationId}-${connectionAttempts}`)
+        .channel(channelName)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -107,30 +121,37 @@ export function useSessionParticipants(conversationId: number | null) {
           }
         })
         .subscribe((status) => {
-          console.log(`Channel status: ${status}`);
+          console.log(`Channel ${channelName} status: ${status}`);
           if (status === 'SUBSCRIBED') {
             console.log('Successfully subscribed to realtime updates');
             setIsConnected(true);
             clearTimeout(connectionTimeout);
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('Error subscribing to channel');
+            console.error('Error subscribing to channel:', channelName);
             setIsConnected(false);
             attemptReconnection();
           }
         });
 
       return () => {
+        console.log(`Cleaning up channel: ${channelName}`);
         clearTimeout(connectionTimeout);
         supabase.removeChannel(channel);
       };
+    } catch (err) {
+      console.error("Error setting up realtime subscription:", err);
+      setError("Failed to establish connection to session");
+      return () => {
+        clearTimeout(connectionTimeout);
+      };
     }
-  }, [conversationId, refetch, toast, isConnected, connectionAttempts, attemptReconnection]);
+  }, [conversationId, refetch, toast, connectionAttempts, attemptReconnection]);
 
   // Connection recovery mechanism
   useEffect(() => {
     if (!isConnected && conversationId && !isLoading && !error) {
       const recoveryInterval = setInterval(() => {
-        console.log("Checking connection status...");
+        console.log("Checking connection status for conversation:", conversationId);
         if (!isConnected) {
           console.log("Connection still not established, attempting recovery");
           attemptReconnection();

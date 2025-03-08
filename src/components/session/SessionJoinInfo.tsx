@@ -96,7 +96,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessio
         .subscribe();
 
       return () => {
-        subscription.unsubscribe();
+        supabase.removeChannel(subscription);
       };
     }
   }, [conversationId, onSessionFull]);

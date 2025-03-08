@@ -58,7 +58,7 @@ const JoinSession = () => {
   useEffect(() => {
     // Set up real-time subscription to track changes to participants
     if (conversationId) {
-      const subscription = supabase
+      const channel = supabase
         .channel(`conversation-${conversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
@@ -76,14 +76,20 @@ const JoinSession = () => {
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
               setCurrentParticipantCount(payload.new.current_participants);
               
-              // If session is full, show a toast and redirect to home
+              // If session is full, show a toast and redirect to session
               const effectiveMax = payload.new.participants || planMaxParticipants;
               if (effectiveMax > 0 && payload.new.current_participants >= effectiveMax) {
                 toast({
                   title: "Session is full",
                   description: `This session has reached its maximum capacity of ${effectiveMax} participants.`,
-                  variant: "warning",
+                  variant: "destructive",
                 });
+                
+                // Automatically join the session with a default name if one isn't provided
+                if (!isJoining) {
+                  const autoName = participantName.trim() || `Guest ${Math.floor(Math.random() * 1000)}`;
+                  navigateToSession(autoName, payload.new.current_participants);
+                }
               }
             }
           }
@@ -91,10 +97,21 @@ const JoinSession = () => {
         .subscribe();
 
       return () => {
-        subscription.unsubscribe();
+        supabase.removeChannel(channel);
       };
     }
-  }, [conversationId, planMaxParticipants, toast]);
+  }, [conversationId, planMaxParticipants, toast, participantName, isJoining]);
+
+  const navigateToSession = (name, participantId) => {
+    navigate(`/session?id=${conversationId}`, {
+      state: { 
+        participantName: name,
+        avatarSeed,
+        isGuest: true,
+        participantId: participantId
+      }
+    });
+  };
 
   const handleJoinSession = async () => {
     if (!participantName.trim()) {
@@ -124,26 +141,24 @@ const JoinSession = () => {
 
     try {
       // Increment the current participant count in the conversation
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .from('conversations')
         .update({ 
           current_participants: currentParticipantCount + 1 
         })
-        .eq('id', conversationId);
+        .eq('id', conversationId)
+        .select('current_participants')
+        .single();
         
       if (updateError) {
         throw updateError;
       }
 
       // Navigate to the session with the participant info
-      navigate(`/session?id=${conversationId}`, {
-        state: { 
-          participantName,
-          avatarSeed,
-          isGuest: true,
-          participantId: currentParticipantCount + 1 // Assign a participant ID based on join order
-        }
-      });
+      // Use the returned current_participants value as the participant ID to ensure uniqueness
+      const newParticipantId = data.current_participants;
+      navigateToSession(participantName, newParticipantId);
+      
     } catch (error) {
       console.error("Error joining session:", error);
       toast({

@@ -21,6 +21,13 @@ export const useConversation = (conversationId: number | null) => {
           throw new Error("Session not found or no longer available");
         }
         
+        // Check if session is active
+        if (data.status !== 'active' || data.is_session_ended) {
+          console.log(`Session is not active or has ended: ${conversationId}`);
+          throw new Error("This session has ended or is no longer available");
+        }
+        
+        console.log('Successfully fetched conversation data:', data);
         return data as ConversationWithSession;
       } catch (error) {
         console.error('Error in query function:', error);

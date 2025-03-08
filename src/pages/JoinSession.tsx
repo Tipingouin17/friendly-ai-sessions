@@ -1,3 +1,4 @@
+
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -25,8 +26,10 @@ const JoinSession = () => {
       setInvalidRequest(true);
     } else {
       console.log("JoinSession: Using conversation ID:", conversationId);
+      // Force invalidate any existing queries for this conversation
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
     }
-  }, [conversationId, idParam]);
+  }, [conversationId, idParam, queryClient]);
   
   // Force refresh conversation data when joining a session
   useEffect(() => {

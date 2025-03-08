@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,7 +22,6 @@ const Session = () => {
   const [setupComplete, setSetupComplete] = useState(false);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   
-  // Handle conversation ID from URL or state
   useEffect(() => {
     const state = location.state as { newConversationId?: number; replace?: boolean } | null;
     
@@ -47,16 +45,13 @@ const Session = () => {
     }
   }, [location, queryClient, navigate]);
 
-  // Fetch conversation data
   const { data: conversation, isLoading, error } = useConversation(currentConversationId);
 
-  // Initialize session state
   const sessionState = useSessionState({
     conversationId: currentConversationId,
     welcomeMessage: conversation?.sessions?.welcome_message ?? null
   });
 
-  // Handle conversation fetch error
   useEffect(() => {
     if (error) {
       console.error('Error in conversation query:', error);
@@ -69,13 +64,11 @@ const Session = () => {
     }
   }, [error, navigate, toast]);
 
-  // Handle participant setup completion
   const handleSetupComplete = (setupParticipants: ParticipantInfo[]) => {
     setParticipants(setupParticipants);
     setSetupComplete(true);
   };
 
-  // Handle message sending
   const handleSendMessage = async () => {
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
@@ -112,9 +105,6 @@ const Session = () => {
       setIsWaitingForResponse(true);
 
       try {
-        // No need to store messages in the database for now
-        // Focus on getting the edge function working first
-        
         console.log('Calling edge function with:', {
           conversationId: currentConversationId,
           messages: [...sessionState.messages, ...participantResponses]
@@ -185,7 +175,6 @@ const Session = () => {
   if (isLoading) return <LoadingState />;
   if (!conversation || !currentConversationId) return <EmptyState />;
 
-  // If setup is not complete, show the participant setup screen
   if (!setupComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-12">
@@ -217,6 +206,7 @@ const Session = () => {
       isGeneratingReport={sessionState.isGeneratingReport}
       onLikeMessage={handleLikeMessage}
       participants={participants}
+      conversationId={currentConversationId}
     />
   );
 };

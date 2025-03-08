@@ -1,9 +1,9 @@
-
 import React from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import ParticipantSelector from "./ParticipantSelector";
+import SessionJoinInfo from "./SessionJoinInfo";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/components/ui/use-toast";
@@ -31,6 +31,7 @@ interface SessionContainerProps {
   participantNames?: { [key: number]: string };
   onLikeMessage?: (messageId: string) => void;
   participants?: ParticipantInfo[];
+  conversationId?: number | null;
 }
 
 const SessionContainer = ({
@@ -51,13 +52,13 @@ const SessionContainer = ({
   onGenerateReport,
   participantNames = {},
   onLikeMessage,
-  participants = []
+  participants = [],
+  conversationId
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Transform messages to use actual names instead of P1, P2, etc.
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
       const participantNumber = parseInt(message.participant.slice(1));
@@ -119,15 +120,21 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReport={messages.length > 0 && canGenerateReports}
           />
-          <div className="flex-1 overflow-hidden">
-            <MessageList 
-              messages={transformedMessages} 
-              participantColors={participantColors}
-              currentParticipant={`P${currentParticipant}`}
-              onLikeMessage={onLikeMessage}
-              isWaitingForResponse={isWaitingForResponse}
-              participants={participants}
-            />
+          <div className="flex-1 overflow-hidden flex">
+            <div className="flex-1 overflow-hidden">
+              <MessageList 
+                messages={transformedMessages} 
+                participantColors={participantColors}
+                currentParticipant={`P${currentParticipant}`}
+                onLikeMessage={onLikeMessage}
+                isWaitingForResponse={isWaitingForResponse}
+                participants={participants}
+              />
+            </div>
+            
+            <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 flex flex-col">
+              <SessionJoinInfo conversationId={conversationId || null} />
+            </div>
           </div>
           <ParticipantSelector
             participantCount={participantCount}

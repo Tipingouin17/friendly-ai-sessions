@@ -6,6 +6,7 @@ import { useSessionRealtime } from "@/hooks/useSessionRealtime";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
 import { participantColors } from "@/utils/sessionHelpers";
 import { SessionContextProps } from "@/types/session";
+import { ConversationWithSession } from "@/types/database";
 
 interface SessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -25,12 +26,15 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     handleStartSession,
   } = useSessionData();
 
+  // Type assertion to ensure conversation is of the right type
+  const typedConversation = conversation as ConversationWithSession | null;
+
   // Set up realtime updates for participants
   useSessionRealtime({
     currentConversationId,
     participants,
     setParticipants,
-    conversation,
+    conversation: typedConversation,
     refetch,
     handleSessionFull
   });
@@ -38,7 +42,7 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   // Set up session state
   const sessionState = useSessionState({
     conversationId: currentConversationId,
-    welcomeMessage: conversation?.sessions?.welcome_message ?? null
+    welcomeMessage: typedConversation?.sessions?.welcome_message ?? null
   });
 
   // Set up message handling and interactions
@@ -49,13 +53,13 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   } = useSessionInteractions({
     currentConversationId,
     sessionState,
-    conversation,
+    conversation: typedConversation,
     participants
   });
 
   const sessionContext: SessionContextProps = {
     isLoading,
-    conversation,
+    conversation: typedConversation,
     currentConversationId,
     sessionState,
     participants,

@@ -38,7 +38,7 @@ export const useConversation = (conversationId: number | null) => {
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     staleTime: 5000,
-    cacheTime: 60000,
+    gcTime: 60000, // Changed from cacheTime to gcTime for React Query v5
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchOnReconnect: true
@@ -84,7 +84,7 @@ const fetchConversation = async (id: number | null) => {
     }
     
     console.log('Successfully fetched conversation:', data);
-    return data;
+    return data as ConversationWithSession;
   } catch (error) {
     console.error('Exception in fetchConversation:', error);
     throw error;

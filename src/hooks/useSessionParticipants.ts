@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
+import { ConversationWithSession } from "@/types/database";
 
 export function useSessionParticipants(conversationId: number | null) {
   const [currentParticipantCount, setCurrentParticipantCount] = useState(0);

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { useSessionJoiner } from "@/hooks/useSessionJoiner";
+import { ConversationWithSession } from "@/types/database";
 
 export function useJoinSessionData(conversationId: number | null) {
   // Participant state
@@ -46,7 +47,7 @@ export function useJoinSessionData(conversationId: number | null) {
       conversationId,
       participantName,
       avatarSeed,
-      conversation,
+      conversation: conversation as ConversationWithSession,
       currentParticipantCount,
       refetch
     });

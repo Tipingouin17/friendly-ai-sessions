@@ -7,6 +7,7 @@ import { useConversationId } from "@/hooks/useConversationId";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
+import { ConversationWithSession } from "@/types/database";
 
 export const useSessionData = () => {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export const useSessionData = () => {
   useSessionStatus(currentConversationId, refetch);
   
   // Set up participant tracking
-  const { participants, setParticipants } = useParticipantTracking(locationState, conversation);
+  const { participants, setParticipants } = useParticipantTracking(locationState, conversation as ConversationWithSession);
   
   // Set up session interface (QR code, links, etc.)
   const { sessionLink, showQrCodeView, handleStartSession } = useSessionInterface(currentConversationId);

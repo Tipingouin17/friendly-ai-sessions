@@ -8,6 +8,7 @@ import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingStat
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConversationWithSession } from "@/types/database";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
@@ -95,7 +96,7 @@ const JoinSession = () => {
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold mb-2">Join Session</h1>
-          {conversation?.sessions?.facilitator_details && (
+          {conversation && conversation.sessions && conversation.sessions.facilitator_details && (
             <p className="text-gray-600">
               You're joining a session with {conversation.sessions.facilitator_details.title || "Facilitator"}
             </p>

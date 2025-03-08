@@ -61,7 +61,6 @@ const Session = () => {
           handleLikeMessage,
           showQrCodeView,
           currentUserParticipantId,
-          // Check if session is marked as started in the database
           isSessionStartedInDB
         } = props;
 
@@ -73,15 +72,18 @@ const Session = () => {
         const currentParticipants = conversation.current_participants || 0;
         const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
         
-        // Update sessionStarted state if it's already started in DB
+        // Update sessionStarted state based on DB status - OUTSIDE OF RENDER
         useEffect(() => {
           if (isSessionStartedInDB) {
             setSessionStarted(true);
           }
         }, [isSessionStartedInDB]);
         
+        // Calculate if session should be shown - fixes the hook error by not using conditionals
+        const shouldShowSession = isSessionStartedInDB || sessionStarted || isSessionFull;
+
         // Admin view gets QR code view for sharing until session is started
-        if (isAdmin && !sessionStarted && showQrCodeView) {
+        if (isAdmin && !shouldShowSession && showQrCodeView) {
           return (
             <QRCodeView
               conversationId={currentConversationId}
@@ -97,9 +99,6 @@ const Session = () => {
           );
         }
         
-        // Simplified condition to check if session should be shown
-        const shouldShowSession = isSessionStartedInDB || sessionStarted || isSessionFull;
-
         // For non-admins, show waiting screen until admin starts the session
         // or other conditions to show the session are met
         if (!isAdmin && !shouldShowSession) {

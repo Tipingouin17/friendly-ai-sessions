@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -101,6 +100,27 @@ const Session = () => {
 
     fetchParticipants();
   }, [currentConversationId, conversation]);
+
+  useEffect(() => {
+    const updateCurrentParticipants = async () => {
+      if (currentConversationId && !showQrCodeView) {
+        try {
+          const { error } = await supabase
+            .from('conversations')
+            .update({ current_participants: 1 })
+            .eq('id', currentConversationId);
+            
+          if (error) {
+            console.error('Error updating current participants:', error);
+          }
+        } catch (error) {
+          console.error('Error updating current participants:', error);
+        }
+      }
+    };
+    
+    updateCurrentParticipants();
+  }, [currentConversationId, showQrCodeView]);
 
   const handleStartSession = () => {
     setShowQrCodeView(false);
@@ -226,14 +246,14 @@ const Session = () => {
           <div className="flex flex-col items-center space-y-6">
             <SessionJoinInfo 
               conversationId={currentConversationId} 
-              currentParticipantCount={participants.length}
+              currentParticipantCount={conversation.current_participants || 0}
             />
             
             <button 
               onClick={handleStartSession}
               className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md transition-colors"
             >
-              Start Session ({participants.length}/{conversation.participants || 0})
+              Start Session ({conversation.current_participants || 0}/{conversation.participants || 0})
             </button>
           </div>
         </div>
@@ -263,6 +283,7 @@ const Session = () => {
       conversationId={currentConversationId}
       facilitator={conversation.sessions?.facilitator_details || {}}
       objective={conversation.sessions?.objective || ''}
+      currentParticipantCount={conversation.current_participants || 0}
     />
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { QrCode, Link, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,11 +38,16 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
     if (conversationId) {
       const fetchConversationDetails = async () => {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('conversations')
             .select('participants, current_participants')
             .eq('id', conversationId)
-            .single();
+            .maybeSingle();
+            
+          if (error) {
+            console.error('Error fetching conversation details:', error);
+            return;
+          }
             
           if (data) {
             // Use the participants field (max allowed participants) for the session

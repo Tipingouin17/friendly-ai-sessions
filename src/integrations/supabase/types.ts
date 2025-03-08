@@ -103,6 +103,7 @@ export type Database = {
         Row: {
           accept_terms_and_conditions: boolean | null
           created_at: string | null
+          current_participants: number | null
           ended_at: string | null
           id: number
           is_saved: boolean
@@ -118,6 +119,7 @@ export type Database = {
         Insert: {
           accept_terms_and_conditions?: boolean | null
           created_at?: string | null
+          current_participants?: number | null
           ended_at?: string | null
           id?: number
           is_saved?: boolean
@@ -133,6 +135,7 @@ export type Database = {
         Update: {
           accept_terms_and_conditions?: boolean | null
           created_at?: string | null
+          current_participants?: number | null
           ended_at?: string | null
           id?: number
           is_saved?: boolean

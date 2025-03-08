@@ -34,7 +34,8 @@ const Session = () => {
           handleStartSession,
           handleSendMessage,
           handleLikeMessage,
-          showQrCodeView
+          showQrCodeView,
+          currentUserParticipantId
         } = props;
 
         if (isLoading) return <LoadingState />;
@@ -90,6 +91,7 @@ const Session = () => {
             facilitator={conversation.sessions?.facilitator_details || {}}
             objective={conversation.sessions?.objective || ''}
             currentParticipantCount={conversation.current_participants || 0}
+            currentUserParticipantId={currentUserParticipantId}
           />
         );
       }}

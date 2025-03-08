@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ParticipantInfo } from "@/types/chat";
+import { getParticipantInfo } from "@/utils/participantUtils";
 
 type UseSessionRealtimeProps = {
   currentConversationId: number | null;
@@ -34,8 +35,9 @@ export const useSessionRealtime = ({
         }
       }
 
-      const channel = supabase
-        .channel(`participants-${currentConversationId}`)
+      // First channel for conversation updates
+      const conversationChannel = supabase
+        .channel(`conversations-${currentConversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -46,20 +48,6 @@ export const useSessionRealtime = ({
           
           if (payload.new && payload.new.current_participants !== undefined) {
             const currentCount = payload.new.current_participants;
-            
-            if (currentCount > participants.length) {
-              const newParticipants = [...participants];
-              for (let i = participants.length + 1; i <= currentCount; i++) {
-                if (!newParticipants.some(p => p.id === i)) {
-                  newParticipants.push({
-                    id: i,
-                    name: `Participant ${i}`,
-                    avatar: null
-                  });
-                }
-              }
-              setParticipants(newParticipants);
-            }
             
             // Check if all participants have joined and trigger redirect
             if (currentCount >= (payload.new.participants || 0) && (payload.new.participants || 0) > 0) {
@@ -73,9 +61,42 @@ export const useSessionRealtime = ({
           }
         })
         .subscribe();
+      
+      // Second channel for session_participants updates
+      const participantsChannel = supabase
+        .channel(`session_participants-${currentConversationId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'session_participants',
+          filter: `conversation_id=eq.${currentConversationId}`
+        }, async (payload) => {
+          console.log("Received new participant:", payload);
+          
+          if (payload.new) {
+            const newParticipant = payload.new;
+            
+            // Check if we already have this participant
+            if (!participants.some(p => p.id === newParticipant.participant_id)) {
+              const participantInfo = await getParticipantInfo(newParticipant);
+              
+              setParticipants(current => {
+                // Double-check we're not adding a duplicate
+                if (current.some(p => p.id === participantInfo.id)) {
+                  return current;
+                }
+                return [...current, participantInfo];
+              });
+            }
+            
+            refetch();
+          }
+        })
+        .subscribe();
         
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(conversationChannel);
+        supabase.removeChannel(participantsChannel);
       };
     }
   }, [currentConversationId, participants, refetch, conversation, handleSessionFull, setParticipants]);

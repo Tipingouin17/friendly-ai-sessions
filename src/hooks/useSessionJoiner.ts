@@ -113,6 +113,21 @@ export function useSessionJoiner() {
       
       console.log("New participant ID:", newParticipantId);
       
+      // Store the participant information in the session_participants table
+      const { error: participantError } = await supabase
+        .from('session_participants')
+        .insert({
+          conversation_id: conversationId,
+          participant_id: newParticipantId,
+          name: participantName,
+          avatar_seed: avatarSeed
+        });
+        
+      if (participantError) {
+        console.error("Error storing participant info:", participantError);
+        // Continue anyway - this is not critical for joining
+      }
+      
       // Add a short delay to allow for Supabase to process the update
       setTimeout(() => {
         navigateToSession(conversationId, participantName, newParticipantId, avatarSeed);

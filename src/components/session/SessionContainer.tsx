@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -33,6 +32,7 @@ interface SessionContainerProps {
   conversationId?: number | null;
   conversation?: any;
   currentParticipantCount?: number;
+  currentUserParticipantId?: number | null;
 }
 
 const SessionContainer = ({
@@ -56,7 +56,8 @@ const SessionContainer = ({
   participants = [],
   conversationId,
   conversation,
-  currentParticipantCount
+  currentParticipantCount,
+  currentUserParticipantId
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   
@@ -99,6 +100,8 @@ const SessionContainer = ({
     }
     return message;
   });
+
+  const canSwitchParticipants = !currentUserParticipantId;
 
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
@@ -148,6 +151,8 @@ const SessionContainer = ({
             onSendMessage={onSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
+            canSwitchParticipants={canSwitchParticipants}
+            currentUserParticipantId={currentUserParticipantId}
           />
         </div>
       </div>

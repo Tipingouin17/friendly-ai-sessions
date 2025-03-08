@@ -1,155 +1,105 @@
-
 import { useState, useEffect } from "react";
-import { Message } from "@/types/chat";
+import { nanoid } from "nanoid";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
-import { usePlanLimits } from "./usePlanLimits";
-import { useNavigate } from "react-router-dom";
+import { Message } from "@/types/chat";
 
-interface UseSessionStateProps {
+type UseSessionStateProps = {
   conversationId: number | null;
-  welcomeMessage?: string;
-}
+  welcomeMessage: string | null;
+  currentUserParticipantId?: number | null;
+};
 
-export const useSessionState = ({ conversationId, welcomeMessage }: UseSessionStateProps) => {
+export function useSessionState({
+  conversationId,
+  welcomeMessage,
+  currentUserParticipantId
+}: UseSessionStateProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [currentParticipant, setCurrentParticipant] = useState(1);
   const [inputMessage, setInputMessage] = useState("");
+  const [participantMessages, setParticipantMessages] = useState<{ [key: string]: string }>({});
+  const [currentParticipant, setCurrentParticipant] = useState<number>(currentUserParticipantId || 1);
   const [isRecording, setIsRecording] = useState(false);
-  const [participantMessages, setParticipantMessages] = useState<{[key: string]: string}>({});
-  const [welcomeMessageSent, setWelcomeMessageSent] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
-  const navigate = useNavigate();
   
-  const { canSaveSessions, canGenerateReports } = usePlanLimits();
-
+  // Enforce that user can only use their assigned participant
   useEffect(() => {
-    if (welcomeMessage && !welcomeMessageSent) {
-      setMessages([{
-        id: Date.now().toString(),
-        content: welcomeMessage,
-        sender: "assistant",
-        timestamp: new Date(),
-      }]);
-      setWelcomeMessageSent(true);
+    if (currentUserParticipantId) {
+      setCurrentParticipant(currentUserParticipantId);
     }
-  }, [welcomeMessage, welcomeMessageSent]);
+  }, [currentUserParticipantId]);
 
+  // Add welcome message if present
+  useEffect(() => {
+    if (welcomeMessage && messages.length === 0) {
+      const welcomeId = nanoid();
+      setMessages([
+        {
+          id: welcomeId,
+          content: welcomeMessage,
+          sender: "assistant",
+          createdAt: new Date().toISOString(),
+          likes: []
+        }
+      ]);
+    }
+  }, [welcomeMessage, messages.length]);
+
+  // Generate session report
   const handleGenerateReport = async () => {
-    if (!conversationId) return;
-    
-    if (!canGenerateReports) {
-      toast({
-        title: "Feature Not Available",
-        description: "Report generation is not available in your current plan. Please upgrade to generate session reports.",
-        variant: "destructive",
-      });
+    if (!conversationId) {
+      console.error("No conversation ID provided");
       return;
     }
-    
+
     setIsGeneratingReport(true);
     try {
-      const response = await supabase.functions.invoke('handle-facilitator-response', {
+      // Aggregate all messages into a single string
+      const allMessages = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
+
+      // Call the Supabase function to generate the report
+      const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
-          messages,
-          conversationId,
-          generateReport: true
+          conversationId: conversationId,
+          messages: allMessages
         }
       });
 
-      if (response.error) throw new Error(response.error.message || 'Failed to generate report');
-      if (!response.data) throw new Error('No response data received');
+      if (error) {
+        console.error("Error generating report:", error);
+      } else {
+        console.log("Report generated successfully:", data);
 
-      const reportResponse: Message = {
-        id: response.data.id || Date.now().toString(),
-        content: response.data.content,
-        sender: "assistant",
-        timestamp: new Date(),
-        isReport: true
-      };
-      
-      setMessages(prev => [...prev, reportResponse]);
-      
-      toast({
-        title: "Report Generated",
-        description: "The conversation report has been generated successfully.",
-      });
-
-    } catch (error) {
-      console.error('Error generating report:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate the report. Please try again.",
-        variant: "destructive",
-      });
+        // Add the report to the messages
+        const reportId = nanoid();
+        setMessages(prevMessages => [
+          ...prevMessages,
+          {
+            id: reportId,
+            content: data,
+            sender: "assistant",
+            createdAt: new Date().toISOString(),
+            isReport: true,
+            likes: []
+          }
+        ]);
+      }
     } finally {
       setIsGeneratingReport(false);
     }
-  };
-  
-  const handleSaveSession = async () => {
-    if (!conversationId) return;
-    
-    if (!canSaveSessions) {
-      toast({
-        title: "Feature Not Available",
-        description: "Session saving is not available in your current plan. Please upgrade to save sessions.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('conversations')
-        .update({ 
-          is_saved: true 
-        })
-        .eq('id', conversationId);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Session Saved",
-        description: "Your session has been saved successfully.",
-      });
-
-    } catch (error) {
-      console.error('Error saving session:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save the session. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
-  const handleUpgradePlan = () => {
-    navigate('/pricing');
   };
 
   return {
     messages,
     setMessages,
-    currentParticipant,
-    setCurrentParticipant,
     inputMessage,
     setInputMessage,
+    participantMessages,
+    setParticipantMessages, 
+    currentParticipant,
+    setCurrentParticipant,
     isRecording,
     setIsRecording,
-    participantMessages,
-    setParticipantMessages,
-    isGeneratingReport,
     handleGenerateReport,
-    handleSaveSession,
-    isSaving,
-    canSaveSessions,
-    canGenerateReports,
-    handleUpgradePlan
+    isGeneratingReport
   };
-};
+}

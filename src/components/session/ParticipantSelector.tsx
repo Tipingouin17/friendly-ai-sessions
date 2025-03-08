@@ -3,8 +3,9 @@ import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ParticipantInfo } from '@/types/chat';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRound } from 'lucide-react';
+import { UserRound, LockIcon } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
+import { cn } from "@/lib/utils";
 
 interface ParticipantSelectorProps {
   participantCount: number;
@@ -12,6 +13,8 @@ interface ParticipantSelectorProps {
   onParticipantSwitch: (num: number) => void;
   participantNames?: { [key: number]: string };
   participants?: ParticipantInfo[];
+  disableSwitching?: boolean;
+  currentUserParticipantId?: number | null;
 }
 
 const ParticipantSelector = ({
@@ -19,7 +22,9 @@ const ParticipantSelector = ({
   currentParticipant,
   onParticipantSwitch,
   participantNames = {},
-  participants = []
+  participants = [],
+  disableSwitching = false,
+  currentUserParticipantId
 }: ParticipantSelectorProps) => {
   // Helper to render avatar
   const renderAvatar = (avatarUrl: string | undefined, name: string) => {
@@ -74,15 +79,21 @@ const ParticipantSelector = ({
             const participant = participants.find(p => p.id === num);
             const name = participant?.name || participantNames[num] || `Anonymous ${num}`;
             const avatar = participant?.avatar || null;
+            const isLocked = disableSwitching && num !== currentUserParticipantId;
             
             return (
               <TabsTrigger 
                 key={num} 
                 value={num.toString()}
-                className="min-w-[100px] flex items-center gap-2"
+                className={cn(
+                  "min-w-[100px] flex items-center gap-2",
+                  isLocked && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={isLocked}
               >
                 {renderAvatar(avatar, name)}
                 <span className="truncate">{name}</span>
+                {isLocked && <LockIcon className="w-3 h-3 ml-1" />}
               </TabsTrigger>
             );
           })}

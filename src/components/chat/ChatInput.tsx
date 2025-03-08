@@ -10,8 +10,9 @@ interface ChatInputProps {
   inputMessage: string;
   setInputMessage: (message: string) => void;
   onSendMessage: () => void;
-  isRecording: boolean;
-  setIsRecording: (isRecording: boolean) => void;
+  isRecording?: boolean;
+  setIsRecording?: (isRecording: boolean) => void;
+  placeholder?: string;
 }
 
 const ChatInput = ({

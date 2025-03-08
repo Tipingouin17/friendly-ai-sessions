@@ -1,5 +1,6 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
 import { useSessionData } from "@/hooks/useSessionData";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
@@ -7,6 +8,7 @@ import { useSessionInteractions } from "@/hooks/useSessionInteractions";
 import { participantColors } from "@/utils/sessionHelpers";
 import { SessionContextProps } from "@/types/session";
 import { ConversationWithSession } from "@/types/database";
+import { getCurrentParticipantId } from "@/utils/participantUtils";
 
 interface SessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -14,6 +16,14 @@ interface SessionProviderProps {
 }
 
 export const SessionProvider = ({ children, handleSessionFull }: SessionProviderProps) => {
+  const location = useLocation();
+  const locationState = location.state as { 
+    participantId?: number; 
+    isGuest?: boolean; 
+    participantName?: string;
+    showMessaging?: boolean 
+  } | null;
+  
   const {
     currentConversationId,
     participants,
@@ -29,6 +39,16 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   // Type assertion to ensure conversation is of the right type
   const typedConversation = conversation as ConversationWithSession | null;
 
+  // Determine the current participant ID based on user role
+  const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (typedConversation) {
+      const participantId = getCurrentParticipantId(locationState, typedConversation);
+      setCurrentUserParticipantId(participantId);
+    }
+  }, [typedConversation, locationState]);
+
   // Set up realtime updates for participants
   useSessionRealtime({
     currentConversationId,
@@ -42,7 +62,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   // Set up session state
   const sessionState = useSessionState({
     conversationId: currentConversationId,
-    welcomeMessage: typedConversation?.sessions?.welcome_message ?? null
+    welcomeMessage: typedConversation?.sessions?.welcome_message ?? null,
+    currentUserParticipantId
   });
 
   // Set up message handling and interactions
@@ -69,7 +90,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     handleSendMessage,
     handleLikeMessage,
     showQrCodeView,
-    sessionLink
+    sessionLink,
+    currentUserParticipantId
   };
 
   return (

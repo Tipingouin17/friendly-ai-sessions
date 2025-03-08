@@ -28,4 +28,5 @@ export interface SessionContextProps {
   handleLikeMessage: (messageId: string) => void;
   showQrCodeView: boolean;
   sessionLink: string;
+  currentUserParticipantId: number | null;
 }

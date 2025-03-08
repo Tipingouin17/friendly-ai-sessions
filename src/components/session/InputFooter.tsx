@@ -15,6 +15,8 @@ interface InputFooterProps {
   onSendMessage: () => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
+  canSwitchParticipants?: boolean;
+  currentUserParticipantId?: number | null;
 }
 
 const InputFooter = ({
@@ -27,16 +29,33 @@ const InputFooter = ({
   setInputMessage,
   onSendMessage,
   isRecording,
-  setIsRecording
+  setIsRecording,
+  canSwitchParticipants = true,
+  currentUserParticipantId
 }: InputFooterProps) => {
+  // Determine whether participant switching is allowed
+  const allowParticipantSwitch = canSwitchParticipants && !currentUserParticipantId;
+  
+  // Handle participant switch attempts when not allowed
+  const handleParticipantSwitch = (num: number) => {
+    if (allowParticipantSwitch) {
+      onParticipantSwitch(num);
+    } else if (num !== currentUserParticipantId) {
+      // Prevent switching to other participants for guests
+      console.log("Participant switching not allowed for guests");
+    }
+  };
+  
   return (
     <>
       <ParticipantSelector
         participantCount={participantCount}
         currentParticipant={currentParticipant}
-        onParticipantSwitch={onParticipantSwitch}
+        onParticipantSwitch={handleParticipantSwitch}
         participantNames={participantNames}
         participants={participants}
+        disableSwitching={!allowParticipantSwitch}
+        currentUserParticipantId={currentUserParticipantId}
       />
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
         <ChatInput
@@ -45,6 +64,7 @@ const InputFooter = ({
           onSendMessage={onSendMessage}
           isRecording={isRecording}
           setIsRecording={setIsRecording}
+          placeholder={`Type as ${participants.find(p => p.id === currentParticipant)?.name || `Participant ${currentParticipant}`}...`}
         />
       </div>
     </>

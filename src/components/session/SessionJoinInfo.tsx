@@ -25,9 +25,18 @@ const SessionJoinInfo = ({
   const baseUrl = window.location.origin;
   const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
 
+  // Initialize with current count
   useEffect(() => {
     setLocalParticipantCount(currentParticipantCount);
   }, [currentParticipantCount]);
+  
+  // Check if session is full on component mount
+  useEffect(() => {
+    if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
+      console.log("Session is already full on component mount, calling onSessionFull");
+      onSessionFull();
+    }
+  }, []);
   
   useEffect(() => {
     if (!conversationId) return;
@@ -48,7 +57,14 @@ const SessionJoinInfo = ({
         console.log("SessionJoinInfo received update:", payload);
         
         if (payload.new && payload.new.current_participants !== undefined) {
-          setLocalParticipantCount(payload.new.current_participants);
+          const newCount = payload.new.current_participants;
+          setLocalParticipantCount(newCount);
+          
+          // Check if the session is now full after this update
+          if (maxParticipants > 0 && newCount >= maxParticipants && onSessionFull) {
+            console.log("Session became full with participant count:", newCount);
+            onSessionFull();
+          }
         }
       })
       .subscribe((status) => {
@@ -58,7 +74,7 @@ const SessionJoinInfo = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, maxParticipants, onSessionFull]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(joinUrl);
@@ -75,12 +91,6 @@ const SessionJoinInfo = ({
   };
 
   const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`;
-
-  useEffect(() => {
-    if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
-      onSessionFull();
-    }
-  }, [localParticipantCount, maxParticipants, onSessionFull]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start space-y-4 pt-2">

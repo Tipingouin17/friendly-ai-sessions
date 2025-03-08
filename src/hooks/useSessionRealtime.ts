@@ -24,6 +24,16 @@ export const useSessionRealtime = ({
     if (currentConversationId) {
       console.log("Setting up realtime subscription for participants in Session page");
       
+      // Check if the session is already full when component mounts
+      if (conversation && 
+          conversation.current_participants >= (conversation.participants || 0) && 
+          (conversation.participants || 0) > 0) {
+        console.log("Session is already full on component mount, triggering handleSessionFull");
+        if (handleSessionFull) {
+          handleSessionFull();
+        }
+      }
+
       const channel = supabase
         .channel(`participants-${currentConversationId}`)
         .on('postgres_changes', { 
@@ -51,7 +61,9 @@ export const useSessionRealtime = ({
               setParticipants(newParticipants);
             }
             
-            if (currentCount >= (conversation?.participants || 0) && (conversation?.participants || 0) > 0) {
+            // Check if all participants have joined and trigger redirect
+            if (currentCount >= (payload.new.participants || 0) && (payload.new.participants || 0) > 0) {
+              console.log("All participants have joined, triggering session start");
               if (handleSessionFull) {
                 handleSessionFull();
               }

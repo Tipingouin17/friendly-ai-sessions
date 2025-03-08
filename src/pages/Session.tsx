@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { SessionProvider } from "@/components/session/SessionProvider";
 import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
@@ -43,10 +43,16 @@ const Session = () => {
         const isMobile = window.innerWidth < 768;
         const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
         
-        // Update the condition to check for the showMessaging flag
+        // Check if we should automatically show session (all participants joined)
+        const maxParticipants = conversation.participants || 0;
+        const currentParticipants = conversation.current_participants || 0;
+        const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
+        
+        // Update the condition to check if session is full or showMessaging flag is set
         const shouldShowSession = !showQrCodeView || 
           (isMobile && locationState?.isGuest) || 
-          locationState?.showMessaging === true;
+          locationState?.showMessaging === true ||
+          isSessionFull;
 
         if (!shouldShowSession) {
           return (

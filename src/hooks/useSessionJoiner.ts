@@ -61,6 +61,11 @@ export function useSessionJoiner() {
         throw new Error("Session not found");
       }
       
+      if (!conversationId) {
+        throw new Error("Invalid session ID");
+      }
+      
+      console.log("Attempting to join session with ID:", conversationId);
       console.log("Current participant count before update:", currentParticipantCount);
       
       // First, fetch the latest count to avoid race conditions
@@ -68,11 +73,11 @@ export function useSessionJoiner() {
         .from('conversations')
         .select('id, current_participants')
         .eq('id', conversationId)
-        .maybeSingle();
+        .single();
         
       if (fetchError) {
         console.error("Error fetching latest conversation data:", fetchError);
-        throw fetchError;
+        throw new Error(`Error fetching latest session data: ${fetchError.message}`);
       }
       
       if (!latestConversation) {
@@ -84,25 +89,26 @@ export function useSessionJoiner() {
       console.log("Latest count from database:", latestCount, "New count will be:", newCount);
       
       // Update the participant count with the latest calculated value
-      const { data, error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await supabase
         .from('conversations')
         .update({ current_participants: newCount })
         .eq('id', conversationId)
         .select('current_participants')
-        .limit(1);
+        .single();
         
       if (updateError) {
         console.error("Error updating participant count:", updateError);
-        setError(updateError.message);
-        throw updateError;
+        throw new Error(`Failed to join: ${updateError.message}`);
       }
 
-      console.log("Update response:", data);
+      if (!updateData) {
+        throw new Error("Failed to update participant count");
+      }
+
+      console.log("Update response:", updateData);
       
-      // Use either the returned value or the calculated new count
-      const newParticipantId = data && data.length > 0 
-        ? data[0].current_participants 
-        : newCount;
+      // Use the returned participant count as the participant ID
+      const newParticipantId = updateData.current_participants;
       
       console.log("New participant ID:", newParticipantId);
       

@@ -1,4 +1,3 @@
-
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -6,9 +5,8 @@ import JoinForm from "@/components/session/JoinForm";
 import SessionFullAlert from "@/components/session/SessionFullAlert";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ConversationWithSession } from "@/types/database";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
@@ -86,6 +84,15 @@ const JoinSession = () => {
               "Invalid session link. Please make sure you have the correct URL." : 
               "The session you're trying to join doesn't exist or has been closed."} 
           />
+          <div className="mt-4">
+            <Button
+              onClick={handleRetry}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
         </div>
       </div>
     );

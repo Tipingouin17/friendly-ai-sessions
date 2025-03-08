@@ -23,19 +23,26 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       return;
     }
     
+    // Clear previous timeouts when component rerenders
+    const timeouts: NodeJS.Timeout[] = [];
+    
     // Set a timeout to show an extended message if loading takes too long
     const longWaitTimeout = setTimeout(() => {
       setIsLongWait(true);
-    }, 3000); // Reduced from 5 to 3 seconds for better UX
+    }, 3000); // 3 seconds for better UX
+    
+    timeouts.push(longWaitTimeout);
 
     // Set a timeout for very long waits
     const veryLongWaitTimeout = setTimeout(() => {
       setIsVeryLongWait(true);
-    }, 10000); // Reduced from 15 to 10 seconds
+    }, 10000); // 10 seconds
+    
+    timeouts.push(veryLongWaitTimeout);
 
     return () => {
-      clearTimeout(longWaitTimeout);
-      clearTimeout(veryLongWaitTimeout);
+      // Clean up all timeouts on unmount
+      timeouts.forEach(timeout => clearTimeout(timeout));
     };
   }, [error]);
 
@@ -45,6 +52,17 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     } else {
       window.location.reload();
     }
+  };
+
+  const getErrorMessage = () => {
+    if (!error) return null;
+    
+    // Handle specific error messages nicely
+    if (error.includes("JSON object requested") || error.includes("no rows")) {
+      return "The session data couldn't be updated. Please try again.";
+    }
+    
+    return error;
   };
 
   return (
@@ -73,7 +91,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
               </p>
               <p>
                 {error
-                  ? error
+                  ? getErrorMessage()
                   : isVeryLongWait 
                     ? "The session might be unavailable or there could be connection issues."
                     : "Connecting to the session. Please wait a moment..."}

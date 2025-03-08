@@ -33,6 +33,7 @@ const JoinSession = () => {
     isFull,
     conversation,
     isLoading,
+    error,
     handleJoinSession
   } = useJoinSessionData(conversationId);
 
@@ -45,13 +46,10 @@ const JoinSession = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4">Session Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            The session you're trying to join doesn't exist or has been closed.
-          </p>
-          <a href="/" className="text-[#FFC107] hover:underline">
-            Return to Home
-          </a>
+          <SessionFullAlert 
+            type="not-found" 
+            message={error ? `Error: ${error}` : undefined} 
+          />
         </div>
       </div>
     );
@@ -70,7 +68,7 @@ const JoinSession = () => {
         </div>
 
         {isFull ? (
-          <SessionFullAlert />
+          <SessionFullAlert type="full" />
         ) : (
           <JoinForm
             participantName={participantName}

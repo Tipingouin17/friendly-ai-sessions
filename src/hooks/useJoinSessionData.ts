@@ -15,24 +15,25 @@ export function useJoinSessionData(conversationId: number | null) {
   const [isJoining, setIsJoining] = useState(false);
   const [currentParticipantCount, setCurrentParticipantCount] = useState(0);
   const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
   
   // Fetch conversation data to show facilitator info
-  const { data: conversation, isLoading, error, refetch } = useConversation(conversationId);
+  const { data: conversation, isLoading, error: fetchError, refetch } = useConversation(conversationId);
 
   useEffect(() => {
-    if (error) {
-      console.error("Error fetching conversation:", error);
+    if (fetchError) {
+      console.error("Error fetching conversation:", fetchError);
+      setError(fetchError.message || "Session not found or no longer available");
       toast({
         title: "Error",
         description: "Session not found or no longer available.",
         variant: "destructive",
       });
-      navigate("/");
     }
-  }, [error, navigate, toast]);
+  }, [fetchError, toast]);
 
   useEffect(() => {
     // Set conversation-specific data once it's loaded
@@ -151,6 +152,7 @@ export function useJoinSessionData(conversationId: number | null) {
         
       if (updateError) {
         console.error("Error updating participant count:", updateError);
+        setError(updateError.message);
         throw updateError;
       }
 
@@ -164,8 +166,9 @@ export function useJoinSessionData(conversationId: number | null) {
         navigateToSession(participantName, newParticipantId);
       }, 500);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error joining session:", error);
+      setError(error.message || "Failed to join the session");
       toast({
         title: "Error",
         description: "Failed to join the session. Please try again.",
@@ -193,6 +196,7 @@ export function useJoinSessionData(conversationId: number | null) {
     isFull,
     conversation,
     isLoading,
+    error,
     handleJoinSession,
     navigateToSession
   };

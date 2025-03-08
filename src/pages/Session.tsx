@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,10 +29,38 @@ const Session = () => {
   const { maxParticipants } = usePlanLimits();
   
   useEffect(() => {
-    const state = location.state as { newConversationId?: number; replace?: boolean; participantName?: string; isGuest?: boolean } | null;
+    const state = location.state as { 
+      newConversationId?: number; 
+      replace?: boolean; 
+      participantName?: string; 
+      avatarSeed?: string;
+      isGuest?: boolean;
+      participantId?: number;
+    } | null;
     
     if (state?.isGuest) {
       setShowQrCodeView(false);
+      
+      // If this is a guest joining, add their participant info
+      if (state.participantName && state.participantId) {
+        // Create avatar URL from boring avatar parameters
+        const avatarUrl = state.avatarSeed 
+          ? `/api/avatar?name=${state.avatarSeed}&variant=beam&palette=0` 
+          : null;
+          
+        setParticipants(prev => {
+          // Check if this participant already exists
+          const exists = prev.some(p => p.id === state.participantId);
+          if (exists) return prev;
+          
+          // Add the new participant
+          return [...prev, {
+            id: state.participantId,
+            name: state.participantName,
+            avatar: avatarUrl
+          }];
+        });
+      }
     }
     
     if (state?.newConversationId) {
@@ -86,12 +115,16 @@ const Session = () => {
         try {
           if (conversation) {
             const participantCount = conversation.participants || 0;
-            const placeholderParticipants: ParticipantInfo[] = Array.from({ length: participantCount }).map((_, index) => ({
-              id: index + 1,
-              name: `Participant ${index + 1}`,
-              avatar: null
-            }));
-            setParticipants(placeholderParticipants);
+            
+            // Only create placeholder participants if we don't have real ones
+            if (participants.length === 0) {
+              const placeholderParticipants: ParticipantInfo[] = Array.from({ length: participantCount }).map((_, index) => ({
+                id: index + 1,
+                name: `Participant ${index + 1}`,
+                avatar: null
+              }));
+              setParticipants(placeholderParticipants);
+            }
           }
         } catch (error) {
           console.error('Error fetching participants:', error);
@@ -100,31 +133,60 @@ const Session = () => {
     };
 
     fetchParticipants();
-  }, [currentConversationId, conversation]);
+  }, [currentConversationId, conversation, participants.length]);
 
+  // Set up subscription to listen for participant changes
   useEffect(() => {
-    const updateCurrentParticipants = async () => {
-      if (currentConversationId && !showQrCodeView) {
-        try {
-          const { error } = await supabase
-            .from('conversations')
-            .update({ current_participants: 1 })
-            .eq('id', currentConversationId);
+    if (currentConversationId) {
+      const channel = supabase
+        .channel(`participants-${currentConversationId}`)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'conversations',
+          filter: `id=eq.${currentConversationId}`
+        }, (payload) => {
+          if (payload.new && payload.new.current_participants !== undefined) {
+            const currentCount = payload.new.current_participants;
             
-          if (error) {
-            console.error('Error updating current participants:', error);
+            // Update participants if count increased
+            if (currentCount > participants.length) {
+              // Add placeholder participants for new joiners
+              const newParticipants = [...participants];
+              for (let i = participants.length + 1; i <= currentCount; i++) {
+                if (!newParticipants.some(p => p.id === i)) {
+                  newParticipants.push({
+                    id: i,
+                    name: `Participant ${i}`,
+                    avatar: null
+                  });
+                }
+              }
+              setParticipants(newParticipants);
+            }
           }
-        } catch (error) {
-          console.error('Error updating current participants:', error);
-        }
-      }
-    };
-    
-    updateCurrentParticipants();
-  }, [currentConversationId, showQrCodeView]);
+        })
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [currentConversationId, participants]);
 
   const handleStartSession = () => {
     setShowQrCodeView(false);
+  };
+
+  const handleSessionFull = () => {
+    if (showQrCodeView) {
+      // Automatically start session when it's full
+      setShowQrCodeView(false);
+      toast({
+        title: "Session is full",
+        description: "The maximum number of participants has joined. Starting session automatically.",
+      });
+    }
   };
 
   const handleSendMessage = async () => {
@@ -248,13 +310,14 @@ const Session = () => {
             <SessionJoinInfo 
               conversationId={currentConversationId} 
               currentParticipantCount={conversation.current_participants || 0}
+              onSessionFull={handleSessionFull}
             />
             
             <Button 
               onClick={handleStartSession}
               className="mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
             >
-              Start Session ({conversation.current_participants || 0}/{conversation.participants || 0})
+              Start Session ({conversation.current_participants || 0}/{conversation.participants || maxParticipants})
             </Button>
           </div>
         </div>

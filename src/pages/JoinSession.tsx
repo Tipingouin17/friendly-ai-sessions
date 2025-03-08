@@ -75,6 +75,16 @@ const JoinSession = () => {
             // Update current participants count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
               setCurrentParticipantCount(payload.new.current_participants);
+              
+              // If session is full, show a toast and redirect to home
+              const effectiveMax = payload.new.participants || planMaxParticipants;
+              if (effectiveMax > 0 && payload.new.current_participants >= effectiveMax) {
+                toast({
+                  title: "Session is full",
+                  description: `This session has reached its maximum capacity of ${effectiveMax} participants.`,
+                  variant: "warning",
+                });
+              }
             }
           }
         })
@@ -84,7 +94,7 @@ const JoinSession = () => {
         subscription.unsubscribe();
       };
     }
-  }, [conversationId]);
+  }, [conversationId, planMaxParticipants, toast]);
 
   const handleJoinSession = async () => {
     if (!participantName.trim()) {
@@ -130,7 +140,8 @@ const JoinSession = () => {
         state: { 
           participantName,
           avatarSeed,
-          isGuest: true
+          isGuest: true,
+          participantId: currentParticipantCount + 1 // Assign a participant ID based on join order
         }
       });
     } catch (error) {
@@ -174,7 +185,7 @@ const JoinSession = () => {
           )}
           
           {isFull && (
-            <Alert variant="warning" className="mt-4 bg-amber-50 border-amber-200 text-amber-800">
+            <Alert variant="warning" className="mt-4">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="flex items-center">
                 <span>This session is full ({effectiveMaxParticipants} participants maximum)</span>

@@ -9,9 +9,10 @@ import { supabase } from '@/integrations/supabase/client';
 interface SessionJoinInfoProps {
   conversationId: number | null;
   currentParticipantCount?: number;
+  onSessionFull?: () => void;
 }
 
-const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: SessionJoinInfoProps) => {
+const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0, onSessionFull }: SessionJoinInfoProps) => {
   const [copied, setCopied] = useState(false);
   const [sessionLink, setSessionLink] = useState('');
   const [realParticipantCount, setRealParticipantCount] = useState(currentParticipantCount);
@@ -83,6 +84,12 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             if (payload.new.current_participants !== undefined && 
                 payload.new.current_participants !== null) {
               setRealParticipantCount(payload.new.current_participants);
+              
+              // Check if session is full and trigger callback if provided
+              if (onSessionFull && payload.new.participants > 0 && 
+                  payload.new.current_participants >= payload.new.participants) {
+                onSessionFull();
+              }
             }
           }
         })
@@ -92,7 +99,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
         subscription.unsubscribe();
       };
     }
-  }, [conversationId]);
+  }, [conversationId, onSessionFull]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(sessionLink);

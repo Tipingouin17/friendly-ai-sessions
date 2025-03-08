@@ -41,8 +41,12 @@ const Session = () => {
         if (!conversation || !currentConversationId) return <EmptyState />;
 
         const isMobile = window.innerWidth < 768;
-        const locationState = location.state as { isGuest?: boolean } | null;
-        const shouldShowSession = !showQrCodeView || (isMobile && locationState?.isGuest);
+        const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
+        
+        // Update the condition to check for the showMessaging flag
+        const shouldShowSession = !showQrCodeView || 
+          (isMobile && locationState?.isGuest) || 
+          locationState?.showMessaging === true;
 
         if (!shouldShowSession) {
           return (

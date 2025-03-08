@@ -28,7 +28,8 @@ export function useSessionJoiner() {
         participantName: name,
         avatarSeed,
         isGuest: true,
-        participantId
+        participantId,
+        showMessaging: true // Add this flag to explicitly show messaging
       }
     });
   };

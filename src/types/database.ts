@@ -1,7 +1,9 @@
 
 import { Database } from "@/integrations/supabase/types";
 
-export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"];
+export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"] & {
+  session_started?: boolean;
+};
 export type DbSession = Database["public"]["Tables"]["sessions"]["Row"];
 export type DbFacilitator = Database["public"]["Tables"]["facilitators"]["Row"];
 

@@ -19,6 +19,7 @@ export function useSessionInterface(conversationId: number | null) {
       // Check if session is already marked as started in the database
       const checkSessionStarted = async () => {
         try {
+          console.log("Checking if session is already started for conversation:", conversationId);
           const { data, error } = await supabase
             .from('conversations')
             .select('*')
@@ -28,9 +29,11 @@ export function useSessionInterface(conversationId: number | null) {
           if (error) {
             console.error("Error checking session_started:", error);
           } else if (data && 'session_started' in data && data.session_started) {
-            console.log("Session is already marked as started in DB");
+            console.log("Session is already marked as started in DB:", data);
             setIsSessionStarted(true);
             setShowQrCodeView(false);
+          } else {
+            console.log("Session not yet started in DB:", data);
           }
         } catch (err) {
           console.error("Exception checking session_started:", err);
@@ -45,11 +48,13 @@ export function useSessionInterface(conversationId: number | null) {
   useEffect(() => {
     const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
     if ((isMobile && locationState?.isGuest) || locationState?.showMessaging === true) {
+      console.log("Setting showQrCodeView to false based on location state:", locationState);
       setShowQrCodeView(false);
     }
   }, [isMobile, location.state]);
   
   const handleStartSession = async () => {
+    console.log("Starting session for conversation:", conversationId);
     setShowQrCodeView(false);
     setIsSessionStarted(true);
     
@@ -65,6 +70,8 @@ export function useSessionInterface(conversationId: number | null) {
           
         if (error) {
           console.error("Error updating session_started:", error);
+        } else {
+          console.log("Successfully updated session_started in DB for conversation:", conversationId);
         }
       } catch (err) {
         console.error("Exception updating session_started:", err);

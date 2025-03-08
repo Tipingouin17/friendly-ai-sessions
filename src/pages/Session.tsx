@@ -6,6 +6,7 @@ import EmptyState from "@/components/session/EmptyState";
 import SessionContainer from "@/components/session/SessionContainer";
 import QRCodeView from "@/components/session/QRCodeView";
 import ParticipantWaitingScreen from "@/components/session/ParticipantWaitingScreen";
+import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useToast } from "@/components/ui/use-toast";
 import { SessionContextProps } from "@/types/session";
 import { useLocation } from "react-router-dom";
@@ -15,6 +16,7 @@ const Session = () => {
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Determine if user is admin based on location state
   useEffect(() => {
@@ -47,51 +49,39 @@ const Session = () => {
   return (
     <SessionProvider handleSessionFull={handleSessionFull}>
       {(props: SessionContextProps) => {
-        const {
-          isLoading,
-          conversation,
-          currentConversationId,
-          sessionState,
-          anonymousState,
-          participants,
-          participantColors,
-          isWaitingForResponse,
-          handleStartSession,
-          handleSendMessage,
-          handleLikeMessage,
-          showQrCodeView,
-          currentUserParticipantId,
-          isSessionStartedInDB
-        } = props;
-
-        if (isLoading) return <LoadingState />;
-        if (!conversation || !currentConversationId) return <EmptyState />;
-
-        // Check if we should automatically show session (all participants joined)
-        const maxParticipants = conversation.participants || 0;
-        const currentParticipants = conversation.current_participants || 0;
-        const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
-        
-        // Update sessionStarted state based on DB status - OUTSIDE OF RENDER
+        // Ensure we update the loading state from the provider
         useEffect(() => {
-          if (isSessionStartedInDB) {
+          setIsLoading(props.isLoading);
+        }, [props.isLoading]);
+        
+        // Update sessionStarted state based on DB status
+        useEffect(() => {
+          if (props.isSessionStartedInDB) {
             setSessionStarted(true);
           }
-        }, [isSessionStartedInDB]);
+        }, [props.isSessionStartedInDB]);
         
-        // Calculate if session should be shown - fixes the hook error by not using conditionals
-        const shouldShowSession = isSessionStartedInDB || sessionStarted || isSessionFull;
+        if (props.isLoading) return <LoadingState />;
+        if (!props.conversation || !props.currentConversationId) return <EmptyState />;
+
+        // Check if we should automatically show session (all participants joined)
+        const maxParticipants = props.conversation.participants || 0;
+        const currentParticipants = props.conversation.current_participants || 0;
+        const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
+        
+        // Calculate if session should be shown
+        const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull;
 
         // Admin view gets QR code view for sharing until session is started
-        if (isAdmin && !shouldShowSession && showQrCodeView) {
+        if (isAdmin && !shouldShowSession && props.showQrCodeView) {
           return (
             <QRCodeView
-              conversationId={currentConversationId}
-              currentParticipantCount={conversation.current_participants || 0}
-              maxParticipants={conversation.participants || 0}
-              facilitatorTitle={conversation.sessions?.facilitator_details?.title}
+              conversationId={props.currentConversationId}
+              currentParticipantCount={props.conversation.current_participants || 0}
+              maxParticipants={props.conversation.participants || 0}
+              facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
               onStartSession={() => {
-                handleStartSession();
+                props.handleStartSession();
                 setSessionStarted(true);
               }}
               onSessionFull={handleSessionFull}
@@ -100,44 +90,43 @@ const Session = () => {
         }
         
         // For non-admins, show waiting screen until admin starts the session
-        // or other conditions to show the session are met
         if (!isAdmin && !shouldShowSession) {
           return (
             <ParticipantWaitingScreen
-              currentParticipantCount={conversation.current_participants || 0}
-              maxParticipants={conversation.participants || 0}
-              facilitatorTitle={conversation.sessions?.facilitator_details?.title}
+              currentParticipantCount={props.conversation.current_participants || 0}
+              maxParticipants={props.conversation.participants || 0}
+              facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
             />
           );
         }
 
         return (
           <SessionContainer
-            participantCount={conversation.participants || participants.length}
-            conversation={conversation}
-            messages={sessionState.messages}
-            inputMessage={sessionState.inputMessage}
-            setInputMessage={sessionState.setInputMessage}
-            currentParticipant={sessionState.currentParticipant}
-            onSendMessage={handleSendMessage}
-            onLikeMessage={handleLikeMessage}
-            isWaitingForResponse={isWaitingForResponse}
-            onGenerateReport={sessionState.handleGenerateReport}
-            isGeneratingReport={sessionState.isGeneratingReport}
-            setIsRecording={sessionState.setIsRecording}
-            isRecording={sessionState.isRecording}
-            participantColors={participantColors}
+            participantCount={props.conversation.participants || props.participants.length}
+            conversation={props.conversation}
+            messages={props.sessionState.messages}
+            inputMessage={props.sessionState.inputMessage}
+            setInputMessage={props.sessionState.setInputMessage}
+            currentParticipant={props.sessionState.currentParticipant}
+            onSendMessage={props.handleSendMessage}
+            onLikeMessage={props.handleLikeMessage}
+            isWaitingForResponse={props.isWaitingForResponse}
+            onGenerateReport={props.sessionState.handleGenerateReport}
+            isGeneratingReport={props.sessionState.isGeneratingReport}
+            setIsRecording={props.sessionState.setIsRecording}
+            isRecording={props.sessionState.isRecording}
+            participantColors={props.participantColors}
             participantNames={{}}
-            participants={participants}
-            conversationId={currentConversationId}
-            facilitator={conversation.sessions?.facilitator_details || {}}
-            objective={conversation.sessions?.objective || ''}
-            currentParticipantCount={conversation.current_participants || 0}
-            currentUserParticipantId={currentUserParticipantId}
-            hasAnswered={sessionState.hasAnswered}
-            totalResponses={sessionState.totalResponses}
-            viewMode={sessionState.viewMode}
-            setViewMode={sessionState.setViewMode}
+            participants={props.participants}
+            conversationId={props.currentConversationId}
+            facilitator={props.conversation.sessions?.facilitator_details || {}}
+            objective={props.conversation.sessions?.objective || ''}
+            currentParticipantCount={props.conversation.current_participants || 0}
+            currentUserParticipantId={props.currentUserParticipantId}
+            hasAnswered={props.sessionState.hasAnswered}
+            totalResponses={props.sessionState.totalResponses}
+            viewMode={props.sessionState.viewMode}
+            setViewMode={props.sessionState.setViewMode}
             isAdmin={isAdmin}
           />
         );

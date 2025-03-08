@@ -39,13 +39,20 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     handleStartSession,
   } = useSessionData();
 
+  console.log("SessionProvider - conversation data:", conversation);
+  console.log("SessionProvider - currentConversationId:", currentConversationId);
+  console.log("SessionProvider - isLoading:", isLoading);
+
   // Type assertion to ensure conversation is of the right type
   const typedConversation = conversation as ConversationWithSession | null;
   
   // Check if the session is marked as started in DB
   useEffect(() => {
     if (typedConversation?.session_started) {
+      console.log("Session is marked as started in DB:", typedConversation.session_started);
       setIsSessionStartedInDB(true);
+    } else {
+      console.log("Session not marked as started in DB:", typedConversation);
     }
   }, [typedConversation]);
 
@@ -55,6 +62,7 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   useEffect(() => {
     if (typedConversation) {
       const participantId = getCurrentParticipantId(locationState, typedConversation);
+      console.log("Setting current participant ID:", participantId, "from state:", locationState);
       setCurrentUserParticipantId(participantId);
     }
   }, [typedConversation, locationState]);
@@ -67,7 +75,10 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     conversation: typedConversation,
     refetch,
     handleSessionFull,
-    onSessionStarted: () => setIsSessionStartedInDB(true)
+    onSessionStarted: () => {
+      console.log("Session started event received from realtime updates");
+      setIsSessionStartedInDB(true);
+    }
   });
 
   // Set up session state

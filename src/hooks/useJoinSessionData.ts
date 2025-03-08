@@ -24,6 +24,7 @@ export function useJoinSessionData(conversationId: number | null) {
 
   useEffect(() => {
     if (error) {
+      console.error("Error fetching conversation:", error);
       toast({
         title: "Error",
         description: "Session not found or no longer available.",
@@ -149,6 +150,7 @@ export function useJoinSessionData(conversationId: number | null) {
         .single();
         
       if (updateError) {
+        console.error("Error updating participant count:", updateError);
         throw updateError;
       }
 

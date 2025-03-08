@@ -28,6 +28,9 @@ const JoinForm: React.FC<JoinFormProps> = ({
 }) => {
   const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
   const spotsLeft = effectiveMaxParticipants > 0 ? effectiveMaxParticipants - currentParticipantCount : 0;
+  
+  // Display at least 1 participant if we're on the page (this prevents showing 0)
+  const displayCount = currentParticipantCount === 0 ? 0 : currentParticipantCount;
 
   return (
     <div className="space-y-4">
@@ -71,8 +74,8 @@ const JoinForm: React.FC<JoinFormProps> = ({
       <div className="text-center text-sm text-gray-600 flex items-center justify-center gap-1">
         <Users className="w-4 h-4" />
         <span>
-          {currentParticipantCount} of {effectiveMaxParticipants || '∞'} participants
-          {!isFull && effectiveMaxParticipants > 0 && (
+          {displayCount} of {effectiveMaxParticipants || '∞'} participants
+          {!isFull && effectiveMaxParticipants > 0 && spotsLeft > 0 && (
             <span className="text-green-600 font-medium ml-1">
               ({spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left)
             </span>

@@ -7,10 +7,17 @@ export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null>({
     queryKey: ['conversation', conversationId],
     queryFn: async () => {
-      const data = await fetchConversation(conversationId);
-      return data as ConversationWithSession | null;
+      try {
+        const data = await fetchConversation(conversationId);
+        return data as ConversationWithSession | null;
+      } catch (error) {
+        console.error('Error fetching conversation:', error);
+        return null;
+      }
     },
     enabled: !!conversationId,
+    retry: 2,
+    staleTime: 30000 // 30 seconds
   });
 };
 
@@ -18,31 +25,37 @@ const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
   console.log('Fetching conversation with ID:', id);
-  const { data, error } = await supabase
-    .from('conversations')
-    .select(`
-      *,
-      sessions!conversations_sessions_id_fkey (
-        id,
-        title,
-        objective,
-        welcome_message,
-        facilitator,
-        facilitator_details:facilitators (
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        sessions!conversations_sessions_id_fkey (
           id,
           title,
-          profile_picture,
-          details
+          objective,
+          welcome_message,
+          facilitator,
+          facilitator_details:facilitators (
+            id,
+            title,
+            profile_picture,
+            details
+          )
         )
-      )
-    `)
-    .eq('id', id)
-    .maybeSingle();
+      `)
+      .eq('id', id)
+      .maybeSingle();
 
-  if (error) {
-    console.error('Error fetching conversation:', error);
+    if (error) {
+      console.error('Error fetching conversation:', error);
+      throw error;
+    }
+    
+    console.log('Fetched conversation:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in fetchConversation:', error);
     throw error;
   }
-  console.log('Fetched conversation:', data);
-  return data;
 };

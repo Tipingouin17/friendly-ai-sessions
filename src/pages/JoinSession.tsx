@@ -15,7 +15,10 @@ const JoinSession = () => {
   // Force refresh conversation data when joining a session
   useEffect(() => {
     if (conversationId) {
+      console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+    } else {
+      console.warn("JoinSession: No conversation ID found in URL parameters");
     }
   }, [conversationId, queryClient]);
   
@@ -35,6 +38,23 @@ const JoinSession = () => {
 
   if (isLoading) {
     return <JoinSessionLoadingState />;
+  }
+
+  // If we have no conversation data and we're not loading, show error message
+  if (!conversation && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">Session Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The session you're trying to join doesn't exist or has been closed.
+          </p>
+          <a href="/" className="text-[#FFC107] hover:underline">
+            Return to Home
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (

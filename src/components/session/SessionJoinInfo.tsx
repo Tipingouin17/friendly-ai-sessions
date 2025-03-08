@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { QrCode, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,8 @@ const SessionJoinInfo = ({
   useEffect(() => {
     if (!conversationId) return;
     
+    console.log("Setting up realtime subscription in SessionJoinInfo for conversation:", conversationId);
+    
     const channel = supabase
       .channel(`join-info-${conversationId}`)
       .on('postgres_changes', { 
@@ -45,7 +48,9 @@ const SessionJoinInfo = ({
           setLocalParticipantCount(payload.new.current_participants);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`SessionJoinInfo channel status: ${status}`);
+      });
       
     return () => {
       supabase.removeChannel(channel);
@@ -75,17 +80,17 @@ const SessionJoinInfo = ({
   }, [localParticipantCount, maxParticipants, onSessionFull]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start space-y-6 pt-4">
+    <div className="w-full h-full flex flex-col items-center justify-start space-y-4 pt-2">
       {conversationId && (
-        <div className="flex flex-col items-center justify-center p-2">
-          <div className="mb-2">
+        <div className="flex flex-col items-center justify-center p-1">
+          <div className="mb-1">
             <img 
               src={qrCodeSrc}
               alt="QR Code to join session"
-              className="w-32 h-32 border p-2 rounded-lg shadow-sm"
+              className="w-28 h-28 border p-1 rounded-lg shadow-sm"
             />
           </div>
-          <div className="text-center mb-2">
+          <div className="text-center mb-1">
             <p className="text-xs text-gray-500 mb-1">
               Scan QR code or share link:
             </p>

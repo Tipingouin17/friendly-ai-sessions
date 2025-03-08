@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { ParticipantInfo } from "@/types/chat";
 import { useConversation } from "@/hooks/useConversation";
+import { supabase } from "@/integrations/supabase/client";
 
 export const useSessionData = () => {
   const location = useLocation();
@@ -122,6 +123,38 @@ export const useSessionData = () => {
       setShowQrCodeView(false);
     }
   }, [isMobile, location.state]);
+
+  useEffect(() => {
+    // Set up real-time listener for changes to the conversation status
+    if (currentConversationId) {
+      const channel = supabase
+        .channel(`session-status-${currentConversationId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${currentConversationId}`
+        }, (payload) => {
+          console.log("Session status update:", payload);
+          if (payload.new) {
+            // Check if session was ended or status changed
+            if (payload.new.is_session_ended || payload.new.status !== 'active') {
+              toast({
+                title: "Session Ended",
+                description: "This session has been closed.",
+              });
+              navigate('/');
+            }
+            refetch();
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [currentConversationId, navigate, refetch, toast]);
 
   const handleStartSession = () => {
     setShowQrCodeView(false);

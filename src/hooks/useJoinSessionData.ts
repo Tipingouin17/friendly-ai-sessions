@@ -27,13 +27,8 @@ export function useJoinSessionData(conversationId: number | null) {
     if (fetchError) {
       console.error("Error fetching conversation:", fetchError);
       setError(fetchError.message || "Session not found or no longer available");
-      toast({
-        title: "Error",
-        description: "Session not found or no longer available.",
-        variant: "destructive",
-      });
     }
-  }, [fetchError, toast]);
+  }, [fetchError]);
 
   useEffect(() => {
     // Set conversation-specific data once it's loaded
@@ -86,6 +81,9 @@ export function useJoinSessionData(conversationId: number | null) {
           console.log(`Channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
             console.log('Successfully subscribed to realtime updates');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('Error subscribing to channel');
+            setError('Unable to establish real-time connection');
           }
         });
 
@@ -133,10 +131,15 @@ export function useJoinSessionData(conversationId: number | null) {
     }
 
     setIsJoining(true);
+    setError(null);
 
     try {
       // Force refresh data before joining to ensure we have latest count
       await refetch();
+      
+      if (!conversation) {
+        throw new Error("Session not found");
+      }
       
       console.log("Current participant count before update:", currentParticipantCount);
       

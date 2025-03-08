@@ -43,12 +43,14 @@ const JoinSession = () => {
 
   // If we have no conversation data and we're not loading, show error message
   if (!conversation && !isLoading) {
+    console.error("Session not found or error:", error, "Conversation ID:", conversationId);
+    
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md text-center">
           <SessionFullAlert 
             type="not-found" 
-            message={error ? `Error: ${error}` : undefined} 
+            message={error ? `Error: ${error}` : "The session you're trying to join doesn't exist or has been closed."} 
           />
         </div>
       </div>

@@ -87,8 +87,10 @@ export function useSessionParticipants(conversationId: number | null) {
     const channelName = `conversation-updates-${conversationId}-${connectionAttempts}`;
     console.log(`Creating channel: ${channelName}`);
     
+    let channel;
+    
     try {
-      const channel = supabase
+      channel = supabase
         .channel(channelName)
         .on('postgres_changes', { 
           event: 'UPDATE', 
@@ -136,7 +138,9 @@ export function useSessionParticipants(conversationId: number | null) {
       return () => {
         console.log(`Cleaning up channel: ${channelName}`);
         clearTimeout(connectionTimeout);
-        supabase.removeChannel(channel);
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
       };
     } catch (err) {
       console.error("Error setting up realtime subscription:", err);
@@ -145,7 +149,7 @@ export function useSessionParticipants(conversationId: number | null) {
         clearTimeout(connectionTimeout);
       };
     }
-  }, [conversationId, refetch, toast, connectionAttempts, attemptReconnection]);
+  }, [conversationId, refetch, toast, connectionAttempts, attemptReconnection, isConnected]);
 
   // Connection recovery mechanism
   useEffect(() => {

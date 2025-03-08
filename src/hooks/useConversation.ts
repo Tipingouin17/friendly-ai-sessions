@@ -35,10 +35,13 @@ export const useConversation = (conversationId: number | null) => {
       }
     },
     enabled: !!conversationId,
-    retry: 1, // Reduce retry attempts to fail faster when conversation doesn't exist
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-    staleTime: 10000,
-    refetchOnWindowFocus: true
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 5000,
+    cacheTime: 60000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true
   });
 };
 
@@ -47,7 +50,8 @@ const fetchConversation = async (id: number | null) => {
   
   console.log('Fetching conversation with ID:', id);
   try {
-    // Use a simpler query that doesn't depend on user authentication
+    // Use a simpler query that doesn't depend on user authentication and has no filters
+    // that would prevent public access
     const { data, error } = await supabase
       .from('conversations')
       .select(`

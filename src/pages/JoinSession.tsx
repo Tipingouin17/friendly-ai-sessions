@@ -36,6 +36,7 @@ const JoinSession = () => {
     if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+      queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true });
     }
   }, [conversationId, queryClient, retryCount]);
   
@@ -44,6 +45,7 @@ const JoinSession = () => {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+      queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
   }, [conversationId, queryClient]);
   

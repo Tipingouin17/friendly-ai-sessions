@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +38,7 @@ export function useSessionState({
           id: welcomeId,
           content: welcomeMessage,
           sender: "assistant",
-          createdAt: new Date().toISOString(),
+          timestamp: new Date(), // Fixed: using timestamp instead of createdAt
           likes: []
         }
       ]);
@@ -77,7 +78,7 @@ export function useSessionState({
             id: reportId,
             content: data,
             sender: "assistant",
-            createdAt: new Date().toISOString(),
+            timestamp: new Date(), // Fixed: using timestamp instead of createdAt
             isReport: true,
             likes: []
           }

@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from "react";
+import React, { useState, useEffect, ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,7 +10,7 @@ import { participantColors } from "@/utils/sessionHelpers";
 import { SessionContextProps } from "@/types/session";
 
 interface SessionProviderProps {
-  children: ReactNode;
+  children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
 }
 
@@ -309,12 +309,7 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
 
   return (
     <>
-      {children && React.Children.map(children, child => {
-        if (React.isValidElement(child)) {
-          return React.cloneElement(child, sessionContext);
-        }
-        return child;
-      })}
+      {children && children(sessionContext)}
     </>
   );
 };

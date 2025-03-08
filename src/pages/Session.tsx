@@ -7,9 +7,11 @@ import SessionContainer from "@/components/session/SessionContainer";
 import QRCodeView from "@/components/session/QRCodeView";
 import { useToast } from "@/components/ui/use-toast";
 import { SessionContextProps } from "@/types/session";
+import { useLocation } from "react-router-dom";
 
 const Session = () => {
   const { toast } = useToast();
+  const location = useLocation();
 
   const handleSessionFull = () => {
     toast({
@@ -39,7 +41,8 @@ const Session = () => {
         if (!conversation || !currentConversationId) return <EmptyState />;
 
         const isMobile = window.innerWidth < 768;
-        const shouldShowSession = !showQrCodeView || (isMobile && location.state?.isGuest);
+        const locationState = location.state as { isGuest?: boolean } | null;
+        const shouldShowSession = !showQrCodeView || (isMobile && locationState?.isGuest);
 
         if (!shouldShowSession) {
           return (

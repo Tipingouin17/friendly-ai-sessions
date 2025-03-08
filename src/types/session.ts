@@ -17,6 +17,8 @@ export interface SessionContextProps {
     setIsRecording: (isRecording: boolean) => void;
     handleGenerateReport: () => Promise<void>;
     isGeneratingReport: boolean;
+    setParticipantMessages: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+    setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };

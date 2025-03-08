@@ -552,6 +552,41 @@ export type Database = {
           },
         ]
       }
+      session_participants: {
+        Row: {
+          avatar_seed: string | null
+          conversation_id: number
+          created_at: string | null
+          id: number
+          name: string
+          participant_id: number
+        }
+        Insert: {
+          avatar_seed?: string | null
+          conversation_id: number
+          created_at?: string | null
+          id?: number
+          name: string
+          participant_id: number
+        }
+        Update: {
+          avatar_seed?: string | null
+          conversation_id?: number
+          created_at?: string | null
+          id?: number
+          name?: string
+          participant_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           category_id: number | null

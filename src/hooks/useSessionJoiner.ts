@@ -109,7 +109,7 @@ export function useSessionJoiner() {
       console.log("Update response:", updateData);
       
       // Use the returned participant count as the participant ID
-      const newParticipantId = updateData.current_participants;
+      const newParticipantId = newCount;
       
       console.log("New participant ID:", newParticipantId);
       

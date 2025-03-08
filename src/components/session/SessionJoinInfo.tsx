@@ -57,7 +57,7 @@ const SessionJoinInfo = ({
               <img 
                 src={qrCodeSrc}
                 alt="QR Code to join session"
-                className="w-40 h-40"
+                className="w-40 h-40 border p-2 rounded-lg shadow-sm"
               />
             </div>
             <div className="text-center mb-4">
@@ -65,17 +65,17 @@ const SessionJoinInfo = ({
                 Scan this QR code to join the session or share the link:
               </p>
               {/* More compact link display with inline copy button */}
-              <div className="flex items-center bg-gray-100 p-1 rounded max-w-full gap-1">
+              <div className="flex items-center bg-gray-50 p-2 rounded-md border shadow-sm max-w-full gap-1">
                 <p className="text-xs text-gray-700 truncate flex-1 px-1">
                   {joinUrl}
                 </p>
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="h-6 py-0 px-2"
+                  className="h-6 py-0 px-2 hover:bg-gray-100"
                   onClick={handleCopyLink}
                 >
-                  {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                 </Button>
               </div>
             </div>
@@ -83,7 +83,7 @@ const SessionJoinInfo = ({
         )}
       </div>
       
-      <div className="text-xs text-gray-500 flex flex-col items-center space-y-1">
+      <div className="text-xs text-gray-500 flex flex-col items-center space-y-1 bg-gray-50 rounded-full px-4 py-2 border">
         <div className="flex items-center">
           <Users className="h-3 w-3 mr-1" />
           <span>Participants</span>

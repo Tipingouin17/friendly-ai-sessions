@@ -5,6 +5,7 @@ import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
 import SessionContainer from "@/components/session/SessionContainer";
 import QRCodeView from "@/components/session/QRCodeView";
+import ParticipantWaitingScreen from "@/components/session/ParticipantWaitingScreen";
 import { useToast } from "@/components/ui/use-toast";
 import { SessionContextProps } from "@/types/session";
 import { useLocation } from "react-router-dom";
@@ -13,6 +14,7 @@ const Session = () => {
   const { toast } = useToast();
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(false);
 
   // Determine if user is admin based on location state
   useEffect(() => {
@@ -69,21 +71,44 @@ const Session = () => {
         const currentParticipants = conversation.current_participants || 0;
         const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
         
-        // Update the condition to check if session is full or showMessaging flag is set
-        const shouldShowSession = !showQrCodeView || 
-          (isMobile && locationState?.isGuest) || 
-          locationState?.showMessaging === true ||
-          isSessionFull;
+        // Admin view gets QR code view for sharing
+        if (isAdmin && !sessionStarted && !showQrCodeView) {
+          // This is when admin is viewing the session but hasn't started it
+          setSessionStarted(true);
+        }
 
-        if (!shouldShowSession) {
+        // Admin gets QR code view until they start the session
+        if (isAdmin && showQrCodeView) {
           return (
             <QRCodeView
               conversationId={currentConversationId}
               currentParticipantCount={conversation.current_participants || 0}
               maxParticipants={conversation.participants || 0}
               facilitatorTitle={conversation.sessions?.facilitator_details?.title}
-              onStartSession={handleStartSession}
+              onStartSession={() => {
+                handleStartSession();
+                setSessionStarted(true);
+              }}
               onSessionFull={handleSessionFull}
+            />
+          );
+        }
+        
+        // Update the condition to check if session should be shown
+        const shouldShowSession = (isAdmin && sessionStarted) || 
+          (!isAdmin && !showQrCodeView) || 
+          (isMobile && locationState?.isGuest) || 
+          locationState?.showMessaging === true ||
+          isSessionFull;
+
+        // For non-admins, show waiting screen until admin starts the session
+        // or other conditions to show the session are met
+        if (!isAdmin && !shouldShowSession) {
+          return (
+            <ParticipantWaitingScreen
+              currentParticipantCount={conversation.current_participants || 0}
+              maxParticipants={conversation.participants || 0}
+              facilitatorTitle={conversation.sessions?.facilitator_details?.title}
             />
           );
         }

@@ -17,12 +17,12 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     // Set a timeout to show an extended message if loading takes too long
     const longWaitTimeout = setTimeout(() => {
       setIsLongWait(true);
-    }, 5000); // 5 seconds
+    }, 3000); // Reduced from 5 to 3 seconds for better UX
 
     // Set a timeout for very long waits
     const veryLongWaitTimeout = setTimeout(() => {
       setIsVeryLongWait(true);
-    }, 15000); // 15 seconds
+    }, 10000); // Reduced from 15 to 10 seconds
 
     return () => {
       clearTimeout(longWaitTimeout);
@@ -59,10 +59,9 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
             <div className="text-sm text-left text-yellow-700">
               <p className="font-medium mb-1">Taking longer than expected</p>
               <p>
-                The session might be unavailable or there could be connection issues. 
                 {isVeryLongWait 
-                  ? " Please try refreshing the page or check the session link."
-                  : " Please wait a moment..."}
+                  ? "The session might be unavailable or there could be connection issues."
+                  : "Connecting to the session. Please wait a moment..."}
               </p>
             </div>
           </div>

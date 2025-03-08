@@ -38,7 +38,7 @@ export const useConversation = (conversationId: number | null) => {
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     staleTime: 5000,
-    gcTime: 60000, // Changed from cacheTime to gcTime for React Query v5
+    gcTime: 60000, // Updated from cacheTime to gcTime for React Query v5
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchOnReconnect: true
@@ -50,8 +50,7 @@ const fetchConversation = async (id: number | null) => {
   
   console.log('Fetching conversation with ID:', id);
   try {
-    // Use a simpler query that doesn't depend on user authentication and has no filters
-    // that would prevent public access
+    // Use a public query that doesn't depend on authentication
     const { data, error } = await supabase
       .from('conversations')
       .select(`

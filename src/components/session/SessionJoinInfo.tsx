@@ -32,10 +32,13 @@ const SessionJoinInfo = ({
   useEffect(() => {
     if (!conversationId) return;
     
-    console.log("Setting up realtime subscription in SessionJoinInfo for conversation:", conversationId);
+    console.log("Setting up public realtime subscription in SessionJoinInfo for conversation:", conversationId);
+    
+    // Use a public channel with a unique name
+    const channelName = `public-join-info-${conversationId}`;
     
     const channel = supabase
-      .channel(`join-info-${conversationId}`)
+      .channel(channelName)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -49,7 +52,7 @@ const SessionJoinInfo = ({
         }
       })
       .subscribe((status) => {
-        console.log(`SessionJoinInfo channel status: ${status}`);
+        console.log(`SessionJoinInfo channel ${channelName} status: ${status}`);
       });
       
     return () => {

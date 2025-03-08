@@ -67,7 +67,7 @@ const JoinSession = () => {
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
-    return <JoinSessionLoadingState onRetry={handleRetry} />;
+    return <JoinSessionLoadingState onRetry={handleRetry} error={error} />;
   }
 
   // Show error state if invalid request or no conversation data

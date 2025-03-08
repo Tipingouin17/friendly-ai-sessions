@@ -63,15 +63,33 @@ export function useSessionJoiner() {
       
       console.log("Current participant count before update:", currentParticipantCount);
       
-      // Increment the current participant count in the conversation
+      // First, fetch the latest count to avoid race conditions
+      const { data: latestConversation, error: fetchError } = await supabase
+        .from('conversations')
+        .select('id, current_participants')
+        .eq('id', conversationId)
+        .maybeSingle();
+        
+      if (fetchError) {
+        console.error("Error fetching latest conversation data:", fetchError);
+        throw fetchError;
+      }
+      
+      if (!latestConversation) {
+        throw new Error("Could not fetch the latest session data");
+      }
+      
+      const latestCount = latestConversation.current_participants || 0;
+      const newCount = latestCount + 1;
+      console.log("Latest count from database:", latestCount, "New count will be:", newCount);
+      
+      // Update the participant count with the latest calculated value
       const { data, error: updateError } = await supabase
         .from('conversations')
-        .update({ 
-          current_participants: (conversation?.current_participants || 0) + 1 
-        })
+        .update({ current_participants: newCount })
         .eq('id', conversationId)
         .select('current_participants')
-        .single();
+        .limit(1);
         
       if (updateError) {
         console.error("Error updating participant count:", updateError);
@@ -81,8 +99,12 @@ export function useSessionJoiner() {
 
       console.log("Update response:", data);
       
-      // Use the returned current_participants value as the participant ID to ensure uniqueness
-      const newParticipantId = data?.current_participants || ((conversation?.current_participants || 0) + 1);
+      // Use either the returned value or the calculated new count
+      const newParticipantId = data && data.length > 0 
+        ? data[0].current_participants 
+        : newCount;
+      
+      console.log("New participant ID:", newParticipantId);
       
       // Add a short delay to allow for Supabase to process the update
       setTimeout(() => {
@@ -94,7 +116,7 @@ export function useSessionJoiner() {
       setError(error.message || "Failed to join the session");
       toast({
         title: "Error",
-        description: "Failed to join the session. Please try again.",
+        description: error.message || "Failed to join the session. Please try again.",
         variant: "destructive",
       });
       setIsJoining(false);

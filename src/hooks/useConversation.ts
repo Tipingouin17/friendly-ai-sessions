@@ -47,6 +47,7 @@ const fetchConversation = async (id: number | null) => {
   
   console.log('Fetching conversation with ID:', id);
   try {
+    // Use a simpler query that doesn't depend on user authentication
     const { data, error } = await supabase
       .from('conversations')
       .select(`

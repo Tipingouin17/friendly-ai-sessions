@@ -7,6 +7,7 @@ import SessionFullAlert from "@/components/session/SessionFullAlert";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();

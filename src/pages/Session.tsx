@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -232,7 +233,7 @@ const Session = () => {
               onClick={handleStartSession}
               className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md transition-colors"
             >
-              Start Session ({participants.length}/{maxParticipants})
+              Start Session ({participants.length}/{conversation.participants || 0})
             </button>
           </div>
         </div>
@@ -242,8 +243,7 @@ const Session = () => {
 
   return (
     <SessionContainer
-      participantCount={participants.length}
-      maxParticipants={maxParticipants}
+      participantCount={conversation.participants || participants.length}
       conversation={conversation}
       messages={sessionState.messages}
       inputMessage={sessionState.inputMessage}
@@ -252,13 +252,17 @@ const Session = () => {
       onSendMessage={handleSendMessage}
       onLikeMessage={handleLikeMessage}
       isWaitingForResponse={isWaitingForResponse}
-      handleGenerateReport={sessionState.handleGenerateReport}
+      onGenerateReport={sessionState.handleGenerateReport}
       isGeneratingReport={sessionState.isGeneratingReport}
-      handleSaveSession={sessionState.handleSaveSession}
-      isSaving={sessionState.isSaving}
-      canSaveSessions={sessionState.canSaveSessions}
-      canGenerateReports={sessionState.canGenerateReports}
-      handleUpgradePlan={sessionState.handleUpgradePlan}
+      onParticipantSwitch={sessionState.setCurrentParticipant}
+      isRecording={sessionState.isRecording}
+      setIsRecording={sessionState.setIsRecording}
+      participantColors={participantColors}
+      participantNames={{}}
+      participants={participants}
+      conversationId={currentConversationId}
+      facilitator={conversation.sessions?.facilitator_details || {}}
+      objective={conversation.sessions?.objective || ''}
     />
   );
 };

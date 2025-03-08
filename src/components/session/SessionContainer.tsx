@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageList from "@/components/chat/MessageList";
@@ -32,6 +33,7 @@ interface SessionContainerProps {
   onLikeMessage?: (messageId: string) => void;
   participants?: ParticipantInfo[];
   conversationId?: number | null;
+  conversation?: any;
 }
 
 const SessionContainer = ({
@@ -53,7 +55,8 @@ const SessionContainer = ({
   participantNames = {},
   onLikeMessage,
   participants = [],
-  conversationId
+  conversationId,
+  conversation
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   const { toast } = useToast();

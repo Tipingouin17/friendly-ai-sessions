@@ -15,7 +15,8 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
   const [copied, setCopied] = useState(false);
   const [sessionLink, setSessionLink] = useState('');
   const [realParticipantCount, setRealParticipantCount] = useState(currentParticipantCount);
-  const { maxParticipants } = usePlanLimits();
+  const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
+  const { maxParticipants: planMaxParticipants } = usePlanLimits();
   
   useEffect(() => {
     // Create the session join link
@@ -35,7 +36,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
   useEffect(() => {
     // Set up a real-time subscription to track changes to the conversation
     if (conversationId) {
-      const fetchCurrentCount = async () => {
+      const fetchConversationDetails = async () => {
         try {
           const { data } = await supabase
             .from('conversations')
@@ -43,15 +44,17 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             .eq('id', conversationId)
             .single();
             
-          if (data && data.participants !== null) {
-            setRealParticipantCount(data.participants);
+          if (data) {
+            if (data.participants !== null) {
+              setMaxParticipantsForSession(data.participants);
+            }
           }
         } catch (error) {
-          console.error('Error fetching participant count:', error);
+          console.error('Error fetching conversation details:', error);
         }
       };
 
-      fetchCurrentCount();
+      fetchConversationDetails();
 
       // Setup subscription for real-time updates
       const subscription = supabase
@@ -62,8 +65,10 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          if (payload.new && payload.new.participants !== null) {
-            setRealParticipantCount(payload.new.participants);
+          if (payload.new) {
+            if (payload.new.participants !== null) {
+              setMaxParticipantsForSession(payload.new.participants);
+            }
           }
         })
         .subscribe();
@@ -82,7 +87,9 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
 
   if (!conversationId) return null;
 
-  const remainingSpots = maxParticipants - realParticipantCount;
+  // Use the session-specific max participants, fallback to plan limit if not set
+  const effectiveMaxParticipants = maxParticipantsForSession || planMaxParticipants;
+  const remainingSpots = effectiveMaxParticipants - realParticipantCount;
   const isFull = remainingSpots <= 0;
 
   return (
@@ -115,7 +122,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
           <div className="text-center p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-xs">
             <Users className="w-3.5 h-3.5 mx-auto mb-1" />
             <p>Session is full</p>
-            <p>Max {maxParticipants} participants</p>
+            <p>Max {effectiveMaxParticipants} participants</p>
           </div>
         ) : (
           <>
@@ -135,7 +142,7 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             
             <div className="w-full text-xs text-center text-gray-600 flex items-center justify-center gap-1">
               <Users className="w-3 h-3" />
-              <span>{realParticipantCount} of {maxParticipants} participants</span>
+              <span>{realParticipantCount} of {effectiveMaxParticipants} participants</span>
               {remainingSpots > 0 && (
                 <span className="text-green-600 font-medium">
                   ({remainingSpots} spots left)

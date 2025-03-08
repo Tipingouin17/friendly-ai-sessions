@@ -48,15 +48,9 @@ const InputFooter = ({
     participantNames[currentParticipant] || 
     `Participant ${currentParticipant}`;
   
-  // In admin view, we don't need input controls
+  // In admin view, we don't show the input at all
   if (viewMode === "admin") {
-    return (
-      <div className="px-6 py-4 border-t border-gray-100 bg-white">
-        <div className="text-center text-gray-500">
-          <p>You're in admin view. Switch to participant view to send messages.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
   
   return (

@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QrCode, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
@@ -18,10 +19,41 @@ const SessionJoinInfo = ({
   onSessionFull
 }: SessionJoinInfoProps) => {
   const [isCopied, setIsCopied] = useState(false);
+  const [localParticipantCount, setLocalParticipantCount] = useState(currentParticipantCount);
   const { toast } = useToast();
 
   const baseUrl = window.location.origin;
   const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
+
+  // Update local count when prop changes
+  useEffect(() => {
+    setLocalParticipantCount(currentParticipantCount);
+  }, [currentParticipantCount]);
+  
+  // Set up real-time subscription to track participants
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    const channel = supabase
+      .channel(`join-info-${conversationId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("SessionJoinInfo received update:", payload);
+        
+        if (payload.new && payload.new.current_participants !== undefined) {
+          setLocalParticipantCount(payload.new.current_participants);
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(joinUrl);
@@ -42,10 +74,10 @@ const SessionJoinInfo = ({
 
   // Check if session is full and trigger callback if needed
   React.useEffect(() => {
-    if (maxParticipants > 0 && currentParticipantCount >= maxParticipants && onSessionFull) {
+    if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
       onSessionFull();
     }
-  }, [currentParticipantCount, maxParticipants, onSessionFull]);
+  }, [localParticipantCount, maxParticipants, onSessionFull]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start space-y-4 pt-4">
@@ -89,7 +121,7 @@ const SessionJoinInfo = ({
           <span>Participants</span>
         </div>
         <div className="font-medium">
-          {currentParticipantCount} {maxParticipants > 0 ? `/ ${maxParticipants}` : ''}
+          {localParticipantCount} {maxParticipants > 0 ? `/ ${maxParticipants}` : ''}
         </div>
       </div>
     </div>

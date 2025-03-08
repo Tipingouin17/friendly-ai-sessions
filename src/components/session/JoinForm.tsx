@@ -53,7 +53,7 @@ const JoinForm: React.FC<JoinFormProps> = ({
       <Button 
         onClick={onJoinSession} 
         className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
-        disabled={isJoining}
+        disabled={isJoining || isFull}
       >
         {isJoining ? (
           <span className="flex items-center justify-center">
@@ -67,14 +67,16 @@ const JoinForm: React.FC<JoinFormProps> = ({
         )}
       </Button>
       
-      <div className="text-center text-xs text-gray-500 flex items-center justify-center gap-1">
-        <Users className="w-3.5 h-3.5" />
-        <span>{currentParticipantCount} of {effectiveMaxParticipants || '∞'} participants</span>
-        {!isFull && effectiveMaxParticipants > 0 && (
-          <span className="text-green-600 font-medium">
-            ({spotsLeft} spots left)
-          </span>
-        )}
+      <div className="text-center text-sm text-gray-600 flex items-center justify-center gap-1">
+        <Users className="w-4 h-4" />
+        <span>
+          {currentParticipantCount} of {effectiveMaxParticipants || '∞'} participants
+          {!isFull && effectiveMaxParticipants > 0 && (
+            <span className="text-green-600 font-medium ml-1">
+              ({spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left)
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

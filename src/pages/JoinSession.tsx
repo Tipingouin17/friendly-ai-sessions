@@ -1,13 +1,23 @@
 
 import { useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinForm from "@/components/session/JoinForm";
 import SessionFullAlert from "@/components/session/SessionFullAlert";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
+import { useQueryClient } from "@tanstack/react-query";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
   const conversationId = searchParams.get("id") ? Number(searchParams.get("id")) : null;
+  const queryClient = useQueryClient();
+  
+  // Force refresh conversation data when joining a session
+  useEffect(() => {
+    if (conversationId) {
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+    }
+  }, [conversationId, queryClient]);
   
   const {
     participantName,

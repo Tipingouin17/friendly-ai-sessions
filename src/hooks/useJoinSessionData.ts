@@ -20,7 +20,7 @@ export function useJoinSessionData(conversationId: number | null) {
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
   
   // Fetch conversation data to show facilitator info
-  const { data: conversation, isLoading, error } = useConversation(conversationId);
+  const { data: conversation, isLoading, error, refetch } = useConversation(conversationId);
 
   useEffect(() => {
     if (error) {
@@ -56,7 +56,7 @@ export function useJoinSessionData(conversationId: number | null) {
       console.log("Setting up realtime subscription for conversation:", conversationId);
       
       const channel = supabase
-        .channel(`conversation-${conversationId}`)
+        .channel(`conversation-updates-${conversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -74,6 +74,9 @@ export function useJoinSessionData(conversationId: number | null) {
             // Update current participants count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
               setCurrentParticipantCount(payload.new.current_participants);
+              
+              // Force refetch conversation data to ensure we have latest state
+              refetch();
             }
           }
         })
@@ -88,7 +91,7 @@ export function useJoinSessionData(conversationId: number | null) {
         supabase.removeChannel(channel);
       };
     }
-  }, [conversationId]);
+  }, [conversationId, refetch]);
 
   const navigateToSession = (name: string, participantId: number) => {
     console.log(`Navigating to session with name: ${name}, participantId: ${participantId}`);
@@ -130,13 +133,16 @@ export function useJoinSessionData(conversationId: number | null) {
     setIsJoining(true);
 
     try {
+      // Force refresh data before joining to ensure we have latest count
+      await refetch();
+      
       console.log("Current participant count before update:", currentParticipantCount);
       
       // Increment the current participant count in the conversation
       const { data, error: updateError } = await supabase
         .from('conversations')
         .update({ 
-          current_participants: currentParticipantCount + 1 
+          current_participants: (conversation?.current_participants || 0) + 1 
         })
         .eq('id', conversationId)
         .select('current_participants')
@@ -149,8 +155,12 @@ export function useJoinSessionData(conversationId: number | null) {
       console.log("Update response:", data);
       
       // Use the returned current_participants value as the participant ID to ensure uniqueness
-      const newParticipantId = data?.current_participants || (currentParticipantCount + 1);
-      navigateToSession(participantName, newParticipantId);
+      const newParticipantId = data?.current_participants || ((conversation?.current_participants || 0) + 1);
+      
+      // Add a short delay to allow for Supabase to process the update
+      setTimeout(() => {
+        navigateToSession(participantName, newParticipantId);
+      }, 500);
       
     } catch (error) {
       console.error("Error joining session:", error);

@@ -558,6 +558,7 @@ export type Database = {
           conversation_id: number
           created_at: string | null
           id: number
+          is_anonymous: boolean | null
           name: string
           participant_id: number
         }
@@ -566,6 +567,7 @@ export type Database = {
           conversation_id: number
           created_at?: string | null
           id?: number
+          is_anonymous?: boolean | null
           name: string
           participant_id: number
         }
@@ -574,6 +576,7 @@ export type Database = {
           conversation_id?: number
           created_at?: string | null
           id?: number
+          is_anonymous?: boolean | null
           name?: string
           participant_id?: number
         }

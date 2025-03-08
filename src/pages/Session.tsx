@@ -61,8 +61,8 @@ const Session = () => {
           // Add the new participant
           console.log("Adding participant with ID:", state.participantId);
           return [...prev, {
-            id: state.participantId,
-            name: state.participantName,
+            id: state.participantId!,
+            name: state.participantName!,
             avatar: avatarUrl
           }];
         });
@@ -82,6 +82,8 @@ const Session = () => {
       if (conversationId) {
         console.log('Setting conversation ID from URL:', conversationId);
         setCurrentConversationId(Number(conversationId));
+        // Force refresh data when loading from URL
+        queryClient.invalidateQueries({ queryKey: ['conversation', Number(conversationId)] });
       } else {
         console.log('No conversation ID found in state or URL');
         navigate('/my-facilitators');
@@ -96,7 +98,7 @@ const Session = () => {
     }
   }, [currentConversationId]);
 
-  const { data: conversation, isLoading, error } = useConversation(currentConversationId);
+  const { data: conversation, isLoading, error, refetch } = useConversation(currentConversationId);
 
   const sessionState = useSessionState({
     conversationId: currentConversationId,
@@ -114,6 +116,31 @@ const Session = () => {
       navigate('/my-facilitators');
     }
   }, [error, navigate, toast]);
+
+  // When conversation data is loaded, update participants with current count
+  useEffect(() => {
+    if (conversation && conversation.current_participants > 0) {
+      // Only update if we have a valid participant count and it's greater than our current list
+      if (conversation.current_participants > participants.length) {
+        console.log("Updating participants based on conversation data:", conversation.current_participants);
+        
+        const updatedParticipants = [...participants];
+        
+        // Add placeholders for any missing participants
+        for (let i = updatedParticipants.length + 1; i <= conversation.current_participants; i++) {
+          if (!updatedParticipants.some(p => p.id === i)) {
+            updatedParticipants.push({
+              id: i,
+              name: `Participant ${i}`,
+              avatar: null
+            });
+          }
+        }
+        
+        setParticipants(updatedParticipants);
+      }
+    }
+  }, [conversation, participants]);
 
   useEffect(() => {
     // If we're a mobile guest, disable QR code view
@@ -155,6 +182,9 @@ const Session = () => {
               }
               setParticipants(newParticipants);
             }
+            
+            // Force refresh the conversation data
+            refetch();
           }
         })
         .subscribe();
@@ -163,7 +193,7 @@ const Session = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [currentConversationId, participants]);
+  }, [currentConversationId, participants, refetch]);
 
   const handleStartSession = () => {
     setShowQrCodeView(false);
@@ -194,7 +224,7 @@ const Session = () => {
       [currentParticipantKey]: sessionState.inputMessage
     };
     const totalParticipants = conversation?.participants ?? 1;
-    const allParticipantsResponded = Object.keys(updatedMessages).length === totalParticipants;
+    const allParticipantsResponded = Object.keys(updatedMessages).length >= totalParticipants;
 
     if (allParticipantsResponded) {
       const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => {
@@ -304,6 +334,7 @@ const Session = () => {
             <SessionJoinInfo 
               conversationId={currentConversationId} 
               currentParticipantCount={conversation.current_participants || 0}
+              maxParticipants={conversation.participants || 0}
               onSessionFull={handleSessionFull}
             />
             

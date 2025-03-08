@@ -73,7 +73,7 @@ const SessionJoinInfo = ({
   const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`;
 
   // Check if session is full and trigger callback if needed
-  React.useEffect(() => {
+  useEffect(() => {
     if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
       onSessionFull();
     }

@@ -47,13 +47,14 @@ const JoinForm: React.FC<JoinFormProps> = ({
           value={participantName}
           onChange={onNameChange}
           className="w-full"
+          autoFocus
         />
       </div>
 
       <Button 
         onClick={onJoinSession} 
         className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
-        disabled={isJoining || isFull}
+        disabled={isJoining || isFull || !participantName.trim()}
       >
         {isJoining ? (
           <span className="flex items-center justify-center">

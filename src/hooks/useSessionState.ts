@@ -22,7 +22,7 @@ export function useSessionState({
   const [hasAnswered, setHasAnswered] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [viewMode, setViewMode] = useState<"participant" | "admin">("admin");
+  const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   
   // Ensure current participant is locked to their assigned ID
   const currentParticipant = currentUserParticipantId || 1;

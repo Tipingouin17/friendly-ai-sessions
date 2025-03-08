@@ -45,16 +45,15 @@ const JoinSession = () => {
       if (!conversationId) return;
       
       try {
-        // Query to get the participant count or current active participants
-        // This can be adjusted based on how participants are tracked in your database
+        // Query to get the participant count from the conversation
         const { data } = await supabase
           .from('conversations')
           .select('participants')
           .eq('id', conversationId)
           .single();
           
-        if (data) {
-          setCurrentParticipantCount(data.participants || 0);
+        if (data && data.participants !== null) {
+          setCurrentParticipantCount(data.participants);
         }
       } catch (error) {
         console.error("Error fetching participant count:", error);
@@ -62,6 +61,27 @@ const JoinSession = () => {
     };
     
     fetchParticipantCount();
+
+    // Set up real-time subscription to track changes to participants
+    if (conversationId) {
+      const subscription = supabase
+        .channel(`conversation-${conversationId}`)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        }, (payload) => {
+          if (payload.new && payload.new.participants !== null) {
+            setCurrentParticipantCount(payload.new.participants);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, [conversationId]);
 
   const handleJoinSession = async () => {
@@ -87,7 +107,19 @@ const JoinSession = () => {
     setIsJoining(true);
 
     try {
-      // For this implementation, we'll just navigate to the session with the participant info
+      // Increment the participant count in the conversation
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({ 
+          participants: currentParticipantCount + 1 
+        })
+        .eq('id', conversationId);
+        
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Navigate to the session with the participant info
       navigate(`/session?id=${conversationId}`, {
         state: { 
           participantName,
@@ -189,6 +221,11 @@ const JoinSession = () => {
               <div className="text-center text-xs text-gray-500 flex items-center justify-center gap-1">
                 <Users className="w-3.5 h-3.5" />
                 <span>{currentParticipantCount} of {maxParticipants} participants</span>
+                {!isFull && (
+                  <span className="text-green-600 font-medium">
+                    ({maxParticipants - currentParticipantCount} spots left)
+                  </span>
+                )}
               </div>
             </div>
           </>

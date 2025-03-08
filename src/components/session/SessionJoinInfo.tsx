@@ -4,6 +4,7 @@ import { QrCode, Link, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
@@ -13,6 +14,7 @@ interface SessionJoinInfoProps {
 const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: SessionJoinInfoProps) => {
   const [copied, setCopied] = useState(false);
   const [sessionLink, setSessionLink] = useState('');
+  const [realParticipantCount, setRealParticipantCount] = useState(currentParticipantCount);
   const { maxParticipants } = usePlanLimits();
   
   useEffect(() => {
@@ -20,6 +22,55 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
     if (conversationId) {
       const baseUrl = window.location.origin;
       setSessionLink(`${baseUrl}/join-session?id=${conversationId}`);
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    // Update the real participant count if it changes from props
+    if (currentParticipantCount !== undefined) {
+      setRealParticipantCount(currentParticipantCount);
+    }
+  }, [currentParticipantCount]);
+
+  useEffect(() => {
+    // Set up a real-time subscription to track changes to the conversation
+    if (conversationId) {
+      const fetchCurrentCount = async () => {
+        try {
+          const { data } = await supabase
+            .from('conversations')
+            .select('participants')
+            .eq('id', conversationId)
+            .single();
+            
+          if (data && data.participants !== null) {
+            setRealParticipantCount(data.participants);
+          }
+        } catch (error) {
+          console.error('Error fetching participant count:', error);
+        }
+      };
+
+      fetchCurrentCount();
+
+      // Setup subscription for real-time updates
+      const subscription = supabase
+        .channel(`conversation-${conversationId}`)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        }, (payload) => {
+          if (payload.new && payload.new.participants !== null) {
+            setRealParticipantCount(payload.new.participants);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
     }
   }, [conversationId]);
 
@@ -31,11 +82,11 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
 
   if (!conversationId) return null;
 
-  const remainingSpots = maxParticipants - currentParticipantCount;
+  const remainingSpots = maxParticipants - realParticipantCount;
   const isFull = remainingSpots <= 0;
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-gray-100">
+    <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-gray-100 w-full">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-medium flex items-center gap-1 text-gray-700">
           <QrCode className="w-4 h-4" /> Join this session
@@ -84,7 +135,12 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
             
             <div className="w-full text-xs text-center text-gray-600 flex items-center justify-center gap-1">
               <Users className="w-3 h-3" />
-              <span>{currentParticipantCount} of {maxParticipants} participants</span>
+              <span>{realParticipantCount} of {maxParticipants} participants</span>
+              {remainingSpots > 0 && (
+                <span className="text-green-600 font-medium">
+                  ({remainingSpots} spots left)
+                </span>
+              )}
             </div>
           </>
         )}

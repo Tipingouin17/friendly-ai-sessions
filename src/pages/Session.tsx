@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,9 +10,8 @@ import LoadingState from "@/components/session/LoadingState";
 import EmptyState from "@/components/session/EmptyState";
 import SessionContainer from "@/components/session/SessionContainer";
 import { ParticipantInfo } from "@/types/chat";
-import { QrCode, Link, Copy, Check, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { usePlanLimits } from "@/hooks/usePlanLimits";
+import SessionJoinInfo from "@/components/session/SessionJoinInfo";
 
 const Session = () => {
   const location = useLocation();
@@ -25,10 +23,15 @@ const Session = () => {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [sessionLink, setSessionLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showQrCodeView, setShowQrCodeView] = useState(true);
   const { maxParticipants } = usePlanLimits();
   
   useEffect(() => {
-    const state = location.state as { newConversationId?: number; replace?: boolean } | null;
+    const state = location.state as { newConversationId?: number; replace?: boolean; participantName?: string; isGuest?: boolean } | null;
+    
+    if (state?.isGuest) {
+      setShowQrCodeView(false);
+    }
     
     if (state?.newConversationId) {
       console.log('Setting conversation ID from state:', state.newConversationId);
@@ -50,7 +53,6 @@ const Session = () => {
     }
   }, [location, queryClient, navigate]);
 
-  // Create session join link when conversation ID is available
   useEffect(() => {
     if (currentConversationId) {
       const baseUrl = window.location.origin;
@@ -77,10 +79,30 @@ const Session = () => {
     }
   }, [error, navigate, toast]);
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(sessionLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      if (currentConversationId) {
+        try {
+          if (conversation) {
+            const participantCount = conversation.participants || 0;
+            const placeholderParticipants: ParticipantInfo[] = Array.from({ length: participantCount }).map((_, index) => ({
+              id: index + 1,
+              name: `Participant ${index + 1}`,
+              avatar: null
+            }));
+            setParticipants(placeholderParticipants);
+          }
+        } catch (error) {
+          console.error('Error fetching participants:', error);
+        }
+      }
+    };
+
+    fetchParticipants();
+  }, [currentConversationId, conversation]);
+
+  const handleStartSession = () => {
+    setShowQrCodeView(false);
   };
 
   const handleSendMessage = async () => {
@@ -189,56 +211,55 @@ const Session = () => {
   if (isLoading) return <LoadingState />;
   if (!conversation || !currentConversationId) return <EmptyState />;
 
-  // Show the session QR code screen
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-12">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h2 className="text-2xl font-bold mb-2 text-center">Join This Session</h2>
-        <p className="text-gray-600 mb-6 text-center">
-          {conversation.sessions?.facilitator_details?.title 
-            ? `Session with ${conversation.sessions.facilitator_details.title}` 
-            : 'Scan the QR code to join this session'}
-        </p>
-        
-        <div className="flex flex-col items-center space-y-4">
-          {/* QR Code - using a simple QR code API */}
-          <img 
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(sessionLink)}`}
-            alt="Session QR Code"
-            className="rounded-md border border-gray-200 bg-white p-2"
-            width={200}
-            height={200}
-          />
+  if (showQrCodeView) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-12">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-2 text-center">Join This Session</h2>
+          <p className="text-gray-600 mb-6 text-center">
+            {conversation.sessions?.facilitator_details?.title 
+              ? `Session with ${conversation.sessions.facilitator_details.title}` 
+              : 'Scan the QR code to join this session'}
+          </p>
           
-          <div className="w-full flex items-center gap-2 bg-gray-50 p-3 rounded text-sm text-gray-700 border border-gray-200">
-            <Link className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <span className="truncate">{sessionLink}</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="ml-auto"
-              onClick={handleCopyLink}
+          <div className="flex flex-col items-center space-y-6">
+            <SessionJoinInfo 
+              conversationId={currentConversationId} 
+              currentParticipantCount={participants.length}
+            />
+            
+            <button 
+              onClick={handleStartSession}
+              className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md transition-colors"
             >
-              {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-            </Button>
+              Start Session ({participants.length}/{maxParticipants})
+            </button>
           </div>
-          
-          <div className="text-sm text-center text-gray-600 flex items-center justify-center gap-1 mt-2">
-            <Users className="w-4 h-4" />
-            <span>{participants.length} of {maxParticipants} participants</span>
-          </div>
-          
-          <Button 
-            onClick={() => sessionState.setMessages.length > 0 
-              ? navigate(`/session?id=${currentConversationId}`) 
-              : null}
-            className="mt-4 w-full"
-          >
-            Start Session ({participants.length}/{maxParticipants})
-          </Button>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <SessionContainer
+      participantCount={participants.length}
+      maxParticipants={maxParticipants}
+      conversation={conversation}
+      messages={sessionState.messages}
+      inputMessage={sessionState.inputMessage}
+      setInputMessage={sessionState.setInputMessage}
+      currentParticipant={sessionState.currentParticipant}
+      onSendMessage={handleSendMessage}
+      onLikeMessage={handleLikeMessage}
+      isWaitingForResponse={isWaitingForResponse}
+      handleGenerateReport={sessionState.handleGenerateReport}
+      isGeneratingReport={sessionState.isGeneratingReport}
+      handleSaveSession={sessionState.handleSaveSession}
+      isSaving={sessionState.isSaving}
+      canSaveSessions={sessionState.canSaveSessions}
+      canGenerateReports={sessionState.canGenerateReports}
+      handleUpgradePlan={sessionState.handleUpgradePlan}
+    />
   );
 };
 

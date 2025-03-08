@@ -91,14 +91,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/session"
-            element={
-              <ProtectedRoute>
-                <Session />
-              </ProtectedRoute>
-            }
-          />
+          {/* Remove the ProtectedRoute wrapper for Session page */}
+          <Route path="/session" element={<Session />} />
           <Route path="/checkout/:planType?" element={<Checkout />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

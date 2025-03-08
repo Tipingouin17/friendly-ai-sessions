@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,7 +26,6 @@ const Session = () => {
   const [showQrCodeView, setShowQrCodeView] = useState(true);
   const { maxParticipants } = usePlanLimits();
   
-  // Check if we're on a mobile device
   const isMobile = window.innerWidth < 768;
   
   useEffect(() => {
@@ -46,19 +44,15 @@ const Session = () => {
       console.log("Guest participant joining with data:", state);
       setShowQrCodeView(false);
       
-      // If this is a guest joining, add their participant info
       if (state.participantName && state.participantId) {
-        // Create avatar URL from boring avatar parameters
         const avatarUrl = state.avatarSeed 
           ? `/api/avatar?name=${state.avatarSeed}&variant=beam&palette=0` 
           : null;
           
         setParticipants(prev => {
-          // Check if this participant already exists
           const exists = prev.some(p => p.id === state.participantId);
           if (exists) return prev;
           
-          // Add the new participant
           console.log("Adding participant with ID:", state.participantId);
           return [...prev, {
             id: state.participantId!,
@@ -82,11 +76,10 @@ const Session = () => {
       if (conversationId) {
         console.log('Setting conversation ID from URL:', conversationId);
         setCurrentConversationId(Number(conversationId));
-        // Force refresh data when loading from URL
         queryClient.invalidateQueries({ queryKey: ['conversation', Number(conversationId)] });
       } else {
         console.log('No conversation ID found in state or URL');
-        navigate('/my-facilitators');
+        navigate('/');
       }
     }
   }, [location, queryClient, navigate]);
@@ -113,20 +106,17 @@ const Session = () => {
         description: "Failed to load the session. Please try again.",
         variant: "destructive",
       });
-      navigate('/my-facilitators');
+      navigate('/');
     }
   }, [error, navigate, toast]);
 
-  // When conversation data is loaded, update participants with current count
   useEffect(() => {
     if (conversation && conversation.current_participants > 0) {
-      // Only update if we have a valid participant count and it's greater than our current list
       if (conversation.current_participants > participants.length) {
         console.log("Updating participants based on conversation data:", conversation.current_participants);
         
         const updatedParticipants = [...participants];
         
-        // Add placeholders for any missing participants
         for (let i = updatedParticipants.length + 1; i <= conversation.current_participants; i++) {
           if (!updatedParticipants.some(p => p.id === i)) {
             updatedParticipants.push({
@@ -143,13 +133,11 @@ const Session = () => {
   }, [conversation, participants]);
 
   useEffect(() => {
-    // If we're a mobile guest, disable QR code view
     if (isMobile && location.state?.isGuest) {
       setShowQrCodeView(false);
     }
   }, [isMobile, location.state]);
 
-  // Set up subscription to listen for participant changes
   useEffect(() => {
     if (currentConversationId) {
       console.log("Setting up realtime subscription for participants in Session page");
@@ -167,9 +155,7 @@ const Session = () => {
           if (payload.new && payload.new.current_participants !== undefined) {
             const currentCount = payload.new.current_participants;
             
-            // Update participants if count increased
             if (currentCount > participants.length) {
-              // Add placeholder participants for new joiners
               const newParticipants = [...participants];
               for (let i = participants.length + 1; i <= currentCount; i++) {
                 if (!newParticipants.some(p => p.id === i)) {
@@ -183,7 +169,6 @@ const Session = () => {
               setParticipants(newParticipants);
             }
             
-            // Force refresh the conversation data
             refetch();
           }
         })
@@ -201,7 +186,6 @@ const Session = () => {
 
   const handleSessionFull = () => {
     if (showQrCodeView) {
-      // Automatically start session when it's full
       setShowQrCodeView(false);
       toast({
         title: "Session is full",
@@ -316,7 +300,6 @@ const Session = () => {
   if (isLoading) return <LoadingState />;
   if (!conversation || !currentConversationId) return <EmptyState />;
 
-  // If we're on mobile and have participant info, skip QR code view
   const shouldShowSession = !showQrCodeView || (isMobile && location.state?.isGuest);
 
   if (!shouldShowSession) {

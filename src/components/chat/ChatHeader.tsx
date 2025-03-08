@@ -10,6 +10,7 @@ interface ChatHeaderProps {
   onGenerateReport?: () => void;
   isGeneratingReport?: boolean;
   canGenerateReport?: boolean;
+  viewMode?: "participant" | "admin";
 }
 
 const ChatHeader = ({ 
@@ -19,7 +20,8 @@ const ChatHeader = ({
   participantCount = 1,
   onGenerateReport,
   isGeneratingReport,
-  canGenerateReport
+  canGenerateReport,
+  viewMode = "participant"
 }: ChatHeaderProps) => {
   return (
     <div className="border-b border-gray-100 p-6">
@@ -33,9 +35,12 @@ const ChatHeader = ({
           <div>
             <h2 className="text-xl font-semibold">{title}</h2>
             <p className="text-gray-600 text-sm">{objective}</p>
-            <p className="text-sm text-primary mt-1">
-              {participantCount} {participantCount === 1 ? 'participant' : 'participants'}
-            </p>
+            {/* Only show participant count in admin view */}
+            {viewMode === "admin" && (
+              <p className="text-sm text-primary mt-1">
+                {participantCount} {participantCount === 1 ? 'participant' : 'participants'}
+              </p>
+            )}
           </div>
         </div>
         {onGenerateReport && (

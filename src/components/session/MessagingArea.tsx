@@ -122,7 +122,8 @@ const MessagingArea = ({
         )}
       </div>
       
-      {!isMobile && (
+      {/* Only show the QR code and participant count for admin view */}
+      {!isMobile && viewMode === "admin" && (
         <div className="w-32 p-2 flex-shrink-0 border-l border-gray-100 order-1 sm:order-2">
           <SessionJoinInfo 
             conversationId={conversationId} 

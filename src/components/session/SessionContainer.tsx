@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -178,6 +177,7 @@ const SessionContainer = ({
             isGeneratingReport={isGeneratingReport}
             canGenerateReports={canGenerateReports}
             messagesCount={messages.length}
+            viewMode={viewMode}
           />
           
           <ViewModeToggle 
@@ -200,7 +200,8 @@ const SessionContainer = ({
             viewMode={viewMode}
           />
           
-          {isMobile && (
+          {/* Only show QR dialog for admin view on mobile */}
+          {isMobile && viewMode === "admin" && (
             <JoinSessionDialog 
               isOpen={isQrDialogOpen}
               setIsOpen={setIsQrDialogOpen}

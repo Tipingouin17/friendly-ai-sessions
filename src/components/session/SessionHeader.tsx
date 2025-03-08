@@ -13,6 +13,7 @@ interface SessionHeaderProps {
   isGeneratingReport?: boolean;
   canGenerateReports: boolean;
   messagesCount: number;
+  viewMode: "participant" | "admin";
 }
 
 const SessionHeader = ({
@@ -22,7 +23,8 @@ const SessionHeader = ({
   onGenerateReport,
   isGeneratingReport,
   canGenerateReports,
-  messagesCount
+  messagesCount,
+  viewMode
 }: SessionHeaderProps) => {
   return (
     <ChatHeader 
@@ -33,6 +35,7 @@ const SessionHeader = ({
       onGenerateReport={onGenerateReport}
       isGeneratingReport={isGeneratingReport}
       canGenerateReport={messagesCount > 0 && canGenerateReports}
+      viewMode={viewMode}
     />
   );
 };

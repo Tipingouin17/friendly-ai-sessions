@@ -12,6 +12,7 @@ interface SessionJoinParams {
   conversation: ConversationWithSession | null;
   currentParticipantCount: number;
   refetch: () => Promise<any>;
+  isAnonymous?: boolean;
 }
 
 export function useSessionJoiner() {
@@ -40,7 +41,8 @@ export function useSessionJoiner() {
     avatarSeed,
     conversation,
     currentParticipantCount,
-    refetch
+    refetch,
+    isAnonymous = false
   }: SessionJoinParams) => {
     if (!participantName.trim()) {
       toast({
@@ -120,7 +122,8 @@ export function useSessionJoiner() {
           conversation_id: conversationId,
           participant_id: newParticipantId,
           name: participantName,
-          avatar_seed: avatarSeed
+          avatar_seed: avatarSeed,
+          is_anonymous: isAnonymous
         });
         
       if (participantError) {

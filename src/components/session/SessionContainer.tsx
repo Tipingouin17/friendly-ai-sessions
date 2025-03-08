@@ -2,6 +2,7 @@
 import React from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { Message, ParticipantInfo } from "@/types/chat";
 import SessionHeader from "./SessionHeader";
 import MessagingArea from "./MessagingArea";
@@ -22,7 +23,6 @@ interface SessionContainerProps {
   isRecording: boolean;
   isGeneratingReport?: boolean;
   isWaitingForResponse?: boolean;
-  onParticipantSwitch: (num: number) => void;
   setInputMessage: (message: string) => void;
   onSendMessage: () => void;
   setIsRecording: (isRecording: boolean) => void;
@@ -34,6 +34,8 @@ interface SessionContainerProps {
   conversation?: any;
   currentParticipantCount?: number;
   currentUserParticipantId?: number | null;
+  hasAnswered: boolean;
+  totalResponses: number;
 }
 
 const SessionContainer = ({
@@ -47,7 +49,6 @@ const SessionContainer = ({
   isRecording,
   isGeneratingReport,
   isWaitingForResponse = false,
-  onParticipantSwitch,
   setInputMessage,
   onSendMessage,
   setIsRecording,
@@ -58,7 +59,9 @@ const SessionContainer = ({
   conversationId,
   conversation,
   currentParticipantCount,
-  currentUserParticipantId
+  currentUserParticipantId,
+  hasAnswered,
+  totalResponses
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   
@@ -74,11 +77,19 @@ const SessionContainer = ({
     conversationId: conversationId || null
   });
   
+  // Anonymous state management
+  const { isAnonymous, toggleAnonymous } = useAnonymousState({
+    conversationId,
+    currentParticipantId: currentUserParticipantId
+  });
+  
+  // Process messages to handle participant names and anonymity
   const transformedMessages = messages.map(message => {
     if (message.participant && message.participant.startsWith('P')) {
       const participantNumber = parseInt(message.participant.slice(1));
       const participant = participants.find(p => p.id === participantNumber);
       
+      // Don't modify the message content, just add participant details
       if (participant) {
         return {
           ...message,
@@ -101,8 +112,6 @@ const SessionContainer = ({
     }
     return message;
   });
-
-  const canSwitchParticipants = !currentUserParticipantId;
 
   return (
     <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
@@ -144,7 +153,6 @@ const SessionContainer = ({
           <InputFooter 
             participantCount={participantCount}
             currentParticipant={currentParticipant}
-            onParticipantSwitch={onParticipantSwitch}
             participantNames={participantNames}
             participants={participants}
             inputMessage={inputMessage}
@@ -152,8 +160,11 @@ const SessionContainer = ({
             onSendMessage={onSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
-            canSwitchParticipants={canSwitchParticipants}
             currentUserParticipantId={currentUserParticipantId}
+            isAnonymous={isAnonymous}
+            toggleAnonymous={toggleAnonymous}
+            hasAnswered={hasAnswered}
+            totalResponses={totalResponses}
           />
         </div>
       </div>

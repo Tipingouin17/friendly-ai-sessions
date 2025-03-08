@@ -5,6 +5,7 @@ import { useSessionState } from "@/hooks/useSessionState";
 import { useSessionData } from "@/hooks/useSessionData";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
+import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { participantColors } from "@/utils/sessionHelpers";
 import { SessionContextProps } from "@/types/session";
 import { ConversationWithSession } from "@/types/database";
@@ -66,6 +67,12 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     currentUserParticipantId
   });
 
+  // Set up anonymous state
+  const anonymousState = useAnonymousState({
+    conversationId: currentConversationId,
+    currentParticipantId: currentUserParticipantId
+  });
+
   // Set up message handling and interactions
   const {
     isWaitingForResponse,
@@ -75,7 +82,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     currentConversationId,
     sessionState,
     conversation: typedConversation,
-    participants
+    participants,
+    isAnonymous: anonymousState.isAnonymous
   });
 
   const sessionContext: SessionContextProps = {
@@ -91,7 +99,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     handleLikeMessage,
     showQrCodeView,
     sessionLink,
-    currentUserParticipantId
+    currentUserParticipantId,
+    anonymousState
   };
 
   return (

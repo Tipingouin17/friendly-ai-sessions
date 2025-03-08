@@ -10,15 +10,14 @@ export interface SessionContextProps {
     messages: Message[];
     inputMessage: string;
     setInputMessage: (message: string) => void;
-    participantMessages: { [key: string]: string };
     currentParticipant: number;
-    setCurrentParticipant: (num: number) => void;
     isRecording: boolean;
     setIsRecording: (isRecording: boolean) => void;
     handleGenerateReport: () => Promise<void>;
     isGeneratingReport: boolean;
-    setParticipantMessages: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+    hasAnswered: boolean;
+    totalResponses: number;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };
@@ -29,4 +28,8 @@ export interface SessionContextProps {
   showQrCodeView: boolean;
   sessionLink: string;
   currentUserParticipantId: number | null;
+  anonymousState: {
+    isAnonymous: boolean;
+    toggleAnonymous: () => void;
+  };
 }

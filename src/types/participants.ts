@@ -6,4 +6,5 @@ export interface SessionParticipant {
   avatar_seed: string | null;
   participant_id: number;
   created_at?: string;
+  is_anonymous?: boolean;
 }

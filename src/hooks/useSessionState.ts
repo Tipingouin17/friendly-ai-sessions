@@ -17,17 +17,14 @@ export function useSessionState({
 }: UseSessionStateProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [participantMessages, setParticipantMessages] = useState<{ [key: string]: string }>({});
-  const [currentParticipant, setCurrentParticipant] = useState<number>(currentUserParticipantId || 1);
+  const [pendingResponses, setPendingResponses] = useState<{ [key: number]: boolean }>({});
+  const [totalResponses, setTotalResponses] = useState(0);
+  const [hasAnswered, setHasAnswered] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
-  // Enforce that user can only use their assigned participant
-  useEffect(() => {
-    if (currentUserParticipantId) {
-      setCurrentParticipant(currentUserParticipantId);
-    }
-  }, [currentUserParticipantId]);
+  // Ensure current participant is locked to their assigned ID
+  const currentParticipant = currentUserParticipantId || 1;
 
   // Add welcome message if present
   useEffect(() => {
@@ -38,7 +35,7 @@ export function useSessionState({
           id: welcomeId,
           content: welcomeMessage,
           sender: "assistant",
-          timestamp: new Date(), // Fixed: using timestamp instead of createdAt
+          timestamp: new Date(),
           likes: []
         }
       ]);
@@ -78,7 +75,7 @@ export function useSessionState({
             id: reportId,
             content: data,
             sender: "assistant",
-            timestamp: new Date(), // Fixed: using timestamp instead of createdAt
+            timestamp: new Date(),
             isReport: true,
             likes: []
           }
@@ -89,18 +86,49 @@ export function useSessionState({
     }
   };
 
+  // Record a response to a facilitator question
+  const recordResponse = (participantId: number, hasResponded: boolean) => {
+    setPendingResponses(prev => ({
+      ...prev,
+      [participantId]: hasResponded
+    }));
+    
+    if (hasResponded && participantId === currentParticipant) {
+      setHasAnswered(true);
+    }
+  };
+  
+  // Update total responses count
+  useEffect(() => {
+    if (Object.keys(pendingResponses).length > 0) {
+      const count = Object.values(pendingResponses).filter(Boolean).length;
+      setTotalResponses(count);
+    }
+  }, [pendingResponses]);
+
+  // Reset answer state when a new facilitator message arrives
+  useEffect(() => {
+    const latestMessage = messages[messages.length - 1];
+    if (latestMessage?.sender === "assistant" && !latestMessage.isReport) {
+      setHasAnswered(false);
+      setPendingResponses({});
+      setTotalResponses(0);
+    }
+  }, [messages]);
+
   return {
     messages,
     setMessages,
     inputMessage,
     setInputMessage,
-    participantMessages,
-    setParticipantMessages, 
     currentParticipant,
-    setCurrentParticipant,
     isRecording,
     setIsRecording,
     handleGenerateReport,
-    isGeneratingReport
+    isGeneratingReport,
+    recordResponse,
+    totalResponses,
+    hasAnswered,
+    pendingResponses
   };
 }

@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
+import { nanoid } from "nanoid";
 
 type UseSessionInteractionsProps = {
   currentConversationId: number | null;
@@ -12,20 +13,22 @@ type UseSessionInteractionsProps = {
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     inputMessage: string;
     setInputMessage: (message: string) => void;
-    participantMessages: { [key: string]: string };
-    setParticipantMessages: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
     currentParticipant: number;
-    setCurrentParticipant: (num: number) => void;
+    recordResponse: (participantId: number, hasResponded: boolean) => void;
+    totalResponses: number;
+    hasAnswered: boolean;
   };
   conversation: any;
   participants: any[];
+  isAnonymous: boolean;
 };
 
 export const useSessionInteractions = ({
   currentConversationId,
   sessionState,
   conversation,
-  participants
+  participants,
+  isAnonymous
 }: UseSessionInteractionsProps) => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const { toast } = useToast();
@@ -33,47 +36,52 @@ export const useSessionInteractions = ({
   const handleSendMessage = async () => {
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
-    const currentParticipantKey = `P${sessionState.currentParticipant}`;
-    sessionState.setParticipantMessages(prev => ({
-      ...prev,
-      [currentParticipantKey]: sessionState.inputMessage
-    }));
-
-    const updatedMessages = {
-      ...sessionState.participantMessages,
-      [currentParticipantKey]: sessionState.inputMessage
+    // Get the current participant info
+    const currentParticipant = sessionState.currentParticipant;
+    const currentParticipantKey = `P${currentParticipant}`;
+    const participantInfo = participants.find(p => p.id === currentParticipant);
+    
+    // Record this participant has responded
+    sessionState.recordResponse(currentParticipant, true);
+    
+    // Create the message object
+    const messageId = nanoid();
+    const newMessage = {
+      id: messageId,
+      content: sessionState.inputMessage,
+      sender: "user" as const,
+      participant: currentParticipantKey,
+      timestamp: new Date(),
+      color: participantColors[currentParticipantKey as keyof typeof participantColors],
+      avatar: participantInfo?.avatar,
+      isAnonymous: isAnonymous
     };
+
+    // Add the participant's message to the displayed messages
+    sessionState.setMessages(prev => [...prev, newMessage]);
+    
+    // Check if we have responses from all participants
     const totalParticipants = conversation?.participants ?? 1;
-    const allParticipantsResponded = Object.keys(updatedMessages).length >= totalParticipants;
+    const allParticipantsResponded = sessionState.totalResponses >= totalParticipants;
 
+    // If all participants have responded, send to facilitator
     if (allParticipantsResponded) {
-      const participantResponses = Object.entries(updatedMessages).map(([participant, content], index) => {
-        const participantNumber = parseInt(participant.slice(1));
-        const participantInfo = participants.find(p => p.id === participantNumber);
-        
-        return {
-          id: Date.now().toString() + index,
-          content,
-          sender: "user" as const,
-          participant,
-          timestamp: new Date(),
-          color: participantColors[participant as keyof typeof participantColors],
-          avatar: participantInfo?.avatar
-        };
-      });
-
-      sessionState.setMessages(prev => [...prev, ...participantResponses]);
       setIsWaitingForResponse(true);
 
       try {
+        // Get all participant messages for this round
+        const participantMessages = sessionState.messages.filter(msg => 
+          msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
+        ).slice(-totalParticipants);
+        
         console.log('Calling edge function with:', {
           conversationId: currentConversationId,
-          messages: [...sessionState.messages, ...participantResponses]
+          messages: sessionState.messages
         });
 
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
-            messages: [...sessionState.messages, ...participantResponses],
+            messages: sessionState.messages,
             conversationId: currentConversationId
           }
         });
@@ -84,7 +92,7 @@ export const useSessionInteractions = ({
         if (!response.data) throw new Error('No response data received from AI');
 
         const aiResponse = {
-          id: response.data.id || Date.now().toString(),
+          id: response.data.id || nanoid(),
           content: response.data.content,
           sender: "assistant" as const,
           timestamp: new Date(),
@@ -101,12 +109,6 @@ export const useSessionInteractions = ({
       } finally {
         setIsWaitingForResponse(false);
       }
-
-      sessionState.setParticipantMessages({});
-    } else {
-      const nextParticipant = sessionState.currentParticipant < totalParticipants ? 
-        sessionState.currentParticipant + 1 : 1;
-      sessionState.setCurrentParticipant(nextParticipant);
     }
 
     sessionState.setInputMessage("");

@@ -1,13 +1,15 @@
 
 import React from 'react';
-import ParticipantSelector from "./ParticipantSelector";
 import ChatInput from "@/components/chat/ChatInput";
 import { ParticipantInfo } from "@/types/chat";
+import { Badge } from "@/components/ui/badge";
+import { EyeOff, Users } from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface InputFooterProps {
   participantCount: number;
   currentParticipant: number;
-  onParticipantSwitch: (num: number) => void;
   participantNames: { [key: number]: string };
   participants: ParticipantInfo[];
   inputMessage: string;
@@ -15,14 +17,16 @@ interface InputFooterProps {
   onSendMessage: () => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
-  canSwitchParticipants?: boolean;
   currentUserParticipantId?: number | null;
+  isAnonymous: boolean;
+  toggleAnonymous: () => void;
+  hasAnswered: boolean;
+  totalResponses: number;
 }
 
 const InputFooter = ({
   participantCount,
   currentParticipant,
-  onParticipantSwitch,
   participantNames,
   participants,
   inputMessage,
@@ -30,33 +34,55 @@ const InputFooter = ({
   onSendMessage,
   isRecording,
   setIsRecording,
-  canSwitchParticipants = true,
-  currentUserParticipantId
+  currentUserParticipantId,
+  isAnonymous,
+  toggleAnonymous,
+  hasAnswered,
+  totalResponses
 }: InputFooterProps) => {
-  // Determine whether participant switching is allowed
-  const allowParticipantSwitch = canSwitchParticipants && !currentUserParticipantId;
-  
-  // Handle participant switch attempts when not allowed
-  const handleParticipantSwitch = (num: number) => {
-    if (allowParticipantSwitch) {
-      onParticipantSwitch(num);
-    } else if (num !== currentUserParticipantId) {
-      // Prevent switching to other participants for guests
-      console.log("Participant switching not allowed for guests");
-    }
-  };
+  // Find current participant info
+  const participantInfo = participants.find(p => p.id === currentParticipant);
+  const participantName = participantInfo?.name || 
+    participantNames[currentParticipant] || 
+    `Participant ${currentParticipant}`;
   
   return (
     <>
-      <ParticipantSelector
-        participantCount={participantCount}
-        currentParticipant={currentParticipant}
-        onParticipantSwitch={handleParticipantSwitch}
-        participantNames={participantNames}
-        participants={participants}
-        disableSwitching={!allowParticipantSwitch}
-        currentUserParticipantId={currentUserParticipantId}
-      />
+      <div className="px-4 py-2 border-t border-gray-100 bg-white flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-gray-50">
+            <Users className="w-3 h-3 mr-1" />
+            <span>{totalResponses} of {participantCount} answered</span>
+          </Badge>
+          
+          {hasAnswered && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              Your answer submitted
+            </Badge>
+          )}
+        </div>
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Toggle 
+                pressed={isAnonymous} 
+                onPressedChange={toggleAnonymous}
+                size="sm"
+                variant="outline"
+                className={isAnonymous ? "bg-gray-100" : ""}
+              >
+                <EyeOff className="h-3.5 w-3.5 mr-1" />
+                Anonymous
+              </Toggle>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>When enabled, your name will not be shown with your messages</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
         <ChatInput
           inputMessage={inputMessage}
@@ -64,7 +90,8 @@ const InputFooter = ({
           onSendMessage={onSendMessage}
           isRecording={isRecording}
           setIsRecording={setIsRecording}
-          placeholder={`Type as ${participants.find(p => p.id === currentParticipant)?.name || `Participant ${currentParticipant}`}...`}
+          placeholder={`Type as ${participantName}...`}
+          disabled={hasAnswered}
         />
       </div>
     </>

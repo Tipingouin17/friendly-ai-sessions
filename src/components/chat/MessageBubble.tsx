@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { EyeOff } from 'lucide-react';
 
 interface MessageBubbleProps {
   content: string;
@@ -9,6 +10,7 @@ interface MessageBubbleProps {
   participantName?: string;
   backgroundColor?: string;
   isFirstMessageOfGroup: boolean;
+  isAnonymous?: boolean;
 }
 
 const MessageBubble = ({ 
@@ -17,7 +19,8 @@ const MessageBubble = ({
   isReport = false, 
   participantName,
   backgroundColor,
-  isFirstMessageOfGroup
+  isFirstMessageOfGroup,
+  isAnonymous = false
 }: MessageBubbleProps) => {
   return (
     <div
@@ -35,13 +38,17 @@ const MessageBubble = ({
     >
       {(sender === "user" && participantName && isFirstMessageOfGroup) && (
         <div 
-          className="text-xs font-medium mb-1"
+          className={cn(
+            "text-xs font-medium mb-1 flex items-center gap-1",
+            isAnonymous && "italic"
+          )}
           style={{
             color: "#1A1F2C",
             opacity: 0.8
           }}
         >
           {participantName}
+          {isAnonymous && <EyeOff className="h-3 w-3 opacity-70" />}
         </div>
       )}
       {isReport && (

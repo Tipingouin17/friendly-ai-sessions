@@ -9,12 +9,14 @@ export interface Message {
   isReport?: boolean;
   likes?: string[]; // Array of participant identifiers who liked the message
   avatar?: string; // Added for participant avatar
+  isAnonymous?: boolean; // Flag for anonymous messages
 }
 
 export interface ParticipantInfo {
   id: number;
   name: string;
   avatar: string;
+  is_anonymous?: boolean;
 }
 
 export interface SpeechRecognition extends EventTarget {

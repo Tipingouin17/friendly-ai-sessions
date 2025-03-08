@@ -1,17 +1,41 @@
 
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRound } from 'lucide-react';
+import { UserRound, EyeOff } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
 
 interface MessageAvatarProps {
-  avatarUrl: string | undefined;
+  avatarUrl?: string | null;
   name: string;
+  size?: 'sm' | 'md' | 'lg';
+  anonymized?: boolean;
 }
 
-const MessageAvatar = ({ avatarUrl, name }: MessageAvatarProps) => {
+const MessageAvatar = ({ 
+  avatarUrl, 
+  name, 
+  size = 'md',
+  anonymized = false 
+}: MessageAvatarProps) => {
+  const dimensions = {
+    sm: 'h-7 w-7',
+    md: 'h-8 w-8',
+    lg: 'h-10 w-10'
+  };
+
+  // For anonymized avatars, show a special avatar
+  if (anonymized) {
+    return (
+      <Avatar className={`${dimensions[size]} bg-gray-100`}>
+        <AvatarFallback className="bg-gray-100 text-gray-500">
+          <EyeOff className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+
+  // Handle boring-avatars
   if (avatarUrl?.startsWith('/api/avatar')) {
-    // Use boring-avatars for dynamically generated avatars
     const params = new URLSearchParams(avatarUrl.split('?')[1]);
     const avatarName = params.get('name') || name;
     const variant = params.get('variant') || 'marble';
@@ -30,9 +54,9 @@ const MessageAvatar = ({ avatarUrl, name }: MessageAvatarProps) => {
     ];
     
     return (
-      <div className="overflow-hidden rounded-full">
+      <div className={`overflow-hidden rounded-full ${dimensions[size]}`}>
         <BoringAvatar
-          size={32}
+          size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
           name={avatarName}
           variant={variant as any}
           colors={AVATAR_PALETTES[paletteIndex]}
@@ -41,13 +65,13 @@ const MessageAvatar = ({ avatarUrl, name }: MessageAvatarProps) => {
       </div>
     );
   }
-  
-  // Fallback to regular avatar
+
+  // Regular avatar
   return (
-    <Avatar className="w-8 h-8">
-      <AvatarImage src={avatarUrl} alt={name} />
+    <Avatar className={dimensions[size]}>
+      <AvatarImage src={avatarUrl || undefined} alt={name} />
       <AvatarFallback>
-        <UserRound className="w-4 h-4" />
+        <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
       </AvatarFallback>
     </Avatar>
   );

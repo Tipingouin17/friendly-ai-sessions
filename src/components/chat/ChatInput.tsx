@@ -13,6 +13,7 @@ interface ChatInputProps {
   isRecording?: boolean;
   setIsRecording?: (isRecording: boolean) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 const ChatInput = ({
@@ -20,7 +21,9 @@ const ChatInput = ({
   setInputMessage,
   onSendMessage,
   isRecording,
-  setIsRecording
+  setIsRecording,
+  placeholder = "Type your message here...",
+  disabled = false
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -94,10 +97,11 @@ const ChatInput = ({
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
-          placeholder="Type your message here..."
+          placeholder={disabled ? "You have already answered this question" : placeholder}
           className="min-h-[80px] pr-24"
+          disabled={disabled}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !disabled) {
               e.preventDefault();
               onSendMessage();
             }
@@ -109,13 +113,14 @@ const ChatInput = ({
             size="icon"
             onClick={isRecording ? handleStopRecording : handleStartRecording}
             className={`h-8 w-8 ${isRecording ? "text-red-600" : "text-gray-500 hover:text-gray-700"}`}
+            disabled={disabled}
           >
             {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
           <Button
             onClick={onSendMessage}
             size="icon"
-            disabled={!inputMessage.trim()}
+            disabled={!inputMessage.trim() || disabled}
             className="h-8 w-8"
           >
             <Send className="h-4 w-4" />

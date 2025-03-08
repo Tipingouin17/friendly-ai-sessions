@@ -25,6 +25,12 @@ const MessageItem = ({
 }: MessageItemProps) => {
   const isLikedByCurrentParticipant = message.likes?.includes(currentParticipant || '');
   const likeCount = message.likes?.length || 0;
+  
+  // Handle anonymous messages
+  const isAnonymous = message.isAnonymous && message.sender === "user";
+  const displayParticipantName = isAnonymous 
+    ? "Anonymous participant" 
+    : participantInfo?.name || message.participant;
 
   const handleLike = () => {
     if (onLikeMessage) {
@@ -62,9 +68,10 @@ const MessageItem = ({
           content={message.content}
           sender={message.sender}
           isReport={message.isReport}
-          participantName={participantInfo?.name || message.participant}
+          participantName={displayParticipantName}
           backgroundColor={message.color}
           isFirstMessageOfGroup={isFirstMessageOfGroup}
+          isAnonymous={isAnonymous}
         />
         
         {message.sender !== "assistant" && (
@@ -75,11 +82,20 @@ const MessageItem = ({
           />
         )}
         
-        {message.sender === "user" && isFirstMessageOfGroup && (
+        {message.sender === "user" && isFirstMessageOfGroup && !isAnonymous && (
           <div className="mb-1">
             <MessageAvatar 
               avatarUrl={participantInfo?.avatar} 
               name={participantInfo?.name || "User"} 
+            />
+          </div>
+        )}
+        
+        {message.sender === "user" && isFirstMessageOfGroup && isAnonymous && (
+          <div className="mb-1">
+            <MessageAvatar 
+              anonymized={true}
+              name="Anonymous"
             />
           </div>
         )}

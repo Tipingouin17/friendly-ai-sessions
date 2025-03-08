@@ -28,6 +28,7 @@ const Session = () => {
           conversation,
           currentConversationId,
           sessionState,
+          anonymousState,
           participants,
           participantColors,
           isWaitingForResponse,
@@ -81,9 +82,8 @@ const Session = () => {
             isWaitingForResponse={isWaitingForResponse}
             onGenerateReport={sessionState.handleGenerateReport}
             isGeneratingReport={sessionState.isGeneratingReport}
-            onParticipantSwitch={sessionState.setCurrentParticipant}
-            isRecording={sessionState.isRecording}
             setIsRecording={sessionState.setIsRecording}
+            isRecording={sessionState.isRecording}
             participantColors={participantColors}
             participantNames={{}}
             participants={participants}
@@ -92,6 +92,8 @@ const Session = () => {
             objective={conversation.sessions?.objective || ''}
             currentParticipantCount={conversation.current_participants || 0}
             currentUserParticipantId={currentUserParticipantId}
+            hasAnswered={sessionState.hasAnswered}
+            totalResponses={sessionState.totalResponses}
           />
         );
       }}

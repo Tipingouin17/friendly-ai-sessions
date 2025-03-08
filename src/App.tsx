@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
@@ -7,7 +8,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
-import IndexPage from "./pages/IndexPage";
+import IndexPage from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Pricing from "./pages/Pricing";
@@ -18,12 +19,12 @@ import PastWorkshops from "./pages/PastWorkshops";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Session from "./pages/Session";
-import Checkout from "./pages/Checkout";
+import Checkout from "./pages/checkout";
 import NotFound from "./pages/NotFound";
 import JoinSession from "./pages/JoinSession";
 
 function App() {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,7 +42,7 @@ function App() {
         </div>
       );
     }
-    if (!currentUser) {
+    if (!user) {
       return <Navigate to="/login" />;
     }
     return children;

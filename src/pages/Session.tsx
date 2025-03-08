@@ -249,12 +249,12 @@ const Session = () => {
               currentParticipantCount={conversation.current_participants || 0}
             />
             
-            <button 
+            <Button 
               onClick={handleStartSession}
-              className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md transition-colors"
+              className="mt-6 w-full"
             >
               Start Session ({conversation.current_participants || 0}/{conversation.participants || 0})
-            </button>
+            </Button>
           </div>
         </div>
       </div>

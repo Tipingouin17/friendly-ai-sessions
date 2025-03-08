@@ -106,15 +106,15 @@ const SessionJoinInfo = ({ conversationId, currentParticipantCount = 0 }: Sessio
   // Use the session-specific max participants, fallback to plan limit if not set
   const effectiveMaxParticipants = maxParticipantsForSession || planMaxParticipants;
   
-  // For a new session, the real count should be the host (1) at minimum
+  // For a new session, the real count should be at most the value from the database
   // This prevents showing the session as full when it's newly created
-  const adjustedRealCount = Math.max(realParticipantCount, 1);
+  const adjustedRealCount = Math.min(realParticipantCount, effectiveMaxParticipants);
   
-  // Calculate remaining spots - the host is counted as a participant
+  // Calculate remaining spots
   const remainingSpots = effectiveMaxParticipants - adjustedRealCount;
   
-  // Only consider full if we've actually hit the limit
-  const isFull = remainingSpots <= 0;
+  // Only consider full if we've actually hit the limit and have real participants
+  const isFull = remainingSpots <= 0 && realParticipantCount > 0;
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-gray-100 w-full">

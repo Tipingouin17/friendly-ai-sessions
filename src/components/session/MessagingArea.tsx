@@ -32,6 +32,11 @@ const MessagingArea = ({
   isMobile,
   viewMode
 }: MessagingAreaProps) => {
+  console.log("MessagingArea - Current messages:", messages);
+  console.log("MessagingArea - Current participants:", participants);
+  console.log("MessagingArea - Current participant:", currentParticipant);
+  console.log("MessagingArea - ViewMode:", viewMode);
+  
   // Group messages by facilitator question for admin view
   const groupedMessages = React.useMemo(() => {
     if (viewMode !== "admin") return [];
@@ -63,6 +68,7 @@ const MessagingArea = ({
       groups.push(currentGroup);
     }
     
+    console.log("Admin view grouped messages:", groups);
     return groups;
   }, [messages, viewMode]);
 

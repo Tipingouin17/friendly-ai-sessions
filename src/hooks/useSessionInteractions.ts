@@ -45,8 +45,9 @@ export const useSessionInteractions = ({
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
     
-    // Record this participant has responded
-    sessionState.recordResponse(currentParticipant, true);
+    console.log("Sending message as participant:", currentParticipant, "with key:", currentParticipantKey);
+    console.log("Current participants:", participants);
+    console.log("Current participant info:", participantInfo);
     
     // Create the message object
     const messageId = nanoid();
@@ -64,12 +65,20 @@ export const useSessionInteractions = ({
     // Add the participant's message to the displayed messages
     sessionState.setMessages(prev => [...prev, newMessage]);
     
+    // Record this participant has responded - do this AFTER adding the message
+    sessionState.recordResponse(currentParticipant, true);
+    
+    // Reset the input message
+    sessionState.setInputMessage("");
+    
     // Check if we have responses from all participants
     const totalParticipants = conversation?.participants ?? 1;
-    const allParticipantsResponded = sessionState.totalResponses >= totalParticipants;
-
+    console.log("Total expected participants:", totalParticipants);
+    console.log("Current total responses:", sessionState.totalResponses + 1); // +1 because we just added one
+    
     // If all participants have responded, send to facilitator
-    if (allParticipantsResponded) {
+    // We add +1 here because the state update for totalResponses hasn't happened yet
+    if (sessionState.totalResponses + 1 >= totalParticipants) {
       setIsWaitingForResponse(true);
 
       try {
@@ -78,10 +87,8 @@ export const useSessionInteractions = ({
           msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
         ).slice(-totalParticipants);
         
-        console.log('Calling edge function with:', {
-          conversationId: currentConversationId,
-          messages: sessionState.messages
-        });
+        console.log('Calling edge function with participant messages:', participantMessages);
+        console.log('Number of messages being sent:', sessionState.messages.length);
 
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
@@ -114,8 +121,6 @@ export const useSessionInteractions = ({
         setIsWaitingForResponse(false);
       }
     }
-
-    sessionState.setInputMessage("");
   };
 
   const handleLikeMessage = (messageId: string) => {

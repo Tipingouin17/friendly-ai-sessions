@@ -24,6 +24,9 @@ const MessageList = ({
   participants = []
 }: MessageListProps) => {
   const { ref } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
+  
+  console.log("MessageList - received messages:", messages);
+  console.log("MessageList - current participant:", currentParticipant);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -46,6 +49,7 @@ const MessageList = ({
           if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
             const participantNumber = parseInt(message.participant.slice(1));
             participantInfo = participants.find(p => p.id === participantNumber);
+            console.log("Found participant info for message:", participantInfo);
           }
 
           return (

@@ -89,28 +89,34 @@ export function useSessionState({
 
   // Record a response to a facilitator question
   const recordResponse = (participantId: number, hasResponded: boolean) => {
-    setPendingResponses(prev => ({
-      ...prev,
-      [participantId]: hasResponded
-    }));
+    console.log("Recording response for participant:", participantId, "with hasResponded:", hasResponded);
+    
+    setPendingResponses(prev => {
+      const newResponses = {
+        ...prev,
+        [participantId]: hasResponded
+      };
+      console.log("New pending responses:", newResponses);
+      return newResponses;
+    });
     
     if (hasResponded && participantId === currentParticipant) {
       setHasAnswered(true);
     }
   };
   
-  // Update total responses count
+  // Update total responses count based on pendingResponses
   useEffect(() => {
-    if (Object.keys(pendingResponses).length > 0) {
-      const count = Object.values(pendingResponses).filter(Boolean).length;
-      setTotalResponses(count);
-    }
+    const count = Object.values(pendingResponses).filter(Boolean).length;
+    console.log("Updating total responses count to:", count);
+    setTotalResponses(count);
   }, [pendingResponses]);
 
   // Reset answer state when a new facilitator message arrives
   useEffect(() => {
     const latestMessage = messages[messages.length - 1];
     if (latestMessage?.sender === "assistant" && !latestMessage.isReport) {
+      console.log("New facilitator message detected, resetting response state");
       setHasAnswered(false);
       setPendingResponses({});
       setTotalResponses(0);

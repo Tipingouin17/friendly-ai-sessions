@@ -48,6 +48,11 @@ const InputFooter = ({
     participantNames[currentParticipant] || 
     `Participant ${currentParticipant}`;
   
+  console.log("InputFooter - totalResponses:", totalResponses);
+  console.log("InputFooter - participantCount:", participantCount);
+  console.log("InputFooter - hasAnswered:", hasAnswered);
+  console.log("InputFooter - currentParticipant:", currentParticipant);
+  
   // In admin view, we don't show the input at all
   if (viewMode === "admin") {
     return null;

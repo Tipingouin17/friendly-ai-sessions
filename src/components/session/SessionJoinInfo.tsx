@@ -9,12 +9,14 @@ interface SessionJoinInfoProps {
   conversationId: number | null;
   currentParticipantCount: number;
   maxParticipants?: number;
+  onSessionFull?: () => void;
 }
 
 const SessionJoinInfo = ({ 
   conversationId, 
   currentParticipantCount, 
-  maxParticipants = 0 
+  maxParticipants = 0,
+  onSessionFull
 }: SessionJoinInfoProps) => {
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
@@ -35,6 +37,13 @@ const SessionJoinInfo = ({
       setIsCopied(false);
     }, 2000);
   };
+
+  // Check if session is full and trigger callback if needed
+  React.useEffect(() => {
+    if (maxParticipants > 0 && currentParticipantCount >= maxParticipants && onSessionFull) {
+      onSessionFull();
+    }
+  }, [currentParticipantCount, maxParticipants, onSessionFull]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start space-y-4 pt-4">

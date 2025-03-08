@@ -30,7 +30,8 @@ export function useSessionJoiner() {
         avatarSeed,
         isGuest: true,
         participantId,
-        showMessaging: true // Add this flag to explicitly show messaging
+        showMessaging: true, // Add this flag to explicitly show messaging
+        isAdmin: false // Explicitly mark session joiners as non-admin
       }
     });
   };

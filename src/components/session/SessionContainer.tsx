@@ -8,8 +8,6 @@ import SessionHeader from "./SessionHeader";
 import MessagingArea from "./MessagingArea";
 import InputFooter from "./InputFooter";
 import JoinSessionDialog from "./JoinSessionDialog";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Eye, Users } from "lucide-react";
 import ViewModeToggle from "./ViewModeToggle";
 
 interface SessionContainerProps {
@@ -41,6 +39,7 @@ interface SessionContainerProps {
   totalResponses: number;
   viewMode: "participant" | "admin";
   setViewMode: (mode: "participant" | "admin") => void;
+  isAdmin: boolean;
 }
 
 const SessionContainer = ({
@@ -68,7 +67,8 @@ const SessionContainer = ({
   hasAnswered,
   totalResponses,
   viewMode,
-  setViewMode
+  setViewMode,
+  isAdmin
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
   
@@ -183,7 +183,7 @@ const SessionContainer = ({
           <ViewModeToggle 
             viewMode={viewMode} 
             setViewMode={setViewMode}
-            isAdmin={true} // This would be determined by user role in a real app
+            isAdmin={isAdmin}
           />
           
           <MessagingArea 

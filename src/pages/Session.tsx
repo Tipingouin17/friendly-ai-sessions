@@ -14,12 +14,23 @@ const Session = () => {
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Check if user is admin (in a real app, this would be based on user role)
+  // Determine if user is admin based on location state
   useEffect(() => {
-    // For demo purposes, we're setting everyone as admin
-    // In a real app, you would check user permissions
-    setIsAdmin(true);
-  }, []);
+    const locationState = location.state as { 
+      isGuest?: boolean; 
+      showMessaging?: boolean;
+      isAdmin?: boolean;
+    } | null;
+    
+    // User is considered admin if:
+    // 1. They're explicitly marked as admin in the state
+    // 2. They're not a guest (implying they created the session)
+    // 3. They're not accessing via the join flow
+    setIsAdmin(
+      Boolean(locationState?.isAdmin) || 
+      (locationState?.isGuest !== true)
+    );
+  }, [location]);
 
   const handleSessionFull = () => {
     toast({
@@ -104,6 +115,7 @@ const Session = () => {
             totalResponses={sessionState.totalResponses}
             viewMode={sessionState.viewMode}
             setViewMode={sessionState.setViewMode}
+            isAdmin={isAdmin}
           />
         );
       }}

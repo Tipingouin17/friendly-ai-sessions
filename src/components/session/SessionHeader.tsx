@@ -41,7 +41,7 @@ const SessionHeader = ({
       isGeneratingReport={isGeneratingReport}
       canGenerateReport={messagesCount > 0 && canGenerateReports}
       viewMode={viewMode}
-      onProfilePictureError={handleImageError}
+      onImageError={handleImageError} // Changed from onProfilePictureError to match ChatHeader props
     />
   );
 };

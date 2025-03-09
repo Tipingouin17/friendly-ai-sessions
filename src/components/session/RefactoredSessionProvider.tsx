@@ -9,6 +9,7 @@ import { useSessionRoomState } from "@/hooks/useSessionRoomState";
 import { SessionContextProps } from "@/types/session";
 import { participantColors } from "@/utils/sessionHelpers";
 import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
+import { useToast } from "@/components/ui/use-toast";
 
 interface RefactoredSessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -22,6 +23,7 @@ export const RefactoredSessionProvider = ({
   onError 
 }: RefactoredSessionProviderProps) => {
   const location = useLocation();
+  const { toast } = useToast();
   const locationState = location.state as { 
     participantId?: number; 
     isGuest?: boolean; 
@@ -41,6 +43,7 @@ export const RefactoredSessionProvider = ({
     showQrCodeView,
     sessionLink,
     handleStartSession,
+    isSessionStarted,
     error: dataError
   } = useRefactoredSessionData();
 
@@ -54,6 +57,14 @@ export const RefactoredSessionProvider = ({
 
   // Monitor session start status
   const isSessionStartedInDB = useSessionStartMonitor({ conversation });
+
+  // Log session start status for debugging
+  useEffect(() => {
+    console.log("Session start monitoring:", { 
+      isSessionStartedInDB,
+      conversationStarted: conversation?.session_started
+    });
+  }, [isSessionStartedInDB, conversation?.session_started]);
 
   // Set up participant management
   const {
@@ -93,6 +104,21 @@ export const RefactoredSessionProvider = ({
     }
   }, [roomState.error, handleError]);
 
+  // Handler for starting session with better error handling
+  const enhancedHandleStartSession = () => {
+    try {
+      console.log("Enhanced handleStartSession called");
+      handleStartSession();
+      toast({
+        title: "Starting session",
+        description: "The session is now starting...",
+      });
+    } catch (error) {
+      console.error("Error in handleStartSession:", error);
+      handleError("Failed to start session. Please try again.");
+    }
+  };
+
   // If we have serious errors, return error fallback
   if (providerError) {
     return (
@@ -127,7 +153,7 @@ export const RefactoredSessionProvider = ({
     participants,
     participantColors,
     isWaitingForResponse: roomState.isWaitingForResponse,
-    handleStartSession,
+    handleStartSession: enhancedHandleStartSession,
     handleSendMessage: roomState.handleSendMessage,
     handleLikeMessage: roomState.handleLikeMessage,
     showQrCodeView,

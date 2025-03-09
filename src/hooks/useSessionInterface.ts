@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 export function useSessionInterface(conversationId: number | null) {
   const [sessionLink, setSessionLink] = useState('');
@@ -55,26 +56,40 @@ export function useSessionInterface(conversationId: number | null) {
   
   const handleStartSession = async () => {
     console.log("Starting session for conversation:", conversationId);
+    
+    // First, update the local state to start showing the session UI
     setShowQrCodeView(false);
     setIsSessionStarted(true);
     
-    // Update the session_started flag in the database when admin starts session
+    // Then update the session_started flag in the database
     if (conversationId) {
       try {
         const { error } = await supabase
           .from('conversations')
-          .update({ 
-            session_started: true 
-          } as any) // Use 'as any' to bypass TypeScript checking temporarily
+          .update({ session_started: true })
           .eq('id', conversationId);
           
         if (error) {
           console.error("Error updating session_started:", error);
+          toast({
+            title: "Error starting session",
+            description: "There was a problem starting the session. Please try again.",
+            variant: "destructive",
+          });
         } else {
           console.log("Successfully updated session_started in DB for conversation:", conversationId);
+          toast({
+            title: "Session started",
+            description: "The session has been successfully started.",
+          });
         }
       } catch (err) {
         console.error("Exception updating session_started:", err);
+        toast({
+          title: "Error starting session",
+          description: "There was a problem starting the session. Please try again.",
+          variant: "destructive",
+        });
       }
     }
   };

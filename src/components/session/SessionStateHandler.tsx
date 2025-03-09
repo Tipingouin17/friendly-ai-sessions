@@ -7,6 +7,7 @@ import AdminQrView from "./AdminQrView";
 import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
 import SessionView from "./SessionView";
 import { SessionStateProvider } from "@/contexts/SessionStateProvider";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SessionStateHandlerProps {
   props: SessionContextProps;
@@ -23,6 +24,8 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   setSessionStarted,
   onSessionFull
 }) => {
+  const { toast } = useToast();
+  
   // Update sessionStarted state based on DB status
   useEffect(() => {
     if (props.isSessionStartedInDB) {
@@ -40,13 +43,21 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       sessionData={props}
       isAdmin={isAdmin}
       onSessionFull={onSessionFull}
-      onError={(error) => console.error("Session error:", error)}
+      onError={(error) => {
+        console.error("Session error:", error);
+        toast({
+          title: "Session Error",
+          description: error,
+          variant: "destructive",
+        });
+      }}
     >
       <SessionStateContent
         props={props}
         isAdmin={isAdmin}
         sessionStarted={sessionStarted}
         setSessionStarted={setSessionStarted}
+        onSessionFull={onSessionFull}
       />
     </SessionStateProvider>
   );
@@ -58,11 +69,13 @@ const SessionStateContent: React.FC<{
   isAdmin: boolean;
   sessionStarted: boolean;
   setSessionStarted: (started: boolean) => void;
+  onSessionFull: () => void;
 }> = ({
   props,
   isAdmin,
   sessionStarted,
-  setSessionStarted
+  setSessionStarted,
+  onSessionFull
 }) => {
   // Calculate if session should be shown
   const maxParticipants = props.conversation?.participants || 0;
@@ -90,10 +103,11 @@ const SessionStateContent: React.FC<{
         maxParticipants={props.conversation.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onStartSession={() => {
+          console.log("Start session button clicked");
           props.handleStartSession();
           setSessionStarted(true);
         }}
-        onSessionFull={() => {}}
+        onSessionFull={onSessionFull}
       />
     );
   }

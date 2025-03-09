@@ -17,7 +17,7 @@ export interface ParticipantInfo {
   id: number;
   name: string;
   avatar: string;
-  is_anonymous?: boolean;
+  isAnonymous?: boolean; // Changed from is_anonymous to isAnonymous for consistency
 }
 
 export interface SpeechRecognition extends EventTarget {

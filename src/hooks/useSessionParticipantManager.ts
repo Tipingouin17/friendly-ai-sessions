@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";

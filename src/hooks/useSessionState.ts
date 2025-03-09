@@ -23,6 +23,7 @@ export const useSessionState = ({
   const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   const [error, setError] = useState<string | null>(null);
+  const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>({});
   
   // Calculate metrics for UI
   const hasAnswered = messages.some(message => 
@@ -30,6 +31,11 @@ export const useSessionState = ({
   );
   
   const totalResponses = messages.filter(message => message.sender === "user").length;
+
+  // Record if a participant has responded
+  const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
+    setParticipantResponded(prev => ({...prev, [participantId]: hasResponded}));
+  }, []);
   
   // Fetch messages for this conversation
   useEffect(() => {
@@ -63,6 +69,7 @@ export const useSessionState = ({
                 id: 'welcome',
                 content: welcomeMessage,
                 sender: 'assistant',
+                timestamp: new Date(),
                 created_at: new Date().toISOString()
               };
               setMessages([welcomeMsg]);
@@ -73,19 +80,25 @@ export const useSessionState = ({
         
         // Transform database messages to UI message format
         const formattedMessages: Message[] = data.map(msg => {
-          const participantId = msg.participant_id ? `P${msg.participant_id}` : undefined;
+          // Extract participant ID if available (it might be null)
+          let participantId: string | undefined = undefined;
+          if ('participant_id' in msg && msg.participant_id) {
+            participantId = `P${msg.participant_id}`;
+          }
+          
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
           return {
-            id: msg.id,
-            content: msg.content,
+            id: String(msg.id),
+            content: msg.content as string,
             sender: msg.role === 'assistant' ? 'assistant' : 'user',
             participant: participantId,
             color,
+            timestamp: new Date(msg.created_at),
             created_at: msg.created_at,
-            likes: msg.likes || [],
-            isReport: msg.is_report || false,
-            isAnonymous: msg.is_anonymous || false
+            likes: 'likes' in msg ? msg.likes || [] : [],
+            isReport: 'is_report' in msg ? Boolean(msg.is_report) : false,
+            isAnonymous: 'is_anonymous' in msg ? Boolean(msg.is_anonymous) : false
           };
         });
         
@@ -114,7 +127,6 @@ export const useSessionState = ({
       console.log('Generating report for conversation:', conversationId);
       
       // Find the last participant message to determine where we are in the conversation
-      // Instead of findLastIndex which is ES2023, use a for loop to find the last index
       let lastParticipantMessageIndex = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].sender === 'user') {
@@ -142,6 +154,7 @@ export const useSessionState = ({
           id: `report-${Date.now()}`,
           content: reportData.report,
           sender: 'assistant',
+          timestamp: new Date(),
           created_at: new Date().toISOString(),
           isReport: true
         };
@@ -172,6 +185,7 @@ export const useSessionState = ({
     totalResponses,
     viewMode,
     setViewMode,
+    recordResponse,
     error
   };
 };

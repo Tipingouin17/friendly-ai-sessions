@@ -1,8 +1,10 @@
+
 export interface Message {
   id: string;
   content: string;
   sender: "user" | "assistant";
-  timestamp: Date;
+  timestamp?: Date;
+  created_at?: string; // Add this to support both timestamp and created_at
   participant?: string;
   color?: string;
   isReport?: boolean;

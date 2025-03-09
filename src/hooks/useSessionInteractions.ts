@@ -32,6 +32,7 @@ export const useSessionInteractions = ({
   isAnonymous
 }: UseSessionInteractionsProps) => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  const [error, setError] = useState<string | null>(null); // Add error state
   const { toast } = useToast();
   const requestInProgressRef = useRef(false);
   const messageChannelRef = useRef<any>(null);
@@ -148,6 +149,7 @@ export const useSessionInteractions = ({
       });
     } catch (error) {
       console.error("Error saving message to database:", error);
+      setError("Failed to save message. Please try again.");
     }
     
     // Clear the input message
@@ -205,14 +207,17 @@ export const useSessionInteractions = ({
           });
         } catch (error) {
           console.error("Error saving AI response to database:", error);
+          setError("Failed to save AI response. Please try again.");
         }
         
         sessionState.setMessages(prev => [...prev, aiResponse]);
       } catch (error) {
         console.error('Error getting AI response:', error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.";
+        setError(errorMessage);
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         });
       } finally {
@@ -255,6 +260,7 @@ export const useSessionInteractions = ({
   return {
     isWaitingForResponse,
     handleSendMessage,
-    handleLikeMessage
+    handleLikeMessage,
+    error // Add the error property to the return object
   };
 };

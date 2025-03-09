@@ -51,5 +51,6 @@ export const useSessionData = () => {
     isLoading,
     refetch,
     handleStartSession,
+    error // Add the error property to the return object
   };
 };

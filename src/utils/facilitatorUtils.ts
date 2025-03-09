@@ -16,9 +16,10 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   }
   
   try {
-    // First, try profile_picture field if it exists (prioritize this)
+    // Check the profile_picture field first (now that we've updated it in the database)
     if (facilitator.profile_picture) {
       console.log(`Using profile_picture URL for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
+      
       // Skip HEAD request validation for Supabase URLs
       if (facilitator.profile_picture.includes('supabase')) {
         return facilitator.profile_picture;
@@ -35,30 +36,14 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
     }
     
-    // Then check if there's a custom avatar in the storage bucket
+    // Fallback: If profile_picture is not available or invalid, 
+    // we can still try to construct the URL directly based on ID
     if (facilitator.id) {
-      console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
+      console.log(`Constructing direct avatar URL for facilitator ${facilitator.id}`);
+      const directUrl = `https://msahrdujupfcotujyluy.supabase.co/storage/v1/object/public/facilitators-avatars/${facilitator.id}.jpg`;
       
-      // First try with jpg extension
-      const { data: jpgData } = supabase.storage
-        .from('facilitators-avatars')
-        .getPublicUrl(`${facilitator.id}.jpg`);
-      
-      // Try without validation for supabase URLs
-      if (jpgData.publicUrl) {
-        console.log(`Found jpg avatar: ${jpgData.publicUrl}`);
-        return jpgData.publicUrl;
-      }
-      
-      // Then try with png extension
-      const { data: pngData } = supabase.storage
-        .from('facilitators-avatars')
-        .getPublicUrl(`${facilitator.id}.png`);
-        
-      if (pngData.publicUrl) {
-        console.log(`Found png avatar: ${pngData.publicUrl}`);
-        return pngData.publicUrl;
-      }
+      // No validation needed for direct Supabase URLs
+      return directUrl;
     }
     
     // If nothing works, return placeholder

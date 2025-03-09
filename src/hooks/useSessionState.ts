@@ -141,18 +141,22 @@ export function useSessionState({
           // Check if current participant has already answered the latest question
           if (currentParticipant) {
             // Find the latest facilitator message
-            const latestFacilitatorIndex = convertedMessages.findLastIndex(m => m.sender === 'assistant');
+            // Using reverse find instead of findLastIndex for compatibility
+            const messagesCopy = [...convertedMessages];
+            const latestFacilitatorIndex = messagesCopy.reverse().findIndex(m => m.sender === 'assistant');
+            const actualIndex = latestFacilitatorIndex >= 0 ? (convertedMessages.length - 1 - latestFacilitatorIndex) : -1;
             
-            if (latestFacilitatorIndex !== -1) {
+            if (actualIndex !== -1) {
               // See if there's a response from this participant after the latest facilitator message
-              const hasResponse = convertedMessages.slice(latestFacilitatorIndex + 1)
+              const messagesAfterFacilitator = convertedMessages.slice(actualIndex + 1);
+              const hasResponse = messagesAfterFacilitator
                 .some(m => m.sender === 'user' && m.participant === `P${currentParticipant}`);
               
               setHasAnswered(hasResponse);
               
               // Also update pending responses
               const responses: {[key: number]: boolean} = {};
-              convertedMessages.slice(latestFacilitatorIndex + 1)
+              messagesAfterFacilitator
                 .filter(m => m.sender === 'user' && m.participant?.startsWith('P'))
                 .forEach(m => {
                   if (m.participant) {

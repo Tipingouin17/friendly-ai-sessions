@@ -1,4 +1,3 @@
-
 import { Mail, MapPin, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,7 +161,7 @@ const Contact = () => {
             />
           </div>
 
-          <Card className="p-8">
+          <Card className="p-8 bg-white">
             <ContactForm 
               formData={formData}
               isSubmitting={isSubmitting}

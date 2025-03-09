@@ -29,6 +29,7 @@ export const useSessionRealtime = ({
   const channelsRef = useRef<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isInitializedRef = useRef(false);
+  const isSubscribedRef = useRef(false);
   
   // Set up real-time subscription
   useEffect(() => {
@@ -54,6 +55,9 @@ export const useSessionRealtime = ({
         console.log(`Cleaning up ${channelsRef.current.length} realtime channels`);
         channelsRef.current.forEach(channel => {
           try {
+            if (channel && typeof channel.unsubscribe === 'function') {
+              channel.unsubscribe();
+            }
             supabase.removeChannel(channel);
           } catch (err) {
             console.error("Error removing channel:", err);
@@ -79,11 +83,16 @@ export const useSessionRealtime = ({
     }
 
     try {
+      if (isSubscribedRef.current) {
+        console.log("Already subscribed to realtime channels, skipping setup");
+        return;
+      }
+      
       console.log("Setting up realtime channels for conversation:", currentConversationId);
       
-      // Use fixed channel names that don't change on re-renders
+      // Use stable channel names without timestamps
       const conversationChannel = supabase
-        .channel(`conv-${currentConversationId}`)
+        .channel(`conversation-${currentConversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -126,13 +135,16 @@ export const useSessionRealtime = ({
           if (status === 'CHANNEL_ERROR') {
             setError("Error connecting to session updates");
           }
+          if (status === 'SUBSCRIBED') {
+            isSubscribedRef.current = true;
+          }
         });
       
       channelsRef.current.push(conversationChannel);
       
       // Channel for session_participants updates
       const participantsChannel = supabase
-        .channel(`part-${currentConversationId}`)
+        .channel(`participants-${currentConversationId}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
@@ -176,7 +188,7 @@ export const useSessionRealtime = ({
       
       // Channel to track messages for admin view
       const messagesChannel = supabase
-        .channel(`msg-${currentConversationId}`)
+        .channel(`messages-${currentConversationId}`)
         .on('postgres_changes', {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
@@ -199,6 +211,7 @@ export const useSessionRealtime = ({
       
       return () => {
         console.log("Cleaning up realtime channels on unmount");
+        isSubscribedRef.current = false;
         cleanupChannels();
       };
     } catch (err) {

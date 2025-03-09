@@ -87,7 +87,8 @@ const Session = () => {
           conversationId: props.currentConversationId,
           messagesCount: props.sessionState.messages.length,
           participantsCount: props.participants.length,
-          isSessionStartedInDB: props.isSessionStartedInDB
+          isSessionStartedInDB: props.isSessionStartedInDB,
+          error: props.error
         });
         
         // Ensure we update the loading state from the provider
@@ -102,6 +103,13 @@ const Session = () => {
             setSessionStarted(true);
           }
         }, [props.isSessionStartedInDB]);
+        
+        // Handle errors from the session provider
+        useEffect(() => {
+          if (props.error) {
+            handleError(props.error);
+          }
+        }, [props.error]);
         
         if (props.isLoading) return <LoadingState />;
         if (!props.conversation || !props.currentConversationId) return <EmptyState />;

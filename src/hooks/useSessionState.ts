@@ -24,6 +24,7 @@ export function useSessionState({
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Store in ref to avoid creating a new function on each render
   const welcomeAddedRef = useRef(false);
@@ -60,9 +61,13 @@ export function useSessionState({
   useEffect(() => {
     const fetchMessages = async () => {
       if (!conversationId || initialMessagesLoadedRef.current || messagesLoadAttemptedRef.current) {
+        if (!conversationId) {
+          console.log("No conversation ID provided, skipping message fetch");
+        }
         return;
       }
       
+      setIsLoading(true);
       messagesLoadAttemptedRef.current = true;
       console.log("Fetching messages for conversation:", conversationId);
       
@@ -76,6 +81,7 @@ export function useSessionState({
         if (error) {
           console.error("Error fetching messages:", error);
           setError(`Failed to load messages: ${error.message}`);
+          setIsLoading(false);
           return;
         }
         
@@ -178,6 +184,8 @@ export function useSessionState({
       } catch (error) {
         console.error("Error fetching messages:", error);
         setError("Failed to load messages. Please try refreshing the page.");
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -195,6 +203,7 @@ export function useSessionState({
       console.log("New conversation ID detected, resetting initialization flags");
       initialMessagesLoadedRef.current = false;
       welcomeAddedRef.current = false;
+      setIsLoading(true);
     }
   }, [conversationId]);
 
@@ -224,7 +233,7 @@ export function useSessionState({
         console.error("Error generating report:", error);
         setError(`Failed to generate report: ${error.message}`);
       } else {
-        console.log("Report generated successfully");
+        console.log("Report generated successfully", data);
 
         // Add the report to the messages
         const reportId = nanoid();
@@ -320,6 +329,7 @@ export function useSessionState({
     pendingResponses,
     viewMode,
     setViewMode,
-    error
+    error,
+    isLoading
   };
 }

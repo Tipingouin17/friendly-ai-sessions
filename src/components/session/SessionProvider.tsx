@@ -27,6 +27,16 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
   } | null;
   
   const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  
+  // Handle all errors in one place
+  const handleInternalError = (errorMessage: string) => {
+    console.error("Session provider error:", errorMessage);
+    setProviderError(errorMessage);
+    if (onError) {
+      onError(errorMessage);
+    }
+  };
   
   const {
     currentConversationId,
@@ -35,7 +45,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     sessionLink,
     showQrCodeView,
     conversation,
-    isLoading,
+    isLoading: dataLoading,
     refetch,
     handleStartSession,
     error: dataError
@@ -43,16 +53,15 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
 
   console.log("SessionProvider - conversation data:", conversation);
   console.log("SessionProvider - currentConversationId:", currentConversationId);
-  console.log("SessionProvider - isLoading:", isLoading);
-  console.log("SessionProvider - dataError:", dataError);
-
+  console.log("SessionProvider - isLoading:", dataLoading);
+  
   // Handle data errors
   useEffect(() => {
-    if (dataError && onError) {
+    if (dataError) {
       console.error("Session data error:", dataError.message);
-      onError(dataError.message);
+      handleInternalError(dataError.message);
     }
-  }, [dataError, onError]);
+  }, [dataError]);
 
   // Type assertion to ensure conversation is of the right type
   const typedConversation = conversation as ConversationWithSession | null;
@@ -94,11 +103,11 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
 
   // Handle realtime errors
   useEffect(() => {
-    if (realtimeError && onError) {
+    if (realtimeError) {
       console.error("Session realtime error:", realtimeError);
-      onError(realtimeError);
+      handleInternalError(realtimeError);
     }
-  }, [realtimeError, onError]);
+  }, [realtimeError]);
 
   // Set up session state
   const sessionState = useSessionState({
@@ -109,11 +118,11 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
 
   // Handle session state errors
   useEffect(() => {
-    if (sessionState.error && onError) {
+    if (sessionState.error) {
       console.error("Session state error:", sessionState.error);
-      onError(sessionState.error);
+      handleInternalError(sessionState.error);
     }
-  }, [sessionState.error, onError]);
+  }, [sessionState.error]);
 
   // Set up anonymous state
   const anonymousState = useAnonymousState({
@@ -137,11 +146,14 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
 
   // Handle interactions errors
   useEffect(() => {
-    if (interactionsError && onError) {
+    if (interactionsError) {
       console.error("Session interactions error:", interactionsError);
-      onError(interactionsError);
+      handleInternalError(interactionsError);
     }
-  }, [interactionsError, onError]);
+  }, [interactionsError]);
+
+  // Combined loading state
+  const isLoading = dataLoading;
 
   const sessionContext: SessionContextProps = {
     isLoading,
@@ -160,6 +172,11 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     anonymousState,
     isSessionStartedInDB
   };
+
+  // Provide error if we have one
+  if (providerError) {
+    sessionContext.error = providerError;
+  }
 
   return (
     <>

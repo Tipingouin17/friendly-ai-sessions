@@ -24,10 +24,15 @@ export const StepNavigation = ({
 }: StepNavigationProps) => {
   return (
     <div className="flex justify-between mt-8">
-      <Button variant="outline" onClick={onPrevious} disabled={currentStep === 1}>
-        <ChevronLeft className="w-4 h-4 mr-2" />
-        Previous
-      </Button>
+      {currentStep !== 1 && (
+        <Button variant="outline" onClick={onPrevious}>
+          <ChevronLeft className="w-4 h-4 mr-2" />
+          Previous
+        </Button>
+      )}
+      
+      {/* Add an empty div when on step 1 to maintain the justify-between layout */}
+      {currentStep === 1 && <div></div>}
 
       {currentStep < 3 ? (
         <Button 

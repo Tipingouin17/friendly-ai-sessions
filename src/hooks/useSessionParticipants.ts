@@ -83,7 +83,7 @@ export function useSessionParticipants(conversationId: number | null) {
     
     if (!conversationId) {
       console.log("No conversation ID provided, skipping realtime subscription");
-      return cleanup;
+      return cleanupChannel; // Return the cleanup function instead of undefined 'cleanup'
     }
     
     console.log("Setting up realtime subscription for conversation:", conversationId);

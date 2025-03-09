@@ -69,10 +69,6 @@ export function useSessionInterface(conversationId: number | null) {
       return;
     }
     
-    // First, update the local state to start showing the session UI
-    setShowQrCodeView(false);
-    setIsSessionStarted(true);
-    
     try {
       // Update the session_started flag in the database
       const { error } = await supabase
@@ -97,7 +93,7 @@ export function useSessionInterface(conversationId: number | null) {
         });
         
         // Double-check to make sure the update went through by fetching the current status
-        const { data, error: fetchError } = await supabase
+        const { data, fetchError } = await supabase
           .from('conversations')
           .select('session_started')
           .eq('id', conversationId)
@@ -108,6 +104,13 @@ export function useSessionInterface(conversationId: number | null) {
         } else {
           console.log("Verified session started status:", data);
         }
+        
+        // First, update the local state to start showing the session UI
+        setShowQrCodeView(false);
+        setIsSessionStarted(true);
+        
+        // Redirect to the session page with admin status
+        window.location.href = `/session?id=${conversationId}`;
       }
     } catch (err) {
       console.error("Exception updating session_started:", err);

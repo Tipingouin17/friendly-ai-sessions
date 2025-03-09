@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +10,7 @@ import { AlertCircle, Loader2, DollarSign, Euro, PoundSterling } from 'lucide-re
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
 import { supabase } from '@/integrations/supabase/client';
+import { createSafeUrl } from '@/utils/crossOriginUtils';
 
 export const CheckoutForm = ({ 
   plan, 
@@ -26,7 +26,6 @@ export const CheckoutForm = ({
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Format price with correct currency symbol
   const formatPrice = (price: number, currency: string = 'USD') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -37,7 +36,6 @@ export const CheckoutForm = ({
     return formatter.format(price);
   };
 
-  // Get appropriate currency icon
   const CurrencyIcon = () => {
     const currency = plan.currency?.toUpperCase() || 'USD';
     switch (currency) {
@@ -53,7 +51,6 @@ export const CheckoutForm = ({
 
   const formattedPrice = formatPrice(plan.price, plan.currency);
 
-  // Helper function to directly update the user's subscription in the database
   const updateUserSubscription = async (planId: number) => {
     if (!user) {
       throw new Error("User must be logged in to update subscription");
@@ -64,7 +61,6 @@ export const CheckoutForm = ({
       planId: planId
     });
     
-    // Update the user's profile with the new plan ID
     const { data, error: updateError } = await supabase
       .from('profiles')
       .update({ 
@@ -88,7 +84,6 @@ export const CheckoutForm = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Debug information
     console.log("Stripe loaded?", !!stripe);
     console.log("Elements loaded?", !!elements);
     console.log("User logged in?", !!user);
@@ -98,14 +93,11 @@ export const CheckoutForm = ({
       return;
     }
 
-    // Clear previous errors
     setError(null);
     setFieldErrors({});
     
-    // Validate form fields
     const newFieldErrors: Record<string, string> = {};
     
-    // Check for empty required fields
     if (!billingDetails.name) {
       newFieldErrors['name'] = "Full name is required";
     }
@@ -136,7 +128,6 @@ export const CheckoutForm = ({
       newFieldErrors['address.country'] = "Country is required";
     }
     
-    // Check if card details are filled (only required when Stripe is being used)
     if (stripe && elements) {
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
@@ -144,11 +135,9 @@ export const CheckoutForm = ({
       }
     }
     
-    // If there are field errors, show them and return
     if (Object.keys(newFieldErrors).length > 0) {
       setFieldErrors(newFieldErrors);
       
-      // Scroll to the first error field
       const firstErrorField = Object.keys(newFieldErrors)[0];
       const errorElement = document.getElementById(firstErrorField);
       if (errorElement) {
@@ -156,7 +145,6 @@ export const CheckoutForm = ({
         errorElement.focus();
       }
       
-      // Show toast for form validation errors
       toast({
         title: "Please check your information",
         description: "There are some required fields that need to be filled out.",
@@ -172,12 +160,9 @@ export const CheckoutForm = ({
       console.log("Creating subscription with plan ID:", plan.id);
       console.log("Using stripe plan ID:", plan.stripe_plan_id);
       
-      // Always use direct database update in development mode
-      // or if Stripe isn't properly configured
       if (process.env.NODE_ENV === 'development' || !stripe || !elements || !plan.stripe_plan_id) {
         console.log("⚠️ Using direct database update (development mode or Stripe not available)");
         
-        // Directly update the user's subscription in the database
         await updateUserSubscription(plan.id);
         
         toast({
@@ -185,12 +170,13 @@ export const CheckoutForm = ({
           description: `You've successfully subscribed to the ${plan.title} plan!`,
         });
         
-        // Navigate to profile page
         navigate('/profile');
         return;
       }
 
-      // Step 1: Create a payment intent or setup intent via the Supabase Edge Function
+      const returnUrl = createSafeUrl('/profile');
+      console.log("Using return URL:", returnUrl);
+
       const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, {
         method: 'POST',
         headers: {
@@ -202,8 +188,9 @@ export const CheckoutForm = ({
           stripePlanId: plan.stripe_plan_id,
           userId: user.id,
           billingDetails,
-          returnUrl: window.location.origin + '/profile',
+          returnUrl: returnUrl,
         }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -213,8 +200,7 @@ export const CheckoutForm = ({
 
       const { clientSecret, subscriptionId, customerId } = await response.json();
 
-      // Step 2: Confirm the payment with Stripe
-      const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      const confirmPaymentOptions = {
         payment_method: {
           card: elements.getElement(CardElement)!,
           billing_details: {
@@ -228,15 +214,19 @@ export const CheckoutForm = ({
               country: billingDetails.address.country,
             }
           }
-        }
-      });
+        },
+        return_url: returnUrl,
+      };
+
+      const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret, 
+        confirmPaymentOptions
+      );
 
       if (paymentError) {
-        // If it's a card error, it's likely due to the card details
         if (paymentError.type === 'card_error') {
           setFieldErrors({ card: paymentError.message || 'Card error' });
           
-          // Scroll to card element
           const cardContainer = document.querySelector('.p-4.border.rounded-md.bg-white');
           if (cardContainer) {
             cardContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -246,7 +236,6 @@ export const CheckoutForm = ({
         throw new Error(paymentError.message || 'Payment failed');
       }
 
-      // Step 3: Confirm the subscription with our backend
       const confirmResponse = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/confirm-subscription`, {
         method: 'POST',
         headers: {
@@ -260,6 +249,7 @@ export const CheckoutForm = ({
           planId: plan.id,
           paymentIntentId: paymentIntent?.id
         }),
+        credentials: 'include',
       });
 
       if (!confirmResponse.ok) {
@@ -267,13 +257,11 @@ export const CheckoutForm = ({
         throw new Error(errorData.error || 'Failed to confirm subscription');
       }
 
-      // Successfully subscribed
       toast({
         title: "Success",
         description: `You've successfully subscribed to the ${plan.title} plan!`,
       });
 
-      // Navigate to profile page
       navigate('/profile');
       
     } catch (err: any) {
@@ -284,14 +272,12 @@ export const CheckoutForm = ({
     }
   };
 
-  // Helper to determine if a specific field has error
   const hasFieldError = (fieldName: string) => {
     return fieldName in fieldErrors;
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-      {/* Field error indicators for billing details section */}
       {Object.keys(fieldErrors).length > 0 && Object.keys(fieldErrors).some(key => key !== 'card') && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -301,9 +287,7 @@ export const CheckoutForm = ({
         </Alert>
       )}
       
-      {/* Display field errors under each input field */}
       {Object.entries(fieldErrors).map(([field, message]) => {
-        // Only show errors for fields other than 'card' here
         if (field !== 'card') {
           const inputField = document.getElementById(field);
           if (inputField) {
@@ -342,7 +326,6 @@ export const CheckoutForm = ({
         )}
       </div>
 
-      {/* General error alert */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />

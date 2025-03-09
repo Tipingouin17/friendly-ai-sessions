@@ -20,6 +20,16 @@ export const StripeProvider = ({ children }: StripeProviderProps) => {
       options={{
         // Add Stripe Elements options to prevent CSP issues
         loader: 'auto',
+        fonts: [
+          {
+            cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+          },
+        ],
+        // Improve cookie handling with SameSite settings
+        clientSecret: undefined,
+        appearance: {
+          theme: 'stripe',
+        },
       }}
     >
       {children}

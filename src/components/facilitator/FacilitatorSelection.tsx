@@ -7,7 +7,7 @@ import { CreateFacilitatorModal } from "./CreateFacilitatorModal";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, handleAvatarError, validateImageUrl } from "@/utils/facilitatorUtils";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -24,6 +24,7 @@ export const FacilitatorSelection = ({
 }: FacilitatorSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [avatarStatuses, setAvatarStatuses] = useState<Record<number, boolean>>({});
   const itemsToShow = 4;
   const { planRestrictions } = useUserPlan();
   const { 
@@ -47,6 +48,26 @@ export const FacilitatorSelection = ({
     }
   }, [accessibleFacilitators, startIndex]);
 
+  // Check if avatars exist when facilitators load
+  useEffect(() => {
+    const checkAvatars = async () => {
+      const statuses: Record<number, boolean> = {};
+      
+      for (const facilitator of facilitators) {
+        if (facilitator.id) {
+          const avatarUrl = getFacilitatorAvatarUrl(facilitator.id);
+          statuses[facilitator.id] = await validateImageUrl(avatarUrl);
+        }
+      }
+      
+      setAvatarStatuses(statuses);
+    };
+    
+    if (facilitators.length > 0) {
+      checkAvatars();
+    }
+  }, [facilitators]);
+
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
   };
@@ -64,7 +85,7 @@ export const FacilitatorSelection = ({
 
   // Debug log
   console.log('Accessible facilitators:', accessibleFacilitators);
-
+  
   return (
     <div className="relative">
       <div className="flex items-center">
@@ -82,8 +103,9 @@ export const FacilitatorSelection = ({
           {accessibleFacilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => {
             // Debug log for each facilitator
             console.log('Rendering facilitator:', facilitator.id, facilitator.title);
-            const avatarUrl = getFacilitatorAvatarUrl(facilitator.id);
-            console.log('Avatar URL:', avatarUrl);
+            
+            // Get avatar URL
+            const avatarUrl = facilitator.id ? getFacilitatorAvatarUrl(facilitator.id) : '/placeholder.svg';
             
             return (
               <div
@@ -96,7 +118,7 @@ export const FacilitatorSelection = ({
                 <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
                   <img 
                     src={avatarUrl} 
-                    alt={facilitator.title} 
+                    alt={facilitator.title || 'Facilitator'} 
                     className="h-full w-full object-cover" 
                     onError={handleAvatarError}
                   />

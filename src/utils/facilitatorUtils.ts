@@ -16,26 +16,48 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   }
   
   try {
-    // First check if there's a custom avatar in the storage bucket
-    if (facilitator.id) {
-      const { data } = supabase.storage
-        .from('facilitators-avatars')
-        .getPublicUrl(`${facilitator.id}.jpg`);
+    // First, try profile_picture field if it exists (prioritize this)
+    if (facilitator.profile_picture) {
+      console.log(`Using profile_picture URL for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
+      // Skip HEAD request validation for Supabase URLs
+      if (facilitator.profile_picture.includes('supabase')) {
+        return facilitator.profile_picture;
+      }
       
-      // Validate if the custom avatar exists
-      const customAvatarExists = await validateImageUrl(data.publicUrl);
-      if (customAvatarExists) {
-        console.log(`Using custom avatar for facilitator ${facilitator.id}`);
-        return data.publicUrl;
+      // Only validate non-Supabase URLs
+      try {
+        const isValid = await validateImageUrl(facilitator.profile_picture);
+        if (isValid) {
+          return facilitator.profile_picture;
+        }
+      } catch (err) {
+        console.error('Error validating profile_picture URL:', err);
       }
     }
     
-    // If no custom avatar or it doesn't exist, try the profile_picture field
-    if (facilitator.profile_picture) {
-      const isValid = await validateImageUrl(facilitator.profile_picture);
-      if (isValid) {
-        console.log(`Using profile_picture URL for facilitator: ${facilitator.profile_picture}`);
-        return facilitator.profile_picture;
+    // Then check if there's a custom avatar in the storage bucket
+    if (facilitator.id) {
+      console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
+      
+      // First try with jpg extension
+      const { data: jpgData } = supabase.storage
+        .from('facilitators-avatars')
+        .getPublicUrl(`${facilitator.id}.jpg`);
+      
+      // Try without validation for supabase URLs
+      if (jpgData.publicUrl) {
+        console.log(`Found jpg avatar: ${jpgData.publicUrl}`);
+        return jpgData.publicUrl;
+      }
+      
+      // Then try with png extension
+      const { data: pngData } = supabase.storage
+        .from('facilitators-avatars')
+        .getPublicUrl(`${facilitator.id}.png`);
+        
+      if (pngData.publicUrl) {
+        console.log(`Found png avatar: ${pngData.publicUrl}`);
+        return pngData.publicUrl;
       }
     }
     
@@ -58,9 +80,13 @@ export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): vo
 
 /**
  * Validates if an image at a URL exists
+ * Note: Only use for non-Supabase URLs as Supabase HEAD requests might fail
  */
 export const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url || url === '/placeholder.svg') return false;
+  
+  // Skip validation for Supabase URLs
+  if (url.includes('supabase')) return true;
   
   try {
     const response = await fetch(url, { method: 'HEAD' });
@@ -70,4 +96,3 @@ export const validateImageUrl = async (url: string): Promise<boolean> => {
     return false;
   }
 };
-

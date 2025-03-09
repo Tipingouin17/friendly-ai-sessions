@@ -1,14 +1,13 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
-import AdminQrView from "./AdminQrView";
-import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
-import SessionView from "./SessionView";
 import { SessionStateProvider } from "@/contexts/SessionStateProvider";
 import { useToast } from "@/components/ui/use-toast";
-import JoinSessionLoadingState from "./JoinSessionLoadingState";
+import { useSessionStateTransition } from "@/hooks/useSessionStateTransition";
+import SessionViewSelector from "./SessionViewSelector";
+import SessionStateDebugger from "./SessionStateDebugger";
 
 interface SessionStateHandlerProps {
   props: SessionContextProps;
@@ -108,13 +107,7 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   // Error handling
   if (props.error) {
     console.log("Showing error state:", props.error);
-    return (
-      <JoinSessionLoadingState 
-        error={props.error} 
-        onRetry={() => props.refetch()}
-        retryCount={props.connectionAttempts}
-      />
-    );
+    return null; // This will be handled by SessionViewSelector
   }
   
   if (!props.conversation) {
@@ -126,6 +119,21 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     console.log("No conversation ID, showing empty state");
     return <EmptyState />;
   }
+
+  // Get session transition state from our custom hook
+  const {
+    isTransitioning,
+    shouldShowSession,
+    currentParticipants,
+    maxParticipants,
+    handleStartSession
+  } = useSessionStateTransition({
+    props,
+    isAdmin,
+    sessionStarted,
+    setSessionStarted,
+    onSessionFull
+  });
 
   // Wrap everything in our state provider
   return (
@@ -142,143 +150,28 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
         });
       }}
     >
-      <SessionStateContent
+      {/* Debug component - doesn't render anything visible */}
+      <SessionStateDebugger 
+        props={props}
+        sessionStarted={sessionStarted}
+        shouldShowSession={shouldShowSession}
+        isTransitioning={isTransitioning}
+        currentParticipants={currentParticipants}
+        maxParticipants={maxParticipants}
+      />
+      
+      {/* View selector - renders the appropriate view based on session state */}
+      <SessionViewSelector
         props={props}
         isAdmin={isAdmin}
         sessionStarted={sessionStarted}
-        setSessionStarted={setSessionStarted}
+        isTransitioning={isTransitioning}
+        shouldShowSession={shouldShowSession}
+        onStartSession={handleStartSession}
         onSessionFull={onSessionFull}
       />
     </SessionStateProvider>
   );
-};
-
-// Separate component to use the context
-const SessionStateContent: React.FC<{
-  props: SessionContextProps;
-  isAdmin: boolean;
-  sessionStarted: boolean;
-  setSessionStarted: (started: boolean) => void;
-  onSessionFull: () => void;
-}> = ({
-  props,
-  isAdmin,
-  sessionStarted,
-  setSessionStarted,
-  onSessionFull
-}) => {
-  const { toast } = useToast();
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  
-  // Handle state transitions with a delay to avoid flashing
-  useEffect(() => {
-    if (props.isSessionStartedInDB && !sessionStarted) {
-      setIsTransitioning(true);
-      const timer = setTimeout(() => {
-        setSessionStarted(true);
-        setIsTransitioning(false);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [props.isSessionStartedInDB, sessionStarted, setSessionStarted]);
-  
-  // Safety check for null values
-  if (!props.conversation) {
-    console.log("No conversation in SessionStateContent");
-    return <EmptyState />;
-  }
-
-  // Calculate if session should be shown
-  const maxParticipants = props.conversation?.participants || 0;
-  const currentParticipants = props.conversation?.current_participants || 0;
-  const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
-  const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull || isTransitioning;
-
-  // Log session state for debugging
-  console.log("Session state:", {
-    shouldShowSession,
-    isSessionStartedInDB: props.isSessionStartedInDB,
-    sessionStarted,
-    isSessionFull,
-    isTransitioning,
-    currentParticipants,
-    maxParticipants,
-    messageCount: props.sessionState.messages.length,
-    participantsCount: props.participants.length,
-    conversation: props.conversation ? "exists" : "missing",
-    conversationId: props.currentConversationId
-  });
-
-  // Admin view gets QR code view for sharing until session is started
-  if (isAdmin && !shouldShowSession && props.showQrCodeView) {
-    console.log("Rendering AdminQrView");
-    return (
-      <AdminQrView
-        conversationId={props.currentConversationId}
-        currentParticipantCount={currentParticipants}
-        maxParticipants={maxParticipants}
-        facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
-        onStartSession={() => {
-          console.log("Start session button clicked in AdminQrView");
-          setIsTransitioning(true);
-          
-          try {
-            props.handleStartSession();
-            toast({
-              title: "Starting session",
-              description: "The session is now starting...",
-            });
-            
-            // Set a timer to transition state
-            setTimeout(() => {
-              setSessionStarted(true);
-              setIsTransitioning(false);
-            }, 1000);
-          } catch (error) {
-            console.error("Error starting session:", error);
-            setIsTransitioning(false);
-            toast({
-              title: "Error Starting Session",
-              description: "There was a problem starting the session. Please try again.",
-              variant: "destructive"
-            });
-          }
-        }}
-        onSessionFull={onSessionFull}
-      />
-    );
-  }
-  
-  // For non-admins, show waiting screen until admin starts the session
-  if (!isAdmin && !shouldShowSession) {
-    console.log("Rendering ParticipantWaitingScreen");
-    return (
-      <ParticipantWaitingScreen
-        conversationId={props.currentConversationId}
-        currentParticipantCount={currentParticipants}
-        maxParticipants={maxParticipants}
-        facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
-        onSessionStarted={() => {
-          console.log("Session started callback from ParticipantWaitingScreen");
-          setIsTransitioning(true);
-          setTimeout(() => {
-            setSessionStarted(true);
-            setIsTransitioning(false);
-          }, 500);
-        }}
-      />
-    );
-  }
-
-  // Show loading if transitioning between states
-  if (isTransitioning) {
-    console.log("Showing transition loading state");
-    return <LoadingState />;
-  }
-
-  // Show the main session view
-  console.log("Rendering main SessionView");
-  return <SessionView props={props} isAdmin={isAdmin} />;
 };
 
 export default SessionStateHandler;

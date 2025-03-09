@@ -1,165 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import { QrCode, Copy, Check, Users } from 'lucide-react';
+
+import React from 'react';
+import { QrCode, Share2, Copy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
   currentParticipantCount: number;
-  maxParticipants?: number;
-  onSessionFull?: () => void;
+  maxParticipants: number;
 }
 
 const SessionJoinInfo = ({ 
   conversationId, 
-  currentParticipantCount, 
-  maxParticipants = 0,
-  onSessionFull
+  currentParticipantCount = 0, 
+  maxParticipants = 0 
 }: SessionJoinInfoProps) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const [localParticipantCount, setLocalParticipantCount] = useState(currentParticipantCount);
   const { toast } = useToast();
-
+  
+  if (!conversationId) return null;
+  
+  // Generate join URL
   const baseUrl = window.location.origin;
   const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
-
-  // Initialize with current count
-  useEffect(() => {
-    setLocalParticipantCount(currentParticipantCount);
-  }, [currentParticipantCount]);
   
-  // Check if session is full on component mount
-  useEffect(() => {
-    if (maxParticipants > 0 && localParticipantCount >= maxParticipants && onSessionFull) {
-      console.log("Session is already full on component mount, calling onSessionFull");
-      onSessionFull();
-      
-      // Automatically mark session as started in the database
-      if (conversationId) {
-        updateSessionStarted(conversationId, true);
-      }
-    }
-  }, [localParticipantCount, maxParticipants, onSessionFull, conversationId]);
-  
-  // Update session_started in the database
-  const updateSessionStarted = async (convId: number, started: boolean) => {
-    try {
-      console.log(`Setting session_started to ${started} for conversation:`, convId);
-      const { error } = await supabase
-        .from('conversations')
-        .update({ 
-          session_started: started 
-        })
-        .eq('id', convId);
-        
-      if (error) {
-        console.error("Error updating session_started:", error);
-      } else {
-        console.log("Successfully updated session_started to", started);
-      }
-    } catch (err) {
-      console.error("Exception updating session_started:", err);
-    }
-  };
-  
-  useEffect(() => {
-    if (!conversationId) return;
-    
-    console.log("Setting up public realtime subscription in SessionJoinInfo for conversation:", conversationId);
-    
-    // Use a public channel with a unique name
-    const channelName = `public-join-info-${conversationId}`;
-    
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'conversations',
-        filter: `id=eq.${conversationId}`
-      }, (payload) => {
-        console.log("SessionJoinInfo received update:", payload);
-        
-        if (payload.new && payload.new.current_participants !== undefined) {
-          const newCount = payload.new.current_participants;
-          setLocalParticipantCount(newCount);
-          
-          // Check if the session is now full after this update
-          if (maxParticipants > 0 && newCount >= maxParticipants && onSessionFull) {
-            console.log("Session became full with participant count:", newCount);
-            onSessionFull();
-            
-            // Automatically mark session as started in the database
-            updateSessionStarted(conversationId, true);
-          }
-        }
-      })
-      .subscribe((status) => {
-        console.log(`SessionJoinInfo channel ${channelName} status: ${status}`);
-      });
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [conversationId, maxParticipants, onSessionFull]);
-
-  const handleCopyLink = () => {
+  const copyToClipboard = () => {
     navigator.clipboard.writeText(joinUrl);
-    setIsCopied(true);
-    
     toast({
-      title: "Link Copied",
-      description: "The join link has been copied to your clipboard",
+      title: "Link copied!",
+      description: "Session link copied to clipboard.",
     });
-    
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 2000);
   };
-
-  // Generate QR code for the session
-  const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`;
-
+  
+  const percentageFilled = maxParticipants ? (currentParticipantCount / maxParticipants) * 100 : 0;
+  
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start space-y-4 pt-2">
-      {conversationId && (
-        <div className="flex flex-col items-center justify-center p-1">
-          <div className="mb-1">
-            <img 
-              src={qrCodeSrc}
-              alt="QR Code to join session"
-              className="w-28 h-28 border p-1 rounded-lg shadow-sm"
-            />
-          </div>
-          <div className="text-center mb-1">
-            <p className="text-xs text-gray-500 mb-1">
-              Scan QR code or share link:
-            </p>
-            <div className="flex items-center bg-gray-50 p-1 rounded-md border shadow-sm max-w-full gap-1">
-              <p className="text-xs text-gray-700 truncate flex-1 px-1">
-                {joinUrl}
-              </p>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="h-5 py-0 px-2 hover:bg-gray-100"
-                onClick={handleCopyLink}
-              >
-                {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-              </Button>
-            </div>
-          </div>
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 mt-4">
+      <div className="text-center mb-3">
+        <h3 className="text-gray-700 font-medium mb-1 flex items-center justify-center gap-1">
+          <Users className="w-4 h-4" /> Participants
+        </h3>
+        <div className="text-xl font-semibold text-primary">
+          {currentParticipantCount} <span className="text-gray-400 text-sm font-normal">/ {maxParticipants}</span>
         </div>
-      )}
+      </div>
       
-      <div className="text-xs text-gray-500 flex flex-col items-center space-y-1 bg-gray-50 rounded-full px-4 py-1 border">
-        <div className="flex items-center">
-          <Users className="h-3 w-3 mr-1" />
-          <span>Participants</span>
+      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden mb-6">
+        <div 
+          className="bg-primary h-full rounded-full transition-all duration-500 ease-in-out"
+          style={{ width: `${percentageFilled}%` }}
+        />
+      </div>
+      
+      <div className="border-t border-gray-100 pt-4">
+        <h3 className="text-gray-700 font-medium mb-3 flex items-center gap-1">
+          <QrCode className="w-4 h-4" /> Session QR Code
+        </h3>
+        
+        <div className="flex justify-center mb-3">
+          <img 
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(joinUrl)}`} 
+            alt="Join session QR code" 
+            className="w-32 h-32"
+          />
         </div>
-        <div className="font-medium">
-          {localParticipantCount} {maxParticipants > 0 ? `/ ${maxParticipants}` : ''}
+        
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-sm flex items-center gap-1"
+            onClick={copyToClipboard}
+          >
+            <Copy className="w-3 h-3" /> Copy link
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-sm flex items-center gap-1"
+            onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(joinUrl)}`, '_blank')}
+          >
+            <Share2 className="w-3 h-3" /> Share QR
+          </Button>
         </div>
       </div>
     </div>

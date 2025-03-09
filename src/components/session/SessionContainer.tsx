@@ -11,6 +11,7 @@ import MessagingArea from "./MessagingArea";
 import InputFooter from "./InputFooter";
 import QrDialogManager from "./QrDialogManager";
 import ViewModeToggle from "./ViewModeToggle";
+import SessionJoinInfo from "./SessionJoinInfo";
 
 interface SessionContainerProps {
   facilitator: {
@@ -120,19 +121,34 @@ const SessionContainer = ({
         isAdmin={isAdmin}
       />
       
-      <MessagingArea 
-        messages={processedMessages}
-        participantColors={participantColors}
-        currentParticipant={currentParticipant}
-        isWaitingForResponse={isWaitingForResponse}
-        onLikeMessage={onLikeMessage}
-        participants={participants}
-        conversationId={conversationId || null}
-        currentParticipantCount={currentParticipantCount || participants.length || 0}
-        maxParticipants={conversation?.participants || 0}
-        isMobile={isMobile}
-        viewMode={viewMode}
-      />
+      <div className="flex flex-1 overflow-hidden">
+        <div className={`flex-1 ${viewMode === "admin" ? "" : "overflow-hidden"}`}>
+          <MessagingArea 
+            messages={processedMessages}
+            participantColors={participantColors}
+            currentParticipant={currentParticipant}
+            isWaitingForResponse={isWaitingForResponse}
+            onLikeMessage={onLikeMessage}
+            participants={participants}
+            conversationId={conversationId || null}
+            currentParticipantCount={currentParticipantCount || participants.length || 0}
+            maxParticipants={conversation?.participants || 0}
+            isMobile={isMobile}
+            viewMode={viewMode}
+          />
+        </div>
+        
+        {/* Show QR code panel in admin view */}
+        {viewMode === "admin" && !isMobile && (
+          <div className="w-64 p-4 flex-shrink-0 border-l border-gray-100 overflow-y-auto">
+            <SessionJoinInfo 
+              conversationId={conversationId || null}
+              currentParticipantCount={currentParticipantCount || participants.length || 0}
+              maxParticipants={conversation?.participants || 0}
+            />
+          </div>
+        )}
+      </div>
       
       <QrDialogManager
         isMobile={isMobile}

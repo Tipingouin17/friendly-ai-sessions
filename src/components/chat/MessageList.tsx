@@ -5,6 +5,7 @@ import { getParticipantColor } from '@/utils/sessionHelpers';
 import MessageItem from './MessageItem';
 import ThinkingIndicator from './ThinkingIndicator';
 import { useScrollToBottom } from '@/hooks/useScrollToBottom';
+import { MessagesSquare } from 'lucide-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -24,28 +25,10 @@ const MessageList = ({
   participants = []
 }: MessageListProps) => {
   const { ref } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
-  const messagesLengthRef = useRef(messages.length);
   
-  // Debounced logging to reduce console spam
-  const logMessageInfo = useCallback(() => {
-    console.log("MessageList - received messages count:", messages.length);
-    console.log("MessageList - current participant:", currentParticipant);
-    console.log("MessageList - messages:", messages);
-  }, [messages.length, currentParticipant, messages]);
-
-  // Log only when messages change
-  useEffect(() => {
-    if (messagesLengthRef.current !== messages.length) {
-      messagesLengthRef.current = messages.length;
-      logMessageInfo();
-    }
-  }, [messages.length, logMessageInfo]);
-
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
-    
-    console.log("Processing messages for display:", messages);
     
     return messages.map((message, index) => {
       // Skip processing if message is invalid
@@ -83,10 +66,16 @@ const MessageList = ({
     }).filter(Boolean); // Filter out any null entries
   }, [messages, participantColors, participants]);
 
-  if (!processedMessages) {
+  if (processedMessages.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-8">
-        Loading messages...
+      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-8">
+        <div className="mb-4 p-4 bg-gray-50 rounded-full">
+          <MessagesSquare className="w-8 h-8 text-gray-400" />
+        </div>
+        <p className="text-lg font-medium mb-2">No messages yet</p>
+        <p className="max-w-md text-sm">
+          When the session begins, messages will appear here.
+        </p>
       </div>
     );
   }
@@ -94,23 +83,17 @@ const MessageList = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="px-4 py-6 space-y-4">
-        {processedMessages.length > 0 ? (
-          processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
-            <MessageItem
-              key={`${message.id || index}-${index}`} // Ensure key is unique even if id is missing
-              message={message}
-              isFirstMessageOfGroup={isFirstMessageOfGroup}
-              isLastMessageOfGroup={isLastMessageOfGroup}
-              currentParticipant={currentParticipant}
-              onLikeMessage={onLikeMessage}
-              participantInfo={participantInfo}
-            />
-          ))
-        ) : (
-          <div className="text-center text-gray-500 py-8">
-            No messages to display. Start the conversation to see messages here.
-          </div>
-        )}
+        {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
+          <MessageItem
+            key={`${message.id || index}-${index}`}
+            message={message}
+            isFirstMessageOfGroup={isFirstMessageOfGroup}
+            isLastMessageOfGroup={isLastMessageOfGroup}
+            currentParticipant={currentParticipant}
+            onLikeMessage={onLikeMessage}
+            participantInfo={participantInfo}
+          />
+        ))}
         
         {/* Thinking indicator */}
         {isWaitingForResponse && <ThinkingIndicator />}

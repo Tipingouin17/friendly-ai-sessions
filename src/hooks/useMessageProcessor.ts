@@ -18,6 +18,11 @@ export const useMessageProcessor = ({
   currentParticipant
 }: UseMessageProcessorProps) => {
   return React.useMemo(() => {
+    // No messages to process
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+    
     // Log the inputs for debugging
     console.log(`useMessageProcessor - Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
     
@@ -47,28 +52,24 @@ export const useMessageProcessor = ({
           }
           return {
             ...message,
-            participant: `Anonymous ${participantNumber}`
+            participant: `Participant ${participantNumber}`
           };
         }
         return message;
       });
     } else {
-      // Participant mode - more verbose logging for debugging
-      console.log("Participant messages before filtering:", messages);
+      // Participant mode - filter messages for this participant
+      const participantKey = `P${currentParticipant}`;
       
       // Filter to only include facilitator messages and this participant's messages
       const filteredMessages = messages.filter(message => {
         // Include all facilitator messages
         if (message.sender === "assistant") {
-          console.log("Including assistant message:", message);
           return true;
         }
         
         // Include only this participant's messages
-        const isCurrentParticipant = message.participant === `P${currentParticipant}`;
-        console.log(`Message from ${message.participant}, current is P${currentParticipant}, include: ${isCurrentParticipant}`);
-        
-        if (isCurrentParticipant) {
+        if (message.sender === "user" && message.participant === participantKey) {
           return true;
         }
         
@@ -76,11 +77,9 @@ export const useMessageProcessor = ({
         return false;
       });
       
-      console.log("Filtered messages for participant view:", filteredMessages);
-      
       // Process the filtered messages
       return filteredMessages.map(message => {
-        // Process the message the same way
+        // Process the message the same way as in admin view
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
           const participant = participants.find(p => p.id === participantNumber);
@@ -103,7 +102,7 @@ export const useMessageProcessor = ({
           }
           return {
             ...message,
-            participant: `Anonymous ${participantNumber}`
+            participant: `You`  // In participant view, show own messages as "You"
           };
         }
         return message;

@@ -107,12 +107,19 @@ export const RefactoredSessionProvider = ({
   // Handler for starting session with better error handling
   const enhancedHandleStartSession = () => {
     try {
-      console.log("Enhanced handleStartSession called");
+      console.log("Enhanced handleStartSession called from RefactoredSessionProvider");
       handleStartSession();
       toast({
         title: "Starting session",
         description: "The session is now starting...",
       });
+      
+      // Force refetch after a short delay to ensure we get the latest state
+      setTimeout(() => {
+        console.log("Forcing refetch after session start");
+        refetch();
+      }, 1000);
+      
     } catch (error) {
       console.error("Error in handleStartSession:", error);
       handleError("Failed to start session. Please try again.");

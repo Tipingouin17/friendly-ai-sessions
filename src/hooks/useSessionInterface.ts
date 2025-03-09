@@ -2,13 +2,14 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 
 export function useSessionInterface(conversationId: number | null) {
   const [sessionLink, setSessionLink] = useState('');
   const [showQrCodeView, setShowQrCodeView] = useState(true);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
+  const { toast } = useToast();
   const location = useLocation();
   const isMobile = window.innerWidth < 768;
   
@@ -58,45 +59,61 @@ export function useSessionInterface(conversationId: number | null) {
   const handleStartSession = async () => {
     console.log("Starting session for conversation:", conversationId);
     
+    if (!conversationId) {
+      console.error("Cannot start session: No conversation ID provided");
+      toast({
+        title: "Error starting session",
+        description: "No conversation ID found. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // First, update the local state to start showing the session UI
     setShowQrCodeView(false);
     setIsSessionStarted(true);
     
-    // Then update the session_started flag in the database
-    if (conversationId) {
-      try {
-        // Use type casting to handle the session_started field
-        const updateData = { 
-          session_started: true 
-        } as Partial<ConversationWithSession>;
+    try {
+      // Update the session_started flag in the database
+      const { error } = await supabase
+        .from('conversations')
+        .update({ session_started: true })
+        .eq('id', conversationId);
         
-        const { error } = await supabase
-          .from('conversations')
-          .update(updateData)
-          .eq('id', conversationId);
-          
-        if (error) {
-          console.error("Error updating session_started:", error);
-          toast({
-            title: "Error starting session",
-            description: "There was a problem starting the session. Please try again.",
-            variant: "destructive",
-          });
-        } else {
-          console.log("Successfully updated session_started in DB for conversation:", conversationId);
-          toast({
-            title: "Session started",
-            description: "The session has been successfully started.",
-          });
-        }
-      } catch (err) {
-        console.error("Exception updating session_started:", err);
+      if (error) {
+        console.error("Error updating session_started:", error);
         toast({
           title: "Error starting session",
           description: "There was a problem starting the session. Please try again.",
           variant: "destructive",
         });
+      } else {
+        console.log("Successfully updated session_started in DB for conversation:", conversationId);
+        toast({
+          title: "Session started",
+          description: "The session has been successfully started.",
+        });
+        
+        // Double-check to make sure the update went through by fetching the current status
+        const { data, error: fetchError } = await supabase
+          .from('conversations')
+          .select('session_started')
+          .eq('id', conversationId)
+          .maybeSingle();
+          
+        if (fetchError) {
+          console.error("Error verifying session start:", fetchError);
+        } else {
+          console.log("Verified session started status:", data);
+        }
       }
+    } catch (err) {
+      console.error("Exception updating session_started:", err);
+      toast({
+        title: "Error starting session",
+        description: "There was a problem starting the session. Please try again.",
+        variant: "destructive",
+      });
     }
   };
   

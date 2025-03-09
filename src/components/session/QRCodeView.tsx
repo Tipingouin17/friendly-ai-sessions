@@ -20,6 +20,11 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
   onStartSession,
   onSessionFull
 }) => {
+  const handleStartClick = () => {
+    console.log("Start session button clicked in QRCodeView");
+    onStartSession();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
       <div className="bg-white p-4 sm:p-8 rounded-lg shadow-lg max-w-md w-full">
@@ -39,7 +44,7 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
           />
           
           <Button 
-            onClick={onStartSession}
+            onClick={handleStartClick}
             className="mt-4 sm:mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
           >
             Start Session

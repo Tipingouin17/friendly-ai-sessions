@@ -103,7 +103,7 @@ const SessionStateContent: React.FC<{
         maxParticipants={props.conversation.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onStartSession={() => {
-          console.log("Start session button clicked");
+          console.log("Start session button clicked in AdminQrView");
           props.handleStartSession();
           setSessionStarted(true);
         }}

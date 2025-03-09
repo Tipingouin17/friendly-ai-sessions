@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { QrCode, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,16 +41,15 @@ const SessionJoinInfo = ({
         updateSessionStarted(conversationId, true);
       }
     }
-  }, []);
+  }, [localParticipantCount, maxParticipants, onSessionFull, conversationId]);
   
   // Update session_started in the database
   const updateSessionStarted = async (convId: number, started: boolean) => {
     try {
+      console.log(`Setting session_started to ${started} for conversation:`, convId);
       const { error } = await supabase
         .from('conversations')
-        .update({ 
-          session_started: started 
-        } as any) // Use 'as any' to bypass TypeScript checking temporarily
+        .update({ session_started: started })
         .eq('id', convId);
         
       if (error) {
@@ -117,6 +117,7 @@ const SessionJoinInfo = ({
     }, 2000);
   };
 
+  // Generate QR code for the session
   const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`;
 
   return (

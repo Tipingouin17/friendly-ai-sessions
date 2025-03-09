@@ -3,15 +3,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, DollarSign, Euro, PoundSterling } from 'lucide-react';
+import { useStripe, useElements } from '@stripe/react-stripe-js';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { createSafeUrl, applySafeCookieParams } from '@/utils/crossOriginUtils';
+import { ValidationErrors } from './components/ValidationErrors';
+import { PaymentMethodInput } from './components/PaymentMethodInput';
+import { CheckoutActions } from './components/CheckoutActions';
 
 export const CheckoutForm = ({ 
   plan, 
@@ -26,31 +25,6 @@ export const CheckoutForm = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const formatPrice = (price: number, currency: string = 'USD') => {
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-    return formatter.format(price);
-  };
-
-  const CurrencyIcon = () => {
-    const currency = plan.currency?.toUpperCase() || 'USD';
-    switch (currency) {
-      case 'EUR':
-        return <Euro className="h-4 w-4 mr-1" />;
-      case 'GBP':
-        return <PoundSterling className="h-4 w-4 mr-1" />;
-      case 'USD':
-      default:
-        return <DollarSign className="h-4 w-4 mr-1" />;
-    }
-  };
-
-  const formattedPrice = formatPrice(plan.price, plan.currency);
 
   const updateUserSubscription = async (planId: number) => {
     if (!user) {
@@ -82,21 +56,7 @@ export const CheckoutForm = ({
     return data;
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    console.log("Stripe loaded?", !!stripe);
-    console.log("Elements loaded?", !!elements);
-    console.log("User logged in?", !!user);
-    
-    if (!user) {
-      setError("You must be logged in to complete this purchase.");
-      return;
-    }
-
-    setError(null);
-    setFieldErrors({});
-    
+  const validateForm = (): Record<string, string> => {
     const newFieldErrors: Record<string, string> = {};
     
     if (!billingDetails.name) {
@@ -135,6 +95,26 @@ export const CheckoutForm = ({
         newFieldErrors['card'] = "Payment form not loaded properly";
       }
     }
+    
+    return newFieldErrors;
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    console.log("Stripe loaded?", !!stripe);
+    console.log("Elements loaded?", !!elements);
+    console.log("User logged in?", !!user);
+    
+    if (!user) {
+      setError("You must be logged in to complete this purchase.");
+      return;
+    }
+
+    setError(null);
+    setFieldErrors({});
+    
+    const newFieldErrors = validateForm();
     
     if (Object.keys(newFieldErrors).length > 0) {
       setFieldErrors(newFieldErrors);
@@ -282,89 +262,36 @@ export const CheckoutForm = ({
     return fieldName in fieldErrors;
   };
 
+  // Apply CSS classes to fields with errors
+  React.useEffect(() => {
+    Object.entries(fieldErrors).forEach(([field, message]) => {
+      if (field !== 'card') {
+        const inputField = document.getElementById(field);
+        if (inputField) {
+          inputField.classList.add('border-destructive', 'focus-visible:ring-destructive');
+        }
+      }
+    });
+  }, [fieldErrors]);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-      {Object.keys(fieldErrors).length > 0 && Object.keys(fieldErrors).some(key => key !== 'card') && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Please correct the highlighted fields below.
-          </AlertDescription>
-        </Alert>
-      )}
+      <ValidationErrors 
+        fieldErrors={fieldErrors} 
+        generalError={error} 
+      />
       
-      {Object.entries(fieldErrors).map(([field, message]) => {
-        if (field !== 'card') {
-          const inputField = document.getElementById(field);
-          if (inputField) {
-            inputField.classList.add('border-destructive', 'focus-visible:ring-destructive');
-          }
-        }
-        return null;
-      })}
+      <PaymentMethodInput 
+        hasError={hasFieldError('card')} 
+        errorMessage={fieldErrors['card']} 
+      />
 
-      <div className="p-4 border rounded-lg">
-        <Label htmlFor="card-element" className="text-left block mb-2">
-          Card Details <span className="text-destructive">*</span>
-        </Label>
-        <div className={`p-4 border rounded-md bg-white ${hasFieldError('card') ? 'border-destructive ring-2 ring-destructive' : ''}`}>
-          <CardElement 
-            id="card-element"
-            options={{
-              style: {
-                base: {
-                  fontSize: '16px',
-                  color: '#424770',
-                  '::placeholder': {
-                    color: '#aab7c4',
-                  },
-                },
-                invalid: {
-                  color: '#ef4444',
-                },
-              },
-              hidePostalCode: true,
-            }} 
-          />
-        </div>
-        {hasFieldError('card') && (
-          <p className="mt-1 text-sm text-destructive">{fieldErrors['card']}</p>
-        )}
-      </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex flex-col gap-3 pt-2">
-        <Button 
-          type="submit" 
-          disabled={loading}
-          className="w-full py-6"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing payment...
-            </>
-          ) : (
-            <>Complete purchase - {formattedPrice}/month</>
-          )}
-        </Button>
-        
-        <Button 
-          type="button"
-          variant="outline" 
-          onClick={onCancel}
-          disabled={loading}
-          className="w-full"
-        >
-          Cancel
-        </Button>
-      </div>
+      <CheckoutActions 
+        price={plan.price}
+        currency={plan.currency}
+        isLoading={loading}
+        onCancel={onCancel}
+      />
     </form>
   );
 };

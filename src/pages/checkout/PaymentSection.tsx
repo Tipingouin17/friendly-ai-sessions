@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { CreditCard } from 'lucide-react';
+import { CardElement } from '@stripe/react-stripe-js';
 import { CheckoutForm } from './CheckoutForm';
 import { StripeProvider } from './StripeProvider';
 import { CheckoutFormProps } from './types';

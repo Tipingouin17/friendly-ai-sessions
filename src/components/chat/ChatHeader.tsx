@@ -13,6 +13,7 @@ interface ChatHeaderProps {
   canGenerateReport?: boolean;
   viewMode?: "participant" | "admin";
   onImageError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  isLoading?: boolean; // Added isLoading prop
 }
 
 const ChatHeader = ({ 
@@ -24,7 +25,8 @@ const ChatHeader = ({
   isGeneratingReport,
   canGenerateReport,
   viewMode = "participant",
-  onImageError
+  onImageError,
+  isLoading = false // Set default value
 }: ChatHeaderProps) => {
   return (
     <div className="border-b border-gray-100 p-6">

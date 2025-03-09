@@ -8,7 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
  * 2. URL from the facilitator's profile_picture field if available
  * 3. Default placeholder as fallback
  */
-export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null }): Promise<string> => {
+export const getFacilitatorAvatarUrl = async (facilitator: { 
+  id?: number, 
+  profile_picture?: string | null,
+  title?: string  // Added title to the type
+}): Promise<string> => {
   // If no facilitator data provided, return placeholder
   if (!facilitator) {
     console.log('No facilitator data provided, using placeholder');

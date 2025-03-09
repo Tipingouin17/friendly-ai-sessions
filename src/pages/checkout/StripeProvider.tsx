@@ -2,6 +2,7 @@
 import React from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { getSafeCookieParams } from '@/utils/crossOriginUtils';
 
 // Initialize Stripe with a valid publishable key
 // Use the proper Stripe test publishable key format that starts with pk_test_
@@ -14,6 +15,8 @@ interface StripeProviderProps {
 }
 
 export const StripeProvider = ({ children }: StripeProviderProps) => {
+  const cookieParams = getSafeCookieParams();
+  
   return (
     <Elements 
       stripe={stripePromise}
@@ -30,6 +33,11 @@ export const StripeProvider = ({ children }: StripeProviderProps) => {
         appearance: {
           theme: 'stripe',
         },
+        // Apply safe cookie parameters
+        cookies: {
+          secure: cookieParams.secure,
+          sameSite: cookieParams.sameSite as 'Strict' | 'Lax' | 'None' | undefined,
+        }
       }}
     >
       {children}

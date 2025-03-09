@@ -75,9 +75,12 @@ export function useSessionInterface(conversationId: number | null) {
     
     try {
       // Update the session_started flag in the database
+      // Use type assertion to handle the TypeScript error
       const { error } = await supabase
         .from('conversations')
-        .update({ session_started: true })
+        .update({ 
+          session_started: true 
+        } as any)
         .eq('id', conversationId);
         
       if (error) {

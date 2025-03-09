@@ -49,7 +49,9 @@ const SessionJoinInfo = ({
       console.log(`Setting session_started to ${started} for conversation:`, convId);
       const { error } = await supabase
         .from('conversations')
-        .update({ session_started: started })
+        .update({ 
+          session_started: started 
+        } as any)
         .eq('id', convId);
         
       if (error) {

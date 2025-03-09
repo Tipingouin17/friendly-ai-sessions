@@ -168,8 +168,8 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
         participantColors,
         isWaitingForResponse: false,
         handleStartSession,
-        handleSendMessage,
-        handleLikeMessage,
+        handleSendMessage: async () => { return Promise.resolve(); }, // Fix: Return a Promise
+        handleLikeMessage: () => {},
         showQrCodeView: false,
         sessionLink: '',
         currentUserParticipantId: null,
@@ -226,7 +226,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
         totalResponses: 0,
         viewMode: "participant",
         setViewMode: () => {},
-        handleGenerateReport: () => {},
+        handleGenerateReport: async () => { return Promise.resolve(); }, // Fix: Return a Promise
         isGeneratingReport: false,
         recordResponse: () => {},
         error: null
@@ -235,7 +235,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
       participantColors,
       isWaitingForResponse: false,
       handleStartSession: () => {},
-      handleSendMessage: () => {},
+      handleSendMessage: async () => { return Promise.resolve(); }, // Fix: Return a Promise
       handleLikeMessage: () => {},
       showQrCodeView: false,
       sessionLink: '',

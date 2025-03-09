@@ -27,6 +27,18 @@ export const useSessionRealtime = ({
   const sessionFullCalledRef = useRef(false);
   const sessionStartedCalledRef = useRef(false);
   const channelsRef = useRef<any[]>([]);
+  const lastStateRef = useRef({
+    conversationId: null as number | null,
+    participants: [] as ParticipantInfo[]
+  });
+
+  // Update the lastState ref when props change
+  useEffect(() => {
+    lastStateRef.current = {
+      conversationId: currentConversationId,
+      participants: [...participants]
+    };
+  }, [currentConversationId, participants]);
 
   useEffect(() => {
     // Clean up function to remove all channels
@@ -41,14 +53,16 @@ export const useSessionRealtime = ({
     };
 
     // Reset handler flags when conversation ID changes
-    sessionFullCalledRef.current = false;
-    sessionStartedCalledRef.current = false;
+    if (currentConversationId !== lastStateRef.current.conversationId) {
+      sessionFullCalledRef.current = false;
+      sessionStartedCalledRef.current = false;
+    }
     
     // Clean up existing subscriptions before creating new ones
     cleanupChannels();
 
     if (currentConversationId) {
-      console.log("Setting up realtime subscription for participants in Session page");
+      console.log("Setting up realtime subscription for participants in Session page, conversation ID:", currentConversationId);
       
       // Check if the session is already full when component mounts
       if (conversation && 
@@ -64,7 +78,7 @@ export const useSessionRealtime = ({
 
       // First channel for conversation updates
       const conversationChannel = supabase
-        .channel(`conversations-${currentConversationId}`)
+        .channel(`conversations-${currentConversationId}-${Date.now()}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
@@ -102,13 +116,15 @@ export const useSessionRealtime = ({
             refetch();
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Conversation channel status: ${status}`);
+        });
       
       channelsRef.current.push(conversationChannel);
       
       // Second channel for session_participants updates - only create if we need to track new participants
       const participantsChannel = supabase
-        .channel(`session_participants-${currentConversationId}`)
+        .channel(`session_participants-${currentConversationId}-${Date.now()}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
@@ -122,21 +138,49 @@ export const useSessionRealtime = ({
             
             // Check if we already have this participant
             if (!participants.some(p => p.id === newParticipant.participant_id)) {
-              const participantInfo = await getParticipantInfo(newParticipant);
-              
-              setParticipants(current => {
-                // Double-check we're not adding a duplicate
-                if (current.some(p => p.id === participantInfo.id)) {
-                  return current;
-                }
-                return [...current, participantInfo];
-              });
+              try {
+                const participantInfo = await getParticipantInfo(newParticipant);
+                
+                setParticipants(current => {
+                  // Double-check we're not adding a duplicate
+                  if (current.some(p => p.id === participantInfo.id)) {
+                    return current;
+                  }
+                  const updatedParticipants = [...current, participantInfo];
+                  console.log("Updated participant list:", updatedParticipants);
+                  return updatedParticipants;
+                });
+              } catch (error) {
+                console.error("Error getting participant info:", error);
+              }
             }
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Participants channel status: ${status}`);
+        });
         
       channelsRef.current.push(participantsChannel);
+      
+      // Add a channel to track messages for admin view
+      const messagesChannel = supabase
+        .channel(`messages-${currentConversationId}-${Date.now()}`)
+        .on('postgres_changes', {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${currentConversationId}`
+        }, (payload) => {
+          console.log("Messages table change detected:", payload);
+          
+          // Force a refetch to update UI with new messages
+          refetch();
+        })
+        .subscribe((status) => {
+          console.log(`Messages channel status: ${status}`);
+        });
+        
+      channelsRef.current.push(messagesChannel);
       
       return () => {
         cleanupChannels();

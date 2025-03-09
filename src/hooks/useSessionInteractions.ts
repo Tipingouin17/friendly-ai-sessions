@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
@@ -34,6 +34,75 @@ export const useSessionInteractions = ({
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const { toast } = useToast();
   const requestInProgressRef = useRef(false);
+  const messageChannelRef = useRef<any>(null);
+
+  // Set up real-time listening for new messages
+  useEffect(() => {
+    const setupRealtimeListener = () => {
+      if (!currentConversationId) return null;
+      
+      // Clean up existing channel if it exists
+      if (messageChannelRef.current) {
+        supabase.removeChannel(messageChannelRef.current);
+        messageChannelRef.current = null;
+      }
+      
+      console.log("Setting up realtime subscription for messages in conversation:", currentConversationId);
+      
+      const channel = supabase
+        .channel(`messages-sync-${currentConversationId}-${Date.now()}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${currentConversationId}`
+        }, (payload) => {
+          console.log("New message detected:", payload);
+          
+          if (payload.new && sessionState.viewMode === "admin") {
+            // For admin view, we need to update our messages state
+            // This ensures admin sees messages from all participants in real-time
+            try {
+              const newMessageContent = typeof payload.new.content === 'string' 
+                ? payload.new.content 
+                : JSON.stringify(payload.new.content);
+              
+              const newMessage: Message = {
+                id: payload.new.id.toString(),
+                content: newMessageContent,
+                sender: payload.new.role === 'assistant' ? 'assistant' : 'user',
+                timestamp: new Date(payload.new.created_at),
+                likes: []
+              };
+              
+              // Add to messages state if it doesn't already exist
+              sessionState.setMessages(prevMessages => {
+                if (prevMessages.some(msg => msg.id === newMessage.id)) {
+                  return prevMessages;
+                }
+                return [...prevMessages, newMessage];
+              });
+            } catch (error) {
+              console.error("Error processing new message:", error);
+            }
+          }
+        })
+        .subscribe();
+      
+      messageChannelRef.current = channel;
+      
+      return () => {
+        if (messageChannelRef.current) {
+          console.log("Cleaning up message sync channel");
+          supabase.removeChannel(messageChannelRef.current);
+          messageChannelRef.current = null;
+        }
+      };
+    };
+    
+    const cleanup = setupRealtimeListener();
+    return cleanup;
+  }, [currentConversationId, sessionState.viewMode, sessionState.setMessages]);
 
   const handleSendMessage = useCallback(async () => {
     // Prevent concurrent requests
@@ -68,6 +137,19 @@ export const useSessionInteractions = ({
     // Add the participant's message to the displayed messages
     sessionState.setMessages(prev => [...prev, newMessage]);
     
+    try {
+      // Store message in database for sync
+      await supabase.from('messages').insert({
+        conversation_id: currentConversationId,
+        content: sessionState.inputMessage,
+        role: 'user',
+        name: participantInfo?.name || `Participant ${currentParticipant}`,
+        user_id: null // For anonymous participants
+      });
+    } catch (error) {
+      console.error("Error saving message to database:", error);
+    }
+    
     // Clear the input message
     sessionState.setInputMessage("");
     
@@ -80,6 +162,7 @@ export const useSessionInteractions = ({
     
     console.log("Total expected participants:", totalParticipants);
     console.log("Current total responses:", updatedTotalResponses);
+    console.log("This participant's hasAnswered:", sessionState.hasAnswered);
     
     // If all participants have responded, send to facilitator
     if (updatedTotalResponses >= totalParticipants) {
@@ -111,6 +194,19 @@ export const useSessionInteractions = ({
           timestamp: new Date(),
           avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
         };
+        
+        // Save AI response to database
+        try {
+          await supabase.from('messages').insert({
+            conversation_id: currentConversationId,
+            content: aiResponse.content,
+            role: 'assistant',
+            user_id: null
+          });
+        } catch (error) {
+          console.error("Error saving AI response to database:", error);
+        }
+        
         sessionState.setMessages(prev => [...prev, aiResponse]);
       } catch (error) {
         console.error('Error getting AI response:', error);

@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import MessageList from "@/components/chat/MessageList";
 import SessionJoinInfo from "@/components/session/SessionJoinInfo";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -32,6 +32,13 @@ const MessagingArea = ({
   isMobile,
   viewMode
 }: MessagingAreaProps) => {
+  // Log messages count for debugging
+  useEffect(() => {
+    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
+    console.log("Participants count:", participants.length);
+    console.log("Current participant count from props:", currentParticipantCount);
+  }, [messages.length, viewMode, participants.length, currentParticipantCount]);
+  
   // For participant view, filter messages to only show their own and facilitator messages
   const filteredMessages = useMemo(() => {
     if (viewMode === "participant") {
@@ -54,6 +61,8 @@ const MessagingArea = ({
   // Group messages by facilitator question for admin view
   const groupedMessages = useMemo(() => {
     if (viewMode !== "admin") return [];
+    
+    console.log("Grouping messages for admin view:", messages.length);
 
     const groups = [];
     let currentGroup = { question: null, responses: [] };
@@ -82,6 +91,7 @@ const MessagingArea = ({
       groups.push(currentGroup);
     }
     
+    console.log("Grouped message count:", groups.length);
     return groups;
   }, [messages, viewMode]);
 
@@ -91,40 +101,42 @@ const MessagingArea = ({
         {viewMode === "admin" ? (
           <div className="h-full overflow-y-auto">
             <div className="px-4 py-6 space-y-8">
-              {groupedMessages.map((group, groupIndex) => (
-                <div key={`group-${groupIndex}-${group.question.id}`} className="border border-gray-100 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 p-4 border-b border-gray-100">
-                    <div className="font-medium text-gray-800 mb-1">Question {groupIndex + 1}</div>
-                    <div className="text-gray-700">{group.question.content}</div>
-                  </div>
-                  
-                  <ParticipantResponseStats 
-                    responses={group.responses}
-                    totalParticipants={maxParticipants}
-                  />
-                  
-                  <div className="divide-y divide-gray-100">
-                    {group.responses.map((response, responseIndex) => (
-                      <div key={`response-${response.id}-${responseIndex}`} className="p-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-2 h-2 rounded-full" 
-                            style={{ backgroundColor: participantColors[response.participant] || '#888' }} 
-                          />
-                          <div className="text-sm font-medium flex items-center gap-1">
-                            {response.isAnonymous ? 'Anonymous participant' : response.participant}
-                            {response.isAnonymous && <span className="text-xs text-gray-500">(anonymous)</span>}
+              {groupedMessages.length > 0 ? (
+                groupedMessages.map((group, groupIndex) => (
+                  <div key={`group-${groupIndex}-${group.question.id}`} className="border border-gray-100 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 p-4 border-b border-gray-100">
+                      <div className="font-medium text-gray-800 mb-1">Question {groupIndex + 1}</div>
+                      <div className="text-gray-700">{group.question.content}</div>
+                    </div>
+                    
+                    <ParticipantResponseStats 
+                      responses={group.responses}
+                      totalParticipants={maxParticipants}
+                    />
+                    
+                    <div className="divide-y divide-gray-100">
+                      {group.responses.map((response, responseIndex) => (
+                        <div key={`response-${response.id}-${responseIndex}`} className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full" 
+                              style={{ backgroundColor: participantColors[response.participant] || '#888' }} 
+                            />
+                            <div className="text-sm font-medium flex items-center gap-1">
+                              {response.isAnonymous ? 'Anonymous participant' : response.participant}
+                              {response.isAnonymous && <span className="text-xs text-gray-500">(anonymous)</span>}
+                            </div>
                           </div>
+                          <div className="text-gray-700 pl-4">{response.content}</div>
                         </div>
-                        <div className="text-gray-700 pl-4">{response.content}</div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-              
-              {groupedMessages.length === 0 && (
+                ))
+              ) : (
                 <div className="text-center text-gray-500 py-8">
-                  No messages to display. Start the conversation to see responses here.
+                  {messages.length > 0 ? 
+                    "Processing messages... If you see this message for too long, try refreshing the page." :
+                    "No messages to display. Start the conversation to see responses here."}
                 </div>
               )}
             </div>

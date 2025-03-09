@@ -27,6 +27,7 @@ export function useSessionState({
   // Store in ref to avoid creating a new function on each render
   const welcomeAddedRef = useRef(false);
   const reportGenerationInProgressRef = useRef(false);
+  const initialMessagesLoadedRef = useRef(false);
   
   // Ensure current participant is locked to their assigned ID
   const currentParticipant = currentUserParticipantId || 1;
@@ -47,6 +48,112 @@ export function useSessionState({
       ]);
     }
   }, [welcomeMessage, messages.length]);
+
+  // Load initial messages from the database
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!conversationId || initialMessagesLoadedRef.current) return;
+      
+      try {
+        console.log("Fetching messages for conversation:", conversationId);
+        
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          console.log(`Loaded ${data.length} messages from database`, data);
+          
+          // Convert database messages to our Message format
+          const convertedMessages: Message[] = data.map(msg => {
+            // Determine the participant identifier if it's a user message
+            let participant: string | undefined = undefined;
+            if (msg.role === 'user') {
+              // Try to determine participant ID
+              // This may need to be adjusted based on how you store participant info
+              participant = msg.name?.startsWith('Participant') 
+                ? `P${msg.name.split(' ')[1]}` 
+                : undefined;
+            }
+            
+            return {
+              id: msg.id.toString(),
+              content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+              sender: msg.role === 'assistant' ? 'assistant' : 'user',
+              timestamp: new Date(msg.created_at),
+              participant,
+              likes: []
+            };
+          });
+          
+          // If we have a welcome message, add it at the beginning if not already present
+          if (welcomeMessage && welcomeAddedRef.current) {
+            const hasWelcome = convertedMessages.some(m => 
+              m.sender === 'assistant' && m.content === welcomeMessage
+            );
+            
+            if (!hasWelcome) {
+              const welcomeId = nanoid();
+              convertedMessages.unshift({
+                id: welcomeId,
+                content: welcomeMessage,
+                sender: "assistant",
+                timestamp: new Date(),
+                likes: []
+              });
+            }
+          }
+          
+          setMessages(convertedMessages);
+          
+          // Check if current participant has already answered the latest question
+          if (currentParticipant) {
+            // Find the latest facilitator message
+            const latestFacilitatorIndex = convertedMessages.findIndex(m => m.sender === 'assistant');
+            
+            if (latestFacilitatorIndex !== -1) {
+              // See if there's a response from this participant after the latest facilitator message
+              const hasResponse = convertedMessages.slice(latestFacilitatorIndex + 1)
+                .some(m => m.sender === 'user' && m.participant === `P${currentParticipant}`);
+              
+              setHasAnswered(hasResponse);
+              
+              // Also update pending responses
+              const responses: {[key: number]: boolean} = {};
+              convertedMessages.slice(latestFacilitatorIndex + 1)
+                .filter(m => m.sender === 'user' && m.participant?.startsWith('P'))
+                .forEach(m => {
+                  if (m.participant) {
+                    const participantId = parseInt(m.participant.slice(1));
+                    responses[participantId] = true;
+                  }
+                });
+              
+              setPendingResponses(responses);
+              setTotalResponses(Object.values(responses).filter(Boolean).length);
+            }
+          }
+          
+          initialMessagesLoadedRef.current = true;
+        } else {
+          console.log("No messages found for conversation:", conversationId);
+        }
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+    
+    fetchMessages();
+    
+    // Reset flag when conversation changes
+    return () => {
+      initialMessagesLoadedRef.current = false;
+    };
+  }, [conversationId, welcomeMessage, currentParticipant]);
 
   // Generate session report
   const handleGenerateReport = useCallback(async () => {
@@ -77,17 +184,28 @@ export function useSessionState({
 
         // Add the report to the messages
         const reportId = nanoid();
-        setMessages(prevMessages => [
-          ...prevMessages,
-          {
-            id: reportId,
+        const reportMessage = {
+          id: reportId,
+          content: data,
+          sender: "assistant" as const,
+          timestamp: new Date(),
+          isReport: true,
+          likes: []
+        };
+        
+        setMessages(prevMessages => [...prevMessages, reportMessage]);
+        
+        // Save report to database
+        try {
+          await supabase.from('messages').insert({
+            conversation_id: conversationId,
             content: data,
-            sender: "assistant",
-            timestamp: new Date(),
-            isReport: true,
-            likes: []
-          }
-        ]);
+            role: 'assistant',
+            user_id: null
+          });
+        } catch (dbError) {
+          console.error("Error saving report to database:", dbError);
+        }
       }
     } catch (error) {
       console.error('Error generating report:', error);

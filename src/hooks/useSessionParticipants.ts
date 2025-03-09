@@ -83,7 +83,7 @@ export function useSessionParticipants(conversationId: number | null) {
     
     if (!conversationId) {
       console.log("No conversation ID provided, skipping realtime subscription");
-      return cleanupChannel; // Return the cleanup function instead of undefined 'cleanup'
+      return cleanupChannel;
     }
     
     console.log("Setting up realtime subscription for conversation:", conversationId);
@@ -102,7 +102,7 @@ export function useSessionParticipants(conversationId: number | null) {
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received realtime update");
+          console.log("Received realtime update for conversation:", payload);
           setIsConnected(true);
           
           if (payload.new) {
@@ -140,13 +140,11 @@ export function useSessionParticipants(conversationId: number | null) {
 
       channelRef.current = channel;
 
-      return () => {
-        cleanupChannel();
-      };
+      return cleanupChannel;
     } catch (err) {
       console.error("Error setting up realtime subscription:", err);
       setError("Failed to establish connection to session");
-      return () => {};
+      return cleanupChannel;
     }
   }, [conversationId, refetch, attemptReconnection]);
 

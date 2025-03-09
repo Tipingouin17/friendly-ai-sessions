@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import MessageItem from './MessageItem';
@@ -25,14 +25,21 @@ const MessageList = ({
 }: MessageListProps) => {
   const { ref } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
   
-  // Log only when necessary
-  React.useEffect(() => {
+  // Debounced logging to reduce console spam
+  const logMessageInfo = useCallback(() => {
     console.log("MessageList - received messages count:", messages.length);
     console.log("MessageList - current participant:", currentParticipant);
   }, [messages.length, currentParticipant]);
 
+  // Log only when messages change
+  useEffect(() => {
+    logMessageInfo();
+  }, [messages.length, logMessageInfo]);
+
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
+    if (messages.length === 0) return [];
+    
     return messages.map((message, index) => {
       const isFirstMessageOfGroup = index === 0 || 
         messages[index - 1].sender !== message.sender || 
@@ -69,17 +76,23 @@ const MessageList = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="px-4 py-6 space-y-4">
-        {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            isFirstMessageOfGroup={isFirstMessageOfGroup}
-            isLastMessageOfGroup={isLastMessageOfGroup}
-            currentParticipant={currentParticipant}
-            onLikeMessage={onLikeMessage}
-            participantInfo={participantInfo}
-          />
-        ))}
+        {processedMessages.length > 0 ? (
+          processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
+            <MessageItem
+              key={`${message.id}-${index}`} // Add index to key to ensure uniqueness
+              message={message}
+              isFirstMessageOfGroup={isFirstMessageOfGroup}
+              isLastMessageOfGroup={isLastMessageOfGroup}
+              currentParticipant={currentParticipant}
+              onLikeMessage={onLikeMessage}
+              participantInfo={participantInfo}
+            />
+          ))
+        ) : (
+          <div className="text-center text-gray-500 py-8">
+            No messages to display. Start the conversation to see messages here.
+          </div>
+        )}
         
         {/* Thinking indicator */}
         {isWaitingForResponse && <ThinkingIndicator />}

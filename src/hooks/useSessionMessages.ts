@@ -6,10 +6,10 @@ import { getParticipantColor } from '@/utils/sessionHelpers';
 
 const WELCOME_MESSAGE_DELAY = 1000; // 1 second delay before showing welcome message
 
-type UseSessionMessagesProps = {
+interface UseSessionMessagesProps {
   conversationId: number | null;
   welcomeMessage: string | null;
-};
+}
 
 export const useSessionMessages = ({
   conversationId,

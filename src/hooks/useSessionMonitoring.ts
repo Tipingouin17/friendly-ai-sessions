@@ -30,13 +30,23 @@ export function useSessionMonitoring({
   }, [conversation]);
 
   // Set up room state using existing hooks
-  const messages = useSessionMessages(conversationId);
+  const { messages, setMessages, error: messagesError } = useSessionMessages({
+    conversationId,
+    welcomeMessage: null
+  });
   
   // Set up anonymous state
   const anonymousState = useAnonymousState({
     conversationId,
     currentParticipantId: currentUserParticipantId
   });
+
+  // Handle errors from messages
+  useEffect(() => {
+    if (messagesError && onError) {
+      onError(messagesError);
+    }
+  }, [messagesError, onError]);
 
   // Create a minimal room state for now
   const roomState = {
@@ -48,14 +58,18 @@ export function useSessionMonitoring({
     setIsRecording: (recording: boolean) => console.log("setIsRecording:", recording),
     handleGenerateReport: async () => { console.log("Generate report"); },
     isGeneratingReport: false,
-    setMessages: (messages: React.SetStateAction<Message[]>) => console.log("setMessages", messages),
+    setMessages: (messages: React.SetStateAction<Message[]>) => {
+      if (setMessages) {
+        setMessages(messages);
+      }
+    },
     hasAnswered: false,
     totalResponses: 0,
     viewMode: "participant" as const,
     setViewMode: (mode: "participant" | "admin") => console.log("setViewMode:", mode),
     recordResponse: (participantId: number, hasResponded: boolean) => 
       console.log("recordResponse:", participantId, hasResponded),
-    error: null,
+    error: messagesError || null,
     isWaitingForResponse: false,
     handleSendMessage: async () => { console.log("Send message"); },
     handleLikeMessage: (messageId: string) => console.log("Like message:", messageId),

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { AlertCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface JoinSessionLoadingStateProps {
@@ -19,12 +19,37 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   const [isLongWait, setIsLongWait] = useState(false);
   const [isVeryLongWait, setIsVeryLongWait] = useState(false);
   const [errorDescription, setErrorDescription] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(loadingTimeElapsed);
+  const startTime = useRef(Date.now());
   const mountedRef = useRef(true);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Set up cleanup on unmount
   useEffect(() => {
+    console.log("JoinSessionLoadingState mounted", { error, retryCount });
+    mountedRef.current = true;
+    
+    // Start timer to update elapsed time
+    timerRef.current = setInterval(() => {
+      if (mountedRef.current) {
+        const newElapsed = (Date.now() - startTime.current) / 1000;
+        setElapsed(newElapsed);
+        
+        // Automatically update wait states based on elapsed time
+        if (newElapsed > 4 && !isLongWait) {
+          setIsLongWait(true);
+        }
+        if (newElapsed > 10 && !isVeryLongWait) {
+          setIsVeryLongWait(true);
+        }
+      }
+    }, 1000);
+    
     return () => {
       mountedRef.current = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, []);
   
@@ -45,6 +70,10 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     } else {
       setErrorDescription(error);
     }
+    
+    // Force long wait states when there's an error
+    setIsLongWait(true);
+    setIsVeryLongWait(true);
   }, [error]);
   
   // If we already have a loading time elapsed or error, show appropriate state immediately
@@ -59,43 +88,6 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       setIsVeryLongWait(true);
     }
   }, [loadingTimeElapsed, retryCount, error]);
-
-  useEffect(() => {
-    if (!mountedRef.current) return;
-    
-    // Reset wait states if there's an error
-    if (error) {
-      setIsLongWait(true);
-      setIsVeryLongWait(true);
-      return;
-    }
-    
-    // Clear previous timeouts when component rerenders
-    const timeouts: NodeJS.Timeout[] = [];
-    
-    // Set a timeout to show an extended message if loading takes too long
-    const longWaitTimeout = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsLongWait(true);
-      }
-    }, 3000); // 3 seconds for better UX
-    
-    timeouts.push(longWaitTimeout);
-
-    // Set a timeout for very long waits
-    const veryLongWaitTimeout = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsVeryLongWait(true);
-      }
-    }, 8000); // 8 seconds
-    
-    timeouts.push(veryLongWaitTimeout);
-
-    return () => {
-      // Clean up all timeouts on unmount
-      timeouts.forEach(timeout => clearTimeout(timeout));
-    };
-  }, [error]);
 
   const handleRefresh = () => {
     if (onRetry) {
@@ -137,6 +129,13 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         <p className="text-gray-600 mb-2 text-lg font-medium">
           {getStatusMessage()}
         </p>
+        
+        {elapsed > 2 && (
+          <div className="flex items-center justify-center text-sm text-gray-500 mb-3">
+            <Clock className="w-4 h-4 mr-1" />
+            <span>Elapsed: {Math.floor(elapsed)} seconds</span>
+          </div>
+        )}
         
         {(isLongWait || error) && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md flex items-start">

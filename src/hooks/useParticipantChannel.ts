@@ -12,14 +12,16 @@ interface UseParticipantChannelProps {
   refetch: () => void;
 }
 
-export function useParticipantChannel({
-  conversationId,
-  setIsConnected,
-  attemptReconnection,
-  setCurrentParticipantCount,
-  setMaxParticipantsForSession,
-  refetch
-}: UseParticipantChannelProps) {
+export function useParticipantChannel(props: UseParticipantChannelProps) {
+  const { 
+    conversationId,
+    setIsConnected,
+    attemptReconnection,
+    setCurrentParticipantCount,
+    setMaxParticipantsForSession,
+    refetch
+  } = props;
+  
   const channelRef = useRef<any>(null);
   
   useEffect(() => {
@@ -93,4 +95,6 @@ export function useParticipantChannel({
       return cleanupChannel;
     }
   }, [conversationId, refetch, attemptReconnection, setIsConnected, setCurrentParticipantCount, setMaxParticipantsForSession]);
+
+  return { error: null };
 }

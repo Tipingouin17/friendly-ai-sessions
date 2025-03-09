@@ -53,14 +53,14 @@ export function useSessionParticipants(conversationId: number | null) {
   } = useParticipantCounts(conversation);
 
   // Set up participant channel
-  useParticipantChannel(
+  useParticipantChannel({
     conversationId,
     setIsConnected,
     attemptReconnection,
     setCurrentParticipantCount,
     setMaxParticipantsForSession,
     refetch
-  );
+  });
 
   // Combine errors
   useEffect(() => {

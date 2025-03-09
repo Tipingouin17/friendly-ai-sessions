@@ -56,7 +56,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         
         // Upload to storage with the facilitator ID as the filename
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('facilitators-avatars')
+          .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {
             contentType: 'image/jpeg',
             upsert: true
@@ -74,7 +74,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         } else {
           // Get the public URL
           const { data: publicUrlData } = supabase.storage
-            .from('facilitators-avatars')
+            .from('facilitator-avatars')
             .getPublicUrl(`${facilitator.id}.jpg`);
             
           console.log("Public URL:", publicUrlData.publicUrl);

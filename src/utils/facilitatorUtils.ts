@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 /**
  * Generates a URL for a facilitator's avatar
  * Follows this priority:
- * 1. Custom uploaded avatar from facilitators-avatars bucket if available
+ * 1. Custom uploaded avatar from facilitator-avatars bucket if available
  * 2. URL from the facilitator's profile_picture field if available
  * 3. Default placeholder as fallback
  */
@@ -16,13 +16,13 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   }
   
   try {
-    // First check if there's a custom avatar in the facilitators-avatars bucket
+    // First check if there's a custom avatar in the facilitator-avatars bucket
     if (facilitator.id) {
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
       // Try with jpg extension
       const { data: jpgData } = supabase.storage
-        .from('facilitators-avatars')
+        .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (jpgData && jpgData.publicUrl) {

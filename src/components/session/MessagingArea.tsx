@@ -37,6 +37,25 @@ const MessagingArea = ({
   console.log("MessagingArea - Current participant:", currentParticipant);
   console.log("MessagingArea - ViewMode:", viewMode);
   
+  // For participant view, filter messages to only show their own and facilitator messages
+  const filteredMessages = React.useMemo(() => {
+    if (viewMode === "participant") {
+      return messages.filter(message => {
+        // Always show facilitator messages
+        if (message.sender === "assistant") return true;
+        
+        // Show this participant's messages
+        if (message.sender === "user" && message.participant === `P${currentParticipant}`) return true;
+        
+        // Hide all other messages
+        return false;
+      });
+    }
+    
+    // Admin view sees all messages
+    return messages;
+  }, [messages, viewMode, currentParticipant]);
+  
   // Group messages by facilitator question for admin view
   const groupedMessages = React.useMemo(() => {
     if (viewMode !== "admin") return [];
@@ -118,7 +137,7 @@ const MessagingArea = ({
           </div>
         ) : (
           <MessageList 
-            messages={messages} 
+            messages={filteredMessages} 
             participantColors={participantColors}
             currentParticipant={`P${currentParticipant}`}
             onLikeMessage={onLikeMessage}

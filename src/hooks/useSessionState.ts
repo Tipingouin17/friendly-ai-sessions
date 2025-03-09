@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
@@ -88,7 +88,7 @@ export function useSessionState({
   };
 
   // Record a response to a facilitator question
-  const recordResponse = (participantId: number, hasResponded: boolean) => {
+  const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
     console.log("Recording response for participant:", participantId, "with hasResponded:", hasResponded);
     
     setPendingResponses(prev => {
@@ -103,7 +103,7 @@ export function useSessionState({
     if (hasResponded && participantId === currentParticipant) {
       setHasAnswered(true);
     }
-  };
+  }, [currentParticipant]);
   
   // Update total responses count based on pendingResponses
   useEffect(() => {

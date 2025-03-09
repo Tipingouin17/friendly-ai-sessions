@@ -40,16 +40,20 @@ const MessageList = ({
             messages[index + 1].sender !== message.sender || 
             messages[index + 1].participant !== message.participant;
 
-          const messageColor = message.sender === "user" && message.participant
-            ? (participantColors[message.participant] || getParticipantColor(message.participant))
-            : message.sender === "assistant" ? "#FFFFFF" : undefined;
+          // Ensure message has a color if it's a user message
+          let messageColor = message.color;
+          if (message.sender === "user" && message.participant && !messageColor) {
+            messageColor = participantColors[message.participant] || getParticipantColor(message.participant);
+          } else if (message.sender === "assistant" && !messageColor) {
+            messageColor = "#FFFFFF";
+          }
 
           // Get participant info if this is a user message
           let participantInfo = null;
           if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
             const participantNumber = parseInt(message.participant.slice(1));
             participantInfo = participants.find(p => p.id === participantNumber);
-            console.log("Found participant info for message:", participantInfo);
+            console.log(`Found participant info for message from P${participantNumber}:`, participantInfo);
           }
 
           return (

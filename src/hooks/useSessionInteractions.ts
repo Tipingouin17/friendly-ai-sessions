@@ -57,7 +57,7 @@ export const useSessionInteractions = ({
       sender: "user" as const,
       participant: currentParticipantKey,
       timestamp: new Date(),
-      color: participantColors[currentParticipantKey as keyof typeof participantColors],
+      color: participantColors[currentParticipantKey] || "#CCCCCC",
       avatar: participantInfo?.avatar,
       isAnonymous: isAnonymous
     };
@@ -65,20 +65,21 @@ export const useSessionInteractions = ({
     // Add the participant's message to the displayed messages
     sessionState.setMessages(prev => [...prev, newMessage]);
     
-    // Record this participant has responded - do this AFTER adding the message
-    sessionState.recordResponse(currentParticipant, true);
-    
-    // Reset the input message
+    // Clear the input message
     sessionState.setInputMessage("");
+    
+    // Record this participant has responded - after adding the message
+    sessionState.recordResponse(currentParticipant, true);
     
     // Check if we have responses from all participants
     const totalParticipants = conversation?.participants ?? 1;
+    const updatedTotalResponses = sessionState.totalResponses + 1;
+    
     console.log("Total expected participants:", totalParticipants);
-    console.log("Current total responses:", sessionState.totalResponses + 1); // +1 because we just added one
+    console.log("Current total responses:", updatedTotalResponses);
     
     // If all participants have responded, send to facilitator
-    // We add +1 here because the state update for totalResponses hasn't happened yet
-    if (sessionState.totalResponses + 1 >= totalParticipants) {
+    if (updatedTotalResponses >= totalParticipants) {
       setIsWaitingForResponse(true);
 
       try {

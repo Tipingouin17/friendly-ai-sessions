@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface JoinSessionLoadingStateProps {
@@ -18,9 +18,39 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
 }) => {
   const [isLongWait, setIsLongWait] = useState(false);
   const [isVeryLongWait, setIsVeryLongWait] = useState(false);
+  const [errorDescription, setErrorDescription] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  
+  // Set up cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  
+  // Process error messages to provide more helpful descriptions
+  useEffect(() => {
+    if (!error) {
+      setErrorDescription(null);
+      return;
+    }
+    
+    // Handle different types of errors with more user-friendly messages
+    if (error.includes("Permission denied") || error.includes("nodeType")) {
+      setErrorDescription("There was a problem with browser permissions. This might be resolved by reloading the page.");
+    } else if (error.includes("network") || error.includes("connection") || error.includes("timeout")) {
+      setErrorDescription("There seems to be a network connectivity issue. Please check your internet connection.");
+    } else if (error.includes("JSON") || error.includes("parse") || error.includes("no rows")) {
+      setErrorDescription("The session data couldn't be loaded properly. Please try again.");
+    } else {
+      setErrorDescription(error);
+    }
+  }, [error]);
   
   // If we already have a loading time elapsed or error, show appropriate state immediately
   useEffect(() => {
+    if (!mountedRef.current) return;
+    
     if (loadingTimeElapsed > 3) {
       setIsLongWait(true);
     }
@@ -31,6 +61,8 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   }, [loadingTimeElapsed, retryCount, error]);
 
   useEffect(() => {
+    if (!mountedRef.current) return;
+    
     // Reset wait states if there's an error
     if (error) {
       setIsLongWait(true);
@@ -43,14 +75,18 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     
     // Set a timeout to show an extended message if loading takes too long
     const longWaitTimeout = setTimeout(() => {
-      setIsLongWait(true);
+      if (mountedRef.current) {
+        setIsLongWait(true);
+      }
     }, 3000); // 3 seconds for better UX
     
     timeouts.push(longWaitTimeout);
 
     // Set a timeout for very long waits
     const veryLongWaitTimeout = setTimeout(() => {
-      setIsVeryLongWait(true);
+      if (mountedRef.current) {
+        setIsVeryLongWait(true);
+      }
     }, 8000); // 8 seconds
     
     timeouts.push(veryLongWaitTimeout);
@@ -67,17 +103,6 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     } else {
       window.location.reload();
     }
-  };
-
-  const getErrorMessage = () => {
-    if (!error) return null;
-    
-    // Handle specific error messages nicely
-    if (error.includes("JSON object requested") || error.includes("no rows")) {
-      return "The session data couldn't be updated. Please try again.";
-    }
-    
-    return error;
   };
 
   const getStatusMessage = () => {
@@ -105,7 +130,8 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         {!isVeryLongWait && !error ? (
           <div className="w-10 h-10 border-t-2 border-purple-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
         ) : (
-          <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" />
+          error ? <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" /> : 
+                 <WifiOff className="w-10 h-10 text-amber-500 mx-auto mb-4" />
         )}
         
         <p className="text-gray-600 mb-2 text-lg font-medium">
@@ -120,8 +146,8 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
                 {error ? "Connection error" : "Taking longer than expected"}
               </p>
               <p>
-                {error
-                  ? getErrorMessage()
+                {errorDescription
+                  ? errorDescription
                   : isVeryLongWait 
                     ? "The session might be unavailable or there could be connection issues."
                     : "Connecting to the session. Please wait a moment..."}

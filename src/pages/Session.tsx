@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useSessionPageState } from "@/hooks/useSessionPageState";
@@ -13,6 +13,7 @@ const Session = () => {
   const { toast } = useToast();
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [lastAttemptTime, setLastAttemptTime] = useState<number>(0);
+  const sessionMountedRef = useRef(false);
   
   const {
     isAdmin,
@@ -30,14 +31,38 @@ const Session = () => {
     console.log("Retrying connection...");
     setConnectionAttempts(prev => prev + 1);
     setLastAttemptTime(Date.now());
-    window.location.reload();
+    
+    // Safer reload approach that preserves location state
+    if (connectionAttempts < 3) {
+      window.location.reload();
+    } else {
+      // After multiple attempts, try a different approach
+      toast({
+        title: "Connection issues detected",
+        description: "Trying an alternative connection method...",
+        variant: "destructive",
+      });
+      
+      // Force refresh instead of reload to avoid potential caching issues
+      setTimeout(() => {
+        window.location.href = window.location.href;
+      }, 1000);
+    }
   };
+
+  // Set mounted flag to help prevent memory leaks on component unmount
+  useEffect(() => {
+    sessionMountedRef.current = true;
+    return () => {
+      sessionMountedRef.current = false;
+    };
+  }, []);
 
   // Attempt to recover from blank screens with a timer
   useEffect(() => {
     // If we've been loading for more than 10 seconds, show a recovery option
     const recoveryTimer = setTimeout(() => {
-      if (isLoading && !error) {
+      if (isLoading && !error && sessionMountedRef.current) {
         console.log("Session page appears stuck in loading state, triggering recovery");
         // Only show toast on first attempt
         if (connectionAttempts === 0) {
@@ -106,12 +131,14 @@ const Session = () => {
         
         // Ensure we update the loading state from the provider
         React.useEffect(() => {
-          setIsLoading(props.isLoading);
+          if (sessionMountedRef.current) {
+            setIsLoading(props.isLoading);
+          }
         }, [props.isLoading, setIsLoading]);
         
         // Handle errors from the session provider
         React.useEffect(() => {
-          if (props.error) {
+          if (props.error && sessionMountedRef.current) {
             handleError(props.error);
           }
         }, [props.error, handleError]);

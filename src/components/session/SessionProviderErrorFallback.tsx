@@ -11,8 +11,10 @@ export const SessionProviderErrorFallback = ({
   errorMessage, 
   children 
 }: SessionProviderErrorFallbackProps) => {
-  // Return basic error state
-  return children({
+  console.log("Rendering SessionProviderErrorFallback with error:", errorMessage);
+  
+  // Create safe default props
+  const safeProps: SessionContextProps = {
     isLoading: false,
     conversation: null,
     currentConversationId: null,
@@ -29,7 +31,7 @@ export const SessionProviderErrorFallback = ({
       setViewMode: () => {},
       handleGenerateReport: async () => { return Promise.resolve(); },
       isGeneratingReport: false,
-      setMessages: (messages) => {},
+      setMessages: () => {},
       recordResponse: () => {},
       error: null
     },
@@ -48,7 +50,10 @@ export const SessionProviderErrorFallback = ({
     },
     isSessionStartedInDB: false,
     error: errorMessage
-  });
+  };
+
+  // Return error state
+  return children(safeProps);
 };
 
 // Import this from sessionHelpers to avoid circular dependencies

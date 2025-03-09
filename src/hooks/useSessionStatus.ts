@@ -32,6 +32,14 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
             });
             navigate('/');
           }
+          // Check if session was started
+          if (payload.new.session_started && !payload.old.session_started) {
+            console.log("Session was started remotely");
+            toast({
+              title: "Session Started",
+              description: "The session has been started.",
+            });
+          }
           refetch();
         }
       })

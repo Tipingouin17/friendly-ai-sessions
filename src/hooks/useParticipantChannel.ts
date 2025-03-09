@@ -69,8 +69,11 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
             // Update current participants count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
               setCurrentParticipantCount(payload.new.current_participants);
-              
-              // Force refetch conversation data to ensure we have latest state
+            }
+            
+            // Check if session was started
+            if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
+              console.log("Session was started, forcing data refresh");
               refetch();
             }
           }

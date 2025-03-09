@@ -55,8 +55,9 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         const blob = await base64Response.blob();
         
         // Upload to storage with the facilitator ID as the filename
+        // Updated bucket name to 'facilitator-avatars' (without the 's')
         const { error: uploadError } = await supabase.storage
-          .from('facilitators-avatars')
+          .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {
             contentType: 'image/jpeg',
             upsert: true

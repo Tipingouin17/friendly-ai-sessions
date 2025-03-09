@@ -22,7 +22,7 @@ export const StripeProvider = ({ children }: StripeProviderProps) => {
     <Elements 
       stripe={stripePromise}
       options={{
-        // Add Stripe Elements options to prevent CSP issues
+        // Add Stripe Elements options for better CSP compatibility
         loader: 'auto',
         fonts: [
           {
@@ -30,7 +30,6 @@ export const StripeProvider = ({ children }: StripeProviderProps) => {
           },
         ],
         // Improve cookie handling with SameSite settings
-        clientSecret: undefined,
         appearance: {
           theme: 'stripe',
         },

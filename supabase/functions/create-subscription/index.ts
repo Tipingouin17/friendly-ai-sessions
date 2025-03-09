@@ -43,14 +43,22 @@ serve(async (req) => {
     
     console.log(`Created Stripe customer: ${customer.id}`);
     
-    // Create the subscription
+    // Create the subscription with proper cross-origin support
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [
         { price: stripePlanId },
       ],
       payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
+      payment_settings: { 
+        save_default_payment_method: 'on_subscription',
+        payment_method_options: {
+          card: {
+            // Allow stored credentials and other cross-site usage
+            setup_future_usage: 'on_session',
+          }
+        }
+      },
       expand: ['latest_invoice.payment_intent'],
       metadata: {
         supabase_user_id: userId,
@@ -77,7 +85,11 @@ serve(async (req) => {
         clientSecret: clientSecret,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
         status: 200,
       }
     );

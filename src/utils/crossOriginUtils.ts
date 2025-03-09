@@ -1,6 +1,6 @@
 
 /**
- * Utility functions to help with cross-origin issues
+ * Enhanced utility functions to help with cross-origin issues
  */
 
 /**
@@ -60,4 +60,24 @@ export const applySafeCookieParams = (options: RequestInit = {}): RequestInit =>
     credentials: 'include',
     // You could add headers here if needed for specific cookie control
   };
+};
+
+/**
+ * Detect if we're in a full frame cross-origin context or an iframe
+ */
+export const isInIframe = (): boolean => {
+  try {
+    return window !== window.top;
+  } catch (e) {
+    return true;
+  }
+};
+
+/**
+ * Create a fallback URL for session access issues
+ */
+export const createSessionFallbackUrl = (sessionId?: string | number): string => {
+  const baseUrl = getCurrentOrigin();
+  const path = sessionId ? `/session?id=${sessionId}` : '/session';
+  return `${baseUrl}${path}`;
 };

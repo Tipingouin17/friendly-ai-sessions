@@ -5,14 +5,19 @@ import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingStat
 import { useSessionPageState } from "@/hooks/useSessionPageState";
 import SessionStateHandler from "@/components/session/SessionStateHandler";
 import { SessionContextProps } from "@/types/session";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
+import { isInCrossOriginContext, isInIframe } from "@/utils/crossOriginUtils";
+import EmptyState from "@/components/session/EmptyState";
 
 const Session = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [lastAttemptTime, setLastAttemptTime] = useState<number>(0);
+  const [isCrossOrigin, setIsCrossOrigin] = useState<boolean>(false);
+  const [noSessionFound, setNoSessionFound] = useState<boolean>(false);
   const sessionMountedRef = useRef(false);
   
   const {
@@ -26,6 +31,27 @@ const Session = () => {
     handleError
   } = useSessionPageState();
 
+  // Detect cross-origin context on mount
+  useEffect(() => {
+    const crossOriginContext = isInCrossOriginContext();
+    const inIframe = isInIframe();
+    setIsCrossOrigin(crossOriginContext);
+    
+    console.log("Session environment:", {
+      isInCrossOriginContext: crossOriginContext,
+      isInIframe: inIframe,
+      locationSearch: location.search,
+    });
+
+    // If we're in a cross-origin context, show a toast with helpful information
+    if (crossOriginContext) {
+      toast({
+        title: "Cross-Origin Session",
+        description: "You're accessing this session from another site. This may affect some functionality.",
+      });
+    }
+  }, [location.search, toast]);
+
   // Function to retry connection with exponential backoff
   const retryConnection = () => {
     console.log("Retrying connection...");
@@ -34,7 +60,26 @@ const Session = () => {
     
     // Safer reload approach that preserves location state
     if (connectionAttempts < 3) {
-      window.location.reload();
+      // For cross-origin contexts, try a more aggressive approach
+      if (isCrossOrigin) {
+        // Extract session ID from URL if available
+        const searchParams = new URLSearchParams(location.search);
+        const sessionId = searchParams.get('id');
+        
+        if (sessionId) {
+          toast({
+            title: "Reestablishing connection",
+            description: "Trying an alternative connection method for cross-origin context...",
+          });
+          
+          // Navigate to the session page directly
+          window.location.href = `${window.location.origin}/session?id=${sessionId}`;
+        } else {
+          window.location.reload();
+        }
+      } else {
+        window.location.reload();
+      }
     } else {
       // After multiple attempts, try a different approach
       toast({
@@ -57,6 +102,17 @@ const Session = () => {
       sessionMountedRef.current = false;
     };
   }, []);
+
+  // Check for session ID in the URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const sessionId = searchParams.get('id');
+    
+    if (!sessionId && !location.state) {
+      console.log("No session ID found in URL or state");
+      setNoSessionFound(true);
+    }
+  }, [location]);
 
   // Attempt to recover from blank screens with a timer
   useEffect(() => {
@@ -86,9 +142,15 @@ const Session = () => {
       isAdmin,
       error,
       connectionAttempts,
-      isLoading
+      isLoading,
+      isCrossOrigin
     });
-  }, [location, isAdmin, error, connectionAttempts, isLoading]);
+  }, [location, isAdmin, error, connectionAttempts, isLoading, isCrossOrigin]);
+
+  // If no session ID is provided, show empty state
+  if (noSessionFound) {
+    return <EmptyState />;
+  }
 
   // Show error state if there's an error
   if (error) {
@@ -126,7 +188,8 @@ const Session = () => {
           participantsCount: props.participants?.length || 0,
           isSessionStartedInDB: props.isSessionStartedInDB,
           error: props.error,
-          hasConversation: !!props.conversation
+          hasConversation: !!props.conversation,
+          isCrossOrigin
         });
         
         // Ensure we update the loading state from the provider

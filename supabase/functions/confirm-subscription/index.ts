@@ -67,7 +67,11 @@ serve(async (req) => {
         message: 'Subscription confirmed and user profile updated',
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate', 
+        },
         status: 200,
       }
     );

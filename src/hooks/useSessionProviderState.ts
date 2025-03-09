@@ -8,7 +8,7 @@ interface UseSessionProviderStateProps {
   onError?: (error: string) => void;
 }
 
-export const useSessionProviderState = ({ onError }: UseSessionProviderStateProps) => {
+export const useSessionProviderState = ({ onError }: UseSessionProviderStateProps = {}) => {
   const { toast } = useToast();
   
   // Set up error handling

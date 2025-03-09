@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { ConversationWithSession } from "@/types/database";
 import { useConversation } from "@/hooks/useConversation";
-import { useSessionErrorHandling } from "@/hooks/useSessionErrorHandling";
 
 interface UseSessionDataFetchingProps {
   conversationId: number | null;
@@ -21,12 +20,18 @@ export function useSessionDataFetching({
     refetch
   } = useConversation(conversationId);
   
+  // Handle errors from the query
+  const errorMessage = error ? error.message : null;
+
   // Handle fetch errors
-  const { errorMessage } = useSessionErrorHandling({
-    error: error || null,
-    conversationId,
-    onError
-  });
+  useEffect(() => {
+    if (error) {
+      console.log("Session data fetching error:", error.message);
+      if (onError) {
+        onError(error.message);
+      }
+    }
+  }, [error, onError]);
 
   // Additional validation for conversation data
   useEffect(() => {

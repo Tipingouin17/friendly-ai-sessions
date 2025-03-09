@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 export function useSessionState() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Handle session full state
@@ -23,6 +24,8 @@ export function useSessionState() {
     setSessionStarted, 
     hasInitializedProvider, 
     setHasInitializedProvider,
+    error,
+    setError,
     handleSessionFull 
   };
 }

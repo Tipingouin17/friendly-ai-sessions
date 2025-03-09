@@ -21,17 +21,23 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
       // Try with jpg extension
-      const { data: jpgData } = supabase.storage
+      const { data: jpgData, error: jpgError } = supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
+      if (jpgError) {
+        console.error(`Error getting public URL for facilitator ${facilitator.id}.jpg:`, jpgError);
+      }
+      
       if (jpgData && jpgData.publicUrl) {
         console.log(`Found jpg avatar: ${jpgData.publicUrl}`);
-        // Validate the URL before returning it
+        // Check if the URL exists before returning it
         try {
           const isValid = await validateImageUrl(jpgData.publicUrl);
           if (isValid) {
             return jpgData.publicUrl;
+          } else {
+            console.log(`The jpg URL exists but image validation failed: ${jpgData.publicUrl}`);
           }
         } catch (err) {
           console.error('Error validating jpg URL:', err);
@@ -59,6 +65,8 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         const isValid = await validateImageUrl(fixedUrl);
         if (isValid) {
           return fixedUrl;
+        } else {
+          console.log(`Profile picture URL validation failed: ${fixedUrl}`);
         }
       } catch (err) {
         console.error('Error validating profile_picture URL:', err);

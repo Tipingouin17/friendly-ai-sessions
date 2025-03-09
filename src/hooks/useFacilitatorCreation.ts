@@ -50,6 +50,8 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
 
       // If a profile picture is provided, upload it to the storage bucket
       if (profilePicture && facilitator) {
+        console.log(`Uploading profile picture for facilitator ${facilitator.id}`);
+        
         // Convert base64 to blob
         const base64Response = await fetch(profilePicture);
         const blob = await base64Response.blob();

@@ -53,6 +53,7 @@ export const FacilitatorSelection = ({
             console.log(`Profile picture value: ${facilitator.profile_picture}`);
             
             const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+            console.log(`Resolved avatar URL for facilitator ${facilitator.id}: ${avatarUrl}`);
             return { id: facilitator.id, url: avatarUrl };
           }
           return null;
@@ -66,7 +67,7 @@ export const FacilitatorSelection = ({
           }
         });
         
-        console.log('Facilitator images loaded:', imageMap);
+        console.log('All facilitator images loaded:', imageMap);
         setFacilitatorImages(imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);

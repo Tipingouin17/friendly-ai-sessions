@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { useStripe, useElements } from '@stripe/react-stripe-js';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
 import { supabase } from '@/integrations/supabase/client';
@@ -158,7 +157,6 @@ export const CheckoutForm = ({
       const returnUrl = createSafeUrl('/profile');
       console.log("Using return URL:", returnUrl);
 
-      // Apply safe cookie parameters to fetch call
       const fetchOptions = applySafeCookieParams({
         method: 'POST',
         headers: {
@@ -183,10 +181,14 @@ export const CheckoutForm = ({
 
       const { clientSecret, subscriptionId, customerId } = await response.json();
 
-      // Set up payment method with proper billing details
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
       const confirmPaymentOptions = {
         payment_method: {
-          card: elements.getElement(CardElement)!,
+          card: cardElement,
           billing_details: {
             name: billingDetails.name,
             email: billingDetails.email,
@@ -220,7 +222,6 @@ export const CheckoutForm = ({
         throw new Error(paymentError.message || 'Payment failed');
       }
 
-      // Also use safe cookie parameters for confirmation
       const confirmOptions = applySafeCookieParams({
         method: 'POST',
         headers: {
@@ -262,7 +263,6 @@ export const CheckoutForm = ({
     return fieldName in fieldErrors;
   };
 
-  // Apply CSS classes to fields with errors
   React.useEffect(() => {
     Object.entries(fieldErrors).forEach(([field, message]) => {
       if (field !== 'card') {

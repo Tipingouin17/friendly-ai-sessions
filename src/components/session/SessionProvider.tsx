@@ -155,6 +155,28 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
   // Combined loading state
   const isLoading = dataLoading;
 
+  // If we have serious errors, return early with error handling
+  if (providerError) {
+    return children({
+      isLoading,
+      conversation: null,
+      currentConversationId,
+      sessionState,
+      participants: [],
+      participantColors,
+      isWaitingForResponse: false,
+      handleStartSession,
+      handleSendMessage,
+      handleLikeMessage,
+      showQrCodeView: false,
+      sessionLink: '',
+      currentUserParticipantId: null,
+      anonymousState,
+      isSessionStartedInDB: false,
+      error: providerError
+    });
+  }
+
   const sessionContext: SessionContextProps = {
     isLoading,
     conversation: typedConversation,
@@ -178,6 +200,6 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     sessionContext.error = providerError;
   }
 
-  // Return children with context - ensure we actually return the React element
+  // Return children with context
   return children(sessionContext);
 };

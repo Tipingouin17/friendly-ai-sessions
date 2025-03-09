@@ -111,6 +111,11 @@ const Session = () => {
           }
         }, [props.error]);
         
+        // If there's an error, return early
+        if (props.error) {
+          return <JoinSessionLoadingState error={props.error} onRetry={() => window.location.reload()} />;
+        }
+        
         if (props.isLoading) return <LoadingState />;
         if (!props.conversation || !props.currentConversationId) return <EmptyState />;
 

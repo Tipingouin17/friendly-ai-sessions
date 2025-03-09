@@ -10,11 +10,11 @@ const stripePromise = loadStripe('pk_test_51Ov1xjH5dusncBPeU9Cy97XPSXWQlTcK8VQJG
   stripeAccount: undefined, // Make sure no connected account is specified
 });
 
-interface StripeProviderProps {
+interface PaymentProviderProps {
   children: React.ReactNode;
 }
 
-export const StripeProvider = ({ children }: StripeProviderProps) => {
+export const PaymentProvider = ({ children }: PaymentProviderProps) => {
   // Get safe cookie parameters for cross-origin contexts
   const cookieParams = getSafeCookieParams();
   

@@ -2,13 +2,26 @@
 import React from 'react';
 import { CardElement } from '@stripe/react-stripe-js';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PaymentMethodInputProps {
   hasError: boolean;
   errorMessage?: string;
+  isLoading?: boolean;
 }
 
-export const PaymentMethodInput = ({ hasError, errorMessage }: PaymentMethodInputProps) => {
+export const PaymentMethodInput = ({ hasError, errorMessage, isLoading = false }: PaymentMethodInputProps) => {
+  if (isLoading) {
+    return (
+      <div className="p-4 border rounded-lg">
+        <Label className="text-left block mb-2">
+          Card Details <span className="text-destructive">*</span>
+        </Label>
+        <Skeleton className="h-16 w-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 border rounded-lg">
       <Label htmlFor="card-element" className="text-left block mb-2">

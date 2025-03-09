@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -12,12 +12,20 @@ import { CheckoutActions } from './components/CheckoutActions';
 import { useCheckoutFormValidation } from './hooks/useCheckoutFormValidation';
 import { updateUserSubscription } from './utils/subscriptionUtils';
 import { createSubscription, confirmPayment, confirmSubscription } from './services/paymentService';
+import { Loader2 } from 'lucide-react';
+
+interface ExtendedCheckoutFormProps extends CheckoutFormProps {
+  isStripeLoading?: boolean;
+  onStripeLoaded?: () => void;
+}
 
 export const CheckoutForm = ({ 
   plan, 
   billingDetails,
-  onCancel 
-}: CheckoutFormProps) => {
+  onCancel,
+  isStripeLoading = false,
+  onStripeLoaded 
+}: ExtendedCheckoutFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -32,6 +40,13 @@ export const CheckoutForm = ({
     validateForm, 
     hasFieldError 
   } = useCheckoutFormValidation();
+
+  // Check if Stripe is loaded
+  useEffect(() => {
+    if (stripe && elements && onStripeLoaded) {
+      onStripeLoaded();
+    }
+  }, [stripe, elements, onStripeLoaded]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -144,6 +159,16 @@ export const CheckoutForm = ({
     }
   };
 
+  // Display a loading indicator while Stripe is initializing
+  if (isStripeLoading) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading payment processor...</p>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
       <ValidationErrors 
@@ -153,7 +178,8 @@ export const CheckoutForm = ({
       
       <PaymentMethodInput 
         hasError={hasFieldError('card')} 
-        errorMessage={fieldErrors['card']} 
+        errorMessage={fieldErrors['card']}
+        isLoading={isStripeLoading}
       />
 
       <CheckoutActions 

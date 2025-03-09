@@ -228,6 +228,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
         setViewMode: () => {},
         handleGenerateReport: async () => { return Promise.resolve(); }, // Fix: Return a Promise
         isGeneratingReport: false,
+        setMessages: (messages) => {}, // Add the missing setMessages property
         recordResponse: () => {},
         error: null
       },

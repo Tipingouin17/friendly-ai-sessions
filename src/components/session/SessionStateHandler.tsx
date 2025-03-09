@@ -1,5 +1,4 @@
-
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SessionContextProps } from "@/types/session";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -29,7 +28,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   const initializationTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   
-  // Set up cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -40,7 +38,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     };
   }, []);
   
-  // Update sessionStarted state based on DB status
   useEffect(() => {
     if (props.isSessionStartedInDB) {
       console.log("Session started status from DB:", props.isSessionStartedInDB);
@@ -48,11 +45,9 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     }
   }, [props.isSessionStartedInDB, setSessionStarted]);
   
-  // Initialization delay to ensure consistent behavior during initial load
   useEffect(() => {
     if (!mountedRef.current) return;
     
-    // Give initialization a small delay to ensure all data is loaded
     if (initializing && props.conversation && props.currentConversationId) {
       initializationTimerRef.current = window.setTimeout(() => {
         if (mountedRef.current) {
@@ -68,8 +63,7 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       }
     };
   }, [initializing, props.conversation, props.currentConversationId]);
-
-  // Connection recovery through refetching
+  
   useEffect(() => {
     if (!mountedRef.current) return;
     
@@ -84,8 +78,7 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       clearInterval(recoverInterval);
     };
   }, [props.conversation, props.currentConversationId, props.isConnected, props.refetch]);
-
-  // Handle connection status changes
+  
   useEffect(() => {
     if (!mountedRef.current) return;
     
@@ -97,17 +90,15 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       });
     }
   }, [props.isConnected, props.connectionAttempts, toast]);
-
-  // Safety check: If props.isLoading is true or required data is missing, show appropriate state
+  
   if (props.isLoading || initializing) {
     console.log("Showing loading state - isLoading:", props.isLoading, "initializing:", initializing);
     return <LoadingState />;
   }
   
-  // Error handling
   if (props.error) {
     console.log("Showing error state:", props.error);
-    return null; // This will be handled by SessionViewSelector
+    return null;
   }
   
   if (!props.conversation) {
@@ -120,7 +111,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     return <EmptyState />;
   }
 
-  // Get session transition state from our custom hook
   const {
     isTransitioning,
     shouldShowSession,
@@ -135,7 +125,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     onSessionFull
   });
 
-  // Wrap everything in our state provider
   return (
     <SessionStateProvider 
       sessionData={props}
@@ -150,7 +139,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
         });
       }}
     >
-      {/* Debug component - doesn't render anything visible */}
       <SessionStateDebugger 
         props={props}
         sessionStarted={sessionStarted}
@@ -160,7 +148,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
         maxParticipants={maxParticipants}
       />
       
-      {/* View selector - renders the appropriate view based on session state */}
       <SessionViewSelector
         props={props}
         isAdmin={isAdmin}

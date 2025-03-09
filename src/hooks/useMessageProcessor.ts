@@ -39,7 +39,7 @@ export const useMessageProcessor = ({
               ...message,
               participant: participant.name,
               avatar: participant.avatar,
-              isAnonymous: participant.is_anonymous
+              isAnonymous: participant.isAnonymous
             };
           }
           
@@ -89,7 +89,7 @@ export const useMessageProcessor = ({
               ...message,
               participant: participant.name,
               avatar: participant.avatar,
-              isAnonymous: participant.is_anonymous
+              isAnonymous: participant.isAnonymous
             };
           }
           

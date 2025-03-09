@@ -34,8 +34,21 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     }
   }, [props.isSessionStartedInDB, setSessionStarted]);
 
-  if (props.isLoading) return <LoadingState />;
-  if (!props.conversation || !props.currentConversationId) return <EmptyState />;
+  // Safety check: If props.isLoading is true or required data is missing, show appropriate state
+  if (props.isLoading) {
+    console.log("Showing loading state");
+    return <LoadingState />;
+  }
+  
+  if (!props.conversation) {
+    console.log("No conversation data, showing empty state");
+    return <EmptyState />;
+  }
+  
+  if (!props.currentConversationId) {
+    console.log("No conversation ID, showing empty state");
+    return <EmptyState />;
+  }
 
   // Wrap everything in our state provider
   return (
@@ -77,6 +90,12 @@ const SessionStateContent: React.FC<{
   setSessionStarted,
   onSessionFull
 }) => {
+  // Safety check for null values
+  if (!props.conversation) {
+    console.log("No conversation in SessionStateContent");
+    return <EmptyState />;
+  }
+
   // Calculate if session should be shown
   const maxParticipants = props.conversation?.participants || 0;
   const currentParticipants = props.conversation?.current_participants || 0;
@@ -92,11 +111,14 @@ const SessionStateContent: React.FC<{
     currentParticipants,
     maxParticipants,
     messageCount: props.sessionState.messages.length,
-    participantsCount: props.participants.length
+    participantsCount: props.participants.length,
+    conversation: props.conversation ? "exists" : "missing",
+    conversationId: props.currentConversationId
   });
 
   // Admin view gets QR code view for sharing until session is started
   if (isAdmin && !shouldShowSession && props.showQrCodeView) {
+    console.log("Rendering AdminQrView");
     return (
       <AdminQrView
         conversationId={props.currentConversationId}
@@ -115,6 +137,7 @@ const SessionStateContent: React.FC<{
   
   // For non-admins, show waiting screen until admin starts the session
   if (!isAdmin && !shouldShowSession) {
+    console.log("Rendering ParticipantWaitingScreen");
     return (
       <ParticipantWaitingScreen
         conversationId={props.currentConversationId}
@@ -130,6 +153,7 @@ const SessionStateContent: React.FC<{
   }
 
   // Show the main session view
+  console.log("Rendering main SessionView");
   return <SessionView props={props} isAdmin={isAdmin} />;
 };
 

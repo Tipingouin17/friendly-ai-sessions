@@ -25,15 +25,24 @@ const Session = () => {
     console.log("Session page rendered with:", {
       locationSearch: location.search,
       locationState: location.state,
-      isAdmin: isAdmin,
-      error: error
+      isAdmin,
+      error
     });
   }, [location, isAdmin, error]);
 
+  // Show error state if there's an error
   if (error) {
+    console.log("Rendering error state:", error);
     return <JoinSessionLoadingState error={error} onRetry={() => window.location.reload()} />;
   }
 
+  // Show loading state during initial data fetching
+  if (isLoading && !error) {
+    console.log("Rendering global loading state");
+    return <JoinSessionLoadingState />;
+  }
+
+  console.log("Rendering RefactoredSessionProvider");
   return (
     <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
@@ -47,7 +56,8 @@ const Session = () => {
           messagesCount: props.sessionState.messages.length,
           participantsCount: props.participants.length,
           isSessionStartedInDB: props.isSessionStartedInDB,
-          error: props.error
+          error: props.error,
+          hasConversation: !!props.conversation
         });
         
         // Ensure we update the loading state from the provider
@@ -62,16 +72,25 @@ const Session = () => {
           }
         }, [props.error, handleError]);
         
+        // If we're still loading, show a loading state
+        if (props.isLoading) {
+          console.log("Showing provider loading state");
+          return <JoinSessionLoadingState />;
+        }
+        
         // If there's an error, return early
         if (props.error) {
+          console.log("Showing provider error state:", props.error);
           return <JoinSessionLoadingState error={props.error} onRetry={() => window.location.reload()} />;
         }
         
         // If no conversation is found despite not having an error, show a more helpful message
         if (!props.currentConversationId && !props.isLoading) {
           console.error("No conversation ID found in session provider, but no error was returned");
+          return <JoinSessionLoadingState error="Session not found. Please try again." onRetry={() => window.location.reload()} />;
         }
         
+        console.log("Rendering SessionStateHandler");
         return (
           <SessionStateHandler
             props={props}

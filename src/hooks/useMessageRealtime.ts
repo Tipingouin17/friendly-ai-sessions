@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
+import { removeChannel } from "@/utils/realtimeHelpers";
 
 type UseMessageRealtimeProps = {
   currentConversationId: number | null;
@@ -23,7 +24,7 @@ export const useMessageRealtime = ({
       
       // Clean up existing channel if it exists
       if (messageChannelRef.current) {
-        supabase.removeChannel(messageChannelRef.current);
+        removeChannel(messageChannelRef.current);
         messageChannelRef.current = null;
       }
       
@@ -74,7 +75,7 @@ export const useMessageRealtime = ({
       return () => {
         if (messageChannelRef.current) {
           console.log("Cleaning up message sync channel");
-          supabase.removeChannel(messageChannelRef.current);
+          removeChannel(messageChannelRef.current);
           messageChannelRef.current = null;
         }
       };

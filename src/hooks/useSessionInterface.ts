@@ -93,7 +93,7 @@ export function useSessionInterface(conversationId: number | null) {
         });
         
         // Double-check to make sure the update went through by fetching the current status
-        const { data, fetchError } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('conversations')
           .select('session_started')
           .eq('id', conversationId)

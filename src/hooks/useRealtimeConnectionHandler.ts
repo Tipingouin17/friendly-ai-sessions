@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
+import { useToast } from "@/components/ui/use-toast";
 
 interface UseRealtimeConnectionHandlerProps {
   conversationId: number | null;
@@ -24,19 +25,25 @@ export function useRealtimeConnectionHandler({
     setError
   } = useRealtimeConnection(conversationId, refetch);
 
+  const { toast } = useToast();
+  
   // Track last successful connection time
   const [lastPingSuccess, setLastPingSuccess] = useState<number>(Date.now());
+  const [isPerformingConnectionCheck, setIsPerformingConnectionCheck] = useState(false);
 
   // Handle connection errors
   useEffect(() => {
     if (connectionError && onConnectionError) {
+      console.error("Connection error detected:", connectionError);
       onConnectionError(connectionError);
     }
   }, [connectionError, onConnectionError]);
 
   // Function to perform a connection check
   const performConnectionCheck = useCallback(async () => {
-    if (!conversationId) return;
+    if (!conversationId || isPerformingConnectionCheck) return false;
+    
+    setIsPerformingConnectionCheck(true);
     
     try {
       console.log("Performing connection check...");
@@ -52,6 +59,7 @@ export function useRealtimeConnectionHandler({
         console.error("Connection check failed:", error);
         setError("Connection to server lost");
         attemptReconnection();
+        setIsPerformingConnectionCheck(false);
         return false;
       } 
       
@@ -62,29 +70,43 @@ export function useRealtimeConnectionHandler({
         
         // If we got data, might as well refresh our state
         refetch();
+        setIsPerformingConnectionCheck(false);
         return true;
       }
       
+      setIsPerformingConnectionCheck(false);
       return false;
     } catch (err) {
       console.error("Error in performConnectionCheck:", err);
       setError("Unable to check connection status");
+      setIsPerformingConnectionCheck(false);
       return false;
     }
-  }, [conversationId, setIsConnected, setError, attemptReconnection, refetch]);
+  }, [conversationId, setIsConnected, setError, attemptReconnection, refetch, isPerformingConnectionCheck]);
 
   // Setup ping system to keep connection alive and verify connectivity
   useEffect(() => {
     if (!conversationId) return;
     
-    // Initial connection check
-    performConnectionCheck();
+    // Initial connection check with slight delay to allow other systems to initialize
+    const initialCheckTimeout = setTimeout(() => {
+      performConnectionCheck();
+    }, 1500);
     
     const pingInterval = setInterval(() => {
       // Check if it's been too long since last successful ping
       const timeSinceLastSuccess = Date.now() - lastPingSuccess;
       if (timeSinceLastSuccess > 30000) { // 30 seconds
         console.log("Long time since last successful ping:", timeSinceLastSuccess / 1000, "seconds");
+        
+        // Show toast for extended connection issues
+        if (timeSinceLastSuccess > 45000 && isConnected) {
+          toast({
+            title: "Connection issues detected",
+            description: "Trying to reconnect to the session...",
+            variant: "destructive",
+          });
+        }
       }
       
       // If we think we're disconnected or it's been a while, do a check
@@ -94,8 +116,11 @@ export function useRealtimeConnectionHandler({
       }
     }, 15000); // Check every 15 seconds
     
-    return () => clearInterval(pingInterval);
-  }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck]);
+    return () => {
+      clearTimeout(initialCheckTimeout);
+      clearInterval(pingInterval);
+    };
+  }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck, toast]);
 
   return {
     isConnected,

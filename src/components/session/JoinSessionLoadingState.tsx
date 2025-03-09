@@ -6,14 +6,29 @@ import { Button } from '@/components/ui/button';
 interface JoinSessionLoadingStateProps {
   onRetry?: () => void;
   error?: string | null;
+  retryCount?: number;
+  loadingTimeElapsed?: number;
 }
 
 const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({ 
   onRetry,
-  error
+  error,
+  retryCount = 0,
+  loadingTimeElapsed = 0
 }) => {
   const [isLongWait, setIsLongWait] = useState(false);
   const [isVeryLongWait, setIsVeryLongWait] = useState(false);
+  
+  // If we already have a loading time elapsed or error, show appropriate state immediately
+  useEffect(() => {
+    if (loadingTimeElapsed > 3) {
+      setIsLongWait(true);
+    }
+    if (loadingTimeElapsed > 10 || retryCount > 0 || error) {
+      setIsLongWait(true);
+      setIsVeryLongWait(true);
+    }
+  }, [loadingTimeElapsed, retryCount, error]);
 
   useEffect(() => {
     // Reset wait states if there's an error
@@ -36,7 +51,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     // Set a timeout for very long waits
     const veryLongWaitTimeout = setTimeout(() => {
       setIsVeryLongWait(true);
-    }, 10000); // 10 seconds
+    }, 8000); // 8 seconds
     
     timeouts.push(veryLongWaitTimeout);
 
@@ -65,6 +80,25 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     return error;
   };
 
+  const getStatusMessage = () => {
+    if (error) {
+      return "Unable to connect to the session";
+    }
+    
+    if (isVeryLongWait) {
+      if (retryCount > 1) {
+        return "Still having trouble connecting...";
+      }
+      return "Unable to connect to the session";
+    }
+    
+    if (isLongWait) {
+      return "Taking longer than expected";
+    }
+    
+    return "Loading session information...";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
       <div className="text-center max-w-md">
@@ -74,16 +108,12 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
           <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" />
         )}
         
-        <p className="text-gray-600 mb-2">
-          {error 
-            ? "Unable to connect to the session" 
-            : isVeryLongWait 
-              ? "Unable to connect to the session" 
-              : "Loading session information..."}
+        <p className="text-gray-600 mb-2 text-lg font-medium">
+          {getStatusMessage()}
         </p>
         
         {(isLongWait || error) && (
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-start">
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md flex items-start">
             <AlertCircle className="w-5 h-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-left text-yellow-700">
               <p className="font-medium mb-1">
@@ -96,6 +126,11 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
                     ? "The session might be unavailable or there could be connection issues."
                     : "Connecting to the session. Please wait a moment..."}
               </p>
+              {retryCount > 0 && !error && (
+                <p className="mt-2 text-xs">
+                  Retry attempt: {retryCount} {retryCount > 1 ? "(If issues persist, please check your network connection)" : ""}
+                </p>
+              )}
             </div>
           </div>
         )}

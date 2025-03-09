@@ -1,4 +1,3 @@
-
 import React from "react";
 import { SessionContextProps } from "@/types/session";
 
@@ -14,7 +13,7 @@ export const SessionProviderErrorFallback = ({
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage);
   
   // Create safe default props
-  const safeProps: SessionContextProps = {
+  const fallbackSessionContext: SessionContextProps = {
     isLoading: false,
     conversation: null,
     currentConversationId: null,
@@ -49,11 +48,14 @@ export const SessionProviderErrorFallback = ({
       toggleAnonymous: () => {}
     },
     isSessionStartedInDB: false,
-    error: errorMessage
+    error: errorMessage,
+    isConnected: false,
+    connectionAttempts: 0,
+    refetch: () => {}
   };
 
   // Return error state
-  return children(safeProps);
+  return children(fallbackSessionContext);
 };
 
 // Import this from sessionHelpers to avoid circular dependencies

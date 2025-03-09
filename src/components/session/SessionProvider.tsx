@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useLocation } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
@@ -160,7 +159,10 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
       sessionLink,
       currentUserParticipantId,
       anonymousState,
-      isSessionStartedInDB
+      isSessionStartedInDB,
+      isConnected: true,
+      connectionAttempts: 0,
+      refetch
     };
 
     // Provide error if we have one

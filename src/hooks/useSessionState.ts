@@ -79,7 +79,7 @@ export const useSessionState = ({
         }
         
         // Transform database messages to UI message format
-        const formattedMessages: Message[] = data.map(msg => {
+        const formattedMessages = data.map(msg => {
           // Extract participant ID if available (it might be null)
           let participantId: string | undefined = undefined;
           if ('participant_id' in msg && msg.participant_id) {
@@ -87,6 +87,13 @@ export const useSessionState = ({
           }
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
+          
+          // Ensure likes is always an array
+          let likesArray: string[] = [];
+          if ('likes' in msg && msg.likes) {
+            // If likes exists and is not null, ensure it's an array
+            likesArray = Array.isArray(msg.likes) ? msg.likes : [];
+          }
           
           return {
             id: String(msg.id),
@@ -96,10 +103,10 @@ export const useSessionState = ({
             color,
             timestamp: new Date(msg.created_at),
             created_at: msg.created_at,
-            likes: 'likes' in msg ? msg.likes || [] : [],
+            likes: likesArray,
             isReport: 'is_report' in msg ? Boolean(msg.is_report) : false,
             isAnonymous: 'is_anonymous' in msg ? Boolean(msg.is_anonymous) : false
-          };
+          } as Message; // Type assertion to ensure it matches the Message type
         });
         
         console.log('Successfully fetched messages:', formattedMessages.length);

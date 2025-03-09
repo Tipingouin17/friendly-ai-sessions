@@ -1,6 +1,6 @@
 
 import React from "react";
-import { SessionProvider } from "@/components/session/SessionProvider";
+import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useSessionPageState } from "@/hooks/useSessionPageState";
 import SessionStateHandler from "@/components/session/SessionStateHandler";
@@ -23,7 +23,7 @@ const Session = () => {
   }
 
   return (
-    <SessionProvider 
+    <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
       onError={handleError}
     >
@@ -65,7 +65,7 @@ const Session = () => {
           />
         );
       }}
-    </SessionProvider>
+    </RefactoredSessionProvider>
   );
 };
 

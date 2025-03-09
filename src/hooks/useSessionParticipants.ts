@@ -75,6 +75,7 @@ export function useSessionParticipants(conversationId: number | null) {
     conversation,
     error,
     refetch,
+    isLoading,
     isConnected,
     connectionAttempts
   };

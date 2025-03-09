@@ -21,13 +21,9 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
       // Try with jpg extension
-      const { data: jpgData, error: jpgError } = supabase.storage
+      const { data: jpgData } = supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
-      
-      if (jpgError) {
-        console.error(`Error getting public URL for facilitator ${facilitator.id}.jpg:`, jpgError);
-      }
       
       if (jpgData && jpgData.publicUrl) {
         console.log(`Found jpg avatar: ${jpgData.publicUrl}`);

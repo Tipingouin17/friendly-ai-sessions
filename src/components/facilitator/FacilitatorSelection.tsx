@@ -7,6 +7,7 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 import { FacilitatorCarousel } from "./FacilitatorCarousel";
 import { FacilitatorDetailsPanel } from "./FacilitatorDetailsPanel";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -45,28 +46,46 @@ export const FacilitatorSelection = ({
       
       console.log('Loading facilitator images for', facilitators.length, 'facilitators');
       
-      for (const facilitator of facilitators) {
-        if (facilitator.id) {
-          console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
-          console.log(`Profile picture value: ${facilitator.profile_picture}`);
-          
-          const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-          imageMap[facilitator.id] = avatarUrl;
+      try {
+        for (const facilitator of facilitators) {
+          if (facilitator.id) {
+            console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
+            console.log(`Profile picture value: ${facilitator.profile_picture}`);
+            
+            const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+            imageMap[facilitator.id] = avatarUrl;
+          }
         }
+        
+        console.log('Facilitator images loaded:', imageMap);
+        setFacilitatorImages(imageMap);
+      } catch (error) {
+        console.error('Error loading facilitator images:', error);
+      } finally {
+        setLoadingImages(false);
       }
-      
-      console.log('Facilitator images:', imageMap);
-      setFacilitatorImages(imageMap);
-      setLoadingImages(false);
     };
     
     if (facilitators.length > 0) {
       loadFacilitatorImages();
+    } else {
+      setLoadingImages(false);
     }
   }, [facilitators]);
 
-  if (isLoading || loadingImages) {
-    return <div className="py-12 text-center">Loading facilitators...</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="w-1/4 p-4">
+              <Skeleton className="mx-auto mb-4 h-24 w-24 rounded-full" />
+              <Skeleton className="mx-auto h-6 w-3/4" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -80,6 +99,7 @@ export const FacilitatorSelection = ({
         hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
         maxFacilitators={maxFacilitators}
         canCreateCustomFacilitators={canCreateCustomFacilitators}
+        isLoading={loadingImages}
       />
       
       <FacilitatorDetailsPanel

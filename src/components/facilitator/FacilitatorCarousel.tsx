@@ -15,6 +15,7 @@ interface FacilitatorCarouselProps {
   hasReachedFacilitatorLimit: boolean;
   maxFacilitators: number;
   canCreateCustomFacilitators: boolean;
+  isLoading?: boolean;
 }
 
 export const FacilitatorCarousel = ({
@@ -25,7 +26,8 @@ export const FacilitatorCarousel = ({
   facilitatorImages,
   hasReachedFacilitatorLimit,
   maxFacilitators,
-  canCreateCustomFacilitators
+  canCreateCustomFacilitators,
+  isLoading = false
 }: FacilitatorCarouselProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 4;
@@ -71,6 +73,7 @@ export const FacilitatorCarousel = ({
                 isSelected={selectedFacilitator === facilitator.id}
                 avatarUrl={avatarUrl}
                 onClick={() => onSelect(facilitator.id)}
+                isLoading={isLoading}
               />
             );
           })}

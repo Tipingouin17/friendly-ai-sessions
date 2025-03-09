@@ -34,16 +34,22 @@ const SessionHeader = ({
   useEffect(() => {
     const loadProfilePicture = async () => {
       setIsLoading(true);
-      if (facilitator) {
-        console.log('SessionHeader: Loading profile picture for facilitator:', facilitator);
-        const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-        console.log('SessionHeader: Avatar URL resolved to:', avatarUrl);
-        setProfilePicture(avatarUrl);
-      } else {
-        console.log('SessionHeader: No facilitator data provided');
+      try {
+        if (facilitator) {
+          console.log('SessionHeader: Loading profile picture for facilitator:', facilitator);
+          const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+          console.log('SessionHeader: Avatar URL resolved to:', avatarUrl);
+          setProfilePicture(avatarUrl);
+        } else {
+          console.log('SessionHeader: No facilitator data provided');
+          setProfilePicture('/placeholder.svg');
+        }
+      } catch (error) {
+        console.error('Error loading facilitator avatar:', error);
         setProfilePicture('/placeholder.svg');
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     
     loadProfilePicture();

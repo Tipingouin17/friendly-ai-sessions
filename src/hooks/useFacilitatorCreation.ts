@@ -55,13 +55,15 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         const blob = await base64Response.blob();
         
         // Upload to storage with the facilitator ID as the filename
-        // Updated bucket name to 'facilitator-avatars' (without the 's')
-        const { error: uploadError } = await supabase.storage
+        // Important: Use 'facilitator-avatars' (singular) not 'facilitators-avatars'
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {
             contentType: 'image/jpeg',
             upsert: true
           });
+        
+        console.log("Upload result:", uploadData);
         
         if (uploadError) {
           console.error('Error uploading profile picture:', uploadError);
@@ -70,6 +72,25 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
             description: "Facilitator created but profile picture could not be uploaded",
             variant: "destructive",
           });
+        } else {
+          // Get the public URL
+          const { data: publicUrlData } = supabase.storage
+            .from('facilitator-avatars')
+            .getPublicUrl(`${facilitator.id}.jpg`);
+            
+          console.log("Public URL:", publicUrlData.publicUrl);
+          
+          // Update the facilitator with the profile picture URL
+          const { error: updateError } = await supabase
+            .from('facilitators')
+            .update({
+              profile_picture: publicUrlData.publicUrl
+            })
+            .eq('id', facilitator.id);
+            
+          if (updateError) {
+            console.error('Error updating facilitator with profile picture URL:', updateError);
+          }
         }
       }
 

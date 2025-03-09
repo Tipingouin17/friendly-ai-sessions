@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Generates a URL for a facilitator's avatar
- * Follows this priority:
- * 1. Custom uploaded avatar from facilitator-avatars bucket if available
+ * Updated priority order:
+ * 1. Custom uploaded avatar from facilitator-avatars bucket
  * 2. URL from the facilitator's profile_picture field if available
- * 3. Default placeholder as fallback
+ * 3. Try demo structure as fallback
+ * 4. Default placeholder as final fallback
  */
 export const getFacilitatorAvatarUrl = async (facilitator: { 
   id?: number, 
@@ -19,49 +20,47 @@ export const getFacilitatorAvatarUrl = async (facilitator: {
     return '/placeholder.svg';
   }
   
+  console.log(`Attempting to load avatar for facilitator ID: ${facilitator.id}, title: ${facilitator.title}`);
+  
   try {
-    // If profile_picture is provided and not null, use it directly
-    if (facilitator.profile_picture && facilitator.profile_picture.trim() !== '') {
-      // Check if URL contains 'null' which sometimes happens due to string conversion
-      if (facilitator.profile_picture.includes('null')) {
-        console.log('Profile picture URL contains null, using placeholder');
-        return '/placeholder.svg';
-      }
-      
-      console.log(`Trying profile picture: ${facilitator.profile_picture}`);
-      
-      // Try to validate if the profile_picture URL is accessible
-      const isValid = await validateImageUrl(facilitator.profile_picture);
-      if (isValid) {
-        console.log(`Profile picture valid: ${facilitator.profile_picture}`);
-        return facilitator.profile_picture;
-      } else {
-        console.log(`Profile picture invalid: ${facilitator.profile_picture}`);
-      }
-    }
-    
-    // If we get here, the profile_picture was null, empty or invalid
-    // Try facilitator-avatars bucket as a backup (for custom uploaded avatars)
-    // Note the corrected bucket name: "facilitator-avatars" instead of "facilitators-avatars"
+    // PRIORITY 1: Try facilitator-avatars bucket first (for custom uploaded avatars)
     if (facilitator.id) {
       const { data } = supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
-      console.log(`Trying custom avatar: ${data.publicUrl}`);
+      console.log(`Trying custom avatar from bucket: ${data.publicUrl}`);
       
       // Validate if the custom avatar exists
       const customAvatarExists = await validateImageUrl(data.publicUrl);
       if (customAvatarExists) {
-        console.log(`Custom avatar valid: ${data.publicUrl}`);
+        console.log(`✅ Custom avatar valid: ${data.publicUrl}`);
         return data.publicUrl;
       } else {
-        console.log(`Custom avatar invalid for facilitator ${facilitator.id}`);
+        console.log(`❌ Custom avatar invalid for facilitator ${facilitator.id}`);
       }
     }
     
-    // Try the demo folder structure as a fallback
-    // This is a workaround for existing demo data
+    // PRIORITY 2: If profile_picture is provided and not null, use it
+    if (facilitator.profile_picture && facilitator.profile_picture.trim() !== '') {
+      // Check if URL contains 'null' which sometimes happens due to string conversion
+      if (facilitator.profile_picture.includes('null')) {
+        console.log('❌ Profile picture URL contains null, skipping');
+      } else {
+        console.log(`Trying profile picture: ${facilitator.profile_picture}`);
+        
+        // Try to validate if the profile_picture URL is accessible
+        const isValid = await validateImageUrl(facilitator.profile_picture);
+        if (isValid) {
+          console.log(`✅ Profile picture valid: ${facilitator.profile_picture}`);
+          return facilitator.profile_picture;
+        } else {
+          console.log(`❌ Profile picture invalid: ${facilitator.profile_picture}`);
+        }
+      }
+    }
+    
+    // PRIORITY 3: Try the demo folder structure as a fallback
     if (facilitator.title) {
       const folderName = facilitator.title.replace(/\s+/g, '%20');
       const fileName = folderName.replace(/\s+/g, '_');
@@ -71,15 +70,15 @@ export const getFacilitatorAvatarUrl = async (facilitator: {
       
       const isDemoValid = await validateImageUrl(demoUrl);
       if (isDemoValid) {
-        console.log(`Demo URL valid: ${demoUrl}`);
+        console.log(`✅ Demo URL valid: ${demoUrl}`);
         return demoUrl;
       } else {
-        console.log(`Demo URL invalid: ${demoUrl}`);
+        console.log(`❌ Demo URL invalid: ${demoUrl}`);
       }
     }
     
     // If nothing works, return placeholder
-    console.log('No valid avatar found, using placeholder');
+    console.log('⚠️ No valid avatar found, using placeholder');
     return '/placeholder.svg';
   } catch (error) {
     console.error('Error generating avatar URL:', error);

@@ -1,60 +1,28 @@
 
-import { useState } from 'react';
-import { useSessionMessages } from './useSessionMessages';
-import { useReportGenerator } from './useReportGenerator';
-import { useParticipantResponses } from './useParticipantResponses';
+import { useState, useCallback } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
-type UseSessionStateProps = {
-  conversationId: number | null;
-  welcomeMessage: string | null;
-  currentUserParticipantId: number | null;
-};
+export function useSessionState() {
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
+  const { toast } = useToast();
 
-export const useSessionState = ({
-  conversationId,
-  welcomeMessage,
-  currentUserParticipantId
-}: UseSessionStateProps) => {
-  // State for input and recording
-  const [inputMessage, setInputMessage] = useState<string>('');
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
-  
-  // Use our new hooks for specific functionalities
-  const { messages, setMessages, error: messagesError } = useSessionMessages({
-    conversationId,
-    welcomeMessage
-  });
-  
-  const { handleGenerateReport, isGeneratingReport, error: reportError } = useReportGenerator({
-    conversationId,
-    messages,
-    setMessages
-  });
-  
-  const { hasAnswered, totalResponses, recordResponse } = useParticipantResponses({
-    messages,
-    currentUserParticipantId
-  });
-  
-  // Combine errors from different sources
-  const error = messagesError || reportError || null;
-  
-  return {
-    messages,
-    inputMessage,
-    setInputMessage,
-    currentParticipant: currentUserParticipantId || 0,
-    isRecording,
-    setIsRecording,
-    handleGenerateReport,
-    isGeneratingReport,
-    setMessages,
-    hasAnswered,
-    totalResponses,
-    viewMode,
-    setViewMode,
-    recordResponse,
-    error
+  // Handle session full state
+  const handleSessionFull = useCallback(() => {
+    // Auto-start session when it's full
+    setSessionStarted(true);
+    
+    toast({
+      title: "Session is full",
+      description: "The maximum number of participants has joined. Starting session automatically.",
+    });
+  }, [toast]);
+
+  return { 
+    sessionStarted, 
+    setSessionStarted, 
+    hasInitializedProvider, 
+    setHasInitializedProvider,
+    handleSessionFull 
   };
-};
+}

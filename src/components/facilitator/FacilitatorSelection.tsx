@@ -47,15 +47,24 @@ export const FacilitatorSelection = ({
       console.log('Loading facilitator images for', facilitators.length, 'facilitators');
       
       try {
-        for (const facilitator of facilitators) {
+        const loadPromises = facilitators.map(async (facilitator) => {
           if (facilitator.id) {
             console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
             console.log(`Profile picture value: ${facilitator.profile_picture}`);
             
             const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-            imageMap[facilitator.id] = avatarUrl;
+            return { id: facilitator.id, url: avatarUrl };
           }
-        }
+          return null;
+        });
+
+        const results = await Promise.all(loadPromises);
+        
+        results.forEach(result => {
+          if (result) {
+            imageMap[result.id] = result.url;
+          }
+        });
         
         console.log('Facilitator images loaded:', imageMap);
         setFacilitatorImages(imageMap);

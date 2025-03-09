@@ -21,6 +21,12 @@ export const FacilitatorCard = ({
   isLoading = false
 }: FacilitatorCardProps) => {
   const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    setImageError(true);
+    handleAvatarError(e);
+  };
   
   return (
     <div
@@ -35,7 +41,7 @@ export const FacilitatorCard = ({
           <AvatarImage 
             src={avatarUrl} 
             alt={facilitator.title || 'Facilitator'} 
-            onError={handleAvatarError}
+            onError={handleImageError}
             onLoad={() => setImageLoading(false)}
             className="object-cover"
           />

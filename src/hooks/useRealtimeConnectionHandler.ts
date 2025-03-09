@@ -23,7 +23,8 @@ export function useRealtimeConnectionHandler({
     connectionAttempts,
     attemptReconnection,
     error: connectionError,
-    setError
+    setError,
+    isConnecting
   } = useRealtimeConnection(conversationId, refetch);
 
   const { toast } = useToast();
@@ -32,11 +33,23 @@ export function useRealtimeConnectionHandler({
   const [lastPingSuccess, setLastPingSuccess] = useState<number>(Date.now());
   const [isPerformingConnectionCheck, setIsPerformingConnectionCheck] = useState(false);
   const mountedRef = useRef(true);
+  const pingIntervalRef = useRef<number | null>(null);
+  const connectionCheckTimeoutRef = useRef<number | null>(null);
 
   // Set up cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      
+      // Clear all intervals and timeouts
+      if (pingIntervalRef.current !== null) {
+        clearInterval(pingIntervalRef.current);
+      }
+      
+      if (connectionCheckTimeoutRef.current !== null) {
+        clearTimeout(connectionCheckTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -83,6 +96,7 @@ export function useRealtimeConnectionHandler({
           throw new Error('Request timed out');
         })
       ]).catch(err => {
+        console.error("Connection check error:", err);
         return { data: null, error: err };
       }) as { data: any, error: any };
       
@@ -126,13 +140,13 @@ export function useRealtimeConnectionHandler({
     if (!conversationId || !mountedRef.current) return;
     
     // Initial connection check with slight delay to allow other systems to initialize
-    const initialCheckTimeout = setTimeout(() => {
+    connectionCheckTimeoutRef.current = setTimeout(() => {
       if (mountedRef.current) {
         performConnectionCheck();
       }
     }, 1500);
     
-    const pingInterval = setInterval(() => {
+    pingIntervalRef.current = setInterval(() => {
       if (!mountedRef.current) return;
       
       // Check if it's been too long since last successful ping
@@ -158,8 +172,15 @@ export function useRealtimeConnectionHandler({
     }, 15000); // Check every 15 seconds
     
     return () => {
-      clearTimeout(initialCheckTimeout);
-      clearInterval(pingInterval);
+      if (connectionCheckTimeoutRef.current !== null) {
+        clearTimeout(connectionCheckTimeoutRef.current);
+        connectionCheckTimeoutRef.current = null;
+      }
+      
+      if (pingIntervalRef.current !== null) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
     };
   }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck, toast]);
 
@@ -169,6 +190,7 @@ export function useRealtimeConnectionHandler({
     connectionAttempts,
     attemptReconnection,
     connectionError,
-    performConnectionCheck
+    performConnectionCheck,
+    isConnecting
   };
 }

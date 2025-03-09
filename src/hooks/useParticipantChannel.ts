@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
@@ -22,8 +22,45 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
     refetch
   } = props;
   
+  const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<any>(null);
+  const mountedRef = useRef(true);
+  const subscribedRef = useRef(false);
+  const reconnectTimerRef = useRef<number | null>(null);
   
+  // Setup cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Handle reconnection logic
+  const setupReconnectionTimer = useCallback(() => {
+    if (!mountedRef.current || subscribedRef.current) return;
+    
+    // Clear any existing timer
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+    
+    // Set a new timer
+    reconnectTimerRef.current = window.setTimeout(() => {
+      if (mountedRef.current && !subscribedRef.current && conversationId) {
+        console.log("Reconnection timer triggered, attempting to reconnect participant channel");
+        setError(null);
+        attemptReconnection();
+      }
+    }, 5000); // 5 second delay before reconnection attempt
+  }, [attemptReconnection, conversationId]);
+  
+  // Core channel subscription logic
   useEffect(() => {
     // Clean up existing subscription
     const cleanupChannel = () => {
@@ -32,6 +69,7 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
         removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      subscribedRef.current = false;
     };
     
     cleanupChannel();
@@ -43,8 +81,9 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
     
     console.log("Setting up realtime subscription for conversation:", conversationId);
     
-    // Create a unique channel name with the conversation ID
-    const channelName = `public-conversation-${conversationId}`;
+    // Create a unique channel name with the conversation ID and a timestamp
+    // to prevent reusing stale channels
+    const channelName = `public-conversation-${conversationId}-${Date.now()}`;
     console.log(`Creating public channel: ${channelName}`);
     
     try {
@@ -57,8 +96,11 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
+          if (!mountedRef.current) return;
+          
           console.log("Received realtime update for conversation:", payload);
           setIsConnected(true);
+          subscribedRef.current = true;
           
           if (payload.new) {
             // Update max participants if available
@@ -79,14 +121,25 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
           }
         })
         .subscribe((status) => {
+          if (!mountedRef.current) return;
+          
           console.log(`Channel ${channelName} status: ${status}`);
           if (status === 'SUBSCRIBED') {
             console.log('Successfully subscribed to realtime updates');
             setIsConnected(true);
+            subscribedRef.current = true;
+            // Reset error state
+            if (error) setError(null);
           } else if (status === 'CHANNEL_ERROR') {
             console.error('Error subscribing to channel:', channelName);
             setIsConnected(false);
-            attemptReconnection();
+            subscribedRef.current = false;
+            setError("Failed to establish realtime connection");
+            setupReconnectionTimer();
+          } else if (status === 'TIMED_OUT') {
+            console.warn('Channel subscription timed out:', channelName);
+            subscribedRef.current = false;
+            setupReconnectionTimer();
           }
         });
 
@@ -95,9 +148,12 @@ export function useParticipantChannel(props: UseParticipantChannelProps) {
       return cleanupChannel;
     } catch (err) {
       console.error("Error setting up realtime subscription:", err);
+      subscribedRef.current = false;
+      setError("Error setting up realtime connection");
+      setupReconnectionTimer();
       return cleanupChannel;
     }
-  }, [conversationId, refetch, attemptReconnection, setIsConnected, setCurrentParticipantCount, setMaxParticipantsForSession]);
+  }, [conversationId, refetch, attemptReconnection, setIsConnected, setCurrentParticipantCount, setMaxParticipantsForSession, error, setupReconnectionTimer]);
 
-  return { error: null };
+  return { error };
 }

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useSessionPageState } from "@/hooks/useSessionPageState";
@@ -9,8 +9,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { isInCrossOriginContext, isInIframe } from "@/utils/crossOriginUtils";
 import EmptyState from "@/components/session/EmptyState";
+import { useConversationId } from "@/hooks/useConversationId";
 
 const Session = () => {
+  const { currentConversationId } = useConversationId();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,7 +20,9 @@ const Session = () => {
   const [lastAttemptTime, setLastAttemptTime] = useState<number>(0);
   const [isCrossOrigin, setIsCrossOrigin] = useState<boolean>(false);
   const [noSessionFound, setNoSessionFound] = useState<boolean>(false);
+  const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
   const sessionMountedRef = useRef(false);
+  const recoveryTimerRef = useRef<number | null>(null);
   
   const {
     isAdmin,
@@ -41,6 +45,7 @@ const Session = () => {
       isInCrossOriginContext: crossOriginContext,
       isInIframe: inIframe,
       locationSearch: location.search,
+      conversationId: currentConversationId
     });
 
     // If we're in a cross-origin context, show a toast with helpful information
@@ -50,10 +55,23 @@ const Session = () => {
         description: "You're accessing this session from another site. This may affect some functionality.",
       });
     }
-  }, [location.search, toast]);
+  }, [location.search, toast, currentConversationId]);
+
+  // Set mounted flag to help prevent memory leaks on component unmount
+  useEffect(() => {
+    sessionMountedRef.current = true;
+    return () => {
+      sessionMountedRef.current = false;
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current);
+      }
+    };
+  }, []);
 
   // Function to retry connection with exponential backoff
-  const retryConnection = () => {
+  const retryConnection = useCallback(() => {
+    if (!sessionMountedRef.current) return;
+    
     console.log("Retrying connection...");
     setConnectionAttempts(prev => prev + 1);
     setLastAttemptTime(Date.now());
@@ -64,7 +82,7 @@ const Session = () => {
       if (isCrossOrigin) {
         // Extract session ID from URL if available
         const searchParams = new URLSearchParams(location.search);
-        const sessionId = searchParams.get('id');
+        const sessionId = searchParams.get('id') || currentConversationId?.toString();
         
         if (sessionId) {
           toast({
@@ -93,32 +111,29 @@ const Session = () => {
         window.location.href = window.location.href;
       }, 1000);
     }
-  };
-
-  // Set mounted flag to help prevent memory leaks on component unmount
-  useEffect(() => {
-    sessionMountedRef.current = true;
-    return () => {
-      sessionMountedRef.current = false;
-    };
-  }, []);
+  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId]);
 
   // Check for session ID in the URL
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const sessionId = searchParams.get('id');
     
-    if (!sessionId && !location.state) {
+    if (!sessionId && !location.state && !currentConversationId) {
       console.log("No session ID found in URL or state");
       setNoSessionFound(true);
     }
-  }, [location]);
+  }, [location, currentConversationId]);
 
   // Attempt to recover from blank screens with a timer
   useEffect(() => {
+    // Clear any existing timer
+    if (recoveryTimerRef.current) {
+      clearTimeout(recoveryTimerRef.current);
+    }
+    
     // If we've been loading for more than 10 seconds, show a recovery option
-    const recoveryTimer = setTimeout(() => {
-      if (isLoading && !error && sessionMountedRef.current) {
+    recoveryTimerRef.current = setTimeout(() => {
+      if (isLoading && !error && sessionMountedRef.current && !hasInitializedProvider) {
         console.log("Session page appears stuck in loading state, triggering recovery");
         // Only show toast on first attempt
         if (connectionAttempts === 0) {
@@ -131,21 +146,27 @@ const Session = () => {
       }
     }, 10000);
 
-    return () => clearTimeout(recoveryTimer);
-  }, [isLoading, error, toast, connectionAttempts]);
+    return () => {
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current);
+      }
+    };
+  }, [isLoading, error, toast, connectionAttempts, hasInitializedProvider]);
 
   // Debug logging for the session page
   useEffect(() => {
     console.log("Session page rendered with:", {
       locationSearch: location.search,
       locationState: location.state,
+      currentConversationId,
       isAdmin,
       error,
       connectionAttempts,
       isLoading,
-      isCrossOrigin
+      isCrossOrigin,
+      hasInitializedProvider
     });
-  }, [location, isAdmin, error, connectionAttempts, isLoading, isCrossOrigin]);
+  }, [location, isAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
 
   // If no session ID is provided, show empty state
   if (noSessionFound) {
@@ -163,7 +184,7 @@ const Session = () => {
   }
 
   // Show loading state during initial data fetching
-  if (isLoading && !error) {
+  if (isLoading && !error && !hasInitializedProvider) {
     console.log("Rendering global loading state");
     const loadingTimeElapsed = lastAttemptTime > 0 ? (Date.now() - lastAttemptTime) / 1000 : 0;
     return <JoinSessionLoadingState 
@@ -180,6 +201,13 @@ const Session = () => {
       onError={handleError}
     >
       {(props: SessionContextProps) => {
+        // Once the provider renders, mark it as initialized
+        React.useEffect(() => {
+          if (sessionMountedRef.current && !hasInitializedProvider) {
+            setHasInitializedProvider(true);
+          }
+        }, []);
+        
         // Log props for debugging
         console.log("SessionProvider props:", {
           isLoading: props.isLoading,
@@ -189,6 +217,8 @@ const Session = () => {
           isSessionStartedInDB: props.isSessionStartedInDB,
           error: props.error,
           hasConversation: !!props.conversation,
+          isConnected: props.isConnected || false,
+          connectionAttempts: props.connectionAttempts || 0,
           isCrossOrigin
         });
         
@@ -197,17 +227,17 @@ const Session = () => {
           if (sessionMountedRef.current) {
             setIsLoading(props.isLoading);
           }
-        }, [props.isLoading, setIsLoading]);
+        }, [props.isLoading]);
         
         // Handle errors from the session provider
         React.useEffect(() => {
           if (props.error && sessionMountedRef.current) {
             handleError(props.error);
           }
-        }, [props.error, handleError]);
+        }, [props.error]);
         
         // If we're still loading, show a loading state with retry option
-        if (props.isLoading) {
+        if (props.isLoading && !props.conversation) {
           console.log("Showing provider loading state");
           return <JoinSessionLoadingState 
             onRetry={retryConnection}

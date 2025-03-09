@@ -1,14 +1,17 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { useParticipantCounts } from "@/hooks/useParticipantCounts";
 import { useParticipantChannel } from "@/hooks/useParticipantChannel";
+import { useSessionStatus } from "@/hooks/useSessionStatus";
 
 export function useSessionParticipants(conversationId: number | null) {
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
+  const mountedRef = useRef(true);
   
   const { 
     data: conversation, 
@@ -19,6 +22,8 @@ export function useSessionParticipants(conversationId: number | null) {
 
   // Handle fetch errors
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     if (fetchError) {
       console.error("Error fetching conversation:", fetchError);
       setError(fetchError.message || "Session not found or no longer available");
@@ -27,13 +32,30 @@ export function useSessionParticipants(conversationId: number | null) {
 
   // Check if session has ended
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     if (conversation?.is_session_ended) {
+      console.log("Session has ended, updating error state");
       setError("This session has ended and is no longer available");
     } else if (conversation && error) {
       // Reset any previous errors since we have data
+      console.log("Got conversation data, clearing previous error");
       setError(null);
     }
-  }, [conversation, error]);
+    
+    if (conversation && !isInitialized) {
+      console.log("Session participant hook initialized with conversation:", conversation.id);
+      setIsInitialized(true);
+    }
+  }, [conversation, error, isInitialized]);
+
+  // Set up cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Use our specialized hooks
   const {
@@ -42,7 +64,8 @@ export function useSessionParticipants(conversationId: number | null) {
     connectionAttempts,
     attemptReconnection,
     error: connectionError,
-    setError: setConnectionError
+    setError: setConnectionError,
+    isConnecting
   } = useRealtimeConnection(conversationId, refetch);
 
   const {
@@ -53,7 +76,7 @@ export function useSessionParticipants(conversationId: number | null) {
   } = useParticipantCounts(conversation);
 
   // Set up participant channel
-  useParticipantChannel({
+  const participantChannelResult = useParticipantChannel({
     conversationId,
     setIsConnected,
     attemptReconnection,
@@ -62,12 +85,39 @@ export function useSessionParticipants(conversationId: number | null) {
     refetch
   });
 
+  // Monitor session status (ended, started, etc.)
+  useSessionStatus(conversationId, refetch);
+
   // Combine errors
   useEffect(() => {
-    if (connectionError) {
+    if (!mountedRef.current) return;
+
+    if (connectionError && !error) {
+      console.log("Setting error from connection error:", connectionError);
       setError(connectionError);
     }
-  }, [connectionError]);
+    
+    if (participantChannelResult.error && !error && !connectionError) {
+      console.log("Setting error from participant channel:", participantChannelResult.error);
+      setError(participantChannelResult.error);
+    }
+  }, [connectionError, participantChannelResult.error, error]);
+
+  // Force periodic refresh to ensure data consistency
+  useEffect(() => {
+    if (!conversationId || !mountedRef.current) return;
+    
+    const intervalId = setInterval(() => {
+      if (mountedRef.current) {
+        console.log("Periodic refresh of session data");
+        refetch();
+      }
+    }, 15000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [conversationId, refetch]);
 
   return {
     currentParticipantCount,
@@ -77,6 +127,8 @@ export function useSessionParticipants(conversationId: number | null) {
     refetch,
     isLoading,
     isConnected,
-    connectionAttempts
+    isConnecting,
+    connectionAttempts,
+    isInitialized
   };
 }

@@ -35,11 +35,11 @@ export const useConversation = (conversationId: number | null) => {
       }
     },
     enabled: !!conversationId,
-    retry: 2,
+    retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 5000,
+    staleTime: 3000,
     gcTime: 60000, // Updated from cacheTime to gcTime for React Query v5
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false, // Disable automatic refetch on window focus to prevent interrupting session flow
     refetchOnMount: true,
     refetchOnReconnect: true
   });

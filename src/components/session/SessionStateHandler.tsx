@@ -6,6 +6,7 @@ import EmptyState from "./EmptyState";
 import AdminQrView from "./AdminQrView";
 import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
 import SessionView from "./SessionView";
+import { SessionStateProvider } from "@/contexts/SessionStateProvider";
 
 interface SessionStateHandlerProps {
   props: SessionContextProps;
@@ -33,12 +34,40 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   if (props.isLoading) return <LoadingState />;
   if (!props.conversation || !props.currentConversationId) return <EmptyState />;
 
-  // Check if we should automatically show session (all participants joined)
-  const maxParticipants = props.conversation.participants || 0;
-  const currentParticipants = props.conversation.current_participants || 0;
-  const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
-  
+  // Wrap everything in our state provider
+  return (
+    <SessionStateProvider 
+      sessionData={props}
+      isAdmin={isAdmin}
+      onSessionFull={onSessionFull}
+      onError={(error) => console.error("Session error:", error)}
+    >
+      <SessionStateContent
+        props={props}
+        isAdmin={isAdmin}
+        sessionStarted={sessionStarted}
+        setSessionStarted={setSessionStarted}
+      />
+    </SessionStateProvider>
+  );
+};
+
+// Separate component to use the context
+const SessionStateContent: React.FC<{
+  props: SessionContextProps;
+  isAdmin: boolean;
+  sessionStarted: boolean;
+  setSessionStarted: (started: boolean) => void;
+}> = ({
+  props,
+  isAdmin,
+  sessionStarted,
+  setSessionStarted
+}) => {
   // Calculate if session should be shown
+  const maxParticipants = props.conversation?.participants || 0;
+  const currentParticipants = props.conversation?.current_participants || 0;
+  const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
   const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull;
 
   // Log session state for debugging
@@ -64,7 +93,7 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
           props.handleStartSession();
           setSessionStarted(true);
         }}
-        onSessionFull={onSessionFull}
+        onSessionFull={() => {}}
       />
     );
   }

@@ -3,14 +3,23 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
-export function useParticipantChannel(
-  conversationId: number | null,
-  setIsConnected: (state: boolean) => void,
-  attemptReconnection: () => void,
-  setCurrentParticipantCount: (count: number) => void,
-  setMaxParticipantsForSession: (max: number) => void,
-  refetch: () => void
-) {
+interface UseParticipantChannelProps {
+  conversationId: number | null;
+  setIsConnected: (state: boolean) => void;
+  attemptReconnection: () => void;
+  setCurrentParticipantCount: (count: number) => void;
+  setMaxParticipantsForSession: (max: number) => void;
+  refetch: () => void;
+}
+
+export function useParticipantChannel({
+  conversationId,
+  setIsConnected,
+  attemptReconnection,
+  setCurrentParticipantCount,
+  setMaxParticipantsForSession,
+  refetch
+}: UseParticipantChannelProps) {
   const channelRef = useRef<any>(null);
   
   useEffect(() => {

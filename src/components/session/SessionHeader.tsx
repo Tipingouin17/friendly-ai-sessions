@@ -29,13 +29,21 @@ const SessionHeader = ({
   viewMode
 }: SessionHeaderProps) => {
   const [profilePicture, setProfilePicture] = useState<string>('/placeholder.svg');
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const loadProfilePicture = async () => {
+      setIsLoading(true);
       if (facilitator) {
+        console.log('SessionHeader: Loading profile picture for facilitator:', facilitator);
         const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+        console.log('SessionHeader: Avatar URL resolved to:', avatarUrl);
         setProfilePicture(avatarUrl);
+      } else {
+        console.log('SessionHeader: No facilitator data provided');
+        setProfilePicture('/placeholder.svg');
       }
+      setIsLoading(false);
     };
     
     loadProfilePicture();
@@ -52,6 +60,7 @@ const SessionHeader = ({
       canGenerateReport={messagesCount > 0 && canGenerateReports}
       viewMode={viewMode}
       onImageError={handleAvatarError}
+      isLoading={isLoading}
     />
   );
 };

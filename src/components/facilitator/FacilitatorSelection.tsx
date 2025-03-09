@@ -8,6 +8,7 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -25,6 +26,7 @@ export const FacilitatorSelection = ({
   const [startIndex, setStartIndex] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({});
+  const [loadingImages, setLoadingImages] = useState(true);
   const itemsToShow = 4;
   const { planRestrictions } = useUserPlan();
   const { 
@@ -38,9 +40,6 @@ export const FacilitatorSelection = ({
   // All existing facilitators should be accessible for selection
   const accessibleFacilitators = facilitators;
   
-  // These are the facilitators you CANNOT CREATE MORE OF, but can still select
-  const lockedFacilitators = []; // No locked facilitators since all are accessible for selection
-
   // Adjust startIndex if needed when the accessible facilitators list changes
   useEffect(() => {
     if (startIndex > 0 && startIndex >= accessibleFacilitators.length - itemsToShow) {
@@ -51,16 +50,24 @@ export const FacilitatorSelection = ({
   // Load all facilitator images
   useEffect(() => {
     const loadFacilitatorImages = async () => {
+      setLoadingImages(true);
       const imageMap: Record<number, string> = {};
+      
+      console.log('Loading facilitator images for', facilitators.length, 'facilitators');
       
       for (const facilitator of facilitators) {
         if (facilitator.id) {
+          console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
+          console.log(`Profile picture value: ${facilitator.profile_picture}`);
+          
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
           imageMap[facilitator.id] = avatarUrl;
         }
       }
       
+      console.log('Facilitator images:', imageMap);
       setFacilitatorImages(imageMap);
+      setLoadingImages(false);
     };
     
     if (facilitators.length > 0) {
@@ -76,15 +83,12 @@ export const FacilitatorSelection = ({
     setStartIndex(Math.min(accessibleFacilitators.length - itemsToShow, startIndex + 1));
   };
 
-  if (isLoading) {
-    return <div>Loading facilitators...</div>;
+  if (isLoading || loadingImages) {
+    return <div className="py-12 text-center">Loading facilitators...</div>;
   }
   
   // Determine if the "Add New Facilitator" button should be disabled
   const isCreateDisabled = hasReachedFacilitatorLimit || !canCreateCustomFacilitators;
-
-  // Debug log
-  console.log('Facilitator images:', facilitatorImages);
   
   return (
     <div className="relative">
@@ -104,7 +108,7 @@ export const FacilitatorSelection = ({
             // Get avatar URL from our pre-loaded map
             const avatarUrl = facilitator.id && facilitatorImages[facilitator.id] 
               ? facilitatorImages[facilitator.id] 
-              : facilitator.profile_picture || '/placeholder.svg';
+              : '/placeholder.svg';
             
             return (
               <div
@@ -115,12 +119,14 @@ export const FacilitatorSelection = ({
                 onClick={() => onSelect(facilitator.id)}
               >
                 <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-                  <img 
-                    src={avatarUrl} 
-                    alt={facilitator.title || 'Facilitator'} 
-                    className="h-full w-full object-cover" 
-                    onError={handleAvatarError}
-                  />
+                  <Avatar className="h-full w-full">
+                    <AvatarImage 
+                      src={avatarUrl} 
+                      alt={facilitator.title || 'Facilitator'} 
+                      onError={handleAvatarError}
+                    />
+                    <AvatarFallback>{facilitator.title?.charAt(0) || 'F'}</AvatarFallback>
+                  </Avatar>
                 </div>
                 <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
               </div>

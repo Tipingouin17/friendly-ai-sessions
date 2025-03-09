@@ -33,8 +33,8 @@ export function useRealtimeConnectionHandler({
   const [lastPingSuccess, setLastPingSuccess] = useState<number>(Date.now());
   const [isPerformingConnectionCheck, setIsPerformingConnectionCheck] = useState(false);
   const mountedRef = useRef(true);
-  const pingIntervalRef = useRef<number | null>(null);
-  const connectionCheckTimeoutRef = useRef<number | null>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Set up cleanup on unmount
   useEffect(() => {

@@ -11,7 +11,7 @@ export function useRealtimeConnection(
   const [error, setError] = useState<string | null>(null);
   const [isCrossOrigin, setIsCrossOrigin] = useState(false);
   const [lastConnectionTime, setLastConnectionTime] = useState<number>(0);
-  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
   
   // Check for cross-origin context on mount

@@ -116,9 +116,14 @@ const SessionStateContent: React.FC<{
   if (!isAdmin && !shouldShowSession) {
     return (
       <ParticipantWaitingScreen
+        conversationId={props.currentConversationId}
         currentParticipantCount={props.conversation.current_participants || 0}
         maxParticipants={props.conversation.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        onSessionStarted={() => {
+          console.log("Session started callback from ParticipantWaitingScreen");
+          setSessionStarted(true);
+        }}
       />
     );
   }

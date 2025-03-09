@@ -70,7 +70,10 @@ export const RefactoredSessionProvider = ({
   const {
     participants,
     currentUserParticipantId,
-    error: participantError
+    error: participantError,
+    currentParticipantCount,
+    maxParticipantsForSession,
+    forceRefreshParticipants
   } = useSessionParticipantManager({
     conversationId: currentConversationId,
     conversation,
@@ -103,6 +106,21 @@ export const RefactoredSessionProvider = ({
       handleError(roomState.error);
     }
   }, [roomState.error, handleError]);
+
+  // Force periodic refresh of participant data
+  useEffect(() => {
+    if (currentConversationId) {
+      const interval = setInterval(() => {
+        console.log("Forcing periodic refresh of conversation data");
+        refetch();
+        if (forceRefreshParticipants) {
+          forceRefreshParticipants();
+        }
+      }, 5000); // Every 5 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentConversationId, refetch, forceRefreshParticipants]);
 
   // Handler for starting session with better error handling
   const enhancedHandleStartSession = () => {

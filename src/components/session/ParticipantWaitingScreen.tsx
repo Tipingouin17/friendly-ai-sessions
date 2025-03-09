@@ -1,19 +1,81 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Clock, Users } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { removeChannel } from "@/utils/realtimeHelpers";
 
 interface ParticipantWaitingScreenProps {
+  conversationId?: number | null;
   currentParticipantCount: number;
   maxParticipants?: number;
   facilitatorTitle?: string;
+  onSessionStarted?: () => void;
 }
 
 const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
+  conversationId,
   currentParticipantCount,
   maxParticipants,
-  facilitatorTitle
+  facilitatorTitle,
+  onSessionStarted
 }) => {
+  const { toast } = useToast();
+  const [participantCount, setParticipantCount] = React.useState(currentParticipantCount);
+  
+  // Set up real-time listener for conversation updates
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    console.log("Setting up realtime subscription for participant waiting screen:", conversationId);
+    
+    // Create a unique channel name with the conversation ID
+    const channelName = `public-conversation-${conversationId}-participant-waiting`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("Received realtime update in participant waiting screen:", payload);
+        
+        if (payload.new) {
+          // Update participant count
+          if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
+            console.log("Updating participant count:", payload.new.current_participants);
+            setParticipantCount(payload.new.current_participants);
+          }
+          
+          // Check if session was started
+          if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
+            console.log("Session was started, triggering callback");
+            toast({
+              title: "Session Started",
+              description: "The session has been started by the admin."
+            });
+            
+            if (onSessionStarted) {
+              setTimeout(() => {
+                onSessionStarted();
+              }, 1000); // Short delay to ensure toast is shown
+            }
+          }
+        }
+      })
+      .subscribe((status) => {
+        console.log(`ParticipantWaitingScreen channel ${channelName} status:`, status);
+      });
+    
+    return () => {
+      console.log("Cleaning up participant waiting screen channel");
+      removeChannel(channel);
+    };
+  }, [conversationId, onSessionStarted, toast]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-md w-full text-center">
@@ -37,7 +99,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
         <div className="inline-flex items-center gap-2 bg-gray-50 rounded-full px-4 py-2 border mb-2">
           <Users className="h-4 w-4 text-gray-500" />
           <span className="text-sm font-medium">
-            {currentParticipantCount} {maxParticipants ? `of ${maxParticipants}` : ''} participants joined
+            {participantCount} {maxParticipants ? `of ${maxParticipants}` : ''} participants joined
           </span>
         </div>
       </div>

@@ -43,16 +43,22 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.profile_picture) {
       console.log(`Using profile_picture URL for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
       
+      // Fix any potential double slashes in the URL that aren't part of the protocol
+      const fixedUrl = facilitator.profile_picture.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+        return protocol || '/';
+      });
+      
       // Skip HEAD request validation for Supabase URLs to avoid CORS issues
-      if (facilitator.profile_picture.includes('supabase')) {
-        return facilitator.profile_picture;
+      if (fixedUrl.includes('supabase')) {
+        console.log(`Using Supabase URL without validation: ${fixedUrl}`);
+        return fixedUrl;
       }
       
       // Only validate non-Supabase URLs
       try {
-        const isValid = await validateImageUrl(facilitator.profile_picture);
+        const isValid = await validateImageUrl(fixedUrl);
         if (isValid) {
-          return facilitator.profile_picture;
+          return fixedUrl;
         }
       } catch (err) {
         console.error('Error validating profile_picture URL:', err);

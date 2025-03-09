@@ -14,9 +14,11 @@ export const useParticipantResponses = ({
   const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>({});
   
   // Calculate metrics for UI
-  const hasAnswered = useMemo(() => messages.some(message => 
-    message.participant === `P${currentUserParticipantId}` && message.sender === "user"
-  ), [messages, currentUserParticipantId]);
+  const hasAnswered = useMemo(() => 
+    messages.some(message => 
+      message.participant === `P${currentUserParticipantId}` && message.sender === "user"
+    )
+  , [messages, currentUserParticipantId]);
   
   const totalResponses = useMemo(() => 
     messages.filter(message => message.sender === "user").length

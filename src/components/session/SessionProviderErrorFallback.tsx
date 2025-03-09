@@ -1,3 +1,4 @@
+
 import React from "react";
 import { SessionContextProps } from "@/types/session";
 
@@ -49,6 +50,8 @@ export const SessionProviderErrorFallback = ({
     },
     isSessionStartedInDB: false,
     error: errorMessage,
+    
+    // Add missing properties required by SessionContextProps
     isConnected: false,
     connectionAttempts: 0,
     refetch: () => {}

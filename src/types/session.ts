@@ -43,4 +43,8 @@ export interface SessionContextProps {
   isConnected: boolean;
   connectionAttempts: number;
   refetch: () => void;
+  
+  // Properties needed by SessionProviderWrapper
+  isAdmin?: boolean;
+  sessionStarted?: boolean;
 }

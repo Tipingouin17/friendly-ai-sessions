@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
-import { getFacilitatorAvatarUrl, handleAvatarError, validateImageUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -28,37 +28,24 @@ const SessionHeader = ({
   messagesCount,
   viewMode
 }: SessionHeaderProps) => {
-  const [validProfilePicture, setValidProfilePicture] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string>('/placeholder.svg');
   
-  // Get profile picture URL using the facilitator ID
   useEffect(() => {
-    const checkProfilePicture = async () => {
-      if (facilitator?.id) {
-        const avatarUrl = getFacilitatorAvatarUrl(facilitator.id);
-        const isValid = await validateImageUrl(avatarUrl);
-        
-        if (isValid) {
-          setValidProfilePicture(avatarUrl);
-        } else if (facilitator.profile_picture) {
-          setValidProfilePicture(facilitator.profile_picture);
-        } else {
-          setValidProfilePicture('/placeholder.svg');
-        }
-      } else if (facilitator?.profile_picture) {
-        setValidProfilePicture(facilitator.profile_picture);
-      } else {
-        setValidProfilePicture('/placeholder.svg');
+    const loadProfilePicture = async () => {
+      if (facilitator) {
+        const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+        setProfilePicture(avatarUrl);
       }
     };
     
-    checkProfilePicture();
+    loadProfilePicture();
   }, [facilitator]);
 
   return (
     <ChatHeader 
       title={facilitator?.title}
       objective={objective}
-      profilePicture={validProfilePicture || '/placeholder.svg'}
+      profilePicture={profilePicture}
       participantCount={participantCount}
       onGenerateReport={onGenerateReport}
       isGeneratingReport={isGeneratingReport}

@@ -7,7 +7,7 @@ import { CreateFacilitatorModal } from "./CreateFacilitatorModal";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getFacilitatorAvatarUrl, handleAvatarError, validateImageUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -24,7 +24,7 @@ export const FacilitatorSelection = ({
 }: FacilitatorSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [avatarStatuses, setAvatarStatuses] = useState<Record<number, boolean>>({});
+  const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({});
   const itemsToShow = 4;
   const { planRestrictions } = useUserPlan();
   const { 
@@ -48,23 +48,23 @@ export const FacilitatorSelection = ({
     }
   }, [accessibleFacilitators, startIndex]);
 
-  // Check if avatars exist when facilitators load
+  // Load all facilitator images
   useEffect(() => {
-    const checkAvatars = async () => {
-      const statuses: Record<number, boolean> = {};
+    const loadFacilitatorImages = async () => {
+      const imageMap: Record<number, string> = {};
       
       for (const facilitator of facilitators) {
         if (facilitator.id) {
-          const avatarUrl = getFacilitatorAvatarUrl(facilitator.id);
-          statuses[facilitator.id] = await validateImageUrl(avatarUrl);
+          const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+          imageMap[facilitator.id] = avatarUrl;
         }
       }
       
-      setAvatarStatuses(statuses);
+      setFacilitatorImages(imageMap);
     };
     
     if (facilitators.length > 0) {
-      checkAvatars();
+      loadFacilitatorImages();
     }
   }, [facilitators]);
 
@@ -84,7 +84,7 @@ export const FacilitatorSelection = ({
   const isCreateDisabled = hasReachedFacilitatorLimit || !canCreateCustomFacilitators;
 
   // Debug log
-  console.log('Accessible facilitators:', accessibleFacilitators);
+  console.log('Facilitator images:', facilitatorImages);
   
   return (
     <div className="relative">
@@ -101,11 +101,10 @@ export const FacilitatorSelection = ({
 
         <div className="mx-12 flex gap-4 overflow-hidden">
           {accessibleFacilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => {
-            // Debug log for each facilitator
-            console.log('Rendering facilitator:', facilitator.id, facilitator.title);
-            
-            // Get avatar URL
-            const avatarUrl = facilitator.id ? getFacilitatorAvatarUrl(facilitator.id) : '/placeholder.svg';
+            // Get avatar URL from our pre-loaded map
+            const avatarUrl = facilitator.id && facilitatorImages[facilitator.id] 
+              ? facilitatorImages[facilitator.id] 
+              : facilitator.profile_picture || '/placeholder.svg';
             
             return (
               <div

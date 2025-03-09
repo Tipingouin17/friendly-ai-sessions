@@ -94,11 +94,29 @@ export function useSessionParticipantManager({
         }));
         
         setParticipants(updatedParticipants);
+      } else {
+        // If no participants found but we know the count, generate placeholders
+        if (conversation?.current_participants) {
+          const count = conversation.current_participants;
+          console.log("No participant data found, creating placeholders for", count, "participants");
+          
+          const placeholders: ParticipantInfo[] = [];
+          for (let i = 1; i <= count; i++) {
+            placeholders.push({
+              id: i,
+              name: `Participant ${i}`,
+              avatar: null,
+              isAnonymous: false
+            });
+          }
+          
+          setParticipants(placeholders);
+        }
       }
     } catch (err) {
       console.error("Error in forceRefreshParticipants:", err);
     }
-  }, [conversationId]);
+  }, [conversationId, conversation?.current_participants]);
 
   // Initial load of participants
   useEffect(() => {
@@ -144,6 +162,19 @@ export function useSessionParticipantManager({
       }
     }
   }, [conversation, participants.length, forceRefreshParticipants]);
+
+  // Force periodic refresh of participant data to ensure UI stays updated
+  useEffect(() => {
+    if (conversationId) {
+      const intervalId = setInterval(() => {
+        forceRefreshParticipants();
+      }, 10000); // Refresh every 10 seconds
+      
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [conversationId, forceRefreshParticipants]);
 
   return {
     participants,

@@ -33,47 +33,52 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     // Create a unique channel name with the conversation ID
     const channelName = `public-conversation-${conversationId}-participant-waiting`;
     
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'conversations',
-        filter: `id=eq.${conversationId}`
-      }, (payload) => {
-        console.log("Received realtime update in participant waiting screen:", payload);
-        
-        if (payload.new) {
-          // Update participant count
-          if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
-            console.log("Updating participant count:", payload.new.current_participants);
-            setParticipantCount(payload.new.current_participants);
-          }
+    try {
+      const channel = supabase
+        .channel(channelName)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        }, (payload) => {
+          console.log("Received realtime update in participant waiting screen:", payload);
           
-          // Check if session was started
-          if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-            console.log("Session was started, triggering callback");
-            toast({
-              title: "Session Started",
-              description: "The session has been started by the admin."
-            });
+          if (payload.new) {
+            // Update participant count
+            if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
+              console.log("Updating participant count:", payload.new.current_participants);
+              setParticipantCount(payload.new.current_participants);
+            }
             
-            if (onSessionStarted) {
-              setTimeout(() => {
-                onSessionStarted();
-              }, 1000); // Short delay to ensure toast is shown
+            // Check if session was started
+            if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
+              console.log("Session was started, triggering callback");
+              toast({
+                title: "Session Started",
+                description: "The session has been started by the admin."
+              });
+              
+              if (onSessionStarted) {
+                setTimeout(() => {
+                  onSessionStarted();
+                }, 1000); // Short delay to ensure toast is shown
+              }
             }
           }
-        }
-      })
-      .subscribe((status) => {
-        console.log(`ParticipantWaitingScreen channel ${channelName} status:`, status);
-      });
-    
-    return () => {
-      console.log("Cleaning up participant waiting screen channel");
-      removeChannel(channel);
-    };
+        })
+        .subscribe((status) => {
+          console.log(`ParticipantWaitingScreen channel ${channelName} status:`, status);
+        });
+      
+      return () => {
+        console.log("Cleaning up participant waiting screen channel");
+        removeChannel(channel);
+      };
+    } catch (err) {
+      console.error("Error setting up participant waiting subscription:", err);
+      return () => {}; // Empty cleanup function to avoid runtime errors
+    }
   }, [conversationId, onSessionStarted, toast]);
 
   return (

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useSessionErrorHandler } from "@/hooks/useSessionErrorHandler";
 import { useRefactoredSessionData } from "@/hooks/useRefactoredSessionData";
@@ -66,6 +66,14 @@ export const RefactoredSessionProvider = ({
     });
   }, [isSessionStartedInDB, conversation?.session_started]);
 
+  // Memoize handleSessionFull callback to prevent re-renders
+  const memoizedHandleSessionFull = useCallback(() => {
+    if (handleSessionFull) {
+      console.log("Calling memoized handleSessionFull");
+      handleSessionFull();
+    }
+  }, [handleSessionFull]);
+
   // Set up participant management
   const {
     participants,
@@ -79,7 +87,7 @@ export const RefactoredSessionProvider = ({
     conversation,
     locationState,
     refetch,
-    onSessionFull: handleSessionFull
+    onSessionFull: memoizedHandleSessionFull
   });
 
   // Handle participant errors
@@ -116,14 +124,14 @@ export const RefactoredSessionProvider = ({
         if (forceRefreshParticipants) {
           forceRefreshParticipants();
         }
-      }, 5000); // Every 5 seconds
+      }, 10000); // Every 10 seconds
       
       return () => clearInterval(interval);
     }
   }, [currentConversationId, refetch, forceRefreshParticipants]);
 
   // Handler for starting session with better error handling
-  const enhancedHandleStartSession = () => {
+  const enhancedHandleStartSession = useCallback(() => {
     try {
       console.log("Enhanced handleStartSession called from RefactoredSessionProvider");
       handleStartSession();
@@ -142,7 +150,7 @@ export const RefactoredSessionProvider = ({
       console.error("Error in handleStartSession:", error);
       handleError("Failed to start session. Please try again.");
     }
-  };
+  }, [handleStartSession, toast, refetch, handleError]);
 
   // If we have serious errors, return error fallback
   if (providerError) {

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,6 +11,7 @@ export function useSessionParticipants(conversationId: number | null) {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const channelRef = useRef<any>(null);
   const { toast } = useToast();
   
   const { 
@@ -31,7 +32,7 @@ export function useSessionParticipants(conversationId: number | null) {
   // Set conversation data
   useEffect(() => {
     if (conversation) {
-      console.log("Conversation data loaded successfully:", conversation);
+      console.log("Conversation data loaded successfully");
       
       // Check if session has ended
       if (conversation.is_session_ended) {
@@ -69,9 +70,20 @@ export function useSessionParticipants(conversationId: number | null) {
 
   // Set up real-time subscription
   useEffect(() => {
+    // Clean up existing subscription
+    const cleanupChannel = () => {
+      if (channelRef.current) {
+        console.log("Cleaning up existing channel subscription");
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+    
+    cleanupChannel();
+    
     if (!conversationId) {
       console.log("No conversation ID provided, skipping realtime subscription");
-      return;
+      return cleanup;
     }
     
     console.log("Setting up realtime subscription for conversation:", conversationId);
@@ -90,7 +102,7 @@ export function useSessionParticipants(conversationId: number | null) {
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received realtime update:", payload);
+          console.log("Received realtime update");
           setIsConnected(true);
           
           if (payload.new) {
@@ -126,27 +138,34 @@ export function useSessionParticipants(conversationId: number | null) {
           }
         });
 
+      channelRef.current = channel;
+
       return () => {
-        console.log(`Cleaning up channel: ${channelName}`);
-        supabase.removeChannel(channel);
+        cleanupChannel();
       };
     } catch (err) {
       console.error("Error setting up realtime subscription:", err);
       setError("Failed to establish connection to session");
       return () => {};
     }
-  }, [conversationId, refetch, connectionAttempts, attemptReconnection]);
+  }, [conversationId, refetch, attemptReconnection]);
 
   // Connection recovery mechanism
   useEffect(() => {
+    let recoveryTimeout: number | null = null;
+    
     if (!isConnected && conversationId && !isLoading && !error) {
-      const recoveryTimeout = setTimeout(() => {
+      recoveryTimeout = window.setTimeout(() => {
         console.log("Connection not established, attempting recovery");
         attemptReconnection();
       }, 5000);
-      
-      return () => clearTimeout(recoveryTimeout);
     }
+    
+    return () => {
+      if (recoveryTimeout !== null) {
+        clearTimeout(recoveryTimeout);
+      }
+    };
   }, [isConnected, conversationId, isLoading, error, attemptReconnection]);
 
   return {

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import MessageList from "@/components/chat/MessageList";
 import SessionJoinInfo from "@/components/session/SessionJoinInfo";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -32,13 +32,8 @@ const MessagingArea = ({
   isMobile,
   viewMode
 }: MessagingAreaProps) => {
-  console.log("MessagingArea - Current messages:", messages);
-  console.log("MessagingArea - Current participants:", participants);
-  console.log("MessagingArea - Current participant:", currentParticipant);
-  console.log("MessagingArea - ViewMode:", viewMode);
-  
   // For participant view, filter messages to only show their own and facilitator messages
-  const filteredMessages = React.useMemo(() => {
+  const filteredMessages = useMemo(() => {
     if (viewMode === "participant") {
       return messages.filter(message => {
         // Always show facilitator messages
@@ -57,7 +52,7 @@ const MessagingArea = ({
   }, [messages, viewMode, currentParticipant]);
   
   // Group messages by facilitator question for admin view
-  const groupedMessages = React.useMemo(() => {
+  const groupedMessages = useMemo(() => {
     if (viewMode !== "admin") return [];
 
     const groups = [];
@@ -87,7 +82,6 @@ const MessagingArea = ({
       groups.push(currentGroup);
     }
     
-    console.log("Admin view grouped messages:", groups);
     return groups;
   }, [messages, viewMode]);
 
@@ -98,7 +92,7 @@ const MessagingArea = ({
           <div className="h-full overflow-y-auto">
             <div className="px-4 py-6 space-y-8">
               {groupedMessages.map((group, groupIndex) => (
-                <div key={groupIndex} className="border border-gray-100 rounded-lg overflow-hidden">
+                <div key={`group-${groupIndex}-${group.question.id}`} className="border border-gray-100 rounded-lg overflow-hidden">
                   <div className="bg-gray-50 p-4 border-b border-gray-100">
                     <div className="font-medium text-gray-800 mb-1">Question {groupIndex + 1}</div>
                     <div className="text-gray-700">{group.question.content}</div>
@@ -111,7 +105,7 @@ const MessagingArea = ({
                   
                   <div className="divide-y divide-gray-100">
                     {group.responses.map((response, responseIndex) => (
-                      <div key={responseIndex} className="p-4">
+                      <div key={`response-${response.id}-${responseIndex}`} className="p-4">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="w-2 h-2 rounded-full" 
                             style={{ backgroundColor: participantColors[response.participant] || '#888' }} 
@@ -161,4 +155,4 @@ const MessagingArea = ({
   );
 };
 
-export default MessagingArea;
+export default React.memo(MessagingArea);

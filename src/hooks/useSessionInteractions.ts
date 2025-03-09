@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
@@ -33,8 +33,15 @@ export const useSessionInteractions = ({
 }: UseSessionInteractionsProps) => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const { toast } = useToast();
+  const requestInProgressRef = useRef(false);
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
+    // Prevent concurrent requests
+    if (requestInProgressRef.current || isWaitingForResponse) {
+      console.log("Request already in progress, ignoring duplicate send");
+      return;
+    }
+    
     // Don't allow sending in admin view
     if (sessionState.viewMode === "admin") return;
     
@@ -44,10 +51,6 @@ export const useSessionInteractions = ({
     const currentParticipant = sessionState.currentParticipant;
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
-    
-    console.log("Sending message as participant:", currentParticipant, "with key:", currentParticipantKey);
-    console.log("Current participants:", participants);
-    console.log("Current participant info:", participantInfo);
     
     // Create the message object
     const messageId = nanoid();
@@ -80,16 +83,16 @@ export const useSessionInteractions = ({
     
     // If all participants have responded, send to facilitator
     if (updatedTotalResponses >= totalParticipants) {
+      requestInProgressRef.current = true;
       setIsWaitingForResponse(true);
 
       try {
-        // Get all participant messages for this round
+        // Get all participant messages for this round - only the most recent messages
         const participantMessages = sessionState.messages.filter(msg => 
           msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
         ).slice(-totalParticipants);
         
-        console.log('Calling edge function with participant messages:', participantMessages);
-        console.log('Number of messages being sent:', sessionState.messages.length);
+        console.log('Calling edge function with participant messages count:', participantMessages.length);
 
         const response = await supabase.functions.invoke('handle-facilitator-response', {
           body: {
@@ -97,8 +100,6 @@ export const useSessionInteractions = ({
             conversationId: currentConversationId
           }
         });
-
-        console.log('Edge function response:', response);
 
         if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
         if (!response.data) throw new Error('No response data received from AI');
@@ -120,11 +121,21 @@ export const useSessionInteractions = ({
         });
       } finally {
         setIsWaitingForResponse(false);
+        requestInProgressRef.current = false;
       }
     }
-  };
+  }, [
+    isWaitingForResponse, 
+    sessionState, 
+    currentConversationId, 
+    participants, 
+    isAnonymous, 
+    conversation?.participants,
+    conversation?.sessions?.facilitator_details?.profile_picture,
+    toast
+  ]);
 
-  const handleLikeMessage = (messageId: string) => {
+  const handleLikeMessage = useCallback((messageId: string) => {
     const currentParticipantId = `P${sessionState.currentParticipant}`;
     
     sessionState.setMessages(prev => 
@@ -143,7 +154,7 @@ export const useSessionInteractions = ({
         return message;
       })
     );
-  };
+  }, [sessionState]);
 
   return {
     isWaitingForResponse,

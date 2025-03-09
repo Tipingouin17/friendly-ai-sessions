@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
@@ -24,12 +24,17 @@ export function useSessionState({
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   
+  // Store in ref to avoid creating a new function on each render
+  const welcomeAddedRef = useRef(false);
+  const reportGenerationInProgressRef = useRef(false);
+  
   // Ensure current participant is locked to their assigned ID
   const currentParticipant = currentUserParticipantId || 1;
 
-  // Add welcome message if present
+  // Add welcome message if present - only once
   useEffect(() => {
-    if (welcomeMessage && messages.length === 0) {
+    if (welcomeMessage && messages.length === 0 && !welcomeAddedRef.current) {
+      welcomeAddedRef.current = true;
       const welcomeId = nanoid();
       setMessages([
         {
@@ -44,13 +49,15 @@ export function useSessionState({
   }, [welcomeMessage, messages.length]);
 
   // Generate session report
-  const handleGenerateReport = async () => {
-    if (!conversationId) {
-      console.error("No conversation ID provided");
+  const handleGenerateReport = useCallback(async () => {
+    if (!conversationId || reportGenerationInProgressRef.current) {
+      console.error("No conversation ID provided or report generation already in progress");
       return;
     }
 
+    reportGenerationInProgressRef.current = true;
     setIsGeneratingReport(true);
+    
     try {
       // Aggregate all messages into a single string
       const allMessages = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
@@ -66,7 +73,7 @@ export function useSessionState({
       if (error) {
         console.error("Error generating report:", error);
       } else {
-        console.log("Report generated successfully:", data);
+        console.log("Report generated successfully");
 
         // Add the report to the messages
         const reportId = nanoid();
@@ -82,16 +89,24 @@ export function useSessionState({
           }
         ]);
       }
+    } catch (error) {
+      console.error('Error generating report:', error);
     } finally {
       setIsGeneratingReport(false);
+      reportGenerationInProgressRef.current = false;
     }
-  };
+  }, [conversationId, messages]);
 
-  // Record a response to a facilitator question
+  // Record a response to a facilitator question - memoized to prevent recreation
   const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
     console.log("Recording response for participant:", participantId, "with hasResponded:", hasResponded);
     
     setPendingResponses(prev => {
+      // Skip update if nothing changed
+      if (prev[participantId] === hasResponded) {
+        return prev;
+      }
+      
       const newResponses = {
         ...prev,
         [participantId]: hasResponded
@@ -108,9 +123,11 @@ export function useSessionState({
   // Update total responses count based on pendingResponses
   useEffect(() => {
     const count = Object.values(pendingResponses).filter(Boolean).length;
-    console.log("Updating total responses count to:", count);
-    setTotalResponses(count);
-  }, [pendingResponses]);
+    if (count !== totalResponses) {
+      console.log("Updating total responses count to:", count);
+      setTotalResponses(count);
+    }
+  }, [pendingResponses, totalResponses]);
 
   // Reset answer state when a new facilitator message arrives
   useEffect(() => {

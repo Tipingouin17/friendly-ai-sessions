@@ -15,6 +15,7 @@ interface StripeProviderProps {
 }
 
 export const StripeProvider = ({ children }: StripeProviderProps) => {
+  // Get safe cookie parameters for cross-origin contexts
   const cookieParams = getSafeCookieParams();
   
   return (
@@ -33,11 +34,6 @@ export const StripeProvider = ({ children }: StripeProviderProps) => {
         appearance: {
           theme: 'stripe',
         },
-        // Apply safe cookie parameters
-        cookies: {
-          secure: cookieParams.secure,
-          sameSite: cookieParams.sameSite as 'Strict' | 'Lax' | 'None' | undefined,
-        }
       }}
     >
       {children}

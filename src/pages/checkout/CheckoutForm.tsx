@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +11,7 @@ import { AlertCircle, Loader2, DollarSign, Euro, PoundSterling } from 'lucide-re
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { CheckoutFormProps } from './types';
 import { supabase } from '@/integrations/supabase/client';
-import { createSafeUrl } from '@/utils/crossOriginUtils';
+import { createSafeUrl, applySafeCookieParams } from '@/utils/crossOriginUtils';
 
 export const CheckoutForm = ({ 
   plan, 
@@ -177,7 +178,8 @@ export const CheckoutForm = ({
       const returnUrl = createSafeUrl('/profile');
       console.log("Using return URL:", returnUrl);
 
-      const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, {
+      // Apply safe cookie parameters to fetch call
+      const fetchOptions = applySafeCookieParams({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,8 +192,9 @@ export const CheckoutForm = ({
           billingDetails,
           returnUrl: returnUrl,
         }),
-        credentials: 'include',
       });
+
+      const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, fetchOptions);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -200,6 +203,7 @@ export const CheckoutForm = ({
 
       const { clientSecret, subscriptionId, customerId } = await response.json();
 
+      // Set up payment method with proper billing details
       const confirmPaymentOptions = {
         payment_method: {
           card: elements.getElement(CardElement)!,
@@ -236,7 +240,8 @@ export const CheckoutForm = ({
         throw new Error(paymentError.message || 'Payment failed');
       }
 
-      const confirmResponse = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/confirm-subscription`, {
+      // Also use safe cookie parameters for confirmation
+      const confirmOptions = applySafeCookieParams({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,8 +254,9 @@ export const CheckoutForm = ({
           planId: plan.id,
           paymentIntentId: paymentIntent?.id
         }),
-        credentials: 'include',
       });
+
+      const confirmResponse = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/confirm-subscription`, confirmOptions);
 
       if (!confirmResponse.ok) {
         const errorData = await confirmResponse.json();

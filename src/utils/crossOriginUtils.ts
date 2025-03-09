@@ -39,9 +39,25 @@ export const createSafeUrl = (path: string): string => {
  */
 export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => {
   const isHttps = window.location.protocol === 'https:';
+  const isCrossOrigin = isInCrossOriginContext();
   
+  // For cross-origin contexts in modern browsers, we need to use SameSite=None with secure
   return {
-    sameSite: isInCrossOriginContext() ? 'None' : 'Lax',
-    secure: isHttps, // Only set secure flag on HTTPS
+    sameSite: isCrossOrigin ? 'None' : 'Lax',
+    secure: isHttps || isCrossOrigin, // Always secure for cross-origin, optional for same-origin
+  };
+};
+
+/**
+ * Apply cookie parameters to any fetch calls in cross-origin contexts
+ */
+export const applySafeCookieParams = (options: RequestInit = {}): RequestInit => {
+  const cookieParams = getSafeCookieParams();
+  
+  // If we're in a cross-origin context, always include credentials
+  return {
+    ...options,
+    credentials: 'include',
+    // You could add headers here if needed for specific cookie control
   };
 };

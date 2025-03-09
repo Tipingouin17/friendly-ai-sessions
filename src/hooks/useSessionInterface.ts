@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
@@ -11,6 +11,7 @@ export function useSessionInterface(conversationId: number | null) {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const { toast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = window.innerWidth < 768;
   
   // Generate session link when conversationId changes
@@ -109,8 +110,16 @@ export function useSessionInterface(conversationId: number | null) {
         setShowQrCodeView(false);
         setIsSessionStarted(true);
         
-        // Redirect to the session page with admin status
-        window.location.href = `/session?id=${conversationId}`;
+        // Redirect using navigate instead of directly changing window.location
+        // This prevents page reload and maintains React Router state
+        console.log("Redirecting to session page with ID:", conversationId);
+        navigate(`/session?id=${conversationId}`, { 
+          state: { 
+            isAdmin: true,
+            showMessaging: true 
+          },
+          replace: true // Replace current history entry to prevent back navigation to QR view
+        });
       }
     } catch (err) {
       console.error("Exception updating session_started:", err);

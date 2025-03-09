@@ -83,11 +83,25 @@ export const FacilitatorSelection = ({
               }`}
               onClick={() => onSelect(facilitator.id)}
             >
-              <img 
-                src={facilitator.profile_picture} 
-                alt={facilitator.title} 
-                className="mb-4 h-24 w-24 rounded-full" 
-              />
+              <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
+                {facilitator.profile_picture ? (
+                  <img 
+                    src={facilitator.profile_picture} 
+                    alt={facilitator.title} 
+                    className="h-full w-full object-cover" 
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full w-full bg-gray-200">
+                    <span className="text-2xl font-semibold text-gray-500">
+                      {facilitator.title.charAt(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
               <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
             </div>
           ))}

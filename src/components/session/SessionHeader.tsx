@@ -26,6 +26,11 @@ const SessionHeader = ({
   messagesCount,
   viewMode
 }: SessionHeaderProps) => {
+  // Add error handling for profile_picture
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = '/placeholder.svg';
+  };
+
   return (
     <ChatHeader 
       title={facilitator?.title}
@@ -36,6 +41,7 @@ const SessionHeader = ({
       isGeneratingReport={isGeneratingReport}
       canGenerateReport={messagesCount > 0 && canGenerateReports}
       viewMode={viewMode}
+      onProfilePictureError={handleImageError}
     />
   );
 };

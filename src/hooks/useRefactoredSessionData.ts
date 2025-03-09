@@ -1,7 +1,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useSessionDataFetching } from "@/hooks/useSessionDataFetching";
-import { useConversationId } from "@/hooks/useConversationId";
+import { useConversationId, LocationStateType } from "@/hooks/useConversationId";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
@@ -44,6 +44,7 @@ export const useRefactoredSessionData = () => {
 
   return {
     currentConversationId,
+    locationState,
     participants,
     setParticipants,
     sessionLink,

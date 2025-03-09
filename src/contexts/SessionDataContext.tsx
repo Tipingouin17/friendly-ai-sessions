@@ -7,12 +7,14 @@ import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManag
 import { useSessionLogger } from "@/hooks/useSessionLogger";
 import { useSessionErrorBoundary } from "@/hooks/useSessionErrorBoundary";
 import { useSessionStartMonitor } from "@/hooks/useSessionStartMonitor";
+import { LocationStateType } from "@/hooks/useConversationId";
 
 // Context type definition
 interface SessionDataContextType {
   // Basic session data
   conversation: ConversationWithSession | null;
   currentConversationId: number | null;
+  locationState: LocationStateType | null;
   isLoading: boolean;
   error: string | null;
   
@@ -94,6 +96,7 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     // Session data
     conversation: sessionData.conversation,
     currentConversationId: sessionData.currentConversationId,
+    locationState: sessionData.locationState,
     isLoading: sessionData.isLoading,
     error: boundaryError,
     

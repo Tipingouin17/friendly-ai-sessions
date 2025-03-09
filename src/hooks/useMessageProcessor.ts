@@ -18,6 +18,9 @@ export const useMessageProcessor = ({
   currentParticipant
 }: UseMessageProcessorProps) => {
   return React.useMemo(() => {
+    // Log the inputs for debugging
+    console.log(`useMessageProcessor - Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
+    
     if (viewMode === "admin") {
       // Admin sees all messages
       return messages.map(message => {
@@ -50,17 +53,33 @@ export const useMessageProcessor = ({
         return message;
       });
     } else {
-      // Participant only sees facilitator messages and their own responses
-      return messages.filter(message => {
+      // Participant mode - more verbose logging for debugging
+      console.log("Participant messages before filtering:", messages);
+      
+      // Filter to only include facilitator messages and this participant's messages
+      const filteredMessages = messages.filter(message => {
         // Include all facilitator messages
-        if (message.sender === "assistant") return true;
+        if (message.sender === "assistant") {
+          console.log("Including assistant message:", message);
+          return true;
+        }
         
         // Include only this participant's messages
-        if (message.participant === `P${currentParticipant}`) return true;
+        const isCurrentParticipant = message.participant === `P${currentParticipant}`;
+        console.log(`Message from ${message.participant}, current is P${currentParticipant}, include: ${isCurrentParticipant}`);
+        
+        if (isCurrentParticipant) {
+          return true;
+        }
         
         // Exclude all other participant messages
         return false;
-      }).map(message => {
+      });
+      
+      console.log("Filtered messages for participant view:", filteredMessages);
+      
+      // Process the filtered messages
+      return filteredMessages.map(message => {
         // Process the message the same way
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));

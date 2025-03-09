@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import MessageList from "@/components/chat/MessageList";
 import SessionJoinInfo from "@/components/session/SessionJoinInfo";
@@ -37,19 +36,32 @@ const MessagingArea = ({
     console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
     console.log("Participants count:", participants.length);
     console.log("Current participant count from props:", currentParticipantCount);
-  }, [messages.length, viewMode, participants.length, currentParticipantCount]);
+    console.log("Current participant:", currentParticipant);
+    console.log("Messages:", messages);
+  }, [messages.length, viewMode, participants.length, currentParticipantCount, currentParticipant, messages]);
   
   // For participant view, filter messages to only show their own and facilitator messages
   const filteredMessages = useMemo(() => {
     if (viewMode === "participant") {
+      // Debug the filtering logic
+      console.log(`Filtering messages for participant P${currentParticipant}`);
+      
       return messages.filter(message => {
         // Always show facilitator messages
-        if (message.sender === "assistant") return true;
+        if (message.sender === "assistant") {
+          console.log("Including assistant message:", message);
+          return true;
+        }
         
         // Show this participant's messages
-        if (message.sender === "user" && message.participant === `P${currentParticipant}`) return true;
+        const participantKey = `P${currentParticipant}`;
+        if (message.sender === "user" && message.participant === participantKey) {
+          console.log(`Including user message from ${participantKey}:`, message);
+          return true;
+        }
         
-        // Hide all other messages
+        // Log excluded messages for debugging
+        console.log(`Excluding message:`, message);
         return false;
       });
     }

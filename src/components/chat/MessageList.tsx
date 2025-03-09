@@ -30,7 +30,8 @@ const MessageList = ({
   const logMessageInfo = useCallback(() => {
     console.log("MessageList - received messages count:", messages.length);
     console.log("MessageList - current participant:", currentParticipant);
-  }, [messages.length, currentParticipant]);
+    console.log("MessageList - messages:", messages);
+  }, [messages.length, currentParticipant, messages]);
 
   // Log only when messages change
   useEffect(() => {
@@ -43,6 +44,8 @@ const MessageList = ({
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
+    
+    console.log("Processing messages for display:", messages);
     
     return messages.map((message, index) => {
       // Skip processing if message is invalid

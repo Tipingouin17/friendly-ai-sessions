@@ -53,6 +53,13 @@ export const useMessageSender = ({
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
     
+    console.log("Sending message with participant info:", {
+      currentParticipant,
+      currentParticipantKey,
+      participantInfo,
+      message: sessionState.inputMessage
+    });
+    
     // Create the message object
     const messageId = nanoid();
     const newMessage = {
@@ -66,18 +73,29 @@ export const useMessageSender = ({
       isAnonymous: isAnonymous
     };
 
+    console.log("Adding new message to UI:", newMessage);
+
     // Add the participant's message to the displayed messages
     sessionState.setMessages(prev => [...prev, newMessage]);
     
     try {
       // Store message in database for sync
-      await supabase.from('messages').insert({
+      const { data, error: dbError } = await supabase.from('messages').insert({
         conversation_id: currentConversationId,
         content: sessionState.inputMessage,
         role: 'user',
+        participant_id: currentParticipant,
         name: participantInfo?.name || `Participant ${currentParticipant}`,
-        user_id: null // For anonymous participants
-      });
+        user_id: null, // For anonymous participants
+        is_anonymous: isAnonymous
+      }).select();
+      
+      if (dbError) {
+        console.error("Error saving message to database:", dbError);
+        throw new Error(dbError.message);
+      }
+      
+      console.log("Message saved to database:", data);
     } catch (error) {
       console.error("Error saving message to database:", error);
       setError("Failed to save message. Please try again.");
@@ -127,6 +145,8 @@ export const useMessageSender = ({
           timestamp: new Date(),
           avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
         };
+        
+        console.log("Got AI response:", aiResponse);
         
         // Save AI response to database
         try {

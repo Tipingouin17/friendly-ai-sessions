@@ -62,6 +62,9 @@ export const FacilitatorSelection = ({
   // Determine if the "Add New Facilitator" button should be disabled
   const isCreateDisabled = hasReachedFacilitatorLimit || !canCreateCustomFacilitators;
 
+  // Debug log
+  console.log('Accessible facilitators:', accessibleFacilitators);
+
   return (
     <div className="relative">
       <div className="flex items-center">
@@ -76,25 +79,32 @@ export const FacilitatorSelection = ({
         </Button>
 
         <div className="mx-12 flex gap-4 overflow-hidden">
-          {accessibleFacilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => (
-            <div
-              key={facilitator.id}
-              className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
-                selectedFacilitator === facilitator.id ? 'border-primary' : 'border-gray-200'
-              }`}
-              onClick={() => onSelect(facilitator.id)}
-            >
-              <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-                <img 
-                  src={getFacilitatorAvatarUrl(facilitator.id)} 
-                  alt={facilitator.title} 
-                  className="h-full w-full object-cover" 
-                  onError={handleAvatarError}
-                />
+          {accessibleFacilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => {
+            // Debug log for each facilitator
+            console.log('Rendering facilitator:', facilitator.id, facilitator.title);
+            const avatarUrl = getFacilitatorAvatarUrl(facilitator.id);
+            console.log('Avatar URL:', avatarUrl);
+            
+            return (
+              <div
+                key={facilitator.id}
+                className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
+                  selectedFacilitator === facilitator.id ? 'border-primary' : 'border-gray-200'
+                }`}
+                onClick={() => onSelect(facilitator.id)}
+              >
+                <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
+                  <img 
+                    src={avatarUrl} 
+                    alt={facilitator.title} 
+                    className="h-full w-full object-cover" 
+                    onError={handleAvatarError}
+                  />
+                </div>
+                <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
               </div>
-              <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
-            </div>
-          ))}
+            );
+          })}
           
           {/* Create new facilitator button - show/hide based on customisable_facilitators permission */}
           {canCreateCustomFacilitators ? (

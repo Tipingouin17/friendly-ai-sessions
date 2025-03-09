@@ -14,6 +14,7 @@ export const getFacilitatorAvatarUrl = (facilitatorId: number | undefined): stri
     .from('facilitators-avatars')
     .getPublicUrl(`${facilitatorId}.jpg`);
   
+  console.log('Generated avatar URL:', data.publicUrl);
   return data.publicUrl;
 };
 
@@ -21,5 +22,6 @@ export const getFacilitatorAvatarUrl = (facilitatorId: number | undefined): stri
  * Handles image loading errors by setting a fallback image
  */
 export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
+  console.log('Image load error, using fallback');
   e.currentTarget.src = '/placeholder.svg';
 };

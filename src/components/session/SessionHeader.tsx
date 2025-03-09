@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
-import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -43,9 +43,7 @@ const SessionHeader = ({
       isGeneratingReport={isGeneratingReport}
       canGenerateReport={messagesCount > 0 && canGenerateReports}
       viewMode={viewMode}
-      onImageError={(e) => {
-        e.currentTarget.src = '/placeholder.svg';
-      }}
+      onImageError={handleAvatarError}
     />
   );
 };

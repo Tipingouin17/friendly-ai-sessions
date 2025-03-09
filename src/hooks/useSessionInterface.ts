@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { ConversationWithSession } from "@/types/database";
 
 export function useSessionInterface(conversationId: number | null) {
   const [sessionLink, setSessionLink] = useState('');
@@ -64,9 +65,14 @@ export function useSessionInterface(conversationId: number | null) {
     // Then update the session_started flag in the database
     if (conversationId) {
       try {
+        // Use type casting to handle the session_started field
+        const updateData = { 
+          session_started: true 
+        } as Partial<ConversationWithSession>;
+        
         const { error } = await supabase
           .from('conversations')
-          .update({ session_started: true })
+          .update(updateData)
           .eq('id', conversationId);
           
         if (error) {

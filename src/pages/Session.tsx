@@ -17,6 +17,12 @@ const Session = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Log initial state for debugging
+  useEffect(() => {
+    console.log("Session page loaded with state:", location.state);
+  }, [location.state]);
 
   // Determine if user is admin based on location state
   useEffect(() => {
@@ -30,12 +36,11 @@ const Session = () => {
     // 1. They're explicitly marked as admin in the state
     // 2. They're not a guest (implying they created the session)
     // 3. They're not accessing via the join flow
-    setIsAdmin(
-      Boolean(locationState?.isAdmin) || 
-      (locationState?.isGuest !== true)
-    );
+    const adminStatus = Boolean(locationState?.isAdmin) || 
+      (locationState?.isGuest !== true);
     
-    console.log("Session page - isAdmin determined as:", isAdmin, "from state:", locationState);
+    setIsAdmin(adminStatus);
+    console.log("Session page - isAdmin determined as:", adminStatus, "from state:", locationState);
   }, [location]);
 
   const handleSessionFull = () => {
@@ -48,9 +53,35 @@ const Session = () => {
     });
   };
 
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
+    console.error("Session error:", errorMessage);
+    
+    toast({
+      title: "Session Error",
+      description: errorMessage,
+      variant: "destructive",
+    });
+  };
+
+  if (error) {
+    return <JoinSessionLoadingState error={error} onRetry={() => window.location.reload()} />;
+  }
+
   return (
-    <SessionProvider handleSessionFull={handleSessionFull}>
+    <SessionProvider 
+      handleSessionFull={handleSessionFull}
+      onError={handleError}
+    >
       {(props: SessionContextProps) => {
+        // Log props for debugging
+        console.log("SessionProvider props:", {
+          isLoading: props.isLoading,
+          conversationId: props.currentConversationId,
+          messagesCount: props.sessionState.messages.length,
+          participantsCount: props.participants.length
+        });
+        
         // Ensure we update the loading state from the provider
         useEffect(() => {
           setIsLoading(props.isLoading);
@@ -59,6 +90,7 @@ const Session = () => {
         // Update sessionStarted state based on DB status
         useEffect(() => {
           if (props.isSessionStartedInDB) {
+            console.log("Session started status from DB:", props.isSessionStartedInDB);
             setSessionStarted(true);
           }
         }, [props.isSessionStartedInDB]);
@@ -73,6 +105,16 @@ const Session = () => {
         
         // Calculate if session should be shown
         const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull;
+
+        // Log session state for debugging
+        console.log("Session state:", {
+          shouldShowSession,
+          isSessionStartedInDB: props.isSessionStartedInDB,
+          sessionStarted,
+          isSessionFull,
+          currentParticipants,
+          maxParticipants
+        });
 
         // Admin view gets QR code view for sharing until session is started
         if (isAdmin && !shouldShowSession && props.showQrCodeView) {

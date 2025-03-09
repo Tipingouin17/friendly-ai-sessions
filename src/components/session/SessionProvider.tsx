@@ -14,9 +14,10 @@ import { getCurrentParticipantId } from "@/utils/participantUtils";
 interface SessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
+  onError?: (error: string) => void;
 }
 
-export const SessionProvider = ({ children, handleSessionFull }: SessionProviderProps) => {
+export const SessionProvider = ({ children, handleSessionFull, onError }: SessionProviderProps) => {
   const location = useLocation();
   const locationState = location.state as { 
     participantId?: number; 
@@ -37,11 +38,19 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     isLoading,
     refetch,
     handleStartSession,
+    error: dataError
   } = useSessionData();
 
   console.log("SessionProvider - conversation data:", conversation);
   console.log("SessionProvider - currentConversationId:", currentConversationId);
   console.log("SessionProvider - isLoading:", isLoading);
+
+  // Handle data errors
+  useEffect(() => {
+    if (dataError && onError) {
+      onError(dataError.message);
+    }
+  }, [dataError, onError]);
 
   // Type assertion to ensure conversation is of the right type
   const typedConversation = conversation as ConversationWithSession | null;
@@ -68,7 +77,7 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   }, [typedConversation, locationState]);
 
   // Set up realtime updates for participants
-  useSessionRealtime({
+  const { error: realtimeError } = useSessionRealtime({
     currentConversationId,
     participants,
     setParticipants,
@@ -80,6 +89,13 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
       setIsSessionStartedInDB(true);
     }
   });
+
+  // Handle realtime errors
+  useEffect(() => {
+    if (realtimeError && onError) {
+      onError(realtimeError);
+    }
+  }, [realtimeError, onError]);
 
   // Set up session state
   const sessionState = useSessionState({
@@ -98,7 +114,8 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
   const {
     isWaitingForResponse,
     handleSendMessage,
-    handleLikeMessage
+    handleLikeMessage,
+    error: interactionsError
   } = useSessionInteractions({
     currentConversationId,
     sessionState,
@@ -106,6 +123,13 @@ export const SessionProvider = ({ children, handleSessionFull }: SessionProvider
     participants,
     isAnonymous: anonymousState.isAnonymous
   });
+
+  // Handle interactions errors
+  useEffect(() => {
+    if (interactionsError && onError) {
+      onError(interactionsError);
+    }
+  }, [interactionsError, onError]);
 
   const sessionContext: SessionContextProps = {
     isLoading,

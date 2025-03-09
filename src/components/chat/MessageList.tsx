@@ -1,5 +1,5 @@
 
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React, { useMemo, useEffect, useCallback, useRef } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import MessageItem from './MessageItem';
@@ -24,6 +24,7 @@ const MessageList = ({
   participants = []
 }: MessageListProps) => {
   const { ref } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
+  const messagesLengthRef = useRef(messages.length);
   
   // Debounced logging to reduce console spam
   const logMessageInfo = useCallback(() => {
@@ -33,21 +34,27 @@ const MessageList = ({
 
   // Log only when messages change
   useEffect(() => {
-    logMessageInfo();
+    if (messagesLengthRef.current !== messages.length) {
+      messagesLengthRef.current = messages.length;
+      logMessageInfo();
+    }
   }, [messages.length, logMessageInfo]);
 
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
-    if (messages.length === 0) return [];
+    if (!messages || messages.length === 0) return [];
     
     return messages.map((message, index) => {
+      // Skip processing if message is invalid
+      if (!message) return null;
+      
       const isFirstMessageOfGroup = index === 0 || 
-        messages[index - 1].sender !== message.sender || 
-        messages[index - 1].participant !== message.participant;
+        messages[index - 1]?.sender !== message.sender || 
+        messages[index - 1]?.participant !== message.participant;
       
       const isLastMessageOfGroup = index === messages.length - 1 || 
-        messages[index + 1].sender !== message.sender || 
-        messages[index + 1].participant !== message.participant;
+        messages[index + 1]?.sender !== message.sender || 
+        messages[index + 1]?.participant !== message.participant;
 
       // Ensure message has a color if it's a user message
       let messageColor = message.color;
@@ -70,8 +77,16 @@ const MessageList = ({
         isLastMessageOfGroup,
         participantInfo
       };
-    });
+    }).filter(Boolean); // Filter out any null entries
   }, [messages, participantColors, participants]);
+
+  if (!processedMessages) {
+    return (
+      <div className="text-center text-gray-500 py-8">
+        Loading messages...
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -79,7 +94,7 @@ const MessageList = ({
         {processedMessages.length > 0 ? (
           processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
             <MessageItem
-              key={`${message.id}-${index}`} // Add index to key to ensure uniqueness
+              key={`${message.id || index}-${index}`} // Ensure key is unique even if id is missing
               message={message}
               isFirstMessageOfGroup={isFirstMessageOfGroup}
               isLastMessageOfGroup={isLastMessageOfGroup}

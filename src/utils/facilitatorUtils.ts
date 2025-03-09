@@ -26,14 +26,19 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (jpgData && jpgData.publicUrl) {
-        console.log(`Found jpg avatar: ${jpgData.publicUrl}`);
+        // Fix any double slashes in the URL
+        const fixedUrl = jpgData.publicUrl.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+          return protocol || '/';
+        });
+        
+        console.log(`Found jpg avatar: ${fixedUrl}`);
         // Check if the URL exists before returning it
         try {
-          const isValid = await validateImageUrl(jpgData.publicUrl);
+          const isValid = await validateImageUrl(fixedUrl);
           if (isValid) {
-            return jpgData.publicUrl;
+            return fixedUrl;
           } else {
-            console.log(`The jpg URL exists but image validation failed: ${jpgData.publicUrl}`);
+            console.log(`The jpg URL exists but image validation failed: ${fixedUrl}`);
           }
         } catch (err) {
           console.error('Error validating jpg URL:', err);

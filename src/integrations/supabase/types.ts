@@ -111,6 +111,7 @@ export type Database = {
           language: string | null
           participant_description: string | null
           participants: number | null
+          session_started: boolean | null
           sessions_id: number | null
           status: Database["public"]["Enums"]["session_status"] | null
           updated_at: string | null
@@ -127,6 +128,7 @@ export type Database = {
           language?: string | null
           participant_description?: string | null
           participants?: number | null
+          session_started?: boolean | null
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
           updated_at?: string | null
@@ -143,6 +145,7 @@ export type Database = {
           language?: string | null
           participant_description?: string | null
           participants?: number | null
+          session_started?: boolean | null
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
           updated_at?: string | null

@@ -31,7 +31,7 @@ export function useSessionInterface(conversationId: number | null) {
             
           if (error) {
             console.error("Error checking session_started:", error);
-          } else if (data && 'session_started' in data && data.session_started) {
+          } else if (data && data.session_started) {
             console.log("Session is already marked as started in DB:", data);
             setIsSessionStarted(true);
             setShowQrCodeView(false);
@@ -75,12 +75,11 @@ export function useSessionInterface(conversationId: number | null) {
     
     try {
       // Update the session_started flag in the database
-      // Use type assertion to handle the TypeScript error
       const { error } = await supabase
         .from('conversations')
         .update({ 
           session_started: true 
-        } as any)
+        })
         .eq('id', conversationId);
         
       if (error) {

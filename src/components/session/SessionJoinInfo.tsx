@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { QrCode, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,7 @@ const SessionJoinInfo = ({
         .from('conversations')
         .update({ 
           session_started: started 
-        } as any)
+        })
         .eq('id', convId);
         
       if (error) {

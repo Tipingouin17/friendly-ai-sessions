@@ -14,7 +14,7 @@ interface FacilitatorFormProps {
   profilePicture: string;
   setProfilePicture: (url: string) => void;
   currentFacilitatorCount: number;
-  maxFacilitators: number | Infinity;
+  maxFacilitators: number | typeof Infinity;
   isLoading: boolean;
   onCancel: () => void;
   onSubmit: (e: React.FormEvent) => void;

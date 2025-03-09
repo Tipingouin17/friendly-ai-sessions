@@ -28,24 +28,30 @@ export const useSessionRealtime = ({
   const sessionStartedCalledRef = useRef(false);
   const channelsRef = useRef<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const lastStateRef = useRef({
-    conversationId: null as number | null,
-    participants: [] as ParticipantInfo[]
-  });
-
-  // Update the lastState ref when props change
+  const isInitializedRef = useRef(false);
+  
+  // Set up real-time subscription
   useEffect(() => {
-    lastStateRef.current = {
-      conversationId: currentConversationId,
-      participants: [...participants]
-    };
-  }, [currentConversationId, participants]);
-
-  useEffect(() => {
+    console.log("useSessionRealtime effect triggered with conversation ID:", currentConversationId);
+    
+    // Don't set up channels if there's no conversation ID
+    if (!currentConversationId) {
+      console.log("No conversation ID provided, skipping realtime setup");
+      return;
+    }
+    
+    // Reset handler flags when component mounts
+    if (!isInitializedRef.current) {
+      console.log("Initializing session realtime handlers");
+      sessionFullCalledRef.current = false;
+      sessionStartedCalledRef.current = false;
+      isInitializedRef.current = true;
+    }
+    
     // Clean up function to remove all channels
     const cleanupChannels = () => {
       if (channelsRef.current.length > 0) {
-        console.log(`Cleaning up ${channelsRef.current.length} channels`);
+        console.log(`Cleaning up ${channelsRef.current.length} realtime channels`);
         channelsRef.current.forEach(channel => {
           try {
             supabase.removeChannel(channel);
@@ -57,156 +63,175 @@ export const useSessionRealtime = ({
       }
     };
 
-    // Reset handler flags when conversation ID changes
-    if (currentConversationId !== lastStateRef.current.conversationId) {
-      sessionFullCalledRef.current = false;
-      sessionStartedCalledRef.current = false;
-    }
-    
     // Clean up existing subscriptions before creating new ones
     cleanupChannels();
+    
+    // Check if the session is already full when component mounts
+    if (conversation && 
+        conversation.current_participants >= (conversation.participants || 0) && 
+        (conversation.participants || 0) > 0 && 
+        !sessionFullCalledRef.current) {
+      console.log("Session is already full on component mount, triggering handleSessionFull");
+      sessionFullCalledRef.current = true;
+      if (handleSessionFull) {
+        handleSessionFull();
+      }
+    }
 
-    if (currentConversationId) {
-      console.log("Setting up realtime subscription for participants in Session page, conversation ID:", currentConversationId);
+    try {
+      console.log("Setting up realtime channels for conversation:", currentConversationId);
       
-      // Check if the session is already full when component mounts
-      if (conversation && 
-          conversation.current_participants >= (conversation.participants || 0) && 
+      // Use fixed channel names that don't change on re-renders
+      const conversationChannel = supabase
+        .channel(`conv-${currentConversationId}`)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'conversations',
+          filter: `id=eq.${currentConversationId}`
+        }, (payload) => {
+          console.log("Received realtime update for conversation:", payload);
+          
+          if (payload.new) {
+            // Check for session_started flag
+            if (payload.new.session_started && !sessionStartedCalledRef.current) {
+              console.log("Session started flag detected, triggering onSessionStarted");
+              sessionStartedCalledRef.current = true;
+              if (onSessionStarted) {
+                onSessionStarted();
+              }
+            }
+            
+            if (payload.new.current_participants !== undefined) {
+              const currentCount = payload.new.current_participants;
+              
+              // Check if all participants have joined and trigger redirect
+              if (currentCount >= (payload.new.participants || 0) && 
+                  (payload.new.participants || 0) > 0 && 
+                  !sessionFullCalledRef.current) {
+                console.log("All participants have joined, triggering session start");
+                sessionFullCalledRef.current = true;
+                if (handleSessionFull) {
+                  handleSessionFull();
+                }
+              }
+            }
+            
+            // Only refetch if needed to reduce unnecessary API calls
+            refetch();
+          }
+        })
+        .subscribe((status) => {
+          console.log(`Conversation channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR') {
+            setError("Error connecting to session updates");
+          }
+        });
+      
+      channelsRef.current.push(conversationChannel);
+      
+      // Channel for session_participants updates
+      const participantsChannel = supabase
+        .channel(`part-${currentConversationId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'session_participants',
+          filter: `conversation_id=eq.${currentConversationId}`
+        }, async (payload) => {
+          console.log("Received new participant:", payload);
+          
+          if (payload.new) {
+            const newParticipant = payload.new;
+            
+            // Check if we already have this participant
+            if (!participants.some(p => p.id === newParticipant.participant_id)) {
+              try {
+                const participantInfo = await getParticipantInfo(newParticipant);
+                
+                setParticipants(current => {
+                  // Double-check we're not adding a duplicate
+                  if (current.some(p => p.id === participantInfo.id)) {
+                    return current;
+                  }
+                  const updatedParticipants = [...current, participantInfo];
+                  console.log("Updated participant list:", updatedParticipants);
+                  return updatedParticipants;
+                });
+              } catch (error) {
+                console.error("Error getting participant info:", error);
+                setError("Error retrieving participant information");
+              }
+            }
+          }
+        })
+        .subscribe((status) => {
+          console.log(`Participants channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR') {
+            setError("Error connecting to participant updates");
+          }
+        });
+        
+      channelsRef.current.push(participantsChannel);
+      
+      // Channel to track messages for admin view
+      const messagesChannel = supabase
+        .channel(`msg-${currentConversationId}`)
+        .on('postgres_changes', {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${currentConversationId}`
+        }, (payload) => {
+          console.log("Messages table change detected:", payload);
+          
+          // Force a refetch to update UI with new messages
+          refetch();
+        })
+        .subscribe((status) => {
+          console.log(`Messages channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR') {
+            setError("Error connecting to message updates");
+          }
+        });
+        
+      channelsRef.current.push(messagesChannel);
+      
+      return () => {
+        console.log("Cleaning up realtime channels on unmount");
+        cleanupChannels();
+      };
+    } catch (err) {
+      console.error("Error setting up realtime channels:", err);
+      setError("Failed to establish connection to session");
+      return () => cleanupChannels();
+    }
+  }, [currentConversationId]); // Only re-run when conversation ID changes
+  
+  // Second effect to handle conversation/participant changes separately
+  useEffect(() => {
+    if (conversation && currentConversationId) {
+      // Check for session status
+      if (conversation.session_started && !sessionStartedCalledRef.current) {
+        console.log("Session already started from props, triggering onSessionStarted");
+        sessionStartedCalledRef.current = true;
+        if (onSessionStarted) {
+          onSessionStarted();
+        }
+      }
+      
+      // Check if session is full
+      if (conversation.current_participants >= (conversation.participants || 0) && 
           (conversation.participants || 0) > 0 && 
           !sessionFullCalledRef.current) {
-        console.log("Session is already full on component mount, triggering handleSessionFull");
+        console.log("Session is full from props, triggering handleSessionFull");
         sessionFullCalledRef.current = true;
         if (handleSessionFull) {
           handleSessionFull();
         }
       }
-
-      try {
-        // First channel for conversation updates
-        const conversationChannel = supabase
-          .channel(`conversations-${currentConversationId}-${Date.now()}`)
-          .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'conversations',
-            filter: `id=eq.${currentConversationId}`
-          }, (payload) => {
-            console.log("Received realtime update for participants in Session page:", payload);
-            
-            if (payload.new) {
-              // Check for session_started flag
-              if (payload.new.session_started && !sessionStartedCalledRef.current) {
-                console.log("Session started flag detected, triggering onSessionStarted");
-                sessionStartedCalledRef.current = true;
-                if (onSessionStarted) {
-                  onSessionStarted();
-                }
-              }
-              
-              if (payload.new.current_participants !== undefined) {
-                const currentCount = payload.new.current_participants;
-                
-                // Check if all participants have joined and trigger redirect
-                if (currentCount >= (payload.new.participants || 0) && 
-                    (payload.new.participants || 0) > 0 && 
-                    !sessionFullCalledRef.current) {
-                  console.log("All participants have joined, triggering session start");
-                  sessionFullCalledRef.current = true;
-                  if (handleSessionFull) {
-                    handleSessionFull();
-                  }
-                }
-              }
-              
-              // Only refetch if needed to reduce unnecessary API calls
-              refetch();
-            }
-          })
-          .subscribe((status) => {
-            console.log(`Conversation channel status: ${status}`);
-            if (status === 'CHANNEL_ERROR') {
-              setError("Error connecting to session updates");
-            }
-          });
-        
-        channelsRef.current.push(conversationChannel);
-        
-        // Second channel for session_participants updates - only create if we need to track new participants
-        const participantsChannel = supabase
-          .channel(`session_participants-${currentConversationId}-${Date.now()}`)
-          .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'session_participants',
-            filter: `conversation_id=eq.${currentConversationId}`
-          }, async (payload) => {
-            console.log("Received new participant:", payload);
-            
-            if (payload.new) {
-              const newParticipant = payload.new;
-              
-              // Check if we already have this participant
-              if (!participants.some(p => p.id === newParticipant.participant_id)) {
-                try {
-                  const participantInfo = await getParticipantInfo(newParticipant);
-                  
-                  setParticipants(current => {
-                    // Double-check we're not adding a duplicate
-                    if (current.some(p => p.id === participantInfo.id)) {
-                      return current;
-                    }
-                    const updatedParticipants = [...current, participantInfo];
-                    console.log("Updated participant list:", updatedParticipants);
-                    return updatedParticipants;
-                  });
-                } catch (error) {
-                  console.error("Error getting participant info:", error);
-                  setError("Error retrieving participant information");
-                }
-              }
-            }
-          })
-          .subscribe((status) => {
-            console.log(`Participants channel status: ${status}`);
-            if (status === 'CHANNEL_ERROR') {
-              setError("Error connecting to participant updates");
-            }
-          });
-          
-        channelsRef.current.push(participantsChannel);
-        
-        // Add a channel to track messages for admin view
-        const messagesChannel = supabase
-          .channel(`messages-${currentConversationId}-${Date.now()}`)
-          .on('postgres_changes', {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${currentConversationId}`
-          }, (payload) => {
-            console.log("Messages table change detected:", payload);
-            
-            // Force a refetch to update UI with new messages
-            refetch();
-          })
-          .subscribe((status) => {
-            console.log(`Messages channel status: ${status}`);
-            if (status === 'CHANNEL_ERROR') {
-              setError("Error connecting to message updates");
-            }
-          });
-          
-        channelsRef.current.push(messagesChannel);
-      } catch (err) {
-        console.error("Error setting up realtime channels:", err);
-        setError("Failed to establish connection to session");
-      }
-      
-      return cleanupChannels;
     }
-    
-    return cleanupChannels;
-  }, [currentConversationId, participants, refetch, conversation, handleSessionFull, onSessionStarted, setParticipants]);
+  }, [conversation, currentConversationId, onSessionStarted, handleSessionFull]);
 
   return { error };
 };

@@ -44,10 +44,12 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
   console.log("SessionProvider - conversation data:", conversation);
   console.log("SessionProvider - currentConversationId:", currentConversationId);
   console.log("SessionProvider - isLoading:", isLoading);
+  console.log("SessionProvider - dataError:", dataError);
 
   // Handle data errors
   useEffect(() => {
     if (dataError && onError) {
+      console.error("Session data error:", dataError.message);
       onError(dataError.message);
     }
   }, [dataError, onError]);
@@ -93,6 +95,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
   // Handle realtime errors
   useEffect(() => {
     if (realtimeError && onError) {
+      console.error("Session realtime error:", realtimeError);
       onError(realtimeError);
     }
   }, [realtimeError, onError]);
@@ -103,6 +106,14 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     welcomeMessage: typedConversation?.sessions?.welcome_message ?? null,
     currentUserParticipantId
   });
+
+  // Handle session state errors
+  useEffect(() => {
+    if (sessionState.error && onError) {
+      console.error("Session state error:", sessionState.error);
+      onError(sessionState.error);
+    }
+  }, [sessionState.error, onError]);
 
   // Set up anonymous state
   const anonymousState = useAnonymousState({
@@ -127,6 +138,7 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
   // Handle interactions errors
   useEffect(() => {
     if (interactionsError && onError) {
+      console.error("Session interactions error:", interactionsError);
       onError(interactionsError);
     }
   }, [interactionsError, onError]);

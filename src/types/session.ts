@@ -20,6 +20,7 @@ export interface SessionContextProps {
     totalResponses: number;
     viewMode: "participant" | "admin";
     setViewMode: (mode: "participant" | "admin") => void;
+    error: string | null;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };

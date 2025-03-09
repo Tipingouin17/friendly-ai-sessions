@@ -23,47 +23,61 @@ export function useSessionState({
   const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
+  const [error, setError] = useState<string | null>(null);
   
   // Store in ref to avoid creating a new function on each render
   const welcomeAddedRef = useRef(false);
   const reportGenerationInProgressRef = useRef(false);
   const initialMessagesLoadedRef = useRef(false);
+  const messagesLoadAttemptedRef = useRef(false);
   
   // Ensure current participant is locked to their assigned ID
   const currentParticipant = currentUserParticipantId || 1;
 
   // Add welcome message if present - only once
   useEffect(() => {
-    if (welcomeMessage && messages.length === 0 && !welcomeAddedRef.current) {
+    if (welcomeMessage && !welcomeAddedRef.current) {
+      console.log("Adding welcome message to chat:", welcomeMessage);
       welcomeAddedRef.current = true;
       const welcomeId = nanoid();
-      setMessages([
-        {
+      setMessages(prev => {
+        // Avoid duplicate welcome messages
+        if (prev.some(msg => msg.content === welcomeMessage && msg.sender === "assistant")) {
+          return prev;
+        }
+        return [{
           id: welcomeId,
           content: welcomeMessage,
           sender: "assistant",
           timestamp: new Date(),
           likes: []
-        }
-      ]);
+        }, ...prev];
+      });
     }
-  }, [welcomeMessage, messages.length]);
+  }, [welcomeMessage]);
 
   // Load initial messages from the database
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!conversationId || initialMessagesLoadedRef.current) return;
+      if (!conversationId || initialMessagesLoadedRef.current || messagesLoadAttemptedRef.current) {
+        return;
+      }
+      
+      messagesLoadAttemptedRef.current = true;
+      console.log("Fetching messages for conversation:", conversationId);
       
       try {
-        console.log("Fetching messages for conversation:", conversationId);
-        
         const { data, error } = await supabase
           .from('messages')
           .select('*')
           .eq('conversation_id', conversationId)
           .order('created_at');
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching messages:", error);
+          setError(`Failed to load messages: ${error.message}`);
+          return;
+        }
         
         if (data && data.length > 0) {
           console.log(`Loaded ${data.length} messages from database`, data);
@@ -74,7 +88,6 @@ export function useSessionState({
             let participant: string | undefined = undefined;
             if (msg.role === 'user') {
               // Try to determine participant ID
-              // This may need to be adjusted based on how you store participant info
               participant = msg.name?.startsWith('Participant') 
                 ? `P${msg.name.split(' ')[1]}` 
                 : undefined;
@@ -90,30 +103,45 @@ export function useSessionState({
             };
           });
           
-          // If we have a welcome message, add it at the beginning if not already present
-          if (welcomeMessage && welcomeAddedRef.current) {
-            const hasWelcome = convertedMessages.some(m => 
-              m.sender === 'assistant' && m.content === welcomeMessage
-            );
+          // Set messages with welcome message at the beginning if needed
+          setMessages(prev => {
+            let updatedMessages = [...convertedMessages];
             
-            if (!hasWelcome) {
-              const welcomeId = nanoid();
-              convertedMessages.unshift({
-                id: welcomeId,
-                content: welcomeMessage,
-                sender: "assistant",
-                timestamp: new Date(),
-                likes: []
-              });
+            // Add welcome message at the beginning if not already present
+            if (welcomeMessage && welcomeAddedRef.current) {
+              const hasWelcome = updatedMessages.some(m => 
+                m.sender === 'assistant' && m.content === welcomeMessage
+              );
+              
+              if (!hasWelcome) {
+                updatedMessages.unshift({
+                  id: nanoid(),
+                  content: welcomeMessage,
+                  sender: "assistant",
+                  timestamp: new Date(),
+                  likes: []
+                });
+              }
             }
-          }
-          
-          setMessages(convertedMessages);
+            
+            // Preserve any messages that might have been added since component mounted
+            if (prev.length > 0) {
+              // Check for any messages in prev that aren't in the loaded messages
+              const newMsgIds = updatedMessages.map(m => m.id);
+              const uniquePrevMsgs = prev.filter(m => !newMsgIds.includes(m.id));
+              
+              if (uniquePrevMsgs.length > 0) {
+                updatedMessages = [...updatedMessages, ...uniquePrevMsgs];
+              }
+            }
+            
+            return updatedMessages;
+          });
           
           // Check if current participant has already answered the latest question
           if (currentParticipant) {
             // Find the latest facilitator message
-            const latestFacilitatorIndex = convertedMessages.findIndex(m => m.sender === 'assistant');
+            const latestFacilitatorIndex = convertedMessages.findLastIndex(m => m.sender === 'assistant');
             
             if (latestFacilitatorIndex !== -1) {
               // See if there's a response from this participant after the latest facilitator message
@@ -141,19 +169,30 @@ export function useSessionState({
           initialMessagesLoadedRef.current = true;
         } else {
           console.log("No messages found for conversation:", conversationId);
+          initialMessagesLoadedRef.current = true;
         }
       } catch (error) {
         console.error("Error fetching messages:", error);
+        setError("Failed to load messages. Please try refreshing the page.");
       }
     };
     
     fetchMessages();
     
-    // Reset flag when conversation changes
+    // Reset flags when conversation changes
     return () => {
-      initialMessagesLoadedRef.current = false;
+      messagesLoadAttemptedRef.current = false;
     };
   }, [conversationId, welcomeMessage, currentParticipant]);
+
+  // Reset initialization flags when conversation changes
+  useEffect(() => {
+    if (conversationId) {
+      console.log("New conversation ID detected, resetting initialization flags");
+      initialMessagesLoadedRef.current = false;
+      welcomeAddedRef.current = false;
+    }
+  }, [conversationId]);
 
   // Generate session report
   const handleGenerateReport = useCallback(async () => {
@@ -179,6 +218,7 @@ export function useSessionState({
 
       if (error) {
         console.error("Error generating report:", error);
+        setError(`Failed to generate report: ${error.message}`);
       } else {
         console.log("Report generated successfully");
 
@@ -205,10 +245,12 @@ export function useSessionState({
           });
         } catch (dbError) {
           console.error("Error saving report to database:", dbError);
+          setError("Report was generated but couldn't be saved to the database.");
         }
       }
     } catch (error) {
       console.error('Error generating report:', error);
+      setError("Failed to generate report. Please try again later.");
     } finally {
       setIsGeneratingReport(false);
       reportGenerationInProgressRef.current = false;
@@ -273,6 +315,7 @@ export function useSessionState({
     hasAnswered,
     pendingResponses,
     viewMode,
-    setViewMode
+    setViewMode,
+    error
   };
 }

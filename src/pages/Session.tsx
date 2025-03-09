@@ -64,6 +64,13 @@ const Session = () => {
     });
   };
 
+  // Reset error state if we navigate away and back
+  useEffect(() => {
+    return () => {
+      setError(null);
+    };
+  }, []);
+
   if (error) {
     return <JoinSessionLoadingState error={error} onRetry={() => window.location.reload()} />;
   }
@@ -79,7 +86,8 @@ const Session = () => {
           isLoading: props.isLoading,
           conversationId: props.currentConversationId,
           messagesCount: props.sessionState.messages.length,
-          participantsCount: props.participants.length
+          participantsCount: props.participants.length,
+          isSessionStartedInDB: props.isSessionStartedInDB
         });
         
         // Ensure we update the loading state from the provider
@@ -113,7 +121,8 @@ const Session = () => {
           sessionStarted,
           isSessionFull,
           currentParticipants,
-          maxParticipants
+          maxParticipants,
+          messageCount: props.sessionState.messages.length
         });
 
         // Admin view gets QR code view for sharing until session is started

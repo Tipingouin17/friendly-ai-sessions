@@ -54,7 +54,7 @@ export function useRealtimeConnection(
       const backoffTime = Math.min(1000 * Math.pow(2, connectionAttempts), 10000);
       console.log(`Using backoff time of ${backoffTime}ms`);
       
-      reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = setTimeout(() => {
         if (mountedRef.current) {
           console.log(`Executing reconnection attempt ${connectionAttempts + 1}`);
           refetch();
@@ -72,7 +72,7 @@ export function useRealtimeConnection(
   useEffect(() => {
     if (!isConnected && conversationId && !error) {
       // Only attempt recovery if we have a conversation ID and no current connection
-      const timeoutId = window.setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (mountedRef.current) {
           console.log("Connection not established, attempting recovery");
           attemptReconnection();
@@ -80,7 +80,7 @@ export function useRealtimeConnection(
       }, 5000);
       
       return () => {
-        window.clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
       };
     }
     
@@ -102,7 +102,7 @@ export function useRealtimeConnection(
     return () => {
       mountedRef.current = false;
       if (reconnectTimerRef.current !== null) {
-        window.clearTimeout(reconnectTimerRef.current);
+        clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
     };

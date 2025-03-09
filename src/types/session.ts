@@ -39,8 +39,8 @@ export interface SessionContextProps {
   isSessionStartedInDB: boolean;
   error?: string | null;
   
-  // Add missing properties for connection status
-  isConnected?: boolean;
-  connectionAttempts?: number;
-  refetch?: () => void;
+  // Connection status properties
+  isConnected: boolean;
+  connectionAttempts: number;
+  refetch: () => void;
 }

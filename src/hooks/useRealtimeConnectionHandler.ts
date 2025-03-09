@@ -1,4 +1,3 @@
-
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,7 +113,7 @@ export function useRealtimeConnectionHandler({
       
       if (data) {
         console.log("Connection check successful, data:", data);
-        setIsConnected(true);
+        setIsConnected();
         setLastPingSuccess(Date.now());
         
         // If we got data, might as well refresh our state

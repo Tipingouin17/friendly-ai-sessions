@@ -1,3 +1,4 @@
+
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,13 +61,31 @@ export function useRealtimeConnectionHandler({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const { data, error } = await supabase.from('conversations')
+      // Create the request but don't execute it immediately
+      const query = supabase.from('conversations')
         .select('id, current_participants, session_started')
         .eq('id', conversationId)
         .limit(1)
-        .maybeSingle()
-        .abortSignal(controller.signal);
+        .maybeSingle();
         
+      // Manually handle the AbortController
+      const signal = controller.signal;
+      const abortPromise = new Promise((_, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(new Error('Request aborted due to timeout'));
+        });
+      });
+      
+      // Race the query against the abort promise
+      const { data, error } = await Promise.race([
+        query,
+        abortPromise.then(() => {
+          throw new Error('Request timed out');
+        })
+      ]).catch(err => {
+        return { data: null, error: err };
+      }) as { data: any, error: any };
+      
       clearTimeout(timeoutId);
       
       if (!mountedRef.current) return false;

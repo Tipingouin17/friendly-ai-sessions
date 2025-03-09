@@ -79,6 +79,14 @@ export const useMessageSender = ({
     sessionState.setMessages(prev => [...prev, newMessage]);
     
     try {
+      requestInProgressRef.current = true;
+      
+      // Clear the input message immediately to prevent duplicate sends
+      sessionState.setInputMessage("");
+      
+      // Record this participant has responded - after adding the message
+      sessionState.recordResponse(currentParticipant, true);
+      
       // Store message in database for sync
       const { data, error: dbError } = await supabase.from('messages').insert({
         conversation_id: currentConversationId,
@@ -96,85 +104,84 @@ export const useMessageSender = ({
       }
       
       console.log("Message saved to database:", data);
+      
+      // Check if we have responses from all participants
+      const totalParticipants = conversation?.participants ?? 1;
+      const updatedTotalResponses = sessionState.totalResponses + 1;
+      
+      console.log("Total expected participants:", totalParticipants);
+      console.log("Current total responses:", updatedTotalResponses);
+      console.log("This participant's hasAnswered:", sessionState.hasAnswered);
+      
+      // If all participants have responded, send to facilitator
+      if (updatedTotalResponses >= totalParticipants) {
+        setIsWaitingForResponse(true);
+
+        try {
+          // Get all participant messages for this round - only the most recent messages
+          const participantMessages = sessionState.messages.filter(msg => 
+            msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
+          ).slice(-totalParticipants);
+          
+          console.log('Calling edge function with participant messages count:', participantMessages.length);
+
+          const response = await supabase.functions.invoke('handle-facilitator-response', {
+            body: {
+              messages: sessionState.messages,
+              conversationId: currentConversationId
+            }
+          });
+
+          if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
+          if (!response.data) throw new Error('No response data received from AI');
+
+          const aiResponse = {
+            id: response.data.id || nanoid(),
+            content: response.data.content,
+            sender: "assistant" as const,
+            timestamp: new Date(),
+            avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
+          };
+          
+          console.log("Got AI response:", aiResponse);
+          
+          // Save AI response to database
+          try {
+            await supabase.from('messages').insert({
+              conversation_id: currentConversationId,
+              content: aiResponse.content,
+              role: 'assistant',
+              user_id: null
+            });
+          } catch (error) {
+            console.error("Error saving AI response to database:", error);
+            setError("Failed to save AI response. Please try again.");
+          }
+          
+          sessionState.setMessages(prev => [...prev, aiResponse]);
+        } catch (error) {
+          console.error('Error getting AI response:', error);
+          const errorMessage = error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.";
+          setError(errorMessage);
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        } finally {
+          setIsWaitingForResponse(false);
+        }
+      }
     } catch (error) {
       console.error("Error saving message to database:", error);
       setError("Failed to save message. Please try again.");
-    }
-    
-    // Clear the input message
-    sessionState.setInputMessage("");
-    
-    // Record this participant has responded - after adding the message
-    sessionState.recordResponse(currentParticipant, true);
-    
-    // Check if we have responses from all participants
-    const totalParticipants = conversation?.participants ?? 1;
-    const updatedTotalResponses = sessionState.totalResponses + 1;
-    
-    console.log("Total expected participants:", totalParticipants);
-    console.log("Current total responses:", updatedTotalResponses);
-    console.log("This participant's hasAnswered:", sessionState.hasAnswered);
-    
-    // If all participants have responded, send to facilitator
-    if (updatedTotalResponses >= totalParticipants) {
-      requestInProgressRef.current = true;
-      setIsWaitingForResponse(true);
-
-      try {
-        // Get all participant messages for this round - only the most recent messages
-        const participantMessages = sessionState.messages.filter(msg => 
-          msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
-        ).slice(-totalParticipants);
-        
-        console.log('Calling edge function with participant messages count:', participantMessages.length);
-
-        const response = await supabase.functions.invoke('handle-facilitator-response', {
-          body: {
-            messages: sessionState.messages,
-            conversationId: currentConversationId
-          }
-        });
-
-        if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
-        if (!response.data) throw new Error('No response data received from AI');
-
-        const aiResponse = {
-          id: response.data.id || nanoid(),
-          content: response.data.content,
-          sender: "assistant" as const,
-          timestamp: new Date(),
-          avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
-        };
-        
-        console.log("Got AI response:", aiResponse);
-        
-        // Save AI response to database
-        try {
-          await supabase.from('messages').insert({
-            conversation_id: currentConversationId,
-            content: aiResponse.content,
-            role: 'assistant',
-            user_id: null
-          });
-        } catch (error) {
-          console.error("Error saving AI response to database:", error);
-          setError("Failed to save AI response. Please try again.");
-        }
-        
-        sessionState.setMessages(prev => [...prev, aiResponse]);
-      } catch (error) {
-        console.error('Error getting AI response:', error);
-        const errorMessage = error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.";
-        setError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setIsWaitingForResponse(false);
-        requestInProgressRef.current = false;
-      }
+      toast({
+        title: "Error sending message",
+        description: "Failed to save message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      requestInProgressRef.current = false;
     }
   }, [
     isWaitingForResponse, 

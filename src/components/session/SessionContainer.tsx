@@ -115,11 +115,13 @@ const SessionContainer = ({
         viewMode={viewMode}
       />
       
-      <ViewModeToggle 
-        viewMode={viewMode} 
-        setViewMode={setViewMode}
-        isAdmin={isAdmin}
-      />
+      {isAdmin && (
+        <ViewModeToggle 
+          viewMode={viewMode} 
+          setViewMode={setViewMode}
+          isAdmin={isAdmin}
+        />
+      )}
       
       <div className="flex flex-1 overflow-hidden">
         <div className={`flex-1 ${viewMode === "admin" ? "" : "overflow-hidden"}`}>
@@ -138,8 +140,8 @@ const SessionContainer = ({
           />
         </div>
         
-        {/* Show QR code panel in admin view */}
-        {viewMode === "admin" && !isMobile && (
+        {/* Show QR code panel in admin view only */}
+        {viewMode === "admin" && !isMobile && isAdmin && (
           <div className="w-64 p-4 flex-shrink-0 border-l border-gray-100 overflow-y-auto">
             <SessionJoinInfo 
               conversationId={conversationId || null}
@@ -150,15 +152,18 @@ const SessionContainer = ({
         )}
       </div>
       
-      <QrDialogManager
-        isMobile={isMobile}
-        viewMode={viewMode}
-        isQrDialogOpen={isQrDialogOpen}
-        setIsQrDialogOpen={setIsQrDialogOpen}
-        joinUrl={joinUrl}
-        currentParticipantCount={currentParticipantCount || participants.length || 0}
-        maxParticipants={conversation?.participants || 0}
-      />
+      {/* Only show QR dialog manager in admin view */}
+      {isAdmin && viewMode === "admin" && (
+        <QrDialogManager
+          isMobile={isMobile}
+          viewMode={viewMode}
+          isQrDialogOpen={isQrDialogOpen}
+          setIsQrDialogOpen={setIsQrDialogOpen}
+          joinUrl={joinUrl}
+          currentParticipantCount={currentParticipantCount || participants.length || 0}
+          maxParticipants={conversation?.participants || 0}
+        />
+      )}
       
       <InputFooter 
         participantCount={participantCount}

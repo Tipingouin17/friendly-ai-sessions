@@ -113,10 +113,13 @@ export function useSessionInterface(conversationId: number | null) {
         // Redirect using navigate instead of directly changing window.location
         // This prevents page reload and maintains React Router state
         console.log("Redirecting to session page with ID:", conversationId);
+        
+        // Use exact ID parameter instead of state to ensure it's properly picked up
         navigate(`/session?id=${conversationId}`, { 
           state: { 
             isAdmin: true,
-            showMessaging: true 
+            showMessaging: true,
+            conversationId: conversationId // Explicitly include the conversationId in state
           },
           replace: true // Replace current history entry to prevent back navigation to QR view
         });

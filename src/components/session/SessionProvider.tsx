@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useLocation } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
 import { useSessionData } from "@/hooks/useSessionData";
@@ -8,8 +8,10 @@ import { useSessionInteractions } from "@/hooks/useSessionInteractions";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { participantColors } from "@/utils/sessionHelpers";
 import { SessionContextProps } from "@/types/session";
-import { ConversationWithSession } from "@/types/database";
-import { getCurrentParticipantId } from "@/utils/participantUtils";
+import { useSessionErrorHandler } from "@/hooks/useSessionErrorHandler";
+import { useCurrentParticipant } from "@/hooks/useCurrentParticipant";
+import { useSessionStartMonitor } from "@/hooks/useSessionStartMonitor";
+import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
 
 interface SessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -26,20 +28,12 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     showMessaging?: boolean 
   } | null;
   
-  const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
-  const [providerError, setProviderError] = useState<string | null>(null);
-  
-  // Handle all errors in one place
-  const handleInternalError = (errorMessage: string) => {
-    console.error("Session provider error:", errorMessage);
-    setProviderError(errorMessage);
-    if (onError && typeof onError === 'function') {
-      onError(errorMessage);
-    }
-  };
+  // Set up error handling
+  const { providerError, handleError } = useSessionErrorHandler({ onError });
   
   // Wrap data fetching in try-catch to prevent unhandled errors
   try {
+    // Fetch session data
     const {
       currentConversationId,
       participants,
@@ -53,78 +47,65 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
       error: dataError
     } = useSessionData();
 
+    // Monitor for session start status
+    const isSessionStartedInDB = useSessionStartMonitor({ conversation });
+
+    // Log important data for debugging
     console.log("SessionProvider - conversation data:", conversation);
     console.log("SessionProvider - currentConversationId:", currentConversationId);
     console.log("SessionProvider - isLoading:", dataLoading);
     
     // Handle data errors
-    useEffect(() => {
+    React.useEffect(() => {
       if (dataError) {
         console.error("Session data error:", dataError.message);
-        handleInternalError(dataError.message);
+        handleError(dataError.message);
       }
-    }, [dataError]);
+    }, [dataError, handleError]);
 
-    // Type assertion to ensure conversation is of the right type
-    const typedConversation = conversation as ConversationWithSession | null;
-    
-    // Check if the session is marked as started in DB
-    useEffect(() => {
-      if (typedConversation?.session_started) {
-        console.log("Session is marked as started in DB:", typedConversation.session_started);
-        setIsSessionStartedInDB(true);
-      } else {
-        console.log("Session not marked as started in DB:", typedConversation);
-      }
-    }, [typedConversation]);
-
-    // Determine the current participant ID based on user role
-    const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
-    
-    useEffect(() => {
-      if (typedConversation) {
-        const participantId = getCurrentParticipantId(locationState, typedConversation);
-        console.log("Setting current participant ID:", participantId, "from state:", locationState);
-        setCurrentUserParticipantId(participantId);
-      }
-    }, [typedConversation, locationState]);
+    // Get current participant ID
+    const currentUserParticipantId = useCurrentParticipant({ 
+      locationState, 
+      conversation 
+    });
 
     // Set up realtime updates for participants
     const { error: realtimeError } = useSessionRealtime({
       currentConversationId,
       participants,
       setParticipants,
-      conversation: typedConversation,
+      conversation,
       refetch,
       handleSessionFull,
       onSessionStarted: () => {
         console.log("Session started event received from realtime updates");
-        setIsSessionStartedInDB(true);
+        // This is handled by the useSessionStartMonitor now, which will
+        // update when session_started changes in the conversation data
       }
     });
 
     // Handle realtime errors
-    useEffect(() => {
+    React.useEffect(() => {
       if (realtimeError) {
         console.error("Session realtime error:", realtimeError);
-        handleInternalError(realtimeError);
+        handleError(realtimeError);
       }
-    }, [realtimeError]);
+    }, [realtimeError, handleError]);
 
     // Set up session state
     const sessionState = useSessionState({
       conversationId: currentConversationId,
-      welcomeMessage: typedConversation?.sessions?.welcome_message ?? null,
+      welcomeMessage: conversation?.sessions?.welcome_message ?? null,
       currentUserParticipantId
     });
 
     // Handle session state errors
-    useEffect(() => {
+    React.useEffect(() => {
       if (sessionState.error) {
         console.error("Session state error:", sessionState.error);
-        handleInternalError(sessionState.error);
+        handleError(sessionState.error);
       }
-    }, [sessionState.error]);
+    }, [sessionState.error, handleError]);
 
     // Set up anonymous state
     const anonymousState = useAnonymousState({
@@ -141,47 +122,32 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     } = useSessionInteractions({
       currentConversationId,
       sessionState,
-      conversation: typedConversation,
+      conversation,
       participants,
       isAnonymous: anonymousState.isAnonymous
     });
 
     // Handle interactions errors
-    useEffect(() => {
+    React.useEffect(() => {
       if (interactionsError) {
         console.error("Session interactions error:", interactionsError);
-        handleInternalError(interactionsError);
+        handleError(interactionsError);
       }
-    }, [interactionsError]);
-
-    // Combined loading state
-    const isLoading = dataLoading;
+    }, [interactionsError, handleError]);
 
     // If we have serious errors, return early with error handling
     if (providerError) {
-      return children({
-        isLoading,
-        conversation: null,
-        currentConversationId,
-        sessionState,
-        participants: [],
-        participantColors,
-        isWaitingForResponse: false,
-        handleStartSession,
-        handleSendMessage: async () => { return Promise.resolve(); }, // Fix: Return a Promise
-        handleLikeMessage: () => {},
-        showQrCodeView: false,
-        sessionLink: '',
-        currentUserParticipantId: null,
-        anonymousState,
-        isSessionStartedInDB: false,
-        error: providerError
-      });
+      return (
+        <SessionProviderErrorFallback errorMessage={providerError}>
+          {children}
+        </SessionProviderErrorFallback>
+      );
     }
 
+    // Build session context with all the data and handlers
     const sessionContext: SessionContextProps = {
-      isLoading,
-      conversation: typedConversation,
+      isLoading: dataLoading,
+      conversation,
       currentConversationId,
       sessionState,
       participants,
@@ -208,45 +174,13 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     // Catch any unexpected errors to prevent blank screen
     console.error("Unexpected error in SessionProvider:", unexpectedError);
     const errorMessage = unexpectedError instanceof Error ? unexpectedError.message : "An unexpected error occurred";
-    handleInternalError(errorMessage);
+    handleError(errorMessage);
     
-    // Return basic error state
-    return children({
-      isLoading: false,
-      conversation: null,
-      currentConversationId: null,
-      sessionState: {
-        messages: [],
-        inputMessage: "",
-        setInputMessage: () => {},
-        currentParticipant: 0,
-        isRecording: false,
-        setIsRecording: () => {},
-        hasAnswered: false,
-        totalResponses: 0,
-        viewMode: "participant",
-        setViewMode: () => {},
-        handleGenerateReport: async () => { return Promise.resolve(); }, // Fix: Return a Promise
-        isGeneratingReport: false,
-        setMessages: (messages) => {}, // Add the missing setMessages property
-        recordResponse: () => {},
-        error: null
-      },
-      participants: [],
-      participantColors,
-      isWaitingForResponse: false,
-      handleStartSession: () => {},
-      handleSendMessage: async () => { return Promise.resolve(); }, // Fix: Return a Promise
-      handleLikeMessage: () => {},
-      showQrCodeView: false,
-      sessionLink: '',
-      currentUserParticipantId: null,
-      anonymousState: {
-        isAnonymous: false,
-        toggleAnonymous: () => {}
-      },
-      isSessionStartedInDB: false,
-      error: errorMessage
-    });
+    // Return error fallback component
+    return (
+      <SessionProviderErrorFallback errorMessage={errorMessage}>
+        {children}
+      </SessionProviderErrorFallback>
+    );
   }
 };

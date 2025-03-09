@@ -29,6 +29,10 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     if (!conversationId) return;
     
     console.log("Setting up realtime subscription for participant waiting screen:", conversationId);
+    console.log("Initial participant count:", currentParticipantCount);
+    
+    // Update initial count from props
+    setParticipantCount(currentParticipantCount);
     
     // Create a unique channel name with the conversation ID
     const channelName = `public-conversation-${conversationId}-participant-waiting`;
@@ -79,7 +83,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
       console.error("Error setting up participant waiting subscription:", err);
       return () => {}; // Empty cleanup function to avoid runtime errors
     }
-  }, [conversationId, onSessionStarted, toast]);
+  }, [conversationId, currentParticipantCount, onSessionStarted, toast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
@@ -101,7 +105,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           <p className="text-amber-700 text-sm">Please stay on this page. The session will begin automatically.</p>
         </div>
         
-        <div className="inline-flex items-center gap-2 bg-gray-50 rounded-full px-4 py-2 border mb-2">
+        <div className="inline-flex items-center gap-2 bg-gray-50 rounded-full px-4 py-2 border">
           <Users className="h-4 w-4 text-gray-500" />
           <span className="text-sm font-medium">
             {participantCount} {maxParticipants ? `of ${maxParticipants}` : ''} participants joined

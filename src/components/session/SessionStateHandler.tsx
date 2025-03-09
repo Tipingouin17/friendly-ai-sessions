@@ -91,7 +91,8 @@ const SessionStateContent: React.FC<{
     isSessionFull,
     currentParticipants,
     maxParticipants,
-    messageCount: props.sessionState.messages.length
+    messageCount: props.sessionState.messages.length,
+    participantsCount: props.participants.length
   });
 
   // Admin view gets QR code view for sharing until session is started
@@ -99,8 +100,8 @@ const SessionStateContent: React.FC<{
     return (
       <AdminQrView
         conversationId={props.currentConversationId}
-        currentParticipantCount={props.conversation.current_participants || 0}
-        maxParticipants={props.conversation.participants || 0}
+        currentParticipantCount={currentParticipants}
+        maxParticipants={maxParticipants}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onStartSession={() => {
           console.log("Start session button clicked in AdminQrView");
@@ -117,8 +118,8 @@ const SessionStateContent: React.FC<{
     return (
       <ParticipantWaitingScreen
         conversationId={props.currentConversationId}
-        currentParticipantCount={props.conversation.current_participants || 0}
-        maxParticipants={props.conversation.participants || 0}
+        currentParticipantCount={currentParticipants}
+        maxParticipants={maxParticipants}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onSessionStarted={() => {
           console.log("Session started callback from ParticipantWaitingScreen");

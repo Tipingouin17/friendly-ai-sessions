@@ -19,7 +19,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     // First check if there's a custom avatar in the storage bucket
     if (facilitator.id) {
       const { data } = supabase.storage
-        .from('facilitators-avatars/')
+        .from('facilitators-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       // Validate if the custom avatar exists

@@ -38,7 +38,7 @@ const MessageAvatar = ({
   if (avatarUrl?.startsWith('/api/avatar')) {
     const params = new URLSearchParams(avatarUrl.split('?')[1]);
     const avatarName = params.get('name') || name;
-    const variant = params.get('variant') || 'marble';
+    const variant = params.get('variant') || 'beam';
     const paletteIndex = parseInt(params.get('palette') || '0');
     
     // Default palettes matching those in ParticipantSetup
@@ -54,7 +54,7 @@ const MessageAvatar = ({
     ];
     
     return (
-      <div className={`overflow-hidden rounded-full ${dimensions[size]}`}>
+      <div className={`overflow-hidden rounded-full ${dimensions[size]}`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
         <BoringAvatar
           size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
           name={avatarName}
@@ -69,10 +69,13 @@ const MessageAvatar = ({
   // Regular avatar
   return (
     <Avatar className={dimensions[size]}>
-      <AvatarImage src={avatarUrl || undefined} alt={name} />
-      <AvatarFallback>
-        <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-      </AvatarFallback>
+      {avatarUrl ? (
+        <AvatarImage src={avatarUrl} alt={name} />
+      ) : (
+        <AvatarFallback>
+          <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+        </AvatarFallback>
+      )}
     </Avatar>
   );
 };

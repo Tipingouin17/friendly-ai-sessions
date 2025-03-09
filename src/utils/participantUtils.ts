@@ -8,7 +8,8 @@ export const getParticipantInfo = (participant: any): ParticipantInfo => {
   let avatar = null;
   
   if (participant.avatar_seed) {
-    avatar = `/api/avatar?name=${participant.avatar_seed}&variant=beam&palette=0`;
+    // Generate avatar URL correctly
+    avatar = `/api/avatar?name=${encodeURIComponent(participant.avatar_seed)}&variant=beam&palette=0`;
   }
   
   return {

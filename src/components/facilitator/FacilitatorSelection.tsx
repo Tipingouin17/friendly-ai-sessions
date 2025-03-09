@@ -7,6 +7,7 @@ import { CreateFacilitatorModal } from "./CreateFacilitatorModal";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -84,23 +85,12 @@ export const FacilitatorSelection = ({
               onClick={() => onSelect(facilitator.id)}
             >
               <div className="mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-                {facilitator.profile_picture ? (
-                  <img 
-                    src={facilitator.profile_picture} 
-                    alt={facilitator.title} 
-                    className="h-full w-full object-cover" 
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      (e.target as HTMLImageElement).src = '/placeholder.svg';
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full w-full bg-gray-200">
-                    <span className="text-2xl font-semibold text-gray-500">
-                      {facilitator.title.charAt(0)}
-                    </span>
-                  </div>
-                )}
+                <img 
+                  src={getFacilitatorAvatarUrl(facilitator.id)} 
+                  alt={facilitator.title} 
+                  className="h-full w-full object-cover" 
+                  onError={handleAvatarError}
+                />
               </div>
               <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
             </div>

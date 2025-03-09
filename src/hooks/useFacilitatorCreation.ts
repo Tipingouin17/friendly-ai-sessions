@@ -32,18 +32,45 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       
-      const { error } = await supabase
+      // Create the facilitator entry first so we have an ID
+      const { data: facilitator, error } = await supabase
         .from('facilitators')
         .insert({
           title,
           details,
-          profile_picture: profilePicture || undefined,
+          profile_picture: null, // We'll handle the profile picture separately
           lock: false,
           user_id: user!.id,
           plan_id: plan?.id // Associate the facilitator with the current plan
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // If a profile picture is provided, upload it to the storage bucket
+      if (profilePicture && facilitator) {
+        // Convert base64 to blob
+        const base64Response = await fetch(profilePicture);
+        const blob = await base64Response.blob();
+        
+        // Upload to storage with the facilitator ID as the filename
+        const { error: uploadError } = await supabase.storage
+          .from('facilitators-avatars')
+          .upload(`${facilitator.id}.jpg`, blob, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+        
+        if (uploadError) {
+          console.error('Error uploading profile picture:', uploadError);
+          toast({
+            title: "Warning",
+            description: "Facilitator created but profile picture could not be uploaded",
+            variant: "destructive",
+          });
+        }
+      }
 
       toast({
         title: "Success",

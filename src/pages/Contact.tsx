@@ -136,7 +136,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-24 pb-16">
       <div className="max-w-6xl mx-auto px-4">
         <h1 className="text-4xl font-bold text-center mb-4">Contact Us</h1>
         <p className="text-lg text-muted-foreground text-center mb-12">

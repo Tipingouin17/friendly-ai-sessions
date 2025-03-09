@@ -38,7 +38,7 @@ export const useSessionRealtime = ({
     // Don't set up channels if there's no conversation ID
     if (!currentConversationId) {
       console.log("No conversation ID provided, skipping realtime setup");
-      return;
+      return undefined;
     }
     
     // Reset handler flags when component mounts
@@ -58,7 +58,6 @@ export const useSessionRealtime = ({
             if (channel && typeof channel.unsubscribe === 'function') {
               channel.unsubscribe();
             }
-            supabase.removeChannel(channel);
           } catch (err) {
             console.error("Error removing channel:", err);
           }
@@ -85,7 +84,7 @@ export const useSessionRealtime = ({
     try {
       if (isSubscribedRef.current) {
         console.log("Already subscribed to realtime channels, skipping setup");
-        return;
+        return undefined;
       }
       
       console.log("Setting up realtime channels for conversation:", currentConversationId);
@@ -130,15 +129,7 @@ export const useSessionRealtime = ({
             refetch();
           }
         })
-        .subscribe((status) => {
-          console.log(`Conversation channel status: ${status}`);
-          if (status === 'CHANNEL_ERROR') {
-            setError("Error connecting to session updates");
-          }
-          if (status === 'SUBSCRIBED') {
-            isSubscribedRef.current = true;
-          }
-        });
+        .subscribe();
       
       channelsRef.current.push(conversationChannel);
       
@@ -177,12 +168,7 @@ export const useSessionRealtime = ({
             }
           }
         })
-        .subscribe((status) => {
-          console.log(`Participants channel status: ${status}`);
-          if (status === 'CHANNEL_ERROR') {
-            setError("Error connecting to participant updates");
-          }
-        });
+        .subscribe();
         
       channelsRef.current.push(participantsChannel);
       
@@ -200,12 +186,7 @@ export const useSessionRealtime = ({
           // Force a refetch to update UI with new messages
           refetch();
         })
-        .subscribe((status) => {
-          console.log(`Messages channel status: ${status}`);
-          if (status === 'CHANNEL_ERROR') {
-            setError("Error connecting to message updates");
-          }
-        });
+        .subscribe();
         
       channelsRef.current.push(messagesChannel);
       
@@ -217,9 +198,9 @@ export const useSessionRealtime = ({
     } catch (err) {
       console.error("Error setting up realtime channels:", err);
       setError("Failed to establish connection to session");
-      return () => cleanupChannels();
+      return undefined;
     }
-  }, [currentConversationId]); // Only re-run when conversation ID changes
+  }, [currentConversationId, participants, setParticipants, conversation, refetch, handleSessionFull, onSessionStarted]); 
   
   // Second effect to handle conversation/participant changes separately
   useEffect(() => {

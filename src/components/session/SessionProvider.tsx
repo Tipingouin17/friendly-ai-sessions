@@ -178,9 +178,6 @@ export const SessionProvider = ({ children, handleSessionFull, onError }: Sessio
     sessionContext.error = providerError;
   }
 
-  return (
-    <>
-      {children && children(sessionContext)}
-    </>
-  );
+  // Return children with context - ensure we actually return the React element
+  return children(sessionContext);
 };

@@ -1,335 +1,177 @@
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { nanoid } from "nanoid";
-import { supabase } from "@/integrations/supabase/client";
-import { Message } from "@/types/chat";
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Message } from '@/types/chat';
+import { getParticipantColor } from '@/utils/sessionHelpers';
+
+const WELCOME_MESSAGE_DELAY = 1000; // 1 second delay before showing welcome message
 
 type UseSessionStateProps = {
   conversationId: number | null;
   welcomeMessage: string | null;
-  currentUserParticipantId?: number | null;
+  currentUserParticipantId: number | null;
 };
 
-export function useSessionState({
+export const useSessionState = ({
   conversationId,
   welcomeMessage,
   currentUserParticipantId
-}: UseSessionStateProps) {
+}: UseSessionStateProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [pendingResponses, setPendingResponses] = useState<{ [key: number]: boolean }>({});
-  const [totalResponses, setTotalResponses] = useState(0);
-  const [hasAnswered, setHasAnswered] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [inputMessage, setInputMessage] = useState<string>('');
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   
-  // Store in ref to avoid creating a new function on each render
-  const welcomeAddedRef = useRef(false);
-  const reportGenerationInProgressRef = useRef(false);
-  const initialMessagesLoadedRef = useRef(false);
-  const messagesLoadAttemptedRef = useRef(false);
+  // Calculate metrics for UI
+  const hasAnswered = messages.some(message => 
+    message.participant === `P${currentUserParticipantId}` && message.sender === "user"
+  );
   
-  // Ensure current participant is locked to their assigned ID
-  const currentParticipant = currentUserParticipantId || 1;
-
-  // Add welcome message if present - only once
+  const totalResponses = messages.filter(message => message.sender === "user").length;
+  
+  // Fetch messages for this conversation
   useEffect(() => {
-    if (welcomeMessage && !welcomeAddedRef.current) {
-      console.log("Adding welcome message to chat:", welcomeMessage);
-      welcomeAddedRef.current = true;
-      const welcomeId = nanoid();
-      setMessages(prev => {
-        // Avoid duplicate welcome messages
-        if (prev.some(msg => msg.content === welcomeMessage && msg.sender === "assistant")) {
-          return prev;
-        }
-        return [{
-          id: welcomeId,
-          content: welcomeMessage,
-          sender: "assistant",
-          timestamp: new Date(),
-          likes: []
-        }, ...prev];
-      });
+    if (!conversationId) {
+      console.log('No conversation ID provided, skipping message fetch');
+      return;
     }
-  }, [welcomeMessage]);
-
-  // Load initial messages from the database
-  useEffect(() => {
+    
     const fetchMessages = async () => {
-      if (!conversationId || initialMessagesLoadedRef.current || messagesLoadAttemptedRef.current) {
-        if (!conversationId) {
-          console.log("No conversation ID provided, skipping message fetch");
-        }
-        return;
-      }
-      
-      setIsLoading(true);
-      messagesLoadAttemptedRef.current = true;
-      console.log("Fetching messages for conversation:", conversationId);
-      
       try {
+        console.log('Fetching messages for conversation:', conversationId);
+        
         const { data, error } = await supabase
           .from('messages')
           .select('*')
           .eq('conversation_id', conversationId)
-          .order('created_at');
-        
+          .order('created_at', { ascending: true });
+          
         if (error) {
-          console.error("Error fetching messages:", error);
-          setError(`Failed to load messages: ${error.message}`);
-          setIsLoading(false);
+          console.error('Error fetching messages:', error);
+          setError(`Failed to fetch messages: ${error.message}`);
           return;
         }
         
-        if (data && data.length > 0) {
-          console.log(`Loaded ${data.length} messages from database`, data);
-          
-          // Convert database messages to our Message format
-          const convertedMessages: Message[] = data.map(msg => {
-            // Determine the participant identifier if it's a user message
-            let participant: string | undefined = undefined;
-            if (msg.role === 'user') {
-              // Try to determine participant ID
-              participant = msg.name?.startsWith('Participant') 
-                ? `P${msg.name.split(' ')[1]}` 
-                : undefined;
-            }
-            
-            return {
-              id: msg.id.toString(),
-              content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-              sender: msg.role === 'assistant' ? 'assistant' : 'user',
-              timestamp: new Date(msg.created_at),
-              participant,
-              likes: []
-            };
-          });
-          
-          // Set messages with welcome message at the beginning if needed
-          setMessages(prev => {
-            let updatedMessages = [...convertedMessages];
-            
-            // Add welcome message at the beginning if not already present
-            if (welcomeMessage && welcomeAddedRef.current) {
-              const hasWelcome = updatedMessages.some(m => 
-                m.sender === 'assistant' && m.content === welcomeMessage
-              );
-              
-              if (!hasWelcome) {
-                updatedMessages.unshift({
-                  id: nanoid(),
-                  content: welcomeMessage,
-                  sender: "assistant",
-                  timestamp: new Date(),
-                  likes: []
-                });
-              }
-            }
-            
-            // Preserve any messages that might have been added since component mounted
-            if (prev.length > 0) {
-              // Check for any messages in prev that aren't in the loaded messages
-              const newMsgIds = updatedMessages.map(m => m.id);
-              const uniquePrevMsgs = prev.filter(m => !newMsgIds.includes(m.id));
-              
-              if (uniquePrevMsgs.length > 0) {
-                updatedMessages = [...updatedMessages, ...uniquePrevMsgs];
-              }
-            }
-            
-            return updatedMessages;
-          });
-          
-          // Check if current participant has already answered the latest question
-          if (currentParticipant) {
-            // Find the latest facilitator message
-            // Using reverse find instead of findLastIndex for compatibility
-            const messagesCopy = [...convertedMessages];
-            const latestFacilitatorIndex = messagesCopy.reverse().findIndex(m => m.sender === 'assistant');
-            const actualIndex = latestFacilitatorIndex >= 0 ? (convertedMessages.length - 1 - latestFacilitatorIndex) : -1;
-            
-            if (actualIndex !== -1) {
-              // See if there's a response from this participant after the latest facilitator message
-              const messagesAfterFacilitator = convertedMessages.slice(actualIndex + 1);
-              const hasResponse = messagesAfterFacilitator
-                .some(m => m.sender === 'user' && m.participant === `P${currentParticipant}`);
-              
-              setHasAnswered(hasResponse);
-              
-              // Also update pending responses
-              const responses: {[key: number]: boolean} = {};
-              messagesAfterFacilitator
-                .filter(m => m.sender === 'user' && m.participant?.startsWith('P'))
-                .forEach(m => {
-                  if (m.participant) {
-                    const participantId = parseInt(m.participant.slice(1));
-                    responses[participantId] = true;
-                  }
-                });
-              
-              setPendingResponses(responses);
-              setTotalResponses(Object.values(responses).filter(Boolean).length);
-            }
+        if (!data || data.length === 0) {
+          console.log('No messages found for conversation', conversationId);
+          // Add welcome message after a delay if one is provided
+          if (welcomeMessage) {
+            setTimeout(() => {
+              const welcomeMsg: Message = {
+                id: 'welcome',
+                content: welcomeMessage,
+                sender: 'assistant',
+                created_at: new Date().toISOString()
+              };
+              setMessages([welcomeMsg]);
+            }, WELCOME_MESSAGE_DELAY);
           }
-          
-          initialMessagesLoadedRef.current = true;
-        } else {
-          console.log("No messages found for conversation:", conversationId);
-          initialMessagesLoadedRef.current = true;
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-        setError("Failed to load messages. Please try refreshing the page.");
-      } finally {
-        setIsLoading(false);
+        
+        // Transform database messages to UI message format
+        const formattedMessages: Message[] = data.map(msg => {
+          const participantId = msg.participant_id ? `P${msg.participant_id}` : undefined;
+          const color = participantId ? getParticipantColor(participantId) : undefined;
+          
+          return {
+            id: msg.id,
+            content: msg.content,
+            sender: msg.role === 'assistant' ? 'assistant' : 'user',
+            participant: participantId,
+            color,
+            created_at: msg.created_at,
+            likes: msg.likes || [],
+            isReport: msg.is_report || false,
+            isAnonymous: msg.is_anonymous || false
+          };
+        });
+        
+        console.log('Successfully fetched messages:', formattedMessages.length);
+        setMessages(formattedMessages);
+      } catch (err) {
+        console.error('Exception fetching messages:', err);
+        setError('Failed to load session messages');
       }
     };
-    
+
     fetchMessages();
-    
-    // Reset flags when conversation changes
-    return () => {
-      messagesLoadAttemptedRef.current = false;
-    };
-  }, [conversationId, welcomeMessage, currentParticipant]);
-
-  // Reset initialization flags when conversation changes
-  useEffect(() => {
-    if (conversationId) {
-      console.log("New conversation ID detected, resetting initialization flags");
-      initialMessagesLoadedRef.current = false;
-      welcomeAddedRef.current = false;
-      setIsLoading(true);
-    }
-  }, [conversationId]);
-
-  // Generate session report
+  }, [conversationId, welcomeMessage]);
+  
+  // Handle generating the session report
   const handleGenerateReport = useCallback(async () => {
-    if (!conversationId || reportGenerationInProgressRef.current) {
-      console.error("No conversation ID provided or report generation already in progress");
+    if (!conversationId) {
+      console.error('No conversation ID provided for report generation');
+      setError('Cannot generate report: session not found');
       return;
     }
-
-    reportGenerationInProgressRef.current = true;
+    
     setIsGeneratingReport(true);
     
     try {
-      // Aggregate all messages into a single string
-      const allMessages = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
-
-      // Call the Supabase function to generate the report
-      const { data, error } = await supabase.functions.invoke('generate-report', {
-        body: {
-          conversationId: conversationId,
-          messages: allMessages
+      console.log('Generating report for conversation:', conversationId);
+      
+      // Find the last participant message to determine where we are in the conversation
+      // Instead of findLastIndex which is ES2023, use a for loop to find the last index
+      let lastParticipantMessageIndex = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].sender === 'user') {
+          lastParticipantMessageIndex = i;
+          break;
         }
-      });
-
-      if (error) {
-        console.error("Error generating report:", error);
-        setError(`Failed to generate report: ${error.message}`);
-      } else {
-        console.log("Report generated successfully", data);
-
-        // Add the report to the messages
-        const reportId = nanoid();
-        const reportMessage = {
-          id: reportId,
-          content: data,
-          sender: "assistant" as const,
-          timestamp: new Date(),
-          isReport: true,
-          likes: []
-        };
-        
-        setMessages(prevMessages => [...prevMessages, reportMessage]);
-        
-        // Save report to database
-        try {
-          await supabase.from('messages').insert({
-            conversation_id: conversationId,
-            content: data,
-            role: 'assistant',
-            user_id: null
-          });
-        } catch (dbError) {
-          console.error("Error saving report to database:", dbError);
-          setError("Report was generated but couldn't be saved to the database.");
-        }
-      }
-    } catch (error) {
-      console.error('Error generating report:', error);
-      setError("Failed to generate report. Please try again later.");
-    } finally {
-      setIsGeneratingReport(false);
-      reportGenerationInProgressRef.current = false;
-    }
-  }, [conversationId, messages]);
-
-  // Record a response to a facilitator question - memoized to prevent recreation
-  const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
-    console.log("Recording response for participant:", participantId, "with hasResponded:", hasResponded);
-    
-    setPendingResponses(prev => {
-      // Skip update if nothing changed
-      if (prev[participantId] === hasResponded) {
-        return prev;
       }
       
-      const newResponses = {
-        ...prev,
-        [participantId]: hasResponded
-      };
-      console.log("New pending responses:", newResponses);
-      return newResponses;
-    });
-    
-    if (hasResponded && participantId === currentParticipant) {
-      setHasAnswered(true);
+      // If we have participant messages, use the API endpoint to generate a report
+      if (lastParticipantMessageIndex !== -1) {
+        const response = await fetch('/api/generate-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const reportData = await response.json();
+        
+        // Add the report to our messages
+        const reportMessage: Message = {
+          id: `report-${Date.now()}`,
+          content: reportData.report,
+          sender: 'assistant',
+          created_at: new Date().toISOString(),
+          isReport: true
+        };
+        
+        setMessages(prev => [...prev, reportMessage]);
+      } else {
+        throw new Error('No participant messages found to generate report');
+      }
+    } catch (err) {
+      console.error('Error generating report:', err);
+      setError(`Failed to generate session report: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingReport(false);
     }
-  }, [currentParticipant]);
+  }, [conversationId, messages]);
   
-  // Update total responses count based on pendingResponses
-  useEffect(() => {
-    const count = Object.values(pendingResponses).filter(Boolean).length;
-    if (count !== totalResponses) {
-      console.log("Updating total responses count to:", count);
-      setTotalResponses(count);
-    }
-  }, [pendingResponses, totalResponses]);
-
-  // Reset answer state when a new facilitator message arrives
-  useEffect(() => {
-    const latestMessage = messages[messages.length - 1];
-    if (latestMessage?.sender === "assistant" && !latestMessage.isReport) {
-      console.log("New facilitator message detected, resetting response state");
-      setHasAnswered(false);
-      setPendingResponses({});
-      setTotalResponses(0);
-    }
-  }, [messages]);
-
   return {
     messages,
-    setMessages,
     inputMessage,
     setInputMessage,
-    currentParticipant,
+    currentParticipant: currentUserParticipantId || 0,
     isRecording,
     setIsRecording,
     handleGenerateReport,
     isGeneratingReport,
-    recordResponse,
-    totalResponses,
+    setMessages,
     hasAnswered,
-    pendingResponses,
+    totalResponses,
     viewMode,
     setViewMode,
-    error,
-    isLoading
+    error
   };
-}
+};

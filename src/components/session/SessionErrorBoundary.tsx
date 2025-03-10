@@ -10,6 +10,8 @@ export interface SessionErrorBoundaryProps {
   connectionAttempts?: number;
   retryConnection?: () => void;
   lastAttemptTime?: number;
+  isLoading?: boolean;
+  hasInitializedProvider?: boolean;
 }
 
 const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
@@ -18,7 +20,9 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   noSessionFound = false,
   connectionAttempts = 0,
   retryConnection = () => {},
-  lastAttemptTime = 0
+  lastAttemptTime = 0,
+  isLoading = false,
+  hasInitializedProvider = false
 }) => {
   if (error || noSessionFound) {
     return (

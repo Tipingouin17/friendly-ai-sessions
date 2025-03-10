@@ -11,6 +11,7 @@ import { useConversation } from "@/hooks/useConversation";
 import AdminMessageInput from "@/components/session/AdminMessageInput";
 import { useAdminSessionState } from "@/hooks/useAdminSessionState";
 import ParticipantResponseStats from "@/components/session/ParticipantResponseStats";
+import { Users } from "lucide-react";
 
 const SessionAdmin = () => {
   const {

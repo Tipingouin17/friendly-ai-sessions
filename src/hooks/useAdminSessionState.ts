@@ -82,16 +82,20 @@ export const useAdminSessionState = ({
       setMessages(prev => [...prev, adminMessage]);
       
       // In a real implementation, you would save to the database
+      // Since the database schema might be different from our Message type,
+      // we need to adapt the data structure
       const { error } = await supabase
         .from('messages')
         .insert({
-          id: messageId,
           content,
           conversation_id: conversationId,
           role: 'assistant',
-          is_pinned: isPinned,
-          recipient_id: recipientId,
-          is_admin_message: true
+          // Using custom metadata to store additional fields
+          name: JSON.stringify({
+            is_pinned: isPinned,
+            recipient_id: recipientId,
+            is_admin_message: true
+          })
         });
       
       if (error) {

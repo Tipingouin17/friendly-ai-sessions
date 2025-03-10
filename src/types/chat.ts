@@ -1,4 +1,3 @@
-
 export interface Message {
   id: string;
   content: string;
@@ -11,6 +10,9 @@ export interface Message {
   likes?: string[]; // Array of participant identifiers who liked the message
   avatar?: string; // Added for participant avatar
   isAnonymous?: boolean; // Flag for anonymous messages
+  isPinned?: boolean; // Flag for pinned messages
+  recipientId?: string; // For directed messages
+  isAdminMessage?: boolean; // Flag for admin messages
 }
 
 export interface ParticipantInfo {

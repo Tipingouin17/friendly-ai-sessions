@@ -68,7 +68,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <span className="text-sm text-gray-500">Facilitator: {facilitatorTitle}</span>
           )}
           <Badge 
-            variant={isSessionActive ? "success" : "secondary"}
+            variant={isSessionActive ? "default" : "secondary"}
             className={`ml-2 ${isSessionActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
           >
             {isSessionActive ? "Active" : "Paused"}

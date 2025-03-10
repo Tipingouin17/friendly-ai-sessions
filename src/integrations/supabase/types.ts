@@ -584,6 +584,38 @@ export type Database = {
           },
         ]
       }
+      session_events: {
+        Row: {
+          conversation_id: number
+          created_at: string
+          data: Json | null
+          event_type: string
+          id: number
+        }
+        Insert: {
+          conversation_id: number
+          created_at?: string
+          data?: Json | null
+          event_type: string
+          id?: number
+        }
+        Update: {
+          conversation_id?: number
+          created_at?: string
+          data?: Json | null
+          event_type?: string
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_participants: {
         Row: {
           avatar_seed: string | null

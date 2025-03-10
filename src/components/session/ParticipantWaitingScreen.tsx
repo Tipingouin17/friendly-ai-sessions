@@ -45,9 +45,6 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     // Update initial count from props
     setParticipantCount(currentParticipantCount || 0);
     
-    // Create a unique channel name with the conversation ID
-    const channelName = `public-conversation-${conversationId}-participant-waiting`;
-    
     try {
       // Listen for conversation changes
       const conversationChannel = supabase

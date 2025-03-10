@@ -109,7 +109,7 @@ export function useSessionCapacityCheck() {
 
         console.log("Update response:", updateData);
         
-        // Broadcast the update through a separate channel to ensure all clients update
+        // Broadcast the update through session_events table to ensure all clients update
         try {
           const { error: broadcastError } = await supabase
             .from('session_events')
@@ -125,6 +125,8 @@ export function useSessionCapacityCheck() {
             
           if (broadcastError) {
             console.error("Error broadcasting participant join event:", broadcastError);
+          } else {
+            console.log("Successfully broadcast participant join event");
           }
         } catch (broadcastErr) {
           console.error("Exception broadcasting join event:", broadcastErr);

@@ -1,7 +1,5 @@
-
 import { useState, useEffect } from "react";
 import { useSessionRoomState } from "@/hooks/useSessionRoomState";
-import { useSessionStartMonitor } from "@/hooks/useSessionStartMonitor";
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
@@ -45,14 +43,14 @@ export const useSessionMonitoring = ({
     }
   }, [conversation]);
   
-  // Get room state - fixed to remove onError from useSessionRoomState props
+  // Get room state - fixed to include isAdmin prop properly
   const roomState = useSessionRoomState({
     conversationId,
     conversation,
     currentUserParticipantId,
     participants,
     welcomeMessage: conversation?.sessions?.welcome_message || null,
-    isAdmin: forceAdmin ? true : isAdmin // Use forceAdmin to override isAdmin
+    isAdmin: forceAdmin || isAdmin
   });
   
   return {

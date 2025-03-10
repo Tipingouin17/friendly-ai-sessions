@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useReportGenerator } from "@/hooks/useReportGenerator";
@@ -14,6 +13,7 @@ interface UseSessionRoomStateProps {
   currentUserParticipantId: number | null;
   participants: ParticipantInfo[];
   welcomeMessage: string | null;
+  isAdmin?: boolean;
 }
 
 export function useSessionRoomState({
@@ -21,7 +21,8 @@ export function useSessionRoomState({
   conversation,
   currentUserParticipantId,
   participants,
-  welcomeMessage
+  welcomeMessage,
+  isAdmin
 }: UseSessionRoomStateProps) {
   // UI state
   const [inputMessage, setInputMessage] = useState<string>('');

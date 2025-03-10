@@ -37,7 +37,7 @@ export const useMessageProcessor = ({
           if (participant) {
             return {
               ...message,
-              participant: participant.name || `Participant ${participantNumber}`,
+              participant: participant.name,
               avatar: participant.avatar,
               isAnonymous: participant.isAnonymous
             };

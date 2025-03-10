@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
@@ -125,7 +124,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
                 style={{ backgroundColor: ['#FCA5A5', '#FDBA74', '#BEF264'][participant.id % 3] }} 
               />
               <div className="flex-1">
-                <div className="text-sm font-medium">{participant.name || `Participant ${participant.id}`}</div>
+                <div className="text-sm font-medium">{participant.name}</div>
                 {participant.isAnonymous && (
                   <div className="text-xs text-gray-500">Anonymous mode</div>
                 )}

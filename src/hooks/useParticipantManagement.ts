@@ -35,7 +35,7 @@ export const useParticipantManagement = (
     setIsLoading(false);
   }, []);
 
-  // This function needs to return a Promise to match the expected type
+  // This function now properly returns a Promise to match the expected type
   const forceRefreshParticipants = useCallback(async () => {
     if (!conversationId) return Promise.resolve();
     

@@ -65,6 +65,7 @@ export function useSessionParticipantManager({
   });
 
   // Function to force refresh participant data from the database
+  // Fix: Make sure this function returns a Promise
   const forceRefreshParticipants = useCallback(async () => {
     if (!conversationId) return Promise.resolve();
     

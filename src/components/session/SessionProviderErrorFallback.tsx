@@ -17,9 +17,12 @@ export const SessionProviderErrorFallback = ({
 }: SessionProviderErrorFallbackProps) => {
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage, "isAdmin:", isAdmin);
   
-  // For admin users, handle session full error differently
-  if (isAdmin && errorMessage.includes("session is full")) {
-    console.log("Admin detected with session full error - should override this error");
+  // For admin users, explicitly handle session full error
+  if (isAdmin && (
+    errorMessage.includes("session is full") || 
+    errorMessage.includes("maximum capacity")
+  )) {
+    console.log("Admin detected with session full error - overriding this error");
     errorMessage = "You are an admin - overriding session full restriction";
     
     // Force set admin status in session storage

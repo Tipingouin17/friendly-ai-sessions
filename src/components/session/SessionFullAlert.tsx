@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -25,20 +24,23 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   isAdmin: propIsAdmin
 }) => {
   const navigate = useNavigate();
+  
+  // Check all possible sources of admin status
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
-  const isAdmin = propIsAdmin || contextIsAdmin || sessionStorage.getItem('isAdminSession') === 'true';
+  const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
+  const isAdmin = propIsAdmin || contextIsAdmin || storedIsAdmin;
 
   // Skip showing session full alert for admin users immediately
   useEffect(() => {
     if (isAdmin && type === 'full' && onClose) {
-      console.log("Suppressing session full alert for admin user");
+      console.log("🔑 Suppressing session full alert for admin user");
       onClose();
     }
   }, [isAdmin, type, onClose]);
 
   // If we're an admin and this is a full session alert, don't render anything
   if (isAdmin && type === 'full') {
-    console.log("Admin user detected - not rendering session full alert");
+    console.log("🔑 Admin user detected - not rendering session full alert");
     return null;
   }
 
@@ -48,8 +50,13 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   };
 
   const handleRetry = () => {
-    // Refresh the page to retry connection
-    window.location.reload();
+    // For admin users we'll force a hard refresh
+    if (isAdmin) {
+      window.location.reload();
+    } else {
+      // For regular users just do a normal refresh
+      window.location.reload();
+    }
     if (onClose) onClose();
   };
 

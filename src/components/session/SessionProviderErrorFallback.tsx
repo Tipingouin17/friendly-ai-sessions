@@ -18,31 +18,29 @@ export const SessionProviderErrorFallback = ({
   
   // For admin users, explicitly handle session full error
   const originalError = errorMessage;
+  const isSessionFullError = errorMessage.includes("session is full") || 
+                            errorMessage.includes("maximum capacity");
   
   // Keep a reference to the original error message while determining what to display
-  const displayError = isAdmin && (
-    errorMessage.includes("session is full") || 
-    errorMessage.includes("maximum capacity")
-  ) ? "You are an admin - overriding session full restriction" : errorMessage;
+  const displayError = isAdmin && isSessionFullError
+    ? "You are an admin - overriding session full restriction" 
+    : errorMessage;
   
-  // Force set admin status in session storage
+  // Force set admin status in session storage and auto-retry for admin session full
   useEffect(() => {
     if (isAdmin) {
-      console.log("Admin detected in error fallback - enforcing admin status");
+      console.log("🔑 Admin detected in error fallback - enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
       
       // If it's a session full error and we're admin, auto-retry
-      if (onRetry && (
-        originalError.includes("session is full") || 
-        originalError.includes("maximum capacity")
-      )) {
-        console.log("Admin detected with session full error - auto-retrying");
+      if (onRetry && isSessionFullError) {
+        console.log("🔑 Admin detected with session full error - auto-retrying");
         setTimeout(() => {
           onRetry();
         }, 1000);
       }
     }
-  }, [isAdmin, originalError, onRetry]);
+  }, [isAdmin, isSessionFullError, onRetry]);
   
   // Create safe default props
   const fallbackSessionContext: SessionContextProps = {

@@ -152,29 +152,33 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6">
             {joinUrl && (
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`} 
-                alt="Session QR Code" 
-                className="mb-4 border border-gray-200 rounded-md"
-              />
+              <>
+                <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-4">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`} 
+                    alt="Session QR Code" 
+                    className="w-48 h-48"
+                  />
+                </div>
+                <div className="flex w-full items-center mt-2 bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
+                  <input 
+                    type="text" 
+                    value={joinUrl} 
+                    readOnly 
+                    className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    className="h-full rounded-l-none border-l" 
+                    onClick={copySessionLink}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
             )}
-            <div className="flex w-full mt-4">
-              <input 
-                type="text" 
-                value={joinUrl} 
-                readOnly 
-                className="flex-1 rounded-l-md border border-r-0 border-gray-300 px-3 py-2 text-sm"
-              />
-              <Button 
-                variant="outline" 
-                className="rounded-l-none border border-l-0" 
-                onClick={copySessionLink}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="mt-4 text-sm text-gray-500 text-center">
-              <p>Current participants: {currentParticipants}/{maxParticipants}</p>
+            <div className="mt-4 text-sm text-gray-600 text-center">
+              <p className="font-medium">Current participants: {currentParticipants}/{maxParticipants}</p>
               <p className="mt-1">Share this QR code or link with participants to join the session</p>
             </div>
           </div>

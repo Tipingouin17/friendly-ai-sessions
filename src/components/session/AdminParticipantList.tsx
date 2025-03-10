@@ -115,10 +115,9 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
             </div>
           ))
         ) : participants.length > 0 ? (
-          // Show actual participants when available
-          participants.map(participant => (
+          participants.map((participant) => (
             <div 
-              key={`participant-${participant.id}`}
+              key={participant.id}
               className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
             >
               <div 

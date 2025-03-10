@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationWithSession } from "@/types/database";
@@ -16,7 +15,6 @@ export async function checkSessionCapacity(
 ): Promise<SessionCapacityResult> {
   console.log("Checking session capacity with admin status:", isAdmin);
   
-  // First, fetch the latest count to avoid race conditions - for ALL users
   const { data: latestConversation, error: fetchError } = await supabase
     .from('conversations')
     .select('id, current_participants, participants')
@@ -32,7 +30,6 @@ export async function checkSessionCapacity(
     throw new Error("Could not fetch the latest session data");
   }
   
-  // If admin user detected, ALWAYS allow joining regardless of session capacity
   if (isAdmin) {
     console.log("🔑 Admin user detected - bypassing ALL session full checks");
     return {
@@ -42,25 +39,36 @@ export async function checkSessionCapacity(
     };
   }
   
-  // Check if session is at capacity for regular users
   const currentCount = latestConversation.current_participants || 0;
   const maxAllowed = latestConversation.participants || 0;
   
-  // Only enforce the limit if maxParticipants is greater than 0
   if (maxAllowed > 0 && currentCount >= maxAllowed) {
-    console.log("Session is full, regular user cannot join:", {
+    console.log("Session is full, starting automatically:", {
       currentCount,
       maxAllowed
     });
-    return {
-      canJoin: false,
-      latestConversation,
-      newParticipantId: 0,
-      error: "This session is full and cannot accept more participants."
-    };
+    
+    const { error: startError } = await supabase
+      .from('conversations')
+      .update({ session_started: true })
+      .eq('id', conversationId);
+      
+    if (startError) {
+      console.error("Error auto-starting session:", startError);
+    } else {
+      console.log("Session auto-started successfully");
+    }
+    
+    if (!isAdmin) {
+      return {
+        canJoin: false,
+        latestConversation,
+        newParticipantId: 0,
+        error: "This session is full and cannot accept more participants."
+      };
+    }
   }
   
-  // For all users, calculate the new participant ID and count
   const newCount = currentCount + 1;
   console.log("Latest count from database:", currentCount, "New count will be:", newCount);
   
@@ -82,15 +90,11 @@ export function useSessionCapacityCheck() {
     console.log("Checking capacity with admin status:", isAdmin);
     
     try {
-      // First check capacity without updating - this avoids race conditions
       const capacityResult = await checkSessionCapacity(conversationId, isAdmin);
       
-      // For admin users, always force canJoin=true regardless of capacity
       const effectiveCanJoin = isAdmin ? true : capacityResult.canJoin;
       
       if (effectiveCanJoin) {
-        // Only now update the participant count with the latest calculated value
-        // This is an atomic operation to avoid race conditions
         const { data: updateData, error: updateError } = await supabase
           .from('conversations')
           .update({ current_participants: capacityResult.newParticipantId })
@@ -109,7 +113,6 @@ export function useSessionCapacityCheck() {
 
         console.log("Update response:", updateData);
         
-        // Broadcast the update through session_events table to ensure all clients update
         try {
           const { error: broadcastError } = await supabase
             .from('session_events')
@@ -135,13 +138,12 @@ export function useSessionCapacityCheck() {
       
       setIsCheckingCapacity(false);
       
-      // For admin users, override canJoin to always be true
       if (isAdmin && !capacityResult.canJoin) {
         console.log("🔑 Admin override: forcing canJoin=true despite session being full");
         return {
           ...capacityResult,
           canJoin: true,
-          error: undefined // Clear any error for admins
+          error: undefined
         };
       }
       
@@ -149,13 +151,12 @@ export function useSessionCapacityCheck() {
     } catch (error) {
       setIsCheckingCapacity(false);
       
-      // If admin user, catch the error but still allow joining
       if (isAdmin) {
         console.log("🔑 Admin exception handling: forcing success despite error:", error);
         return {
           canJoin: true,
           latestConversation: null,
-          newParticipantId: 1, // Default to 1 for admin error case
+          newParticipantId: 1,
           error: undefined
         };
       }

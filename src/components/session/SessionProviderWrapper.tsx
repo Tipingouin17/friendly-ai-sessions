@@ -29,9 +29,10 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
 }) => {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializationAttempted = useRef(false);
+  const forcedInitialization = useRef(false);
   const { toast } = useToast();
 
-  // Set up initialization timeout to prevent stuck states
+  // Set up initialization timeout to prevent stuck states - use shorter timeout
   useEffect(() => {
     if (initializationAttempted.current) return;
     
@@ -39,15 +40,31 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     
     // Set a safety timeout to ensure we declare provider initialized even if there's an issue
     initializeTimeoutRef.current = setTimeout(() => {
-      if (sessionMountedRef.current) {
+      if (sessionMountedRef.current && !forcedInitialization.current) {
         console.log("Forcing provider initialization after timeout");
+        forcedInitialization.current = true;
         onInitialized();
         toast({
           title: "Session initialization taking longer than expected",
           description: "We're still trying to connect to the session."
         });
       }
-    }, 8000); // 8 second safety timeout
+    }, 5000); // Reduced from 8 seconds to 5 seconds
+    
+    // Add a second safety timeout for critical failures
+    setTimeout(() => {
+      if (sessionMountedRef.current && !forcedInitialization.current) {
+        console.log("Critical initialization timeout reached, forcing initialization");
+        forcedInitialization.current = true;
+        onInitialized();
+        onLoading(false); // Force loading to false as well
+        toast({
+          title: "Session initialization failed",
+          description: "Please try refreshing the page if you encounter issues.",
+          variant: "destructive"
+        });
+      }
+    }, 8000);
     
     initializationAttempted.current = true;
     
@@ -56,7 +73,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         clearTimeout(initializeTimeoutRef.current);
       }
     };
-  }, [onInitialized, sessionMountedRef, toast]);
+  }, [onInitialized, sessionMountedRef, toast, onLoading]);
 
   return (
     <RefactoredSessionProvider 
@@ -66,26 +83,34 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       {(props: SessionContextProps) => {
         // Initialize provider when first mounted with successful data
         React.useEffect(() => {
-          if (sessionMountedRef.current && props.conversation && props.currentConversationId) {
-            console.log("Provider successfully initialized with data:", {
-              conversationId: props.currentConversationId,
-              hasData: !!props.conversation
-            });
-            
-            // Clear safety timeout since we have real data
-            if (initializeTimeoutRef.current) {
-              clearTimeout(initializeTimeoutRef.current);
-              initializeTimeoutRef.current = null;
+          if (sessionMountedRef.current && !forcedInitialization.current) {
+            if (props.conversation && props.currentConversationId) {
+              console.log("Provider successfully initialized with data:", {
+                conversationId: props.currentConversationId,
+                hasData: !!props.conversation,
+                isAdmin: props.isAdmin
+              });
+              
+              // Clear safety timeout since we have real data
+              if (initializeTimeoutRef.current) {
+                clearTimeout(initializeTimeoutRef.current);
+                initializeTimeoutRef.current = null;
+              }
+              
+              onInitialized();
+            } else if (props.error) {
+              // If we have an error, we should also initialize to stop showing loading state
+              console.log("Provider initialization with error:", props.error);
+              onInitialized();
             }
-            
-            onInitialized();
           }
-        }, [props.conversation, props.currentConversationId]);
+        }, [props.conversation, props.currentConversationId, props.error, props.isAdmin]);
         
         // Log provider state 
         console.log("SessionProvider props:", {
           isLoading: props.isLoading,
           conversationId: props.currentConversationId,
+          isAdmin: props.isAdmin,
           messagesCount: props.sessionState?.messages?.length || 0,
           participantsCount: props.participants?.length || 0,
           isSessionStartedInDB: props.isSessionStartedInDB,

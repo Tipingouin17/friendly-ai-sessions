@@ -35,11 +35,11 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         const newElapsed = (Date.now() - startTime.current) / 1000;
         setElapsed(newElapsed);
         
-        // Automatically update wait states based on elapsed time
-        if (newElapsed > 4 && !isLongWait) {
+        // Automatically update wait states based on elapsed time - use shorter thresholds
+        if (newElapsed > 3 && !isLongWait) {
           setIsLongWait(true);
         }
-        if (newElapsed > 10 && !isVeryLongWait) {
+        if (newElapsed > 8 && !isVeryLongWait) {
           setIsVeryLongWait(true);
         }
       }
@@ -67,23 +67,27 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       setErrorDescription("There seems to be a network connectivity issue. Please check your internet connection.");
     } else if (error.includes("JSON") || error.includes("parse") || error.includes("no rows")) {
       setErrorDescription("The session data couldn't be loaded properly. Please try again.");
+    } else if (error.includes("websocket") || error.includes("WebSocket")) {
+      setErrorDescription("We're having trouble establishing a real-time connection. This might be due to network restrictions.");
     } else {
       setErrorDescription(error);
     }
     
     // Force long wait states when there's an error
     setIsLongWait(true);
-    setIsVeryLongWait(true);
-  }, [error]);
+    if (error.toLowerCase().includes("not found") || error.includes("ended") || retryCount > 1) {
+      setIsVeryLongWait(true);
+    }
+  }, [error, retryCount]);
   
   // If we already have a loading time elapsed or error, show appropriate state immediately
   useEffect(() => {
     if (!mountedRef.current) return;
     
-    if (loadingTimeElapsed > 3) {
+    if (loadingTimeElapsed > 2) {
       setIsLongWait(true);
     }
-    if (loadingTimeElapsed > 10 || retryCount > 0 || error) {
+    if (loadingTimeElapsed > 6 || retryCount > 0 || error) {
       setIsLongWait(true);
       setIsVeryLongWait(true);
     }
@@ -106,21 +110,21 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       if (retryCount > 1) {
         return "Still having trouble connecting...";
       }
-      return "Unable to connect to the session";
+      return "Connection taking longer than expected";
     }
     
     if (isLongWait) {
-      return "Taking longer than expected";
+      return "Establishing connection...";
     }
     
-    return "Loading session information...";
+    return "Loading session...";
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
       <div className="text-center max-w-md">
         {!isVeryLongWait && !error ? (
-          <div className="w-10 h-10 border-t-2 border-purple-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-10 h-10 border-t-2 border-amber-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
         ) : (
           error ? <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" /> : 
                  <WifiOff className="w-10 h-10 text-amber-500 mx-auto mb-4" />
@@ -164,11 +168,23 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
           <div className="mt-4">
             <Button 
               onClick={handleRefresh}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry Connection
             </Button>
+            
+            {retryCount > 2 && (
+              <div className="mt-2">
+                <Button 
+                  onClick={() => window.location.href = '/'}
+                  variant="outline"
+                  className="text-sm"
+                >
+                  Return to Home
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

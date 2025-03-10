@@ -7,7 +7,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   const location = useLocation();
   const { toast } = useToast();
   const [connectionAttempts, setConnectionAttempts] = useState(0);
-  const [lastAttemptTime, setLastAttemptTime] = useState<number>(0);
+  const [lastAttemptTime, setLastAttemptTime] = useState<number>(Date.now());
   const [isRecovering, setIsRecovering] = useState(false);
   const sessionMountedRef = useRef(false);
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,7 +34,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
     };
   }, []);
 
-  // Retry connection function with improved error handling
+  // Retry connection function with improved error handling and shorter timeouts
   const retryConnection = useCallback(() => {
     if (!sessionMountedRef.current) return;
     
@@ -49,8 +49,8 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
     setConnectionAttempts(prev => prev + 1);
     setLastAttemptTime(Date.now());
     
-    // Use exponential backoff strategy to prevent overwhelming the server
-    const retryDelay = Math.min(connectionAttempts * 1000, 3000);
+    // Use more aggressive backoff strategy to recover faster
+    const retryDelay = Math.min(500 * connectionAttempts, 2000);
     
     recoveryTimeoutRef.current = setTimeout(() => {
       try {
@@ -67,7 +67,8 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
                 description: "Trying an alternative connection method...",
               });
               
-              window.location.href = `${window.location.origin}/session?id=${sessionId}`;
+              // Use location.replace to avoid adding to history stack
+              window.location.replace(`${window.location.origin}/session?id=${sessionId}`);
             } else {
               window.location.reload();
             }
@@ -81,10 +82,10 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
             variant: "destructive",
           });
           
-          // On repeated failures, use a fresh load rather than a reload
+          // Force a clean reload after multiple attempts
           setTimeout(() => {
             window.location.href = window.location.href;
-          }, 1000);
+          }, 500);
         }
       } catch (err) {
         console.error("Error during connection retry:", err);

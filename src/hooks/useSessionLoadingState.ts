@@ -13,7 +13,7 @@ export function useSessionLoadingState(
   const recoveryAttemptsMade = useRef(0);
   const { toast } = useToast();
 
-  // Set up recovery timer for stuck loading state
+  // Set up recovery timer for stuck loading state with shorter timeouts
   useEffect(() => {
     // Skip if not mounted yet
     if (!sessionMountedRef.current) return;
@@ -33,8 +33,8 @@ export function useSessionLoadingState(
       return;
     }
     
-    // Implement a progressive backoff for recovery attempts
-    const recoveryTime = Math.min(5000 + (recoveryAttemptsMade.current * 2000), 15000);
+    // Use more aggressive recovery timing to prevent long loading states
+    const recoveryTime = Math.min(3000 + (recoveryAttemptsMade.current * 1000), 8000);
     const loadingTime = Date.now() - loadingStartTime;
     
     // Only set the recovery timer if we're still loading and the session is mounted
@@ -46,13 +46,19 @@ export function useSessionLoadingState(
         
         console.log(`Session loading stuck for ${loadingTime/1000}s, recovery attempt ${recoveryAttemptsMade.current}`);
         
-        // Only show toast on first recovery attempt or after significant time
-        if (connectionAttempts === 0 || recoveryAttemptsMade.current === 1 || recoveryAttemptsMade.current % 3 === 0) {
+        // Show toast on first recovery attempt or after significant time
+        if (connectionAttempts === 0 || recoveryAttemptsMade.current === 1 || recoveryAttemptsMade.current % 2 === 0) {
           toast({
             title: "Connection issue detected",
             description: "The session is taking longer than expected to load. Attempting recovery...",
             variant: "destructive",
           });
+        }
+        
+        // Force provider initialization after multiple recovery attempts
+        if (recoveryAttemptsMade.current >= 3 && isLoading) {
+          console.log("Forcing loading state to false after multiple recovery attempts");
+          setIsLoading(false);
         }
       }
     }, recoveryTime);

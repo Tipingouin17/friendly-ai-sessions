@@ -7,7 +7,7 @@ export function useSessionAdminStatus() {
   const [isAdmin, setIsAdmin] = useState(false);
   const isInitialized = useRef(false);
   
-  // Determine if user is admin
+  // Determine if user is admin - improved with more reliable detection
   useEffect(() => {
     // Only run once to prevent state inconsistency
     if (isInitialized.current) return;
@@ -19,15 +19,31 @@ export function useSessionAdminStatus() {
       newConversationId?: number;
     } | null;
     
-    // User is considered admin if:
-    // 1. They're explicitly marked as admin in the state
-    // 2. They're not a guest (implying they created the session)
-    // 3. They have a newConversationId (implying they created it)
-    const adminStatus = Boolean(locationState?.isAdmin) || 
-      (locationState?.isGuest !== true) || 
-      Boolean(locationState?.newConversationId);
+    // More robust admin detection with clear precedence:
+    // 1. Explicit isAdmin flag in state takes priority
+    // 2. If isGuest is false, user is admin (session creator)
+    // 3. Having newConversationId implies user created the session 
+    let adminStatus = false;
     
-    console.log(`Setting admin status to ${adminStatus} based on:`, locationState);
+    if (locationState?.isAdmin === true) {
+      adminStatus = true;
+    } else if (locationState?.isGuest === false) {
+      adminStatus = true;
+    } else if (locationState?.newConversationId) {
+      adminStatus = true;
+    } else {
+      // Not explicitly marked as admin or guest, default to non-admin
+      adminStatus = false;
+    }
+    
+    console.log(`Setting admin status to ${adminStatus} based on state:`, 
+      JSON.stringify({
+        isAdminInState: locationState?.isAdmin,
+        isGuest: locationState?.isGuest,
+        hasNewConversationId: Boolean(locationState?.newConversationId)
+      })
+    );
+    
     setIsAdmin(adminStatus);
     isInitialized.current = true;
   }, [location]);

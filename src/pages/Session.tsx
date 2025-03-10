@@ -27,8 +27,9 @@ const Session = () => {
   
   const { toast } = useToast();
   const pageLoadTime = useRef(Date.now());
+  const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Log initialization on mount
+  // Log initialization on mount and set up safety timeouts
   useEffect(() => {
     console.log("Session page mounted", {
       time: new Date().toISOString(),
@@ -39,7 +40,7 @@ const Session = () => {
     });
     
     // Set a timeout to check if initialization takes too long
-    const timeoutId = setTimeout(() => {
+    initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.warn("Session initialization taking longer than expected");
         toast({
@@ -47,12 +48,31 @@ const Session = () => {
           description: "We're having trouble connecting to the session. You may need to refresh the page.",
         });
       }
-    }, 15000); // 15 seconds is very generous
+    }, 10000); // Reduced from 15 seconds to 10 seconds
+    
+    // Additional critical safety timeout
+    setTimeout(() => {
+      if (isLoading && !hasInitializedProvider) {
+        console.error("Critical timeout reached, session may be stuck");
+        toast({
+          title: "Connection problem",
+          description: "Unable to establish connection. Please try refreshing the page.",
+          variant: "destructive"
+        });
+        
+        // Force clean state to allow UI to render
+        setIsLoading(false);
+        setHasInitializedProvider(true);
+      }
+    }, 15000);
     
     return () => {
-      clearTimeout(timeoutId);
+      if (initializeTimeoutRef.current) {
+        clearTimeout(initializeTimeoutRef.current);
+        initializeTimeoutRef.current = null;
+      }
     };
-  }, [isAdmin, error, noSessionFound, isLoading, hasInitializedProvider, toast]);
+  }, [isAdmin, error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider]);
 
   // Render the session page
   return (
@@ -68,6 +88,13 @@ const Session = () => {
       <SessionProviderWrapper
         onInitialized={() => {
           console.log(`Provider initialized after ${Date.now() - pageLoadTime.current}ms`);
+          
+          // Clear initialization timeout since we've successfully initialized
+          if (initializeTimeoutRef.current) {
+            clearTimeout(initializeTimeoutRef.current);
+            initializeTimeoutRef.current = null;
+          }
+          
           setHasInitializedProvider(true);
         }}
         onLoading={setIsLoading}

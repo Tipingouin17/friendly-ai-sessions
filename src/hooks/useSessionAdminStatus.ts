@@ -19,13 +19,16 @@ export function useSessionAdminStatus() {
       newConversationId?: number;
     } | null;
     
+    const searchParams = new URLSearchParams(location.search);
+    const isAdminParam = searchParams.get('admin') === 'true';
+    
     // More robust admin detection with clear precedence:
-    // 1. Explicit isAdmin flag in state takes priority
+    // 1. Explicit isAdmin flag in state or query param takes priority
     // 2. If isGuest is false, user is admin (session creator)
     // 3. Having newConversationId implies user created the session 
     let adminStatus = false;
     
-    if (locationState?.isAdmin === true) {
+    if (locationState?.isAdmin === true || isAdminParam) {
       adminStatus = true;
     } else if (locationState?.isGuest === false) {
       adminStatus = true;
@@ -39,6 +42,7 @@ export function useSessionAdminStatus() {
     console.log(`Setting admin status to ${adminStatus} based on state:`, 
       JSON.stringify({
         isAdminInState: locationState?.isAdmin,
+        isAdminInQuery: isAdminParam,
         isGuest: locationState?.isGuest,
         hasNewConversationId: Boolean(locationState?.newConversationId)
       })

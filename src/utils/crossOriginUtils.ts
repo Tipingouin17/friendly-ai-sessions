@@ -43,7 +43,7 @@ export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => 
   
   // For cross-origin contexts in modern browsers, we need to use SameSite=None with secure
   return {
-    sameSite: isCrossOrigin ? 'None' : 'Lax',
+    sameSite: isCrossOrigin ? 'none' : 'lax', // Changed to lowercase "none" for compatibility
     secure: isHttps || isCrossOrigin, // Always secure for cross-origin, optional for same-origin
   };
 };
@@ -52,8 +52,6 @@ export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => 
  * Apply cookie parameters to any fetch calls in cross-origin contexts
  */
 export const applySafeCookieParams = (options: RequestInit = {}): RequestInit => {
-  const cookieParams = getSafeCookieParams();
-  
   // If we're in a cross-origin context, always include credentials
   return {
     ...options,
@@ -80,4 +78,35 @@ export const createSessionFallbackUrl = (sessionId?: string | number): string =>
   const baseUrl = getCurrentOrigin();
   const path = sessionId ? `/session?id=${sessionId}` : '/session';
   return `${baseUrl}${path}`;
+};
+
+/**
+ * Sets a cookie with proper SameSite attributes for cross-origin contexts
+ */
+export const setCrossDomainCookie = (name: string, value: string, days = 7): void => {
+  const { sameSite, secure } = getSafeCookieParams();
+  
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  
+  // Build cookie string with appropriate attributes for cross-domain contexts
+  let cookieString = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
+  
+  // Add SameSite attribute
+  cookieString += `; SameSite=${sameSite}`;
+  
+  // Add Secure attribute if needed
+  if (secure) {
+    cookieString += '; Secure';
+  }
+  
+  document.cookie = cookieString;
+};
+
+/**
+ * Gets a cookie value by name
+ */
+export const getCookie = (name: string): string | null => {
+  const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+  return match ? decodeURIComponent(match[3]) : null;
 };

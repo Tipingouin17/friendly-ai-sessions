@@ -39,18 +39,18 @@ const Session = () => {
       isLoading
     });
     
-    // Set a timeout to check if initialization takes too long
+    // Set a timeout to check if initialization takes too long - reduced to 8 seconds
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.warn("Session initialization taking longer than expected");
         toast({
           title: "Slow connection detected",
-          description: "We're having trouble connecting to the session. You may need to refresh the page.",
+          description: "We're having trouble connecting to the session. Please wait or refresh if needed.",
         });
       }
-    }, 10000); // Reduced from 15 seconds to 10 seconds
+    }, 8000);
     
-    // Additional critical safety timeout
+    // Additional critical safety timeout - reduced to 12 seconds
     setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.error("Critical timeout reached, session may be stuck");
@@ -64,7 +64,7 @@ const Session = () => {
         setIsLoading(false);
         setHasInitializedProvider(true);
       }
-    }, 15000);
+    }, 12000);
     
     return () => {
       if (initializeTimeoutRef.current) {
@@ -96,6 +96,14 @@ const Session = () => {
           }
           
           setHasInitializedProvider(true);
+          
+          // If we're in admin mode, ensure we're not stuck in loading
+          if (isAdmin && isLoading) {
+            console.log("Admin detected, ensuring loading state is properly cleared");
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 500);
+          }
         }}
         onLoading={setIsLoading}
         onError={handleError}
@@ -104,6 +112,7 @@ const Session = () => {
         connectionAttempts={connectionAttempts}
         error={error}
         sessionMountedRef={sessionMountedRef}
+        isAdmin={isAdmin}
       />
     </SessionErrorBoundary>
   );

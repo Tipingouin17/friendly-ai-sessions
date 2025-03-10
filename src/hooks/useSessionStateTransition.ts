@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { SessionContextProps } from "@/types/session";
 
@@ -18,8 +18,15 @@ export function useSessionStateTransition({
   setSessionStarted,
   onSessionFull
 }: UseSessionStateTransitionProps) {
+  // Always initialize all hooks at the top level in the same order
   const { toast } = useToast();
   const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Calculate variables that don't need useState
+  const maxParticipants = props.conversation?.participants || 0;
+  const currentParticipants = props.conversation?.current_participants || 0;
+  const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
+  const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull || isTransitioning;
   
   // Handle state transitions with a delay to avoid flashing
   useEffect(() => {
@@ -33,14 +40,8 @@ export function useSessionStateTransition({
     }
   }, [props.isSessionStartedInDB, sessionStarted, setSessionStarted]);
   
-  // Calculate if session should be shown
-  const maxParticipants = props.conversation?.participants || 0;
-  const currentParticipants = props.conversation?.current_participants || 0;
-  const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
-  const shouldShowSession = props.isSessionStartedInDB || sessionStarted || isSessionFull || isTransitioning;
-
-  // Handler for starting the session
-  const handleStartSession = () => {
+  // Handler for starting the session - using useCallback to prevent recreation
+  const handleStartSession = useCallback(() => {
     console.log("Start session button clicked");
     setIsTransitioning(true);
     
@@ -65,7 +66,7 @@ export function useSessionStateTransition({
         variant: "destructive"
       });
     }
-  };
+  }, [props.handleStartSession, toast, setSessionStarted]);
 
   return {
     isTransitioning,

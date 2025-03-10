@@ -12,6 +12,15 @@ export function useSessionLoadingState(
   const [loadingStartTime] = useState(Date.now());
   const recoveryAttemptsMade = useRef(0);
   const { toast } = useToast();
+  const lastLoadingState = useRef<boolean>(true);
+
+  // Track loading state changes to help with debugging
+  useEffect(() => {
+    if (lastLoadingState.current !== isLoading) {
+      console.log(`Loading state changed: ${lastLoadingState.current} -> ${isLoading}`);
+      lastLoadingState.current = isLoading;
+    }
+  }, [isLoading]);
 
   // Set up recovery timer for stuck loading state with shorter timeouts
   useEffect(() => {
@@ -55,8 +64,8 @@ export function useSessionLoadingState(
           });
         }
         
-        // Force provider initialization after multiple recovery attempts
-        if (recoveryAttemptsMade.current >= 3 && isLoading) {
+        // Force provider initialization after multiple recovery attempts (reduced from 3 to 2)
+        if (recoveryAttemptsMade.current >= 2 && isLoading) {
           console.log("Forcing loading state to false after multiple recovery attempts");
           setIsLoading(false);
         }

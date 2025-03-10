@@ -15,6 +15,7 @@ interface SessionProviderWrapperProps {
   connectionAttempts: number;
   error: string | null;
   sessionMountedRef: React.RefObject<boolean>;
+  isAdmin?: boolean;
 }
 
 const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
@@ -25,20 +26,24 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   retryConnection,
   connectionAttempts,
   error,
-  sessionMountedRef
+  sessionMountedRef,
+  isAdmin = false
 }) => {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializationAttempted = useRef(false);
   const forcedInitialization = useRef(false);
   const { toast } = useToast();
 
-  // Set up initialization timeout to prevent stuck states - use shorter timeout
+  // Set up initialization timeout to prevent stuck states - shorter timeouts for admin
   useEffect(() => {
     if (initializationAttempted.current) return;
     
-    console.log("Setting up initialization safety timeout");
+    console.log("Setting up initialization safety timeout, isAdmin:", isAdmin);
     
     // Set a safety timeout to ensure we declare provider initialized even if there's an issue
+    // Use faster timeout for admin
+    const initialTimeout = isAdmin ? 3000 : 5000;
+    
     initializeTimeoutRef.current = setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
         console.log("Forcing provider initialization after timeout");
@@ -49,9 +54,11 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           description: "We're still trying to connect to the session."
         });
       }
-    }, 5000); // Reduced from 8 seconds to 5 seconds
+    }, initialTimeout);
     
-    // Add a second safety timeout for critical failures
+    // Add a second safety timeout for critical failures - shorter for admin
+    const criticalTimeout = isAdmin ? 6000 : 8000;
+    
     setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
         console.log("Critical initialization timeout reached, forcing initialization");
@@ -59,12 +66,12 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         onInitialized();
         onLoading(false); // Force loading to false as well
         toast({
-          title: "Session initialization failed",
-          description: "Please try refreshing the page if you encounter issues.",
-          variant: "destructive"
+          title: "Session initialization taking longer than expected",
+          description: "Please wait a moment while we complete setup.",
+          variant: isAdmin ? "default" : "destructive"
         });
       }
-    }, 8000);
+    }, criticalTimeout);
     
     initializationAttempted.current = true;
     
@@ -73,7 +80,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         clearTimeout(initializeTimeoutRef.current);
       }
     };
-  }, [onInitialized, sessionMountedRef, toast, onLoading]);
+  }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin]);
 
   return (
     <RefactoredSessionProvider 
@@ -84,14 +91,18 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         // Initialize provider when first mounted with successful data
         React.useEffect(() => {
           if (sessionMountedRef.current && !forcedInitialization.current) {
-            if (props.conversation && props.currentConversationId) {
+            // For admin, we can initialize faster even if data isn't fully loaded
+            const shouldInitialize = isAdmin ? true : (props.conversation && props.currentConversationId);
+            
+            if (shouldInitialize) {
               console.log("Provider successfully initialized with data:", {
                 conversationId: props.currentConversationId,
                 hasData: !!props.conversation,
-                isAdmin: props.isAdmin
+                isAdmin: props.isAdmin,
+                providedIsAdmin: isAdmin
               });
               
-              // Clear safety timeout since we have real data
+              // Clear safety timeout since we're initializing
               if (initializeTimeoutRef.current) {
                 clearTimeout(initializeTimeoutRef.current);
                 initializeTimeoutRef.current = null;
@@ -111,6 +122,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           isLoading: props.isLoading,
           conversationId: props.currentConversationId,
           isAdmin: props.isAdmin,
+          providedIsAdmin: isAdmin,
           messagesCount: props.sessionState?.messages?.length || 0,
           participantsCount: props.participants?.length || 0,
           isSessionStartedInDB: props.isSessionStartedInDB,
@@ -123,9 +135,15 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         // Update loading state when it changes
         React.useEffect(() => {
           if (sessionMountedRef.current) {
-            onLoading(props.isLoading);
+            // For admin, we might want to force loading to false more aggressively
+            if (isAdmin && props.isAdmin) {
+              console.log("Admin detected in provider, ensuring loading state is properly updated");
+              onLoading(false);
+            } else {
+              onLoading(props.isLoading);
+            }
           }
-        }, [props.isLoading]);
+        }, [props.isLoading, props.isAdmin]);
         
         // Update error state when it changes
         React.useEffect(() => {
@@ -134,8 +152,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           }
         }, [props.error]);
         
-        // Show loading state if still loading
-        if (props.isLoading && !props.conversation) {
+        // Show loading state if still loading, but not for admin after loading
+        if (props.isLoading && !props.conversation && !(isAdmin && props.isAdmin)) {
           console.log("Showing provider loading state");
           return <JoinSessionLoadingState 
             onRetry={retryConnection}
@@ -153,8 +171,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           />;
         }
         
-        // Show error if no conversation ID is found
-        if (!props.currentConversationId && !props.isLoading) {
+        // Show error if no conversation ID is found - but bypass for admin
+        if (!props.currentConversationId && !props.isLoading && !isAdmin) {
           console.error("No conversation ID found in session provider, but no error was returned");
           return <JoinSessionLoadingState 
             error="Session not found. Please try again." 
@@ -167,7 +185,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         return (
           <SessionStateHandler
             props={props}
-            isAdmin={props.isAdmin || false}
+            isAdmin={props.isAdmin || isAdmin}
             sessionStarted={props.sessionStarted || false}
             setSessionStarted={(started) => console.log("Session started:", started)}
             onSessionFull={handleSessionFull}

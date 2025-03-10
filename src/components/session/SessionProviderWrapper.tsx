@@ -1,10 +1,11 @@
 
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { SessionContextProps } from "@/types/session";
 import SessionStateHandler from "@/components/session/SessionStateHandler";
-import { useToast } from "@/components/ui/use-toast";
+import { useSessionProviderInitialization } from "@/hooks/useSessionProviderInitialization";
+import { useSessionProviderAdmin } from "@/hooks/useSessionProviderAdmin";
 
 interface SessionProviderWrapperProps {
   onInitialized?: () => void;
@@ -33,21 +34,20 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   forceAdmin = false,
   children
 }) => {
-  const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const initializationAttempted = useRef(false);
-  const forcedInitialization = useRef(false);
-  const { toast } = useToast();
+  // Use admin status management hook
+  useSessionProviderAdmin({ forceAdmin });
 
-  // Enforce admin status if forceAdmin is true
-  useEffect(() => {
-    if (forceAdmin) {
-      console.log("Enforcing admin status due to forceAdmin=true");
-      sessionStorage.setItem('isAdminSession', 'true');
-    }
-  }, [forceAdmin]);
+  // Use initialization hook
+  const { forcedInitialization } = useSessionProviderInitialization({
+    onInitialized,
+    onLoading,
+    sessionMountedRef,
+    isAdmin,
+    forceAdmin
+  });
 
   // Log admin settings
-  useEffect(() => {
+  React.useEffect(() => {
     console.log("SessionProviderWrapper initialized with admin settings:", { 
       isAdmin, 
       forceAdmin,
@@ -56,52 +56,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     });
   }, [isAdmin, forceAdmin]);
 
-  useEffect(() => {
-    if (initializationAttempted.current) return;
-    
-    console.log("Setting up initialization safety timeout, isAdmin:", isAdmin || forceAdmin);
-    
-    // Use shorter timeouts for admin views
-    const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 5000;
-    
-    initializeTimeoutRef.current = setTimeout(() => {
-      if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Forcing provider initialization after timeout, isAdmin:", isAdmin || forceAdmin);
-        forcedInitialization.current = true;
-        onInitialized();
-        toast({
-          title: "Session initialization taking longer than expected",
-          description: "We're still trying to connect to the session."
-        });
-      }
-    }, initialTimeout);
-    
-    const criticalTimeout = (isAdmin || forceAdmin) ? 4000 : 8000;
-    
-    setTimeout(() => {
-      if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
-        forcedInitialization.current = true;
-        onInitialized();
-        onLoading(false);
-        toast({
-          title: "Session initialization taking longer than expected",
-          description: "Please wait a moment while we complete setup.",
-          variant: (isAdmin || forceAdmin) ? "default" : "destructive"
-        });
-      }
-    }, criticalTimeout);
-    
-    initializationAttempted.current = true;
-    
-    return () => {
-      if (initializeTimeoutRef.current) {
-        clearTimeout(initializeTimeoutRef.current);
-      }
-    };
-  }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin, forceAdmin]);
-
-  // If forceAdmin is true, always ensure admin status is set
   const effectiveAdmin = isAdmin || forceAdmin;
 
   return (
@@ -113,7 +67,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       {(props: SessionContextProps) => {
         React.useEffect(() => {
           if (sessionMountedRef.current && !forcedInitialization.current) {
-            // For admin pages, we initialize sooner
             const shouldInitialize = effectiveAdmin ? true : (props.conversation && props.currentConversationId);
             
             if (shouldInitialize) {
@@ -124,12 +77,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
                 providedIsAdmin: isAdmin,
                 forceAdmin
               });
-              
-              if (initializeTimeoutRef.current) {
-                clearTimeout(initializeTimeoutRef.current);
-                initializeTimeoutRef.current = null;
-              }
-              
               onInitialized();
             } else if (props.error) {
               console.log("Provider initialization with error:", props.error);
@@ -170,7 +117,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           }
         }, [props.error]);
         
-        // Don't show loading state for admin mode when forceAdmin is true
         if (props.isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
           console.log("Showing provider loading state");
           return <JoinSessionLoadingState 
@@ -197,7 +143,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           />;
         }
         
-        // Ensure admin status is enforced for forceAdmin
         if (forceAdmin && !props.isAdmin) {
           console.log("Forcing admin status in SessionProviderWrapper for forceAdmin=true");
           sessionStorage.setItem('isAdminSession', 'true');
@@ -206,7 +151,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         if (children) {
           return children({
             ...props,
-            // Ensure admin status is correctly passed if forceAdmin is true
             isAdmin: props.isAdmin || effectiveAdmin 
           });
         }
@@ -215,7 +159,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           <SessionStateHandler
             props={{
               ...props,
-              // Ensure admin status is correctly passed if forceAdmin is true
               isAdmin: props.isAdmin || effectiveAdmin
             }}
             isAdmin={props.isAdmin || effectiveAdmin}

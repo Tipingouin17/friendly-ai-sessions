@@ -18,7 +18,7 @@ export function useSessionStateTransition({
   setSessionStarted,
   onSessionFull
 }: UseSessionStateTransitionProps) {
-  // Always initialize all hooks at the top level in the same order
+  // All hooks need to be called at the top level in the same order every render
   const { toast } = useToast();
   const [isTransitioning, setIsTransitioning] = useState(false);
   

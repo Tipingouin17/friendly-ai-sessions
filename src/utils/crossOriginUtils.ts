@@ -41,9 +41,8 @@ export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => 
   const isHttps = window.location.protocol === 'https:';
   const isCrossOrigin = isInCrossOriginContext();
   
-  // For cross-origin contexts in modern browsers, we need to use SameSite=None with secure
   return {
-    sameSite: isCrossOrigin ? 'none' : 'lax', // Changed to lowercase "none" for compatibility
+    sameSite: isCrossOrigin ? 'none' : 'lax',
     secure: isHttps || isCrossOrigin, // Always secure for cross-origin, optional for same-origin
   };
 };
@@ -56,7 +55,6 @@ export const applySafeCookieParams = (options: RequestInit = {}): RequestInit =>
   return {
     ...options,
     credentials: 'include',
-    // You could add headers here if needed for specific cookie control
   };
 };
 

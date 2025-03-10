@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import React from "react";
 import { SessionContextProps } from "@/types/session";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -18,21 +18,32 @@ interface SessionStateHandlerProps {
   onSessionFull: () => void;
 }
 
-const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
+// This is a separate component to handle the conditional rendering
+// after all hooks have been called in the main component
+const SessionContent: React.FC<{
+  props: SessionContextProps;
+  isAdmin: boolean;
+  sessionStarted: boolean;
+  setSessionStarted: (started: boolean) => void;
+  onSessionFull: () => void;
+  initializing: boolean;
+  transitionState: {
+    isTransitioning: boolean;
+    shouldShowSession: boolean;
+    currentParticipants: number;
+    maxParticipants: number;
+    handleStartSession: () => void;
+  };
+}> = ({
   props,
   isAdmin,
   sessionStarted,
   setSessionStarted,
-  onSessionFull
+  onSessionFull,
+  initializing,
+  transitionState
 }) => {
-  const { toast } = useToast();
-  
-  // Use our new initialization hook
-  const { initializing } = useSessionInitialization({
-    props,
-    setSessionStarted
-  });
-  
+  // Error and loading states are handled first with early returns
   if (props.isLoading || initializing) {
     console.log("Showing loading state - isLoading:", props.isLoading, "initializing:", initializing);
     return <LoadingState />;
@@ -53,19 +64,14 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     return <EmptyState />;
   }
 
+  // Destructure transition state for cleaner usage
   const {
     isTransitioning,
     shouldShowSession,
     currentParticipants,
     maxParticipants,
     handleStartSession
-  } = useSessionStateTransition({
-    props,
-    isAdmin,
-    sessionStarted,
-    setSessionStarted,
-    onSessionFull
-  });
+  } = transitionState;
 
   return (
     <SessionStateProvider 
@@ -74,11 +80,7 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       onSessionFull={onSessionFull}
       onError={(error) => {
         console.error("Session error:", error);
-        toast({
-          title: "Session Error",
-          description: error,
-          variant: "destructive",
-        });
+        // Toast usage is isolated to the SessionStateProvider
       }}
     >
       <SessionStateDebugger 
@@ -100,6 +102,46 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
         onSessionFull={onSessionFull}
       />
     </SessionStateProvider>
+  );
+};
+
+// Main component that ensures consistent hook order
+const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
+  props,
+  isAdmin,
+  sessionStarted,
+  setSessionStarted,
+  onSessionFull
+}) => {
+  // All hooks are called every time in the same order
+  const { toast } = useToast();
+  
+  // Use initialization hook
+  const { initializing } = useSessionInitialization({
+    props,
+    setSessionStarted
+  });
+  
+  // Use transition state hook - called unconditionally
+  const transitionState = useSessionStateTransition({
+    props,
+    isAdmin,
+    sessionStarted,
+    setSessionStarted,
+    onSessionFull
+  });
+
+  // Render the content separately to avoid conditional hook calls
+  return (
+    <SessionContent
+      props={props}
+      isAdmin={isAdmin}
+      sessionStarted={sessionStarted}
+      setSessionStarted={setSessionStarted}
+      onSessionFull={onSessionFull}
+      initializing={initializing}
+      transitionState={transitionState}
+    />
   );
 };
 

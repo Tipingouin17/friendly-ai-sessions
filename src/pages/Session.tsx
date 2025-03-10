@@ -39,7 +39,11 @@ const Session = () => {
       isLoading
     });
     
-    // Set a timeout to check if initialization takes too long - reduced to 8 seconds
+    // Different timeouts based on user role
+    const initialTimeout = isAdmin ? 5000 : 8000;
+    const criticalTimeout = isAdmin ? 8000 : 12000;
+    
+    // Set a timeout to check if initialization takes too long
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.warn("Session initialization taking longer than expected");
@@ -48,9 +52,9 @@ const Session = () => {
           description: "We're having trouble connecting to the session. Please wait or refresh if needed.",
         });
       }
-    }, 8000);
+    }, initialTimeout);
     
-    // Additional critical safety timeout - reduced to 12 seconds
+    // Additional critical safety timeout
     setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.error("Critical timeout reached, session may be stuck");
@@ -64,7 +68,7 @@ const Session = () => {
         setIsLoading(false);
         setHasInitializedProvider(true);
       }
-    }, 12000);
+    }, criticalTimeout);
     
     return () => {
       if (initializeTimeoutRef.current) {
@@ -100,9 +104,10 @@ const Session = () => {
           // If we're in admin mode, ensure we're not stuck in loading
           if (isAdmin && isLoading) {
             console.log("Admin detected, ensuring loading state is properly cleared");
+            // Use shorter timeout for admin users
             setTimeout(() => {
               setIsLoading(false);
-            }, 500);
+            }, 300);
           }
         }}
         onLoading={setIsLoading}

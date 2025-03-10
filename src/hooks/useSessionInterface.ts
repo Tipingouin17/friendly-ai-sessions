@@ -106,23 +106,32 @@ export function useSessionInterface(conversationId: number | null) {
           console.log("Verified session started status:", data);
         }
         
-        // First, update the local state to start showing the session UI
+        // First, update the local state
         setShowQrCodeView(false);
         setIsSessionStarted(true);
         
-        // Redirect using navigate instead of directly changing window.location
-        // This prevents page reload and maintains React Router state
-        console.log("Redirecting to session page with ID:", conversationId);
-        
-        // Use exact ID parameter instead of state to ensure it's properly picked up
-        navigate(`/session?id=${conversationId}`, { 
-          state: { 
-            isAdmin: true,
-            showMessaging: true,
-            conversationId: conversationId // Explicitly include the conversationId in state
-          },
-          replace: true // Replace current history entry to prevent back navigation to QR view
-        });
+        // Check if we're already on the admin path
+        if (location.pathname.includes('/admin')) {
+          // If already on admin path, just update state
+          navigate(`/session/admin?id=${conversationId}`, { 
+            state: { 
+              isAdmin: true,
+              showMessaging: true,
+              conversationId: conversationId
+            },
+            replace: true
+          });
+        } else {
+          // Redirect to admin page for session creators
+          navigate(`/session/admin?id=${conversationId}`, { 
+            state: { 
+              isAdmin: true,
+              showMessaging: true,
+              conversationId: conversationId
+            },
+            replace: true
+          });
+        }
       }
     } catch (err) {
       console.error("Exception updating session_started:", err);

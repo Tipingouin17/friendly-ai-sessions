@@ -73,10 +73,11 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-        navigate('/session', {
-          replace: true,
+        // Navigate to admin session page with explicit admin state
+        navigate('/session/admin', {
           state: {
             newConversationId: data.id,
+            isAdmin: true,
             replace: true
           }
         });

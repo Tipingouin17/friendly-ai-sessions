@@ -19,6 +19,7 @@ import PastWorkshops from "./pages/PastWorkshops";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Session from "./pages/Session";
+import SessionAdmin from "./pages/SessionAdmin";
 import Checkout from "./pages/checkout";
 import NotFound from "./pages/NotFound";
 import JoinSession from "./pages/JoinSession";
@@ -91,8 +92,19 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Remove the ProtectedRoute wrapper for Session page */}
+          {/* Regular session route for participants */}
           <Route path="/session" element={<Session />} />
+          
+          {/* Admin-specific session route */}
+          <Route 
+            path="/session/admin" 
+            element={
+              <ProtectedRoute>
+                <SessionAdmin />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route path="/checkout/:planType?" element={<Checkout />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

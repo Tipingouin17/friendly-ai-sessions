@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
@@ -65,7 +66,7 @@ export function useSessionParticipantManager({
 
   // Function to force refresh participant data from the database
   const forceRefreshParticipants = useCallback(async () => {
-    if (!conversationId) return;
+    if (!conversationId) return Promise.resolve();
     
     try {
       console.log("Forcibly refreshing participant data for conversation:", conversationId);
@@ -78,7 +79,7 @@ export function useSessionParticipantManager({
         
       if (error) {
         console.error("Error fetching participant data:", error);
-        return;
+        return Promise.resolve();
       }
       
       if (data && data.length > 0) {
@@ -112,8 +113,10 @@ export function useSessionParticipantManager({
           setParticipants(placeholders);
         }
       }
+      return Promise.resolve();
     } catch (err) {
       console.error("Error in forceRefreshParticipants:", err);
+      return Promise.resolve();
     }
   }, [conversationId, conversation?.current_participants]);
 

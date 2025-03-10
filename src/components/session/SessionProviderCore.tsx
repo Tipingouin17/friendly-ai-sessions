@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -52,7 +53,8 @@ export const SessionProviderCore = ({
     dataError,
     providerError,
     handleError,
-    enhancedHandleStartSession
+    enhancedHandleStartSession,
+    isAdmin
   } = useSessionProviderState({ 
     onError, 
     forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) 
@@ -133,7 +135,7 @@ export const SessionProviderCore = ({
   }
 
   // Determine effective admin status
-  const effectiveIsAdmin = forceAdmin === true || locationState?.isAdmin === true;
+  const effectiveIsAdmin = forceAdmin === true || locationState?.isAdmin === true || isAdmin;
 
   // Build session context
   const sessionContext: SessionContextProps = {
@@ -182,4 +184,3 @@ export const SessionProviderCore = ({
   // Return children with context
   return children(sessionContext);
 };
-

@@ -64,7 +64,7 @@ export function useSessionLoadingState(
           });
         }
         
-        // Force provider initialization after multiple recovery attempts (reduced from 3 to 2)
+        // Force provider initialization after multiple recovery attempts
         if (recoveryAttemptsMade.current >= 2 && isLoading) {
           console.log("Forcing loading state to false after multiple recovery attempts");
           setIsLoading(false);

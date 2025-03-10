@@ -24,7 +24,7 @@ export function useSessionAdminStatus() {
     const isAdminPath = location.pathname.includes('/admin');
     
     // More robust admin detection with clear precedence:
-    // 1. Check if we're on the /session/admin path
+    // 1. Check if we're on the /session/admin path or any path with 'admin'
     // 2. Explicit isAdmin flag in state or query param 
     // 3. If isGuest is false, user is admin (session creator)
     // 4. Having newConversationId implies user created the session 

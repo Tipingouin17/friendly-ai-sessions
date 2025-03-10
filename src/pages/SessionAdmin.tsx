@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useLocation, Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import SessionProviderWrapper from "@/components/session/SessionProviderWrapper";
@@ -7,6 +7,7 @@ import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";
 import { useToast } from "@/components/ui/use-toast";
 import AdminHeader from "@/components/session/AdminHeader";
 import { useConversationId } from "@/hooks/useConversationId";
+import { useConversation } from "@/hooks/useConversation";
 
 const SessionAdmin = () => {
   const {
@@ -28,6 +29,7 @@ const SessionAdmin = () => {
   } = useSessionPage();
   
   const { currentConversationId, locationState } = useConversationId();
+  const { data: conversationData } = useConversation(currentConversationId);
   const { toast } = useToast();
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -45,7 +47,8 @@ const SessionAdmin = () => {
       noSessionFound,
       isLoading,
       currentConversationId,
-      locationState
+      locationState,
+      conversationData: conversationData?.title
     });
     
     // Shorter timeouts for admin session
@@ -84,7 +87,7 @@ const SessionAdmin = () => {
         initializeTimeoutRef.current = null;
       }
     };
-  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState]);
+  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState, conversationData]);
 
   // Admin Welcome message
   useEffect(() => {
@@ -106,7 +109,10 @@ const SessionAdmin = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AdminHeader />
+      <AdminHeader 
+        sessionTitle={conversationData?.sessions?.title || "Session Admin Panel"}
+        facilitatorTitle={conversationData?.sessions?.facilitator_details?.title || ""}
+      />
       
       <div className="flex-1">
         <SessionErrorBoundary

@@ -22,7 +22,7 @@ export function useSessionJoiner() {
   const { toast } = useToast();
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAdmin } = useSessionAdminStatus();
+  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
 
   const navigateToSession = (conversationId: number | null, name: string, participantId: number, avatarSeed: string, forceAdmin: boolean = false) => {
     const adminStatus = forceAdmin || isAdmin;
@@ -31,6 +31,7 @@ export function useSessionJoiner() {
     if (adminStatus) {
       // Set admin status in session storage to ensure it persists
       sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
     }
     
     navigate(`/session?id=${conversationId}`, {
@@ -84,8 +85,7 @@ export function useSessionJoiner() {
       console.log("Current participant count before update:", currentParticipantCount);
       console.log("Admin status:", effectiveIsAdmin);
       
-      // Check if the session has a max participant limit
-      // Skip this check for admin users
+      // Skip session full check for admin users completely
       if (!effectiveIsAdmin) {
         const maxParticipants = conversation.participants || 0;
         
@@ -93,11 +93,35 @@ export function useSessionJoiner() {
         if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
           throw new Error("This session is full and cannot accept more participants.");
         }
+        
+        // First, fetch the latest count to avoid race conditions
+        const { data: latestConversation, error: fetchError } = await supabase
+          .from('conversations')
+          .select('id, current_participants, participants')
+          .eq('id', conversationId)
+          .single();
+          
+        if (fetchError) {
+          console.error("Error fetching latest conversation data:", fetchError);
+          throw new Error(`Error fetching latest session data: ${fetchError.message}`);
+        }
+        
+        if (!latestConversation) {
+          throw new Error("Could not fetch the latest session data");
+        }
+        
+        // Double-check the participant limit with the latest data
+        if (latestConversation.participants > 0 && 
+            latestConversation.current_participants >= latestConversation.participants) {
+          throw new Error("This session is full and cannot accept more participants.");
+        }
       } else {
-        console.log("Admin user detected in useSessionJoiner - bypassing session full check");
+        console.log("Admin user detected - bypassing ALL session full checks");
       }
       
-      // First, fetch the latest count to avoid race conditions
+      // For admin users or when session isn't full, we can proceed
+      
+      // First get latest count (even for admins, we need to know the correct count)
       const { data: latestConversation, error: fetchError } = await supabase
         .from('conversations')
         .select('id, current_participants, participants')
@@ -111,13 +135,6 @@ export function useSessionJoiner() {
       
       if (!latestConversation) {
         throw new Error("Could not fetch the latest session data");
-      }
-      
-      // Double-check the participant limit with the latest data
-      // Skip this check for admin users
-      if (!effectiveIsAdmin && latestConversation.participants > 0 && 
-          latestConversation.current_participants >= latestConversation.participants) {
-        throw new Error("This session is full and cannot accept more participants.");
       }
       
       const latestCount = latestConversation.current_participants || 0;

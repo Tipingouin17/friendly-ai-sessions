@@ -26,7 +26,8 @@ export const SessionProviderCore = ({
     participantId?: number; 
     isGuest?: boolean; 
     participantName?: string;
-    showMessaging?: boolean 
+    showMessaging?: boolean;
+    isAdmin?: boolean;
   } | null;
   
   // Force admin status if specified
@@ -34,8 +35,11 @@ export const SessionProviderCore = ({
     if (forceAdmin) {
       console.log("SessionProviderCore: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
+    } else if (locationState?.isAdmin) {
+      console.log("SessionProviderCore: Setting admin status from location state");
+      sessionStorage.setItem('isAdminSession', 'true');
     }
-  }, [forceAdmin]);
+  }, [forceAdmin, locationState]);
   
   // Load core provider state
   const {
@@ -50,7 +54,10 @@ export const SessionProviderCore = ({
     providerError,
     handleError,
     enhancedHandleStartSession
-  } = useSessionProviderState({ onError, forceAdmin }); // Pass forceAdmin to provider state hook
+  } = useSessionProviderState({ 
+    onError, 
+    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) 
+  }); // Pass forceAdmin to provider state hook
 
   // Handle data errors
   useEffect(() => {
@@ -74,7 +81,7 @@ export const SessionProviderCore = ({
     refetch,
     onError: handleError,
     onSessionFull: handleSessionFull,
-    forceAdmin // Pass forceAdmin to participant setup
+    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) // Pass forceAdmin to participant setup
   });
 
   // Log participant information for debugging
@@ -86,15 +93,16 @@ export const SessionProviderCore = ({
       participants: participants.length,
       maxParticipants: maxParticipantsForSession,
       isSessionFull,
-      forceAdmin
+      forceAdmin,
+      locationStateIsAdmin: locationState?.isAdmin
     });
     
     // If we're an admin, we should never see the session full error
-    if (isSessionFull && forceAdmin) {
+    if (isSessionFull && (forceAdmin || locationState?.isAdmin)) {
       console.error("Admin user incorrectly marked as session full - this should never happen");
     }
   }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
-      maxParticipantsForSession, isSessionFull, forceAdmin]);
+      maxParticipantsForSession, isSessionFull, forceAdmin, locationState]);
 
   // Set up session monitoring
   const {
@@ -106,7 +114,7 @@ export const SessionProviderCore = ({
     currentUserParticipantId,
     participants,
     onError: handleError,
-    forceAdmin // Pass forceAdmin to session monitoring
+    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) // Pass forceAdmin to session monitoring
   });
 
   // If we have serious errors, return error fallback
@@ -114,7 +122,7 @@ export const SessionProviderCore = ({
     return (
       <SessionProviderErrorFallback 
         errorMessage={providerError}
-        isAdmin={Boolean(forceAdmin)}
+        isAdmin={Boolean(forceAdmin || locationState?.isAdmin)}
         onRetry={() => {
           console.log("Retry requested from error fallback");
           refetch();
@@ -126,7 +134,7 @@ export const SessionProviderCore = ({
   }
 
   // Determine effective admin status
-  const effectiveIsAdmin = forceAdmin === true ? true : undefined;
+  const effectiveIsAdmin = forceAdmin === true || locationState?.isAdmin === true;
 
   // Build session context
   const sessionContext: SessionContextProps = {

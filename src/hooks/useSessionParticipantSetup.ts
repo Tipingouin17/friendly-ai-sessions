@@ -11,7 +11,7 @@ type UseSessionParticipantSetupProps = {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
   locationState: LocationStateType | null;
-  refetch: () => void;
+  refetch: () => Promise<any>; // Ensure this is a Promise
   onError?: (error: string) => void;
   onSessionFull?: () => void;
   forceAdmin?: boolean;
@@ -63,8 +63,8 @@ export const useSessionParticipantSetup = ({
     
     try {
       console.log("Forcibly refreshing participant data from useSessionParticipantSetup");
-      await refetch();
-      return Promise.resolve();
+      const result = await refetch();
+      return Promise.resolve(result);
     } catch (err) {
       console.error("Error in forceRefreshParticipants:", err);
       return Promise.resolve();
@@ -74,8 +74,14 @@ export const useSessionParticipantSetup = ({
   // Handle session full logic with improved admin detection
   useEffect(() => {
     const effectiveIsAdmin = isAdmin || forceAdmin === true;
+    console.log("Session full check:", {
+      currentCount: currentParticipantCount,
+      maxAllowed: maxParticipantsForSession,
+      isAdmin: effectiveIsAdmin,
+      isSessionFull
+    });
     
-    // Skip check if admin
+    // Always skip check if admin - they should never see the session as full
     if (effectiveIsAdmin) {
       console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
       // If we previously set session as full but now we're admin, reset it
@@ -112,6 +118,10 @@ export const useSessionParticipantSetup = ({
         description: "This session has reached its maximum capacity of participants.",
         variant: "destructive",
       });
+    } else if (!isFull && isSessionFull) {
+      // Reset the session full state if the conditions no longer apply
+      console.log("Session is no longer full, resetting state");
+      setIsSessionFull(false);
     }
   }, [
     currentParticipantCount, 

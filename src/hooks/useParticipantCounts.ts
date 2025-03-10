@@ -9,7 +9,10 @@ export function useParticipantCounts(conversation: ConversationWithSession | nul
   // Set conversation data
   useEffect(() => {
     if (conversation) {
-      console.log("Conversation data loaded successfully");
+      console.log("Conversation data loaded in useParticipantCounts:", {
+        current: conversation.current_participants,
+        max: conversation.participants
+      });
       
       // Set the maximum participants for this specific session
       if (conversation.participants !== null && conversation.participants > 0) {

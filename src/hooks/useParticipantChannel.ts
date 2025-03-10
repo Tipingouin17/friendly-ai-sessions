@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
@@ -66,7 +65,9 @@ export function useParticipantChannel({
           }
           
           // Also refetch the full conversation to keep everything in sync
-          refetch();
+          refetch().catch(err => {
+            console.error("Error refetching conversation after realtime update:", err);
+          });
         }
         
         // Mark as connected when we get updates
@@ -78,6 +79,11 @@ export function useParticipantChannel({
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed to participant count updates');
           setIsConnected(true);
+          
+          // Immediately refetch after subscribing to get latest counts
+          refetch().catch(err => {
+            console.error("Error refetching conversation after channel subscribe:", err);
+          });
         } else if (status === 'CHANNEL_ERROR') {
           console.error('Error subscribing to participant count updates');
           setError('Failed to connect to session updates');

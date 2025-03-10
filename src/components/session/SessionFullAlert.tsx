@@ -5,6 +5,7 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 interface SessionFullAlertProps {
   type?: 'full' | 'not-found' | 'error';
@@ -22,6 +23,16 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   onClose
 }) => {
   const navigate = useNavigate();
+  const { isAdmin } = useSessionAdminStatus();
+
+  // Skip showing session full alert for admin users
+  if (isAdmin && type === 'full') {
+    console.log("Suppressing session full alert for admin user");
+    if (onClose) {
+      setTimeout(() => onClose(), 0);
+    }
+    return null;
+  }
 
   const handleReturn = () => {
     navigate("/");

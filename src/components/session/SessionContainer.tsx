@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
@@ -12,6 +12,8 @@ import InputFooter from "./InputFooter";
 import QrDialogManager from "./QrDialogManager";
 import ViewModeToggle from "./ViewModeToggle";
 import SessionJoinInfo from "./SessionJoinInfo";
+import AdminNotification from "./AdminNotification";
+import AdminHeader from "./AdminHeader";
 
 interface SessionContainerProps {
   facilitator: {
@@ -43,6 +45,7 @@ interface SessionContainerProps {
   viewMode: "participant" | "admin";
   setViewMode: (mode: "participant" | "admin") => void;
   isAdmin: boolean;
+  onSendAdminMessage?: (message: string) => void;
 }
 
 const SessionContainer = ({
@@ -71,9 +74,11 @@ const SessionContainer = ({
   totalResponses,
   viewMode,
   setViewMode,
-  isAdmin
+  isAdmin,
+  onSendAdminMessage
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
+  const [adminNotification, setAdminNotification] = useState<string | null>(null);
   
   const {
     isMobile,
@@ -104,16 +109,29 @@ const SessionContainer = ({
 
   return (
     <SessionLayout>
-      <SessionHeader 
-        facilitator={facilitator}
-        objective={objective}
-        participantCount={currentParticipantCount || participants.length || participantCount}
-        onGenerateReport={handleGenerateReport}
-        isGeneratingReport={isGeneratingReport}
-        canGenerateReports={canGenerateReports}
-        messagesCount={messages.length}
-        viewMode={viewMode}
-      />
+      {isAdmin ? (
+        <AdminHeader 
+          sessionTitle={facilitator?.title || "Session"}
+          facilitatorTitle={facilitator?.title || ""}
+          currentParticipants={currentParticipantCount || participants.length || participantCount}
+          maxParticipants={conversation?.participants || 0}
+          isSessionActive={true}
+          onToggleSessionState={() => {}}
+          onSendAdminMessage={onSendAdminMessage}
+          onExportData={onGenerateReport}
+        />
+      ) : (
+        <SessionHeader 
+          facilitator={facilitator}
+          objective={objective}
+          participantCount={currentParticipantCount || participants.length || participantCount}
+          onGenerateReport={handleGenerateReport}
+          isGeneratingReport={isGeneratingReport}
+          canGenerateReports={canGenerateReports}
+          messagesCount={messages.length}
+          viewMode={viewMode}
+        />
+      )}
       
       {isAdmin && (
         <ViewModeToggle 
@@ -182,6 +200,14 @@ const SessionContainer = ({
         totalResponses={totalResponses}
         viewMode={viewMode}
       />
+      
+      {/* Admin Notification for participant view */}
+      {!isAdmin && (
+        <AdminNotification 
+          message={adminNotification} 
+          onClose={() => setAdminNotification(null)}
+        />
+      )}
     </SessionLayout>
   );
 };

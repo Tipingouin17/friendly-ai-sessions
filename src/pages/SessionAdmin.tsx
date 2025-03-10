@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import { useLocation, Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -14,6 +13,7 @@ import ParticipantResponseStats from "@/components/session/ParticipantResponseSt
 import { Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Message, ParticipantInfo } from "@/types/chat";
+import SessionView from "@/components/session/SessionView";
 
 const SessionAdmin = () => {
   const {
@@ -41,13 +41,11 @@ const SessionAdmin = () => {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
   
-  // Use state for real data from the database
   const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   
-  // Use our custom admin session state hook
   const {
     isSessionPaused,
     isExporting,
@@ -56,16 +54,14 @@ const SessionAdmin = () => {
     exportSessionData
   } = useAdminSessionState({
     conversationId: currentConversationId,
-    currentUserParticipantId: null, // Admin doesn't have a participant ID
+    currentUserParticipantId: null,
     participants,
     messages: sessionMessages,
     setMessages: setSessionMessages
   });
   
-  // Ensure we're in admin mode
   const forceAdmin = true;
   
-  // Log initialization on mount and set up safety timeouts
   useEffect(() => {
     console.log("Admin session page mounted", {
       time: new Date().toISOString(),
@@ -78,11 +74,9 @@ const SessionAdmin = () => {
       conversationData: conversationData?.sessions?.title
     });
     
-    // Shorter timeouts for admin session
     const initialTimeout = 3000;
     const criticalTimeout = 5000;
     
-    // Set a timeout to check if initialization takes too long
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.warn("Admin session initialization taking longer than expected");
@@ -93,7 +87,6 @@ const SessionAdmin = () => {
       }
     }, initialTimeout);
     
-    // Additional critical safety timeout
     setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
         console.error("Critical timeout reached, admin session may be stuck");
@@ -102,7 +95,6 @@ const SessionAdmin = () => {
           description: "Your admin dashboard is almost ready.",
         });
         
-        // Force clean state to allow UI to render
         setIsLoading(false);
         setHasInitializedProvider(true);
       }
@@ -116,7 +108,6 @@ const SessionAdmin = () => {
     };
   }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState, conversationData]);
 
-  // Admin Welcome message
   useEffect(() => {
     const timer = setTimeout(() => {
       toast({
@@ -128,7 +119,6 @@ const SessionAdmin = () => {
     return () => clearTimeout(timer);
   }, [toast, conversationData]);
   
-  // Fetch real participant data from session_participants table
   useEffect(() => {
     if (!currentConversationId) return;
     
@@ -164,7 +154,6 @@ const SessionAdmin = () => {
     
     fetchParticipants();
     
-    // Set up real-time subscription for participant changes
     const channel = supabase
       .channel('public:session_participants')
       .on('postgres_changes', {
@@ -173,7 +162,7 @@ const SessionAdmin = () => {
         table: 'session_participants',
         filter: `conversation_id=eq.${currentConversationId}`
       }, () => {
-        fetchParticipants(); // Refetch on any changes
+        fetchParticipants();
       })
       .subscribe();
     
@@ -182,7 +171,6 @@ const SessionAdmin = () => {
     };
   }, [currentConversationId]);
   
-  // Fetch real message data from the messages table
   useEffect(() => {
     if (!currentConversationId) return;
     
@@ -201,33 +189,25 @@ const SessionAdmin = () => {
         }
         
         if (data) {
-          // Transform database messages to the Message type format
           const formattedMessages: Message[] = data.map(msg => {
-            // Handle content parsing safely
             let parsedContent = typeof msg.content === 'string' 
               ? msg.content 
               : typeof msg.content === 'object' && msg.content !== null
                 ? JSON.stringify(msg.content)
                 : '';
                 
-            // Extract isPinned and other properties safely
             let isPinned = false;
             let recipientId = undefined;
             let isAdminMessage = msg.role === 'admin';
             
-            // Safely process content if it's an object
             if (typeof msg.content === 'object' && msg.content !== null) {
-              // Handle both array and object formats
               if (Array.isArray(msg.content)) {
-                // Handle array format if needed
                 console.log("Array content format", msg.content);
               } else {
-                // Object format - check for properties we need
                 try {
                   isPinned = 'isPinned' in msg.content ? !!msg.content.isPinned : false;
                   recipientId = 'recipientId' in msg.content ? msg.content.recipientId : undefined;
                   
-                  // If we have a message property in the content, use that as the display content
                   if ('message' in msg.content && typeof msg.content.message === 'string') {
                     parsedContent = msg.content.message;
                   }
@@ -260,7 +240,6 @@ const SessionAdmin = () => {
     
     fetchMessages();
     
-    // Set up real-time subscription for message changes
     const channel = supabase
       .channel('public:messages')
       .on('postgres_changes', {
@@ -269,7 +248,7 @@ const SessionAdmin = () => {
         table: 'messages',
         filter: `conversation_id=eq.${currentConversationId}`
       }, () => {
-        fetchMessages(); // Refetch on any changes
+        fetchMessages();
       })
       .subscribe();
     
@@ -278,19 +257,78 @@ const SessionAdmin = () => {
     };
   }, [currentConversationId]);
 
-  // If there's no conversation ID, redirect to the home page
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
     console.error("No conversation ID found on admin page, redirecting home");
     return <Navigate to="/" />;
   }
 
-  // Handle sending an admin message
-  const handleAdminMessage = (message: string, isPinned: boolean, recipientId?: string) => {
-    sendAdminMessage(message, isPinned, recipientId);
+  const handleSendAdminMessage = (message: string) => {
+    if (!message.trim() || !currentConversationId) return;
+    
+    try {
+      const notificationContent = {
+        type: "admin_notification",
+        message: message
+      };
+      
+      supabase
+        .from('admin_notifications')
+        .insert({
+          conversation_id: currentConversationId,
+          content: notificationContent,
+          created_at: new Date().toISOString()
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error("Error sending admin notification:", error);
+            toast({
+              title: "Error",
+              description: "Failed to send notification to participants",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Notification sent",
+              description: "Your message has been sent to all participants",
+            });
+          }
+        });
+      
+      sendAdminMessage(message, true);
+    } catch (error) {
+      console.error("Error in handleSendAdminMessage:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message to participants",
+        variant: "destructive"
+      });
+    }
   };
 
+  if (!isLoading && hasInitializedProvider && !error) {
+    return (
+      <SessionProviderWrapper
+        handleSessionFull={handleSessionFull}
+        onError={handleError}
+        forceAdmin={true}
+      >
+        {(props) => (
+          <SessionErrorBoundary>
+            <SessionView 
+              props={{
+                ...props,
+                onSendAdminMessage: handleSendAdminMessage
+              }} 
+              isAdmin={true} 
+            />
+          </SessionErrorBoundary>
+        )}
+      </SessionProviderWrapper>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen pt-16"> {/* Added pt-16 to account for fixed navbar */}
+    <div className="flex flex-col min-h-screen pt-16">
       <AdminHeader 
         sessionTitle={conversationData?.sessions?.title || "Session Admin Panel"}
         facilitatorTitle={conversationData?.sessions?.facilitator_details?.title || ""}
@@ -298,12 +336,11 @@ const SessionAdmin = () => {
         maxParticipants={conversationData?.participants || 10}
         isSessionActive={!isSessionPaused}
         onToggleSessionState={toggleSessionState}
-        onSendAdminMessage={() => {}} // This would normally open a dialog
+        onSendAdminMessage={handleSendAdminMessage}
         onExportData={exportSessionData}
       />
       
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Main content area */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {isLoading || isConversationLoading || isLoadingMessages ? (
             <div className="flex-1 flex items-center justify-center">
@@ -317,33 +354,25 @@ const SessionAdmin = () => {
           ) : sessionMessages.length > 0 ? (
             <>
               <div className="flex-1 overflow-auto">
-                {/* Group messages by questions as in MessagingArea admin view */}
                 <div className="p-6 space-y-8">
-                  {/* Group messages by facilitator questions */}
                   {(() => {
                     const groups = [];
                     let currentGroup = { question: null, responses: [] };
                     
-                    // Loop through all messages to create question-answer groups
                     for (const message of sessionMessages) {
                       if (message.sender === "assistant" && !message.isReport && !message.isAdminMessage) {
-                        // If we have an existing group with responses, add it to our groups array
                         if (currentGroup.question && currentGroup.responses.length > 0) {
                           groups.push({ ...currentGroup });
                         }
-                        
-                        // Start a new group with this facilitator question
                         currentGroup = { 
                           question: message, 
                           responses: [] 
                         };
                       } else if (message.sender === "user" && currentGroup.question) {
-                        // Add participant response to the current group
                         currentGroup.responses.push(message);
                       }
                     }
                     
-                    // Add the last group if it has a question and responses
                     if (currentGroup.question && currentGroup.responses.length > 0) {
                       groups.push(currentGroup);
                     }
@@ -392,7 +421,6 @@ const SessionAdmin = () => {
                 </div>
               </div>
               
-              {/* Admin message input */}
               <AdminMessageInput 
                 onSendMessage={handleAdminMessage}
                 participants={participants}
@@ -416,7 +444,6 @@ const SessionAdmin = () => {
           )}
         </div>
         
-        {/* Right sidebar for participant info */}
         <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
           <h3 className="font-medium mb-2 flex items-center gap-2">
             <Users className="h-4 w-4" /> 

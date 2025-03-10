@@ -16,10 +16,13 @@ import {
   Dialog, 
   DialogContent, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Badge } from '@/components/ui/badge';
 import { useConversationId } from "@/hooks/useConversationId";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AdminHeaderProps {
   sessionTitle: string;
@@ -28,7 +31,7 @@ interface AdminHeaderProps {
   maxParticipants?: number;
   isSessionActive?: boolean;
   onToggleSessionState?: () => void;
-  onSendAdminMessage?: () => void;
+  onSendAdminMessage?: (message: string) => void;
   onExportData?: () => void;
 }
 
@@ -44,6 +47,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
 }) => {
   const { toast } = useToast();
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const [adminMessage, setAdminMessage] = useState('');
   const { currentConversationId } = useConversationId();
   const [joinUrl, setJoinUrl] = useState('');
   
@@ -63,6 +68,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       toast({
         title: "Link copied",
         description: "Session join link copied to clipboard",
+      });
+    }
+  };
+  
+  const handleSendMessage = () => {
+    if (adminMessage.trim() && onSendAdminMessage) {
+      onSendAdminMessage(adminMessage);
+      setAdminMessage('');
+      setShowMessageDialog(false);
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent to all participants",
       });
     }
   };
@@ -95,7 +112,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={onSendAdminMessage}
+            onClick={() => setShowMessageDialog(true)}
           >
             <MessageSquare size={16} />
             <span>Send Message</span>
@@ -190,6 +207,37 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               <p className="mt-1">Share this QR code or link with participants to join the session</p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Admin Message Dialog */}
+      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Message to Participants</DialogTitle>
+            <DialogDescription>
+              This message will appear as a notification for all participants.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4">
+            <Textarea
+              placeholder="Type your message here..."
+              value={adminMessage}
+              onChange={(e) => setAdminMessage(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowMessageDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSendMessage} disabled={!adminMessage.trim()}>
+              Send Message
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </header>

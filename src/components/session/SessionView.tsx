@@ -46,6 +46,7 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       viewMode={props.sessionState.viewMode}
       setViewMode={props.sessionState.setViewMode}
       isAdmin={isAdmin}
+      onSendAdminMessage={props.onSendAdminMessage}
     />
   );
 };

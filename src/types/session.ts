@@ -47,4 +47,7 @@ export interface SessionContextProps {
   // Properties needed by SessionProviderWrapper
   isAdmin?: boolean;
   sessionStarted?: boolean;
+  
+  // Admin message function
+  onSendAdminMessage?: (message: string) => void;
 }

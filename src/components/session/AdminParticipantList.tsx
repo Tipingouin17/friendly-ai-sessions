@@ -1,9 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AdminParticipantListProps {
   participants: ParticipantInfo[];
@@ -22,16 +22,13 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
 }) => {
   const [displayCount, setDisplayCount] = useState(currentParticipantCount);
   
-  // Set up real-time listener for participant count updates
   useEffect(() => {
     if (!conversationData?.id) return;
     
     const conversationId = conversationData.id;
     
-    // Set initial count
     setDisplayCount(Math.max(participants.length, currentParticipantCount));
     
-    // Listen for conversation updates
     const conversationChannel = supabase
       .channel(`admin-conversation-updates-${conversationId}`)
       .on('postgres_changes', { 
@@ -49,7 +46,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       })
       .subscribe();
     
-    // Also listen for session events
     const eventsChannel = supabase
       .channel(`admin-session-events-${conversationId}`)
       .on('postgres_changes', {
@@ -76,7 +72,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     };
   }, [conversationData, participants.length, currentParticipantCount]);
 
-  // Log participant information for debugging
   useEffect(() => {
     console.log("AdminParticipantList rendering with:", { 
       participants: participants.length,
@@ -94,13 +89,23 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
         Participants ({displayCount}/{maxParticipants || "∞"})
       </h3>
       
-      {isLoading ? (
-        <div className="text-center py-4 text-sm text-gray-500">
-          Loading participants...
-        </div>
-      ) : participants.length > 0 ? (
-        <div className="space-y-2">
-          {participants.map(participant => (
+      <div className="space-y-2">
+        {isLoading ? (
+          Array.from({ length: displayCount || 1 }).map((_, index) => (
+            <div 
+              key={`skeleton-${index}`}
+              className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
+            >
+              <Skeleton className="w-2 h-2 rounded-full" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-24 mb-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-5 w-14 rounded-full" />
+            </div>
+          ))
+        ) : participants.length > 0 ? (
+          participants.map(participant => (
             <div 
               key={`participant-${participant.id}`}
               className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
@@ -119,13 +124,13 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
                 Active
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-4 text-sm text-gray-500">
-          No participants have joined yet.
-        </div>
-      )}
+          ))
+        ) : (
+          <div className="text-center py-4 text-sm text-gray-500">
+            No participants have joined yet.
+          </div>
+        )}
+      </div>
       
       <div className="mt-4 text-xs text-gray-500">
         <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>

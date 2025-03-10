@@ -1,35 +1,58 @@
 
-import { useState, useEffect } from "react";
-import { Toast, ToastActionElement, ToastProps } from "@/components/ui/toast";
+import * as React from "react";
 import {
-  useToast as useToastPrimitive,
-  ToastActionElement as ToastActionElementPrimitive,
-} from "@radix-ui/react-toast";
+  Toast,
+  ToastActionElement,
+  ToastProps
+} from "@/components/ui/toast";
 
-export type ToastType = {
+export interface ToastType {
   id: string;
   title?: string;
   description?: React.ReactNode;
   action?: ToastActionElement;
   variant?: "default" | "destructive";
   duration?: number;
-};
+}
 
+// Custom hook for toast functionality
 export const useToast = () => {
-  const { toast } = useToastPrimitive();
-  
+  const [toasts, setToasts] = React.useState<ToastType[]>([]);
+
+  const toast = React.useCallback(({ ...props }: ToastProps) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    
+    setToasts((prevToasts) => [
+      ...prevToasts,
+      { id, ...props } as ToastType,
+    ]);
+
+    return id;
+  }, []);
+
+  const dismiss = React.useCallback((toastId?: string) => {
+    setToasts((prevToasts) => {
+      if (toastId) {
+        return prevToasts.filter((toast) => toast.id !== toastId);
+      }
+      return [];
+    });
+  }, []);
+
   return {
-    toast: (props: ToastProps) => {
-      return toast({
-        ...props,
-        duration: props.duration ?? 5000,
-      });
-    },
-    dismiss: (toastId?: string) => console.log("Dismiss toast", toastId),
+    toast,
+    dismiss,
+    toasts,
   };
 };
 
-export const toast = (props: ToastProps) => {
-  const { toast: toastFn } = useToast();
-  return toastFn(props);
+// For direct use without the hook
+type ToastFunction = (props: ToastProps) => string;
+
+// Create a single instance of the toast function that can be imported directly
+const toastFn = (props: ToastProps) => {
+  const { toast } = useToast();
+  return toast(props);
 };
+
+export const toast: ToastFunction = (props) => toastFn(props);

@@ -71,14 +71,14 @@ export function useAdminSessionState({
       
       // In a real implementation, send to database via Supabase
       if (conversationId) {
-        // Format for database
+        // Format for database - make sure we're sending content as a JSON object
         const messageData = {
           conversation_id: conversationId,
-          content: JSON.stringify({ 
-            message,
-            isPinned,
-            recipientId
-          }),
+          content: {
+            message, // The actual message text
+            isPinned, // Whether the message should be pinned
+            recipientId // Who the message is for (if anyone specific)
+          },
           role: 'admin'
         };
         

@@ -203,23 +203,49 @@ const SessionAdmin = () => {
         if (data) {
           // Transform database messages to the Message type format
           const formattedMessages: Message[] = data.map(msg => {
-            const content = typeof msg.content === 'string' 
+            // Handle content parsing safely
+            let parsedContent = typeof msg.content === 'string' 
               ? msg.content 
               : typeof msg.content === 'object' && msg.content !== null
                 ? JSON.stringify(msg.content)
                 : '';
+                
+            // Extract isPinned and other properties safely
+            let isPinned = false;
+            let recipientId = undefined;
+            let isAdminMessage = msg.role === 'admin';
+            
+            // Safely process content if it's an object
+            if (typeof msg.content === 'object' && msg.content !== null) {
+              // Handle both array and object formats
+              if (Array.isArray(msg.content)) {
+                // Handle array format if needed
+                console.log("Array content format", msg.content);
+              } else {
+                // Object format - check for properties we need
+                try {
+                  isPinned = 'isPinned' in msg.content ? !!msg.content.isPinned : false;
+                  recipientId = 'recipientId' in msg.content ? msg.content.recipientId : undefined;
+                  
+                  // If we have a message property in the content, use that as the display content
+                  if ('message' in msg.content && typeof msg.content.message === 'string') {
+                    parsedContent = msg.content.message;
+                  }
+                } catch (parseError) {
+                  console.error('Error parsing message content:', parseError);
+                }
+              }
+            }
             
             return {
               id: msg.id.toString(),
-              content: content,
+              content: parsedContent,
               sender: msg.role === 'assistant' ? 'assistant' : 'user',
               timestamp: new Date(msg.created_at),
               created_at: msg.created_at,
               participant: msg.name ? `P${msg.name}` : undefined,
-              isAdminMessage: msg.role === 'admin',
-              isPinned: msg.content && typeof msg.content === 'object' && msg.content !== null 
-                ? msg.content.isPinned 
-                : false
+              isAdminMessage,
+              isPinned
             };
           });
           

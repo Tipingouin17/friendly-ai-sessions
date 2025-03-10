@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,18 +23,15 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   const mountedRef = useRef(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Set up cleanup on unmount
   useEffect(() => {
     console.log("JoinSessionLoadingState mounted", { error, retryCount });
     mountedRef.current = true;
     
-    // Start timer to update elapsed time
     timerRef.current = setInterval(() => {
       if (mountedRef.current) {
         const newElapsed = (Date.now() - startTime.current) / 1000;
         setElapsed(newElapsed);
         
-        // Automatically update wait states based on elapsed time - use shorter thresholds
         if (newElapsed > 3 && !isLongWait) {
           setIsLongWait(true);
         }
@@ -43,7 +39,6 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
           setIsVeryLongWait(true);
         }
         
-        // Auto retry after a long wait
         if (newElapsed > 8 && onRetry && retryCount < 1) {
           console.log("Auto-retrying connection after long wait");
           onRetry();
@@ -59,14 +54,12 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     };
   }, [onRetry, retryCount]);
   
-  // Process error messages to provide more helpful descriptions
   useEffect(() => {
     if (!error) {
       setErrorDescription(null);
       return;
     }
     
-    // Handle different types of errors with more user-friendly messages
     if (error.includes("Permission denied") || error.includes("nodeType")) {
       setErrorDescription("There was a problem with browser permissions. This might be resolved by reloading the page.");
     } else if (error.includes("network") || error.includes("connection") || error.includes("timeout")) {
@@ -79,14 +72,12 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       setErrorDescription(error);
     }
     
-    // Force long wait states when there's an error
     setIsLongWait(true);
     if (error.toLowerCase().includes("not found") || error.includes("ended") || retryCount > 1) {
       setIsVeryLongWait(true);
     }
   }, [error, retryCount]);
   
-  // If we already have a loading time elapsed or error, show appropriate state immediately
   useEffect(() => {
     if (!mountedRef.current) return;
     
@@ -99,7 +90,6 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     }
   }, [loadingTimeElapsed, retryCount, error]);
 
-  // Add auto-refresh mechanism
   useEffect(() => {
     const autoRefreshTimeout = setTimeout(() => {
       if (elapsed > 15 && mountedRef.current) {

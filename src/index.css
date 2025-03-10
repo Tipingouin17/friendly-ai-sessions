@@ -44,6 +44,15 @@
   .hover-lift {
     @apply transition-transform duration-300 hover:-translate-y-1;
   }
+  
+  /* Add new spinner utility classes */
+  .spinner {
+    @apply w-8 h-8 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
+  }
+  
+  .spinner-sm {
+    @apply w-4 h-4 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
+  }
 }
 
 .glass-morphism {

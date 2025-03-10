@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 interface SessionJoinParams {
   conversationId: number | null;
@@ -20,9 +21,10 @@ export function useSessionJoiner() {
   const { toast } = useToast();
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAdmin } = useSessionAdminStatus();
 
   const navigateToSession = (conversationId: number | null, name: string, participantId: number, avatarSeed: string) => {
-    console.log(`Navigating to session with name: ${name}, participantId: ${participantId}`);
+    console.log(`Navigating to session with name: ${name}, participantId: ${participantId}, isAdmin: ${isAdmin}`);
     
     navigate(`/session?id=${conversationId}`, {
       state: { 
@@ -30,8 +32,8 @@ export function useSessionJoiner() {
         avatarSeed,
         isGuest: true,
         participantId,
-        showMessaging: true, // Add this flag to explicitly show messaging
-        isAdmin: false // Explicitly mark session joiners as non-admin
+        showMessaging: true,
+        isAdmin: isAdmin // Pass the admin status to ensure it persists
       }
     });
   };
@@ -51,7 +53,7 @@ export function useSessionJoiner() {
         description: "A name is required to join the session.",
         variant: "destructive",
       });
-      return;
+      return Promise.resolve();
     }
 
     setIsJoining(true);
@@ -71,13 +73,19 @@ export function useSessionJoiner() {
       
       console.log("Attempting to join session with ID:", conversationId);
       console.log("Current participant count before update:", currentParticipantCount);
+      console.log("Admin status:", isAdmin);
       
       // Check if the session has a max participant limit
-      const maxParticipants = conversation.participants || 0;
-      
-      // Only enforce the limit if maxParticipants is greater than 0
-      if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
-        throw new Error("This session is full and cannot accept more participants.");
+      // Skip this check for admin users
+      if (!isAdmin) {
+        const maxParticipants = conversation.participants || 0;
+        
+        // Only enforce the limit if maxParticipants is greater than 0
+        if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+          throw new Error("This session is full and cannot accept more participants.");
+        }
+      } else {
+        console.log("Admin user detected in useSessionJoiner - bypassing session full check");
       }
       
       // First, fetch the latest count to avoid race conditions
@@ -97,7 +105,8 @@ export function useSessionJoiner() {
       }
       
       // Double-check the participant limit with the latest data
-      if (latestConversation.participants > 0 && 
+      // Skip this check for admin users
+      if (!isAdmin && latestConversation.participants > 0 && 
           latestConversation.current_participants >= latestConversation.participants) {
         throw new Error("This session is full and cannot accept more participants.");
       }
@@ -151,6 +160,7 @@ export function useSessionJoiner() {
         navigateToSession(conversationId, participantName, newParticipantId, avatarSeed);
       }, 500);
       
+      return Promise.resolve();
     } catch (error: any) {
       console.error("Error joining session:", error);
       setError(error.message || "Failed to join the session");
@@ -160,6 +170,7 @@ export function useSessionJoiner() {
         variant: "destructive",
       });
       setIsJoining(false);
+      return Promise.resolve();
     }
   };
 

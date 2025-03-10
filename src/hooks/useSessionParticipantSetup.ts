@@ -1,10 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
 import { LocationStateType } from "@/hooks/useConversationId";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { useToast } from "@/components/ui/use-toast";
 
 type UseSessionParticipantSetupProps = {
   conversationId: number | null;
@@ -13,7 +14,7 @@ type UseSessionParticipantSetupProps = {
   refetch: () => void;
   onError?: (error: string) => void;
   onSessionFull?: () => void;
-  forceAdmin?: boolean; // Added forceAdmin prop
+  forceAdmin?: boolean;
 };
 
 export const useSessionParticipantSetup = ({
@@ -29,6 +30,7 @@ export const useSessionParticipantSetup = ({
   const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const { toast } = useToast();
   
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
@@ -39,7 +41,7 @@ export const useSessionParticipantSetup = ({
     }
   }, [forceAdmin, setAdminStatus]);
   
-  // Get participants using the hook - fixed to pass only conversationId
+  // Get participants using the hook
   const participantsData = useSessionParticipants(conversationId);
   
   // Extract needed properties from participantsData
@@ -55,11 +57,31 @@ export const useSessionParticipantSetup = ({
     }
   }, [locationState]);
   
-  // Handle session full logic
+  // Function to force refresh participants - must return a Promise
+  const forceRefreshParticipants = useCallback(async () => {
+    if (!conversationId) return Promise.resolve();
+    
+    try {
+      console.log("Forcibly refreshing participant data from useSessionParticipantSetup");
+      await refetch();
+      return Promise.resolve();
+    } catch (err) {
+      console.error("Error in forceRefreshParticipants:", err);
+      return Promise.resolve();
+    }
+  }, [conversationId, refetch]);
+  
+  // Handle session full logic with improved admin detection
   useEffect(() => {
+    const effectiveIsAdmin = isAdmin || forceAdmin === true;
+    
     // Skip check if admin
-    if ((isAdmin || forceAdmin) && conversationId) {
-      console.log("Admin user detected, skipping session full check");
+    if (effectiveIsAdmin && conversationId) {
+      console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
+      // If we previously set session as full but now we're admin, reset it
+      if (isSessionFull) {
+        setIsSessionFull(false);
+      }
       return;
     }
     
@@ -71,7 +93,8 @@ export const useSessionParticipantSetup = ({
     if (isFull && !isSessionFull && conversationId) {
       console.log("Session is full, notifying:", {
         currentCount: currentParticipantCount,
-        maxAllowed: maxParticipantsForSession
+        maxAllowed: maxParticipantsForSession,
+        isAdmin: effectiveIsAdmin
       });
       
       setIsSessionFull(true);
@@ -83,6 +106,12 @@ export const useSessionParticipantSetup = ({
       if (onError) {
         onError("This session is full and cannot accept more participants.");
       }
+      
+      toast({
+        title: "Session Full",
+        description: "This session has reached its maximum capacity of participants.",
+        variant: "destructive",
+      });
     }
   }, [
     currentParticipantCount, 
@@ -92,7 +121,8 @@ export const useSessionParticipantSetup = ({
     onSessionFull,
     onError,
     isAdmin,
-    forceAdmin
+    forceAdmin,
+    toast
   ]);
   
   return {
@@ -101,6 +131,7 @@ export const useSessionParticipantSetup = ({
     currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    isParticipantTracking: true // Added this property since it was expected in the return value
+    isParticipantTracking: true,
+    forceRefreshParticipants
   };
 };

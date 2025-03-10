@@ -5,17 +5,17 @@ import { SessionContextProps } from "@/types/session";
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
   children: (props: SessionContextProps) => React.ReactElement;
-  isAdmin?: boolean; // Add the isAdmin prop
-  onRetry?: () => void; // Make onRetry optional
+  isAdmin?: boolean; // This prop is already defined
+  onRetry?: () => void;
 }
 
 export const SessionProviderErrorFallback = ({ 
   errorMessage, 
   children,
-  isAdmin = false, // Default to false
+  isAdmin = false, // Default to false as in the original
   onRetry 
 }: SessionProviderErrorFallbackProps) => {
-  console.log("Rendering SessionProviderErrorFallback with error:", errorMessage);
+  console.log("Rendering SessionProviderErrorFallback with error:", errorMessage, "isAdmin:", isAdmin);
   
   // Create safe default props
   const fallbackSessionContext: SessionContextProps = {

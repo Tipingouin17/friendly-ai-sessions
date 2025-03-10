@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -13,7 +12,7 @@ import QrDialogManager from "./QrDialogManager";
 import ViewModeToggle from "./ViewModeToggle";
 import SessionJoinInfo from "./SessionJoinInfo";
 import AdminNotification from "./AdminNotification";
-import AdminHeader from "./AdminHeader";
+import AdminHeader from "./admin/AdminHeader";
 
 interface SessionContainerProps {
   facilitator: {
@@ -92,13 +91,11 @@ const SessionContainer = ({
     conversationId: conversationId || null
   });
   
-  // Anonymous state management
   const { isAnonymous, toggleAnonymous } = useAnonymousState({
     conversationId,
     currentParticipantId: currentUserParticipantId
   });
   
-  // Process messages based on view mode
   const processedMessages = useMessageProcessor({
     messages,
     viewMode,
@@ -158,7 +155,6 @@ const SessionContainer = ({
           />
         </div>
         
-        {/* Show QR code panel in admin view only */}
         {viewMode === "admin" && !isMobile && isAdmin && (
           <div className="w-64 p-4 flex-shrink-0 border-l border-gray-100 overflow-y-auto">
             <SessionJoinInfo 
@@ -170,7 +166,6 @@ const SessionContainer = ({
         )}
       </div>
       
-      {/* Only show QR dialog manager in admin view */}
       {isAdmin && viewMode === "admin" && (
         <QrDialogManager
           isMobile={isMobile}
@@ -201,7 +196,6 @@ const SessionContainer = ({
         viewMode={viewMode}
       />
       
-      {/* Admin Notification for participant view */}
       {!isAdmin && (
         <AdminNotification 
           message={adminNotification} 

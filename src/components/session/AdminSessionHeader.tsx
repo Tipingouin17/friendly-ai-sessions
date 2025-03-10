@@ -1,6 +1,6 @@
 
 import React from 'react';
-import AdminHeader from './AdminHeader';
+import AdminHeader from './admin/AdminHeader';
 
 interface AdminSessionHeaderProps {
   conversationData: any;

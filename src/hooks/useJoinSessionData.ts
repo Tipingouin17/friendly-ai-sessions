@@ -33,9 +33,18 @@ export function useJoinSessionData(conversationId: number | null) {
   const error = participantsError || joinerError;
 
   const handleJoinSession = async () => {
+    // Force a refetch before joining to ensure we have the latest counts
+    await refetch();
+    
     // Use session-specific max or fall back to plan limit
     const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
       maxParticipantsForSession : planMaxParticipants;
+
+    console.log("Join session check:", {
+      currentParticipantCount,
+      effectiveMaxParticipants,
+      isFull: effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants
+    });
 
     // Only check if session is full if effectiveMaxParticipants is greater than 0
     if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {

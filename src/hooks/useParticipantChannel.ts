@@ -1,159 +1,103 @@
-
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
 interface UseParticipantChannelProps {
   conversationId: number | null;
-  setIsConnected: (state: boolean) => void;
+  setIsConnected: (isConnected: boolean) => void;
   attemptReconnection: () => void;
   setCurrentParticipantCount: (count: number) => void;
   setMaxParticipantsForSession: (max: number) => void;
-  refetch: () => void;
+  refetch: () => Promise<any>;
 }
 
-export function useParticipantChannel(props: UseParticipantChannelProps) {
-  const { 
-    conversationId,
-    setIsConnected,
-    attemptReconnection,
-    setCurrentParticipantCount,
-    setMaxParticipantsForSession,
-    refetch
-  } = props;
-  
+export function useParticipantChannel({
+  conversationId,
+  setIsConnected,
+  attemptReconnection,
+  setCurrentParticipantCount,
+  setMaxParticipantsForSession,
+  refetch
+}: UseParticipantChannelProps) {
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);
   const mountedRef = useRef(true);
-  const subscribedRef = useRef(false);
-  const reconnectTimerRef = useRef<number | null>(null);
   
-  // Setup cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
     };
   }, []);
   
-  // Handle reconnection logic
-  const setupReconnectionTimer = useCallback(() => {
-    if (!mountedRef.current || subscribedRef.current) return;
-    
-    // Clear any existing timer
-    if (reconnectTimerRef.current !== null) {
-      clearTimeout(reconnectTimerRef.current);
-    }
-    
-    // Set a new timer
-    reconnectTimerRef.current = window.setTimeout(() => {
-      if (mountedRef.current && !subscribedRef.current && conversationId) {
-        console.log("Reconnection timer triggered, attempting to reconnect participant channel");
-        setError(null);
-        attemptReconnection();
-      }
-    }, 5000); // 5 second delay before reconnection attempt
-  }, [attemptReconnection, conversationId]);
-  
-  // Core channel subscription logic
   useEffect(() => {
-    // Clean up existing subscription
-    const cleanupChannel = () => {
-      if (channelRef.current) {
-        console.log("Cleaning up existing channel subscription");
-        removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      subscribedRef.current = false;
-    };
+    if (!conversationId || !mountedRef.current) return;
     
-    cleanupChannel();
+    console.log(`Setting up participant channel for conversation ${conversationId}`);
     
-    if (!conversationId) {
-      console.log("No conversation ID provided, skipping realtime subscription");
-      return cleanupChannel;
-    }
+    // Create a unique channel name to prevent stale connections
+    const channelName = `participant-count-${conversationId}-${Date.now()}`;
     
-    console.log("Setting up realtime subscription for conversation:", conversationId);
-    
-    // Create a unique channel name with the conversation ID and a timestamp
-    // to prevent reusing stale channels
-    const channelName = `public-conversation-${conversationId}-${Date.now()}`;
-    console.log(`Creating public channel: ${channelName}`);
-    
-    try {
-      // For public access, we need to use the general schema-db-changes approach
-      const channel = supabase
-        .channel(channelName)
-        .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'conversations',
-          filter: `id=eq.${conversationId}`
-        }, (payload) => {
-          if (!mountedRef.current) return;
+    // Listen for changes to current_participants and participants in the conversation
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, (payload) => {
+        if (!mountedRef.current) return;
+        
+        console.log("Participant count update payload:", payload);
+        
+        if (payload.new) {
+          const newCount = payload.new.current_participants;
+          const maxParticipants = payload.new.participants;
           
-          console.log("Received realtime update for conversation:", payload);
+          if (typeof newCount === 'number') {
+            console.log(`Setting current participant count to ${newCount} from realtime update`);
+            setCurrentParticipantCount(newCount);
+          }
+          
+          if (typeof maxParticipants === 'number') {
+            console.log(`Setting max participants to ${maxParticipants} from realtime update`);
+            setMaxParticipantsForSession(maxParticipants);
+          }
+          
+          // Also refetch the full conversation to keep everything in sync
+          refetch();
+        }
+        
+        // Mark as connected when we get updates
+        setIsConnected(true);
+      })
+      .subscribe((status) => {
+        console.log(`Participant channel ${channelName} status:`, status);
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to participant count updates');
           setIsConnected(true);
-          subscribedRef.current = true;
-          
-          if (payload.new) {
-            // Update max participants if available
-            if (payload.new.participants !== null && payload.new.participants > 0) {
-              setMaxParticipantsForSession(payload.new.participants);
-            }
-            
-            // Update current participants count
-            if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
-              setCurrentParticipantCount(payload.new.current_participants);
-            }
-            
-            // Check if session was started
-            if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-              console.log("Session was started, forcing data refresh");
-              refetch();
-            }
-          }
-        })
-        .subscribe((status) => {
-          if (!mountedRef.current) return;
-          
-          console.log(`Channel ${channelName} status: ${status}`);
-          if (status === 'SUBSCRIBED') {
-            console.log('Successfully subscribed to realtime updates');
-            setIsConnected(true);
-            subscribedRef.current = true;
-            // Reset error state
-            if (error) setError(null);
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('Error subscribing to channel:', channelName);
-            setIsConnected(false);
-            subscribedRef.current = false;
-            setError("Failed to establish realtime connection");
-            setupReconnectionTimer();
-          } else if (status === 'TIMED_OUT') {
-            console.warn('Channel subscription timed out:', channelName);
-            subscribedRef.current = false;
-            setupReconnectionTimer();
-          }
-        });
-
-      channelRef.current = channel;
-
-      return cleanupChannel;
-    } catch (err) {
-      console.error("Error setting up realtime subscription:", err);
-      subscribedRef.current = false;
-      setError("Error setting up realtime connection");
-      setupReconnectionTimer();
-      return cleanupChannel;
-    }
-  }, [conversationId, refetch, attemptReconnection, setIsConnected, setCurrentParticipantCount, setMaxParticipantsForSession, error, setupReconnectionTimer]);
-
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Error subscribing to participant count updates');
+          setError('Failed to connect to session updates');
+          setIsConnected(false);
+          attemptReconnection();
+        } else if (status === 'TIMED_OUT') {
+          console.error('Connection timed out for participant count updates');
+          setError('Connection timed out');
+          setIsConnected(false);
+          attemptReconnection();
+        }
+      });
+      
+    // Clean up the channel when the component unmounts
+    return () => {
+      if (mountedRef.current) {
+        console.log(`Cleaning up participant channel ${channelName}`);
+      }
+      removeChannel(channel);
+    };
+  }, [conversationId, setIsConnected, attemptReconnection, setCurrentParticipantCount, setMaxParticipantsForSession, refetch]);
+  
   return { error };
 }

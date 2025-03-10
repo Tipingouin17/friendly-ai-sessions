@@ -1,7 +1,8 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 export interface SessionErrorBoundaryProps {
   children: React.ReactNode;
@@ -24,22 +25,48 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   isLoading = false,
   hasInitializedProvider = false
 }) => {
+  const { toast } = useToast();
+  
+  // Log error information for debugging
+  useEffect(() => {
+    if (error || noSessionFound) {
+      console.log("SessionErrorBoundary showing error:", { 
+        error, 
+        noSessionFound, 
+        connectionAttempts,
+        isSessionFull: error?.includes("full") || error?.includes("maximum capacity")
+      });
+    }
+  }, [error, noSessionFound, connectionAttempts]);
+
   if (error || noSessionFound) {
+    const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
+    const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
+    
+    const errorTitle = isSessionFullError ? "Session Full" : 
+                       isSessionNotFoundError ? "Session Not Found" : 
+                       "Session Error";
+                       
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
           <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">
-            {noSessionFound ? "Session Not Found" : "Session Error"}
-          </h2>
+          <h2 className="text-xl font-semibold mb-2">{errorTitle}</h2>
           <p className="text-gray-600 mb-6">
             {error || "This session could not be found or has ended. Please check the link and try again."}
           </p>
           
           <div className="space-y-2">
             <Button 
-              onClick={retryConnection}
-              className="w-full"
+              onClick={() => {
+                console.log("Retry connection clicked, reconnecting...");
+                retryConnection();
+                toast({
+                  title: "Reconnecting...",
+                  description: "Attempting to reconnect to the session.",
+                });
+              }}
+              className="w-full bg-amber-400 hover:bg-amber-500 text-black"
               disabled={connectionAttempts > 5 && Date.now() - lastAttemptTime < 10000}
             >
               <RefreshCw className="w-4 h-4 mr-2" />

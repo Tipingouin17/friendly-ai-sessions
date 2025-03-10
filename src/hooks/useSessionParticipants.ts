@@ -103,16 +103,19 @@ export function useSessionParticipants(conversationId: number | null) {
     }
   }, [connectionError, participantChannelResult.error, error]);
 
-  // Force periodic refresh to ensure data consistency
+  // Force periodic refresh to ensure data consistency - reduce interval for more up-to-date data
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
+    
+    // Initial refresh to ensure we have the latest participant count
+    refetch();
     
     const intervalId = setInterval(() => {
       if (mountedRef.current) {
         console.log("Periodic refresh of session data");
         refetch();
       }
-    }, 15000);
+    }, 5000); // Reduced from 15000 to 5000 ms for more frequent updates
     
     return () => {
       clearInterval(intervalId);

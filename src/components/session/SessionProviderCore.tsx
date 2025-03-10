@@ -65,7 +65,8 @@ export const SessionProviderCore = ({
     participants,
     currentUserParticipantId,
     currentParticipantCount,
-    maxParticipantsForSession
+    maxParticipantsForSession,
+    isSessionFull
   } = useSessionParticipantSetup({
     conversationId: currentConversationId,
     conversation,
@@ -75,6 +76,25 @@ export const SessionProviderCore = ({
     onSessionFull: handleSessionFull,
     forceAdmin // Pass forceAdmin to participant setup
   });
+
+  // Log participant information for debugging
+  useEffect(() => {
+    console.log("SessionProviderCore participant info:", {
+      currentConversationId,
+      conversationParticipants: conversation?.current_participants,
+      hookParticipants: currentParticipantCount,
+      participants: participants.length,
+      maxParticipants: maxParticipantsForSession,
+      isSessionFull,
+      forceAdmin
+    });
+    
+    // If we're an admin, we should never see the session full error
+    if (isSessionFull && forceAdmin) {
+      console.error("Admin user incorrectly marked as session full - this should never happen");
+    }
+  }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
+      maxParticipantsForSession, isSessionFull, forceAdmin]);
 
   // Set up session monitoring
   const {
@@ -92,7 +112,14 @@ export const SessionProviderCore = ({
   // If we have serious errors, return error fallback
   if (providerError) {
     return (
-      <SessionProviderErrorFallback errorMessage={providerError}>
+      <SessionProviderErrorFallback 
+        errorMessage={providerError}
+        isAdmin={forceAdmin}
+        onRetry={() => {
+          console.log("Retry requested from error fallback");
+          refetch();
+        }}
+      >
         {children}
       </SessionProviderErrorFallback>
     );

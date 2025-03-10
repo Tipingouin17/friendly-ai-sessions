@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
 
@@ -18,11 +18,24 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   isLoading,
   conversationData
 }) => {
+  // Log participant information for debugging
+  useEffect(() => {
+    console.log("AdminParticipantList rendering with:", { 
+      participants: participants.length,
+      currentParticipantCount,
+      maxParticipants,
+      conversationDataParticipants: conversationData?.current_participants
+    });
+  }, [participants.length, currentParticipantCount, maxParticipants, conversationData]);
+
+  // Use the higher count between participants array length and currentParticipantCount
+  const displayParticipantCount = Math.max(participants.length, currentParticipantCount);
+
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
       <h3 className="font-medium mb-2 flex items-center gap-2">
         <Users className="h-4 w-4" /> 
-        Participants ({participants.length}/{maxParticipants})
+        Participants ({displayParticipantCount}/{maxParticipants || "∞"})
       </h3>
       
       {isLoading ? (
@@ -61,7 +74,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       <div className="mt-4 text-xs text-gray-500">
         <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>
         <p>Objective: {conversationData?.sessions?.objective || "Not specified"}</p>
-        <p>Max participants: {conversationData?.participants || "Not specified"}</p>
+        <p>Max participants: {conversationData?.participants || "Unlimited"}</p>
         <p>Current participants: {conversationData?.current_participants || 0}</p>
         <p>Language: {conversationData?.language || "Not specified"}</p>
         <p>Session started: {conversationData?.session_started ? "Yes" : "No"}</p>

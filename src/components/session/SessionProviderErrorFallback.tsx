@@ -5,11 +5,15 @@ import { SessionContextProps } from "@/types/session";
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
   children: (props: SessionContextProps) => React.ReactElement;
+  isAdmin?: boolean; // Add the isAdmin prop
+  onRetry?: () => void; // Make onRetry optional
 }
 
 export const SessionProviderErrorFallback = ({ 
   errorMessage, 
-  children 
+  children,
+  isAdmin = false, // Default to false
+  onRetry 
 }: SessionProviderErrorFallbackProps) => {
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage);
   
@@ -54,11 +58,29 @@ export const SessionProviderErrorFallback = ({
     // Add missing properties required by SessionContextProps
     isConnected: false,
     connectionAttempts: 0,
-    refetch: () => {}
+    refetch: () => {},
+    
+    // Include isAdmin in the fallback context
+    isAdmin: isAdmin
   };
 
-  // Return error state
-  return children(fallbackSessionContext);
+  // Return error state with a retry button if onRetry is provided
+  return (
+    <div className="flex-1 flex flex-col">
+      {children(fallbackSessionContext)}
+      
+      {onRetry && (
+        <div className="fixed bottom-4 right-4">
+          <button 
+            onClick={onRetry}
+            className="bg-primary text-white px-4 py-2 rounded shadow-md hover:bg-primary/90"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Import this from sessionHelpers to avoid circular dependencies

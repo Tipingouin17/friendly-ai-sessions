@@ -49,10 +49,10 @@ export function useJoinSessionData(conversationId: number | null) {
     // Only check if session is full if effectiveMaxParticipants is greater than 0
     if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
       setError("This session has reached its maximum capacity of participants.");
-      return;
+      return Promise.resolve(); // Return a resolved promise for async compatibility
     }
 
-    await joinSession({
+    return joinSession({
       conversationId,
       participantName,
       avatarSeed,

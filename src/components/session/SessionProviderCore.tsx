@@ -114,7 +114,7 @@ export const SessionProviderCore = ({
     return (
       <SessionProviderErrorFallback 
         errorMessage={providerError}
-        isAdmin={forceAdmin}
+        isAdmin={Boolean(forceAdmin)}
         onRetry={() => {
           console.log("Retry requested from error fallback");
           refetch();

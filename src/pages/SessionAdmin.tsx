@@ -12,6 +12,7 @@ import SessionView from "@/components/session/SessionView";
 import AdminSessionHeader from "@/components/session/AdminSessionHeader";
 import AdminSessionMessages from "@/components/session/AdminSessionMessages";
 import AdminParticipantList from "@/components/session/AdminParticipantList";
+import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 
 const SessionAdmin = () => {
   // Enforce admin status
@@ -41,9 +42,12 @@ const SessionAdmin = () => {
     locationState
   } = useAdminSessionLoader();
   
-  // Participant state
-  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
-  const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
+  // Participant tracking
+  const {
+    participants,
+    setParticipants,
+    isLoading: isLoadingParticipants
+  } = useParticipantTracking(locationState, conversationData, currentConversationId);
   
   // Admin message handling
   const {
@@ -71,9 +75,10 @@ const SessionAdmin = () => {
       currentConversationId,
       locationState,
       conversationData,
-      path: window.location.pathname
+      path: window.location.pathname,
+      participantsCount: participants.length
     });
-  }, [isLoading, currentConversationId, locationState, conversationData]);
+  }, [isLoading, currentConversationId, locationState, conversationData, participants.length]);
   
   // Redirect if no conversation ID
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {

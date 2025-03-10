@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
@@ -78,9 +79,10 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       currentParticipantCount,
       maxParticipants,
       conversationDataParticipants: conversationData?.current_participants,
-      displayCount
+      displayCount,
+      isLoading
     });
-  }, [participants.length, currentParticipantCount, maxParticipants, conversationData, displayCount]);
+  }, [participants.length, currentParticipantCount, maxParticipants, conversationData, displayCount, isLoading]);
 
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
@@ -91,7 +93,8 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       
       <div className="space-y-2">
         {isLoading ? (
-          Array.from({ length: displayCount || 1 }).map((_, index) => (
+          // Show loading skeletons when data is being loaded
+          Array.from({ length: displayCount || 3 }).map((_, index) => (
             <div 
               key={`skeleton-${index}`}
               className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
@@ -105,6 +108,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
             </div>
           ))
         ) : participants.length > 0 ? (
+          // Show actual participants when available
           participants.map(participant => (
             <div 
               key={`participant-${participant.id}`}
@@ -126,6 +130,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
             </div>
           ))
         ) : (
+          // Show no participants message
           <div className="text-center py-4 text-sm text-gray-500">
             No participants have joined yet.
           </div>

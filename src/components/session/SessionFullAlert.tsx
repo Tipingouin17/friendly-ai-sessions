@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,16 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   const { isAdmin } = useSessionAdminStatus();
 
   // Skip showing session full alert for admin users
-  if (isAdmin && type === 'full') {
-    console.log("Suppressing session full alert for admin user");
-    if (onClose) {
+  useEffect(() => {
+    if (isAdmin && type === 'full' && onClose) {
+      console.log("Suppressing session full alert for admin user");
       setTimeout(() => onClose(), 0);
     }
+  }, [isAdmin, type, onClose]);
+
+  // If we're an admin and this is a full session alert, don't render anything
+  if (isAdmin && type === 'full') {
+    console.log("Suppressing session full alert render for admin user");
     return null;
   }
 

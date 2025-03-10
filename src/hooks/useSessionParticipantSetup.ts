@@ -50,6 +50,18 @@ export const useSessionParticipantSetup = ({
     maxParticipantsForSession,
   } = participantsData;
   
+  // Debug logging
+  useEffect(() => {
+    console.log("useSessionParticipantSetup current state:", {
+      conversationId,
+      currentParticipantCount,
+      maxParticipantsForSession,
+      isAdmin,
+      forceAdmin,
+      isSessionFull
+    });
+  }, [conversationId, currentParticipantCount, maxParticipantsForSession, isAdmin, forceAdmin, isSessionFull]);
+  
   // Set current user participant ID from location state
   useEffect(() => {
     if (locationState?.participantId) {

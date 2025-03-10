@@ -11,7 +11,8 @@ export function useParticipantCounts(conversation: ConversationWithSession | nul
     if (conversation) {
       console.log("Conversation data loaded in useParticipantCounts:", {
         current: conversation.current_participants,
-        max: conversation.participants
+        max: conversation.participants,
+        id: conversation.id
       });
       
       // Set the maximum participants for this specific session
@@ -20,7 +21,10 @@ export function useParticipantCounts(conversation: ConversationWithSession | nul
       }
       
       // Set the current participants count
-      if (conversation.current_participants !== null && conversation.current_participants >= 0) {
+      if (conversation.current_participants !== null && 
+          typeof conversation.current_participants === 'number' && 
+          conversation.current_participants >= 0) {
+        console.log(`Setting current participant count to ${conversation.current_participants} from conversation data`);
         setCurrentParticipantCount(conversation.current_participants);
       }
     }

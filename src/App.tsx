@@ -95,7 +95,7 @@ function App() {
           {/* Regular session route for participants */}
           <Route path="/session" element={<Session />} />
           
-          {/* Admin-specific session route */}
+          {/* Admin-specific session route - ensure it's prioritized */}
           <Route 
             path="/session/admin" 
             element={

@@ -12,6 +12,7 @@ interface SessionErrorBoundaryProps {
   isLoading: boolean;
   hasInitializedProvider: boolean;
   lastAttemptTime: number;
+  isAdmin?: boolean; // Add optional isAdmin prop
 }
 
 const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
@@ -22,7 +23,8 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   connectionAttempts,
   isLoading,
   hasInitializedProvider,
-  lastAttemptTime
+  lastAttemptTime,
+  isAdmin = false // Set default value to false
 }) => {
   // Show empty state if no session is found
   if (noSessionFound) {

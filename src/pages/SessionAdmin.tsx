@@ -1,10 +1,12 @@
 
 import React, { useRef, useEffect } from "react";
+import { useLocation, Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import SessionProviderWrapper from "@/components/session/SessionProviderWrapper";
 import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";
 import { useToast } from "@/components/ui/use-toast";
 import AdminHeader from "@/components/session/AdminHeader";
+import { useConversationId } from "@/hooks/useConversationId";
 
 const SessionAdmin = () => {
   const {
@@ -25,11 +27,13 @@ const SessionAdmin = () => {
     retryConnection
   } = useSessionPage();
   
+  const { currentConversationId, locationState } = useConversationId();
   const { toast } = useToast();
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const location = useLocation();
   
-  // Force admin mode regardless of what useSessionPage returns
+  // Ensure we're in admin mode
   const forceAdmin = true;
   
   // Log initialization on mount and set up safety timeouts
@@ -39,7 +43,9 @@ const SessionAdmin = () => {
       isAdmin: true,
       hasError: !!error,
       noSessionFound,
-      isLoading
+      isLoading,
+      currentConversationId,
+      locationState
     });
     
     // Shorter timeouts for admin session
@@ -78,7 +84,7 @@ const SessionAdmin = () => {
         initializeTimeoutRef.current = null;
       }
     };
-  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider]);
+  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState]);
 
   // Admin Welcome message
   useEffect(() => {
@@ -91,6 +97,12 @@ const SessionAdmin = () => {
     
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // If there's no conversation ID, redirect to the home page
+  if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
+    console.error("No conversation ID found on admin page, redirecting home");
+    return <Navigate to="/" />;
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

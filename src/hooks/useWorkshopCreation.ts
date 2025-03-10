@@ -73,13 +73,21 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-        // Navigate to admin session page with explicit admin state
+        console.log("New conversation created with ID:", data.id, "redirecting to admin");
+        
+        // Use navigate with replace:true to prevent back button from returning to creation form
         navigate('/session/admin', {
           state: {
             newConversationId: data.id,
             isAdmin: true,
             replace: true
-          }
+          },
+          replace: true // Add this to ensure proper replacement in history
+        });
+        
+        toast({
+          title: "Session Created",
+          description: "Your admin session has been created successfully.",
         });
       }
     } catch (error) {

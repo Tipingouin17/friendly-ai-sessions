@@ -1,58 +1,66 @@
 
 import React from "react";
-import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
-import EmptyState from "@/components/session/EmptyState";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-interface SessionErrorBoundaryProps {
+export interface SessionErrorBoundaryProps {
   children: React.ReactNode;
-  error: string | null;
-  noSessionFound: boolean;
-  retryConnection: () => void;
-  connectionAttempts: number;
-  isLoading: boolean;
-  hasInitializedProvider: boolean;
-  lastAttemptTime: number;
-  isAdmin?: boolean; // Add optional isAdmin prop
+  error?: string | null;
+  noSessionFound?: boolean;
+  connectionAttempts?: number;
+  retryConnection?: () => void;
+  lastAttemptTime?: number;
 }
 
 const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   children,
-  error,
-  noSessionFound,
-  retryConnection,
-  connectionAttempts,
-  isLoading,
-  hasInitializedProvider,
-  lastAttemptTime,
-  isAdmin = false // Set default value to false
+  error = null,
+  noSessionFound = false,
+  connectionAttempts = 0,
+  retryConnection = () => {},
+  lastAttemptTime = 0
 }) => {
-  // Show empty state if no session is found
-  if (noSessionFound) {
-    return <EmptyState />;
+  if (error || noSessionFound) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+          <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">
+            {noSessionFound ? "Session Not Found" : "Session Error"}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {error || "This session could not be found or has ended. Please check the link and try again."}
+          </p>
+          
+          <div className="space-y-2">
+            <Button 
+              onClick={retryConnection}
+              className="w-full"
+              disabled={connectionAttempts > 5 && Date.now() - lastAttemptTime < 10000}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {connectionAttempts > 3 ? `Retry (Attempt ${connectionAttempts})` : "Retry Connection"}
+            </Button>
+            
+            <Button 
+              variant="outline"
+              className="w-full"
+              onClick={() => window.location.href = "/"}
+            >
+              Return Home
+            </Button>
+          </div>
+          
+          {connectionAttempts > 5 && (
+            <p className="mt-4 text-sm text-gray-500">
+              Multiple connection attempts failed. There might be an issue with the session.
+            </p>
+          )}
+        </div>
+      </div>
+    );
   }
 
-  // Show error state if there's an error
-  if (error) {
-    console.log("Rendering error state:", error);
-    return <JoinSessionLoadingState 
-      error={error} 
-      onRetry={retryConnection}
-      retryCount={connectionAttempts} 
-    />;
-  }
-
-  // Show loading state during initial load
-  if (isLoading && !error && !hasInitializedProvider) {
-    console.log("Rendering global loading state");
-    const loadingTimeElapsed = lastAttemptTime > 0 ? (Date.now() - lastAttemptTime) / 1000 : 0;
-    return <JoinSessionLoadingState 
-      onRetry={retryConnection}
-      retryCount={connectionAttempts}
-      loadingTimeElapsed={loadingTimeElapsed} 
-    />;
-  }
-
-  // No errors or loading, render children
   return <>{children}</>;
 };
 

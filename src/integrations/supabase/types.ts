@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          content: Json | null
+          conversation_id: number
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          content?: Json | null
+          conversation_id: number
+          created_at?: string | null
+          id?: number
+        }
+        Update: {
+          content?: Json | null
+          conversation_id?: number
+          created_at?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string | null

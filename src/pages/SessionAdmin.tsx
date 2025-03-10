@@ -272,10 +272,11 @@ const SessionAdmin = () => {
       };
       
       supabase
-        .from('admin_notifications')
+        .from('messages')
         .insert({
           conversation_id: currentConversationId,
           content: notificationContent,
+          role: 'admin',
           created_at: new Date().toISOString()
         })
         .then(({ error }) => {
@@ -305,6 +306,10 @@ const SessionAdmin = () => {
     }
   };
 
+  const handleAdminMessage = (message: string, isPinned: boolean = false, recipientId?: string) => {
+    handleSendAdminMessage(message);
+  };
+
   if (!isLoading && hasInitializedProvider && !error) {
     return (
       <SessionProviderWrapper
@@ -313,7 +318,13 @@ const SessionAdmin = () => {
         forceAdmin={true}
       >
         {(props) => (
-          <SessionErrorBoundary>
+          <SessionErrorBoundary
+            error={error}
+            noSessionFound={noSessionFound}
+            connectionAttempts={connectionAttempts}
+            retryConnection={retryConnection}
+            lastAttemptTime={lastAttemptTime || 0}
+          >
             <SessionView 
               props={{
                 ...props,
@@ -498,3 +509,4 @@ const SessionAdmin = () => {
 };
 
 export default SessionAdmin;
+

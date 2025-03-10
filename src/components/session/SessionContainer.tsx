@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
-import { useSessionContainer } from "@/hooks/useSessionContainer";
+
+import React from 'react';
+import { useSessionContainerState } from "@/hooks/useSessionContainerState";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
-import { useAnonymousState } from "@/hooks/useAnonymousState";
-import { useMessageProcessor } from "@/hooks/useMessageProcessor";
-import { Message, ParticipantInfo } from "@/types/chat";
 import SessionLayout from "./SessionLayout";
-import SessionHeader from "./SessionHeader";
 import MessagingArea from "./MessagingArea";
 import InputFooter from "./InputFooter";
-import QrDialogManager from "./QrDialogManager";
-import ViewModeToggle from "./ViewModeToggle";
-import SessionJoinInfo from "./SessionJoinInfo";
-import AdminNotification from "./AdminNotification";
-import AdminHeader from "./admin/AdminHeader";
+import SessionHeaderManager from "./SessionHeaderManager";
+import ViewModeSelector from "./ViewModeSelector";
+import SessionQrManager from "./SessionQrManager";
+import AdminNotificationManager from "./AdminNotificationManager";
 
 interface SessionContainerProps {
   facilitator: {
@@ -21,7 +17,7 @@ interface SessionContainerProps {
   };
   objective?: string;
   participantCount: number;
-  messages: Message[];
+  messages: any[];
   participantColors: { [key: string]: string };
   currentParticipant: number;
   inputMessage: string;
@@ -34,7 +30,7 @@ interface SessionContainerProps {
   onGenerateReport?: () => void;
   participantNames?: { [key: number]: string };
   onLikeMessage?: (messageId: string) => void;
-  participants?: ParticipantInfo[];
+  participants?: any[];
   conversationId?: number | null;
   conversation?: any;
   currentParticipantCount?: number;
@@ -77,26 +73,23 @@ const SessionContainer = ({
   onSendAdminMessage
 }: SessionContainerProps) => {
   const { canGenerateReports } = usePlanLimits();
-  const [adminNotification, setAdminNotification] = useState<string | null>(null);
   
   const {
+    adminNotification,
+    setAdminNotification,
     isMobile,
     joinUrl,
     isQrDialogOpen,
     setIsQrDialogOpen,
-    handleGenerateReport
-  } = useSessionContainer({
+    handleGenerateReport,
+    isAnonymous,
+    toggleAnonymous,
+    processedMessages
+  } = useSessionContainerState({
+    conversationId: conversationId || null,
+    currentUserParticipantId: currentUserParticipantId || null,
     canGenerateReports,
     onGenerateReport,
-    conversationId: conversationId || null
-  });
-  
-  const { isAnonymous, toggleAnonymous } = useAnonymousState({
-    conversationId,
-    currentParticipantId: currentUserParticipantId
-  });
-  
-  const processedMessages = useMessageProcessor({
     messages,
     viewMode,
     participants,
@@ -106,37 +99,27 @@ const SessionContainer = ({
 
   return (
     <SessionLayout>
-      {isAdmin ? (
-        <AdminHeader 
-          sessionTitle={facilitator?.title || "Session"}
-          facilitatorTitle={facilitator?.title || ""}
-          currentParticipants={currentParticipantCount || participants.length || participantCount}
-          maxParticipants={conversation?.participants || 0}
-          isSessionActive={true}
-          onToggleSessionState={() => {}}
-          onSendAdminMessage={onSendAdminMessage}
-          onExportData={onGenerateReport}
-        />
-      ) : (
-        <SessionHeader 
-          facilitator={facilitator}
-          objective={objective}
-          participantCount={currentParticipantCount || participants.length || participantCount}
-          onGenerateReport={handleGenerateReport}
-          isGeneratingReport={isGeneratingReport}
-          canGenerateReports={canGenerateReports}
-          messagesCount={messages.length}
-          viewMode={viewMode}
-        />
-      )}
+      <SessionHeaderManager 
+        isAdmin={isAdmin}
+        facilitator={facilitator}
+        objective={objective}
+        participantCount={participantCount}
+        currentParticipantCount={currentParticipantCount}
+        maxParticipants={conversation?.participants || 0}
+        onGenerateReport={handleGenerateReport}
+        isGeneratingReport={isGeneratingReport}
+        canGenerateReports={canGenerateReports}
+        messagesCount={messages.length}
+        viewMode={viewMode}
+        onSendAdminMessage={onSendAdminMessage}
+        isSessionActive={true}
+      />
       
-      {isAdmin && (
-        <ViewModeToggle 
-          viewMode={viewMode} 
-          setViewMode={setViewMode}
-          isAdmin={isAdmin}
-        />
-      )}
+      <ViewModeSelector 
+        viewMode={viewMode} 
+        setViewMode={setViewMode}
+        isAdmin={isAdmin}
+      />
       
       <div className="flex flex-1 overflow-hidden">
         <div className={`flex-1 ${viewMode === "admin" ? "" : "overflow-hidden"}`}>
@@ -154,29 +137,18 @@ const SessionContainer = ({
             viewMode={viewMode}
           />
         </div>
-        
-        {viewMode === "admin" && !isMobile && isAdmin && (
-          <div className="w-64 p-4 flex-shrink-0 border-l border-gray-100 overflow-y-auto">
-            <SessionJoinInfo 
-              conversationId={conversationId || null}
-              currentParticipantCount={currentParticipantCount || participants.length || 0}
-              maxParticipants={conversation?.participants || 0}
-            />
-          </div>
-        )}
       </div>
       
-      {isAdmin && viewMode === "admin" && (
-        <QrDialogManager
-          isMobile={isMobile}
-          viewMode={viewMode}
-          isQrDialogOpen={isQrDialogOpen}
-          setIsQrDialogOpen={setIsQrDialogOpen}
-          joinUrl={joinUrl}
-          currentParticipantCount={currentParticipantCount || participants.length || 0}
-          maxParticipants={conversation?.participants || 0}
-        />
-      )}
+      <SessionQrManager
+        isAdmin={isAdmin}
+        viewMode={viewMode}
+        isMobile={isMobile}
+        isQrDialogOpen={isQrDialogOpen}
+        setIsQrDialogOpen={setIsQrDialogOpen}
+        joinUrl={joinUrl}
+        currentParticipantCount={currentParticipantCount || participants.length || 0}
+        maxParticipants={conversation?.participants || 0}
+      />
       
       <InputFooter 
         participantCount={participantCount}
@@ -196,12 +168,11 @@ const SessionContainer = ({
         viewMode={viewMode}
       />
       
-      {!isAdmin && (
-        <AdminNotification 
-          message={adminNotification} 
-          onClose={() => setAdminNotification(null)}
-        />
-      )}
+      <AdminNotificationManager 
+        isAdmin={isAdmin}
+        message={adminNotification}
+        onClose={() => setAdminNotification(null)}
+      />
     </SessionLayout>
   );
 };

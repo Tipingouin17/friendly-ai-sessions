@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { useConversationId } from "@/hooks/useConversationId";
 
 interface JoinSessionDialogProps {
   isOpen: boolean;
@@ -29,16 +30,35 @@ const JoinSessionDialog = ({
 }: JoinSessionDialogProps) => {
   const { toast } = useToast();
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const { currentConversationId } = useConversationId();
+  const [internalJoinUrl, setInternalJoinUrl] = useState('');
 
   useEffect(() => {
-    if (joinUrl) {
-      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`);
+    // Generate the join URL if it's not provided but we have a conversation ID
+    const generateJoinUrl = () => {
+      if (joinUrl) {
+        setInternalJoinUrl(joinUrl);
+      } else if (currentConversationId) {
+        const baseUrl = window.location.origin;
+        const generatedUrl = `${baseUrl}/join-session?id=${currentConversationId}`;
+        setInternalJoinUrl(generatedUrl);
+      }
+    };
+
+    generateJoinUrl();
+  }, [joinUrl, currentConversationId]);
+
+  useEffect(() => {
+    // Generate QR code URL when the join URL is available
+    if (internalJoinUrl) {
+      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(internalJoinUrl)}`);
+      console.log("Generated QR code for URL:", internalJoinUrl);
     }
-  }, [joinUrl]);
+  }, [internalJoinUrl]);
 
   const copyJoinLink = () => {
-    if (joinUrl) {
-      navigator.clipboard.writeText(joinUrl);
+    if (internalJoinUrl) {
+      navigator.clipboard.writeText(internalJoinUrl);
       toast({
         title: "Link copied",
         description: "Session join link copied to clipboard",
@@ -66,7 +86,7 @@ const JoinSessionDialog = ({
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center justify-center p-4">
-          {joinUrl ? (
+          {internalJoinUrl ? (
             <>
               <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-4">
                 <img 
@@ -78,7 +98,7 @@ const JoinSessionDialog = ({
               <div className="flex w-full items-center mt-2 bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
                 <input 
                   type="text" 
-                  value={joinUrl} 
+                  value={internalJoinUrl} 
                   readOnly 
                   className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none"
                 />

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { 
   Share2, 
@@ -19,6 +19,7 @@ import {
   DialogTitle 
 } from "@/components/ui/dialog";
 import { Badge } from '@/components/ui/badge';
+import { useConversationId } from "@/hooks/useConversationId";
 
 interface AdminHeaderProps {
   sessionTitle: string;
@@ -43,11 +44,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
 }) => {
   const { toast } = useToast();
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const { currentConversationId } = useConversationId();
+  const [joinUrl, setJoinUrl] = useState('');
   
-  // Generate join URL
-  const sessionId = new URLSearchParams(window.location.search).get('id');
-  const baseUrl = window.location.origin;
-  const joinUrl = sessionId ? `${baseUrl}/join-session?id=${sessionId}` : '';
+  // Generate join URL when component mounts or conversation ID changes
+  useEffect(() => {
+    if (currentConversationId) {
+      const baseUrl = window.location.origin;
+      const url = `${baseUrl}/join-session?id=${currentConversationId}`;
+      setJoinUrl(url);
+      console.log("Generated join URL:", url);
+    }
+  }, [currentConversationId]);
   
   const copySessionLink = () => {
     if (joinUrl) {

@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 export interface SessionErrorBoundaryProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ export interface SessionErrorBoundaryProps {
   lastAttemptTime?: number;
   isLoading?: boolean;
   hasInitializedProvider?: boolean;
+  isAdmin?: boolean;
 }
 
 const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
@@ -23,9 +25,12 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   retryConnection = () => {},
   lastAttemptTime = 0,
   isLoading = false,
-  hasInitializedProvider = false
+  hasInitializedProvider = false,
+  isAdmin = false
 }) => {
   const { toast } = useToast();
+  const { isAdmin: adminStatus } = useSessionAdminStatus();
+  const effectiveIsAdmin = isAdmin || adminStatus;
   
   // Log error information for debugging
   useEffect(() => {
@@ -34,10 +39,18 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
         error, 
         noSessionFound, 
         connectionAttempts,
-        isSessionFull: error?.includes("full") || error?.includes("maximum capacity")
+        isSessionFull: error?.includes("full") || error?.includes("maximum capacity"),
+        isAdmin: effectiveIsAdmin
       });
     }
-  }, [error, noSessionFound, connectionAttempts]);
+  }, [error, noSessionFound, connectionAttempts, effectiveIsAdmin]);
+
+  // For admin users, bypass session full errors
+  if (effectiveIsAdmin && error && (error.includes("full") || error.includes("maximum capacity"))) {
+    console.log("Admin user detected - bypassing session full error");
+    // Render children for admin users even when session is full
+    return <>{children}</>;
+  }
 
   if (error || noSessionFound) {
     const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");

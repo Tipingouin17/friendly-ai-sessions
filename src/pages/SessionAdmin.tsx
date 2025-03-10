@@ -62,6 +62,19 @@ const SessionAdmin = () => {
   // Calculate effective loading state
   const isLoading = sessionPageLoading || loaderIsLoading || isConversationLoading;
   
+  // Log status on mount
+  useEffect(() => {
+    console.log("Admin session page mounted", {
+      time: new Date().toISOString(),
+      isAdmin: true,
+      isLoading,
+      currentConversationId,
+      locationState,
+      conversationData,
+      path: window.location.pathname
+    });
+  }, [isLoading, currentConversationId, locationState, conversationData]);
+  
   // Redirect if no conversation ID
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
     console.error("No conversation ID found on admin page, redirecting home");
@@ -83,6 +96,7 @@ const SessionAdmin = () => {
             connectionAttempts={connectionAttempts}
             retryConnection={retryConnection}
             lastAttemptTime={lastAttemptTime || 0}
+            isAdmin={true}
           >
             <SessionView 
               props={{

@@ -13,6 +13,7 @@ interface SessionFullAlertProps {
   isModal?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  isAdmin?: boolean;
 }
 
 const SessionFullAlert: React.FC<SessionFullAlertProps> = ({ 
@@ -20,10 +21,12 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   message,
   isModal = false,
   isOpen = true,
-  onClose
+  onClose,
+  isAdmin: propIsAdmin
 }) => {
   const navigate = useNavigate();
-  const { isAdmin } = useSessionAdminStatus();
+  const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  const isAdmin = propIsAdmin || contextIsAdmin;
 
   // Skip showing session full alert for admin users
   useEffect(() => {

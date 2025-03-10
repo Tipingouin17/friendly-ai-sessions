@@ -33,7 +33,7 @@ const SessionAdmin = () => {
   } = useSessionPage();
   
   const { currentConversationId, locationState } = useConversationId();
-  const { data: conversationData } = useConversation(currentConversationId);
+  const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
   const { toast } = useToast();
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -117,32 +117,37 @@ const SessionAdmin = () => {
     const timer = setTimeout(() => {
       toast({
         title: "Welcome to Admin Dashboard",
-        description: "You have access to all admin controls for this session.",
+        description: `You have access to all admin controls for ${conversationData?.sessions?.title || 'this session'}.`,
       });
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [toast]);
+  }, [toast, conversationData]);
   
   // Mock data subscription (in reality would come from SessionProviderWrapper)
   useEffect(() => {
+    // Using data from actual conversation to generate more realistic messages
+    const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title || "Facilitator";
+    const sessionTitle = conversationData?.sessions?.title || "Session";
+    const sessionObjective = conversationData?.sessions?.objective || "Discuss topics";
+    
     const mockMessages = [
       {
         id: "q1",
-        content: "What is your favorite color and why?",
+        content: `Welcome to the ${sessionTitle}. ${conversationData?.sessions?.welcome_message || "Let's begin our discussion"}`,
         sender: "assistant",
         timestamp: new Date(Date.now() - 1000 * 60 * 10)
       },
       {
         id: "a1",
-        content: "Blue because it reminds me of the sky",
+        content: `Hello! I'm excited to participate in this ${facilitatorTitle}-led session.`,
         sender: "user",
         participant: "P1",
         timestamp: new Date(Date.now() - 1000 * 60 * 9)
       },
       {
         id: "a2",
-        content: "Green because it's the color of nature",
+        content: "I've been looking forward to this discussion for a while.",
         sender: "user",
         participant: "P2",
         timestamp: new Date(Date.now() - 1000 * 60 * 8),
@@ -150,13 +155,13 @@ const SessionAdmin = () => {
       },
       {
         id: "q2",
-        content: "Describe your ideal vacation destination.",
+        content: `Let's focus on our objective: ${sessionObjective}. What are your initial thoughts?`,
         sender: "assistant",
         timestamp: new Date(Date.now() - 1000 * 60 * 7)
       },
       {
         id: "a3",
-        content: "A tropical beach with clear blue water",
+        content: "I think we should start by identifying key areas for improvement in our processes.",
         sender: "user",
         participant: "P1",
         timestamp: new Date(Date.now() - 1000 * 60 * 6)
@@ -170,11 +175,13 @@ const SessionAdmin = () => {
     ];
     
     // Simulate data loading
-    setTimeout(() => {
-      setSessionMessages(mockMessages);
-      setParticipants(mockParticipants);
-    }, 1500);
-  }, []);
+    if (conversationData && !isConversationLoading) {
+      setTimeout(() => {
+        setSessionMessages(mockMessages);
+        setParticipants(mockParticipants);
+      }, 1500);
+    }
+  }, [conversationData, isConversationLoading]);
 
   // If there's no conversation ID, redirect to the home page
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
@@ -203,7 +210,16 @@ const SessionAdmin = () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Main content area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {!isLoading && sessionMessages.length > 0 ? (
+          {isLoading || isConversationLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <h3 className="mb-2 text-xl font-medium">Loading session data...</h3>
+                <p className="text-gray-500">
+                  Please wait while we fetch the session information.
+                </p>
+              </div>
+            </div>
+          ) : sessionMessages.length > 0 ? (
             <>
               <div className="flex-1 overflow-auto">
                 {/* Group messages by questions as in MessagingArea admin view */}
@@ -292,7 +308,13 @@ const SessionAdmin = () => {
               <div className="text-center">
                 <h3 className="mb-2 text-xl font-medium">Waiting for session data...</h3>
                 <p className="text-gray-500">
-                  {isLoading ? "Loading session information..." : "No messages yet. The session may not have started."}
+                  No messages yet. The session may not have started.
+                </p>
+                <p className="text-gray-500 mt-2">
+                  Session: {conversationData?.sessions?.title || "Unknown"}
+                </p>
+                <p className="text-gray-500">
+                  Facilitator: {conversationData?.sessions?.facilitator_details?.title || "Unknown"}
                 </p>
               </div>
             </div>
@@ -302,7 +324,8 @@ const SessionAdmin = () => {
         {/* Right sidebar for participant info */}
         <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
           <h3 className="font-medium mb-2 flex items-center gap-2">
-            <Users className="h-4 w-4" /> Participants ({participants.length}/{conversationData?.participants || 10})
+            <Users className="h-4 w-4" /> 
+            Participants ({participants.length}/{conversationData?.participants || 10})
           </h3>
           
           <div className="space-y-2">
@@ -329,8 +352,12 @@ const SessionAdmin = () => {
           </div>
           
           <div className="mt-4 text-xs text-gray-500">
-            <p>The session has been active for 12 minutes</p>
-            <p>Average response time: 45 seconds</p>
+            <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>
+            <p>Objective: {conversationData?.sessions?.objective || "Not specified"}</p>
+            <p>Max participants: {conversationData?.participants || "Not specified"}</p>
+            <p>Current participants: {conversationData?.current_participants || 0}</p>
+            <p>Language: {conversationData?.language || "Not specified"}</p>
+            <p>Session started: {conversationData?.session_started ? "Yes" : "No"}</p>
           </div>
         </div>
       </div>

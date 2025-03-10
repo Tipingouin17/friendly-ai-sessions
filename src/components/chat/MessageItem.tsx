@@ -30,9 +30,15 @@ const MessageItem = ({
   const isAnonymous = message.isAnonymous && message.sender === "user";
   
   // Use participantInfo.name if available, otherwise fall back to message.participant
-  const displayParticipantName = isAnonymous 
-    ? "Anonymous participant" 
-    : participantInfo?.name || message.participant;
+  // Make sure we don't display "Participant X" format strings
+  let displayParticipantName = "User";
+  if (isAnonymous) {
+    displayParticipantName = "Anonymous participant";
+  } else if (participantInfo && participantInfo.name) {
+    displayParticipantName = participantInfo.name;
+  } else if (message.participant && !message.participant.startsWith("Participant")) {
+    displayParticipantName = message.participant;
+  }
 
   const handleLike = () => {
     if (onLikeMessage) {

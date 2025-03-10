@@ -28,7 +28,8 @@ export const useSessionProviderInitialization = ({
     
     console.log("Setting up initialization safety timeout, isAdmin:", isAdmin || forceAdmin);
     
-    const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 5000;
+    // Use shorter timeouts for both admin and participant sessions to prevent stuck states
+    const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 3000;
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
@@ -42,14 +43,15 @@ export const useSessionProviderInitialization = ({
       }
     }, initialTimeout);
     
-    const criticalTimeout = (isAdmin || forceAdmin) ? 4000 : 8000;
+    // Shorter critical timeout for participants
+    const criticalTimeout = (isAdmin || forceAdmin) ? 4000 : 6000;
     
     setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
         console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
         forcedInitialization.current = true;
         onInitialized();
-        onLoading(false);
+        onLoading(false); // Force loading state to false
         toast({
           title: "Session initialization taking longer than expected",
           description: "Please wait a moment while we complete setup.",

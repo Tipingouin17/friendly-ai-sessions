@@ -38,6 +38,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   const [sessionStarted, setSessionStarted] = useState(false);
   const effectiveAdmin = isAdmin || forceAdmin || sessionStorage.getItem('isAdminSession') === 'true';
   const { toast } = useToast();
+  const providerInitialized = useRef(false);
   
   // Persist admin status when detected
   useEffect(() => {
@@ -58,6 +59,20 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     isAdmin: effectiveAdmin,
     forceAdmin: effectiveAdmin
   });
+
+  // Force initialization after a timeout - this helps with participant sessions getting stuck
+  useEffect(() => {
+    const initTimeout = setTimeout(() => {
+      if (!providerInitialized.current) {
+        console.log("Force initializing provider after timeout");
+        providerInitialized.current = true;
+        onInitialized();
+        onLoading(false);
+      }
+    }, 8000);
+    
+    return () => clearTimeout(initTimeout);
+  }, [onInitialized, onLoading]);
 
   // Log admin settings
   useEffect(() => {
@@ -87,7 +102,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       {(props: SessionContextProps) => {
         // Initialize session when data is available
         useEffect(() => {
-          if (sessionMountedRef.current && !forcedInitialization.current) {
+          if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
             const shouldInitialize = effectiveAdmin ? true : (props.conversation && props.currentConversationId);
             
             if (shouldInitialize) {
@@ -99,25 +114,15 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
                 forceAdmin,
                 effectiveAdmin
               });
+              providerInitialized.current = true;
               onInitialized();
             } else if (props.error) {
               console.log("Provider initialization with error:", props.error);
+              providerInitialized.current = true;
               onInitialized();
             }
           }
         }, [props.conversation, props.currentConversationId, props.error, props.isAdmin]);
-        
-        // Log provider props for debugging
-        console.log("SessionProvider props:", {
-          isLoading: props.isLoading,
-          conversationId: props.currentConversationId,
-          isAdmin: props.isAdmin,
-          providedIsAdmin: isAdmin,
-          forceAdmin,
-          effectiveAdmin,
-          messagesCount: props.sessionState?.messages?.length || 0,
-          participantsCount: props.participants?.length || 0
-        });
         
         // Update loading state based on conditions
         useEffect(() => {
@@ -127,6 +132,16 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
               onLoading(false);
             } else {
               onLoading(props.isLoading);
+              
+              // For participant sessions, force loading to false after a reasonable time
+              if (props.isLoading && !effectiveAdmin) {
+                const timeout = setTimeout(() => {
+                  console.log("Forcing loading state to false for participant session");
+                  onLoading(false);
+                }, 6000);
+                
+                return () => clearTimeout(timeout);
+              }
             }
           }
         }, [props.isLoading, props.isAdmin]);

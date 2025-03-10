@@ -42,8 +42,8 @@ export function useSessionLoadingState(
       return;
     }
     
-    // Use more aggressive recovery timing to prevent long loading states
-    const recoveryTime = Math.min(3000 + (recoveryAttemptsMade.current * 1000), 8000);
+    // More aggressive recovery timing to prevent long loading states
+    const recoveryTime = Math.min(2000 + (recoveryAttemptsMade.current * 1000), 5000);
     const loadingTime = Date.now() - loadingStartTime;
     
     // Only set the recovery timer if we're still loading and the session is mounted
@@ -64,8 +64,8 @@ export function useSessionLoadingState(
           });
         }
         
-        // Force provider initialization after multiple recovery attempts
-        if (recoveryAttemptsMade.current >= 2 && isLoading) {
+        // Force loading state to false after multiple recovery attempts or after a long time
+        if (recoveryAttemptsMade.current >= 2 || loadingTime > 8000) {
           console.log("Forcing loading state to false after multiple recovery attempts");
           setIsLoading(false);
         }

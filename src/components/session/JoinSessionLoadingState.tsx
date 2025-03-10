@@ -39,8 +39,14 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         if (newElapsed > 3 && !isLongWait) {
           setIsLongWait(true);
         }
-        if (newElapsed > 8 && !isVeryLongWait) {
+        if (newElapsed > 6 && !isVeryLongWait) {
           setIsVeryLongWait(true);
+        }
+        
+        // Auto retry after a long wait
+        if (newElapsed > 8 && onRetry && retryCount < 1) {
+          console.log("Auto-retrying connection after long wait");
+          onRetry();
         }
       }
     }, 1000);
@@ -51,7 +57,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, []);
+  }, [onRetry, retryCount]);
   
   // Process error messages to provide more helpful descriptions
   useEffect(() => {
@@ -87,11 +93,23 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     if (loadingTimeElapsed > 2) {
       setIsLongWait(true);
     }
-    if (loadingTimeElapsed > 6 || retryCount > 0 || error) {
+    if (loadingTimeElapsed > 5 || retryCount > 0 || error) {
       setIsLongWait(true);
       setIsVeryLongWait(true);
     }
   }, [loadingTimeElapsed, retryCount, error]);
+
+  // Add auto-refresh mechanism
+  useEffect(() => {
+    const autoRefreshTimeout = setTimeout(() => {
+      if (elapsed > 15 && mountedRef.current) {
+        console.log("Auto-refreshing page after extended loading time");
+        window.location.reload();
+      }
+    }, 15000);
+    
+    return () => clearTimeout(autoRefreshTimeout);
+  }, [elapsed]);
 
   const handleRefresh = () => {
     if (onRetry) {
@@ -157,7 +175,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
               </p>
               {retryCount > 0 && !error && (
                 <p className="mt-2 text-xs">
-                  Retry attempt: {retryCount} {retryCount > 1 ? "(If issues persist, please check your network connection)" : ""}
+                  Retry attempt: {retryCount} {retryCount > 1 ? "(If issues persist, please try refreshing the page)" : ""}
                 </p>
               )}
             </div>
@@ -174,7 +192,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
               Retry Connection
             </Button>
             
-            {retryCount > 2 && (
+            {retryCount > 1 && (
               <div className="mt-2">
                 <Button 
                   onClick={() => window.location.href = '/'}

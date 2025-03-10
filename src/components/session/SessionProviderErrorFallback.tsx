@@ -5,17 +5,26 @@ import { SessionContextProps } from "@/types/session";
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
   children: (props: SessionContextProps) => React.ReactElement;
-  isAdmin?: boolean; // This prop is already defined
+  isAdmin?: boolean;
   onRetry?: () => void;
 }
 
 export const SessionProviderErrorFallback = ({ 
   errorMessage, 
   children,
-  isAdmin = false, // Default to false as in the original
+  isAdmin = false,
   onRetry 
 }: SessionProviderErrorFallbackProps) => {
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage, "isAdmin:", isAdmin);
+  
+  // For admin users, handle session full error differently
+  if (isAdmin && errorMessage.includes("session is full")) {
+    console.log("Admin detected with session full error - should override this error");
+    errorMessage = "You are an admin - overriding session full restriction";
+    
+    // Force set admin status in session storage
+    sessionStorage.setItem('isAdminSession', 'true');
+  }
   
   // Create safe default props
   const fallbackSessionContext: SessionContextProps = {

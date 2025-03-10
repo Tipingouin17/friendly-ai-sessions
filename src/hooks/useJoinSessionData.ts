@@ -68,7 +68,8 @@ export function useJoinSessionData(conversationId: number | null) {
         avatarSeed,
         conversation: conversation as ConversationWithSession,
         currentParticipantCount,
-        refetch
+        refetch,
+        isAdmin: true  // Pass the admin status to joinSession
       });
     }
 
@@ -90,7 +91,8 @@ export function useJoinSessionData(conversationId: number | null) {
       avatarSeed,
       conversation: conversation as ConversationWithSession,
       currentParticipantCount,
-      refetch
+      refetch,
+      isAdmin: false
     });
   };
   

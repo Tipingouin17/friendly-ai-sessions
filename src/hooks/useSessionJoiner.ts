@@ -14,6 +14,7 @@ interface SessionJoinParams {
   currentParticipantCount: number;
   refetch: () => Promise<any>;
   isAnonymous?: boolean;
+  isAdmin?: boolean;
 }
 
 export function useSessionJoiner() {
@@ -23,8 +24,14 @@ export function useSessionJoiner() {
   const [error, setError] = useState<string | null>(null);
   const { isAdmin } = useSessionAdminStatus();
 
-  const navigateToSession = (conversationId: number | null, name: string, participantId: number, avatarSeed: string) => {
-    console.log(`Navigating to session with name: ${name}, participantId: ${participantId}, isAdmin: ${isAdmin}`);
+  const navigateToSession = (conversationId: number | null, name: string, participantId: number, avatarSeed: string, forceAdmin: boolean = false) => {
+    const adminStatus = forceAdmin || isAdmin;
+    console.log(`Navigating to session with name: ${name}, participantId: ${participantId}, isAdmin: ${adminStatus}`);
+    
+    if (adminStatus) {
+      // Set admin status in session storage to ensure it persists
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
     
     navigate(`/session?id=${conversationId}`, {
       state: { 
@@ -33,7 +40,7 @@ export function useSessionJoiner() {
         isGuest: true,
         participantId,
         showMessaging: true,
-        isAdmin: isAdmin // Pass the admin status to ensure it persists
+        isAdmin: adminStatus
       }
     });
   };
@@ -45,7 +52,8 @@ export function useSessionJoiner() {
     conversation,
     currentParticipantCount,
     refetch,
-    isAnonymous = false
+    isAnonymous = false,
+    isAdmin: forceAdmin = false
   }: SessionJoinParams) => {
     if (!participantName.trim()) {
       toast({
@@ -71,13 +79,14 @@ export function useSessionJoiner() {
         throw new Error("Invalid session ID");
       }
       
+      const effectiveIsAdmin = forceAdmin || isAdmin;
       console.log("Attempting to join session with ID:", conversationId);
       console.log("Current participant count before update:", currentParticipantCount);
-      console.log("Admin status:", isAdmin);
+      console.log("Admin status:", effectiveIsAdmin);
       
       // Check if the session has a max participant limit
       // Skip this check for admin users
-      if (!isAdmin) {
+      if (!effectiveIsAdmin) {
         const maxParticipants = conversation.participants || 0;
         
         // Only enforce the limit if maxParticipants is greater than 0
@@ -106,7 +115,7 @@ export function useSessionJoiner() {
       
       // Double-check the participant limit with the latest data
       // Skip this check for admin users
-      if (!isAdmin && latestConversation.participants > 0 && 
+      if (!effectiveIsAdmin && latestConversation.participants > 0 && 
           latestConversation.current_participants >= latestConversation.participants) {
         throw new Error("This session is full and cannot accept more participants.");
       }
@@ -147,7 +156,8 @@ export function useSessionJoiner() {
           participant_id: newParticipantId,
           name: participantName,
           avatar_seed: avatarSeed,
-          is_anonymous: isAnonymous
+          is_anonymous: isAnonymous,
+          is_admin: effectiveIsAdmin
         });
         
       if (participantError) {
@@ -157,7 +167,7 @@ export function useSessionJoiner() {
       
       // Add a short delay to allow for Supabase to process the update
       setTimeout(() => {
-        navigateToSession(conversationId, participantName, newParticipantId, avatarSeed);
+        navigateToSession(conversationId, participantName, newParticipantId, avatarSeed, effectiveIsAdmin);
       }, 500);
       
       return Promise.resolve();

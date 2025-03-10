@@ -76,7 +76,7 @@ export const useSessionParticipantSetup = ({
     const effectiveIsAdmin = isAdmin || forceAdmin === true;
     
     // Skip check if admin
-    if (effectiveIsAdmin && conversationId) {
+    if (effectiveIsAdmin) {
       console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
       // If we previously set session as full but now we're admin, reset it
       if (isSessionFull) {

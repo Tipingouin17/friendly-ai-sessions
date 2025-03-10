@@ -12,6 +12,8 @@ import AdminMessageInput from "@/components/session/AdminMessageInput";
 import { useAdminSessionState } from "@/hooks/useAdminSessionState";
 import ParticipantResponseStats from "@/components/session/ParticipantResponseStats";
 import { Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Message, ParticipantInfo } from "@/types/chat";
 
 const SessionAdmin = () => {
   const {
@@ -39,9 +41,11 @@ const SessionAdmin = () => {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
   
-  // State for session context data (would normally come from SessionProviderWrapper)
-  const [sessionMessages, setSessionMessages] = useState<any[]>([]);
-  const [participants, setParticipants] = useState<any[]>([]);
+  // Use state for real data from the database
+  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   
   // Use our custom admin session state hook
   const {
@@ -124,64 +128,129 @@ const SessionAdmin = () => {
     return () => clearTimeout(timer);
   }, [toast, conversationData]);
   
-  // Mock data subscription (in reality would come from SessionProviderWrapper)
+  // Fetch real participant data from session_participants table
   useEffect(() => {
-    // Using data from actual conversation to generate more realistic messages
-    const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title || "Facilitator";
-    const sessionTitle = conversationData?.sessions?.title || "Session";
-    const sessionObjective = conversationData?.sessions?.objective || "Discuss topics";
+    if (!currentConversationId) return;
     
-    const mockMessages = [
-      {
-        id: "q1",
-        content: `Welcome to the ${sessionTitle}. ${conversationData?.sessions?.welcome_message || "Let's begin our discussion"}`,
-        sender: "assistant",
-        timestamp: new Date(Date.now() - 1000 * 60 * 10)
-      },
-      {
-        id: "a1",
-        content: `Hello! I'm excited to participate in this ${facilitatorTitle}-led session.`,
-        sender: "user",
-        participant: "P1",
-        timestamp: new Date(Date.now() - 1000 * 60 * 9)
-      },
-      {
-        id: "a2",
-        content: "I've been looking forward to this discussion for a while.",
-        sender: "user",
-        participant: "P2",
-        timestamp: new Date(Date.now() - 1000 * 60 * 8),
-        isAnonymous: true
-      },
-      {
-        id: "q2",
-        content: `Let's focus on our objective: ${sessionObjective}. What are your initial thoughts?`,
-        sender: "assistant",
-        timestamp: new Date(Date.now() - 1000 * 60 * 7)
-      },
-      {
-        id: "a3",
-        content: "I think we should start by identifying key areas for improvement in our processes.",
-        sender: "user",
-        participant: "P1",
-        timestamp: new Date(Date.now() - 1000 * 60 * 6)
+    const fetchParticipants = async () => {
+      setIsLoadingParticipants(true);
+      try {
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('conversation_id', currentConversationId);
+        
+        if (error) {
+          console.error('Error fetching participants:', error);
+          return;
+        }
+        
+        if (data) {
+          const formattedParticipants: ParticipantInfo[] = data.map(p => ({
+            id: p.participant_id,
+            name: p.name,
+            avatar: p.avatar_seed ? `https://ui-avatars.com/api/?name=${p.name}` : "https://ui-avatars.com/api/?name=Anonymous",
+            isAnonymous: p.is_anonymous
+          }));
+          
+          setParticipants(formattedParticipants);
+        }
+      } catch (error) {
+        console.error('Error in fetchParticipants:', error);
+      } finally {
+        setIsLoadingParticipants(false);
       }
-    ];
+    };
     
-    const mockParticipants = [
-      { id: 1, name: "John Doe", avatar: "https://ui-avatars.com/api/?name=John+Doe" },
-      { id: 2, name: "Jane Smith", avatar: "https://ui-avatars.com/api/?name=Jane+Smith", isAnonymous: true },
-      { id: 3, name: "Mark Johnson", avatar: "https://ui-avatars.com/api/?name=Mark+Johnson" }
-    ];
+    fetchParticipants();
     
-    // Simulate data loading
-    if (conversationData && !isConversationLoading) {
-      setTimeout(() => {
-        setSessionMessages(mockMessages);
-        setParticipants(mockParticipants);
-      }, 1500);
-    }
-  }, [conversationData, isConversationLoading]);
+    // Set up real-time subscription for participant changes
+    const channel = supabase
+      .channel('public:session_participants')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'session_participants',
+        filter: `conversation_id=eq.${currentConversationId}`
+      }, () => {
+        fetchParticipants(); // Refetch on any changes
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentConversationId]);
+  
+  // Fetch real message data from the messages table
+  useEffect(() => {
+    if (!currentConversationId) return;
+    
+    const fetchMessages = async () => {
+      setIsLoadingMessages(true);
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', currentConversationId)
+          .order('created_at', { ascending: true });
+        
+        if (error) {
+          console.error('Error fetching messages:', error);
+          return;
+        }
+        
+        if (data) {
+          // Transform database messages to the Message type format
+          const formattedMessages: Message[] = data.map(msg => {
+            const content = typeof msg.content === 'string' 
+              ? msg.content 
+              : typeof msg.content === 'object' && msg.content !== null
+                ? JSON.stringify(msg.content)
+                : '';
+            
+            return {
+              id: msg.id.toString(),
+              content: content,
+              sender: msg.role === 'assistant' ? 'assistant' : 'user',
+              timestamp: new Date(msg.created_at),
+              created_at: msg.created_at,
+              participant: msg.name ? `P${msg.name}` : undefined,
+              isAdminMessage: msg.role === 'admin',
+              isPinned: msg.content && typeof msg.content === 'object' && msg.content !== null 
+                ? msg.content.isPinned 
+                : false
+            };
+          });
+          
+          setSessionMessages(formattedMessages);
+        }
+      } catch (error) {
+        console.error('Error in fetchMessages:', error);
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    };
+    
+    fetchMessages();
+    
+    // Set up real-time subscription for message changes
+    const channel = supabase
+      .channel('public:messages')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${currentConversationId}`
+      }, () => {
+        fetchMessages(); // Refetch on any changes
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentConversationId]);
 
   // If there's no conversation ID, redirect to the home page
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
@@ -210,7 +279,7 @@ const SessionAdmin = () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Main content area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {isLoading || isConversationLoading ? (
+          {isLoading || isConversationLoading || isLoadingMessages ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <h3 className="mb-2 text-xl font-medium">Loading session data...</h3>
@@ -328,28 +397,38 @@ const SessionAdmin = () => {
             Participants ({participants.length}/{conversationData?.participants || 10})
           </h3>
           
-          <div className="space-y-2">
-            {participants.map(participant => (
-              <div 
-                key={`participant-${participant.id}`}
-                className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
-              >
+          {isLoadingParticipants ? (
+            <div className="text-center py-4 text-sm text-gray-500">
+              Loading participants...
+            </div>
+          ) : participants.length > 0 ? (
+            <div className="space-y-2">
+              {participants.map(participant => (
                 <div 
-                  className="w-2 h-2 rounded-full" 
-                  style={{ backgroundColor: ['#FCA5A5', '#FDBA74', '#BEF264'][participant.id % 3] }} 
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{participant.name}</div>
-                  {participant.isAnonymous && (
-                    <div className="text-xs text-gray-500">Anonymous mode</div>
-                  )}
+                  key={`participant-${participant.id}`}
+                  className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"
+                >
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: ['#FCA5A5', '#FDBA74', '#BEF264'][participant.id % 3] }} 
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{participant.name}</div>
+                    {participant.isAnonymous && (
+                      <div className="text-xs text-gray-500">Anonymous mode</div>
+                    )}
+                  </div>
+                  <div className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                    Active
+                  </div>
                 </div>
-                <div className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                  Active
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-sm text-gray-500">
+              No participants have joined yet.
+            </div>
+          )}
           
           <div className="mt-4 text-xs text-gray-500">
             <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>

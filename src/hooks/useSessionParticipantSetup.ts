@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { ConversationWithSession } from "@/types/database";

@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -183,3 +182,4 @@ export const SessionProviderCore = ({
   // Return children with context
   return children(sessionContext);
 };
+

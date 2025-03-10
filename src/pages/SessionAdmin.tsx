@@ -48,7 +48,7 @@ const SessionAdmin = () => {
       isLoading,
       currentConversationId,
       locationState,
-      conversationData: conversationData?.title
+      conversationData: conversationData?.sessions?.title
     });
     
     // Shorter timeouts for admin session

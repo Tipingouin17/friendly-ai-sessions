@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -44,6 +44,27 @@ const SessionContent: React.FC<{
   initializing,
   transitionState
 }) => {
+  const { toast } = useToast();
+  
+  // When admin loads the page, check if they need to be notified of anything
+  useEffect(() => {
+    if (isAdmin) {
+      // Check if session is ready to start
+      if (transitionState.currentParticipants > 0 && !sessionStarted) {
+        toast({
+          title: "Participants waiting",
+          description: `You have ${transitionState.currentParticipants} participant(s) waiting to start.`,
+        });
+      }
+      
+      // Show admin controls hint
+      toast({
+        title: "Admin Controls Available",
+        description: "You're viewing the session as an admin. You can start the session and invite participants.",
+      });
+    }
+  }, [isAdmin, sessionStarted, transitionState.currentParticipants, toast]);
+
   // Error and loading states are handled first with early returns
   if (props.isLoading || initializing) {
     console.log("Showing loading state - isLoading:", props.isLoading, "initializing:", initializing);
@@ -81,16 +102,23 @@ const SessionContent: React.FC<{
       onSessionFull={onSessionFull}
       onError={(error) => {
         console.error("Session error:", error);
+        toast({
+          title: "Session Error",
+          description: error,
+          variant: "destructive"
+        });
       }}
     >
-      <SessionStateDebugger 
-        props={props}
-        sessionStarted={sessionStarted}
-        shouldShowSession={shouldShowSession}
-        isTransitioning={isTransitioning}
-        currentParticipants={currentParticipants}
-        maxParticipants={maxParticipants}
-      />
+      {isAdmin && (
+        <SessionStateDebugger 
+          props={props}
+          sessionStarted={sessionStarted}
+          shouldShowSession={shouldShowSession}
+          isTransitioning={isTransitioning}
+          currentParticipants={currentParticipants}
+          maxParticipants={maxParticipants}
+        />
+      )}
       
       <SessionViewSelector
         props={props}
@@ -98,7 +126,14 @@ const SessionContent: React.FC<{
         sessionStarted={sessionStarted}
         isTransitioning={isTransitioning}
         shouldShowSession={shouldShowSession}
-        onStartSession={handleStartSession}
+        onStartSession={() => {
+          console.log("Start session button clicked in SessionViewSelector");
+          toast({
+            title: "Starting Session",
+            description: "The session is now starting for all participants.",
+          });
+          handleStartSession();
+        }}
         onSessionFull={onSessionFull}
       />
     </SessionStateProvider>
@@ -119,7 +154,8 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   // Use initialization hook - called unconditionally
   const { initializing } = useSessionInitialization({
     props,
-    setSessionStarted
+    setSessionStarted,
+    isAdmin
   });
   
   // Use transition state hook - called unconditionally

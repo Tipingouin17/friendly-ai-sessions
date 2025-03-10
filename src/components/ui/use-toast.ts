@@ -1,5 +1,5 @@
 
 // Re-export the useToast hook from our implementation
-import { useToast, toast } from "@/hooks/use-toast";
+import { useToast, toast, ToastContext } from "@/hooks/use-toast";
 
-export { useToast, toast };
+export { useToast, toast, ToastContext };

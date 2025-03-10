@@ -5,11 +5,13 @@ import { SessionContextProps } from "@/types/session";
 interface UseSessionInitializationProps {
   props: SessionContextProps;
   setSessionStarted: (started: boolean) => void;
+  isAdmin?: boolean;
 }
 
 export function useSessionInitialization({ 
   props, 
-  setSessionStarted 
+  setSessionStarted,
+  isAdmin = false
 }: UseSessionInitializationProps) {
   const [initializing, setInitializing] = useState(true);
   
@@ -20,12 +22,16 @@ export function useSessionInitialization({
       setSessionStarted(true);
     }
     
+    // Shorter initialization time for admin users
+    const initializationTime = isAdmin ? 300 : 500;
+    
     const timer = setTimeout(() => {
       setInitializing(false);
-    }, 500);
+      console.log(`Initialization complete after ${initializationTime}ms, isAdmin:`, isAdmin);
+    }, initializationTime);
     
     return () => clearTimeout(timer);
-  }, [props.isSessionStartedInDB, setSessionStarted]);
+  }, [props.isSessionStartedInDB, setSessionStarted, isAdmin]);
 
   return { initializing };
 }

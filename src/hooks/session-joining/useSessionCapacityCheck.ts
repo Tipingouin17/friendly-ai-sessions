@@ -108,6 +108,27 @@ export function useSessionCapacityCheck() {
         }
 
         console.log("Update response:", updateData);
+        
+        // Broadcast the update through a separate channel to ensure all clients update
+        try {
+          const { error: broadcastError } = await supabase
+            .from('session_events')
+            .insert({
+              conversation_id: conversationId,
+              event_type: 'participant_joined',
+              data: { 
+                participant_id: capacityResult.newParticipantId,
+                current_count: capacityResult.newParticipantId,
+                timestamp: new Date().toISOString()
+              }
+            });
+            
+          if (broadcastError) {
+            console.error("Error broadcasting participant join event:", broadcastError);
+          }
+        } catch (broadcastErr) {
+          console.error("Exception broadcasting join event:", broadcastErr);
+        }
       }
       
       setIsCheckingCapacity(false);

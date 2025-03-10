@@ -1,7 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { removeChannel } from "@/utils/realtimeHelpers";
 
 interface AdminParticipantListProps {
   participants: ParticipantInfo[];
@@ -18,24 +20,78 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   isLoading,
   conversationData
 }) => {
+  const [displayCount, setDisplayCount] = useState(currentParticipantCount);
+  
+  // Set up real-time listener for participant count updates
+  useEffect(() => {
+    if (!conversationData?.id) return;
+    
+    const conversationId = conversationData.id;
+    
+    // Set initial count
+    setDisplayCount(Math.max(participants.length, currentParticipantCount));
+    
+    // Listen for conversation updates
+    const conversationChannel = supabase
+      .channel(`admin-conversation-updates-${conversationId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("Admin received conversation update:", payload);
+        
+        if (payload.new && payload.new.current_participants !== undefined) {
+          console.log("Updating admin participant count display:", payload.new.current_participants);
+          setDisplayCount(payload.new.current_participants);
+        }
+      })
+      .subscribe();
+    
+    // Also listen for session events
+    const eventsChannel = supabase
+      .channel(`admin-session-events-${conversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'session_events',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("Admin received session event:", payload);
+        
+        if (payload.new && payload.new.event_type === 'participant_joined') {
+          const eventData = payload.new.data;
+          if (eventData && eventData.current_count !== undefined) {
+            console.log("Updating admin participant count from event:", eventData.current_count);
+            setDisplayCount(eventData.current_count);
+          }
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      removeChannel(conversationChannel);
+      removeChannel(eventsChannel);
+    };
+  }, [conversationData, participants.length, currentParticipantCount]);
+
   // Log participant information for debugging
   useEffect(() => {
     console.log("AdminParticipantList rendering with:", { 
       participants: participants.length,
       currentParticipantCount,
       maxParticipants,
-      conversationDataParticipants: conversationData?.current_participants
+      conversationDataParticipants: conversationData?.current_participants,
+      displayCount
     });
-  }, [participants.length, currentParticipantCount, maxParticipants, conversationData]);
-
-  // Use the higher count between participants array length and currentParticipantCount
-  const displayParticipantCount = Math.max(participants.length, currentParticipantCount);
+  }, [participants.length, currentParticipantCount, maxParticipants, conversationData, displayCount]);
 
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
       <h3 className="font-medium mb-2 flex items-center gap-2">
         <Users className="h-4 w-4" /> 
-        Participants ({displayParticipantCount}/{maxParticipants || "∞"})
+        Participants ({displayCount}/{maxParticipants || "∞"})
       </h3>
       
       {isLoading ? (
@@ -75,7 +131,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
         <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>
         <p>Objective: {conversationData?.sessions?.objective || "Not specified"}</p>
         <p>Max participants: {conversationData?.participants || "Unlimited"}</p>
-        <p>Current participants: {conversationData?.current_participants || 0}</p>
+        <p>Current participants: {displayCount}</p>
         <p>Language: {conversationData?.language || "Not specified"}</p>
         <p>Session started: {conversationData?.session_started ? "Yes" : "No"}</p>
       </div>

@@ -49,20 +49,21 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     const channelName = `public-conversation-${conversationId}-participant-waiting`;
     
     try {
-      const channel = supabase
-        .channel(channelName)
+      // Listen for conversation changes
+      const conversationChannel = supabase
+        .channel(`conversation-updates-${conversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
           schema: 'public', 
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received realtime update in participant waiting screen:", payload);
+          console.log("Received conversation update in participant waiting screen:", payload);
           
           if (payload.new) {
             // Update participant count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
-              console.log("Updating participant count:", payload.new.current_participants);
+              console.log("Updating participant count from conversation update:", payload.new.current_participants);
               setParticipantCount(payload.new.current_participants);
             }
             
@@ -83,12 +84,36 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           }
         })
         .subscribe((status) => {
-          console.log(`ParticipantWaitingScreen channel ${channelName} status:`, status);
+          console.log(`Conversation updates channel status:`, status);
+        });
+      
+      // Also listen for session events for more immediate updates
+      const eventsChannel = supabase
+        .channel(`session-events-${conversationId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'session_events',
+          filter: `conversation_id=eq.${conversationId}`
+        }, (payload) => {
+          console.log("Received session event in participant waiting screen:", payload);
+          
+          if (payload.new && payload.new.event_type === 'participant_joined') {
+            const eventData = payload.new.data;
+            if (eventData && eventData.current_count !== undefined) {
+              console.log("Updating participant count from event:", eventData.current_count);
+              setParticipantCount(eventData.current_count);
+            }
+          }
+        })
+        .subscribe((status) => {
+          console.log(`Session events channel status:`, status);
         });
       
       return () => {
-        console.log("Cleaning up participant waiting screen channel");
-        removeChannel(channel);
+        console.log("Cleaning up participant waiting screen channels");
+        removeChannel(conversationChannel);
+        removeChannel(eventsChannel);
       };
     } catch (err) {
       console.error("Error setting up participant waiting subscription:", err);

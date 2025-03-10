@@ -51,11 +51,15 @@ export function useSessionInterface(conversationId: number | null) {
   // Determine if we should show QR code view based on device and user state
   useEffect(() => {
     const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
-    if ((isMobile && locationState?.isGuest) || locationState?.showMessaging === true) {
+    
+    // Admin pages should never hide QR code view based on mobile status
+    const isAdminPage = location.pathname.includes('/admin');
+    
+    if (!isAdminPage && (isMobile && locationState?.isGuest) || locationState?.showMessaging === true) {
       console.log("Setting showQrCodeView to false based on location state:", locationState);
       setShowQrCodeView(false);
     }
-  }, [isMobile, location.state]);
+  }, [isMobile, location.state, location.pathname]);
   
   const handleStartSession = async () => {
     console.log("Starting session for conversation:", conversationId);
@@ -69,6 +73,9 @@ export function useSessionInterface(conversationId: number | null) {
       });
       return;
     }
+    
+    // Always ensure admin status is preserved
+    sessionStorage.setItem('isAdminSession', 'true');
     
     try {
       // Update the session_started flag in the database

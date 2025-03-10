@@ -14,13 +14,29 @@ import { Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Message, ParticipantInfo } from "@/types/chat";
 import SessionView from "@/components/session/SessionView";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 const SessionAdmin = () => {
   // Force admin mode
+  const { setAdminStatus } = useSessionAdminStatus();
+
+  // Set admin status immediately
   useEffect(() => {
     // Always set admin session status
     sessionStorage.setItem('isAdminSession', 'true');
-  }, []);
+    setAdminStatus(true);
+    
+    // Create a safety timer to regularly check and enforce admin status
+    const adminCheckInterval = setInterval(() => {
+      // Re-establish admin status in case it got lost
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
+    }, 2000);
+    
+    return () => {
+      clearInterval(adminCheckInterval);
+    };
+  }, [setAdminStatus]);
 
   const {
     isAdmin,
@@ -67,7 +83,25 @@ const SessionAdmin = () => {
     setMessages: setSessionMessages
   });
   
+  // Force admin status
   const forceAdmin = true;
+  
+  // Check if we're on the admin path and redirect if needed
+  useEffect(() => {
+    const isAdminPath = location.pathname.includes('/admin');
+    
+    if (!isAdminPath && currentConversationId) {
+      console.log("Not on admin path, redirecting to admin path");
+      navigate(`/session/admin?id=${currentConversationId}`, {
+        state: {
+          isAdmin: true,
+          showMessaging: true,
+          conversationId: currentConversationId
+        },
+        replace: true
+      });
+    }
+  }, [location.pathname, currentConversationId, navigate]);
   
   useEffect(() => {
     console.log("Admin session page mounted", {
@@ -78,11 +112,13 @@ const SessionAdmin = () => {
       isLoading,
       currentConversationId,
       locationState,
-      conversationData: conversationData?.sessions?.title
+      conversationData: conversationData?.sessions?.title,
+      path: location.pathname
     });
     
     // Ensure we're marked as admin
     sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
     
     const initialTimeout = 3000;
     const criticalTimeout = 5000;
@@ -116,7 +152,7 @@ const SessionAdmin = () => {
         initializeTimeoutRef.current = null;
       }
     };
-  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState, conversationData]);
+  }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState, conversationData, location.pathname, setAdminStatus]);
 
   // Additional admin state check to redirect if needed
   useEffect(() => {
@@ -141,6 +177,10 @@ const SessionAdmin = () => {
 
   const handleSendAdminMessage = (message: string) => {
     if (!message.trim() || !currentConversationId) return;
+    
+    // Ensure admin status
+    sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
     
     try {
       const notificationContent = {
@@ -184,6 +224,10 @@ const SessionAdmin = () => {
   };
 
   const handleAdminMessage = (message: string, isPinned: boolean = false, recipientId?: string) => {
+    // Ensure admin status
+    sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
+    
     handleSendAdminMessage(message);
   };
 
@@ -205,7 +249,8 @@ const SessionAdmin = () => {
             <SessionView 
               props={{
                 ...props,
-                onSendAdminMessage: handleSendAdminMessage
+                onSendAdminMessage: handleSendAdminMessage,
+                isAdmin: true // Force admin status
               }} 
               isAdmin={true} 
             />

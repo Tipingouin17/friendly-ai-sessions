@@ -38,25 +38,35 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   const forcedInitialization = useRef(false);
   const { toast } = useToast();
 
+  // Enforce admin status if forceAdmin is true
+  useEffect(() => {
+    if (forceAdmin) {
+      console.log("Enforcing admin status due to forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [forceAdmin]);
+
   // Log admin settings
   useEffect(() => {
     console.log("SessionProviderWrapper initialized with admin settings:", { 
       isAdmin, 
       forceAdmin,
-      path: window.location.pathname
+      path: window.location.pathname,
+      persistedAdmin: sessionStorage.getItem('isAdminSession')
     });
   }, [isAdmin, forceAdmin]);
 
   useEffect(() => {
     if (initializationAttempted.current) return;
     
-    console.log("Setting up initialization safety timeout, isAdmin:", isAdmin);
+    console.log("Setting up initialization safety timeout, isAdmin:", isAdmin || forceAdmin);
     
-    const initialTimeout = isAdmin ? 3000 : 5000;
+    // Use shorter timeouts for admin views
+    const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 5000;
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Forcing provider initialization after timeout");
+        console.log("Forcing provider initialization after timeout, isAdmin:", isAdmin || forceAdmin);
         forcedInitialization.current = true;
         onInitialized();
         toast({
@@ -66,18 +76,18 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       }
     }, initialTimeout);
     
-    const criticalTimeout = isAdmin ? 6000 : 8000;
+    const criticalTimeout = (isAdmin || forceAdmin) ? 4000 : 8000;
     
     setTimeout(() => {
       if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Critical initialization timeout reached, forcing initialization");
+        console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
         forcedInitialization.current = true;
         onInitialized();
         onLoading(false);
         toast({
           title: "Session initialization taking longer than expected",
           description: "Please wait a moment while we complete setup.",
-          variant: isAdmin ? "default" : "destructive"
+          variant: (isAdmin || forceAdmin) ? "default" : "destructive"
         });
       }
     }, criticalTimeout);
@@ -89,17 +99,22 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         clearTimeout(initializeTimeoutRef.current);
       }
     };
-  }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin]);
+  }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin, forceAdmin]);
+
+  // If forceAdmin is true, always ensure admin status is set
+  const effectiveAdmin = isAdmin || forceAdmin;
 
   return (
     <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
       onError={onError}
+      forceAdmin={forceAdmin}
     >
       {(props: SessionContextProps) => {
         React.useEffect(() => {
           if (sessionMountedRef.current && !forcedInitialization.current) {
-            const shouldInitialize = isAdmin ? true : (props.conversation && props.currentConversationId);
+            // For admin pages, we initialize sooner
+            const shouldInitialize = effectiveAdmin ? true : (props.conversation && props.currentConversationId);
             
             if (shouldInitialize) {
               console.log("Provider successfully initialized with data:", {
@@ -140,7 +155,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         
         React.useEffect(() => {
           if (sessionMountedRef.current) {
-            if ((isAdmin || forceAdmin) && props.isAdmin) {
+            if (effectiveAdmin && props.isAdmin) {
               console.log("Admin detected in provider, ensuring loading state is properly updated");
               onLoading(false);
             } else {
@@ -156,7 +171,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         }, [props.error]);
         
         // Don't show loading state for admin mode when forceAdmin is true
-        if (props.isLoading && !props.conversation && !((isAdmin || forceAdmin) && props.isAdmin)) {
+        if (props.isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
           console.log("Showing provider loading state");
           return <JoinSessionLoadingState 
             onRetry={retryConnection}
@@ -173,7 +188,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           />;
         }
         
-        if (!props.currentConversationId && !props.isLoading && !(isAdmin || forceAdmin)) {
+        if (!props.currentConversationId && !props.isLoading && !effectiveAdmin) {
           console.error("No conversation ID found in session provider, but no error was returned");
           return <JoinSessionLoadingState 
             error="Session not found. Please try again." 
@@ -182,14 +197,28 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           />;
         }
         
+        // Ensure admin status is enforced for forceAdmin
+        if (forceAdmin && !props.isAdmin) {
+          console.log("Forcing admin status in SessionProviderWrapper for forceAdmin=true");
+          sessionStorage.setItem('isAdminSession', 'true');
+        }
+        
         if (children) {
-          return children(props);
+          return children({
+            ...props,
+            // Ensure admin status is correctly passed if forceAdmin is true
+            isAdmin: props.isAdmin || effectiveAdmin 
+          });
         }
         
         return (
           <SessionStateHandler
-            props={props}
-            isAdmin={props.isAdmin || isAdmin || forceAdmin}
+            props={{
+              ...props,
+              // Ensure admin status is correctly passed if forceAdmin is true
+              isAdmin: props.isAdmin || effectiveAdmin
+            }}
+            isAdmin={props.isAdmin || effectiveAdmin}
             sessionStarted={props.sessionStarted || false}
             setSessionStarted={(started) => console.log("Session started:", started)}
             onSessionFull={handleSessionFull}

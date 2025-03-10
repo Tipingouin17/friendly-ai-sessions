@@ -22,7 +22,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useConversationId } from "@/hooks/useConversationId";
 import { Textarea } from "@/components/ui/textarea";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 interface AdminHeaderProps {
   sessionTitle: string;
@@ -47,11 +48,13 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [adminMessage, setAdminMessage] = useState('');
   const { currentConversationId } = useConversationId();
   const [joinUrl, setJoinUrl] = useState('');
+  const { setAdminStatus } = useSessionAdminStatus();
   
   // Generate join URL when component mounts or conversation ID changes
   useEffect(() => {
@@ -63,6 +66,13 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
   }, [currentConversationId]);
   
+  // Enforce admin status on mount
+  useEffect(() => {
+    console.log("AdminHeader mounted - enforcing admin status");
+    sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
+  }, [setAdminStatus]);
+  
   const copySessionLink = () => {
     if (joinUrl) {
       navigator.clipboard.writeText(joinUrl);
@@ -73,11 +83,16 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       
       // Mark as admin to maintain state
       sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
     }
   };
   
   const handleSendMessage = () => {
     if (adminMessage.trim() && onSendAdminMessage) {
+      // Ensure admin status before sending
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
+      
       onSendAdminMessage(adminMessage);
       setAdminMessage('');
       setShowMessageDialog(false);
@@ -92,6 +107,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const handleShowQrDialog = () => {
     // Ensure admin state is preserved
     sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
     setShowQrDialog(true);
   };
   
@@ -100,9 +116,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     if (!open) {
       // Reaffirm admin state when closing dialog
       sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
       
       // Check if we need to redirect back to admin page
       if (currentConversationId && !window.location.pathname.includes('/admin')) {
+        console.log("Dialog closed but not on admin path - redirecting back to admin page");
         navigate(`/session/admin?id=${currentConversationId}`, { 
           state: { 
             isAdmin: true,
@@ -114,6 +132,16 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       }
     }
     setShowQrDialog(open);
+  };
+  
+  // Handler for any action button to ensure admin status is preserved
+  const handleAdminAction = (callback?: () => void) => {
+    // Enforce admin status
+    sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
+    
+    // Call the original callback if provided
+    if (callback) callback();
   };
   
   return (
@@ -144,10 +172,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={() => {
-              sessionStorage.setItem('isAdminSession', 'true');
-              setShowMessageDialog(true);
-            }}
+            onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
           >
             <MessageSquare size={16} />
             <span>Send Message</span>
@@ -157,10 +182,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={() => {
-              sessionStorage.setItem('isAdminSession', 'true');
-              if (onToggleSessionState) onToggleSessionState();
-            }}
+            onClick={() => handleAdminAction(onToggleSessionState)}
           >
             {isSessionActive ? (
               <>
@@ -179,7 +201,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={handleShowQrDialog}
+            onClick={() => handleAdminAction(handleShowQrDialog)}
           >
             <QrCode size={16} />
             <span>QR Code</span>
@@ -189,7 +211,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={copySessionLink}
+            onClick={() => handleAdminAction(copySessionLink)}
           >
             <Share2 size={16} />
             <span>Share</span>
@@ -199,10 +221,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={() => {
-              sessionStorage.setItem('isAdminSession', 'true');
-              if (onExportData) onExportData();
-            }}
+            onClick={() => handleAdminAction(onExportData)}
           >
             <Download size={16} />
             <span>Export</span>
@@ -235,7 +254,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
                   <Button 
                     variant="ghost" 
                     className="h-full rounded-l-none border-l" 
-                    onClick={copySessionLink}
+                    onClick={() => handleAdminAction(copySessionLink)}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -254,7 +273,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         open={showMessageDialog} 
         onOpenChange={(open) => {
           if (!open) {
-            sessionStorage.setItem('isAdminSession', 'true');
+            handleAdminAction();
           }
           setShowMessageDialog(open);
         }}
@@ -278,13 +297,13 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <Button 
               variant="outline" 
               onClick={() => {
-                sessionStorage.setItem('isAdminSession', 'true');
+                handleAdminAction();
                 setShowMessageDialog(false);
               }}
             >
               Cancel
             </Button>
-            <Button onClick={handleSendMessage} disabled={!adminMessage.trim()}>
+            <Button onClick={() => handleAdminAction(handleSendMessage)} disabled={!adminMessage.trim()}>
               Send Message
             </Button>
           </DialogFooter>

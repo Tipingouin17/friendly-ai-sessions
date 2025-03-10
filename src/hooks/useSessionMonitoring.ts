@@ -24,6 +24,7 @@ export const useSessionMonitoring = ({
   forceAdmin
 }: UseSessionMonitoringProps) => {
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
   
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
@@ -34,16 +35,23 @@ export const useSessionMonitoring = ({
     }
   }, [forceAdmin, setAdminStatus]);
   
-  // Monitor session start status
-  const { isSessionStartedInDB } = useSessionStartMonitor(conversationId);
+  // Monitor session start status - fixed to pass the conversation object
+  useEffect(() => {
+    if (conversation) {
+      // Check if the session is already started in the DB
+      const isStarted = Boolean(conversation.session_started);
+      console.log("Session started status from conversation:", isStarted);
+      setIsSessionStartedInDB(isStarted);
+    }
+  }, [conversation]);
   
-  // Get room state
+  // Get room state - fixed to remove onError from useSessionRoomState props
   const roomState = useSessionRoomState({
-    conversation,
     conversationId,
+    conversation,
     currentUserParticipantId,
     participants,
-    onError,
+    welcomeMessage: conversation?.sessions?.welcome_message || null,
     isAdmin: forceAdmin ? true : isAdmin // Use forceAdmin to override isAdmin
   });
   

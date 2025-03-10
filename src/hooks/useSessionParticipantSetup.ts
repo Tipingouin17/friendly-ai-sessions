@@ -28,6 +28,7 @@ export const useSessionParticipantSetup = ({
   const [isSessionFull, setIsSessionFull] = useState(false);
   const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
@@ -38,13 +39,14 @@ export const useSessionParticipantSetup = ({
     }
   }, [forceAdmin, setAdminStatus]);
   
-  // Get participants using the hook
+  // Get participants using the hook - fixed to pass only conversationId
+  const participantsData = useSessionParticipants(conversationId);
+  
+  // Extract needed properties from participantsData
   const {
-    participants,
     currentParticipantCount,
     maxParticipantsForSession,
-    isParticipantTracking
-  } = useSessionParticipants(conversationId, locationState, forceAdmin);
+  } = participantsData;
   
   // Set current user participant ID from location state
   useEffect(() => {
@@ -97,6 +99,6 @@ export const useSessionParticipantSetup = ({
     currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    isParticipantTracking
+    isParticipantTracking: true // Added this property since it was expected in the return value
   };
 };

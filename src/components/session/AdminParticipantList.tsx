@@ -28,6 +28,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     
     const conversationId = conversationData.id;
     
+    // Use the higher number between actual participants array length and current_participants count
     setDisplayCount(Math.max(participants.length, currentParticipantCount));
     
     const conversationChannel = supabase
@@ -43,6 +44,23 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
         if (payload.new && payload.new.current_participants !== undefined) {
           console.log("Updating admin participant count display:", payload.new.current_participants);
           setDisplayCount(payload.new.current_participants);
+          
+          // If max participants is reached, update session_started flag
+          if (payload.new.current_participants >= maxParticipants && maxParticipants > 0 && !payload.new.session_started) {
+            console.log("Maximum participants reached, starting session automatically");
+            // Update session_started flag
+            supabase
+              .from('conversations')
+              .update({ session_started: true })
+              .eq('id', conversationId)
+              .then(({ error }) => {
+                if (error) {
+                  console.error("Error starting session automatically:", error);
+                } else {
+                  console.log("Session started automatically");
+                }
+              });
+          }
         }
       })
       .subscribe();
@@ -71,18 +89,19 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       removeChannel(conversationChannel);
       removeChannel(eventsChannel);
     };
-  }, [conversationData, participants.length, currentParticipantCount]);
+  }, [conversationData, participants.length, currentParticipantCount, maxParticipants]);
 
   useEffect(() => {
     console.log("AdminParticipantList rendering with:", { 
-      participants: participants.length,
+      participants,
+      participantCount: participants.length,
       currentParticipantCount,
       maxParticipants,
       conversationDataParticipants: conversationData?.current_participants,
       displayCount,
       isLoading
     });
-  }, [participants.length, currentParticipantCount, maxParticipants, conversationData, displayCount, isLoading]);
+  }, [participants, currentParticipantCount, maxParticipants, conversationData, displayCount, isLoading]);
 
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">

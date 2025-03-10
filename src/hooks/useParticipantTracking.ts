@@ -13,26 +13,64 @@ export function useParticipantTracking(
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Initialize participants based on conversation data
+  // Fetch existing participants from session_participants table
   useEffect(() => {
-    if (conversation && conversation.current_participants > 0) {
-      console.log("Initializing participants from conversation data:", conversation.current_participants);
+    if (!conversationId) return;
+    
+    async function fetchParticipants() {
+      setIsLoading(true);
       
-      const initialParticipants: ParticipantInfo[] = [];
-      
-      for (let i = 1; i <= conversation.current_participants; i++) {
-        initialParticipants.push({
-          id: i,
-          name: `Participant ${i}`,
-          avatar: null,
-          isAnonymous: false
-        });
+      try {
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('participant_id', { ascending: true });
+          
+        if (error) {
+          console.error("Error fetching participants:", error);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          console.log("Fetched participants from database:", data);
+          
+          const participantsList: ParticipantInfo[] = data.map(participant => ({
+            id: participant.participant_id,
+            name: participant.name,
+            avatar: participant.avatar_seed 
+              ? `/api/avatar?name=${participant.avatar_seed}&variant=beam&palette=0` 
+              : null,
+            isAnonymous: participant.is_anonymous || false
+          }));
+          
+          setParticipants(participantsList);
+        } else if (conversation && conversation.current_participants > 0) {
+          // Fallback to placeholder data if no participants are found in the table
+          console.log("No participants found in database, using fallback data");
+          
+          const initialParticipants: ParticipantInfo[] = [];
+          
+          for (let i = 1; i <= conversation.current_participants; i++) {
+            initialParticipants.push({
+              id: i,
+              name: `Participant ${i}`,
+              avatar: null,
+              isAnonymous: false
+            });
+          }
+          
+          setParticipants(initialParticipants);
+        }
+      } catch (err) {
+        console.error("Exception fetching participants:", err);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setParticipants(initialParticipants);
-      setIsLoading(false);
     }
-  }, [conversation]);
+    
+    fetchParticipants();
+  }, [conversationId, conversation]);
   
   // Add participant from location state (for guests joining)
   useEffect(() => {
@@ -65,8 +103,40 @@ export function useParticipantTracking(
     if (!conversationId) return;
     
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
-    setIsLoading(true);
     
+    // Listen for new participant registrations
+    const participantsChannel = supabase
+      .channel(`admin-session-participants-${conversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'session_participants',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("New participant registered:", payload);
+        
+        if (payload.new) {
+          const participant = payload.new;
+          
+          setParticipants(prev => {
+            // Check if we already have this participant
+            if (prev.some(p => p.id === participant.participant_id)) return prev;
+            
+            console.log("Adding participant from realtime event:", participant);
+            return [...prev, {
+              id: participant.participant_id,
+              name: participant.name,
+              avatar: participant.avatar_seed 
+                ? `/api/avatar?name=${participant.avatar_seed}&variant=beam&palette=0` 
+                : null,
+              isAnonymous: participant.is_anonymous || false
+            }];
+          });
+        }
+      })
+      .subscribe();
+    
+    // Listen for participant_joined events
     const eventsChannel = supabase
       .channel(`admin-participant-events-${conversationId}`)
       .on('postgres_changes', {
@@ -101,9 +171,8 @@ export function useParticipantTracking(
       })
       .subscribe();
       
-    setIsLoading(false);
-      
     return () => {
+      removeChannel(participantsChannel);
       removeChannel(eventsChannel);
     };
   }, [conversationId]);

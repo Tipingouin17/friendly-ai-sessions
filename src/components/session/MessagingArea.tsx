@@ -1,11 +1,19 @@
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import MessageList from "@/components/chat/MessageList";
 import SessionJoinInfo from "@/components/session/SessionJoinInfo";
 import { Message, ParticipantInfo } from "@/types/chat";
 import ParticipantResponseStats from './ParticipantResponseStats';
-import { Share2, Users } from 'lucide-react';
+import { Share2, Users, Eye, EyeOff, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Toggle } from '@/components/ui/toggle';
 
 interface MessagingAreaProps {
   messages: Message[];
@@ -34,6 +42,10 @@ const MessagingArea = ({
   isMobile,
   viewMode
 }: MessagingAreaProps) => {
+  // State for admin filters and search
+  const [showAnonymous, setShowAnonymous] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Log messages count for debugging
   useEffect(() => {
     console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
@@ -58,9 +70,26 @@ const MessagingArea = ({
       });
     }
     
-    // Admin view sees all messages
-    return messages;
-  }, [messages, viewMode, currentParticipant]);
+    // Admin view filter
+    let adminFilteredMessages = messages;
+    
+    // Apply anonymous filter if needed
+    if (!showAnonymous) {
+      adminFilteredMessages = adminFilteredMessages.filter(
+        message => !message.isAnonymous
+      );
+    }
+    
+    // Apply search if needed
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      adminFilteredMessages = adminFilteredMessages.filter(
+        message => message.content.toLowerCase().includes(term)
+      );
+    }
+    
+    return adminFilteredMessages;
+  }, [messages, viewMode, currentParticipant, showAnonymous, searchTerm]);
   
   // Group messages by facilitator question for admin view
   const groupedMessages = useMemo(() => {
@@ -85,8 +114,12 @@ const MessagingArea = ({
           responses: [] 
         };
       } else if (message.sender === "user" && currentGroup.question) {
-        // Add participant response to the current group
-        currentGroup.responses.push(message);
+        // Add participant response to the current group if it passes filters
+        if (showAnonymous || !message.isAnonymous) {
+          if (!searchTerm || message.content.toLowerCase().includes(searchTerm.toLowerCase())) {
+            currentGroup.responses.push(message);
+          }
+        }
       }
     }
     
@@ -96,11 +129,58 @@ const MessagingArea = ({
     }
     
     return groups;
-  }, [messages, viewMode]);
+  }, [messages, viewMode, showAnonymous, searchTerm]);
 
   if (viewMode === "admin") {
     return (
       <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-gray-200 bg-white">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="flex-1">
+              <Input
+                placeholder="Search responses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+                prefix={<Search className="h-4 w-4 text-gray-400" />}
+              />
+            </div>
+            <Toggle 
+              pressed={showAnonymous} 
+              onPressedChange={setShowAnonymous}
+              size="sm"
+              aria-label="Toggle anonymous responses"
+              className="flex items-center gap-1"
+            >
+              {showAnonymous ? 
+                <Eye className="h-4 w-4" /> : 
+                <EyeOff className="h-4 w-4" />
+              }
+              Anonymous
+            </Toggle>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-1">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setShowAnonymous(!showAnonymous)}>
+                  {showAnonymous ? "Hide Anonymous" : "Show Anonymous"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSearchTerm('')}>
+                  Clear Search
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="text-sm text-gray-500">
+            Showing {groupedMessages.reduce((acc, group) => acc + group.responses.length, 0)} responses 
+            from {currentParticipantCount || 0} participants
+          </div>
+        </div>
+
         <div className="flex-1 overflow-hidden">
           {groupedMessages.length > 0 ? (
             <div className="h-full overflow-y-auto">
@@ -115,6 +195,7 @@ const MessagingArea = ({
                     <ParticipantResponseStats 
                       responses={group.responses}
                       totalParticipants={maxParticipants}
+                      showDetailedStats={true}
                     />
                     
                     <div className="divide-y divide-gray-100">
@@ -130,6 +211,9 @@ const MessagingArea = ({
                               {response.isAnonymous && 
                                 <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">anonymous</span>
                               }
+                            </div>
+                            <div className="text-xs text-gray-500 ml-auto">
+                              {response.timestamp ? new Date(response.timestamp).toLocaleTimeString() : ''}
                             </div>
                           </div>
                           <div className="text-gray-700 pl-4 border-l-2 border-gray-100">{response.content}</div>
@@ -148,7 +232,7 @@ const MessagingArea = ({
               <p className="text-lg font-medium mb-2">No messages yet</p>
               <p className="max-w-md">
                 {messages.length > 0 ? 
-                  "Processing messages... If you see this message for too long, try refreshing the page." :
+                  "No matching responses found. Try changing your filters." :
                   "Share the QR code with participants to begin the session."}
               </p>
               

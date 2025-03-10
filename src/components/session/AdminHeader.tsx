@@ -1,16 +1,46 @@
 
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Share2, Users, QrCode, Copy, MessageSquare } from "lucide-react";
+import { 
+  Share2, 
+  Users, 
+  QrCode, 
+  Copy, 
+  MessageSquare, 
+  Download,
+  Play,
+  Pause
+} from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { Badge } from '@/components/ui/badge';
 
 interface AdminHeaderProps {
   sessionTitle: string;
   facilitatorTitle: string;
+  currentParticipants?: number;
+  maxParticipants?: number;
+  isSessionActive?: boolean;
+  onToggleSessionState?: () => void;
+  onSendAdminMessage?: () => void;
+  onExportData?: () => void;
 }
 
-const AdminHeader: React.FC<AdminHeaderProps> = ({ sessionTitle, facilitatorTitle }) => {
+const AdminHeader: React.FC<AdminHeaderProps> = ({ 
+  sessionTitle, 
+  facilitatorTitle,
+  currentParticipants = 0,
+  maxParticipants = 0,
+  isSessionActive = true,
+  onToggleSessionState,
+  onSendAdminMessage,
+  onExportData
+}) => {
   const { toast } = useToast();
   const [showQrDialog, setShowQrDialog] = useState(false);
   
@@ -30,24 +60,58 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ sessionTitle, facilitatorTitl
   };
   
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-10">
+    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-10 shadow-sm">
       <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>
           {facilitatorTitle && (
             <span className="text-sm text-gray-500">Facilitator: {facilitatorTitle}</span>
           )}
+          <Badge 
+            variant={isSessionActive ? "success" : "secondary"}
+            className={`ml-2 ${isSessionActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+          >
+            {isSessionActive ? "Active" : "Paused"}
+          </Badge>
         </div>
         
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center mr-4 bg-gray-50 px-3 py-1 rounded-full">
+            <Users size={16} className="text-gray-500 mr-1" />
+            <span className="text-sm font-medium">
+              {currentParticipants}/{maxParticipants}
+            </span>
+          </div>
+          
+          <Button
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={onSendAdminMessage}
+          >
             <MessageSquare size={16} />
             <span>Send Message</span>
           </Button>
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
-            <Users size={16} />
-            <span>Participants</span>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={onToggleSessionState}
+          >
+            {isSessionActive ? (
+              <>
+                <Pause size={16} />
+                <span>Pause</span>
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                <span>Resume</span>
+              </>
+            )}
           </Button>
+          
           <Button 
             variant="outline" 
             size="sm" 
@@ -55,8 +119,9 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ sessionTitle, facilitatorTitl
             onClick={() => setShowQrDialog(true)}
           >
             <QrCode size={16} />
-            <span>Show QR</span>
+            <span>QR Code</span>
           </Button>
+          
           <Button 
             variant="outline" 
             size="sm" 
@@ -65,6 +130,16 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ sessionTitle, facilitatorTitl
           >
             <Share2 size={16} />
             <span>Share</span>
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={onExportData}
+          >
+            <Download size={16} />
+            <span>Export</span>
           </Button>
         </div>
       </div>
@@ -97,6 +172,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ sessionTitle, facilitatorTitl
               >
                 <Copy className="h-4 w-4" />
               </Button>
+            </div>
+            <div className="mt-4 text-sm text-gray-500 text-center">
+              <p>Current participants: {currentParticipants}/{maxParticipants}</p>
+              <p className="mt-1">Share this QR code or link with participants to join the session</p>
             </div>
           </div>
         </DialogContent>

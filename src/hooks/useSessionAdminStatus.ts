@@ -32,15 +32,20 @@ export function useSessionAdminStatus() {
     
     if (isAdminPath) {
       adminStatus = true;
+      console.log("Admin status set to true based on admin path");
     } else if (locationState?.isAdmin === true || isAdminParam) {
       adminStatus = true;
+      console.log("Admin status set to true based on state or query param");
     } else if (locationState?.isGuest === false) {
       adminStatus = true;
+      console.log("Admin status set to true based on not being a guest");
     } else if (locationState?.newConversationId) {
       adminStatus = true;
+      console.log("Admin status set to true based on having newConversationId");
     } else {
       // Not explicitly marked as admin or guest, default to non-admin
       adminStatus = false;
+      console.log("Admin status set to false as no admin indicators found");
     }
     
     console.log(`Setting admin status to ${adminStatus} based on state:`, 

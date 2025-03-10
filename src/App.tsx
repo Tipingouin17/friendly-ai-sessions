@@ -92,9 +92,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Regular session route for participants */}
-          <Route path="/session" element={<Session />} />
-          
           {/* Admin-specific session route - ensure it's prioritized */}
           <Route 
             path="/session/admin" 
@@ -104,6 +101,9 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Regular session route for participants */}
+          <Route path="/session" element={<Session />} />
           
           <Route path="/checkout/:planType?" element={<Checkout />} />
           <Route path="*" element={<NotFound />} />

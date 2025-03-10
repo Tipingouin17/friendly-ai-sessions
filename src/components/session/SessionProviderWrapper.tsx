@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from "react";
 import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
@@ -36,6 +37,15 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   const initializationAttempted = useRef(false);
   const forcedInitialization = useRef(false);
   const { toast } = useToast();
+
+  // Log admin settings
+  useEffect(() => {
+    console.log("SessionProviderWrapper initialized with admin settings:", { 
+      isAdmin, 
+      forceAdmin,
+      path: window.location.pathname
+    });
+  }, [isAdmin, forceAdmin]);
 
   useEffect(() => {
     if (initializationAttempted.current) return;
@@ -96,7 +106,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
                 conversationId: props.currentConversationId,
                 hasData: !!props.conversation,
                 isAdmin: props.isAdmin,
-                providedIsAdmin: isAdmin
+                providedIsAdmin: isAdmin,
+                forceAdmin
               });
               
               if (initializeTimeoutRef.current) {
@@ -117,6 +128,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           conversationId: props.currentConversationId,
           isAdmin: props.isAdmin,
           providedIsAdmin: isAdmin,
+          forceAdmin,
           messagesCount: props.sessionState?.messages?.length || 0,
           participantsCount: props.participants?.length || 0,
           isSessionStartedInDB: props.isSessionStartedInDB,
@@ -128,7 +140,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         
         React.useEffect(() => {
           if (sessionMountedRef.current) {
-            if (isAdmin && props.isAdmin) {
+            if ((isAdmin || forceAdmin) && props.isAdmin) {
               console.log("Admin detected in provider, ensuring loading state is properly updated");
               onLoading(false);
             } else {
@@ -143,7 +155,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           }
         }, [props.error]);
         
-        if (props.isLoading && !props.conversation && !(isAdmin && props.isAdmin)) {
+        // Don't show loading state for admin mode when forceAdmin is true
+        if (props.isLoading && !props.conversation && !((isAdmin || forceAdmin) && props.isAdmin)) {
           console.log("Showing provider loading state");
           return <JoinSessionLoadingState 
             onRetry={retryConnection}
@@ -160,7 +173,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           />;
         }
         
-        if (!props.currentConversationId && !props.isLoading && !isAdmin) {
+        if (!props.currentConversationId && !props.isLoading && !(isAdmin || forceAdmin)) {
           console.error("No conversation ID found in session provider, but no error was returned");
           return <JoinSessionLoadingState 
             error="Session not found. Please try again." 

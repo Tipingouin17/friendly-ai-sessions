@@ -28,6 +28,8 @@ const MessageItem = ({
   
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";
+  
+  // Use participantInfo.name if available, otherwise fall back to message.participant
   const displayParticipantName = isAnonymous 
     ? "Anonymous participant" 
     : participantInfo?.name || message.participant;

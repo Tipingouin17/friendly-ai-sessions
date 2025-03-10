@@ -119,7 +119,6 @@ ToastDescription.displayName = ToastPrimitives.Description.displayName
 export type ToastActionElement = React.ReactElement<typeof ToastAction>
 
 export {
-  type ToastProps,
   ToastProvider,
   ToastViewport,
   Toast,

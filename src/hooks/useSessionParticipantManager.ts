@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
@@ -64,15 +63,15 @@ export function useSessionParticipantManager({
     refetch
   });
 
-  // Function to force refresh participant data from the database
-  // Fix: Make sure this function returns a Promise
-  const forceRefreshParticipants = useCallback(async () => {
-    if (!conversationId) return Promise.resolve();
+  // Function to force refresh participant data
+  const forceRefreshParticipants = useCallback(async (): Promise<void> => {
+    if (!conversationId) {
+      return Promise.resolve();
+    }
     
     try {
       console.log("Forcibly refreshing participant data for conversation:", conversationId);
       
-      // Get the latest participant information for this conversation
       const { data, error } = await supabase
         .from('session_participants')
         .select('*')
@@ -86,7 +85,6 @@ export function useSessionParticipantManager({
       if (data && data.length > 0) {
         console.log("Retrieved updated participant data:", data.length, "participants");
         
-        // Convert to ParticipantInfo format
         const updatedParticipants: ParticipantInfo[] = data.map(p => ({
           id: p.participant_id,
           name: p.name || `Participant ${p.participant_id}`,
@@ -95,25 +93,20 @@ export function useSessionParticipantManager({
         }));
         
         setParticipants(updatedParticipants);
-      } else {
-        // If no participants found but we know the count, generate placeholders
-        if (conversation?.current_participants) {
-          const count = conversation.current_participants;
-          console.log("No participant data found, creating placeholders for", count, "participants");
-          
-          const placeholders: ParticipantInfo[] = [];
-          for (let i = 1; i <= count; i++) {
-            placeholders.push({
-              id: i,
-              name: `Participant ${i}`,
-              avatar: null,
-              isAnonymous: false
-            });
-          }
-          
-          setParticipants(placeholders);
-        }
+      } else if (conversation?.current_participants) {
+        const count = conversation.current_participants;
+        console.log("No participant data found, creating placeholders for", count, "participants");
+        
+        const placeholders: ParticipantInfo[] = Array.from({ length: count }, (_, i) => ({
+          id: i + 1,
+          name: `Participant ${i + 1}`,
+          avatar: null,
+          isAnonymous: false
+        }));
+        
+        setParticipants(placeholders);
       }
+      
       return Promise.resolve();
     } catch (err) {
       console.error("Error in forceRefreshParticipants:", err);
@@ -155,12 +148,10 @@ export function useSessionParticipantManager({
   // Update participants based on conversation data
   useEffect(() => {
     if (conversation && conversation.current_participants > 0) {
-      // If stored participant count is higher than our local list, update
       if (conversation.current_participants > participants.length) {
         console.log("Updating participants based on conversation count:", 
                     conversation.current_participants, "current:", participants.length);
         
-        // Force a refresh to get the latest participants
         forceRefreshParticipants();
       }
     }

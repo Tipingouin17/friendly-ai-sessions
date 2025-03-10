@@ -28,6 +28,12 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
     if (onClose) onClose();
   };
 
+  const handleRetry = () => {
+    // Refresh the page to retry connection
+    window.location.reload();
+    if (onClose) onClose();
+  };
+
   const getAlertContent = () => {
     let title = "";
     let description = "";
@@ -36,7 +42,7 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
     switch (type) {
       case 'full':
         title = "Session Full";
-        description = message || "This session is full (no more spots available)";
+        description = message || "This session is full and cannot accept more participants.";
         alertClass = "border-amber-500 bg-amber-50 text-amber-900";
         break;
       case 'not-found':
@@ -45,7 +51,7 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
         alertClass = "border-red-500 bg-red-50 text-red-900";
         break;
       case 'error':
-        title = "Error Joining Session";
+        title = "Session Error";
         description = message || "There was a problem joining this session. Please try again.";
         alertClass = "border-red-500 bg-red-50 text-red-900";
         break;
@@ -71,8 +77,16 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
         
         <div className="text-center mt-4">
           <Button 
+            onClick={handleRetry} 
+            className="bg-[#FFC107] hover:bg-[#F5B800] text-black mb-2 w-full"
+          >
+            Retry Connection
+          </Button>
+          
+          <Button 
             onClick={handleReturn} 
-            className="bg-[#FFC107] hover:bg-[#F5B800] text-black"
+            variant="outline"
+            className="w-full"
           >
             Return Home
           </Button>

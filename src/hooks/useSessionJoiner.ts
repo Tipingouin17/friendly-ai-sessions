@@ -72,10 +72,18 @@ export function useSessionJoiner() {
       console.log("Attempting to join session with ID:", conversationId);
       console.log("Current participant count before update:", currentParticipantCount);
       
+      // Check if the session has a max participant limit
+      const maxParticipants = conversation.participants || 0;
+      
+      // Only enforce the limit if maxParticipants is greater than 0
+      if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+        throw new Error("This session is full and cannot accept more participants.");
+      }
+      
       // First, fetch the latest count to avoid race conditions
       const { data: latestConversation, error: fetchError } = await supabase
         .from('conversations')
-        .select('id, current_participants')
+        .select('id, current_participants, participants')
         .eq('id', conversationId)
         .single();
         
@@ -86,6 +94,12 @@ export function useSessionJoiner() {
       
       if (!latestConversation) {
         throw new Error("Could not fetch the latest session data");
+      }
+      
+      // Double-check the participant limit with the latest data
+      if (latestConversation.participants > 0 && 
+          latestConversation.current_participants >= latestConversation.participants) {
+        throw new Error("This session is full and cannot accept more participants.");
       }
       
       const latestCount = latestConversation.current_participants || 0;

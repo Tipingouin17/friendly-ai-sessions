@@ -64,7 +64,9 @@ export const useSessionParticipantSetup = ({
     }
     
     // Check if session is full for non-admin users
-    const isFull = currentParticipantCount >= maxParticipantsForSession;
+    // Only consider the session full if maxParticipantsForSession is greater than 0
+    // and currentParticipantCount is greater than or equal to maxParticipantsForSession
+    const isFull = maxParticipantsForSession > 0 && currentParticipantCount >= maxParticipantsForSession;
     
     if (isFull && !isSessionFull && conversationId) {
       console.log("Session is full, notifying:", {

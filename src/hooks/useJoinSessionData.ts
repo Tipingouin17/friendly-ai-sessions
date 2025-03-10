@@ -37,8 +37,8 @@ export function useJoinSessionData(conversationId: number | null) {
     const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
       maxParticipantsForSession : planMaxParticipants;
 
-    // Check if the session is full
-    if (currentParticipantCount >= effectiveMaxParticipants && effectiveMaxParticipants > 0) {
+    // Only check if session is full if effectiveMaxParticipants is greater than 0
+    if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
       setError("This session has reached its maximum capacity of participants.");
       return;
     }
@@ -57,7 +57,7 @@ export function useJoinSessionData(conversationId: number | null) {
   const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
     maxParticipantsForSession : planMaxParticipants;
     
-  // Only consider full if the max is greater than 0 and we've reached it
+  // Only consider session full if effectiveMaxParticipants is greater than 0
   const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
 
   return {

@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { SessionContextProps } from "@/types/session";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -32,6 +32,7 @@ const SessionContent: React.FC<{
     shouldShowSession: boolean;
     currentParticipants: number;
     maxParticipants: number;
+    isSessionFull: boolean;
     handleStartSession: () => void;
   };
 }> = ({
@@ -80,7 +81,6 @@ const SessionContent: React.FC<{
       onSessionFull={onSessionFull}
       onError={(error) => {
         console.error("Session error:", error);
-        // Toast usage is isolated to the SessionStateProvider
       }}
     >
       <SessionStateDebugger 
@@ -113,10 +113,10 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   setSessionStarted,
   onSessionFull
 }) => {
-  // All hooks are called every time in the same order
+  // Always call all hooks unconditionally at the top level in the same order
   const { toast } = useToast();
   
-  // Use initialization hook
+  // Use initialization hook - called unconditionally
   const { initializing } = useSessionInitialization({
     props,
     setSessionStarted

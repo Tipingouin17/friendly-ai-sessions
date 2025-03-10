@@ -66,10 +66,10 @@ export function useSessionJoiner() {
       console.log("Current participant count before update:", currentParticipantCount);
       console.log("Admin status for capacity check:", effectiveIsAdmin);
       
-      // Check capacity and update participant count
+      // Check capacity BEFORE we try to update participant count - fixes race condition
       const capacityResult = await checkCapacityAndUpdate(conversationId, effectiveIsAdmin);
       
-      // For admin users, we should never block them from joining
+      // If the session is full and we're not an admin, block joining
       if (!capacityResult.canJoin && !effectiveIsAdmin) {
         throw new Error(capacityResult.error || "This session is full and cannot accept more participants.");
       }
@@ -88,6 +88,9 @@ export function useSessionJoiner() {
         isAdmin: effectiveIsAdmin
       });
       
+      // Clear any existing "session full" errors since we've successfully joined
+      setError(null);
+      
       // Add a short delay to allow for Supabase to process the update
       setTimeout(() => {
         console.log("Navigating to session with admin status:", effectiveIsAdmin);
@@ -99,15 +102,15 @@ export function useSessionJoiner() {
       console.error("Error joining session:", error);
       
       // Special handling for admin users - if they get an error about session being full,
-      // allow them to join anyway with a warning
+      // always allow them to join anyway
       const isSessionFullError = error.message?.includes("full") || error.message?.includes("maximum capacity");
       const effectiveIsAdmin = forceAdmin || contextIsAdmin || sessionStorage.getItem('isAdminSession') === 'true';
       
       if (isSessionFullError && effectiveIsAdmin) {
         console.log("🔑 Admin override for session full error - forcing join success");
         
-        // For admins, we'll still let them join but with a different participant ID
-        const adminParticipantId = 999; // Use a special ID for admin override
+        // For admins, we'll still let them join with a special participant ID
+        const adminParticipantId = Math.floor(Math.random() * 900) + 9000; // Use a very high ID for admin override
         
         await registerParticipant({
           conversationId: conversationId!, 

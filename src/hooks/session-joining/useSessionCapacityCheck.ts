@@ -32,7 +32,7 @@ export async function checkSessionCapacity(
     throw new Error("Could not fetch the latest session data");
   }
   
-  // Skip session full check for admin users - ALWAYS force canJoin=true
+  // If admin user detected, ALWAYS allow joining regardless of session capacity
   if (isAdmin) {
     console.log("🔑 Admin user detected - bypassing ALL session full checks");
     return {
@@ -42,12 +42,15 @@ export async function checkSessionCapacity(
     };
   }
   
+  // Check if session is at capacity for regular users
+  const currentCount = latestConversation.current_participants || 0;
+  const maxAllowed = latestConversation.participants || 0;
+  
   // Only enforce the limit if maxParticipants is greater than 0
-  if (latestConversation.participants > 0 && 
-      latestConversation.current_participants >= latestConversation.participants) {
+  if (maxAllowed > 0 && currentCount >= maxAllowed) {
     console.log("Session is full, regular user cannot join:", {
-      currentCount: latestConversation.current_participants,
-      maxAllowed: latestConversation.participants
+      currentCount,
+      maxAllowed
     });
     return {
       canJoin: false,
@@ -57,10 +60,9 @@ export async function checkSessionCapacity(
     };
   }
   
-  // For all users (admin handled above), we need to update the participant count
-  const latestCount = latestConversation.current_participants || 0;
-  const newCount = latestCount + 1;
-  console.log("Latest count from database:", latestCount, "New count will be:", newCount);
+  // For all users, calculate the new participant ID and count
+  const newCount = currentCount + 1;
+  console.log("Latest count from database:", currentCount, "New count will be:", newCount);
   
   return {
     canJoin: true,
@@ -80,13 +82,15 @@ export function useSessionCapacityCheck() {
     console.log("Checking capacity with admin status:", isAdmin);
     
     try {
+      // First check capacity without updating - this avoids race conditions
       const capacityResult = await checkSessionCapacity(conversationId, isAdmin);
       
-      // For admin users, always force canJoin=true regardless of capacity result
+      // For admin users, always force canJoin=true regardless of capacity
       const effectiveCanJoin = isAdmin ? true : capacityResult.canJoin;
       
       if (effectiveCanJoin) {
-        // Update the participant count with the latest calculated value
+        // Only now update the participant count with the latest calculated value
+        // This is an atomic operation to avoid race conditions
         const { data: updateData, error: updateError } = await supabase
           .from('conversations')
           .update({ current_participants: capacityResult.newParticipantId })

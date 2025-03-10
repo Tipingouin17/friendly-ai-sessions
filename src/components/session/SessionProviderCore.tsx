@@ -7,6 +7,7 @@ import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
 import { useSessionProviderState } from "@/hooks/useSessionProviderState";
 import { useSessionParticipantSetup } from "@/hooks/useSessionParticipantSetup";
 import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -22,6 +23,8 @@ export const SessionProviderCore = ({
   forceAdmin 
 }: SessionProviderCoreProps) => {
   const location = useLocation();
+  const { toast } = useToast();
+  
   const locationState = location.state as { 
     participantId?: number; 
     isGuest?: boolean; 
@@ -30,16 +33,25 @@ export const SessionProviderCore = ({
     isAdmin?: boolean;
   } | null;
   
-  // Force admin status if specified
+  // Determine effective admin status from all sources
+  const effectiveAdmin = forceAdmin === true || 
+                       locationState?.isAdmin === true ||
+                       sessionStorage.getItem('isAdminSession') === 'true' ||
+                       location.pathname.includes('/admin');
+  
+  // Force admin status if detected from any source
   useEffect(() => {
-    if (forceAdmin) {
-      console.log("SessionProviderCore: Enforcing admin status with forceAdmin=true");
+    if (effectiveAdmin) {
+      console.log("SessionProviderCore: Enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
-    } else if (locationState?.isAdmin) {
-      console.log("SessionProviderCore: Setting admin status from location state");
-      sessionStorage.setItem('isAdminSession', 'true');
+      
+      // Show toast for admin users
+      toast({
+        title: "Admin Mode",
+        description: "You have administrator access to this session."
+      });
     }
-  }, [forceAdmin, locationState]);
+  }, [effectiveAdmin, toast]);
   
   // Load core provider state
   const {
@@ -57,16 +69,23 @@ export const SessionProviderCore = ({
     isAdmin
   } = useSessionProviderState({ 
     onError, 
-    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) 
-  }); // Pass forceAdmin to provider state hook
+    forceAdmin: effectiveAdmin
+  });
 
   // Handle data errors
   useEffect(() => {
     if (dataError) {
-      console.error("Session data error:", dataError);
-      handleError(dataError);
+      // Skip reporting session full errors for admin users
+      const isSessionFullError = dataError.includes("full") || dataError.includes("maximum capacity");
+      
+      if (isSessionFullError && effectiveAdmin) {
+        console.log("🔑 Suppressing session full error for admin in SessionProviderCore");
+      } else {
+        console.error("Session data error:", dataError);
+        handleError(dataError);
+      }
     }
-  }, [dataError, handleError]);
+  }, [dataError, handleError, effectiveAdmin]);
 
   // Set up participant management
   const {
@@ -82,7 +101,7 @@ export const SessionProviderCore = ({
     refetch,
     onError: handleError,
     onSessionFull: handleSessionFull,
-    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) // Pass forceAdmin to participant setup
+    forceAdmin: effectiveAdmin
   });
 
   // Log participant information for debugging
@@ -95,15 +114,17 @@ export const SessionProviderCore = ({
       maxParticipants: maxParticipantsForSession,
       isSessionFull,
       forceAdmin,
-      locationStateIsAdmin: locationState?.isAdmin
+      locationStateIsAdmin: locationState?.isAdmin,
+      effectiveAdmin,
+      isAdmin
     });
     
     // If we're an admin, we should never see the session full error
-    if (isSessionFull && (forceAdmin || locationState?.isAdmin)) {
+    if (isSessionFull && effectiveAdmin) {
       console.error("Admin user incorrectly marked as session full - this should never happen");
     }
   }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
-      maxParticipantsForSession, isSessionFull, forceAdmin, locationState]);
+      maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin]);
 
   // Set up session monitoring
   const {
@@ -115,15 +136,31 @@ export const SessionProviderCore = ({
     currentUserParticipantId,
     participants,
     onError: handleError,
-    forceAdmin: forceAdmin || Boolean(locationState?.isAdmin) // Pass forceAdmin to session monitoring
+    forceAdmin: effectiveAdmin
   });
 
   // If we have serious errors, return error fallback
   if (providerError) {
+    // Skip showing error fallback for session full errors when admin
+    const isSessionFullError = providerError.includes("full") || providerError.includes("maximum capacity");
+    
+    if (isSessionFullError && effectiveAdmin) {
+      console.log("🔑 Admin detected with session full error - bypassing error fallback");
+      
+      // Build session context with admin override
+      const overrideSessionContext: SessionContextProps = {
+        ...buildSessionContext(),
+        error: null, // Clear error for admin
+        isAdmin: true // Force admin status
+      };
+      
+      return children(overrideSessionContext);
+    }
+    
     return (
       <SessionProviderErrorFallback 
         errorMessage={providerError}
-        isAdmin={Boolean(forceAdmin || locationState?.isAdmin)}
+        isAdmin={effectiveAdmin}
         onRetry={() => {
           console.log("Retry requested from error fallback");
           refetch();
@@ -134,53 +171,52 @@ export const SessionProviderCore = ({
     );
   }
 
-  // Determine effective admin status
-  const effectiveIsAdmin = forceAdmin === true || locationState?.isAdmin === true || isAdmin;
-
-  // Build session context
-  const sessionContext: SessionContextProps = {
-    isLoading,
-    conversation,
-    currentConversationId,
-    sessionState: {
-      messages: roomState.messages,
-      inputMessage: roomState.inputMessage,
-      setInputMessage: roomState.setInputMessage,
-      currentParticipant: roomState.currentParticipant,
-      isRecording: roomState.isRecording,
-      setIsRecording: roomState.setIsRecording,
-      handleGenerateReport: roomState.handleGenerateReport,
-      isGeneratingReport: roomState.isGeneratingReport,
-      setMessages: roomState.setMessages,
-      hasAnswered: roomState.hasAnswered,
-      totalResponses: roomState.totalResponses,
-      viewMode: roomState.viewMode,
-      setViewMode: roomState.setViewMode,
-      recordResponse: roomState.recordResponse,
-      error: roomState.error
-    },
-    participants,
-    participantColors,
-    isWaitingForResponse: roomState.isWaitingForResponse,
-    handleStartSession: enhancedHandleStartSession,
-    handleSendMessage: roomState.handleSendMessage,
-    handleLikeMessage: roomState.handleLikeMessage,
-    showQrCodeView,
-    sessionLink,
-    currentUserParticipantId,
-    anonymousState: roomState.anonymousState,
-    isSessionStartedInDB,
-    error: providerError,
-    
-    // Add connection properties
-    isConnected: true, // Default to true, will be updated by connection hooks
-    connectionAttempts: 0,
-    refetch,
-    
-    // Set admin status based on forceAdmin prop
-    isAdmin: effectiveIsAdmin
-  };
+  // Helper function to build session context
+  function buildSessionContext(): SessionContextProps {
+    return {
+      isLoading,
+      conversation,
+      currentConversationId,
+      sessionState: {
+        messages: roomState.messages,
+        inputMessage: roomState.inputMessage,
+        setInputMessage: roomState.setInputMessage,
+        currentParticipant: roomState.currentParticipant,
+        isRecording: roomState.isRecording,
+        setIsRecording: roomState.setIsRecording,
+        handleGenerateReport: roomState.handleGenerateReport,
+        isGeneratingReport: roomState.isGeneratingReport,
+        setMessages: roomState.setMessages,
+        hasAnswered: roomState.hasAnswered,
+        totalResponses: roomState.totalResponses,
+        viewMode: roomState.viewMode,
+        setViewMode: roomState.setViewMode,
+        recordResponse: roomState.recordResponse,
+        error: roomState.error
+      },
+      participants,
+      participantColors,
+      isWaitingForResponse: roomState.isWaitingForResponse,
+      handleStartSession: enhancedHandleStartSession,
+      handleSendMessage: roomState.handleSendMessage,
+      handleLikeMessage: roomState.handleLikeMessage,
+      showQrCodeView,
+      sessionLink,
+      currentUserParticipantId,
+      anonymousState: roomState.anonymousState,
+      isSessionStartedInDB,
+      error: providerError,
+      
+      // Add connection properties
+      isConnected: true, // Default to true, will be updated by connection hooks
+      connectionAttempts: 0,
+      refetch,
+      
+      // Ensure admin status is properly set
+      isAdmin: isAdmin || effectiveAdmin
+    };
+  }
 
   // Return children with context
-  return children(sessionContext);
+  return children(buildSessionContext());
 };

@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SessionContextProps } from "@/types/session";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import SessionStateHandler from "@/components/session/SessionStateHandler";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SessionStateRendererProps {
   props: SessionContextProps;
@@ -27,6 +28,41 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   setSessionStarted,
   handleSessionFull
 }) => {
+  const { toast } = useToast();
+  
+  // If admin status detected but not reflected in props, update the UI
+  useEffect(() => {
+    if (effectiveAdmin && !props.isAdmin) {
+      console.log("Admin status detected but not reflected in props. Forcing admin override in SessionStateRenderer");
+    }
+  }, [effectiveAdmin, props.isAdmin]);
+
+  // Special handling for admin users with session full errors
+  const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
+  
+  if (effectiveAdmin && isSessionFullError) {
+    console.log("🔑 Admin detected with session full error - bypassing error screen");
+    toast({
+      title: "Admin Override",
+      description: "Session is full, but you're connecting as an admin."
+    });
+    
+    // For admin users, we'll bypass the error state and show the session
+    return (
+      <SessionStateHandler
+        props={{
+          ...props,
+          isAdmin: true, // Force admin status
+          error: null // Clear the error for admin
+        }}
+        isAdmin={true}
+        sessionStarted={sessionStarted}
+        setSessionStarted={setSessionStarted}
+        onSessionFull={handleSessionFull}
+      />
+    );
+  }
+  
   if (props.isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
     console.log("Showing provider loading state");
     return <JoinSessionLoadingState 

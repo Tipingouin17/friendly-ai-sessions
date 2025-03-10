@@ -1,10 +1,11 @@
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { RefactoredSessionProvider } from "@/components/session/RefactoredSessionProvider";
 import { SessionContextProps } from "@/types/session";
 import SessionStateRenderer from "@/components/session/SessionStateRenderer";
 import { useSessionProviderInitialization } from "@/hooks/useSessionProviderInitialization";
 import { useSessionProviderAdmin } from "@/hooks/useSessionProviderAdmin";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SessionProviderWrapperProps {
   onInitialized?: () => void;
@@ -35,39 +36,57 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
 }) => {
   // Local state for session started
   const [sessionStarted, setSessionStarted] = useState(false);
-  const effectiveAdmin = isAdmin || forceAdmin;
+  const effectiveAdmin = isAdmin || forceAdmin || sessionStorage.getItem('isAdminSession') === 'true';
+  const { toast } = useToast();
+  
+  // Persist admin status when detected
+  useEffect(() => {
+    if (effectiveAdmin) {
+      console.log("Setting admin status in session storage from SessionProviderWrapper");
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [effectiveAdmin]);
   
   // Use admin status management hook
-  useSessionProviderAdmin({ forceAdmin });
+  useSessionProviderAdmin({ forceAdmin: effectiveAdmin });
 
   // Use initialization hook
   const { forcedInitialization } = useSessionProviderInitialization({
     onInitialized,
     onLoading,
     sessionMountedRef,
-    isAdmin,
-    forceAdmin
+    isAdmin: effectiveAdmin,
+    forceAdmin: effectiveAdmin
   });
 
   // Log admin settings
-  React.useEffect(() => {
+  useEffect(() => {
     console.log("SessionProviderWrapper initialized with admin settings:", { 
       isAdmin, 
       forceAdmin,
+      effectiveAdmin,
       path: window.location.pathname,
       persistedAdmin: sessionStorage.getItem('isAdminSession')
     });
-  }, [isAdmin, forceAdmin]);
+    
+    // Show toast for admin users
+    if (effectiveAdmin) {
+      toast({
+        title: "Admin Mode Active",
+        description: "You are viewing this session as an administrator."
+      });
+    }
+  }, [isAdmin, forceAdmin, effectiveAdmin, toast]);
 
   return (
     <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
       onError={onError}
-      forceAdmin={forceAdmin}
+      forceAdmin={effectiveAdmin}
     >
       {(props: SessionContextProps) => {
         // Initialize session when data is available
-        React.useEffect(() => {
+        useEffect(() => {
           if (sessionMountedRef.current && !forcedInitialization.current) {
             const shouldInitialize = effectiveAdmin ? true : (props.conversation && props.currentConversationId);
             
@@ -77,7 +96,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
                 hasData: !!props.conversation,
                 isAdmin: props.isAdmin,
                 providedIsAdmin: isAdmin,
-                forceAdmin
+                forceAdmin,
+                effectiveAdmin
               });
               onInitialized();
             } else if (props.error) {
@@ -94,12 +114,13 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           isAdmin: props.isAdmin,
           providedIsAdmin: isAdmin,
           forceAdmin,
+          effectiveAdmin,
           messagesCount: props.sessionState?.messages?.length || 0,
           participantsCount: props.participants?.length || 0
         });
         
         // Update loading state based on conditions
-        React.useEffect(() => {
+        useEffect(() => {
           if (sessionMountedRef.current) {
             if (effectiveAdmin && props.isAdmin) {
               console.log("Admin detected in provider, ensuring loading state is properly updated");
@@ -111,15 +132,23 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         }, [props.isLoading, props.isAdmin]);
         
         // Handle errors from provider
-        React.useEffect(() => {
+        useEffect(() => {
           if (props.error && sessionMountedRef.current) {
-            onError(props.error);
+            // Check if it's a "session full" error and we're admin before reporting
+            const isSessionFullError = props.error.includes("full") || props.error.includes("maximum capacity");
+            
+            if (isSessionFullError && effectiveAdmin) {
+              console.log("🔑 Suppressing session full error for admin user");
+              // Don't report the error for admin users
+            } else {
+              onError(props.error);
+            }
           }
         }, [props.error]);
         
         // Force admin status if needed
-        if (forceAdmin && !props.isAdmin) {
-          console.log("Forcing admin status in SessionProviderWrapper for forceAdmin=true");
+        if (effectiveAdmin && !props.isAdmin) {
+          console.log("Forcing admin status in SessionProviderWrapper for admin user");
           sessionStorage.setItem('isAdminSession', 'true');
         }
         
@@ -134,7 +163,10 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         // Render appropriate state based on current conditions
         return (
           <SessionStateRenderer
-            props={props}
+            props={{
+              ...props,
+              isAdmin: props.isAdmin || effectiveAdmin
+            }}
             isLoading={props.isLoading}
             error={error}
             effectiveAdmin={effectiveAdmin}

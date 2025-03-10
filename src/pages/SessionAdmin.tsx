@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { useLocation, Navigate } from "react-router-dom";
+import { useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import SessionProviderWrapper from "@/components/session/SessionProviderWrapper";
 import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";
@@ -16,6 +16,12 @@ import { Message, ParticipantInfo } from "@/types/chat";
 import SessionView from "@/components/session/SessionView";
 
 const SessionAdmin = () => {
+  // Force admin mode
+  useEffect(() => {
+    // Always set admin session status
+    sessionStorage.setItem('isAdminSession', 'true');
+  }, []);
+
   const {
     isAdmin,
     sessionStarted,
@@ -37,6 +43,7 @@ const SessionAdmin = () => {
   const { currentConversationId, locationState } = useConversationId();
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
@@ -45,7 +52,7 @@ const SessionAdmin = () => {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
-  
+
   const {
     isSessionPaused,
     isExporting,
@@ -73,6 +80,9 @@ const SessionAdmin = () => {
       locationState,
       conversationData: conversationData?.sessions?.title
     });
+    
+    // Ensure we're marked as admin
+    sessionStorage.setItem('isAdminSession', 'true');
     
     const initialTimeout = 3000;
     const criticalTimeout = 5000;
@@ -108,154 +118,21 @@ const SessionAdmin = () => {
     };
   }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, setIsLoading, setHasInitializedProvider, currentConversationId, locationState, conversationData]);
 
+  // Additional admin state check to redirect if needed
   useEffect(() => {
-    const timer = setTimeout(() => {
-      toast({
-        title: "Welcome to Admin Dashboard",
-        description: `You have access to all admin controls for ${conversationData?.sessions?.title || 'this session'}.`,
+    // Extra protection for path - if we're not on the admin path but should be
+    if (currentConversationId && !location.pathname.includes('/admin')) {
+      console.log("Should be on admin path but not - redirecting");
+      navigate(`/session/admin?id=${currentConversationId}`, { 
+        state: { 
+          isAdmin: true,
+          showMessaging: true,
+          conversationId: currentConversationId
+        },
+        replace: true
       });
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [toast, conversationData]);
-  
-  useEffect(() => {
-    if (!currentConversationId) return;
-    
-    const fetchParticipants = async () => {
-      setIsLoadingParticipants(true);
-      try {
-        const { data, error } = await supabase
-          .from('session_participants')
-          .select('*')
-          .eq('conversation_id', currentConversationId);
-        
-        if (error) {
-          console.error('Error fetching participants:', error);
-          return;
-        }
-        
-        if (data) {
-          const formattedParticipants: ParticipantInfo[] = data.map(p => ({
-            id: p.participant_id,
-            name: p.name,
-            avatar: p.avatar_seed ? `https://ui-avatars.com/api/?name=${p.name}` : "https://ui-avatars.com/api/?name=Anonymous",
-            isAnonymous: p.is_anonymous
-          }));
-          
-          setParticipants(formattedParticipants);
-        }
-      } catch (error) {
-        console.error('Error in fetchParticipants:', error);
-      } finally {
-        setIsLoadingParticipants(false);
-      }
-    };
-    
-    fetchParticipants();
-    
-    const channel = supabase
-      .channel('public:session_participants')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'session_participants',
-        filter: `conversation_id=eq.${currentConversationId}`
-      }, () => {
-        fetchParticipants();
-      })
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentConversationId]);
-  
-  useEffect(() => {
-    if (!currentConversationId) return;
-    
-    const fetchMessages = async () => {
-      setIsLoadingMessages(true);
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', currentConversationId)
-          .order('created_at', { ascending: true });
-        
-        if (error) {
-          console.error('Error fetching messages:', error);
-          return;
-        }
-        
-        if (data) {
-          const formattedMessages: Message[] = data.map(msg => {
-            let parsedContent = typeof msg.content === 'string' 
-              ? msg.content 
-              : typeof msg.content === 'object' && msg.content !== null
-                ? JSON.stringify(msg.content)
-                : '';
-                
-            let isPinned = false;
-            let recipientId = undefined;
-            let isAdminMessage = msg.role === 'admin';
-            
-            if (typeof msg.content === 'object' && msg.content !== null) {
-              if (Array.isArray(msg.content)) {
-                console.log("Array content format", msg.content);
-              } else {
-                try {
-                  isPinned = 'isPinned' in msg.content ? !!msg.content.isPinned : false;
-                  recipientId = 'recipientId' in msg.content ? msg.content.recipientId : undefined;
-                  
-                  if ('message' in msg.content && typeof msg.content.message === 'string') {
-                    parsedContent = msg.content.message;
-                  }
-                } catch (parseError) {
-                  console.error('Error parsing message content:', parseError);
-                }
-              }
-            }
-            
-            return {
-              id: msg.id.toString(),
-              content: parsedContent,
-              sender: msg.role === 'assistant' ? 'assistant' : 'user',
-              timestamp: new Date(msg.created_at),
-              created_at: msg.created_at,
-              participant: msg.name ? `P${msg.name}` : undefined,
-              isAdminMessage,
-              isPinned
-            };
-          });
-          
-          setSessionMessages(formattedMessages);
-        }
-      } catch (error) {
-        console.error('Error in fetchMessages:', error);
-      } finally {
-        setIsLoadingMessages(false);
-      }
-    };
-    
-    fetchMessages();
-    
-    const channel = supabase
-      .channel('public:messages')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${currentConversationId}`
-      }, () => {
-        fetchMessages();
-      })
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentConversationId]);
+    }
+  }, [currentConversationId, location.pathname, navigate]);
 
   if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
     console.error("No conversation ID found on admin page, redirecting home");
@@ -509,4 +386,3 @@ const SessionAdmin = () => {
 };
 
 export default SessionAdmin;
-

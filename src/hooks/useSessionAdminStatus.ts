@@ -7,7 +7,7 @@ export function useSessionAdminStatus() {
   const [isAdmin, setIsAdmin] = useState(false);
   const isInitialized = useRef(false);
   
-  // Determine if user is admin - improved with more reliable detection
+  // Determine if user is admin - improved with more reliable detection and persistence
   useEffect(() => {
     // Only run once to prevent state inconsistency
     if (isInitialized.current) return;
@@ -23,14 +23,21 @@ export function useSessionAdminStatus() {
     const isAdminParam = searchParams.get('admin') === 'true';
     const isAdminPath = location.pathname.includes('/admin');
     
+    // Check if we've stored admin status in sessionStorage
+    const storedAdminStatus = sessionStorage.getItem('isAdminSession');
+    
     // More robust admin detection with clear precedence:
-    // 1. Check if we're on the /session/admin path or any path with 'admin'
+    // 0. Check sessionStorage for persistence
+    // 1. Check if we're on the /admin path
     // 2. Explicit isAdmin flag in state or query param 
     // 3. If isGuest is false, user is admin (session creator)
     // 4. Having newConversationId implies user created the session 
     let adminStatus = false;
     
-    if (isAdminPath) {
+    if (storedAdminStatus === 'true') {
+      adminStatus = true;
+      console.log("Admin status set to true based on sessionStorage");
+    } else if (isAdminPath) {
       adminStatus = true;
       console.log("Admin status set to true based on admin path");
     } else if (locationState?.isAdmin === true || isAdminParam) {
@@ -55,9 +62,15 @@ export function useSessionAdminStatus() {
         isAdminInState: locationState?.isAdmin,
         isAdminInQuery: isAdminParam,
         isGuest: locationState?.isGuest,
-        hasNewConversationId: Boolean(locationState?.newConversationId)
+        hasNewConversationId: Boolean(locationState?.newConversationId),
+        storedAdminStatus
       })
     );
+    
+    // Store in sessionStorage if admin
+    if (adminStatus) {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
     
     setIsAdmin(adminStatus);
     isInitialized.current = true;

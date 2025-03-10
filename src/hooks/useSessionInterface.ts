@@ -110,25 +110,27 @@ export function useSessionInterface(conversationId: number | null) {
         setShowQrCodeView(false);
         setIsSessionStarted(true);
         
+        // Always force admin state when redirecting
+        const adminState = { 
+          isAdmin: true,
+          showMessaging: true,
+          conversationId: conversationId
+        };
+        
+        // Mark as admin in sessionStorage to persist across page reloads
+        sessionStorage.setItem('isAdminSession', 'true');
+        
         // Check if we're already on the admin path
         if (location.pathname.includes('/admin')) {
           // If already on admin path, just update state
           navigate(`/session/admin?id=${conversationId}`, { 
-            state: { 
-              isAdmin: true,
-              showMessaging: true,
-              conversationId: conversationId
-            },
+            state: adminState,
             replace: true
           });
         } else {
           // Redirect to admin page for session creators
           navigate(`/session/admin?id=${conversationId}`, { 
-            state: { 
-              isAdmin: true,
-              showMessaging: true,
-              conversationId: conversationId
-            },
+            state: adminState,
             replace: true
           });
         }

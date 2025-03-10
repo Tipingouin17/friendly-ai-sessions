@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { 
@@ -23,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useConversationId } from "@/hooks/useConversationId";
 import { Textarea } from "@/components/ui/textarea";
+import { useNavigate } from "react-router-dom";
 
 interface AdminHeaderProps {
   sessionTitle: string;
@@ -46,6 +46,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   onExportData
 }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [adminMessage, setAdminMessage] = useState('');
@@ -69,6 +70,9 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         title: "Link copied",
         description: "Session join link copied to clipboard",
       });
+      
+      // Mark as admin to maintain state
+      sessionStorage.setItem('isAdminSession', 'true');
     }
   };
   
@@ -84,8 +88,36 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
   };
   
+  // Show QR code dialog without losing admin state
+  const handleShowQrDialog = () => {
+    // Ensure admin state is preserved
+    sessionStorage.setItem('isAdminSession', 'true');
+    setShowQrDialog(true);
+  };
+  
+  // Handle dialog close without losing admin state
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      // Reaffirm admin state when closing dialog
+      sessionStorage.setItem('isAdminSession', 'true');
+      
+      // Check if we need to redirect back to admin page
+      if (currentConversationId && !window.location.pathname.includes('/admin')) {
+        navigate(`/session/admin?id=${currentConversationId}`, { 
+          state: { 
+            isAdmin: true,
+            showMessaging: true,
+            conversationId: currentConversationId
+          },
+          replace: true
+        });
+      }
+    }
+    setShowQrDialog(open);
+  };
+  
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-16 z-10 shadow-sm"> {/* Changed top-0 to top-16 to position below navbar */}
+    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-16 z-10 shadow-sm">
       <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>
@@ -112,7 +144,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={() => setShowMessageDialog(true)}
+            onClick={() => {
+              sessionStorage.setItem('isAdminSession', 'true');
+              setShowMessageDialog(true);
+            }}
           >
             <MessageSquare size={16} />
             <span>Send Message</span>
@@ -122,7 +157,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={onToggleSessionState}
+            onClick={() => {
+              sessionStorage.setItem('isAdminSession', 'true');
+              if (onToggleSessionState) onToggleSessionState();
+            }}
           >
             {isSessionActive ? (
               <>
@@ -141,7 +179,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={() => setShowQrDialog(true)}
+            onClick={handleShowQrDialog}
           >
             <QrCode size={16} />
             <span>QR Code</span>
@@ -161,7 +199,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant="outline" 
             size="sm" 
             className="flex items-center gap-2"
-            onClick={onExportData}
+            onClick={() => {
+              sessionStorage.setItem('isAdminSession', 'true');
+              if (onExportData) onExportData();
+            }}
           >
             <Download size={16} />
             <span>Export</span>
@@ -169,8 +210,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
       </div>
       
-      {/* QR Code Dialog */}
-      <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+      <Dialog open={showQrDialog} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Session QR Code</DialogTitle>
@@ -210,8 +250,15 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         </DialogContent>
       </Dialog>
       
-      {/* Admin Message Dialog */}
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
+      <Dialog 
+        open={showMessageDialog} 
+        onOpenChange={(open) => {
+          if (!open) {
+            sessionStorage.setItem('isAdminSession', 'true');
+          }
+          setShowMessageDialog(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Send Message to Participants</DialogTitle>
@@ -230,7 +277,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           <DialogFooter>
             <Button 
               variant="outline" 
-              onClick={() => setShowMessageDialog(false)}
+              onClick={() => {
+                sessionStorage.setItem('isAdminSession', 'true');
+                setShowMessageDialog(false);
+              }}
             >
               Cancel
             </Button>

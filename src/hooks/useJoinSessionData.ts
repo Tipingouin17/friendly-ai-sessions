@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
-import { useSessionJoiner } from "@/hooks/useSessionJoiner";
+import { useSessionJoiner } from "@/hooks/session-joining/useSessionJoiner";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";

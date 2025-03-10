@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
@@ -8,7 +9,7 @@ interface UseParticipantChannelProps {
   attemptReconnection: () => void;
   setCurrentParticipantCount: (count: number) => void;
   setMaxParticipantsForSession: (max: number) => void;
-  refetch: () => Promise<any>;
+  refetch: () => Promise<any>; // Explicitly typed as returning a Promise
 }
 
 export function useParticipantChannel({

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
@@ -9,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface UseSessionParticipantManagerProps {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
-  refetch: () => void;
+  refetch: () => Promise<any>; // Updated to return Promise<any> instead of void
   onSessionFull?: () => void;
   locationState?: { 
     participantId?: number; 

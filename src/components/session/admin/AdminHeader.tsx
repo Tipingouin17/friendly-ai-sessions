@@ -10,8 +10,10 @@ import {
   QrCode, 
   Download,
   Play,
-  Pause
+  Pause,
+  Info
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AdminActionButton from './AdminActionButton';
 import AdminMessageDialog from './AdminMessageDialog';
 import AdminQrDialog from './AdminQrDialog';
@@ -34,9 +36,15 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const location = useLocation();
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
   const { currentConversationId } = useConversationId();
   const [joinUrl, setJoinUrl] = useState('');
   const { setAdminStatus } = useSessionAdminStatus();
+  
+  // Get session details from location state
+  const sessionState = location.state || {};
+  const sessionObjective = sessionState.objective || '';
+  const sessionLanguage = sessionState.language || 'English';
   
   // Generate join URL when component mounts or conversation ID changes
   useEffect(() => {
@@ -124,53 +132,89 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     // Call the original callback if provided
     if (callback) callback();
   };
+
+  // Toggle session details visibility
+  const toggleSessionDetails = () => {
+    setShowSessionDetails(!showSessionDetails);
+  };
   
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-16 z-10 shadow-sm">
-      <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>
-          {facilitatorTitle && (
-            <span className="text-sm text-gray-500">Facilitator: {facilitatorTitle}</span>
-          )}
-          <SessionStatusBadge isActive={isSessionActive} />
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <ParticipantCounter 
-            currentParticipants={currentParticipants}
-            maxParticipants={maxParticipants}
-          />
+      <div className="container mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>
+              <SessionStatusBadge isActive={isSessionActive} />
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      onClick={toggleSessionDetails}
+                      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <Info size={16} className="text-gray-500" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {showSessionDetails ? "Hide session details" : "Show session details"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              {facilitatorTitle && (
+                <span>Facilitator: {facilitatorTitle}</span>
+              )}
+              <span className="text-gray-400">•</span>
+              <ParticipantCounter 
+                currentParticipants={currentParticipants}
+                maxParticipants={maxParticipants}
+              />
+              <span className="text-gray-400">•</span>
+              <span>Language: {sessionLanguage}</span>
+            </div>
+            
+            {showSessionDetails && sessionObjective && (
+              <div className="mt-2 text-sm text-gray-600 max-w-3xl">
+                <span className="font-medium">Objective:</span> {sessionObjective}
+              </div>
+            )}
+          </div>
           
-          <AdminActionButton
-            icon={<MessageSquare size={16} />}
-            label="Send Message"
-            onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
-          />
-          
-          <AdminActionButton
-            icon={isSessionActive ? <Pause size={16} /> : <Play size={16} />}
-            label={isSessionActive ? "Pause" : "Resume"}
-            onClick={() => handleAdminAction(onToggleSessionState)}
-          />
-          
-          <AdminActionButton
-            icon={<QrCode size={16} />}
-            label="QR Code"
-            onClick={() => handleAdminAction(handleShowQrDialog)}
-          />
-          
-          <AdminActionButton
-            icon={<Share2 size={16} />}
-            label="Share"
-            onClick={() => handleAdminAction(copySessionLink)}
-          />
-          
-          <AdminActionButton
-            icon={<Download size={16} />}
-            label="Export"
-            onClick={() => handleAdminAction(onExportData)}
-          />
+          <div className="flex items-center gap-2 mt-2 md:mt-0">
+            <AdminActionButton
+              icon={<MessageSquare size={16} />}
+              label="Send Message"
+              onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
+            />
+            
+            <AdminActionButton
+              icon={isSessionActive ? <Pause size={16} /> : <Play size={16} />}
+              label={isSessionActive ? "Pause" : "Resume"}
+              onClick={() => handleAdminAction(onToggleSessionState)}
+            />
+            
+            <AdminActionButton
+              icon={<QrCode size={16} />}
+              label="QR Code"
+              onClick={() => handleAdminAction(handleShowQrDialog)}
+            />
+            
+            <AdminActionButton
+              icon={<Share2 size={16} />}
+              label="Share"
+              onClick={() => handleAdminAction(copySessionLink)}
+            />
+            
+            <AdminActionButton
+              icon={<Download size={16} />}
+              label="Export"
+              onClick={() => handleAdminAction(onExportData)}
+            />
+          </div>
         </div>
       </div>
       

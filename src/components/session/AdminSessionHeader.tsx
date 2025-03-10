@@ -29,6 +29,12 @@ const AdminSessionHeader: React.FC<AdminSessionHeaderProps> = ({
       onToggleSessionState={onToggleSessionState}
       onSendAdminMessage={onSendAdminMessage}
       onExportData={onExportData}
+      // Pass additional session details from conversationData
+      sessionState={{
+        objective: conversationData?.sessions?.objective || "",
+        language: conversationData?.language || "English",
+        sessionStarted: conversationData?.session_started || false
+      }}
     />
   );
 };

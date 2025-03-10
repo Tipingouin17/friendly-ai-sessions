@@ -91,18 +91,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     };
   }, [conversationData, participants.length, currentParticipantCount, maxParticipants]);
 
-  useEffect(() => {
-    console.log("AdminParticipantList rendering with:", { 
-      participants,
-      participantCount: participants.length,
-      currentParticipantCount,
-      maxParticipants,
-      conversationDataParticipants: conversationData?.current_participants,
-      displayCount,
-      isLoading
-    });
-  }, [participants, currentParticipantCount, maxParticipants, conversationData, displayCount, isLoading]);
-
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50 hidden md:block">
       <h3 className="font-medium mb-2 flex items-center gap-2">
@@ -154,15 +142,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
             No participants have joined yet.
           </div>
         )}
-      </div>
-      
-      <div className="mt-4 text-xs text-gray-500">
-        <p>Session: {conversationData?.sessions?.title || "Unknown"}</p>
-        <p>Objective: {conversationData?.sessions?.objective || "Not specified"}</p>
-        <p>Max participants: {conversationData?.participants || "Unlimited"}</p>
-        <p>Current participants: {displayCount}</p>
-        <p>Language: {conversationData?.language || "Not specified"}</p>
-        <p>Session started: {conversationData?.session_started ? "Yes" : "No"}</p>
       </div>
     </div>
   );

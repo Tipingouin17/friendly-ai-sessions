@@ -1,25 +1,25 @@
 
 export interface AdminHeaderProps {
   sessionTitle: string;
-  facilitatorTitle: string;
-  currentParticipants?: number;
-  maxParticipants?: number;
-  isSessionActive?: boolean;
-  onToggleSessionState?: () => void;
-  onSendAdminMessage?: (message: string) => void;
-  onExportData?: () => void;
+  facilitatorTitle?: string;
+  currentParticipants: number;
+  maxParticipants: number;
+  isSessionActive: boolean;
+  onToggleSessionState: () => void;
+  onSendAdminMessage: (message: string) => void;
+  onExportData: () => void;
+  sessionState?: {
+    objective?: string;
+    language?: string;
+    sessionStarted?: boolean;
+  };
 }
 
 export interface AdminActionButtonProps {
-  onClick: () => void;
   icon: React.ReactNode;
   label: string;
-}
-
-export interface AdminMessageDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSendMessage: (message: string) => void;
+  onClick: () => void;
+  disabled?: boolean;
 }
 
 export interface AdminQrDialogProps {
@@ -29,4 +29,10 @@ export interface AdminQrDialogProps {
   currentParticipants: number;
   maxParticipants: number;
   onCopyLink: () => void;
+}
+
+export interface AdminMessageDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSendMessage: (message: string) => void;
 }

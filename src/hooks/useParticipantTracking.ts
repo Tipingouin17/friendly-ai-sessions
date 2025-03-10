@@ -46,21 +46,10 @@ export function useParticipantTracking(
           
           setParticipants(participantsList);
         } else if (conversation && conversation.current_participants > 0) {
-          // Fallback to placeholder data if no participants are found in the table
-          console.log("No participants found in database, using fallback data");
-          
-          const initialParticipants: ParticipantInfo[] = [];
-          
-          for (let i = 1; i <= conversation.current_participants; i++) {
-            initialParticipants.push({
-              id: i,
-              name: `Participant ${i}`,
-              avatar: null,
-              isAnonymous: false
-            });
-          }
-          
-          setParticipants(initialParticipants);
+          // Instead of using placeholder names, we'll leave the array empty
+          // and wait for the realtime updates to populate it
+          console.log("No participants found in database, waiting for realtime updates");
+          setParticipants([]);
         }
       } catch (err) {
         console.error("Exception fetching participants:", err);

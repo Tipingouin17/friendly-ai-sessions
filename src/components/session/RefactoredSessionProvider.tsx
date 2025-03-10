@@ -7,17 +7,20 @@ interface RefactoredSessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
+  forceAdmin?: boolean; // Added forceAdmin prop
 }
 
 export const RefactoredSessionProvider = ({ 
   children, 
   handleSessionFull, 
-  onError 
+  onError,
+  forceAdmin 
 }: RefactoredSessionProviderProps) => {
   return (
     <SessionProviderCore
       handleSessionFull={handleSessionFull}
       onError={onError}
+      forceAdmin={forceAdmin}
     >
       {children}
     </SessionProviderCore>

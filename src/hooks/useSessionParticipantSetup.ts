@@ -1,63 +1,102 @@
 
 import { useState, useEffect } from "react";
-import { ParticipantInfo } from "@/types/chat";
+import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { ConversationWithSession } from "@/types/database";
+import { ParticipantInfo } from "@/types/chat";
+import { LocationStateType } from "@/hooks/useConversationId";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
-interface UseSessionParticipantSetupProps {
+type UseSessionParticipantSetupProps = {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
-  locationState: { 
-    participantId?: number; 
-    isGuest?: boolean; 
-    participantName?: string;
-    showMessaging?: boolean 
-  } | null;
+  locationState: LocationStateType | null;
   refetch: () => void;
   onError?: (error: string) => void;
   onSessionFull?: () => void;
-}
+  forceAdmin?: boolean; // Added forceAdmin prop
+};
 
-export function useSessionParticipantSetup({
+export const useSessionParticipantSetup = ({
   conversationId,
   conversation,
   locationState,
   refetch,
   onError,
-  onSessionFull
-}: UseSessionParticipantSetupProps) {
-  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  onSessionFull,
+  forceAdmin
+}: UseSessionParticipantSetupProps) => {
+  const [isSessionFull, setIsSessionFull] = useState(false);
   const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
-  const [currentParticipantCount, setCurrentParticipantCount] = useState(0);
-  const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
-
+  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  
+  // Enforce admin status if forceAdmin is true
+  useEffect(() => {
+    if (forceAdmin) {
+      console.log("useSessionParticipantSetup: Enforcing admin status with forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
+    }
+  }, [forceAdmin, setAdminStatus]);
+  
+  // Get participants using the hook
+  const {
+    participants,
+    currentParticipantCount,
+    maxParticipantsForSession,
+    isParticipantTracking
+  } = useSessionParticipants(conversationId, locationState, forceAdmin);
+  
   // Set current user participant ID from location state
   useEffect(() => {
     if (locationState?.participantId) {
       setCurrentUserParticipantId(locationState.participantId);
     }
   }, [locationState]);
-
-  // Set max participants from conversation
+  
+  // Handle session full logic
   useEffect(() => {
-    if (conversation) {
-      setMaxParticipantsForSession(conversation.participants || 0);
+    // Skip check if admin
+    if ((isAdmin || forceAdmin) && conversationId) {
+      console.log("Admin user detected, skipping session full check");
+      return;
     }
-  }, [conversation]);
-
-  // Check if session is full and trigger callback
-  useEffect(() => {
-    const isSessionFull = currentParticipantCount >= maxParticipantsForSession && maxParticipantsForSession > 0;
     
-    if (isSessionFull && onSessionFull) {
-      console.log("Session is full. Triggering onSessionFull callback.");
-      onSessionFull();
+    // Check if session is full for non-admin users
+    const isFull = currentParticipantCount >= maxParticipantsForSession;
+    
+    if (isFull && !isSessionFull && conversationId) {
+      console.log("Session is full, notifying:", {
+        currentCount: currentParticipantCount,
+        maxAllowed: maxParticipantsForSession
+      });
+      
+      setIsSessionFull(true);
+      
+      if (onSessionFull) {
+        onSessionFull();
+      }
+      
+      if (onError) {
+        onError("This session is full and cannot accept more participants.");
+      }
     }
-  }, [currentParticipantCount, maxParticipantsForSession, onSessionFull]);
-
+  }, [
+    currentParticipantCount, 
+    maxParticipantsForSession, 
+    isSessionFull, 
+    conversationId,
+    onSessionFull,
+    onError,
+    isAdmin,
+    forceAdmin
+  ]);
+  
   return {
     participants,
     currentUserParticipantId,
     currentParticipantCount,
-    maxParticipantsForSession
+    maxParticipantsForSession,
+    isSessionFull,
+    isParticipantTracking
   };
-}
+};

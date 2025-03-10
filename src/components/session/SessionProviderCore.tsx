@@ -12,12 +12,14 @@ interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
+  forceAdmin?: boolean; // Added forceAdmin prop
 }
 
 export const SessionProviderCore = ({ 
   children, 
   handleSessionFull, 
-  onError 
+  onError,
+  forceAdmin 
 }: SessionProviderCoreProps) => {
   const location = useLocation();
   const locationState = location.state as { 
@@ -26,6 +28,14 @@ export const SessionProviderCore = ({
     participantName?: string;
     showMessaging?: boolean 
   } | null;
+  
+  // Force admin status if specified
+  useEffect(() => {
+    if (forceAdmin) {
+      console.log("SessionProviderCore: Enforcing admin status with forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [forceAdmin]);
   
   // Load core provider state
   const {
@@ -40,7 +50,7 @@ export const SessionProviderCore = ({
     providerError,
     handleError,
     enhancedHandleStartSession
-  } = useSessionProviderState({ onError });
+  } = useSessionProviderState({ onError, forceAdmin }); // Pass forceAdmin to provider state hook
 
   // Handle data errors
   useEffect(() => {
@@ -62,7 +72,8 @@ export const SessionProviderCore = ({
     locationState,
     refetch,
     onError: handleError,
-    onSessionFull: handleSessionFull
+    onSessionFull: handleSessionFull,
+    forceAdmin // Pass forceAdmin to participant setup
   });
 
   // Set up session monitoring
@@ -74,7 +85,8 @@ export const SessionProviderCore = ({
     conversationId: currentConversationId,
     currentUserParticipantId,
     participants,
-    onError: handleError
+    onError: handleError,
+    forceAdmin // Pass forceAdmin to session monitoring
   });
 
   // If we have serious errors, return error fallback
@@ -85,6 +97,9 @@ export const SessionProviderCore = ({
       </SessionProviderErrorFallback>
     );
   }
+
+  // Determine effective admin status
+  const effectiveIsAdmin = forceAdmin === true ? true : undefined;
 
   // Build session context
   const sessionContext: SessionContextProps = {
@@ -124,7 +139,10 @@ export const SessionProviderCore = ({
     // Add connection properties
     isConnected: true, // Default to true, will be updated by connection hooks
     connectionAttempts: 0,
-    refetch
+    refetch,
+    
+    // Set admin status based on forceAdmin prop
+    isAdmin: effectiveIsAdmin
   };
 
   // Return children with context

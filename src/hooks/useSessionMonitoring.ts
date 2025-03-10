@@ -1,83 +1,54 @@
 
 import { useState, useEffect } from "react";
-import { Message, ParticipantInfo } from "@/types/chat";
+import { useSessionRoomState } from "@/hooks/useSessionRoomState";
+import { useSessionStartMonitor } from "@/hooks/useSessionStartMonitor";
 import { ConversationWithSession } from "@/types/database";
-import { useSessionMessages } from "@/hooks/useSessionMessages";
-import { useAnonymousState } from "@/hooks/useAnonymousState";
+import { ParticipantInfo } from "@/types/chat";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
-interface UseSessionMonitoringProps {
+type UseSessionMonitoringProps = {
   conversation: ConversationWithSession | null;
   conversationId: number | null;
   currentUserParticipantId: number | null;
   participants: ParticipantInfo[];
   onError?: (error: string) => void;
-}
+  forceAdmin?: boolean; // Added forceAdmin prop
+};
 
-export function useSessionMonitoring({
+export const useSessionMonitoring = ({
   conversation,
   conversationId,
   currentUserParticipantId,
   participants,
-  onError
-}: UseSessionMonitoringProps) {
-  const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
-
-  // Check if session is started in DB
+  onError,
+  forceAdmin
+}: UseSessionMonitoringProps) => {
+  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  
+  // Enforce admin status if forceAdmin is true
   useEffect(() => {
-    if (conversation) {
-      setIsSessionStartedInDB(conversation.session_started || false);
+    if (forceAdmin) {
+      console.log("useSessionMonitoring: Enforcing admin status with forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
     }
-  }, [conversation]);
-
-  // Set up room state using existing hooks
-  const { messages, setMessages, error: messagesError } = useSessionMessages({
+  }, [forceAdmin, setAdminStatus]);
+  
+  // Monitor session start status
+  const { isSessionStartedInDB } = useSessionStartMonitor(conversationId);
+  
+  // Get room state
+  const roomState = useSessionRoomState({
+    conversation,
     conversationId,
-    welcomeMessage: null
+    currentUserParticipantId,
+    participants,
+    onError,
+    isAdmin: forceAdmin ? true : isAdmin // Use forceAdmin to override isAdmin
   });
   
-  // Set up anonymous state
-  const anonymousState = useAnonymousState({
-    conversationId,
-    currentParticipantId: currentUserParticipantId
-  });
-
-  // Handle errors from messages
-  useEffect(() => {
-    if (messagesError && onError) {
-      onError(messagesError);
-    }
-  }, [messagesError, onError]);
-
-  // Create a minimal room state for now
-  const roomState = {
-    messages: messages || [],
-    inputMessage: "",
-    setInputMessage: (message: string) => console.log("setInputMessage:", message),
-    currentParticipant: 0,
-    isRecording: false,
-    setIsRecording: (recording: boolean) => console.log("setIsRecording:", recording),
-    handleGenerateReport: async () => { console.log("Generate report"); },
-    isGeneratingReport: false,
-    setMessages: (messages: React.SetStateAction<Message[]>) => {
-      if (setMessages) {
-        setMessages(messages);
-      }
-    },
-    hasAnswered: false,
-    totalResponses: 0,
-    viewMode: "participant" as const,
-    setViewMode: (mode: "participant" | "admin") => console.log("setViewMode:", mode),
-    recordResponse: (participantId: number, hasResponded: boolean) => 
-      console.log("recordResponse:", participantId, hasResponded),
-    error: messagesError || null,
-    isWaitingForResponse: false,
-    handleSendMessage: async () => { console.log("Send message"); },
-    handleLikeMessage: (messageId: string) => console.log("Like message:", messageId),
-    anonymousState
-  };
-
   return {
     isSessionStartedInDB,
     roomState
   };
-}
+};

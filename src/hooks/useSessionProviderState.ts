@@ -1,54 +1,71 @@
 
-import { useCallback } from "react";
-import { useSessionErrorHandler } from "@/hooks/useSessionErrorHandler";
+import { useState, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useRefactoredSessionData } from "@/hooks/useRefactoredSessionData";
-import { useToast } from "@/components/ui/use-toast";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
-interface UseSessionProviderStateProps {
+type UseSessionProviderStateProps = {
   onError?: (error: string) => void;
-}
+  forceAdmin?: boolean; // Added forceAdmin prop
+};
 
-export const useSessionProviderState = ({ onError }: UseSessionProviderStateProps = {}) => {
-  const { toast } = useToast();
+export const useSessionProviderState = ({ 
+  onError,
+  forceAdmin 
+}: UseSessionProviderStateProps = {}) => {
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const location = useLocation();
+  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
   
-  // Set up error handling
-  const { providerError, handleError } = useSessionErrorHandler({ onError });
+  // Enforce admin status if forceAdmin is true
+  useEffect(() => {
+    if (forceAdmin) {
+      console.log("useSessionProviderState: Enforcing admin status with forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
+    }
+  }, [forceAdmin, setAdminStatus]);
   
-  // Load session data
+  // Get session data from refactored hook
   const {
     currentConversationId,
+    sessionLink,
+    showQrCodeView,
     conversation,
     isLoading,
     refetch,
-    showQrCodeView,
-    sessionLink,
     handleStartSession,
     isSessionStarted,
     error: dataError
   } = useRefactoredSessionData();
-
-  // Enhanced handler for starting session with better error handling
-  const enhancedHandleStartSession = useCallback(() => {
-    try {
-      console.log("Enhanced handleStartSession called from session provider");
-      handleStartSession();
-      toast({
-        title: "Starting session",
-        description: "The session is now starting...",
-      });
-      
-      // Force refetch after a short delay to ensure we get the latest state
-      setTimeout(() => {
-        console.log("Forcing refetch after session start");
-        refetch();
-      }, 1000);
-      
-    } catch (error) {
-      console.error("Error in handleStartSession:", error);
-      handleError("Failed to start session. Please try again.");
+  
+  // Error handler for provider
+  const handleError = useCallback((errorMessage: string) => {
+    console.error("Session provider error:", errorMessage);
+    setProviderError(errorMessage);
+    
+    if (onError) {
+      onError(errorMessage);
     }
-  }, [handleStartSession, toast, refetch, handleError]);
-
+  }, [onError]);
+  
+  // Add additional error handling for data errors
+  useEffect(() => {
+    if (dataError) {
+      handleError(dataError);
+    }
+  }, [dataError, handleError]);
+  
+  // Enhanced start session handler
+  const enhancedHandleStartSession = useCallback(() => {
+    // When starting a session, always enforce admin status
+    sessionStorage.setItem('isAdminSession', 'true');
+    setAdminStatus(true);
+    
+    // Call the original handler
+    handleStartSession();
+  }, [handleStartSession, setAdminStatus]);
+  
   return {
     currentConversationId,
     conversation,
@@ -60,6 +77,7 @@ export const useSessionProviderState = ({ onError }: UseSessionProviderStateProp
     dataError,
     providerError,
     handleError,
-    enhancedHandleStartSession
+    enhancedHandleStartSession,
+    isAdmin: forceAdmin ? true : isAdmin // Use forceAdmin to override isAdmin
   };
 };

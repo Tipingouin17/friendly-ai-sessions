@@ -26,19 +26,19 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
-  const isAdmin = propIsAdmin || contextIsAdmin;
+  const isAdmin = propIsAdmin || contextIsAdmin || sessionStorage.getItem('isAdminSession') === 'true';
 
-  // Skip showing session full alert for admin users
+  // Skip showing session full alert for admin users immediately
   useEffect(() => {
     if (isAdmin && type === 'full' && onClose) {
       console.log("Suppressing session full alert for admin user");
-      setTimeout(() => onClose(), 0);
+      onClose();
     }
   }, [isAdmin, type, onClose]);
 
   // If we're an admin and this is a full session alert, don't render anything
   if (isAdmin && type === 'full') {
-    console.log("Suppressing session full alert render for admin user");
+    console.log("Admin user detected - not rendering session full alert");
     return null;
   }
 
@@ -113,6 +113,11 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
       </>
     );
   };
+
+  // Don't render anything for admin users with session full
+  if (isAdmin && type === 'full') {
+    return null;
+  }
 
   if (isModal) {
     return (

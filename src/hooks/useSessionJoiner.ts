@@ -85,43 +85,7 @@ export function useSessionJoiner() {
       console.log("Current participant count before update:", currentParticipantCount);
       console.log("Admin status:", effectiveIsAdmin);
       
-      // Skip session full check for admin users completely
-      if (!effectiveIsAdmin) {
-        const maxParticipants = conversation.participants || 0;
-        
-        // Only enforce the limit if maxParticipants is greater than 0
-        if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
-          throw new Error("This session is full and cannot accept more participants.");
-        }
-        
-        // First, fetch the latest count to avoid race conditions
-        const { data: latestConversation, error: fetchError } = await supabase
-          .from('conversations')
-          .select('id, current_participants, participants')
-          .eq('id', conversationId)
-          .single();
-          
-        if (fetchError) {
-          console.error("Error fetching latest conversation data:", fetchError);
-          throw new Error(`Error fetching latest session data: ${fetchError.message}`);
-        }
-        
-        if (!latestConversation) {
-          throw new Error("Could not fetch the latest session data");
-        }
-        
-        // Double-check the participant limit with the latest data
-        if (latestConversation.participants > 0 && 
-            latestConversation.current_participants >= latestConversation.participants) {
-          throw new Error("This session is full and cannot accept more participants.");
-        }
-      } else {
-        console.log("Admin user detected - bypassing ALL session full checks");
-      }
-      
-      // For admin users or when session isn't full, we can proceed
-      
-      // First get latest count (even for admins, we need to know the correct count)
+      // First, fetch the latest count to avoid race conditions - for ALL users
       const { data: latestConversation, error: fetchError } = await supabase
         .from('conversations')
         .select('id, current_participants, participants')
@@ -137,6 +101,18 @@ export function useSessionJoiner() {
         throw new Error("Could not fetch the latest session data");
       }
       
+      // Skip session full check for admin users
+      if (!effectiveIsAdmin) {
+        // Only enforce the limit if maxParticipants is greater than 0
+        if (latestConversation.participants > 0 && 
+            latestConversation.current_participants >= latestConversation.participants) {
+          throw new Error("This session is full and cannot accept more participants.");
+        }
+      } else {
+        console.log("Admin user detected - bypassing ALL session full checks");
+      }
+      
+      // For all users (admin or not), we need to update the participant count
       const latestCount = latestConversation.current_participants || 0;
       const newCount = latestCount + 1;
       console.log("Latest count from database:", latestCount, "New count will be:", newCount);
@@ -166,20 +142,25 @@ export function useSessionJoiner() {
       console.log("New participant ID:", newParticipantId);
       
       // Store the participant information in the session_participants table
-      const { error: participantError } = await supabase
-        .from('session_participants')
-        .insert({
-          conversation_id: conversationId,
-          participant_id: newParticipantId,
-          name: participantName,
-          avatar_seed: avatarSeed,
-          is_anonymous: isAnonymous,
-          is_admin: effectiveIsAdmin
-        });
-        
-      if (participantError) {
-        console.error("Error storing participant info:", participantError);
-        // Continue anyway - this is not critical for joining
+      try {
+        const { error: participantError } = await supabase
+          .from('session_participants')
+          .insert({
+            conversation_id: conversationId,
+            participant_id: newParticipantId,
+            name: participantName,
+            avatar_seed: avatarSeed,
+            is_anonymous: isAnonymous || false,
+            is_admin: effectiveIsAdmin || false
+          });
+          
+        if (participantError) {
+          console.error("Error storing participant info:", participantError);
+          // Continue anyway - this is not critical for joining
+        }
+      } catch (err) {
+        // Catch any error from the insert operation but continue
+        console.error("Exception storing participant info:", err);
       }
       
       // Add a short delay to allow for Supabase to process the update

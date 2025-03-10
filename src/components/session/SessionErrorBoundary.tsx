@@ -26,11 +26,11 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   lastAttemptTime = 0,
   isLoading = false,
   hasInitializedProvider = false,
-  isAdmin = false
+  isAdmin: propIsAdmin = false
 }) => {
   const { toast } = useToast();
-  const { isAdmin: adminStatus } = useSessionAdminStatus();
-  const effectiveIsAdmin = isAdmin || adminStatus;
+  const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  const effectiveIsAdmin = propIsAdmin || contextIsAdmin;
   
   // Log error information for debugging
   useEffect(() => {
@@ -40,20 +40,42 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
         noSessionFound, 
         connectionAttempts,
         isSessionFull: error?.includes("full") || error?.includes("maximum capacity"),
-        isAdmin: effectiveIsAdmin
+        isAdmin: effectiveIsAdmin,
+        adminFromProps: propIsAdmin,
+        adminFromContext: contextIsAdmin
       });
     }
-  }, [error, noSessionFound, connectionAttempts, effectiveIsAdmin]);
+    
+    // Enforce admin status if needed
+    if (effectiveIsAdmin) {
+      console.log("Admin detected in SessionErrorBoundary - ensuring admin status is set");
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [error, noSessionFound, connectionAttempts, effectiveIsAdmin, propIsAdmin, contextIsAdmin]);
 
-  // For admin users, bypass session full errors
-  if (effectiveIsAdmin && error && (error.includes("full") || error.includes("maximum capacity"))) {
-    console.log("Admin user detected - bypassing session full error");
+  // For admin users, bypass session full errors completely
+  const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
+  
+  if (effectiveIsAdmin && isSessionFullError) {
+    console.log("Admin user detected in error boundary - bypassing session full error");
+    
+    // Auto-retry once for admins with session full errors
+    useEffect(() => {
+      if (effectiveIsAdmin && isSessionFullError) {
+        const timer = setTimeout(() => {
+          console.log("Auto-retrying for admin user with session full error");
+          retryConnection();
+        }, 800);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [effectiveIsAdmin, isSessionFullError]);
+    
     // Render children for admin users even when session is full
     return <>{children}</>;
   }
 
   if (error || noSessionFound) {
-    const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
     const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
     
     const errorTitle = isSessionFullError ? "Session Full" : 

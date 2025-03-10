@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 
 interface SessionProviderErrorFallbackProps {
@@ -18,16 +17,32 @@ export const SessionProviderErrorFallback = ({
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage, "isAdmin:", isAdmin);
   
   // For admin users, explicitly handle session full error
-  if (isAdmin && (
+  const originalError = errorMessage;
+  
+  // Keep a reference to the original error message while determining what to display
+  const displayError = isAdmin && (
     errorMessage.includes("session is full") || 
     errorMessage.includes("maximum capacity")
-  )) {
-    console.log("Admin detected with session full error - overriding this error");
-    errorMessage = "You are an admin - overriding session full restriction";
-    
-    // Force set admin status in session storage
-    sessionStorage.setItem('isAdminSession', 'true');
-  }
+  ) ? "You are an admin - overriding session full restriction" : errorMessage;
+  
+  // Force set admin status in session storage
+  useEffect(() => {
+    if (isAdmin) {
+      console.log("Admin detected in error fallback - enforcing admin status");
+      sessionStorage.setItem('isAdminSession', 'true');
+      
+      // If it's a session full error and we're admin, auto-retry
+      if (onRetry && (
+        originalError.includes("session is full") || 
+        originalError.includes("maximum capacity")
+      )) {
+        console.log("Admin detected with session full error - auto-retrying");
+        setTimeout(() => {
+          onRetry();
+        }, 1000);
+      }
+    }
+  }, [isAdmin, originalError, onRetry]);
   
   // Create safe default props
   const fallbackSessionContext: SessionContextProps = {
@@ -65,12 +80,12 @@ export const SessionProviderErrorFallback = ({
       toggleAnonymous: () => {}
     },
     isSessionStartedInDB: false,
-    error: errorMessage,
+    error: displayError, // Use the potentially modified error message
     
     // Add missing properties required by SessionContextProps
     isConnected: false,
     connectionAttempts: 0,
-    refetch: () => {},
+    refetch: () => Promise.resolve({}),
     
     // Include isAdmin in the fallback context
     isAdmin: isAdmin

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { ConversationWithSession } from "@/types/database";
@@ -31,14 +32,34 @@ export const useSessionParticipantSetup = ({
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const { toast } = useToast();
   
+  // This will store if we're processing as admin to use throughout the component
+  const [effectiveIsAdmin, setEffectiveIsAdmin] = useState(false);
+  
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
-    if (forceAdmin) {
-      console.log("useSessionParticipantSetup: Enforcing admin status with forceAdmin=true");
+    // Determine if we're effectively an admin through any of our sources
+    const adminByForceFlag = forceAdmin === true;
+    const adminByLocationState = locationState?.isAdmin === true;
+    const adminByStatus = isAdmin === true;
+    
+    // Calculate effective admin status
+    const newEffectiveAdmin = adminByForceFlag || adminByLocationState || adminByStatus;
+    
+    if (newEffectiveAdmin) {
+      console.log("useSessionParticipantSetup: Setting effectiveIsAdmin=true based on:", {
+        forceAdmin: adminByForceFlag,
+        locationStateAdmin: adminByLocationState,
+        isAdminStatus: adminByStatus
+      });
+      
+      // Persist the admin status to ensure it's available elsewhere in the app
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
+      setEffectiveIsAdmin(true);
+    } else {
+      setEffectiveIsAdmin(false);
     }
-  }, [forceAdmin, setAdminStatus]);
+  }, [forceAdmin, locationState, isAdmin, setAdminStatus]);
   
   // Get participants using the hook
   const participantsData = useSessionParticipants(conversationId);
@@ -56,10 +77,11 @@ export const useSessionParticipantSetup = ({
       currentParticipantCount,
       maxParticipantsForSession,
       isAdmin,
+      effectiveIsAdmin,
       forceAdmin,
       isSessionFull
     });
-  }, [conversationId, currentParticipantCount, maxParticipantsForSession, isAdmin, forceAdmin, isSessionFull]);
+  }, [conversationId, currentParticipantCount, maxParticipantsForSession, isAdmin, effectiveIsAdmin, forceAdmin, isSessionFull]);
   
   // Set current user participant ID from location state
   useEffect(() => {
@@ -84,7 +106,6 @@ export const useSessionParticipantSetup = ({
   
   // Handle session full logic with improved admin detection
   useEffect(() => {
-    const effectiveIsAdmin = isAdmin || forceAdmin === true;
     console.log("Session full check:", {
       currentCount: currentParticipantCount,
       maxAllowed: maxParticipantsForSession,
@@ -92,7 +113,7 @@ export const useSessionParticipantSetup = ({
       isSessionFull
     });
     
-    // Always skip check if admin - they should never see the session as full
+    // ALWAYS skip check if admin - they should never see the session as full
     if (effectiveIsAdmin) {
       console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
       // If we previously set session as full but now we're admin, reset it
@@ -141,8 +162,7 @@ export const useSessionParticipantSetup = ({
     conversationId,
     onSessionFull,
     onError,
-    isAdmin,
-    forceAdmin,
+    effectiveIsAdmin,
     toast
   ]);
   
@@ -153,6 +173,7 @@ export const useSessionParticipantSetup = ({
     maxParticipantsForSession,
     isSessionFull,
     isParticipantTracking: true,
-    forceRefreshParticipants
+    forceRefreshParticipants,
+    isAdmin: effectiveIsAdmin // Expose the calculated admin status
   };
 };

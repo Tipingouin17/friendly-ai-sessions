@@ -11,6 +11,9 @@ export const Navigation = () => {
 
   // Check if current path is related to facilitators
   const isFacilitatorSection = ['/my-facilitators', '/session'].includes(location.pathname);
+  
+  // Check if we're on a session page
+  const isSessionPage = location.pathname.includes('session-admin') || location.pathname.includes('session');
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">

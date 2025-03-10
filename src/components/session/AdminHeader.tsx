@@ -60,7 +60,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   };
   
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-10 shadow-sm">
+    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-16 z-10 shadow-sm"> {/* Changed top-0 to top-16 to position below navbar */}
       <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>

@@ -290,7 +290,7 @@ const SessionAdmin = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen pt-16"> {/* Added pt-16 to account for fixed navbar */}
       <AdminHeader 
         sessionTitle={conversationData?.sessions?.title || "Session Admin Panel"}
         facilitatorTitle={conversationData?.sessions?.facilitator_details?.title || ""}

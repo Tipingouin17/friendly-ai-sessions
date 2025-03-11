@@ -56,6 +56,10 @@ export function useSessionAdminStatus() {
     } else if (locationState?.newConversationId) {
       adminStatus = true;
       console.log("Admin status set to true based on having newConversationId");
+    } else if (isAdminPath) {
+      // If we're on admin path but no other indicator, still set as admin
+      adminStatus = true;
+      console.log("Admin status set to true based on admin path as fallback");
     } else {
       // Not explicitly marked as admin or guest, default to non-admin
       adminStatus = false;

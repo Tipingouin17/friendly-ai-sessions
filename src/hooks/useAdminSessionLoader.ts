@@ -17,13 +17,16 @@ export function useAdminSessionLoader() {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { currentConversationId, locationState } = useConversationId();
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
+  const hasRedirected = useRef(false);
   
-  // Check if we're on the admin path and redirect if needed
+  // Check if we're on the admin path and redirect if needed - only once
   useEffect(() => {
     const isAdminPath = location.pathname.includes('/admin');
     
-    if (!isAdminPath && currentConversationId) {
+    // Only redirect if not on admin path AND we have not already redirected
+    if (!isAdminPath && currentConversationId && !hasRedirected.current) {
       console.log("Not on admin path, redirecting to admin path");
+      hasRedirected.current = true;
       navigate(`/session/admin?id=${currentConversationId}`, {
         state: {
           isAdmin: true,
@@ -81,10 +84,11 @@ export function useAdminSessionLoader() {
     };
   }, [isLoading, hasInitializedProvider, toast, currentConversationId, locationState, conversationData, location.pathname]);
   
-  // Additional redirect check
+  // Additional redirect check, but only run once to prevent loops
   useEffect(() => {
-    if (currentConversationId && !location.pathname.includes('/admin')) {
-      console.log("Should be on admin path but not - redirecting");
+    if (currentConversationId && !location.pathname.includes('/admin') && !hasRedirected.current) {
+      console.log("Should be on admin path but not - redirecting once");
+      hasRedirected.current = true;
       navigate(`/session/admin?id=${currentConversationId}`, { 
         state: { 
           isAdmin: true,

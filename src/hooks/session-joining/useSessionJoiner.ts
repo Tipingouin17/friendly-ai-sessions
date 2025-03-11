@@ -6,6 +6,7 @@ import { useNavigateToSession } from "./useNavigateToSession";
 import { useSessionCapacityCheck } from "./useSessionCapacityCheck";
 import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SessionJoinParams {
   conversationId: number | null;
@@ -87,6 +88,28 @@ export function useSessionJoiner() {
         isAnonymous,
         isAdmin: effectiveIsAdmin
       });
+      
+      // Create a session_event to log the participant joining
+      // This helps with realtime tracking of participants
+      try {
+        await supabase
+          .from('session_events')
+          .insert({
+            conversation_id: conversationId,
+            event_type: 'participant_joined',
+            data: {
+              participant_id: newParticipantId,
+              participant_name: participantName,
+              avatar_url: avatarSeed ? `/api/avatar?name=${avatarSeed}&variant=beam&palette=0` : null,
+              is_anonymous: isAnonymous,
+              is_admin: effectiveIsAdmin,
+              current_count: currentParticipantCount + 1
+            }
+          });
+      } catch (eventError) {
+        console.error("Error logging participant join event:", eventError);
+        // Don't block the join process if event logging fails
+      }
       
       // Clear any existing "session full" errors since we've successfully joined
       setError(null);

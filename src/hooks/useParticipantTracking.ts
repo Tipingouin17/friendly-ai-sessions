@@ -46,8 +46,6 @@ export function useParticipantTracking(
           
           setParticipants(participantsList);
         } else if (conversation && conversation.current_participants > 0) {
-          // Instead of using placeholder names, we'll leave the array empty
-          // and wait for the realtime updates to populate it
           console.log("No participants found in database, waiting for realtime updates");
           setParticipants([]);
         }
@@ -147,7 +145,7 @@ export function useParticipantTracking(
               // Check if we already have this participant
               if (prev.some(p => p.id === participantId)) return prev;
               
-              console.log("Adding new participant from event:", participantId);
+              console.log("Adding new participant from event:", eventData);
               return [...prev, {
                 id: participantId,
                 name: eventData.participant_name || `Participant ${participantId}`,

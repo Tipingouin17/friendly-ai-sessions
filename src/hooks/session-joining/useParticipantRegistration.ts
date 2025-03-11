@@ -19,6 +19,15 @@ export async function registerParticipant({
   isAdmin = false
 }: RegisterParticipantParams): Promise<void> {
   try {
+    console.log("Registering participant:", {
+      conversationId,
+      participantId,
+      participantName,
+      avatarSeed,
+      isAnonymous,
+      isAdmin
+    });
+    
     const { error: participantError } = await supabase
       .from('session_participants')
       .insert({
@@ -33,6 +42,8 @@ export async function registerParticipant({
     if (participantError) {
       console.error("Error storing participant info:", participantError);
       // Continue anyway - this is not critical for joining
+    } else {
+      console.log("Successfully registered participant:", participantName);
     }
   } catch (err) {
     // Catch any error from the insert operation but continue

@@ -21,6 +21,8 @@ export function useParticipantTracking(
       setIsLoading(true);
       
       try {
+        console.log("Fetching participants for conversation:", conversationId);
+        
         const { data, error } = await supabase
           .from('session_participants')
           .select('*')
@@ -44,6 +46,7 @@ export function useParticipantTracking(
             isAnonymous: participant.is_anonymous || false
           }));
           
+          console.log("Processed participant list:", participantsList);
           setParticipants(participantsList);
         } else if (conversation && conversation.current_participants > 0) {
           console.log("No participants found in database, waiting for realtime updates");
@@ -74,6 +77,8 @@ export function useParticipantTracking(
           if (exists) return prev;
           
           console.log("Adding participant with ID:", conversationState.participantId);
+          console.log("Adding participant with name:", conversationState.participantName);
+          
           return [...prev, {
             id: conversationState.participantId!,
             name: conversationState.participantName!,
@@ -110,6 +115,8 @@ export function useParticipantTracking(
             if (prev.some(p => p.id === participant.participant_id)) return prev;
             
             console.log("Adding participant from realtime event:", participant);
+            console.log("Participant name from database:", participant.name);
+            
             return [...prev, {
               id: participant.participant_id,
               name: participant.name,
@@ -140,19 +147,25 @@ export function useParticipantTracking(
           
           if (eventType === 'participant_joined' && eventData) {
             const participantId = eventData.participant_id;
+            const participantName = eventData.participant_name;
             
-            setParticipants(prev => {
-              // Check if we already have this participant
-              if (prev.some(p => p.id === participantId)) return prev;
-              
-              console.log("Adding new participant from event:", eventData);
-              return [...prev, {
-                id: participantId,
-                name: eventData.participant_name || `Participant ${participantId}`,
-                avatar: eventData.avatar_url || null,
-                isAnonymous: eventData.is_anonymous || false
-              }];
-            });
+            console.log("Participant joined event data:", eventData);
+            console.log("Participant name from event:", participantName);
+            
+            if (participantId && participantName) {
+              setParticipants(prev => {
+                // Check if we already have this participant
+                if (prev.some(p => p.id === participantId)) return prev;
+                
+                console.log("Adding new participant from event:", eventData);
+                return [...prev, {
+                  id: participantId,
+                  name: participantName,
+                  avatar: eventData.avatar_url || null,
+                  isAnonymous: eventData.is_anonymous || false
+                }];
+              });
+            }
           }
         }
       })
@@ -163,6 +176,11 @@ export function useParticipantTracking(
       removeChannel(eventsChannel);
     };
   }, [conversationId]);
+  
+  // Log the current participants array for debugging
+  useEffect(() => {
+    console.log("Current participants array:", participants);
+  }, [participants]);
   
   return {
     participants,

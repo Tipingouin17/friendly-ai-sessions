@@ -35,10 +35,21 @@ const MessageItem = ({
   if (!isAnonymous) {
     if (participantInfo && participantInfo.name) {
       displayParticipantName = participantInfo.name;
-    } else if (message.participant && !message.participant.startsWith("Participant")) {
-      displayParticipantName = message.participant;
+    } else if (message.participant) {
+      if (typeof message.participant === 'string' && !message.participant.startsWith("Participant")) {
+        displayParticipantName = message.participant;
+      }
     }
   }
+  
+  // Log the participant info for debugging
+  React.useEffect(() => {
+    if (isFirstMessageOfGroup) {
+      console.log("MessageItem - Rendering message from:", displayParticipantName);
+      console.log("MessageItem - participantInfo:", participantInfo);
+      console.log("MessageItem - message.participant:", message.participant);
+    }
+  }, [isFirstMessageOfGroup, displayParticipantName, participantInfo, message.participant]);
 
   const handleLike = () => {
     if (onLikeMessage) {
@@ -94,7 +105,7 @@ const MessageItem = ({
           <div className="mb-1">
             <MessageAvatar 
               avatarUrl={participantInfo?.avatar} 
-              name={participantInfo?.name || "User"} 
+              name={participantInfo?.name || displayParticipantName} 
             />
           </div>
         )}

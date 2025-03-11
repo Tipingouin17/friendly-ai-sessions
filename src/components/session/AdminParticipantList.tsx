@@ -22,6 +22,15 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   conversationData
 }) => {
   const [displayCount, setDisplayCount] = useState(currentParticipantCount);
+  const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
+  
+  // Synchronize the component's local state with the incoming props
+  useEffect(() => {
+    if (participants && participants.length > 0) {
+      console.log("AdminParticipantList: Updating participants list from props:", participants);
+      setParticipantsList(participants);
+    }
+  }, [participants]);
   
   useEffect(() => {
     if (!conversationData?.id) return;
@@ -65,6 +74,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       })
       .subscribe();
     
+    // Listen for session events, particularly participant_joined events
     const eventsChannel = supabase
       .channel(`admin-session-events-${conversationId}`)
       .on('postgres_changes', {
@@ -77,10 +87,62 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
         
         if (payload.new && payload.new.event_type === 'participant_joined') {
           const eventData = payload.new.data;
-          if (eventData && eventData.current_count !== undefined) {
-            console.log("Updating admin participant count from event:", eventData.current_count);
-            setDisplayCount(eventData.current_count);
+          if (eventData) {
+            console.log("Updating admin participant count from event:", eventData);
+            
+            if (eventData.current_count !== undefined) {
+              setDisplayCount(eventData.current_count);
+            }
+            
+            // Also update participant information from the event data
+            if (eventData.participant_id && eventData.participant_name) {
+              setParticipantsList(prev => {
+                // Check if participant already exists
+                const exists = prev.some(p => p.id === eventData.participant_id);
+                if (exists) return prev;
+                
+                console.log("Adding participant from session event:", eventData);
+                return [...prev, {
+                  id: eventData.participant_id,
+                  name: eventData.participant_name,
+                  avatar: eventData.avatar_url || null,
+                  isAnonymous: eventData.is_anonymous || false
+                }];
+              });
+            }
           }
+        }
+      })
+      .subscribe();
+      
+    // Set up a direct subscription to session_participants table
+    const participantsDirectChannel = supabase
+      .channel(`admin-participants-direct-${conversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'session_participants',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        console.log("Admin received direct participant registration:", payload);
+        
+        if (payload.new) {
+          const participantData = payload.new;
+          setParticipantsList(prev => {
+            // Check if participant already exists
+            const exists = prev.some(p => p.id === participantData.participant_id);
+            if (exists) return prev;
+            
+            console.log("Adding participant from direct registration:", participantData);
+            return [...prev, {
+              id: participantData.participant_id,
+              name: participantData.name,
+              avatar: participantData.avatar_seed 
+                ? `/api/avatar?name=${participantData.avatar_seed}&variant=beam&palette=0` 
+                : null,
+              isAnonymous: participantData.is_anonymous || false
+            }];
+          });
         }
       })
       .subscribe();
@@ -88,6 +150,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     return () => {
       removeChannel(conversationChannel);
       removeChannel(eventsChannel);
+      removeChannel(participantsDirectChannel);
     };
   }, [conversationData, participants.length, currentParticipantCount, maxParticipants]);
 
@@ -114,8 +177,8 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
               <Skeleton className="h-5 w-14 rounded-full" />
             </div>
           ))
-        ) : participants.length > 0 ? (
-          participants.map((participant) => (
+        ) : participantsList.length > 0 ? (
+          participantsList.map((participant) => (
             <div 
               key={participant.id}
               className="p-2 bg-white rounded border border-gray-100 flex items-center gap-2"

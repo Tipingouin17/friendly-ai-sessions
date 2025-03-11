@@ -25,16 +25,24 @@ export const useMessageProcessor = ({
     
     // Log the inputs for debugging
     console.log(`useMessageProcessor - Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
+    console.log("Available participants data:", participants);
+    
+    // Create a mapping of participant IDs to names for quicker lookup
+    const participantMap = participants.reduce((map, p) => {
+      map[p.id] = p;
+      return map;
+    }, {} as { [key: number]: ParticipantInfo });
     
     if (viewMode === "admin") {
       // Admin sees all messages
       return messages.map(message => {
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
-          const participant = participants.find(p => p.id === participantNumber);
           
-          // Add participant details
+          // First priority: Look for participant in the participants array (from db)
+          const participant = participantMap[participantNumber];
           if (participant) {
+            console.log(`Found participant in map: ${participant.name} for ID ${participantNumber}`);
             return {
               ...message,
               participant: participant.name,
@@ -43,13 +51,18 @@ export const useMessageProcessor = ({
             };
           }
           
+          // Second priority: Check participantNames dictionary
           const name = participantNames[participantNumber];
           if (name) {
+            console.log(`Found participant in names map: ${name} for ID ${participantNumber}`);
             return {
               ...message,
               participant: name
             };
           }
+          
+          // Fallback: Use participant number
+          console.log(`No participant info found for ID ${participantNumber}, using default`);
           return {
             ...message,
             participant: `Participant ${participantNumber}`
@@ -82,27 +95,31 @@ export const useMessageProcessor = ({
         // Process the message the same way as in admin view
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
-          const participant = participants.find(p => p.id === participantNumber);
           
+          // First priority: Check participants array for database info
+          const participant = participantMap[participantNumber];
           if (participant) {
             return {
               ...message,
-              participant: participant.name || `You`,
+              participant: participantNumber === currentParticipant ? "You" : participant.name,
               avatar: participant.avatar,
               isAnonymous: participant.isAnonymous
             };
           }
           
+          // Second priority: Check participantNames dictionary
           const name = participantNames[participantNumber];
           if (name) {
             return {
               ...message,
-              participant: name
+              participant: participantNumber === currentParticipant ? "You" : name
             };
           }
+          
+          // Fallback: Use "You" for current participant
           return {
             ...message,
-            participant: `You`  // In participant view, show own messages as "You"
+            participant: participantNumber === currentParticipant ? "You" : `Participant ${participantNumber}`
           };
         }
         return message;

@@ -29,27 +29,27 @@ const MessageItem = ({
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";
   
-  // Use participantInfo.name if available, otherwise fall back to message.participant
-  let displayParticipantName = isAnonymous ? "Anonymous participant" : "User";
+  // Determine display name - prioritize participantInfo, then message.participant
+  let displayParticipantName = isAnonymous ? "Anonymous participant" : 
+                              participantInfo?.name || 
+                              (typeof message.participant === 'string' ? message.participant : "Participant");
   
-  if (!isAnonymous) {
-    if (participantInfo && participantInfo.name) {
-      displayParticipantName = participantInfo.name;
-    } else if (message.participant) {
-      if (typeof message.participant === 'string' && !message.participant.startsWith("Participant")) {
-        displayParticipantName = message.participant;
-      }
-    }
+  // Ensure we don't display "Participant X" if we have a real name
+  if (displayParticipantName.startsWith("Participant") && participantInfo?.name) {
+    displayParticipantName = participantInfo.name;
   }
   
-  // Log the participant info for debugging
+  // Log participant info for debugging
   React.useEffect(() => {
     if (isFirstMessageOfGroup) {
-      console.log("MessageItem - Rendering message from:", displayParticipantName);
-      console.log("MessageItem - participantInfo:", participantInfo);
-      console.log("MessageItem - message.participant:", message.participant);
+      console.log("MessageItem - Rendering message:", {
+        content: message.content?.substring(0, 20) + "...",
+        from: displayParticipantName,
+        participantInfo,
+        messageParticipant: message.participant
+      });
     }
-  }, [isFirstMessageOfGroup, displayParticipantName, participantInfo, message.participant]);
+  }, [isFirstMessageOfGroup, displayParticipantName, participantInfo, message]);
 
   const handleLike = () => {
     if (onLikeMessage) {

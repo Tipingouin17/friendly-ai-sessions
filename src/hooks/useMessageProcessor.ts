@@ -61,7 +61,7 @@ export const useMessageProcessor = ({
             };
           }
           
-          // Fallback: Use participant number
+          // Fallback: Use participant number as a last resort
           console.log(`No participant info found for ID ${participantNumber}, using default`);
           return {
             ...message,

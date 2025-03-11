@@ -128,7 +128,14 @@ export function useParticipantTracking(
           });
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Participant tracking channel status: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log("Successfully subscribed to participant updates");
+          // Force loading state to false after successful channel subscription
+          setIsLoading(false);
+        }
+      });
     
     // Listen for participant_joined events
     const eventsChannel = supabase
@@ -169,7 +176,14 @@ export function useParticipantTracking(
           }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Participant events channel status: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log("Successfully subscribed to participant events");
+          // Second chance to set loading to false after event channel subscription
+          setIsLoading(false);
+        }
+      });
       
     return () => {
       removeChannel(participantsChannel);

@@ -40,6 +40,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   const { toast } = useToast();
   const providerInitialized = useRef(false);
   const isOnAdminPath = window.location.pathname.includes('/admin');
+  const showedAdminToast = useRef(false);
   
   // Persist admin status consistently
   useEffect(() => {
@@ -93,8 +94,9 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       persistedAdmin: sessionStorage.getItem('isAdminSession')
     });
     
-    // Show toast for admin users
-    if (effectiveAdmin || isOnAdminPath) {
+    // Show toast for admin users - but only once
+    if ((effectiveAdmin || isOnAdminPath) && !showedAdminToast.current) {
+      showedAdminToast.current = true;
       toast({
         title: "Admin Mode Active",
         description: "You are viewing this session as an administrator."

@@ -15,6 +15,7 @@ export function useSessionLoadingState(
   const lastLoadingState = useRef<boolean>(true);
   const forceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isAdminSession = useRef(sessionStorage.getItem('isAdminSession') === 'true');
+  const hasShownForceLoading = useRef(false);
 
   // Track loading state changes to help with debugging
   useEffect(() => {
@@ -33,7 +34,8 @@ export function useSessionLoadingState(
     
     // Set a maximum time that the loading state can remain true
     forceTimeoutRef.current = setTimeout(() => {
-      if (isLoading && sessionMountedRef.current) {
+      if (isLoading && sessionMountedRef.current && !hasShownForceLoading.current) {
+        hasShownForceLoading.current = true;
         console.log(`Maximum loading time of ${timeoutDuration}ms reached, forcing loading state to false`);
         setIsLoading(false);
         

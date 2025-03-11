@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -18,25 +17,6 @@ export function useAdminSessionLoader() {
   const { currentConversationId, locationState } = useConversationId();
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
   const hasRedirected = useRef(false);
-  
-  // Check if we're on the admin path and redirect if needed - only once
-  useEffect(() => {
-    const isAdminPath = location.pathname.includes('/admin');
-    
-    // Only redirect if not on admin path AND we have not already redirected
-    if (!isAdminPath && currentConversationId && !hasRedirected.current) {
-      console.log("Not on admin path, redirecting to admin path");
-      hasRedirected.current = true;
-      navigate(`/session/admin?id=${currentConversationId}`, {
-        state: {
-          isAdmin: true,
-          showMessaging: true,
-          conversationId: currentConversationId
-        },
-        replace: true
-      });
-    }
-  }, [location.pathname, currentConversationId, navigate]);
   
   // Set up initialization and timeout handling
   useEffect(() => {
@@ -83,22 +63,6 @@ export function useAdminSessionLoader() {
       }
     };
   }, [isLoading, hasInitializedProvider, toast, currentConversationId, locationState, conversationData, location.pathname]);
-  
-  // Additional redirect check, but only run once to prevent loops
-  useEffect(() => {
-    if (currentConversationId && !location.pathname.includes('/admin') && !hasRedirected.current) {
-      console.log("Should be on admin path but not - redirecting once");
-      hasRedirected.current = true;
-      navigate(`/session/admin?id=${currentConversationId}`, { 
-        state: { 
-          isAdmin: true,
-          showMessaging: true,
-          conversationId: currentConversationId
-        },
-        replace: true
-      });
-    }
-  }, [currentConversationId, location.pathname, navigate]);
   
   return {
     isLoading,

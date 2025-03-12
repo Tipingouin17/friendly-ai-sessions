@@ -25,24 +25,26 @@ export function useSessionLoadingState(
     }
   }, [isLoading]);
 
-  // Handle loading timeout
+  // Handle loading timeout and initialization
   useEffect(() => {
     if (!sessionMountedRef.current) return;
     
-    // Don't force loading state changes for admin sessions
-    if (isAdminSession.current) {
-      console.log("Admin session: Not forcing loading state changes");
+    // Force loading state to false if provider is initialized
+    if (hasInitializedProvider && isLoading) {
+      console.log("Provider initialized, setting loading to false");
+      setIsLoading(false);
       return;
     }
     
-    const timeoutDuration = 10000;
+    const timeoutDuration = isAdminSession.current ? 8000 : 5000;
     
     forceTimeoutRef.current = setTimeout(() => {
-      if (isLoading && sessionMountedRef.current && !hasToastShown.current) {
-        hasToastShown.current = true;
+      if (isLoading && sessionMountedRef.current) {
+        console.log("Forcing loading state to false after timeout");
         setIsLoading(false);
         
         if (!hasToastShown.current) {
+          hasToastShown.current = true;
           toast({
             title: "Session Ready",
             description: "You can now participate in the session."
@@ -56,7 +58,15 @@ export function useSessionLoadingState(
         clearTimeout(forceTimeoutRef.current);
       }
     };
-  }, [isLoading, toast, sessionMountedRef]);
+  }, [isLoading, toast, sessionMountedRef, hasInitializedProvider]);
+
+  // Clear loading state when provider is initialized
+  useEffect(() => {
+    if (hasInitializedProvider && isLoading) {
+      console.log("Provider initialized, clearing loading state");
+      setIsLoading(false);
+    }
+  }, [hasInitializedProvider, isLoading]);
 
   return { isLoading, setIsLoading };
 }

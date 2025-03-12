@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 
@@ -29,8 +28,8 @@ export function useSessionWrapperEffects({
   useEffect(() => {
     if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
       const isAdmin = effectiveAdmin || isOnAdminPath;
-      // Admin sessions initialize immediately
-      const shouldInitialize = isAdmin || (props.conversation && props.currentConversationId);
+      // Initialize immediately if we have conversation data or it's an admin session
+      const shouldInitialize = isAdmin || (props.conversation && props.currentConversationId) || props.isSessionStartedInDB;
       
       if (shouldInitialize) {
         console.log("Provider successfully initialized with data:", {
@@ -38,10 +37,16 @@ export function useSessionWrapperEffects({
           hasData: !!props.conversation,
           isAdmin: props.isAdmin,
           effectiveAdmin,
-          isOnAdminPath
+          isOnAdminPath,
+          isSessionStarted: props.isSessionStartedInDB
         });
         providerInitialized.current = true;
         onInitialized();
+        
+        // Set loading to false immediately if session is started
+        if (props.isSessionStartedInDB) {
+          onLoading(false);
+        }
         
         if (effectiveAdmin || isOnAdminPath) {
           sessionStorage.setItem('isAdminSession', 'true');
@@ -52,7 +57,7 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
-  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin]);
+  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, props.isSessionStartedInDB]);
 
   // Update loading state based on conditions
   useEffect(() => {
@@ -60,16 +65,21 @@ export function useSessionWrapperEffects({
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
       if (isAdmin) {
-        // For admin sessions, we're more lenient with loading states
         console.log("Admin session: Managing loading state");
         if (!props.isLoading) {
           onLoading(false);
         }
       } else {
-        onLoading(props.isLoading);
+        // For participants, clear loading when session is started
+        if (props.isSessionStartedInDB) {
+          console.log("Session started, clearing loading state for participant");
+          onLoading(false);
+        } else {
+          onLoading(props.isLoading);
+        }
       }
     }
-  }, [props.isLoading, props.isAdmin, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
+  }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
   // Handle errors from provider
   useEffect(() => {

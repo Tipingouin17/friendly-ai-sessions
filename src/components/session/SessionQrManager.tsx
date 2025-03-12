@@ -23,7 +23,8 @@ const SessionQrManager: React.FC<SessionQrManagerProps> = ({
   currentParticipantCount,
   maxParticipants
 }) => {
-  if (!isAdmin || viewMode !== "admin") return null;
+  // Only render for admin users, return null for participants
+  if (!isAdmin) return null;
   
   return (
     <QrDialogManager

@@ -9,6 +9,7 @@ import SessionHeaderManager from "./SessionHeaderManager";
 import ViewModeSelector from "./ViewModeSelector";
 import SessionQrManager from "./SessionQrManager";
 import AdminNotificationManager from "./AdminNotificationManager";
+import SessionJoinInfo from "./SessionJoinInfo";
 
 interface SessionContainerProps {
   facilitator: {
@@ -135,8 +136,21 @@ const SessionContainer = ({
             maxParticipants={conversation?.participants || 0}
             isMobile={isMobile}
             viewMode={viewMode}
+            isAdmin={isAdmin} /* Pass isAdmin prop to control visibility of participant info */
           />
         </div>
+        
+        {/* Only render SessionJoinInfo for admin users */}
+        {isAdmin && (
+          <div className="hidden md:block w-64 p-4 shrink-0">
+            <SessionJoinInfo
+              conversationId={conversationId || null}
+              currentParticipantCount={currentParticipantCount || participants.length || 0}
+              maxParticipants={conversation?.participants || 0}
+              isAdmin={isAdmin}
+            />
+          </div>
+        )}
       </div>
       
       <SessionQrManager

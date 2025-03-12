@@ -9,17 +9,20 @@ interface SessionJoinInfoProps {
   currentParticipantCount: number;
   maxParticipants: number;
   onSessionFull?: () => void;
+  isAdmin?: boolean; // Add isAdmin prop to control visibility
 }
 
 const SessionJoinInfo = ({ 
   conversationId, 
   currentParticipantCount = 0, 
   maxParticipants = 0,
-  onSessionFull
+  onSessionFull,
+  isAdmin = false // Default to false for participants
 }: SessionJoinInfoProps) => {
   const { toast } = useToast();
   
-  if (!conversationId) return null;
+  // If not admin or no conversation ID, don't render this component
+  if (!isAdmin || !conversationId) return null;
   
   // Generate join URL
   const baseUrl = window.location.origin;

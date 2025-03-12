@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useSessionContainerState } from "@/hooks/useSessionContainerState";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -136,11 +135,10 @@ const SessionContainer = ({
             maxParticipants={conversation?.participants || 0}
             isMobile={isMobile}
             viewMode={viewMode}
-            isAdmin={isAdmin} /* Pass isAdmin prop to control visibility of participant info */
+            isAdmin={isAdmin}
           />
         </div>
         
-        {/* Only render SessionJoinInfo for admin users */}
         {isAdmin && (
           <div className="hidden md:block w-64 p-4 shrink-0">
             <SessionJoinInfo
@@ -192,3 +190,4 @@ const SessionContainer = ({
 };
 
 export default SessionContainer;
+

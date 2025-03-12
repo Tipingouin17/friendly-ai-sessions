@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import AdminMessagingView from "./messaging/AdminMessagingView";
@@ -16,6 +15,7 @@ interface MessagingAreaProps {
   maxParticipants: number;
   isMobile: boolean;
   viewMode: "participant" | "admin";
+  isAdmin: boolean;
 }
 
 const MessagingArea = ({
@@ -29,7 +29,8 @@ const MessagingArea = ({
   currentParticipantCount,
   maxParticipants,
   isMobile,
-  viewMode
+  viewMode,
+  isAdmin
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);

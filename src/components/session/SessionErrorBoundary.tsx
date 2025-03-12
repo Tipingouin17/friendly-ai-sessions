@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,8 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 
   if (error || noSessionFound) {
     const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
+    // Define the missing variable
+    const isSessionFullError = error?.includes("session is full") || error?.includes("maximum capacity");
     
     const errorTitle = isSessionFullError ? "Session Full" : 
                       isSessionNotFoundError ? "Session Not Found" : 

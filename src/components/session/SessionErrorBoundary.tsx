@@ -30,8 +30,18 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 }) => {
   const { toast } = useToast();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  
+  // Enhanced admin detection - check all possible sources
   const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
-  const effectiveIsAdmin = propIsAdmin || contextIsAdmin || storedIsAdmin;
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  const hasAdminQueryParam = window.location.search.includes('admin=true');
+  
+  // Combined admin detection from all possible sources
+  const effectiveIsAdmin = propIsAdmin || 
+                         contextIsAdmin || 
+                         storedIsAdmin || 
+                         isOnAdminPath || 
+                         hasAdminQueryParam;
   
   // Enforce admin status if needed
   useEffect(() => {

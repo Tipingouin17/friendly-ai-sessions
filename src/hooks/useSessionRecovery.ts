@@ -12,12 +12,21 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   const sessionMountedRef = useRef(false);
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isAdminSession = location.pathname.includes('/admin') || sessionStorage.getItem('isAdminSession') === 'true';
+  
+  // Enhanced admin detection - check multiple sources
+  const isAdminSession = location.pathname.includes('/admin') || 
+                         sessionStorage.getItem('isAdminSession') === 'true' ||
+                         location.search.includes('admin=true');
 
   // Set up component lifecycle
   useEffect(() => {
     console.log("Session recovery hook mounted, isAdmin:", isAdminSession);
     sessionMountedRef.current = true;
+    
+    // If admin, store the status to ensure persistence
+    if (isAdminSession) {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
     
     return () => {
       sessionMountedRef.current = false;
@@ -31,14 +40,15 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   }, [isAdminSession]);
 
   const retryConnection = useCallback(() => {
-    // Skip automatic recovery for admin sessions completely
+    // IMPORTANT: Skip all recovery for admin sessions completely
     if (!sessionMountedRef.current || isRecovering || isAdminSession) {
       if (isAdminSession) {
         console.log("Admin session: Skipping recovery entirely");
+        return;
       }
-      return;
     }
     
+    // Only proceed with recovery for non-admin sessions
     setIsRecovering(true);
     console.log(`Retrying connection (attempt ${connectionAttempts + 1})...`);
     setConnectionAttempts(prev => prev + 1);
@@ -49,6 +59,13 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
     recoveryTimeoutRef.current = setTimeout(() => {
       try {
         if (!sessionMountedRef.current) return;
+        
+        // Skip recovery for admin sessions even if they somehow get here
+        if (isAdminSession) {
+          console.log("Admin session detected during recovery, aborting");
+          setIsRecovering(false);
+          return;
+        }
         
         if (connectionAttempts < 3) {
           const searchParams = new URLSearchParams(location.search);
@@ -78,6 +95,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
     retryConnection,
     sessionMountedRef,
     recoveryTimerRef,
-    isRecovering
+    isRecovering,
+    isAdminSession // Export this for other hooks to use
   };
 }

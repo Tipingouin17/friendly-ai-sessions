@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -16,6 +17,7 @@ const SessionAdmin = () => {
   // Enforce admin status
   const { forceAdmin } = useAdminStatusPersistence();
   const initialRenderRef = useRef(true);
+  const adminViewMountedRef = useRef(true);
 
   // Session page state
   const {
@@ -38,7 +40,8 @@ const SessionAdmin = () => {
     conversationData,
     isConversationLoading,
     currentConversationId,
-    locationState
+    locationState,
+    adminViewMounted
   } = useAdminSessionLoader();
   
   // Participant tracking
@@ -66,14 +69,24 @@ const SessionAdmin = () => {
   const [adminViewReady, setAdminViewReady] = useState(false);
   
   // Calculate effective loading state
-  const isLoading = sessionPageLoading || loaderIsLoading || isConversationLoading;
+  const isLoading = (sessionPageLoading || loaderIsLoading || isConversationLoading) && !adminViewReady;
   
   // Force admin view to stay ready once it's been loaded
   useEffect(() => {
-    if (!isLoading && conversationData && !adminViewReady) {
+    if (!isLoading && (conversationData || adminViewMounted) && !adminViewReady) {
       setAdminViewReady(true);
     }
-  }, [isLoading, conversationData, adminViewReady]);
+    
+    // Safety timeout to force admin view ready in case other conditions don't trigger
+    const readyTimeout = setTimeout(() => {
+      if (!adminViewReady) {
+        console.log("Forcing admin view ready after timeout");
+        setAdminViewReady(true);
+      }
+    }, 2000);
+    
+    return () => clearTimeout(readyTimeout);
+  }, [isLoading, conversationData, adminViewReady, adminViewMounted]);
   
   // Log status on mount
   useEffect(() => {
@@ -89,17 +102,31 @@ const SessionAdmin = () => {
         path: window.location.pathname,
         participantsCount: participants.length
       });
+      
+      // Make sure admin status is set
+      sessionStorage.setItem('isAdminSession', 'true');
     }
   }, [isLoading, currentConversationId, locationState, conversationData, participants.length]);
   
   // Redirect if no conversation ID and not in loading state
-  if (!currentConversationId && !isLoading && !locationState?.newConversationId && !adminViewReady) {
-    console.error("No conversation ID found on admin page, redirecting home");
-    return <Navigate to="/" />;
+  // Only redirect if BOTH: not loading AND no conversation ID AND no new conversation id AND not admin view ready
+  // This prevents unnecessary redirects for admin sessions
+  if (!adminViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
+    console.log("No conversation ID found, checking if we should show admin interface anyway");
+    
+    // For admin sessions, we'll show the admin interface anyway even without a conversation ID
+    if (sessionStorage.getItem('isAdminSession') === 'true' || window.location.pathname.includes('/admin')) {
+      console.log("Admin session detected - showing admin interface despite missing conversation ID");
+      // Force admin view ready to prevent redirect
+      setAdminViewReady(true);
+    } else {
+      console.error("No conversation ID found on admin page, redirecting home");
+      return <Navigate to="/" />;
+    }
   }
 
   // Show session provider when initialized
-  if ((!isLoading && hasInitializedProvider && !error) || adminViewReady) {
+  if ((!isLoading && (hasInitializedProvider || adminViewReady) && !error) || adminViewReady) {
     return (
       <SessionProviderWrapper
         handleSessionFull={handleSessionFull}

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useLocation } from "react-router-dom";
@@ -15,13 +14,24 @@ export function useAdminSessionLoader() {
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
   const cachedDataRef = useRef<any>(null);
   const wasInitializedRef = useRef<boolean>(false);
+  const adminViewMountedRef = useRef<boolean>(false);
   
   // Always store admin status in session storage
   useEffect(() => {
     sessionStorage.setItem('isAdminSession', 'true');
+    console.log("Admin session loader enforcing admin status");
+    
+    // Set admin view as mounted to prevent unmounting
+    adminViewMountedRef.current = true;
+    
+    return () => {
+      // Reset mounted state on unmount
+      adminViewMountedRef.current = false;
+    };
   }, []);
   
   // Cache conversation data to prevent it from disappearing
+  // Improved caching - keep the data even if the API returns null/undefined
   useEffect(() => {
     if (conversationData) {
       console.log("Caching admin session data for persistence");
@@ -29,7 +39,7 @@ export function useAdminSessionLoader() {
     }
   }, [conversationData]);
   
-  // Set up initialization and timeout handling
+  // Set up initialization and timeout handling - use shorter timeout for admin
   useEffect(() => {
     if (wasInitializedRef.current) return;
     
@@ -51,6 +61,25 @@ export function useAdminSessionLoader() {
     };
   }, [isLoading, hasInitializedProvider]);
   
+  // Force-initialize after a critical timeout even without data
+  useEffect(() => {
+    const criticalTimeout = setTimeout(() => {
+      if (!wasInitializedRef.current) {
+        console.log("Admin: Critical timeout reached - forcing initialization");
+        setIsLoading(false);
+        setHasInitializedProvider(true);
+        wasInitializedRef.current = true;
+        
+        toast({
+          title: "Admin Session Ready",
+          description: "Admin interface loaded in safe mode."
+        });
+      }
+    }, 2500); // Very short critical timeout for admin
+    
+    return () => clearTimeout(criticalTimeout);
+  }, [toast]);
+  
   // Use cached data if current data is missing
   const effectiveData = conversationData || cachedDataRef.current;
   
@@ -62,6 +91,7 @@ export function useAdminSessionLoader() {
     conversationData: effectiveData,
     isConversationLoading: isConversationLoading && !effectiveData,
     currentConversationId,
-    locationState
+    locationState,
+    adminViewMounted: adminViewMountedRef.current
   };
 }

@@ -29,6 +29,7 @@ export function useSessionWrapperEffects({
   useEffect(() => {
     if (effectiveAdmin || isOnAdminPath) {
       sessionStorage.setItem('isAdminSession', 'true');
+      console.log("useSessionWrapperEffects: Setting admin status");
     }
   }, [effectiveAdmin, isOnAdminPath]);
 
@@ -37,12 +38,18 @@ export function useSessionWrapperEffects({
     if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
-      // For admin sessions, initialize immediately regardless of other conditions
+      // For admin sessions, initialize IMMEDIATELY regardless of other conditions
       if (isAdmin) {
-        console.log("Admin session: Fast-tracked initialization");
+        console.log("Admin session: Fast-tracked initialization in wrapper effects");
         providerInitialized.current = true;
         onInitialized();
-        onLoading(false); // Set loading to false immediately for admin
+        
+        // Force loading to false with minimum delay for admin - CRITICAL
+        setTimeout(() => {
+          console.log("Admin session: Forcing loading to false");
+          onLoading(false);
+        }, 100);
+        
         return;
       }
       
@@ -71,15 +78,16 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
-  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, props.isSessionStartedInDB]);
+  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
 
-  // Update loading state based on conditions
+  // More aggressive loading state management for admin sessions
   useEffect(() => {
     if (sessionMountedRef.current) {
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
       if (isAdmin) {
-        // For admin sessions, fast-track the loading state to false
+        // For admin sessions, aggressively set loading to false
+        console.log("Admin detected in wrapper effects, forcing loading to false");
         onLoading(false);
       } else {
         // For participants, clear loading when session is started
@@ -93,16 +101,15 @@ export function useSessionWrapperEffects({
     }
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
-  // Handle errors from provider
+  // Handle errors from provider - suppress for admin
   useEffect(() => {
     if (props.error && sessionMountedRef.current) {
-      const isSessionFullError = props.error.includes("full") || props.error.includes("maximum capacity");
-      
-      if (isSessionFullError && (effectiveAdmin || isOnAdminPath)) {
-        console.log("🔑 Suppressing session full error for admin user");
+      // For admin sessions, we'll suppress ALL errors, not just session-full errors
+      if (effectiveAdmin || isOnAdminPath) {
+        console.log("🔑 Suppressing all errors for admin user: ", props.error);
       } else {
         onError(props.error);
       }
     }
-  }, [props.error]);
+  }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

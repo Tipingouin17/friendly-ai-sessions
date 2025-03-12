@@ -20,13 +20,20 @@ export function useSessionWrapperInitialization({
   const providerInitialized = useRef(false);
   const { toast } = useToast();
   const showedAdminToast = useRef(false);
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const adminTimeout = isOnAdminPath ? 4000 : 8000;
+    // Clear any existing timeout
+    if (initTimeoutRef.current) {
+      clearTimeout(initTimeoutRef.current);
+    }
+
+    // Use longer timeout for admin sessions
+    const adminTimeout = (effectiveAdmin || isOnAdminPath) ? 8000 : 4000;
     
-    const initTimeout = setTimeout(() => {
+    initTimeoutRef.current = setTimeout(() => {
       if (!providerInitialized.current) {
-        console.log(`Force initializing provider after ${adminTimeout}ms timeout`);
+        console.log(`Force initializing provider after ${adminTimeout}ms timeout, isAdmin:`, effectiveAdmin || isOnAdminPath);
         providerInitialized.current = true;
         onInitialized();
         onLoading(false);
@@ -37,7 +44,11 @@ export function useSessionWrapperInitialization({
       }
     }, adminTimeout);
     
-    return () => clearTimeout(initTimeout);
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+    };
   }, [onInitialized, onLoading, effectiveAdmin, isOnAdminPath]);
 
   useEffect(() => {

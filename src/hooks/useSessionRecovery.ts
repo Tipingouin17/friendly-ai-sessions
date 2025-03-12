@@ -12,80 +12,60 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   const sessionMountedRef = useRef(false);
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isAdminSession = location.pathname.includes('/admin') || sessionStorage.getItem('isAdminSession') === 'true';
 
   // Set up component lifecycle
   useEffect(() => {
-    console.log("Session recovery hook mounted");
+    console.log("Session recovery hook mounted, isAdmin:", isAdminSession);
     sessionMountedRef.current = true;
     
     return () => {
-      console.log("Session recovery hook unmounted");
       sessionMountedRef.current = false;
-      
       if (recoveryTimerRef.current) {
         clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
       }
-      
       if (recoveryTimeoutRef.current) {
         clearTimeout(recoveryTimeoutRef.current);
-        recoveryTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, [isAdminSession]);
 
-  // Retry connection function with improved error handling and shorter timeouts
   const retryConnection = useCallback(() => {
-    if (!sessionMountedRef.current) return;
+    if (!sessionMountedRef.current || isRecovering) return;
     
-    // Prevent multiple retries in quick succession
-    if (isRecovering) {
-      console.log("Already recovering, skipping additional retry");
+    // For admin sessions, don't auto-reload
+    if (isAdminSession && connectionAttempts > 0) {
+      console.log("Admin session: Skipping auto-reload recovery");
+      toast({
+        title: "Connection Issues",
+        description: "Trying to reestablish connection...",
+      });
       return;
     }
-    
+
     setIsRecovering(true);
     console.log(`Retrying connection (attempt ${connectionAttempts + 1})...`);
     setConnectionAttempts(prev => prev + 1);
     setLastAttemptTime(Date.now());
     
-    // Use more aggressive backoff strategy to recover faster
-    const retryDelay = Math.min(500 * connectionAttempts, 2000);
+    const retryDelay = Math.min(1000 * (connectionAttempts + 1), 3000);
     
     recoveryTimeoutRef.current = setTimeout(() => {
       try {
         if (!sessionMountedRef.current) return;
         
-        if (connectionAttempts < 3) {
-          if (isCrossOrigin) {
-            const searchParams = new URLSearchParams(location.search);
-            const sessionId = searchParams.get('id') || currentConversationId?.toString();
-            
-            if (sessionId) {
-              toast({
-                title: "Reestablishing connection",
-                description: "Trying an alternative connection method...",
-              });
-              
-              // Use location.replace to avoid adding to history stack
-              window.location.replace(`${window.location.origin}/session?id=${sessionId}`);
-            } else {
-              window.location.reload();
-            }
-          } else {
-            window.location.reload();
+        if (!isAdminSession && connectionAttempts < 3) {
+          const searchParams = new URLSearchParams(location.search);
+          const sessionId = searchParams.get('id') || currentConversationId?.toString();
+          
+          if (sessionId) {
+            window.location.replace(`${window.location.origin}/session?id=${sessionId}`);
           }
         } else {
           toast({
-            title: "Connection issues detected",
-            description: "Unable to establish a stable connection. Trying an alternative method...",
-            variant: "destructive",
+            title: "Connection Status",
+            description: isAdminSession ? "Admin session maintained" : "Reconnecting...",
           });
-          
-          // Force a clean reload after multiple attempts
-          setTimeout(() => {
-            window.location.href = window.location.href;
-          }, 500);
         }
       } catch (err) {
         console.error("Error during connection retry:", err);
@@ -94,7 +74,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       }
     }, retryDelay);
     
-  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering]);
+  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, isAdminSession]);
 
   return { 
     connectionAttempts, 

@@ -28,7 +28,9 @@ export function useSessionWrapperEffects({
   // Initialize session when data is available
   useEffect(() => {
     if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
-      const shouldInitialize = (effectiveAdmin || isOnAdminPath) ? true : (props.conversation && props.currentConversationId);
+      const isAdmin = effectiveAdmin || isOnAdminPath;
+      // Admin sessions initialize immediately
+      const shouldInitialize = isAdmin || (props.conversation && props.currentConversationId);
       
       if (shouldInitialize) {
         console.log("Provider successfully initialized with data:", {
@@ -55,24 +57,19 @@ export function useSessionWrapperEffects({
   // Update loading state based on conditions
   useEffect(() => {
     if (sessionMountedRef.current) {
-      if ((effectiveAdmin || isOnAdminPath) && (props.isAdmin || isOnAdminPath)) {
-        console.log("Admin detected in provider, ensuring loading state is properly updated");
-        onLoading(false);
-        sessionStorage.setItem('isAdminSession', 'true');
+      const isAdmin = effectiveAdmin || isOnAdminPath;
+      
+      if (isAdmin) {
+        // For admin sessions, we're more lenient with loading states
+        console.log("Admin session: Managing loading state");
+        if (!props.isLoading) {
+          onLoading(false);
+        }
       } else {
         onLoading(props.isLoading);
-        
-        if (props.isLoading && !(effectiveAdmin || isOnAdminPath)) {
-          const timeout = setTimeout(() => {
-            console.log("Forcing loading state to false for participant session");
-            onLoading(false);
-          }, 6000);
-          
-          return () => clearTimeout(timeout);
-        }
       }
     }
-  }, [props.isLoading, props.isAdmin]);
+  }, [props.isLoading, props.isAdmin, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
   // Handle errors from provider
   useEffect(() => {

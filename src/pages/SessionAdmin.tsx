@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import SessionProviderWrapper from "@/components/session/SessionProviderWrapper";
@@ -7,7 +6,6 @@ import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";
 import { useAdminStatusPersistence } from "@/hooks/useAdminStatusPersistence";
 import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
 import { useAdminMessages } from "@/hooks/useAdminMessages";
-import { ParticipantInfo } from "@/types/chat";
 import SessionView from "@/components/session/SessionView";
 import AdminSessionHeader from "@/components/session/AdminSessionHeader";
 import AdminSessionMessages from "@/components/session/AdminSessionMessages";
@@ -17,6 +15,7 @@ import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 const SessionAdmin = () => {
   // Enforce admin status
   const { forceAdmin } = useAdminStatusPersistence();
+  const initialRenderRef = useRef(true);
 
   // Session page state
   const {
@@ -63,31 +62,44 @@ const SessionAdmin = () => {
     participants
   });
   
+  // Keep a state reference to preserve UI data
+  const [adminViewReady, setAdminViewReady] = useState(false);
+  
   // Calculate effective loading state
   const isLoading = sessionPageLoading || loaderIsLoading || isConversationLoading;
   
+  // Force admin view to stay ready once it's been loaded
+  useEffect(() => {
+    if (!isLoading && conversationData && !adminViewReady) {
+      setAdminViewReady(true);
+    }
+  }, [isLoading, conversationData, adminViewReady]);
+  
   // Log status on mount
   useEffect(() => {
-    console.log("Admin session page mounted", {
-      time: new Date().toISOString(),
-      isAdmin: true,
-      isLoading,
-      currentConversationId,
-      locationState,
-      conversationData,
-      path: window.location.pathname,
-      participantsCount: participants.length
-    });
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
+      console.log("Admin session page mounted", {
+        time: new Date().toISOString(),
+        isAdmin: true,
+        isLoading,
+        currentConversationId,
+        locationState,
+        conversationData,
+        path: window.location.pathname,
+        participantsCount: participants.length
+      });
+    }
   }, [isLoading, currentConversationId, locationState, conversationData, participants.length]);
   
-  // Redirect if no conversation ID
-  if (!currentConversationId && !isLoading && !locationState?.newConversationId) {
+  // Redirect if no conversation ID and not in loading state
+  if (!currentConversationId && !isLoading && !locationState?.newConversationId && !adminViewReady) {
     console.error("No conversation ID found on admin page, redirecting home");
     return <Navigate to="/" />;
   }
 
   // Show session provider when initialized
-  if (!isLoading && hasInitializedProvider && !error) {
+  if ((!isLoading && hasInitializedProvider && !error) || adminViewReady) {
     return (
       <SessionProviderWrapper
         handleSessionFull={handleSessionFull}

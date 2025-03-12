@@ -9,7 +9,7 @@ export function useAdminStatusPersistence() {
   const { setAdminStatus } = useSessionAdminStatus();
   
   useEffect(() => {
-    // Set admin status immediately
+    // Set admin status immediately and more aggressively
     sessionStorage.setItem('isAdminSession', 'true');
     setAdminStatus(true);
     
@@ -18,7 +18,7 @@ export function useAdminStatusPersistence() {
       // Re-establish admin status in case it got lost
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
-    }, 2000);
+    }, 1000); // Check more frequently
     
     return () => {
       clearInterval(adminCheckInterval);

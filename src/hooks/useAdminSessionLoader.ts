@@ -13,11 +13,20 @@ export function useAdminSessionLoader() {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { currentConversationId, locationState } = useConversationId();
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
+  const cachedDataRef = useRef<any>(null);
+  
+  // Cache conversation data to prevent it from disappearing
+  useEffect(() => {
+    if (conversationData && !cachedDataRef.current) {
+      console.log("Caching admin session data for persistence");
+      cachedDataRef.current = conversationData;
+    }
+  }, [conversationData]);
   
   // Set up initialization and timeout handling
   useEffect(() => {
-    const initialTimeout = 2000; // Shorter timeout for admin
-    const criticalTimeout = 3000;
+    const initialTimeout = 1500; // Shorter timeout for admin
+    const criticalTimeout = 2500;
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
@@ -42,13 +51,16 @@ export function useAdminSessionLoader() {
     };
   }, [isLoading, hasInitializedProvider]);
   
+  // Use cached data if current data is missing
+  const effectiveData = conversationData || cachedDataRef.current;
+  
   return {
     isLoading,
     setIsLoading,
     hasInitializedProvider,
     setHasInitializedProvider,
-    conversationData,
-    isConversationLoading,
+    conversationData: effectiveData,
+    isConversationLoading: isConversationLoading && !effectiveData,
     currentConversationId,
     locationState
   };

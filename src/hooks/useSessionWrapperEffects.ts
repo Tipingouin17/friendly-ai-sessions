@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 
@@ -24,10 +25,27 @@ export function useSessionWrapperEffects({
   onError,
   sessionMountedRef
 }: UseSessionWrapperEffectsProps) {
+  // Always set admin status if detected
+  useEffect(() => {
+    if (effectiveAdmin || isOnAdminPath) {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [effectiveAdmin, isOnAdminPath]);
+
   // Initialize session when data is available
   useEffect(() => {
     if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
       const isAdmin = effectiveAdmin || isOnAdminPath;
+      
+      // For admin sessions, initialize immediately regardless of other conditions
+      if (isAdmin) {
+        console.log("Admin session: Fast-tracked initialization");
+        providerInitialized.current = true;
+        onInitialized();
+        onLoading(false); // Set loading to false immediately for admin
+        return;
+      }
+      
       // Initialize immediately if we have conversation data or it's an admin session
       const shouldInitialize = isAdmin || (props.conversation && props.currentConversationId) || props.isSessionStartedInDB;
       
@@ -47,10 +65,6 @@ export function useSessionWrapperEffects({
         if (props.isSessionStartedInDB) {
           onLoading(false);
         }
-        
-        if (effectiveAdmin || isOnAdminPath) {
-          sessionStorage.setItem('isAdminSession', 'true');
-        }
       } else if (props.error) {
         console.log("Provider initialization with error:", props.error);
         providerInitialized.current = true;
@@ -65,10 +79,8 @@ export function useSessionWrapperEffects({
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
       if (isAdmin) {
-        console.log("Admin session: Managing loading state");
-        if (!props.isLoading) {
-          onLoading(false);
-        }
+        // For admin sessions, fast-track the loading state to false
+        onLoading(false);
       } else {
         // For participants, clear loading when session is started
         if (props.isSessionStartedInDB) {

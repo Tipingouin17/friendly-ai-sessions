@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import AdminMessagingView from "./messaging/AdminMessagingView";
@@ -36,6 +37,13 @@ const MessagingArea = ({
   const [showAnonymous, setShowAnonymous] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Force admin persistence
+  React.useEffect(() => {
+    if (isAdmin || viewMode === "admin") {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [isAdmin, viewMode]);
+  
   // Log messages count for debugging
   React.useEffect(() => {
     console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
@@ -63,7 +71,8 @@ const MessagingArea = ({
     return messages;
   }, [messages, viewMode, currentParticipant]);
 
-  if (viewMode === "admin") {
+  // Always use admin view if isAdmin=true, regardless of viewMode
+  if (isAdmin || viewMode === "admin") {
     return (
       <AdminMessagingView
         messages={messages}

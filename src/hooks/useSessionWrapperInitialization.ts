@@ -28,15 +28,20 @@ export function useSessionWrapperInitialization({
       clearTimeout(initTimeoutRef.current);
     }
 
-    // Use longer timeout for admin sessions
-    const adminTimeout = (effectiveAdmin || isOnAdminPath) ? 8000 : 4000;
+    // Use shorter timeout for admin sessions to prevent long loading states
+    const adminTimeout = (effectiveAdmin || isOnAdminPath) ? 2000 : 4000;
+    
+    // Set admin status immediately for session protection
+    if (effectiveAdmin || isOnAdminPath) {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
     
     initTimeoutRef.current = setTimeout(() => {
       if (!providerInitialized.current) {
         console.log(`Force initializing provider after ${adminTimeout}ms timeout, isAdmin:`, effectiveAdmin || isOnAdminPath);
         providerInitialized.current = true;
         onInitialized();
-        onLoading(false);
+        onLoading(false); // Force loading to false for admin sessions
         
         if (effectiveAdmin || isOnAdminPath) {
           sessionStorage.setItem('isAdminSession', 'true');
@@ -54,11 +59,6 @@ export function useSessionWrapperInitialization({
   useEffect(() => {
     if ((effectiveAdmin || isOnAdminPath) && !showedAdminToast.current) {
       showedAdminToast.current = true;
-      toast({
-        title: "Admin Mode Active",
-        description: "You are viewing this session as an administrator."
-      });
-      
       sessionStorage.setItem('isAdminSession', 'true');
     }
   }, [effectiveAdmin, isOnAdminPath, toast]);

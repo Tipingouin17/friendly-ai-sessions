@@ -14,10 +14,16 @@ export function useAdminSessionLoader() {
   const { currentConversationId, locationState } = useConversationId();
   const { data: conversationData, isLoading: isConversationLoading } = useConversation(currentConversationId);
   const cachedDataRef = useRef<any>(null);
+  const wasInitializedRef = useRef<boolean>(false);
+  
+  // Always store admin status in session storage
+  useEffect(() => {
+    sessionStorage.setItem('isAdminSession', 'true');
+  }, []);
   
   // Cache conversation data to prevent it from disappearing
   useEffect(() => {
-    if (conversationData && !cachedDataRef.current) {
+    if (conversationData) {
       console.log("Caching admin session data for persistence");
       cachedDataRef.current = conversationData;
     }
@@ -25,24 +31,18 @@ export function useAdminSessionLoader() {
   
   // Set up initialization and timeout handling
   useEffect(() => {
-    const initialTimeout = 1500; // Shorter timeout for admin
-    const criticalTimeout = 2500;
+    if (wasInitializedRef.current) return;
+    
+    const initialTimeout = 1000; // Shorter timeout for admin
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
-        console.log("Admin: Still initializing after initial timeout");
+        console.log("Admin: Completing initialization");
         setIsLoading(false);
         setHasInitializedProvider(true);
+        wasInitializedRef.current = true;
       }
     }, initialTimeout);
-    
-    setTimeout(() => {
-      if (isLoading && !hasInitializedProvider) {
-        console.log("Admin: Critical timeout reached");
-        setIsLoading(false);
-        setHasInitializedProvider(true);
-      }
-    }, criticalTimeout);
     
     return () => {
       if (initializeTimeoutRef.current) {
@@ -55,9 +55,9 @@ export function useAdminSessionLoader() {
   const effectiveData = conversationData || cachedDataRef.current;
   
   return {
-    isLoading,
+    isLoading: isLoading && !wasInitializedRef.current,
     setIsLoading,
-    hasInitializedProvider,
+    hasInitializedProvider: hasInitializedProvider || wasInitializedRef.current,
     setHasInitializedProvider,
     conversationData: effectiveData,
     isConversationLoading: isConversationLoading && !effectiveData,

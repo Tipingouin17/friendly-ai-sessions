@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,51 +32,19 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
   const effectiveIsAdmin = propIsAdmin || contextIsAdmin || storedIsAdmin;
   
-  // Log error information for debugging
+  // Enforce admin status if needed
   useEffect(() => {
-    if (error || noSessionFound) {
-      console.log("SessionErrorBoundary showing error:", { 
-        error, 
-        noSessionFound, 
-        connectionAttempts,
-        isSessionFull: error?.includes("full") || error?.includes("maximum capacity"),
-        isAdmin: effectiveIsAdmin,
-        adminFromProps: propIsAdmin,
-        adminFromContext: contextIsAdmin,
-        adminFromStorage: storedIsAdmin
-      });
-    }
-    
-    // Enforce admin status if needed
     if (effectiveIsAdmin) {
       console.log("🔑 Admin detected in SessionErrorBoundary - ensuring admin status is set");
       sessionStorage.setItem('isAdminSession', 'true');
     }
-  }, [error, noSessionFound, connectionAttempts, effectiveIsAdmin, propIsAdmin, contextIsAdmin, storedIsAdmin]);
+  }, [effectiveIsAdmin]);
 
-  // For admin users, bypass session full errors completely
-  const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
-  
-  if (effectiveIsAdmin && isSessionFullError) {
-    console.log("🔑 Admin user detected in error boundary - bypassing session full error");
+  // For admin users, bypass ALL errors completely
+  if (effectiveIsAdmin) {
+    console.log("🔑 Admin user detected in error boundary - bypassing all errors");
     
-    // Auto-retry once for admins with session full errors
-    useEffect(() => {
-      if (effectiveIsAdmin && isSessionFullError) {
-        const timer = setTimeout(() => {
-          console.log("🔑 Auto-retrying for admin user with session full error");
-          retryConnection();
-          toast({
-            title: "Admin Override",
-            description: "Session is full but you're connecting as an admin user."
-          });
-        }, 800);
-        
-        return () => clearTimeout(timer);
-      }
-    }, [effectiveIsAdmin, isSessionFullError]);
-    
-    // Render children for admin users even when session is full
+    // Render children for admin users even when session has errors
     return <>{children}</>;
   }
 

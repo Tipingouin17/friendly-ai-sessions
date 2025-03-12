@@ -31,18 +31,14 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   }, [isAdminSession]);
 
   const retryConnection = useCallback(() => {
-    if (!sessionMountedRef.current || isRecovering) return;
-    
-    // For admin sessions, don't auto-reload
-    if (isAdminSession && connectionAttempts > 0) {
-      console.log("Admin session: Skipping auto-reload recovery");
-      toast({
-        title: "Connection Issues",
-        description: "Trying to reestablish connection...",
-      });
+    // Skip automatic recovery for admin sessions completely
+    if (!sessionMountedRef.current || isRecovering || isAdminSession) {
+      if (isAdminSession) {
+        console.log("Admin session: Skipping recovery entirely");
+      }
       return;
     }
-
+    
     setIsRecovering(true);
     console.log(`Retrying connection (attempt ${connectionAttempts + 1})...`);
     setConnectionAttempts(prev => prev + 1);
@@ -54,7 +50,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       try {
         if (!sessionMountedRef.current) return;
         
-        if (!isAdminSession && connectionAttempts < 3) {
+        if (connectionAttempts < 3) {
           const searchParams = new URLSearchParams(location.search);
           const sessionId = searchParams.get('id') || currentConversationId?.toString();
           
@@ -64,7 +60,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
         } else {
           toast({
             title: "Connection Status",
-            description: isAdminSession ? "Admin session maintained" : "Reconnecting...",
+            description: "Reconnecting...",
           });
         }
       } catch (err) {

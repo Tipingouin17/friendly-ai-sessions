@@ -93,14 +93,14 @@ const ChatInput = ({
   };
 
   return (
-    <div className={`${isMobile ? 'p-3' : 'p-6'} border-t border-gray-100`}>
-      <div className="relative">
+    <div className={`${isMobile ? 'p-2.5' : 'p-6'} border-t border-gray-100`}>
+      <div className="relative flex items-center">
         <Textarea
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder={disabled ? "You have already answered this question" : placeholder}
-          className={`${isMobile ? 'min-h-[60px] text-sm' : 'min-h-[80px]'} pr-20`}
+          className={`${isMobile ? 'min-h-[45px] py-2 text-sm' : 'min-h-[80px]'} pr-16 rounded-full border-gray-200`}
           disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !disabled) {
@@ -109,7 +109,7 @@ const ChatInput = ({
             }
           }}
         />
-        <div className="absolute bottom-2 right-2 flex gap-1 sm:gap-2">
+        <div className="absolute right-2 flex gap-1">
           <Button
             variant="ghost"
             size="icon"
@@ -126,8 +126,8 @@ const ChatInput = ({
           <Button
             onClick={onSendMessage}
             size="icon"
+            className={`${isMobile ? 'h-7 w-7 bg-amber-500 hover:bg-amber-600' : 'h-8 w-8'}`}
             disabled={!inputMessage.trim() || disabled}
-            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'}`}
           >
             <Send className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           </Button>

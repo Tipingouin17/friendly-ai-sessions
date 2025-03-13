@@ -40,18 +40,6 @@ const MessageItem = ({
   if (displayParticipantName.startsWith("Participant") && participantInfo?.name) {
     displayParticipantName = participantInfo.name;
   }
-  
-  // Log participant info for debugging
-  React.useEffect(() => {
-    if (isFirstMessageOfGroup) {
-      console.log("MessageItem - Rendering message:", {
-        content: message.content?.substring(0, 20) + "...",
-        from: displayParticipantName,
-        participantInfo,
-        messageParticipant: message.participant
-      });
-    }
-  }, [isFirstMessageOfGroup, displayParticipantName, participantInfo, message]);
 
   const handleLike = () => {
     if (onLikeMessage) {
@@ -61,7 +49,7 @@ const MessageItem = ({
 
   // Use more compact layout on mobile
   const spacing = isMobile ? "mt-1" : "mt-2";
-  const groupSpacing = isMobile ? "mt-2" : "mt-4";
+  const groupSpacing = isMobile ? "mt-2.5" : "mt-4";
 
   return (
     <div

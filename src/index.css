@@ -19,6 +19,8 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 1rem;
+    --message-user: 0 100% 89%;
+    --message-assistant: 0 0% 100%;
   }
 
   * {
@@ -52,6 +54,22 @@
   
   .spinner-sm {
     @apply w-4 h-4 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
+  }
+  
+  /* Mobile-optimized message bubbles */
+  @media (max-width: 640px) {
+    .message-bubble-user {
+      @apply rounded-lg shadow-sm bg-[#FFC8C8] text-gray-800;
+    }
+    
+    .message-bubble-assistant {
+      @apply rounded-lg shadow-sm bg-white text-gray-800 border border-gray-100;
+    }
+    
+    /* Optimize textarea for mobile */
+    textarea.mobile-input {
+      @apply py-2 text-sm min-h-[45px] rounded-full;
+    }
   }
 }
 

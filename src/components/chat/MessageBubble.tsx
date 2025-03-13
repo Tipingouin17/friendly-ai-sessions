@@ -26,22 +26,22 @@ const MessageBubble = ({
 }: MessageBubbleProps) => {
   // Use responsive sizing
   const maxWidth = isMobile ? "max-w-[85%]" : "max-w-[80%]";
-  const padding = isMobile ? "px-3 py-2" : "px-4 py-2";
+  const padding = isMobile ? "px-3 py-2.5" : "px-4 py-2.5";
   const fontSize = isMobile ? "text-[14px]" : "text-[15px]";
-  const nameSize = isMobile ? "text-[10px]" : "text-xs";
+  const nameSize = isMobile ? "text-[11px]" : "text-xs";
 
   return (
     <div
       className={cn(
         maxWidth, padding, "rounded-2xl shadow-sm",
         sender === "assistant"
-          ? "bg-white text-gray-800 rounded-tl-none border border-gray-100"
-          : "text-gray-800 rounded-tr-none",
+          ? "bg-white text-gray-800 rounded-tl-md border border-gray-100"
+          : "text-gray-800 rounded-tr-md",
         isReport && "bg-green-50 border border-green-200 w-full max-w-full rounded-tl-2xl",
-        isFirstMessageOfGroup && "mt-1"
+        isFirstMessageOfGroup && "mt-1.5"
       )}
       style={{
-        backgroundColor
+        backgroundColor: sender === "user" ? backgroundColor || "#FFC8C8" : undefined
       }}
     >
       {/* Participant name for user messages */}

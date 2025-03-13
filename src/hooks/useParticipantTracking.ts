@@ -19,9 +19,7 @@ export function useParticipantTracking(
     if (!conversationId) {
       console.log("No conversationId provided to useParticipantTracking, skipping fetch");
       setIsLoading(false);
-      return () => {
-        // No cleanup needed for this case
-      };
+      return () => {};
     }
     
     let isMounted = true;
@@ -104,18 +102,15 @@ export function useParticipantTracking(
       }
     }
     
-    return () => {
-      // No cleanup needed for this effect
-    };
+    // Return an empty cleanup function
+    return () => {};
   }, [conversationState]);
   
   // Set up realtime subscription for participant updates
   useEffect(() => {
     if (!conversationId) {
       console.log("No conversationId provided to useParticipantTracking, skipping realtime subscription");
-      return () => {
-        // No cleanup needed for this case
-      };
+      return () => {};
     }
     
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
@@ -230,20 +225,20 @@ export function useParticipantTracking(
       
     return () => {
       // Safe cleanup of channels
-      if (participantsChannel) {
-        try {
+      try {
+        if (participantsChannel) {
           removeChannel(participantsChannel);
-        } catch (e) {
-          console.error("Error removing participants channel:", e);
         }
+      } catch (e) {
+        console.error("Error removing participants channel:", e);
       }
       
-      if (eventsChannel) {
-        try {
+      try {
+        if (eventsChannel) {
           removeChannel(eventsChannel);
-        } catch (e) {
-          console.error("Error removing events channel:", e);
         }
+      } catch (e) {
+        console.error("Error removing events channel:", e);
       }
     };
   }, [conversationId]);
@@ -251,9 +246,8 @@ export function useParticipantTracking(
   // Log the current participants array for debugging
   useEffect(() => {
     console.log("Current participants array:", participants);
-    return () => {
-      // No cleanup needed
-    };
+    // Return an empty cleanup function
+    return () => {};
   }, [participants]);
   
   return {

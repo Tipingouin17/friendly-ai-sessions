@@ -37,9 +37,7 @@ export const useSessionRealtime = ({
   useEffect(() => {
     if (!currentConversationId) {
       console.log("No conversation ID provided, skipping realtime setup");
-      return () => {
-        // No cleanup needed in this case
-      };
+      return () => {};
     }
 
     // Check initial state

@@ -13,24 +13,32 @@ export function useIsMobile() {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
     
-    // Add event listener safely
-    if (mql.addEventListener) {
-      mql.addEventListener("change", onChange)
-    } else {
-      // Fallback for older browsers
-      mql.addListener?.(onChange)
+    try {
+      // Add event listener safely
+      if (mql.addEventListener) {
+        mql.addEventListener("change", onChange)
+      } else if (mql.addListener) {
+        // Fallback for older browsers
+        mql.addListener(onChange)
+      }
+      
+      // Initial check
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    } catch (e) {
+      console.error("Error in mobile detection hook:", e);
     }
-    
-    // Initial check
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     
     // Return a proper cleanup function
     return () => {
-      if (mql.removeEventListener) {
-        mql.removeEventListener("change", onChange)
-      } else if (mql.removeListener) {
-        // Only call removeListener if it exists
-        mql.removeListener(onChange)
+      try {
+        if (mql.removeEventListener) {
+          mql.removeEventListener("change", onChange)
+        } else if (mql.removeListener) {
+          // Only call removeListener if it exists
+          mql.removeListener(onChange)
+        }
+      } catch (e) {
+        console.error("Error cleaning up mobile detection hook:", e);
       }
     }
   }, [])

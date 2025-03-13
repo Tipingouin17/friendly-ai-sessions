@@ -95,14 +95,16 @@ export const setCrossDomainCookie = (name: string, value: string, days = 7): voi
   // Build cookie string with appropriate attributes for cross-domain contexts
   let cookieString = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
   
-  // Add SameSite attribute - for cross-origin contexts, force to 'None'
-  cookieString += `; SameSite=${isInCrossOriginContext() || isInIframe() ? 'None' : sameSite}`;
+  // For cross-origin contexts, force SameSite to 'None'
+  const isCrossOrigin = isInCrossOriginContext() || isInIframe();
+  cookieString += `; SameSite=${isCrossOrigin ? 'None' : sameSite}`;
   
   // Add Secure attribute if needed - always add it for cross-origin
-  if (secure || isInCrossOriginContext() || isInIframe()) {
+  if (secure || isCrossOrigin) {
     cookieString += '; Secure';
   }
   
+  console.log(`Setting cookie ${name} with SameSite=${isCrossOrigin ? 'None' : sameSite}`);
   document.cookie = cookieString;
 };
 
@@ -126,22 +128,21 @@ export const handleStripeCookies = (): void => {
     const stripeMid = getCookie('__stripe_mid');
     const stripeSid = getCookie('__stripe_sid');
     
-    if (stripeMid) {
-      setCrossDomainCookie('__stripe_mid', stripeMid);
-    }
+    // Always set cookies with SameSite=None in cross-origin contexts
+    // This is critical for Stripe to work across origins
     
-    if (stripeSid) {
-      setCrossDomainCookie('__stripe_sid', stripeSid);
-    }
+    const expires = new Date();
+    expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
     
-    // If cookies don't exist yet, set them to empty values with proper attributes
-    if (!stripeMid) {
-      setCrossDomainCookie('__stripe_mid', 'placeholder-mid');
-    }
+    // If cookies exist, preserve their values, otherwise use placeholders
+    const midValue = stripeMid || 'placeholder-mid';
+    const sidValue = stripeSid || 'placeholder-sid';
     
-    if (!stripeSid) {
-      setCrossDomainCookie('__stripe_sid', 'placeholder-sid');
-    }
+    // Set the cookies with SameSite=None and Secure
+    document.cookie = `__stripe_mid=${midValue}; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
+    document.cookie = `__stripe_sid=${sidValue}; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
+    
+    console.log("Cross-origin Stripe cookies set with SameSite=None");
   }
 };
 

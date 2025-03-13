@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSessionContainerState } from "@/hooks/useSessionContainerState";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -178,6 +179,7 @@ const SessionContainer = ({
         hasAnswered={hasAnswered}
         totalResponses={totalResponses}
         viewMode={viewMode}
+        messages={messages}
       />
       
       <AdminNotificationManager 
@@ -190,4 +192,3 @@ const SessionContainer = ({
 };
 
 export default SessionContainer;
-

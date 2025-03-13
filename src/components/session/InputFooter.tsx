@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import ChatInput from "@/components/chat/ChatInput";
-import { ParticipantInfo } from "@/types/chat";
+import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { EyeOff, Users, CheckCircle2 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
@@ -42,7 +42,7 @@ const InputFooter = ({
   hasAnswered,
   totalResponses,
   viewMode,
-  messages
+  messages = [] // Add default empty array
 }: InputFooterProps) => {
   // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);
@@ -51,7 +51,7 @@ const InputFooter = ({
     `Participant ${currentParticipant}`;
   
   // Determine if this is a new session with just a welcome message
-  const isNewSession = messages.length <= 1 && 
+  const isNewSession = messages && messages.length <= 1 && 
     messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   
   // In admin view, we don't show the input at all

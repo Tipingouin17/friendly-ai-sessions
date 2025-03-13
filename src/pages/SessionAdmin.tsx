@@ -51,10 +51,11 @@ const SessionAdmin = () => {
     isLoading: isLoadingParticipants
   } = useParticipantTracking(locationState, conversationData, currentConversationId);
   
+  // Initialize session messages with empty array
+  const [sessionMessages, setSessionMessages] = useState([]);
+  
   // Admin message handling
   const {
-    sessionMessages,
-    setSessionMessages,
     isSessionPaused,
     toggleSessionState,
     exportSessionData,
@@ -62,7 +63,9 @@ const SessionAdmin = () => {
     handleSendAdminMessage
   } = useAdminMessages({
     conversationId: currentConversationId,
-    participants
+    participants: participants || [], // Provide empty array as fallback
+    messages: sessionMessages || [], // Provide empty array as fallback
+    setMessages: setSessionMessages
   });
   
   // Keep a state reference to preserve UI data
@@ -100,13 +103,13 @@ const SessionAdmin = () => {
         locationState,
         conversationData,
         path: window.location.pathname,
-        participantsCount: participants.length
+        participantsCount: participants?.length || 0
       });
       
       // Make sure admin status is set
       sessionStorage.setItem('isAdminSession', 'true');
     }
-  }, [isLoading, currentConversationId, locationState, conversationData, participants.length]);
+  }, [isLoading, currentConversationId, locationState, conversationData, participants]);
   
   // Redirect if no conversation ID and not in loading state
   // Only redirect if BOTH: not loading AND no conversation ID AND no new conversation id AND not admin view ready
@@ -161,7 +164,7 @@ const SessionAdmin = () => {
     <div className="flex flex-col min-h-screen pt-16">
       <AdminSessionHeader 
         conversationData={conversationData}
-        currentParticipantCount={conversationData?.current_participants || participants.length}
+        currentParticipantCount={conversationData?.current_participants || participants?.length || 0}
         isSessionPaused={isSessionPaused}
         onToggleSessionState={toggleSessionState}
         onSendAdminMessage={handleSendAdminMessage}
@@ -171,16 +174,16 @@ const SessionAdmin = () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         <div className="flex-1 overflow-hidden flex flex-col">
           <AdminSessionMessages
-            messages={sessionMessages}
+            messages={sessionMessages || []} // Ensure messages is always an array
             isLoading={isLoading || isConversationLoading}
-            participants={participants}
+            participants={participants || []} // Ensure participants is always an array
             conversationData={conversationData}
             onSendMessage={handleAdminMessage}
           />
         </div>
         
         <AdminParticipantList
-          participants={participants}
+          participants={participants || []} // Ensure participants is always an array
           currentParticipantCount={conversationData?.current_participants || 0}
           maxParticipants={conversationData?.participants || 10}
           isLoading={isLoadingParticipants}

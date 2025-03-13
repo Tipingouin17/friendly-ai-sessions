@@ -67,6 +67,7 @@ export const SessionProviderCore = ({
         description: "You have administrator access to this session."
       });
     }
+    // Don't return anything from this effect
   }, [effectiveAdmin, toast]);
   
   // Load core provider state
@@ -101,6 +102,7 @@ export const SessionProviderCore = ({
         handleError(dataError);
       }
     }
+    // Don't return anything from this effect
   }, [dataError, handleError, effectiveAdmin]);
 
   // Set up participant management
@@ -140,6 +142,7 @@ export const SessionProviderCore = ({
     if (isSessionFull && effectiveAdmin) {
       console.error("Admin user incorrectly marked as session full - this should never happen");
     }
+    // Don't return anything from this effect
   }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
       maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin, persistedParticipantData]);
 
@@ -195,7 +198,7 @@ export const SessionProviderCore = ({
       conversation,
       currentConversationId,
       sessionState: {
-        messages: roomState.messages,
+        messages: roomState.messages || [], // Ensure messages is an array
         inputMessage: roomState.inputMessage,
         setInputMessage: roomState.setInputMessage,
         currentParticipant: roomState.currentParticipant,

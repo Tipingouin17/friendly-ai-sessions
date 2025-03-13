@@ -31,10 +31,10 @@ export function useSessionRoomState({
   const [viewMode, setViewMode] = useState<"participant" | "admin">("participant");
   const [error, setError] = useState<string | null>(null);
   
-  // Message state
+  // Message state - initialize with empty array to prevent undefined
   const { 
-    messages, 
-    setMessages, 
+    messages = [], 
+    setMessages,
     error: messagesError 
   } = useSessionMessages({
     conversationId,
@@ -52,8 +52,8 @@ export function useSessionRoomState({
     setMessages
   });
   
-  // Check if this is a new session with just a welcome message
-  const isNewSession = messages.length <= 1 && 
+  // Check if this is a new session with just a welcome message - safely handle messages array
+  const isNewSession = Array.isArray(messages) && messages.length <= 1 && 
     messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   
   // Participant response tracking
@@ -73,6 +73,7 @@ export function useSessionRoomState({
       console.log('New session detected in useSessionRoomState, clearing responses');
       clearAllResponses();
     }
+    // Don't return anything from this effect
   }, [isNewSession, currentUserParticipantId, clearAllResponses]);
   
   // Anonymous state
@@ -112,6 +113,7 @@ export function useSessionRoomState({
       console.error("Session room error:", newError);
       setError(newError);
     }
+    // Don't return anything from this effect
   }, [messagesError, reportError, interactionsError]);
   
   return {
@@ -123,8 +125,8 @@ export function useSessionRoomState({
     viewMode,
     setViewMode,
     
-    // Message state
-    messages,
+    // Message state - ensure messages is always an array
+    messages: messages || [],
     setMessages,
     isWaitingForResponse,
     isNewSession,

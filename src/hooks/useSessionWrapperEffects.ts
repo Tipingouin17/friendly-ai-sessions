@@ -31,6 +31,7 @@ export function useSessionWrapperEffects({
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status");
     }
+    // Don't return anything from this effect
   }, [effectiveAdmin, isOnAdminPath]);
 
   // Initialize session when data is available
@@ -45,12 +46,12 @@ export function useSessionWrapperEffects({
         onInitialized();
         
         // Force loading to false with minimum delay for admin - CRITICAL
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           console.log("Admin session: Forcing loading to false");
           onLoading(false);
         }, 100);
         
-        return;
+        return () => clearTimeout(timeoutId);
       }
       
       // Initialize immediately if we have conversation data or it's an admin session
@@ -78,6 +79,7 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
+    // No need to return anything from this effect
   }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
 
   // More aggressive loading state management for admin sessions
@@ -99,6 +101,7 @@ export function useSessionWrapperEffects({
         }
       }
     }
+    // No need to return anything from this effect
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
   // Handle errors from provider - suppress for admin
@@ -111,5 +114,6 @@ export function useSessionWrapperEffects({
         onError(props.error);
       }
     }
+    // No need to return anything from this effect
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

@@ -23,7 +23,7 @@ interface InputFooterProps {
   hasAnswered: boolean;
   totalResponses: number;
   viewMode: "participant" | "admin";
-  messages: Message[];
+  messages?: Message[];
 }
 
 const InputFooter = ({
@@ -42,7 +42,7 @@ const InputFooter = ({
   hasAnswered,
   totalResponses,
   viewMode,
-  messages = [] // Add default empty array
+  messages = [] // Provide default empty array
 }: InputFooterProps) => {
   // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);
@@ -50,8 +50,8 @@ const InputFooter = ({
     participantNames[currentParticipant] || 
     `Participant ${currentParticipant}`;
   
-  // Determine if this is a new session with just a welcome message
-  const isNewSession = messages && messages.length <= 1 && 
+  // Safely determine if this is a new session with just a welcome message
+  const isNewSession = Array.isArray(messages) && messages.length <= 1 && 
     messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   
   // In admin view, we don't show the input at all

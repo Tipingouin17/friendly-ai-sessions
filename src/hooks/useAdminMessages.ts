@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,10 +9,16 @@ import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 interface UseAdminMessagesProps {
   conversationId: number | null;
   participants: ParticipantInfo[];
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
-export function useAdminMessages({ conversationId, participants }: UseAdminMessagesProps) {
-  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
+export function useAdminMessages({ 
+  conversationId, 
+  participants, 
+  messages = [], 
+  setMessages 
+}: UseAdminMessagesProps) {
   const { toast } = useToast();
   const { setAdminStatus } = useSessionAdminStatus();
   
@@ -25,9 +31,9 @@ export function useAdminMessages({ conversationId, participants }: UseAdminMessa
   } = useAdminSessionState({
     conversationId,
     currentUserParticipantId: null,
-    participants,
-    messages: sessionMessages,
-    setMessages: setSessionMessages
+    participants: participants || [],
+    messages: messages || [],
+    setMessages
   });
 
   const handleSendAdminMessage = (message: string) => {
@@ -87,8 +93,6 @@ export function useAdminMessages({ conversationId, participants }: UseAdminMessa
   };
   
   return {
-    sessionMessages,
-    setSessionMessages,
     isSessionPaused,
     isExporting,
     toggleSessionState,

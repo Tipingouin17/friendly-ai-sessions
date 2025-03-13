@@ -13,12 +13,14 @@ import AdminSessionMessages from "@/components/session/AdminSessionMessages";
 import AdminParticipantList from "@/components/session/AdminParticipantList";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 import { Message } from "@/types/chat";
+import { useToast } from "@/components/ui/use-toast";
 
 const SessionAdmin = () => {
   // Enforce admin status
   const { forceAdmin } = useAdminStatusPersistence();
   const initialRenderRef = useRef(true);
   const adminViewMountedRef = useRef(true);
+  const { toast } = useToast();
 
   // Session page state
   const {
@@ -45,9 +47,15 @@ const SessionAdmin = () => {
     adminViewMounted
   } = useAdminSessionLoader();
   
-  // Participant tracking
+  // Set admin status in session storage immediately
+  useEffect(() => {
+    sessionStorage.setItem('isAdminSession', 'true');
+    console.log("Admin session confirmed on mount");
+  }, []);
+  
+  // Participant tracking - pass nullish conversationId properly with fallback empty array for participants
   const {
-    participants,
+    participants = [],
     setParticipants,
     isLoading: isLoadingParticipants
   } = useParticipantTracking(locationState, conversationData, currentConversationId);
@@ -109,8 +117,14 @@ const SessionAdmin = () => {
       
       // Make sure admin status is set
       sessionStorage.setItem('isAdminSession', 'true');
+      
+      // Show admin notification
+      toast({
+        title: "Admin Session Interface",
+        description: "You are viewing the admin interface. You can monitor and manage the session."
+      });
     }
-  }, [isLoading, currentConversationId, locationState, conversationData, participants]);
+  }, [isLoading, currentConversationId, locationState, conversationData, participants, toast]);
   
   // Redirect if no conversation ID and not in loading state
   // Only redirect if BOTH: not loading AND no conversation ID AND no new conversation id AND not admin view ready

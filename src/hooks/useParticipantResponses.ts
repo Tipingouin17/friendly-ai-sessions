@@ -13,7 +13,7 @@ export const useParticipantResponses = ({
 }: UseParticipantResponsesProps) => {
   const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>({});
   
-  // Update hasAnswered based on messages
+  // Update hasAnswered based on messages - only run this once when messages change
   useEffect(() => {
     if (currentUserParticipantId) {
       const hasUserResponded = messages.some(message => 
@@ -23,12 +23,18 @@ export const useParticipantResponses = ({
       
       if (hasUserResponded) {
         console.log(`User participant ${currentUserParticipantId} has already responded`);
-        setParticipantResponded(prev => ({...prev, [currentUserParticipantId]: true}));
+        setParticipantResponded(prev => {
+          // Only update if the value is different to avoid unnecessary rerenders
+          if (prev[currentUserParticipantId] !== true) {
+            return {...prev, [currentUserParticipantId]: true};
+          }
+          return prev;
+        });
       }
     }
   }, [messages, currentUserParticipantId]);
   
-  // Calculate if current participant has answered
+  // Calculate if current participant has answered - memoized to avoid recalculations
   const hasAnswered = currentUserParticipantId ? 
     !!participantResponded[currentUserParticipantId] || 
     messages.some(message => 
@@ -36,20 +42,27 @@ export const useParticipantResponses = ({
       message.sender === "user"
     ) : false;
   
-  // Calculate total unique participants who have responded
-  const totalResponses = messages.reduce((count, message) => {
+  // Count unique participants who have responded
+  const totalResponses = messages.reduce((uniqueParticipants, message) => {
     if (message.sender === "user" && message.participant) {
-      const participantId = message.participant.replace('P', '');
-      setParticipantResponded(prev => ({...prev, [parseInt(participantId)]: true}));
-      return count + 1;
+      const participantId = parseInt(message.participant.replace('P', ''));
+      if (!uniqueParticipants.has(participantId)) {
+        uniqueParticipants.add(participantId);
+      }
     }
-    return count;
-  }, 0);
+    return uniqueParticipants;
+  }, new Set<number>()).size;
 
-  // Record if a participant has responded
+  // Record if a participant has responded - memoized to prevent recreation between renders
   const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
     console.log(`Recording participant ${participantId} response status: ${hasResponded}`);
-    setParticipantResponded(prev => ({...prev, [participantId]: hasResponded}));
+    setParticipantResponded(prev => {
+      // Only update if the value is different
+      if (prev[participantId] !== hasResponded) {
+        return {...prev, [participantId]: hasResponded};
+      }
+      return prev;
+    });
   }, []);
   
   return {

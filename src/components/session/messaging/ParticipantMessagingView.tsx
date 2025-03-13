@@ -26,18 +26,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   isMobile,
   conversationId
 }) => {
-  // Log messages for debugging
+  // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {
-    console.log("ParticipantMessagingView - Rendering with messages:", 
-      messages.map(m => ({
-        id: m.id,
-        content: m.content.substring(0, 20) + "...",
-        sender: m.sender,
-        participant: m.participant
-      }))
-    );
     console.log("ParticipantMessagingView - Current participant:", `P${currentParticipant}`);
-  }, [messages, currentParticipant]);
+  }, [currentParticipant]);
   
   return (
     <div className="flex-1 overflow-hidden">

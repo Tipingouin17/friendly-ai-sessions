@@ -1,26 +1,11 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import MessagingArea from "./MessagingArea";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
 import InputFooter from "./InputFooter";
 import AdminSessionHeader from "./AdminSessionHeader";
-
-// Create a simple hook to replace useBreakpoint
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  return { isMobile };
-};
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SessionContainerProps {
   participantCount: number;

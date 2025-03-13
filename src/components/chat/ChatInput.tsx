@@ -14,6 +14,7 @@ interface ChatInputProps {
   setIsRecording?: (isRecording: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
+  isMobile?: boolean;
 }
 
 const ChatInput = ({
@@ -23,7 +24,8 @@ const ChatInput = ({
   isRecording,
   setIsRecording,
   placeholder = "Type your message here...",
-  disabled = false
+  disabled = false,
+  isMobile = false
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -91,14 +93,14 @@ const ChatInput = ({
   };
 
   return (
-    <div className="p-6 border-t border-gray-100">
+    <div className={`${isMobile ? 'p-3' : 'p-6'} border-t border-gray-100`}>
       <div className="relative">
         <Textarea
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder={disabled ? "You have already answered this question" : placeholder}
-          className="min-h-[80px] pr-24"
+          className={`${isMobile ? 'min-h-[60px] text-sm' : 'min-h-[80px]'} pr-20`}
           disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !disabled) {
@@ -107,23 +109,27 @@ const ChatInput = ({
             }
           }}
         />
-        <div className="absolute bottom-2 right-2 flex gap-2">
+        <div className="absolute bottom-2 right-2 flex gap-1 sm:gap-2">
           <Button
             variant="ghost"
             size="icon"
             onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={`h-8 w-8 ${isRecording ? "text-red-600" : "text-gray-500 hover:text-gray-700"}`}
+            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} ${isRecording ? "text-red-600" : "text-gray-500 hover:text-gray-700"}`}
             disabled={disabled}
           >
-            {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {isRecording ? (
+              <StopCircle className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+            ) : (
+              <Mic className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+            )}
           </Button>
           <Button
             onClick={onSendMessage}
             size="icon"
             disabled={!inputMessage.trim() || disabled}
-            className="h-8 w-8"
+            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'}`}
           >
-            <Send className="h-4 w-4" />
+            <Send className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           </Button>
         </div>
       </div>

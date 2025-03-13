@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -57,6 +58,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   participantNames = {},
   currentUserParticipantId = null,
 }) => {
+  // Use the mobile hook to get current screen size
+  const { isMobile: currentIsMobile } = useIsMobile();
+  
   // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {
     console.log("ParticipantMessagingView - Current participant:", `P${currentParticipant}`);
@@ -64,8 +68,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [currentParticipant, messages.length]);
   
   return (
-    <div className="flex-1 overflow-hidden flex flex-col">
-      <div className="flex-1 overflow-hidden">
+    <div className="flex-1 overflow-hidden flex flex-col h-full">
+      <div className="flex-1 overflow-hidden relative">
         <MessageList 
           messages={messages} 
           participantColors={participantColors}
@@ -73,28 +77,31 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           onLikeMessage={onLikeMessage}
           isWaitingForResponse={isWaitingForResponse}
           participants={participants}
+          isMobile={currentIsMobile}
         />
       </div>
       
-      {/* Add InputFooter component here */}
-      <InputFooter
-        participantCount={maxParticipants}
-        currentParticipant={currentParticipant}
-        participantNames={participantNames}
-        participants={participants}
-        inputMessage={inputMessage}
-        setInputMessage={setInputMessage}
-        onSendMessage={onSendMessage}
-        isRecording={isRecording}
-        setIsRecording={setIsRecording}
-        currentUserParticipantId={currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant}
-        isAnonymous={isAnonymous}
-        toggleAnonymous={toggleAnonymous}
-        hasAnswered={hasAnswered}
-        totalResponses={totalResponses}
-        viewMode={viewMode}
-        messages={messages}
-      />
+      {/* Footer with input and participant info */}
+      <div className="mt-auto">
+        <InputFooter
+          participantCount={maxParticipants}
+          currentParticipant={currentParticipant}
+          participantNames={participantNames}
+          participants={participants}
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          onSendMessage={onSendMessage}
+          isRecording={isRecording}
+          setIsRecording={setIsRecording}
+          currentUserParticipantId={currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant}
+          isAnonymous={isAnonymous}
+          toggleAnonymous={toggleAnonymous}
+          hasAnswered={hasAnswered}
+          totalResponses={totalResponses}
+          viewMode={viewMode}
+          messages={messages}
+        />
+      </div>
     </div>
   );
 };

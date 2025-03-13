@@ -11,7 +11,29 @@ export const useParticipantResponses = ({
   messages,
   currentUserParticipantId
 }: UseParticipantResponsesProps) => {
-  const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>({});
+  // Use localStorage to persist response state across refreshes
+  const getInitialResponseState = () => {
+    try {
+      const stored = localStorage.getItem('participant_responses');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Error loading participant responses from storage:', e);
+    }
+    return {};
+  };
+  
+  const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>(getInitialResponseState());
+  
+  // Persist response state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('participant_responses', JSON.stringify(participantResponded));
+    } catch (e) {
+      console.error('Error saving participant responses to storage:', e);
+    }
+  }, [participantResponded]);
   
   // Update hasAnswered based on messages - only run this once when messages change
   useEffect(() => {
@@ -26,7 +48,8 @@ export const useParticipantResponses = ({
         setParticipantResponded(prev => {
           // Only update if the value is different to avoid unnecessary rerenders
           if (prev[currentUserParticipantId] !== true) {
-            return {...prev, [currentUserParticipantId]: true};
+            const updated = {...prev, [currentUserParticipantId]: true};
+            return updated;
           }
           return prev;
         });
@@ -59,7 +82,14 @@ export const useParticipantResponses = ({
     setParticipantResponded(prev => {
       // Only update if the value is different
       if (prev[participantId] !== hasResponded) {
-        return {...prev, [participantId]: hasResponded};
+        const updated = {...prev, [participantId]: hasResponded};
+        // Save to localStorage immediately
+        try {
+          localStorage.setItem('participant_responses', JSON.stringify(updated));
+        } catch (e) {
+          console.error('Error saving participant responses to storage:', e);
+        }
+        return updated;
       }
       return prev;
     });

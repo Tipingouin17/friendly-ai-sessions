@@ -6,6 +6,7 @@ import { useNavigateToSession } from "./useNavigateToSession";
 import { useSessionCapacityCheck } from "./useSessionCapacityCheck";
 import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SessionJoinParams {
@@ -26,6 +27,7 @@ export function useSessionJoiner() {
   const { navigateToSession } = useNavigateToSession();
   const { isCheckingCapacity, checkCapacityAndUpdate } = useSessionCapacityCheck();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  const { persistParticipantData, persistedParticipantData } = useParticipantPersistence();
 
   const joinSession = async ({
     conversationId,
@@ -43,6 +45,24 @@ export function useSessionJoiner() {
         description: "A name is required to join the session.",
         variant: "destructive",
       });
+      return Promise.resolve();
+    }
+
+    // Check if we already have persisted data for this conversation
+    if (persistedParticipantData && persistedParticipantData.conversationId === conversationId) {
+      console.log("Using persisted participant data:", persistedParticipantData);
+      
+      // Navigate directly using persisted data
+      setTimeout(() => {
+        navigateToSession(
+          conversationId!, 
+          participantName, 
+          persistedParticipantData.participantId, 
+          avatarSeed,
+          persistedParticipantData.isAdmin || false
+        );
+      }, 500);
+      
       return Promise.resolve();
     }
 
@@ -111,6 +131,16 @@ export function useSessionJoiner() {
         // Don't block the join process if event logging fails
       }
       
+      // Persist participant data to localStorage
+      persistParticipantData({
+        participantId: newParticipantId,
+        conversationId,
+        name: participantName,
+        avatarSeed,
+        isAnonymous,
+        isAdmin: effectiveIsAdmin
+      });
+      
       // Clear any existing "session full" errors since we've successfully joined
       setError(null);
       
@@ -144,6 +174,16 @@ export function useSessionJoiner() {
           isAdmin: true // Force admin for this registration
         });
         
+        // Persist admin participant data
+        persistParticipantData({
+          participantId: adminParticipantId,
+          conversationId: conversationId!,
+          name: participantName,
+          avatarSeed,
+          isAnonymous,
+          isAdmin: true
+        });
+        
         toast({
           title: "Admin Override",
           description: "Session is full, but you're joining as an admin.",
@@ -173,6 +213,7 @@ export function useSessionJoiner() {
     isJoining: isJoining || isCheckingCapacity,
     error,
     joinSession,
-    setError
+    setError,
+    persistedParticipantData
   };
 }

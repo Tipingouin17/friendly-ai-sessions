@@ -8,12 +8,13 @@ import { useSessionProviderState } from "@/hooks/useSessionProviderState";
 import { useSessionParticipantSetup } from "@/hooks/useSessionParticipantSetup";
 import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
 import { useToast } from "@/components/ui/use-toast";
+import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
 interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
-  forceAdmin?: boolean; // Added forceAdmin prop
+  forceAdmin?: boolean;
 }
 
 export const SessionProviderCore = ({ 
@@ -24,8 +25,10 @@ export const SessionProviderCore = ({
 }: SessionProviderCoreProps) => {
   const location = useLocation();
   const { toast } = useToast();
+  const { persistedParticipantData } = useParticipantPersistence();
   
-  const locationState = location.state as { 
+  // Enhance location state with persisted data if available
+  let locationState = location.state as { 
     participantId?: number; 
     isGuest?: boolean; 
     participantName?: string;
@@ -33,9 +36,22 @@ export const SessionProviderCore = ({
     isAdmin?: boolean;
   } | null;
   
+  // If we have persisted data but no participant ID in location state, use the persisted data
+  if (!locationState?.participantId && persistedParticipantData) {
+    locationState = {
+      ...locationState,
+      participantId: persistedParticipantData.participantId,
+      isGuest: true,
+      participantName: persistedParticipantData.name,
+      isAdmin: persistedParticipantData.isAdmin
+    };
+    console.log("Enhanced provider location state with persisted data:", locationState);
+  }
+  
   // Determine effective admin status from all sources
   const effectiveAdmin = forceAdmin === true || 
                        locationState?.isAdmin === true ||
+                       persistedParticipantData?.isAdmin === true ||
                        sessionStorage.getItem('isAdminSession') === 'true' ||
                        location.pathname.includes('/admin');
   
@@ -116,7 +132,8 @@ export const SessionProviderCore = ({
       forceAdmin,
       locationStateIsAdmin: locationState?.isAdmin,
       effectiveAdmin,
-      isAdmin
+      isAdmin,
+      persistedParticipantData
     });
     
     // If we're an admin, we should never see the session full error
@@ -124,7 +141,7 @@ export const SessionProviderCore = ({
       console.error("Admin user incorrectly marked as session full - this should never happen");
     }
   }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
-      maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin]);
+      maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin, persistedParticipantData]);
 
   // Set up session monitoring
   const {

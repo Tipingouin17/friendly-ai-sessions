@@ -95,11 +95,11 @@ export const setCrossDomainCookie = (name: string, value: string, days = 7): voi
   // Build cookie string with appropriate attributes for cross-domain contexts
   let cookieString = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
   
-  // Add SameSite attribute
-  cookieString += `; SameSite=${sameSite}`;
+  // Add SameSite attribute - for cross-origin contexts, force to 'None'
+  cookieString += `; SameSite=${isInCrossOriginContext() || isInIframe() ? 'None' : sameSite}`;
   
-  // Add Secure attribute if needed
-  if (secure) {
+  // Add Secure attribute if needed - always add it for cross-origin
+  if (secure || isInCrossOriginContext() || isInIframe()) {
     cookieString += '; Secure';
   }
   
@@ -116,10 +116,12 @@ export const getCookie = (name: string): string | null => {
 
 /**
  * Specifically handle Stripe cookies in cross-origin contexts
+ * Automatically called when needed
  */
 export const handleStripeCookies = (): void => {
   // Check if we're in a context where Stripe cookies need special handling
   if (isInCrossOriginContext() || isInIframe()) {
+    console.log("Handling Stripe cookies for cross-origin context");
     // Attempt to fix Stripe cookies by checking for their presence and re-setting them
     const stripeMid = getCookie('__stripe_mid');
     const stripeSid = getCookie('__stripe_sid');
@@ -131,5 +133,21 @@ export const handleStripeCookies = (): void => {
     if (stripeSid) {
       setCrossDomainCookie('__stripe_sid', stripeSid);
     }
+    
+    // If cookies don't exist yet, set them to empty values with proper attributes
+    if (!stripeMid) {
+      setCrossDomainCookie('__stripe_mid', 'placeholder-mid');
+    }
+    
+    if (!stripeSid) {
+      setCrossDomainCookie('__stripe_sid', 'placeholder-sid');
+    }
   }
 };
+
+// Call automatically when importing this file
+// This makes sure Stripe cookies are properly set early
+if (typeof window !== 'undefined') {
+  // Add a small delay to ensure it runs after page load
+  setTimeout(handleStripeCookies, 100);
+}

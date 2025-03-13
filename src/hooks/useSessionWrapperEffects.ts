@@ -31,7 +31,7 @@ export function useSessionWrapperEffects({
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status");
     }
-    // Don't return anything from this effect
+    // No return statement needed here
   }, [effectiveAdmin, isOnAdminPath]);
 
   // Initialize session when data is available

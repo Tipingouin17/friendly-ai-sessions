@@ -13,8 +13,11 @@ export function useIsMobile() {
     }
     mql.addEventListener("change", onChange)
     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    
+    // Return the cleanup function with no null return
     return () => mql.removeEventListener("change", onChange)
   }, [])
 
+  // Return the boolean primitive directly
   return isMobile
 }

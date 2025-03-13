@@ -51,6 +51,7 @@ const InputFooter = ({
     `Participant ${currentParticipant}`;
   
   // Safely determine if this is a new session with just a welcome message
+  // Ensure messages is an array before trying to use array methods
   const isNewSession = Array.isArray(messages) && messages.length <= 1 && 
     messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   

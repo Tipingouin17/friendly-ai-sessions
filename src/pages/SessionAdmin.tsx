@@ -12,6 +12,7 @@ import AdminSessionHeader from "@/components/session/AdminSessionHeader";
 import AdminSessionMessages from "@/components/session/AdminSessionMessages";
 import AdminParticipantList from "@/components/session/AdminParticipantList";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
+import { Message } from "@/types/chat";
 
 const SessionAdmin = () => {
   // Enforce admin status
@@ -52,7 +53,7 @@ const SessionAdmin = () => {
   } = useParticipantTracking(locationState, conversationData, currentConversationId);
   
   // Initialize session messages with empty array
-  const [sessionMessages, setSessionMessages] = useState([]);
+  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   
   // Admin message handling
   const {
@@ -149,7 +150,12 @@ const SessionAdmin = () => {
               props={{
                 ...props,
                 onSendAdminMessage: handleSendAdminMessage,
-                isAdmin: true
+                isAdmin: true,
+                // Ensure sessionState.messages exists
+                sessionState: {
+                  ...props.sessionState,
+                  messages: props.sessionState?.messages || []
+                }
               }} 
               isAdmin={true} 
             />

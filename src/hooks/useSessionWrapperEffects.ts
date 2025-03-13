@@ -79,8 +79,10 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
-    // No need to return anything from this effect
-  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
+    // This effect doesn't need a cleanup function
+  }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, 
+     props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, 
+     isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
 
   // More aggressive loading state management for admin sessions
   useEffect(() => {
@@ -101,8 +103,9 @@ export function useSessionWrapperEffects({
         }
       }
     }
-    // No need to return anything from this effect
-  }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
+    // This effect doesn't need a cleanup function
+  }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, 
+     effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
   // Handle errors from provider - suppress for admin
   useEffect(() => {
@@ -114,6 +117,6 @@ export function useSessionWrapperEffects({
         onError(props.error);
       }
     }
-    // No need to return anything from this effect
+    // This effect doesn't need a cleanup function
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

@@ -19,8 +19,12 @@ export function useParticipantTracking(
     if (!conversationId) {
       console.log("No conversationId provided to useParticipantTracking, skipping fetch");
       setIsLoading(false);
-      return;
+      return () => {
+        // No cleanup needed for this case
+      };
     }
+    
+    let isMounted = true;
     
     async function fetchParticipants() {
       setIsLoading(true);
@@ -39,7 +43,7 @@ export function useParticipantTracking(
           return;
         }
         
-        if (data && data.length > 0) {
+        if (data && data.length > 0 && isMounted) {
           console.log("Fetched participants from database:", data);
           
           const participantsList: ParticipantInfo[] = data.map(participant => ({
@@ -53,18 +57,24 @@ export function useParticipantTracking(
           
           console.log("Processed participant list:", participantsList);
           setParticipants(participantsList);
-        } else if (conversation && conversation.current_participants > 0) {
+        } else if (conversation && conversation.current_participants > 0 && isMounted) {
           console.log("No participants found in database, waiting for realtime updates");
           setParticipants([]);
         }
       } catch (err) {
         console.error("Exception fetching participants:", err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
     
     fetchParticipants();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [conversationId, conversation]);
   
   // Add participant from location state (for guests joining)
@@ -93,19 +103,27 @@ export function useParticipantTracking(
         });
       }
     }
+    
+    return () => {
+      // No cleanup needed for this effect
+    };
   }, [conversationState]);
   
   // Set up realtime subscription for participant updates
   useEffect(() => {
     if (!conversationId) {
       console.log("No conversationId provided to useParticipantTracking, skipping realtime subscription");
-      return;
+      return () => {
+        // No cleanup needed for this case
+      };
     }
     
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
     
     // Listen for new participant registrations
     let participantsChannel;
+    let eventsChannel;
+    
     try {
       participantsChannel = supabase
         .channel(`admin-session-participants-${conversationId}`)
@@ -155,7 +173,6 @@ export function useParticipantTracking(
     }
     
     // Listen for participant_joined events
-    let eventsChannel;
     try {
       eventsChannel = supabase
         .channel(`admin-participant-events-${conversationId}`)
@@ -212,14 +229,31 @@ export function useParticipantTracking(
     }
       
     return () => {
-      if (participantsChannel) removeChannel(participantsChannel);
-      if (eventsChannel) removeChannel(eventsChannel);
+      // Safe cleanup of channels
+      if (participantsChannel) {
+        try {
+          removeChannel(participantsChannel);
+        } catch (e) {
+          console.error("Error removing participants channel:", e);
+        }
+      }
+      
+      if (eventsChannel) {
+        try {
+          removeChannel(eventsChannel);
+        } catch (e) {
+          console.error("Error removing events channel:", e);
+        }
+      }
     };
   }, [conversationId]);
   
   // Log the current participants array for debugging
   useEffect(() => {
     console.log("Current participants array:", participants);
+    return () => {
+      // No cleanup needed
+    };
   }, [participants]);
   
   return {

@@ -18,7 +18,7 @@ export function useIsMobile() {
       mql.addEventListener("change", onChange)
     } else {
       // Fallback for older browsers
-      mql.addListener(onChange)
+      mql.addListener?.(onChange)
     }
     
     // Initial check
@@ -28,13 +28,12 @@ export function useIsMobile() {
     return () => {
       if (mql.removeEventListener) {
         mql.removeEventListener("change", onChange)
-      } else {
-        // Fallback for older browsers
+      } else if (mql.removeListener) {
+        // Only call removeListener if it exists
         mql.removeListener(onChange)
       }
     }
   }, [])
 
-  // Return the boolean primitive directly (not an object with a destroy method)
   return isMobile
 }

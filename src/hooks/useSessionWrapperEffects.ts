@@ -31,7 +31,7 @@ export function useSessionWrapperEffects({
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status");
     }
-    // Return undefined explicitly
+    // Return undefined explicitly with proper type
     return undefined;
   }, [effectiveAdmin, isOnAdminPath]);
 
@@ -52,7 +52,11 @@ export function useSessionWrapperEffects({
           onLoading(false);
         }, 100);
         
-        return () => clearTimeout(timeoutId);
+        return () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+        };
       }
       
       // Initialize immediately if we have conversation data or it's an admin session
@@ -80,8 +84,11 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
-    // Return undefined explicitly
-    return undefined;
+    
+    // Return undefined properly
+    return () => {
+      // No cleanup needed here
+    };
   }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, 
      props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, 
      isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
@@ -105,8 +112,11 @@ export function useSessionWrapperEffects({
         }
       }
     }
-    // Return undefined explicitly
-    return undefined;
+    
+    // Return noop cleanup function
+    return () => {
+      // No cleanup needed here
+    };
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, 
      effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
@@ -120,7 +130,10 @@ export function useSessionWrapperEffects({
         onError(props.error);
       }
     }
-    // Return undefined explicitly
-    return undefined;
+    
+    // Return noop cleanup function
+    return () => {
+      // No cleanup needed here
+    };
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

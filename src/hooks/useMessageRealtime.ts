@@ -42,39 +42,52 @@ export const useMessageRealtime = ({
           console.log("New message detected via realtime:", payload);
           
           try {
-            // Extract content from the jsonb field
-            const contentData = payload.new.content || {};
+            // Extract content from the payload
+            let newMessageContent = '';
+            let participantId: string | undefined = undefined;
+            let isAnonymous = false;
             
-            // Support both formats - direct text or content.text
-            const newMessageContent = typeof contentData === 'object' && contentData.text 
-              ? contentData.text 
-              : (typeof payload.new.content === 'string' 
-                  ? payload.new.content 
-                  : JSON.stringify(payload.new.content));
+            // Get the content data safely
+            const contentData = payload.new.content;
             
-            // Extract participant ID from content if available
-            const participantId = contentData.participant_id 
-              ? contentData.participant_id 
-              : null;
+            // Handle different content formats
+            if (typeof contentData === 'string') {
+              newMessageContent = contentData;
+            } else if (contentData && typeof contentData === 'object') {
+              // Access as a safe record
+              const contentObj = contentData as Record<string, any>;
               
-            // Create participant key if available
-            const participantKey = participantId ? `P${participantId}` : undefined;
+              // Get text content
+              if ('text' in contentObj) {
+                newMessageContent = contentObj.text as string;
+              } else {
+                newMessageContent = JSON.stringify(contentObj);
+              }
+              
+              // Get participant ID if present
+              if ('participant_id' in contentObj) {
+                participantId = `P${contentObj.participant_id}`;
+              }
+              
+              // Get anonymous flag if present
+              isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
+            }
             
             console.log("Processing realtime message:", {
               id: payload.new.id,
               content: newMessageContent.substring(0, 20) + "...",
               role: payload.new.role,
-              participantKey
+              participantId
             });
             
             const newMessage: Message = {
               id: String(payload.new.id),
               content: newMessageContent,
               sender: payload.new.role === 'assistant' ? 'assistant' : 'user',
-              participant: participantKey,
+              participant: participantId,
               timestamp: new Date(payload.new.created_at),
-              color: participantKey ? getParticipantColor(participantKey) : undefined,
-              isAnonymous: contentData.is_anonymous || false,
+              color: participantId ? getParticipantColor(participantId) : undefined,
+              isAnonymous,
               likes: []
             };
             

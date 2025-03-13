@@ -62,23 +62,43 @@ export const useSessionMessages = ({
         // Transform database messages to UI message format
         const formattedMessages = data.map(msg => {
           // Extract content data - handle both string and object formats
-          const contentData = typeof msg.content === 'object' ? msg.content : { text: msg.content };
-          const messageContent = contentData.text || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
-          
-          // Extract participant ID if available from content
+          let messageContent = '';
           let participantId: string | undefined = undefined;
-          if (contentData.participant_id) {
-            participantId = `P${contentData.participant_id}`;
+          let likesArray: string[] = [];
+          let isReport = false;
+          let isAnonymous = false;
+          
+          // Check if content is an object or string
+          if (typeof msg.content === 'string') {
+            messageContent = msg.content;
+          } else if (msg.content && typeof msg.content === 'object') {
+            // It's an object, safely access properties
+            const contentObj = msg.content as Record<string, any>;
+            
+            // Handle text content
+            if ('text' in contentObj) {
+              messageContent = contentObj.text as string;
+            } else {
+              // Fallback to stringifying the object if no text property
+              messageContent = JSON.stringify(contentObj);
+            }
+            
+            // Handle participant ID
+            if ('participant_id' in contentObj) {
+              participantId = `P${contentObj.participant_id}`;
+            }
+            
+            // Handle likes safely
+            if ('likes' in contentObj && Array.isArray(contentObj.likes)) {
+              likesArray = contentObj.likes as string[];
+            }
+            
+            // Handle report and anonymous flags
+            isReport = 'is_report' in contentObj ? Boolean(contentObj.is_report) : false;
+            isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
           }
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
-          
-          // Ensure likes is always an array
-          let likesArray: string[] = [];
-          if (contentData.likes) {
-            // If likes exists and is not null, ensure it's an array
-            likesArray = Array.isArray(contentData.likes) ? contentData.likes : [];
-          }
           
           return {
             id: String(msg.id),
@@ -89,8 +109,8 @@ export const useSessionMessages = ({
             timestamp: new Date(msg.created_at),
             created_at: msg.created_at,
             likes: likesArray,
-            isReport: contentData.is_report ? true : false,
-            isAnonymous: contentData.is_anonymous ? true : false
+            isReport,
+            isAnonymous
           } as Message; // Type assertion to ensure it matches the Message type
         });
         

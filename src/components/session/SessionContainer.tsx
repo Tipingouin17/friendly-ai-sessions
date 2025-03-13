@@ -2,16 +2,29 @@
 import React, { useEffect, useState } from "react";
 import MessagingArea from "./MessagingArea";
 import { Message, ParticipantInfo } from "@/types/chat";
-import { useParticipantNamesStore } from "@/stores/participantNamesStore";
-import { useBreakpoint } from "@/hooks/useBreakpoint";
-import { ConversationWithSession } from "@/types/database";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import AdminHeader from "./AdminHeader";
 import InputFooter from "./InputFooter";
+import AdminSessionHeader from "./AdminSessionHeader";
+
+// Create a simple hook to replace useBreakpoint
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  return { isMobile };
+};
 
 interface SessionContainerProps {
   participantCount: number;
-  conversation: ConversationWithSession | null;
+  conversation: any | null;
   messages: Message[];
   inputMessage: string;
   setInputMessage: (message: string) => void;
@@ -68,10 +81,10 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isAdmin,
   onSendAdminMessage
 }) => {
-  const { isMobile } = useBreakpoint("md");
-  const { participantNames: storedParticipantNames } = useParticipantNamesStore();
-  // Combined participant names from props and store
-  const allParticipantNames = { ...storedParticipantNames, ...participantNames };
+  const { isMobile } = useIsMobile();
+  
+  // Combined participant names from props
+  const allParticipantNames = { ...participantNames };
   
   // Calculate participant colors if needed
   const enhancedParticipantColors = { ...participantColors };
@@ -95,18 +108,13 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Admin header in admin mode */}
       {isAdmin && (
-        <AdminHeader
-          facilitator={facilitator}
-          objective={objective}
-          conversationId={conversationId}
-          isAdmin={isAdmin}
-          onSendAdminMessage={onSendAdminMessage}
-          onGenerateReport={onGenerateReport}
-          isGeneratingReport={isGeneratingReport}
+        <AdminSessionHeader
+          conversationData={conversation}
           currentParticipantCount={currentParticipantCount}
-          maxParticipants={participantCount}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
+          isSessionPaused={false} // This would need to be passed as a prop if needed
+          onToggleSessionState={() => {}} // This would need to be implemented if needed
+          onSendAdminMessage={onSendAdminMessage || (() => {})}
+          onExportData={onGenerateReport}
         />
       )}
       

@@ -4,6 +4,7 @@ import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
+import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 
 export function useParticipantTracking(
   conversationState: { participantName?: string; avatarSeed?: string; isGuest?: boolean; participantId?: number } | null,
@@ -139,11 +140,11 @@ export function useParticipantTracking(
         })
         .subscribe((status) => {
           console.log(`Participants channel subscription status: ${status}`);
-          if (status === 'SUBSCRIBED') {
+          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             console.log("Successfully subscribed to participant updates");
             // Force loading state to false after successful channel subscription
             setIsLoading(false);
-          } else if (status === 'SUBSCRIPTION_ERROR') {
+          } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant updates");
             setIsLoading(false);
           }
@@ -196,11 +197,11 @@ export function useParticipantTracking(
         })
         .subscribe((status) => {
           console.log(`Participant events channel status: ${status}`);
-          if (status === 'SUBSCRIBED') {
+          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             console.log("Successfully subscribed to participant events");
             // Second chance to set loading to false after event channel subscription
             setIsLoading(false);
-          } else if (status === 'SUBSCRIPTION_ERROR') {
+          } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant events");
             setIsLoading(false);
           }

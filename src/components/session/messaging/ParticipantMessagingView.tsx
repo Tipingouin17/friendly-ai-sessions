@@ -59,7 +59,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   currentUserParticipantId = null,
 }) => {
   // Use the mobile hook to get current screen size
-  const { isMobile: currentIsMobile } = useIsMobile();
+  const mobileState = useIsMobile();
+  const currentIsMobile = mobileState === true;
   
   // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {
@@ -77,7 +78,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           onLikeMessage={onLikeMessage}
           isWaitingForResponse={isWaitingForResponse}
           participants={participants}
-          isMobile={currentIsMobile}
+          isMobile={isMobile || currentIsMobile}
         />
       </div>
       

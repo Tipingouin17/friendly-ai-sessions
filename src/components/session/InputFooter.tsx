@@ -46,7 +46,8 @@ const InputFooter = ({
   messages = [] // Provide default empty array
 }: InputFooterProps) => {
   // Use the mobile hook
-  const { isMobile } = useIsMobile();
+  const mobileState = useIsMobile();
+  const isMobile = mobileState === true;
   
   // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);

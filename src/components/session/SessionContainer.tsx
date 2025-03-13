@@ -70,7 +70,8 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isAnonymous = false,
   toggleAnonymous = () => {}
 }) => {
-  const { isMobile } = useIsMobile();
+  const mobileState = useIsMobile();
+  const isMobile = mobileState === true;
   
   // Combined participant names from props
   const allParticipantNames = { ...participantNames };

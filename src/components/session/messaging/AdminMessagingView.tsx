@@ -24,9 +24,44 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
   showAnonymous,
   setShowAnonymous
 }) => {
+  // Log all messages for debugging
+  React.useEffect(() => {
+    console.log("Admin view received messages:", 
+      messages.map(m => ({
+        id: m.id,
+        sender: m.sender,
+        content: m.content.substring(0, 20) + "...",
+        participant: m.participant
+      }))
+    );
+  }, [messages]);
+
   // Group messages by facilitator question for admin view
   const groupedMessages = useMemo(() => {
     console.log("Grouping messages for admin view:", messages.length);
+
+    // If we don't have any assistant messages yet but have user messages,
+    // create a default group with a placeholder question
+    if (messages.length > 0 && !messages.some(m => m.sender === "assistant")) {
+      const userMessages = messages.filter(m => 
+        m.sender === "user" && 
+        (showAnonymous || !m.isAnonymous) &&
+        (!searchTerm || m.content.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      
+      if (userMessages.length > 0) {
+        console.log("Creating default group for user messages without facilitator prompt");
+        return [{
+          question: {
+            id: "default-question",
+            content: "Participant messages",
+            sender: "assistant",
+            timestamp: new Date()
+          },
+          responses: userMessages
+        }];
+      }
+    }
 
     const groups = [];
     let currentGroup = { question: null, responses: [] };
@@ -51,14 +86,36 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
             currentGroup.responses.push(message);
           }
         }
+      } else if (message.sender === "user" && !currentGroup.question) {
+        // This is a user message without a preceding facilitator message
+        // Create a default group if needed
+        if (groups.length === 0 && !currentGroup.question) {
+          currentGroup = {
+            question: {
+              id: "default-question",
+              content: "Participant messages",
+              sender: "assistant",
+              timestamp: new Date()
+            },
+            responses: []
+          };
+        }
+        
+        // Add to the current group
+        if (showAnonymous || !message.isAnonymous) {
+          if (!searchTerm || message.content.toLowerCase().includes(searchTerm.toLowerCase())) {
+            currentGroup.responses.push(message);
+          }
+        }
       }
     }
     
-    // Add the last group if it has a question and responses
+    // Add the last group if it has responses
     if (currentGroup.question && currentGroup.responses.length > 0) {
       groups.push(currentGroup);
     }
     
+    console.log("Created message groups:", groups.length);
     return groups;
   }, [messages, showAnonymous, searchTerm]);
 

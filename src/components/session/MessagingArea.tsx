@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import AdminMessagingView from "./messaging/AdminMessagingView";
 import ParticipantMessagingView from "./messaging/ParticipantMessagingView";
@@ -38,16 +38,23 @@ const MessagingArea = ({
   const [searchTerm, setSearchTerm] = useState('');
   
   // Force admin persistence
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAdmin || viewMode === "admin") {
       sessionStorage.setItem('isAdminSession', 'true');
     }
   }, [isAdmin, viewMode]);
   
   // Log messages count for debugging
-  React.useEffect(() => {
-    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
-  }, [messages.length, viewMode]);
+  useEffect(() => {
+    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`, 
+      messages.map(m => ({
+        id: m.id,
+        sender: m.sender,
+        content: m.content.substring(0, 20) + "...",
+        participant: m.participant
+      }))
+    );
+  }, [messages, viewMode]);
   
   // For participant view, filter messages to only show their own and facilitator messages
   const filteredMessages = React.useMemo(() => {
@@ -71,7 +78,7 @@ const MessagingArea = ({
     return messages;
   }, [messages, viewMode, currentParticipant]);
 
-  // Always use admin view if isAdmin=true, regardless of viewMode
+  // Always use admin view if isAdmin=true or viewMode is admin
   if (isAdmin || viewMode === "admin") {
     return (
       <AdminMessagingView

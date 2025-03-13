@@ -105,25 +105,23 @@ export const useMessageSender = ({
       
       console.log("Message saved to database:", data);
       
-      // Check if we have responses from all participants
+      // For single participant sessions, immediately trigger AI response
+      // Also trigger if all participants have answered
       const totalParticipants = conversation?.participants ?? 1;
       const updatedTotalResponses = sessionState.totalResponses + 1;
       
       console.log("Total expected participants:", totalParticipants);
       console.log("Current total responses:", updatedTotalResponses);
-      console.log("This participant's hasAnswered:", sessionState.hasAnswered);
+      console.log("Total participants vs responses:", totalParticipants, updatedTotalResponses);
       
-      // If all participants have responded, send to facilitator
-      if (updatedTotalResponses >= totalParticipants) {
+      // Always get AI response if either:
+      // 1. This is the only participant (totalParticipants == 1)
+      // 2. All participants have now responded
+      if (totalParticipants <= 1 || updatedTotalResponses >= totalParticipants) {
         setIsWaitingForResponse(true);
 
         try {
-          // Get all participant messages for this round - only the most recent messages
-          const participantMessages = sessionState.messages.filter(msg => 
-            msg.sender === "user" && msg.participant && msg.participant.startsWith('P')
-          ).slice(-totalParticipants);
-          
-          console.log('Calling edge function with participant messages count:', participantMessages.length);
+          console.log('Calling edge function for facilitator response');
 
           const response = await supabase.functions.invoke('handle-facilitator-response', {
             body: {
@@ -132,8 +130,15 @@ export const useMessageSender = ({
             }
           });
 
-          if (response.error) throw new Error(response.error.message || 'Failed to get AI response');
-          if (!response.data) throw new Error('No response data received from AI');
+          if (response.error) {
+            console.error('Error from edge function:', response.error);
+            throw new Error(response.error.message || 'Failed to get AI response');
+          }
+          
+          if (!response.data) {
+            console.error('No response data received from AI');
+            throw new Error('No response data received from AI');
+          }
 
           const aiResponse = {
             id: response.data.id || nanoid(),
@@ -153,11 +158,14 @@ export const useMessageSender = ({
               role: 'assistant',
               user_id: null
             });
+            
+            console.log("AI response saved to database");
           } catch (error) {
             console.error("Error saving AI response to database:", error);
             setError("Failed to save AI response. Please try again.");
           }
           
+          // Add the AI response to the messages
           sessionState.setMessages(prev => [...prev, aiResponse]);
         } catch (error) {
           console.error('Error getting AI response:', error);

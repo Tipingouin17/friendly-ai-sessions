@@ -16,15 +16,45 @@ export const useParticipantResponses = ({
     try {
       const stored = localStorage.getItem('participant_responses');
       if (stored) {
-        return JSON.parse(stored);
+        // Parse the stored responses
+        const storedResponses = JSON.parse(stored);
+        
+        // Check if this is a valid object
+        if (typeof storedResponses === 'object' && storedResponses !== null) {
+          return storedResponses;
+        }
       }
     } catch (e) {
       console.error('Error loading participant responses from storage:', e);
+      // On error, clear the storage to avoid persistent problems
+      localStorage.removeItem('participant_responses');
     }
     return {};
   };
   
   const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>(getInitialResponseState());
+  
+  // Clear response state when joining a new session or if there are no messages yet
+  useEffect(() => {
+    // If messages array is empty or only contains a welcome message,
+    // we should reset the response state for the current user
+    const onlyWelcomeMessage = messages.length <= 1 && messages.some(msg => msg.sender === 'assistant');
+    
+    if ((messages.length === 0 || onlyWelcomeMessage) && currentUserParticipantId) {
+      console.log('New session detected, resetting response state for participant', currentUserParticipantId);
+      setParticipantResponded(prev => {
+        const updated = {...prev};
+        delete updated[currentUserParticipantId];
+        // Update localStorage
+        try {
+          localStorage.setItem('participant_responses', JSON.stringify(updated));
+        } catch (e) {
+          console.error('Error saving participant responses to storage:', e);
+        }
+        return updated;
+      });
+    }
+  }, [messages, currentUserParticipantId]);
   
   // Persist response state to localStorage whenever it changes
   useEffect(() => {
@@ -94,11 +124,23 @@ export const useParticipantResponses = ({
       return prev;
     });
   }, []);
+
+  // Function to clear all participant responses (useful for joining new sessions)
+  const clearAllResponses = useCallback(() => {
+    console.log('Clearing all participant responses');
+    setParticipantResponded({});
+    try {
+      localStorage.removeItem('participant_responses');
+    } catch (e) {
+      console.error('Error removing participant responses from storage:', e);
+    }
+  }, []);
   
   return {
     hasAnswered,
     totalResponses,
     participantResponded,
-    recordResponse
+    recordResponse,
+    clearAllResponses
   };
 };

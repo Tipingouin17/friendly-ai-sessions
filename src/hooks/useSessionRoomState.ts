@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useReportGenerator } from "@/hooks/useReportGenerator";
@@ -51,15 +52,28 @@ export function useSessionRoomState({
     setMessages
   });
   
+  // Check if this is a new session with just a welcome message
+  const isNewSession = messages.length <= 1 && 
+    messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
+  
   // Participant response tracking
   const { 
     hasAnswered, 
     totalResponses, 
-    recordResponse 
+    recordResponse,
+    clearAllResponses 
   } = useParticipantResponses({
     messages,
     currentUserParticipantId
   });
+  
+  // Clear responses state when joining a new session
+  useEffect(() => {
+    if (isNewSession && currentUserParticipantId) {
+      console.log('New session detected in useSessionRoomState, clearing responses');
+      clearAllResponses();
+    }
+  }, [isNewSession, currentUserParticipantId, clearAllResponses]);
   
   // Anonymous state
   const anonymousState = useAnonymousState({
@@ -113,12 +127,14 @@ export function useSessionRoomState({
     messages,
     setMessages,
     isWaitingForResponse,
+    isNewSession,
     
     // Participant state
     currentParticipant: currentUserParticipantId || 0,
     hasAnswered,
     totalResponses,
     recordResponse,
+    clearAllResponses,
     
     // Actions
     handleSendMessage,

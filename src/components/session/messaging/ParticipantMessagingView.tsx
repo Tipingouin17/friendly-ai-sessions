@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
+import InputFooter from '@/components/session/InputFooter';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -14,6 +15,19 @@ interface ParticipantMessagingViewProps {
   currentParticipantCount: number;
   maxParticipants: number;
   isMobile: boolean;
+  
+  // Add additional props needed for InputFooter
+  inputMessage?: string;
+  setInputMessage?: (message: string) => void;
+  onSendMessage?: () => void;
+  isRecording?: boolean;
+  setIsRecording?: (isRecording: boolean) => void;
+  isAnonymous?: boolean;
+  toggleAnonymous?: () => void;
+  hasAnswered?: boolean;
+  totalResponses?: number;
+  viewMode?: "participant" | "admin";
+  participantNames?: { [key: number]: string };
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -24,7 +38,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   onLikeMessage,
   participants,
   isMobile,
-  conversationId
+  conversationId,
+  currentParticipantCount = 0,
+  maxParticipants = 1,
+  
+  // InputFooter props with defaults
+  inputMessage = '',
+  setInputMessage = () => {},
+  onSendMessage = () => {},
+  isRecording = false,
+  setIsRecording = () => {},
+  isAnonymous = false,
+  toggleAnonymous = () => {},
+  hasAnswered = false,
+  totalResponses = 0,
+  viewMode = "participant",
+  participantNames = {}
 }) => {
   // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {

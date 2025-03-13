@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ interface InputFooterProps {
   hasAnswered: boolean;
   totalResponses: number;
   viewMode: "participant" | "admin";
+  messages: Message[];
 }
 
 const InputFooter = ({
@@ -40,13 +41,18 @@ const InputFooter = ({
   toggleAnonymous,
   hasAnswered,
   totalResponses,
-  viewMode
+  viewMode,
+  messages
 }: InputFooterProps) => {
   // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);
   const participantName = participantInfo?.name || 
     participantNames[currentParticipant] || 
     `Participant ${currentParticipant}`;
+  
+  // Determine if this is a new session with just a welcome message
+  const isNewSession = messages.length <= 1 && 
+    messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   
   // In admin view, we don't show the input at all
   if (viewMode === "admin") {
@@ -87,17 +93,8 @@ const InputFooter = ({
       </div>
       
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
-        {hasAnswered ? (
-          <div className="p-6 flex flex-col items-center justify-center">
-            <div className="mb-4 flex items-center justify-center gap-2 bg-green-50 px-4 py-3 rounded-lg text-green-700 border border-green-200 w-full">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-medium">Your answer has been submitted</span>
-            </div>
-            <p className="text-sm text-gray-500">
-              Waiting for other participants to respond...
-            </p>
-          </div>
-        ) : (
+        {/* Show the chat input for new sessions or if the user hasn't answered yet */}
+        {isNewSession || !hasAnswered ? (
           <ChatInput
             inputMessage={inputMessage}
             setInputMessage={setInputMessage}
@@ -107,6 +104,16 @@ const InputFooter = ({
             placeholder={`Type as ${participantName}...`}
             disabled={false}
           />
+        ) : (
+          <div className="p-6 flex flex-col items-center justify-center">
+            <div className="mb-4 flex items-center justify-center gap-2 bg-green-50 px-4 py-3 rounded-lg text-green-700 border border-green-200 w-full">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="font-medium">Your answer has been submitted</span>
+            </div>
+            <p className="text-sm text-gray-500">
+              Waiting for other participants to respond...
+            </p>
+          </div>
         )}
       </div>
     </>

@@ -37,7 +37,7 @@ export const useSessionRealtime = ({
   useEffect(() => {
     if (!currentConversationId) {
       console.log("No conversation ID provided, skipping realtime setup");
-      return () => {};
+      return () => {}; // Empty cleanup function
     }
 
     // Check initial state
@@ -133,7 +133,7 @@ export const useSessionRealtime = ({
       setError("Failed to establish realtime connection");
     }
     
-    // Cleanup function
+    // Cleanup function with null checks
     return () => {
       try {
         if (conversationChannel) {

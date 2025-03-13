@@ -86,14 +86,53 @@ export const useParticipantResponses = ({
       }
     }
   }, [messages, currentUserParticipantId]);
+
+  // Reset hasAnswered when a new facilitator message arrives
+  useEffect(() => {
+    if (!currentUserParticipantId) return;
+    
+    // Get the most recent message
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+    
+    // If the most recent message is from the facilitator (after initial welcome), reset answer state
+    if (lastMessage && lastMessage.sender === 'assistant' && messages.length > 1) {
+      // Check if the participant has already responded to this message
+      const hasRespondedToLatestFacilitatorMessage = messages.some((message, index) => {
+        // Find the last facilitator message
+        if (message.id === lastMessage.id) {
+          // Check if there are any participant messages after this facilitator message
+          return messages.slice(index + 1).some(m => 
+            m.participant === `P${currentUserParticipantId}` && 
+            m.sender === "user"
+          );
+        }
+        return false;
+      });
+      
+      // Only reset if participant hasn't responded to this new message
+      if (!hasRespondedToLatestFacilitatorMessage) {
+        console.log('New facilitator message detected, resetting hasAnswered state');
+        setParticipantResponded(prev => {
+          // Only update if the participant is marked as having responded
+          if (prev[currentUserParticipantId] === true) {
+            const updated = {...prev, [currentUserParticipantId]: false};
+            // Save to localStorage
+            try {
+              localStorage.setItem('participant_responses', JSON.stringify(updated));
+            } catch (e) {
+              console.error('Error saving participant responses to storage:', e);
+            }
+            return updated;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [messages, currentUserParticipantId]);
   
   // Calculate if current participant has answered - memoized to avoid recalculations
   const hasAnswered = currentUserParticipantId ? 
-    !!participantResponded[currentUserParticipantId] || 
-    messages.some(message => 
-      message.participant === `P${currentUserParticipantId}` && 
-      message.sender === "user"
-    ) : false;
+    !!participantResponded[currentUserParticipantId] : false;
   
   // Count unique participants who have responded
   const totalResponses = messages.reduce((uniqueParticipants, message) => {

@@ -56,34 +56,17 @@ const MessagingArea = ({
     );
   }, [messages, viewMode]);
   
-  // For participant view, filter messages to only show their own and facilitator messages
+  // For participant view, show all messages when in participant view
+  // We're no longer filtering messages here as this was causing the participant's messages to be hidden
   const filteredMessages = React.useMemo(() => {
-    if (viewMode === "participant") {
-      console.log("Filtering messages for participant view", {
-        currentParticipant,
-        participantKey: `P${currentParticipant}`
-      });
-      
-      return messages.filter(message => {
-        // Always show facilitator messages
-        if (message.sender === "assistant") {
-          return true;
-        }
-        
-        // Show this participant's messages
-        const participantKey = `P${currentParticipant}`;
-        if (message.sender === "user" && message.participant === participantKey) {
-          console.log("Including participant message:", message.content.substring(0, 20));
-          return true;
-        }
-        
-        console.log("Filtering out message:", message.content.substring(0, 20), "from participant", message.participant);
-        return false;
-      });
+    if (!messages || messages.length === 0) {
+      return [];
     }
     
+    // In participant view, we show ALL messages
+    console.log("Using all messages for participant view");
     return messages;
-  }, [messages, viewMode, currentParticipant]);
+  }, [messages]);
 
   // Always use admin view if isAdmin=true or viewMode is admin
   if (isAdmin || viewMode === "admin") {

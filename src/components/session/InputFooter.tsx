@@ -55,6 +55,22 @@ const InputFooter = ({
   const isNewSession = Array.isArray(messages) && messages.length <= 1 && 
     messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   
+  // Check if the most recent message is from the facilitator 
+  // If so, we should allow the participant to answer
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const shouldAllowAnswer = lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered;
+  
+  // Log debug info for input visibility
+  useEffect(() => {
+    console.log("InputFooter state:", { 
+      hasAnswered, 
+      isNewSession, 
+      lastMessageSender: lastMessage?.sender,
+      shouldAllowAnswer,
+      messagesCount: messages.length
+    });
+  }, [hasAnswered, isNewSession, lastMessage, shouldAllowAnswer, messages.length]);
+  
   // In admin view, we don't show the input at all
   if (viewMode === "admin") {
     return null;
@@ -70,7 +86,7 @@ const InputFooter = ({
           </Badge>
         </div>
         
-        {!hasAnswered && (
+        {shouldAllowAnswer && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -94,8 +110,8 @@ const InputFooter = ({
       </div>
       
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
-        {/* Show the chat input for new sessions or if the user hasn't answered yet */}
-        {isNewSession || !hasAnswered ? (
+        {/* Show input if shouldAllowAnswer is true */}
+        {shouldAllowAnswer ? (
           <ChatInput
             inputMessage={inputMessage}
             setInputMessage={setInputMessage}

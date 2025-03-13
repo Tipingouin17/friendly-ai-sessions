@@ -1,41 +1,36 @@
 
-import React from 'react';
-import { useSessionContainerState } from "@/hooks/useSessionContainerState";
-import { usePlanLimits } from "@/hooks/usePlanLimits";
-import SessionLayout from "./SessionLayout";
+import React, { useEffect, useState } from "react";
 import MessagingArea from "./MessagingArea";
+import { Message, ParticipantInfo } from "@/types/chat";
+import { useParticipantNamesStore } from "@/stores/participantNamesStore";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
+import { ConversationWithSession } from "@/types/database";
+import { getParticipantColor } from "@/utils/sessionHelpers";
+import AdminHeader from "./AdminHeader";
 import InputFooter from "./InputFooter";
-import SessionHeaderManager from "./SessionHeaderManager";
-import ViewModeSelector from "./ViewModeSelector";
-import SessionQrManager from "./SessionQrManager";
-import AdminNotificationManager from "./AdminNotificationManager";
-import SessionJoinInfo from "./SessionJoinInfo";
 
 interface SessionContainerProps {
-  facilitator: {
-    title?: string;
-    profile_picture?: string;
-  };
-  objective?: string;
   participantCount: number;
-  messages: any[];
-  participantColors: { [key: string]: string };
-  currentParticipant: number;
+  conversation: ConversationWithSession | null;
+  messages: Message[];
   inputMessage: string;
-  isRecording: boolean;
-  isGeneratingReport?: boolean;
-  isWaitingForResponse?: boolean;
   setInputMessage: (message: string) => void;
+  currentParticipant: number;
   onSendMessage: () => void;
+  onLikeMessage: (messageId: string) => void;
+  onGenerateReport: () => void;
+  isGeneratingReport: boolean;
+  isWaitingForResponse: boolean;
   setIsRecording: (isRecording: boolean) => void;
-  onGenerateReport?: () => void;
-  participantNames?: { [key: number]: string };
-  onLikeMessage?: (messageId: string) => void;
-  participants?: any[];
-  conversationId?: number | null;
-  conversation?: any;
-  currentParticipantCount?: number;
-  currentUserParticipantId?: number | null;
+  isRecording: boolean;
+  participantColors: { [key: string]: string };
+  participantNames: { [key: number]: string };
+  participants: ParticipantInfo[];
+  conversationId: number | null;
+  facilitator: any;
+  objective: string;
+  currentParticipantCount: number;
+  currentUserParticipantId: number | null;
   hasAnswered: boolean;
   totalResponses: number;
   viewMode: "participant" | "admin";
@@ -44,26 +39,26 @@ interface SessionContainerProps {
   onSendAdminMessage?: (message: string) => void;
 }
 
-const SessionContainer = ({
+const SessionContainer: React.FC<SessionContainerProps> = ({
+  participantCount,
+  conversation,
+  messages,
+  inputMessage,
+  setInputMessage,
+  currentParticipant,
+  onSendMessage,
+  onLikeMessage,
+  onGenerateReport,
+  isGeneratingReport,
+  isWaitingForResponse,
+  setIsRecording,
+  isRecording,
+  participantColors,
+  participantNames,
+  participants,
+  conversationId,
   facilitator,
   objective,
-  participantCount,
-  messages,
-  participantColors,
-  currentParticipant,
-  inputMessage,
-  isRecording,
-  isGeneratingReport,
-  isWaitingForResponse = false,
-  setInputMessage,
-  onSendMessage,
-  setIsRecording,
-  onGenerateReport,
-  participantNames = {},
-  onLikeMessage,
-  participants = [],
-  conversationId,
-  conversation,
   currentParticipantCount,
   currentUserParticipantId,
   hasAnswered,
@@ -72,122 +67,91 @@ const SessionContainer = ({
   setViewMode,
   isAdmin,
   onSendAdminMessage
-}: SessionContainerProps) => {
-  const { canGenerateReports } = usePlanLimits();
+}) => {
+  const { isMobile } = useBreakpoint("md");
+  const { participantNames: storedParticipantNames } = useParticipantNamesStore();
+  // Combined participant names from props and store
+  const allParticipantNames = { ...storedParticipantNames, ...participantNames };
   
-  const {
-    adminNotification,
-    setAdminNotification,
-    isMobile,
-    joinUrl,
-    isQrDialogOpen,
-    setIsQrDialogOpen,
-    handleGenerateReport,
-    isAnonymous,
-    toggleAnonymous,
-    processedMessages
-  } = useSessionContainerState({
-    conversationId: conversationId || null,
-    currentUserParticipantId: currentUserParticipantId || null,
-    canGenerateReports,
-    onGenerateReport,
-    messages,
-    viewMode,
-    participants,
-    participantNames,
-    currentParticipant
+  // Calculate participant colors if needed
+  const enhancedParticipantColors = { ...participantColors };
+  participants.forEach(p => {
+    const key = `P${p.id}`;
+    if (!enhancedParticipantColors[key]) {
+      enhancedParticipantColors[key] = getParticipantColor(key);
+    }
   });
+  
+  // Anonymous state
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const toggleAnonymous = () => setIsAnonymous(prev => !prev);
+  
+  // Debug logging for messages
+  useEffect(() => {
+    console.log(`SessionContainer - Rendering with ${messages.length} messages, participant: ${currentParticipant}, hasAnswered: ${hasAnswered}`);
+  }, [messages.length, currentParticipant, hasAnswered]);
 
   return (
-    <SessionLayout>
-      <SessionHeaderManager 
-        isAdmin={isAdmin}
-        facilitator={facilitator}
-        objective={objective}
-        participantCount={participantCount}
-        currentParticipantCount={currentParticipantCount}
-        maxParticipants={conversation?.participants || 0}
-        onGenerateReport={handleGenerateReport}
-        isGeneratingReport={isGeneratingReport}
-        canGenerateReports={canGenerateReports}
-        messagesCount={messages.length}
-        viewMode={viewMode}
-        onSendAdminMessage={onSendAdminMessage}
-        isSessionActive={true}
-      />
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Admin header in admin mode */}
+      {isAdmin && (
+        <AdminHeader
+          facilitator={facilitator}
+          objective={objective}
+          conversationId={conversationId}
+          isAdmin={isAdmin}
+          onSendAdminMessage={onSendAdminMessage}
+          onGenerateReport={onGenerateReport}
+          isGeneratingReport={isGeneratingReport}
+          currentParticipantCount={currentParticipantCount}
+          maxParticipants={participantCount}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+        />
+      )}
       
-      <ViewModeSelector 
-        viewMode={viewMode} 
-        setViewMode={setViewMode}
-        isAdmin={isAdmin}
-      />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <div className={`flex-1 ${viewMode === "admin" ? "" : "overflow-hidden"}`}>
-          <MessagingArea 
-            messages={processedMessages}
-            participantColors={participantColors}
-            currentParticipant={currentParticipant}
-            isWaitingForResponse={isWaitingForResponse}
-            onLikeMessage={onLikeMessage}
-            participants={participants}
-            conversationId={conversationId || null}
-            currentParticipantCount={currentParticipantCount || participants.length || 0}
-            maxParticipants={conversation?.participants || 0}
-            isMobile={isMobile}
-            viewMode={viewMode}
-            isAdmin={isAdmin}
-          />
-        </div>
-        
-        {isAdmin && (
-          <div className="hidden md:block w-64 p-4 shrink-0">
-            <SessionJoinInfo
-              conversationId={conversationId || null}
-              currentParticipantCount={currentParticipantCount || participants.length || 0}
-              maxParticipants={conversation?.participants || 0}
-              isAdmin={isAdmin}
-            />
-          </div>
-        )}
+      {/* Main content area */}
+      <div className="flex-1 overflow-hidden">
+        <MessagingArea
+          messages={messages}
+          participantColors={enhancedParticipantColors}
+          currentParticipant={currentParticipant}
+          isWaitingForResponse={isWaitingForResponse}
+          onLikeMessage={onLikeMessage}
+          participants={participants}
+          conversationId={conversationId}
+          currentParticipantCount={currentParticipantCount}
+          maxParticipants={participantCount}
+          isMobile={isMobile}
+          viewMode={viewMode}
+          isAdmin={isAdmin}
+        />
       </div>
       
-      <SessionQrManager
-        isAdmin={isAdmin}
-        viewMode={viewMode}
-        isMobile={isMobile}
-        isQrDialogOpen={isQrDialogOpen}
-        setIsQrDialogOpen={setIsQrDialogOpen}
-        joinUrl={joinUrl}
-        currentParticipantCount={currentParticipantCount || participants.length || 0}
-        maxParticipants={conversation?.participants || 0}
-      />
-      
-      <InputFooter 
-        participantCount={participantCount}
-        currentParticipant={currentParticipant}
-        participantNames={participantNames}
-        participants={participants}
-        inputMessage={inputMessage}
-        setInputMessage={setInputMessage}
-        onSendMessage={onSendMessage}
-        isRecording={isRecording}
-        setIsRecording={setIsRecording}
-        currentUserParticipantId={currentUserParticipantId}
-        isAnonymous={isAnonymous}
-        toggleAnonymous={toggleAnonymous}
-        hasAnswered={hasAnswered}
-        totalResponses={totalResponses}
-        viewMode={viewMode}
-        messages={messages}
-      />
-      
-      <AdminNotificationManager 
-        isAdmin={isAdmin}
-        message={adminNotification}
-        onClose={() => setAdminNotification(null)}
-      />
-    </SessionLayout>
+      {/* Input footer in participant mode - handle in MessagingArea component now */}
+      {!isAdmin && viewMode === "participant" && (
+        <div className="hidden">
+          <InputFooter
+            participantCount={participantCount}
+            currentParticipant={currentParticipant}
+            participantNames={allParticipantNames}
+            participants={participants}
+            inputMessage={inputMessage}
+            setInputMessage={setInputMessage}
+            onSendMessage={onSendMessage}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            currentUserParticipantId={currentUserParticipantId}
+            isAnonymous={isAnonymous}
+            toggleAnonymous={toggleAnonymous}
+            hasAnswered={hasAnswered}
+            totalResponses={totalResponses}
+            viewMode={viewMode}
+            messages={messages}
+          />
+        </div>
+      )}
+    </div>
   );
 };
 

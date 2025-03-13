@@ -58,17 +58,40 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {
     console.log("ParticipantMessagingView - Current participant:", `P${currentParticipant}`);
-  }, [currentParticipant]);
+    console.log("Messages in ParticipantMessagingView:", messages.length);
+  }, [currentParticipant, messages.length]);
   
   return (
-    <div className="flex-1 overflow-hidden">
-      <MessageList 
-        messages={messages} 
-        participantColors={participantColors}
-        currentParticipant={`P${currentParticipant}`}
-        onLikeMessage={onLikeMessage}
-        isWaitingForResponse={isWaitingForResponse}
+    <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden">
+        <MessageList 
+          messages={messages} 
+          participantColors={participantColors}
+          currentParticipant={`P${currentParticipant}`}
+          onLikeMessage={onLikeMessage}
+          isWaitingForResponse={isWaitingForResponse}
+          participants={participants}
+        />
+      </div>
+      
+      {/* Add InputFooter component here */}
+      <InputFooter
+        participantCount={maxParticipants}
+        currentParticipant={currentParticipant}
+        participantNames={participantNames}
         participants={participants}
+        inputMessage={inputMessage}
+        setInputMessage={setInputMessage}
+        onSendMessage={onSendMessage}
+        isRecording={isRecording}
+        setIsRecording={setIsRecording}
+        currentUserParticipantId={currentParticipant}
+        isAnonymous={isAnonymous}
+        toggleAnonymous={toggleAnonymous}
+        hasAnswered={hasAnswered}
+        totalResponses={totalResponses}
+        viewMode={viewMode}
+        messages={messages}
       />
     </div>
   );

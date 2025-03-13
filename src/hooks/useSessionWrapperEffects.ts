@@ -36,7 +36,7 @@ export function useSessionWrapperEffects({
       console.error("Error in admin status effect:", e);
     }
     
-    // Return a noop function for cleanup
+    // Return an empty function for cleanup
     return () => {};
   }, [effectiveAdmin, isOnAdminPath]);
 
@@ -130,7 +130,7 @@ export function useSessionWrapperEffects({
       console.error("Error in loading state effect:", e);
     }
     
-    // Return a noop cleanup function
+    // Return an empty function for cleanup
     return () => {};
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, 
      effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
@@ -150,7 +150,7 @@ export function useSessionWrapperEffects({
       console.error("Error in error handling effect:", e);
     }
     
-    // Return a noop cleanup function
+    // Return an empty function for cleanup
     return () => {};
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

@@ -67,9 +67,10 @@ const InputFooter = ({
       isNewSession, 
       lastMessageSender: lastMessage?.sender,
       shouldAllowAnswer,
-      messagesCount: messages.length
+      messagesCount: messages.length,
+      viewMode
     });
-  }, [hasAnswered, isNewSession, lastMessage, shouldAllowAnswer, messages.length]);
+  }, [hasAnswered, isNewSession, lastMessage, shouldAllowAnswer, messages.length, viewMode]);
   
   // In admin view, we don't show the input at all
   if (viewMode === "admin") {
@@ -110,8 +111,8 @@ const InputFooter = ({
       </div>
       
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
-        {/* Show input if shouldAllowAnswer is true */}
-        {shouldAllowAnswer ? (
+        {/* Always show input for participant view for now */}
+        {viewMode === "participant" ? (
           <ChatInput
             inputMessage={inputMessage}
             setInputMessage={setInputMessage}

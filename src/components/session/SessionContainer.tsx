@@ -50,6 +50,8 @@ interface SessionContainerProps {
   setViewMode: (mode: "participant" | "admin") => void;
   isAdmin: boolean;
   onSendAdminMessage?: (message: string) => void;
+  isAnonymous?: boolean;
+  toggleAnonymous?: () => void;
 }
 
 const SessionContainer: React.FC<SessionContainerProps> = ({
@@ -79,7 +81,9 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   viewMode,
   setViewMode,
   isAdmin,
-  onSendAdminMessage
+  onSendAdminMessage,
+  isAnonymous = false,
+  toggleAnonymous = () => {}
 }) => {
   const { isMobile } = useIsMobile();
   
@@ -94,10 +98,6 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
       enhancedParticipantColors[key] = getParticipantColor(key);
     }
   });
-  
-  // Anonymous state
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  const toggleAnonymous = () => setIsAnonymous(prev => !prev);
   
   // Debug logging for messages
   useEffect(() => {
@@ -133,32 +133,21 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           isMobile={isMobile}
           viewMode={viewMode}
           isAdmin={isAdmin}
+          
+          // Pass input functionality props
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          onSendMessage={onSendMessage}
+          isRecording={isRecording}
+          setIsRecording={setIsRecording}
+          isAnonymous={isAnonymous}
+          toggleAnonymous={toggleAnonymous}
+          hasAnswered={hasAnswered}
+          totalResponses={totalResponses}
+          participantNames={allParticipantNames}
+          currentUserParticipantId={currentUserParticipantId}
         />
       </div>
-      
-      {/* Input footer in participant mode - handle in MessagingArea component now */}
-      {!isAdmin && viewMode === "participant" && (
-        <div className="hidden">
-          <InputFooter
-            participantCount={participantCount}
-            currentParticipant={currentParticipant}
-            participantNames={allParticipantNames}
-            participants={participants}
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            onSendMessage={onSendMessage}
-            isRecording={isRecording}
-            setIsRecording={setIsRecording}
-            currentUserParticipantId={currentUserParticipantId}
-            isAnonymous={isAnonymous}
-            toggleAnonymous={toggleAnonymous}
-            hasAnswered={hasAnswered}
-            totalResponses={totalResponses}
-            viewMode={viewMode}
-            messages={messages}
-          />
-        </div>
-      )}
     </div>
   );
 };

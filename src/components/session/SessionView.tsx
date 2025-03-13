@@ -47,6 +47,8 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       setViewMode={props.sessionState.setViewMode}
       isAdmin={isAdmin}
       onSendAdminMessage={props.onSendAdminMessage}
+      isAnonymous={props.anonymousState.isAnonymous}
+      toggleAnonymous={props.anonymousState.toggleAnonymous}
     />
   );
 };

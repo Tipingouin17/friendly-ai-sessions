@@ -17,6 +17,19 @@ interface MessagingAreaProps {
   isMobile: boolean;
   viewMode: "participant" | "admin";
   isAdmin: boolean;
+  
+  // Add props needed for input functionality
+  inputMessage?: string;
+  setInputMessage?: (message: string) => void;
+  onSendMessage?: () => void;
+  isRecording?: boolean;
+  setIsRecording?: (isRecording: boolean) => void;
+  isAnonymous?: boolean;
+  toggleAnonymous?: () => void;
+  hasAnswered?: boolean;
+  totalResponses?: number;
+  participantNames?: { [key: number]: string };
+  currentUserParticipantId?: number | null;
 }
 
 const MessagingArea = ({
@@ -31,7 +44,20 @@ const MessagingArea = ({
   maxParticipants,
   isMobile,
   viewMode,
-  isAdmin
+  isAdmin,
+  
+  // Input props with defaults
+  inputMessage = '',
+  setInputMessage = () => {},
+  onSendMessage = () => {},
+  isRecording = false,
+  setIsRecording = () => {},
+  isAnonymous = false,
+  toggleAnonymous = () => {},
+  hasAnswered = false,
+  totalResponses = 0,
+  participantNames = {},
+  currentUserParticipantId = null
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);
@@ -96,6 +122,20 @@ const MessagingArea = ({
       currentParticipantCount={currentParticipantCount}
       maxParticipants={maxParticipants}
       isMobile={isMobile}
+      
+      // Pass input props to the participant view
+      inputMessage={inputMessage}
+      setInputMessage={setInputMessage}
+      onSendMessage={onSendMessage}
+      isRecording={isRecording}
+      setIsRecording={setIsRecording}
+      isAnonymous={isAnonymous}
+      toggleAnonymous={toggleAnonymous}
+      hasAnswered={hasAnswered}
+      totalResponses={totalResponses}
+      viewMode={viewMode}
+      participantNames={participantNames}
+      currentUserParticipantId={currentUserParticipantId}
     />
   );
 };

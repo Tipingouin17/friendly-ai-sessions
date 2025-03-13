@@ -28,6 +28,7 @@ interface ParticipantMessagingViewProps {
   totalResponses?: number;
   viewMode?: "participant" | "admin";
   participantNames?: { [key: number]: string };
+  currentUserParticipantId?: number | null;
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -53,7 +54,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   hasAnswered = false,
   totalResponses = 0,
   viewMode = "participant",
-  participantNames = {}
+  participantNames = {},
+  currentUserParticipantId = null,
 }) => {
   // Log messages for debugging - removed excessive logging that could cause rerenders
   useEffect(() => {
@@ -85,7 +87,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         onSendMessage={onSendMessage}
         isRecording={isRecording}
         setIsRecording={setIsRecording}
-        currentUserParticipantId={currentParticipant}
+        currentUserParticipantId={currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant}
         isAnonymous={isAnonymous}
         toggleAnonymous={toggleAnonymous}
         hasAnswered={hasAnswered}

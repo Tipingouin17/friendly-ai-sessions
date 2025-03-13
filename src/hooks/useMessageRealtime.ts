@@ -42,13 +42,23 @@ export const useMessageRealtime = ({
           console.log("New message detected via realtime:", payload);
           
           try {
-            // Ensure content is a string
-            const newMessageContent = typeof payload.new.content === 'string' 
-              ? payload.new.content 
-              : JSON.stringify(payload.new.content);
+            // Extract content from the jsonb field
+            const contentData = payload.new.content || {};
             
+            // Support both formats - direct text or content.text
+            const newMessageContent = typeof contentData === 'object' && contentData.text 
+              ? contentData.text 
+              : (typeof payload.new.content === 'string' 
+                  ? payload.new.content 
+                  : JSON.stringify(payload.new.content));
+            
+            // Extract participant ID from content if available
+            const participantId = contentData.participant_id 
+              ? contentData.participant_id 
+              : null;
+              
             // Create participant key if available
-            const participantKey = payload.new.participant_id ? `P${payload.new.participant_id}` : undefined;
+            const participantKey = participantId ? `P${participantId}` : undefined;
             
             console.log("Processing realtime message:", {
               id: payload.new.id,
@@ -64,7 +74,7 @@ export const useMessageRealtime = ({
               participant: participantKey,
               timestamp: new Date(payload.new.created_at),
               color: participantKey ? getParticipantColor(participantKey) : undefined,
-              isAnonymous: !!payload.new.is_anonymous,
+              isAnonymous: contentData.is_anonymous || false,
               likes: []
             };
             

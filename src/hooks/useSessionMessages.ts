@@ -61,32 +61,36 @@ export const useSessionMessages = ({
         
         // Transform database messages to UI message format
         const formattedMessages = data.map(msg => {
-          // Extract participant ID if available (it might be null)
+          // Extract content data - handle both string and object formats
+          const contentData = typeof msg.content === 'object' ? msg.content : { text: msg.content };
+          const messageContent = contentData.text || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
+          
+          // Extract participant ID if available from content
           let participantId: string | undefined = undefined;
-          if ('participant_id' in msg && msg.participant_id) {
-            participantId = `P${msg.participant_id}`;
+          if (contentData.participant_id) {
+            participantId = `P${contentData.participant_id}`;
           }
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
           // Ensure likes is always an array
           let likesArray: string[] = [];
-          if ('likes' in msg && msg.likes) {
+          if (contentData.likes) {
             // If likes exists and is not null, ensure it's an array
-            likesArray = Array.isArray(msg.likes) ? msg.likes : [];
+            likesArray = Array.isArray(contentData.likes) ? contentData.likes : [];
           }
           
           return {
             id: String(msg.id),
-            content: msg.content as string,
+            content: messageContent,
             sender: msg.role === 'assistant' ? 'assistant' : 'user',
             participant: participantId,
             color,
             timestamp: new Date(msg.created_at),
             created_at: msg.created_at,
             likes: likesArray,
-            isReport: 'is_report' in msg ? Boolean(msg.is_report) : false,
-            isAnonymous: 'is_anonymous' in msg ? Boolean(msg.is_anonymous) : false
+            isReport: contentData.is_report ? true : false,
+            isAnonymous: contentData.is_anonymous ? true : false
           } as Message; // Type assertion to ensure it matches the Message type
         });
         

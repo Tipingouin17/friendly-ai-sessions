@@ -88,15 +88,18 @@ export const useMessageSender = ({
       // Record this participant has responded - after adding the message
       sessionState.recordResponse(currentParticipant, true);
       
-      // Store message in database for sync - remove the is_anonymous field as it doesn't exist in the schema
+      // Store message in database for sync - now using JSONB content field to hold participant info
       const { data, error: dbError } = await supabase.from('messages').insert({
         conversation_id: currentConversationId,
-        content: sentMessage,
+        content: {
+          text: sentMessage,
+          participant_id: currentParticipant, // Store participant ID in the content field
+          name: participantInfo?.name || `Participant ${currentParticipant}`,
+          is_anonymous: isAnonymous
+        },
         role: 'user',
-        participant_id: currentParticipant,
-        name: participantInfo?.name || `Participant ${currentParticipant}`,
-        user_id: null // For anonymous participants
-        // Removed is_anonymous field as it doesn't exist in the database schema
+        name: participantInfo?.name || `Participant ${currentParticipant}`
+        // Removed participant_id as it doesn't exist in the database schema
       }).select();
       
       if (dbError) {
@@ -156,7 +159,9 @@ export const useMessageSender = ({
           try {
             await supabase.from('messages').insert({
               conversation_id: currentConversationId,
-              content: aiResponse.content,
+              content: {
+                text: aiResponse.content
+              },
               role: 'assistant',
               user_id: null
             });

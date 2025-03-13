@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { BillingDetails } from '../types';
-import { createSafeUrl, applySafeCookieParams } from '@/utils/crossOriginUtils';
+import { createSafeUrl, applySafeCookieParams, handleStripeCookies } from '@/utils/crossOriginUtils';
 import { CardElement } from '@stripe/react-stripe-js';
 
 export const createSubscription = async (
@@ -10,6 +10,9 @@ export const createSubscription = async (
   userId: string,
   billingDetails: BillingDetails,
 ) => {
+  // Ensure Stripe cookies are properly handled
+  handleStripeCookies();
+  
   const returnUrl = createSafeUrl('/profile');
   console.log("Using return URL:", returnUrl);
 
@@ -45,6 +48,9 @@ export const confirmPayment = async (
   billingDetails: BillingDetails,
   returnUrl: string
 ) => {
+  // Ensure Stripe cookies are properly handled
+  handleStripeCookies();
+  
   const cardElement = elements.getElement(CardElement);
   if (!cardElement) {
     throw new Error('Card element not found');
@@ -78,6 +84,9 @@ export const confirmSubscription = async (
   planId: number,
   paymentIntentId?: string
 ) => {
+  // Ensure Stripe cookies are properly handled
+  handleStripeCookies();
+  
   const confirmOptions = applySafeCookieParams({
     method: 'POST',
     headers: {

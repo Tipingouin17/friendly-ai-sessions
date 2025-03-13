@@ -36,14 +36,18 @@ export const createSafeUrl = (path: string): string => {
 
 /**
  * Safely handle cookies in cross-origin contexts by adding appropriate parameters
+ * Enhanced to handle Stripe cookies specifically
  */
 export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => {
   const isHttps = window.location.protocol === 'https:';
   const isCrossOrigin = isInCrossOriginContext();
+  const isInIframe = window !== window.top;
   
+  // Always use 'none' for SameSite in cross-origin contexts (required for Stripe)
+  // This ensures cookies will be sent in cross-site requests
   return {
-    sameSite: isCrossOrigin ? 'none' : 'lax',
-    secure: isHttps || isCrossOrigin, // Always secure for cross-origin, optional for same-origin
+    sameSite: (isCrossOrigin || isInIframe) ? 'none' : 'lax',
+    secure: isHttps || isCrossOrigin || isInIframe, // Always secure for cross-origin/iframe contexts
   };
 };
 
@@ -80,6 +84,7 @@ export const createSessionFallbackUrl = (sessionId?: string | number): string =>
 
 /**
  * Sets a cookie with proper SameSite attributes for cross-origin contexts
+ * Enhanced to handle Stripe cookies in cross-origin contexts
  */
 export const setCrossDomainCookie = (name: string, value: string, days = 7): void => {
   const { sameSite, secure } = getSafeCookieParams();
@@ -107,4 +112,24 @@ export const setCrossDomainCookie = (name: string, value: string, days = 7): voi
 export const getCookie = (name: string): string | null => {
   const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
   return match ? decodeURIComponent(match[3]) : null;
+};
+
+/**
+ * Specifically handle Stripe cookies in cross-origin contexts
+ */
+export const handleStripeCookies = (): void => {
+  // Check if we're in a context where Stripe cookies need special handling
+  if (isInCrossOriginContext() || isInIframe()) {
+    // Attempt to fix Stripe cookies by checking for their presence and re-setting them
+    const stripeMid = getCookie('__stripe_mid');
+    const stripeSid = getCookie('__stripe_sid');
+    
+    if (stripeMid) {
+      setCrossDomainCookie('__stripe_mid', stripeMid);
+    }
+    
+    if (stripeSid) {
+      setCrossDomainCookie('__stripe_sid', stripeSid);
+    }
+  }
 };

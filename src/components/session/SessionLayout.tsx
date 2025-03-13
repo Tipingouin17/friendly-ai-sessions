@@ -10,9 +10,9 @@ const SessionLayout = ({ children }: SessionLayoutProps) => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex flex-col">
-      <div className={`container mx-auto h-full max-w-4xl flex flex-col ${isMobile ? 'pt-0' : 'pt-16'}`}>
-        <div className={`flex-1 bg-white ${isMobile ? 'rounded-none' : 'rounded-t-3xl'} shadow-lg flex flex-col relative`}>
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className={`container mx-auto h-full max-w-7xl flex flex-col ${isMobile ? 'p-0' : 'px-4 pt-6'}`}>
+        <div className={`flex-1 bg-white ${isMobile ? 'rounded-none' : 'rounded-lg'} shadow-sm flex flex-col relative`}>
           {children}
         </div>
       </div>

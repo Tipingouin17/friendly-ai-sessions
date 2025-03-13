@@ -5,20 +5,18 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useConversationId } from "@/hooks/useConversationId";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { 
-  Share2, 
   MessageSquare, 
-  QrCode, 
-  Download,
-  Play,
   Pause,
-  Info
+  Play,
+  QrCode,
+  Share2,
+  Download,
+  Info,
+  Users
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import AdminActionButton from './AdminActionButton';
 import AdminMessageDialog from './AdminMessageDialog';
 import AdminQrDialog from './AdminQrDialog';
-import ParticipantCounter from './ParticipantCounter';
-import SessionStatusBadge from './SessionStatusBadge';
 import { AdminHeaderProps } from './types';
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({ 
@@ -29,7 +27,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   isSessionActive = true,
   onToggleSessionState,
   onSendAdminMessage,
-  onExportData
+  onExportData,
+  sessionState
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -41,10 +40,9 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [joinUrl, setJoinUrl] = useState('');
   const { setAdminStatus } = useSessionAdminStatus();
   
-  // Get session details from location state
-  const sessionState = location.state || {};
-  const sessionObjective = sessionState.objective || '';
-  const sessionLanguage = sessionState.language || 'English';
+  // Get session details
+  const sessionObjective = sessionState?.objective || '';
+  const sessionLanguage = sessionState?.language || 'English';
   
   // Generate join URL when component mounts or conversation ID changes
   useEffect(() => {
@@ -52,13 +50,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       const baseUrl = window.location.origin;
       const url = `${baseUrl}/join-session?id=${currentConversationId}`;
       setJoinUrl(url);
-      console.log("Generated join URL:", url);
     }
   }, [currentConversationId]);
   
   // Enforce admin status on mount
   useEffect(() => {
-    console.log("AdminHeader mounted - enforcing admin status");
     sessionStorage.setItem('isAdminSession', 'true');
     setAdminStatus(true);
   }, [setAdminStatus]);
@@ -71,7 +67,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         description: "Session join link copied to clipboard",
       });
       
-      // Mark as admin to maintain state
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
     }
@@ -79,7 +74,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   
   const handleSendMessage = (message: string) => {
     if (message.trim() && onSendAdminMessage) {
-      // Ensure admin status before sending
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
       
@@ -92,24 +86,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
   };
   
-  // Show QR code dialog without losing admin state
   const handleShowQrDialog = () => {
-    // Ensure admin state is preserved
     sessionStorage.setItem('isAdminSession', 'true');
     setAdminStatus(true);
     setShowQrDialog(true);
   };
   
-  // Handle dialog close without losing admin state
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      // Reaffirm admin state when closing dialog
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
       
-      // Check if we need to redirect back to admin page
       if (currentConversationId && !window.location.pathname.includes('/admin')) {
-        console.log("Dialog closed but not on admin path - redirecting back to admin page");
         navigate(`/session/admin?id=${currentConversationId}`, { 
           state: { 
             isAdmin: true,
@@ -123,30 +111,27 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     setShowQrDialog(open);
   };
   
-  // Handler for any action button to ensure admin status is preserved
   const handleAdminAction = (callback?: () => void) => {
-    // Enforce admin status
     sessionStorage.setItem('isAdminSession', 'true');
     setAdminStatus(true);
     
-    // Call the original callback if provided
     if (callback) callback();
   };
 
-  // Toggle session details visibility
   const toggleSessionDetails = () => {
     setShowSessionDetails(!showSessionDetails);
   };
   
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-16 z-10 shadow-sm">
+    <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-10">
       <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-gray-900">{sessionTitle}</h1>
-              <SessionStatusBadge isActive={isSessionActive} />
-              
+        <div className="flex flex-col space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-semibold text-gray-900">{sessionTitle || "Session Admin Panel"}</h1>
+              <div className={`px-3 py-1 text-sm font-medium rounded-full ${isSessionActive ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                {isSessionActive ? 'Active' : 'Paused'}
+              </div>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -154,7 +139,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
                       onClick={toggleSessionDetails}
                       className="p-1 rounded-full hover:bg-gray-100 transition-colors"
                     >
-                      <Info size={16} className="text-gray-500" />
+                      <Info size={18} className="text-gray-500" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -164,57 +149,71 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               </TooltipProvider>
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              {facilitatorTitle && (
-                <span>Facilitator: {facilitatorTitle}</span>
-              )}
-              <span className="text-gray-400">•</span>
-              <ParticipantCounter 
-                currentParticipants={currentParticipants}
-                maxParticipants={maxParticipants}
-              />
-              <span className="text-gray-400">•</span>
-              <span>Language: {sessionLanguage}</span>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <MessageSquare size={18} />
+                Send Message
+              </button>
+              
+              <button 
+                onClick={() => handleAdminAction(onToggleSessionState)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                {isSessionActive ? <Pause size={18} /> : <Play size={18} />}
+                {isSessionActive ? "Pause" : "Resume"}
+              </button>
+              
+              <button 
+                onClick={() => handleAdminAction(handleShowQrDialog)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <QrCode size={18} />
+                QR Code
+              </button>
+              
+              <button 
+                onClick={() => handleAdminAction(copySessionLink)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Share2 size={18} />
+                Share
+              </button>
+              
+              <button 
+                onClick={() => handleAdminAction(onExportData)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Download size={18} />
+                Export
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex items-center text-sm text-gray-500 space-x-6">
+            <div className="flex items-center gap-1">
+              <Users size={16} className="text-gray-400" />
+              <span>{currentParticipants}/{maxParticipants}</span>
             </div>
             
-            {showSessionDetails && sessionObjective && (
-              <div className="mt-2 text-sm text-gray-600 max-w-3xl">
-                <span className="font-medium">Objective:</span> {sessionObjective}
+            <div>
+              Language: {sessionLanguage}
+            </div>
+            
+            {facilitatorTitle && (
+              <div>
+                Facilitator: {facilitatorTitle}
               </div>
             )}
           </div>
           
-          <div className="flex items-center gap-2 mt-2 md:mt-0">
-            <AdminActionButton
-              icon={<MessageSquare size={16} />}
-              label="Send Message"
-              onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
-            />
-            
-            <AdminActionButton
-              icon={isSessionActive ? <Pause size={16} /> : <Play size={16} />}
-              label={isSessionActive ? "Pause" : "Resume"}
-              onClick={() => handleAdminAction(onToggleSessionState)}
-            />
-            
-            <AdminActionButton
-              icon={<QrCode size={16} />}
-              label="QR Code"
-              onClick={() => handleAdminAction(handleShowQrDialog)}
-            />
-            
-            <AdminActionButton
-              icon={<Share2 size={16} />}
-              label="Share"
-              onClick={() => handleAdminAction(copySessionLink)}
-            />
-            
-            <AdminActionButton
-              icon={<Download size={16} />}
-              label="Export"
-              onClick={() => handleAdminAction(onExportData)}
-            />
-          </div>
+          {showSessionDetails && sessionObjective && (
+            <div className="mt-1 text-sm text-gray-600 max-w-3xl">
+              <span className="font-medium">Objective:</span> {sessionObjective}
+            </div>
+          )}
         </div>
       </div>
       

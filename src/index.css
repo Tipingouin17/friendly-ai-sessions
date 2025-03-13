@@ -56,6 +56,23 @@
     @apply w-4 h-4 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
   }
   
+  /* Admin session page specific styles */
+  .admin-button {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors;
+  }
+  
+  .status-badge {
+    @apply px-3 py-1 text-sm font-medium rounded-full;
+  }
+  
+  .status-badge-active {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .status-badge-paused {
+    @apply bg-amber-100 text-amber-800;
+  }
+  
   /* Mobile-optimized message bubbles */
   @media (max-width: 640px) {
     .message-bubble-user {

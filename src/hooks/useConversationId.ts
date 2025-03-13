@@ -10,6 +10,7 @@ export interface LocationStateType {
   showMessaging?: boolean;
   isAdmin?: boolean;
   newConversationId?: number; // Add support for this field that might be passed
+  avatarSeed?: string; // Added this property to fix the type error
 }
 
 export const useConversationId = () => {

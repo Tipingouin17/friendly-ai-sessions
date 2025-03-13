@@ -3,7 +3,7 @@ import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { EyeOff, Users } from "lucide-react";
+import { EyeOff, Users, CheckCircle2 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -66,45 +66,53 @@ const InputFooter = ({
             <Users className="w-3 h-3 mr-1" />
             <span>{totalResponses} of {participantCount} answered</span>
           </Badge>
-          
-          {hasAnswered && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              Your answer submitted
-            </Badge>
-          )}
         </div>
         
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Toggle 
-                pressed={isAnonymous} 
-                onPressedChange={toggleAnonymous}
-                size="sm"
-                variant="outline"
-                className={isAnonymous ? "bg-gray-100" : ""}
-              >
-                <EyeOff className="h-3.5 w-3.5 mr-1" />
-                Anonymous
-              </Toggle>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>When enabled, your name will not be shown with your messages</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {!hasAnswered && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Toggle 
+                  pressed={isAnonymous} 
+                  onPressedChange={toggleAnonymous}
+                  size="sm"
+                  variant="outline"
+                  className={isAnonymous ? "bg-gray-100" : ""}
+                >
+                  <EyeOff className="h-3.5 w-3.5 mr-1" />
+                  Anonymous
+                </Toggle>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>When enabled, your name will not be shown with your messages</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
       
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">
-        <ChatInput
-          inputMessage={inputMessage}
-          setInputMessage={setInputMessage}
-          onSendMessage={onSendMessage}
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
-          placeholder={`Type as ${participantName}...`}
-          disabled={hasAnswered}
-        />
+        {hasAnswered ? (
+          <div className="p-6 flex flex-col items-center justify-center">
+            <div className="mb-4 flex items-center justify-center gap-2 bg-green-50 px-4 py-3 rounded-lg text-green-700 border border-green-200 w-full">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="font-medium">Your answer has been submitted</span>
+            </div>
+            <p className="text-sm text-gray-500">
+              Waiting for other participants to respond...
+            </p>
+          </div>
+        ) : (
+          <ChatInput
+            inputMessage={inputMessage}
+            setInputMessage={setInputMessage}
+            onSendMessage={onSendMessage}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            placeholder={`Type as ${participantName}...`}
+            disabled={false}
+          />
+        )}
       </div>
     </>
   );

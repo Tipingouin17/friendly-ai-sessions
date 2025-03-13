@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 
@@ -23,8 +23,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   isWaitingForResponse = false,
   onLikeMessage,
   participants,
-  isMobile
+  isMobile,
+  conversationId
 }) => {
+  // Log messages for debugging
+  useEffect(() => {
+    console.log("ParticipantMessagingView - Rendering with messages:", 
+      messages.map(m => ({
+        id: m.id,
+        content: m.content.substring(0, 20) + "...",
+        sender: m.sender,
+        participant: m.participant
+      }))
+    );
+    console.log("ParticipantMessagingView - Current participant:", `P${currentParticipant}`);
+  }, [messages, currentParticipant]);
+  
   return (
     <div className="flex-1 overflow-hidden">
       <MessageList 

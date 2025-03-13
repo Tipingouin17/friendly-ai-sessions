@@ -39,11 +39,10 @@ export const useMessageRealtime = ({
           table: 'messages',
           filter: `conversation_id=eq.${currentConversationId}`
         }, (payload) => {
-          console.log("New message detected:", payload);
+          console.log("New message detected via realtime:", payload);
           
-          // For both admin and participant views, we need to update messages
-          // This ensures all views see messages from all participants in real-time
           try {
+            // Ensure content is a string
             const newMessageContent = typeof payload.new.content === 'string' 
               ? payload.new.content 
               : JSON.stringify(payload.new.content);
@@ -51,8 +50,15 @@ export const useMessageRealtime = ({
             // Create participant key if available
             const participantKey = payload.new.participant_id ? `P${payload.new.participant_id}` : undefined;
             
+            console.log("Processing realtime message:", {
+              id: payload.new.id,
+              content: newMessageContent.substring(0, 20) + "...",
+              role: payload.new.role,
+              participantKey
+            });
+            
             const newMessage: Message = {
-              id: payload.new.id.toString(),
+              id: String(payload.new.id),
               content: newMessageContent,
               sender: payload.new.role === 'assistant' ? 'assistant' : 'user',
               participant: participantKey,
@@ -64,17 +70,28 @@ export const useMessageRealtime = ({
             
             // Add to messages state if it doesn't already exist
             setMessages(prevMessages => {
-              if (prevMessages.some(msg => msg.id === newMessage.id)) {
+              // Check if this message already exists in our state
+              if (prevMessages.some(msg => msg.id === String(payload.new.id))) {
+                console.log("Message already exists in state, not adding duplicate");
                 return prevMessages;
               }
-              console.log("Adding new message to state:", newMessage);
+              
+              console.log("Adding new message to state:", {
+                id: newMessage.id,
+                content: newMessage.content.substring(0, 20) + "...",
+                sender: newMessage.sender,
+                participant: newMessage.participant
+              });
+              
               return [...prevMessages, newMessage];
             });
           } catch (error) {
             console.error("Error processing new message:", error);
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Message channel subscription status: ${status}`);
+        });
       
       messageChannelRef.current = channel;
       

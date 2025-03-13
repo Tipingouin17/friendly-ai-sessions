@@ -59,6 +59,11 @@ const MessagingArea = ({
   // For participant view, filter messages to only show their own and facilitator messages
   const filteredMessages = React.useMemo(() => {
     if (viewMode === "participant") {
+      console.log("Filtering messages for participant view", {
+        currentParticipant,
+        participantKey: `P${currentParticipant}`
+      });
+      
       return messages.filter(message => {
         // Always show facilitator messages
         if (message.sender === "assistant") {
@@ -68,9 +73,11 @@ const MessagingArea = ({
         // Show this participant's messages
         const participantKey = `P${currentParticipant}`;
         if (message.sender === "user" && message.participant === participantKey) {
+          console.log("Including participant message:", message.content.substring(0, 20));
           return true;
         }
         
+        console.log("Filtering out message:", message.content.substring(0, 20), "from participant", message.participant);
         return false;
       });
     }

@@ -60,28 +60,29 @@ export const useMessageSender = ({
       message: sessionState.inputMessage
     });
     
-    // Create the message object
-    const messageId = nanoid();
-    const newMessage = {
-      id: messageId,
-      content: sessionState.inputMessage,
-      sender: "user" as const,
-      participant: currentParticipantKey,
-      timestamp: new Date(),
-      color: participantColors[currentParticipantKey] || "#CCCCCC",
-      avatar: participantInfo?.avatar,
-      isAnonymous: isAnonymous
-    };
-
-    console.log("Adding new message to UI:", newMessage);
-
-    // Add the participant's message to the displayed messages
-    sessionState.setMessages(prev => [...prev, newMessage]);
-    
     try {
       requestInProgressRef.current = true;
       
+      // Create the message object
+      const messageId = nanoid();
+      const newMessage = {
+        id: messageId,
+        content: sessionState.inputMessage,
+        sender: "user" as const,
+        participant: currentParticipantKey,
+        timestamp: new Date(),
+        color: participantColors[currentParticipantKey] || "#CCCCCC",
+        avatar: participantInfo?.avatar,
+        isAnonymous: isAnonymous
+      };
+
+      console.log("Adding new message to UI:", newMessage);
+
+      // Add the participant's message to the displayed messages immediately
+      sessionState.setMessages(prev => [...prev, newMessage]);
+      
       // Clear the input message immediately to prevent duplicate sends
+      const sentMessage = sessionState.inputMessage;
       sessionState.setInputMessage("");
       
       // Record this participant has responded - after adding the message
@@ -90,7 +91,7 @@ export const useMessageSender = ({
       // Store message in database for sync
       const { data, error: dbError } = await supabase.from('messages').insert({
         conversation_id: currentConversationId,
-        content: sessionState.inputMessage,
+        content: sentMessage,
         role: 'user',
         participant_id: currentParticipant,
         name: participantInfo?.name || `Participant ${currentParticipant}`,
@@ -112,7 +113,8 @@ export const useMessageSender = ({
       
       console.log("Total expected participants:", totalParticipants);
       console.log("Current total responses:", updatedTotalResponses);
-      console.log("Total participants vs responses:", totalParticipants, updatedTotalResponses);
+      console.log("Single participant check:", totalParticipants <= 1);
+      console.log("All participants responded check:", updatedTotalResponses >= totalParticipants);
       
       // Always get AI response if either:
       // 1. This is the only participant (totalParticipants == 1)
@@ -160,13 +162,13 @@ export const useMessageSender = ({
             });
             
             console.log("AI response saved to database");
+            
+            // Add the AI response to the messages
+            sessionState.setMessages(prev => [...prev, aiResponse]);
           } catch (error) {
             console.error("Error saving AI response to database:", error);
             setError("Failed to save AI response. Please try again.");
           }
-          
-          // Add the AI response to the messages
-          sessionState.setMessages(prev => [...prev, aiResponse]);
         } catch (error) {
           console.error('Error getting AI response:', error);
           const errorMessage = error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.";
@@ -181,11 +183,11 @@ export const useMessageSender = ({
         }
       }
     } catch (error) {
-      console.error("Error saving message to database:", error);
-      setError("Failed to save message. Please try again.");
+      console.error("Error sending message:", error);
+      setError("Failed to send message. Please try again.");
       toast({
         title: "Error sending message",
-        description: "Failed to save message. Please try again.",
+        description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
     } finally {

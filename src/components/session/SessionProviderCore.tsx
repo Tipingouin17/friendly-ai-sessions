@@ -67,7 +67,8 @@ export const SessionProviderCore = ({
         description: "You have administrator access to this session."
       });
     }
-    // Don't return anything from this effect - this fixes the "must not return anything besides a function" error
+    // Return undefined explicitly to fix the "must not return anything besides a function" error
+    return undefined;
   }, [effectiveAdmin, toast]);
   
   // Load core provider state
@@ -102,7 +103,8 @@ export const SessionProviderCore = ({
         handleError(dataError);
       }
     }
-    // Don't return anything from this effect
+    // Return undefined explicitly
+    return undefined;
   }, [dataError, handleError, effectiveAdmin]);
 
   // Set up participant management
@@ -142,7 +144,8 @@ export const SessionProviderCore = ({
     if (isSessionFull && effectiveAdmin) {
       console.error("Admin user incorrectly marked as session full - this should never happen");
     }
-    // Don't return anything from this effect
+    // Return undefined explicitly
+    return undefined;
   }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
       maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin, persistedParticipantData]);
 

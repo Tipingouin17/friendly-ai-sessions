@@ -41,13 +41,13 @@ export const createSafeUrl = (path: string): string => {
 export const getSafeCookieParams = (): { sameSite: string; secure: boolean } => {
   const isHttps = window.location.protocol === 'https:';
   const isCrossOrigin = isInCrossOriginContext();
-  const isInIframe = window !== window.top;
+  const isInIframeContext = window !== window.top;
   
   // Always use 'none' for SameSite in cross-origin contexts (required for Stripe)
   // This ensures cookies will be sent in cross-site requests
   return {
-    sameSite: (isCrossOrigin || isInIframe) ? 'none' : 'lax',
-    secure: isHttps || isCrossOrigin || isInIframe, // Always secure for cross-origin/iframe contexts
+    sameSite: (isCrossOrigin || isInIframeContext) ? 'none' : 'lax',
+    secure: isHttps || isCrossOrigin || isInIframeContext, // Always secure for cross-origin/iframe contexts
   };
 };
 

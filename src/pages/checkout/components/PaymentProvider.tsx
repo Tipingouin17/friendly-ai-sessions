@@ -21,7 +21,20 @@ export const PaymentProvider = ({ children }: PaymentProviderProps) => {
   
   // Handle Stripe cookies in cross-origin contexts
   useEffect(() => {
+    // Call handleStripeCookies to ensure cookies are set correctly
     handleStripeCookies();
+    
+    // Set up interval to periodically check and fix Stripe cookies
+    const intervalId = setInterval(() => {
+      handleStripeCookies();
+    }, 5000); // Check every 5 seconds
+    
+    // Cleanup function to clear interval
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
   
   return (

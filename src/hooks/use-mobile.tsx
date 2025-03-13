@@ -8,16 +8,33 @@ export function useIsMobile() {
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    
     const onChange = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
-    mql.addEventListener("change", onChange)
+    
+    // Add event listener safely
+    if (mql.addEventListener) {
+      mql.addEventListener("change", onChange)
+    } else {
+      // Fallback for older browsers
+      mql.addListener(onChange)
+    }
+    
+    // Initial check
     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     
-    // Return the cleanup function with no null return
-    return () => mql.removeEventListener("change", onChange)
+    // Return a proper cleanup function
+    return () => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener("change", onChange)
+      } else {
+        // Fallback for older browsers
+        mql.removeListener(onChange)
+      }
+    }
   }, [])
 
-  // Return the boolean primitive directly
+  // Return the boolean primitive directly (not an object with a destroy method)
   return isMobile
 }

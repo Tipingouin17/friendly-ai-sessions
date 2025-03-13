@@ -31,7 +31,8 @@ export function useSessionWrapperEffects({
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status");
     }
-    // No return statement needed here
+    // Return undefined explicitly
+    return undefined;
   }, [effectiveAdmin, isOnAdminPath]);
 
   // Initialize session when data is available
@@ -79,7 +80,8 @@ export function useSessionWrapperEffects({
         onInitialized();
       }
     }
-    // This effect doesn't need a cleanup function
+    // Return undefined explicitly
+    return undefined;
   }, [props.conversation, props.currentConversationId, props.error, props.isAdmin, 
      props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, 
      isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
@@ -103,7 +105,8 @@ export function useSessionWrapperEffects({
         }
       }
     }
-    // This effect doesn't need a cleanup function
+    // Return undefined explicitly
+    return undefined;
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, 
      effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
@@ -117,6 +120,7 @@ export function useSessionWrapperEffects({
         onError(props.error);
       }
     }
-    // This effect doesn't need a cleanup function
+    // Return undefined explicitly
+    return undefined;
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

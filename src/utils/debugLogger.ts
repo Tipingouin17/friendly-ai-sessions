@@ -25,6 +25,7 @@ const DEBUG_CONFIG = {
   errors: true,            // Always log errors
   warnings: true,          // Always log warnings
   admin: true,             // Admin-specific logs
+  all: true,               // Generic logs that don't fit in other categories
 };
 
 // Enable all logs with this flag (overrides individual settings)
@@ -40,7 +41,7 @@ const DISABLE_ALL_LOGS = false;
  * @param data Optional data to log
  */
 export function debugLog(
-  category: keyof typeof DEBUG_CONFIG | 'all', 
+  category: keyof typeof DEBUG_CONFIG, 
   message: string, 
   ...data: any[]
 ) {

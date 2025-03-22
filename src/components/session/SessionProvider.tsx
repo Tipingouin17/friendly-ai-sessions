@@ -92,22 +92,44 @@ export const SessionProvider = ({
     );
   }
 
+  // Ensure roomState has all required properties
+  const enhancedRoomState = {
+    messages: roomState.messages || [],
+    inputMessage: roomState.inputMessage || "",
+    setInputMessage: roomState.setInputMessage || (() => {}),
+    currentParticipant: roomState.currentParticipant || 0,
+    isRecording: roomState.isRecording || false,
+    setIsRecording: roomState.setIsRecording || (() => {}),
+    handleGenerateReport: roomState.handleGenerateReport || (async () => Promise.resolve()),
+    isGeneratingReport: roomState.isGeneratingReport || false,
+    setMessages: roomState.setMessages || (() => {}),
+    hasAnswered: roomState.hasAnswered || false,
+    totalResponses: roomState.totalResponses || 0,
+    viewMode: roomState.viewMode || "participant",
+    setViewMode: roomState.setViewMode || (() => {}),
+    recordResponse: roomState.recordResponse || (() => {}),
+    error: roomState.error || null
+  };
+
   // Build session context
   const sessionContext: SessionContextProps = {
     isLoading,
     conversation,
     currentConversationId,
-    sessionState: roomState,
+    sessionState: enhancedRoomState,
     participants,
     participantColors,
     isWaitingForResponse: roomState.isWaitingForResponse || false,
     handleStartSession: enhancedHandleStartSession,
-    handleSendMessage: roomState.handleSendMessage,
-    handleLikeMessage: roomState.handleLikeMessage,
+    handleSendMessage: roomState.handleSendMessage || (async () => Promise.resolve()),
+    handleLikeMessage: roomState.handleLikeMessage || (() => {}),
     showQrCodeView,
     sessionLink,
     currentUserParticipantId,
-    anonymousState: roomState.anonymousState,
+    anonymousState: roomState.anonymousState || {
+      isAnonymous: false,
+      toggleAnonymous: () => {}
+    },
     isSessionStartedInDB,
     error: providerError,
     

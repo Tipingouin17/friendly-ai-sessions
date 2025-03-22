@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+
+import { useEffect, useMemo } from "react";
 import { SessionContextProps } from "@/types/session";
+import { participantColors } from "@/utils/sessionHelpers";
 
 interface UseSessionContextValueProps {
   isLoading: boolean;

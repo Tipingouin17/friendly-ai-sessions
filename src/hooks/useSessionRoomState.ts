@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
@@ -28,6 +29,8 @@ export const useSessionRoomState = ({
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
   // Get anonymous state
   const anonymousState = useAnonymousState({
@@ -41,12 +44,29 @@ export const useSessionRoomState = ({
     recordResponse,
     totalResponses,
     hasAnswered,
-    viewMode
+    viewMode,
+    setViewMode
   } = useSessionMessages({
-    conversation,
+    conversationId,
     currentUserParticipantId,
     isAdmin
   });
+  
+  // Handle report generation
+  const handleGenerateReport = async () => {
+    if (!conversationId) return;
+    
+    setIsGeneratingReport(true);
+    try {
+      // Placeholder for report generation logic
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log("Report generated for conversation", conversationId);
+    } catch (error) {
+      console.error("Error generating report:", error);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
   
   // Set up session interactions
   const {
@@ -78,13 +98,19 @@ export const useSessionRoomState = ({
     inputMessage,
     setInputMessage,
     currentParticipant,
+    isRecording,
+    setIsRecording,
+    handleGenerateReport,
+    isGeneratingReport,
     recordResponse,
     totalResponses,
     hasAnswered,
-    viewMode: isAdmin ? "admin" : "participant",
+    viewMode,
+    setViewMode,
     isWaitingForResponse,
     handleSendMessage,
     handleLikeMessage,
-    anonymousState
+    anonymousState,
+    error
   };
 };

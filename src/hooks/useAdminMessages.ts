@@ -15,8 +15,8 @@ interface UseAdminMessagesProps {
 
 export function useAdminMessages({ 
   conversationId, 
-  participants = [], // Provide default empty array
-  messages = [], // Provide default empty array
+  participants = [], 
+  messages = [], 
   setMessages 
 }: UseAdminMessagesProps) {
   const { toast } = useToast();
@@ -31,8 +31,8 @@ export function useAdminMessages({
   } = useAdminSessionState({
     conversationId,
     currentUserParticipantId: null,
-    participants: participants || [], // Ensure it's always an array
-    messages: messages || [], // Ensure it's always an array
+    participants: participants || [],
+    messages: messages || [], 
     setMessages
   });
 

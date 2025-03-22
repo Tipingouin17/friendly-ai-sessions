@@ -6,7 +6,7 @@ export interface Plan {
   title: string;
   price: number;
   plan_type: string;
-  plan_table_details: {
+  plan_table_details?: {
     no_of_facilitator: number | string | null;
     no_of_sessions: number | string | null;
     max_participants: number | string | null;

@@ -6,6 +6,19 @@ import { removeChannel, createUniqueChannelName } from "@/utils/realtimeHelpers"
 import { getParticipantColor } from "@/utils/sessionHelpers";
 import { nanoid } from "nanoid";
 
+// Define a type for the Supabase payload based on the message structure
+interface MessagePayload {
+  new: {
+    id: string | number;
+    content: any; // Could be string or object
+    role: string;
+    created_at: string;
+    conversation_id: number;
+  };
+  old?: Record<string, any>;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+}
+
 type UseMessageRealtimeProps = {
   currentConversationId: number | null;
   viewMode: "participant" | "admin";
@@ -52,8 +65,14 @@ export const useMessageRealtime = ({
             schema: 'public',
             table: 'messages',
             filter: `conversation_id=eq.${currentConversationId}`
-          }, (payload) => {
+          }, (payload: any) => {
             if (!mountedRef.current) return;
+            
+            // Type checking to ensure payload has the expected structure
+            if (!payload || !payload.new) {
+              console.warn('Received invalid payload:', payload);
+              return;
+            }
             
             console.log(`New message detected via realtime in ${viewMode} view:`, payload);
             
@@ -63,7 +82,7 @@ export const useMessageRealtime = ({
               let participantId: string | undefined = undefined;
               let isAnonymous = false;
               
-              // Get the content data safely
+              // Safely access content data
               const contentData = payload.new.content;
               
               // Handle different content formats
@@ -89,6 +108,11 @@ export const useMessageRealtime = ({
                 
                 // Get anonymous flag if present
                 isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
+              }
+              
+              if (!payload.new.id) {
+                console.warn('Message has no ID:', payload);
+                return;
               }
               
               console.log(`Processing realtime message in ${viewMode} view:`, {
@@ -197,12 +221,21 @@ export const useMessageRealtime = ({
       
       // Process messages and update state
       const processedMessages = data.map(msg => {
+        // Type safety: ensure msg has all expected properties
+        if (!msg || typeof msg !== 'object') {
+          console.warn('Invalid message in data:', msg);
+          return null;
+        }
+        
         // Extract content data
         let messageContent = '';
         let participantId: string | undefined = undefined;
         let isAnonymous = false;
         
-        if (typeof msg.content === 'string') {
+        if (!('content' in msg)) {
+          console.warn('Message missing content:', msg);
+          messageContent = 'No content';
+        } else if (typeof msg.content === 'string') {
           messageContent = msg.content;
         } else if (msg.content && typeof msg.content === 'object') {
           const contentObj = msg.content as Record<string, any>;
@@ -222,6 +255,11 @@ export const useMessageRealtime = ({
           isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
         }
         
+        if (!('id' in msg) || !('role' in msg) || !('created_at' in msg)) {
+          console.warn('Message missing required fields:', msg);
+          return null;
+        }
+        
         return {
           id: String(msg.id),
           content: messageContent,
@@ -232,7 +270,7 @@ export const useMessageRealtime = ({
           isAnonymous,
           likes: []
         } as Message;
-      });
+      }).filter(Boolean) as Message[]; // Filter out null values
       
       console.log(`Refreshed ${processedMessages.length} messages for ${viewMode} view`);
       setMessages(processedMessages);

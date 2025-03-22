@@ -1,20 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-
-/**
- * Safely removes a Supabase channel subscription
- * @param channel The channel to remove
- */
-export const removeChannel = (channel: any) => {
-  if (channel && typeof channel.unsubscribe === 'function') {
-    try {
-      channel.unsubscribe();
-      supabase.removeChannel(channel);
-    } catch (err) {
-      console.error("Error removing channel:", err);
-    }
-  }
-};
+import { removeChannel, createUniqueChannelName, createReliableChannel } from "./realtimeHelpers";
 
 /**
  * Safely removes multiple Supabase channel subscriptions
@@ -39,15 +25,25 @@ export const createConversationChannel = (
 ) => {
   console.log(`Creating conversation channel for ID: ${conversationId}`);
   
-  return supabase
-    .channel(`conversation-${conversationId}`)
-    .on('postgres_changes', { 
-      event: 'UPDATE', 
-      schema: 'public', 
-      table: 'conversations',
-      filter: `id=eq.${conversationId}`
-    }, onUpdate)
-    .subscribe();
+  // Use unique channel name to prevent collisions
+  const channelName = createUniqueChannelName(`conversation-${conversationId}`);
+  
+  try {
+    return supabase
+      .channel(channelName)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, onUpdate)
+      .subscribe((status) => {
+        console.log(`Conversation channel subscription status: ${status}`);
+      });
+  } catch (error) {
+    console.error("Error creating conversation channel:", error);
+    return null;
+  }
 };
 
 /**
@@ -62,15 +58,25 @@ export const createParticipantsChannel = (
 ) => {
   console.log(`Creating participants channel for ID: ${conversationId}`);
   
-  return supabase
-    .channel(`participants-${conversationId}`)
-    .on('postgres_changes', { 
-      event: 'INSERT', 
-      schema: 'public', 
-      table: 'session_participants',
-      filter: `conversation_id=eq.${conversationId}`
-    }, onParticipantJoin)
-    .subscribe();
+  // Use unique channel name to prevent collisions
+  const channelName = createUniqueChannelName(`participants-${conversationId}`);
+  
+  try {
+    return supabase
+      .channel(channelName)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'session_participants',
+        filter: `conversation_id=eq.${conversationId}`
+      }, onParticipantJoin)
+      .subscribe((status) => {
+        console.log(`Participants channel subscription status: ${status}`);
+      });
+  } catch (error) {
+    console.error("Error creating participants channel:", error);
+    return null;
+  }
 };
 
 /**
@@ -85,13 +91,23 @@ export const createMessagesChannel = (
 ) => {
   console.log(`Creating messages channel for ID: ${conversationId}`);
   
-  return supabase
-    .channel(`messages-${conversationId}`)
-    .on('postgres_changes', {
-      event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-      schema: 'public',
-      table: 'messages',
-      filter: `conversation_id=eq.${conversationId}`
-    }, onMessageChange)
-    .subscribe();
+  // Use unique channel name to prevent collisions
+  const channelName = createUniqueChannelName(`messages-${conversationId}`);
+  
+  try {
+    return supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`
+      }, onMessageChange)
+      .subscribe((status) => {
+        console.log(`Messages channel subscription status: ${status}`);
+      });
+  } catch (error) {
+    console.error("Error creating messages channel:", error);
+    return null;
+  }
 };

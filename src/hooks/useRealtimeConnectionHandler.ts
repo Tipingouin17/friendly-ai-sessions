@@ -1,3 +1,4 @@
+
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ export function useRealtimeConnectionHandler({
   const mountedRef = useRef(true);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const connectionCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pingChannelRef = useRef<any>(null);
 
   // Set up cleanup on unmount
   useEffect(() => {
@@ -44,10 +46,18 @@ export function useRealtimeConnectionHandler({
       // Clear all intervals and timeouts
       if (pingIntervalRef.current !== null) {
         clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
       }
       
       if (connectionCheckTimeoutRef.current !== null) {
         clearTimeout(connectionCheckTimeoutRef.current);
+        connectionCheckTimeoutRef.current = null;
+      }
+      
+      // Clean up ping channel
+      if (pingChannelRef.current) {
+        removeChannel(pingChannelRef.current);
+        pingChannelRef.current = null;
       }
     };
   }, []);
@@ -60,7 +70,7 @@ export function useRealtimeConnectionHandler({
     }
   }, [connectionError, onConnectionError]);
 
-  // Function to perform a connection check
+  // Function to perform a connection check using a lightweight channel
   const performConnectionCheck = useCallback(async () => {
     if (!conversationId || isPerformingConnectionCheck || !mountedRef.current) return false;
     
@@ -69,57 +79,113 @@ export function useRealtimeConnectionHandler({
     try {
       console.log("Performing connection check...");
       
-      // Simple ping to check connection with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      // Clean up existing ping channel if it exists
+      if (pingChannelRef.current) {
+        removeChannel(pingChannelRef.current);
+        pingChannelRef.current = null;
+      }
       
-      // Create the request but don't execute it immediately
-      const query = supabase.from('conversations')
-        .select('id, current_participants, session_started')
-        .eq('id', conversationId)
-        .limit(1)
-        .maybeSingle();
+      // Create a lightweight ping channel to test connection
+      const channelName = `ping-${conversationId}-${Date.now()}`;
+      let pingSuccess = false;
+      
+      // Create a promise that resolves when subscription succeeds
+      const pingPromise = new Promise<boolean>((resolve) => {
+        const timeoutId = setTimeout(() => resolve(false), 5000);
         
-      // Manually handle the AbortController
-      const signal = controller.signal;
-      const abortPromise = new Promise((_, reject) => {
-        signal.addEventListener('abort', () => {
-          reject(new Error('Request aborted due to timeout'));
-        });
+        try {
+          const channel = supabase
+            .channel(channelName)
+            .subscribe((status) => {
+              if (status === 'SUBSCRIBED') {
+                clearTimeout(timeoutId);
+                pingSuccess = true;
+                resolve(true);
+              } else if (status === 'CHANNEL_ERROR' || status === 'SUBSCRIPTION_ERROR') {
+                clearTimeout(timeoutId);
+                resolve(false);
+              }
+            });
+          
+          pingChannelRef.current = channel;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          resolve(false);
+        }
       });
       
-      // Race the query against the abort promise
-      const { data, error } = await Promise.race([
-        query,
-        abortPromise.then(() => {
-          throw new Error('Request timed out');
-        })
-      ]).catch(err => {
-        console.error("Connection check error:", err);
-        return { data: null, error: err };
-      }) as { data: any, error: any };
-      
-      clearTimeout(timeoutId);
+      // Wait for ping result
+      const pingResult = await pingPromise;
       
       if (!mountedRef.current) return false;
       
-      if (error) {
-        console.error("Connection check failed:", error);
-        setError("Connection to server lost");
-        attemptReconnection();
-        setIsPerformingConnectionCheck(false);
-        return false;
-      } 
-      
-      if (data) {
-        console.log("Connection check successful, data:", data);
+      if (pingResult) {
+        console.log("Connection check successful (channel subscription worked)");
         setIsConnected();
         setLastPingSuccess(Date.now());
         
-        // If we got data, might as well refresh our state
+        // If we got a successful ping, might as well refresh our state
         refetch();
         setIsPerformingConnectionCheck(false);
         return true;
+      }
+      
+      // Fallback to simple database query if channel approach fails
+      try {
+        // Simple ping to check connection with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        // Create the request but don't execute it immediately
+        const query = supabase.from('conversations')
+          .select('id')
+          .eq('id', conversationId)
+          .limit(1)
+          .maybeSingle();
+          
+        // Manually handle the AbortController
+        const signal = controller.signal;
+        const abortPromise = new Promise((_, reject) => {
+          signal.addEventListener('abort', () => {
+            reject(new Error('Request aborted due to timeout'));
+          });
+        });
+        
+        // Race the query against the abort promise
+        const { data, error } = await Promise.race([
+          query,
+          abortPromise.then(() => {
+            throw new Error('Request timed out');
+          })
+        ]).catch(err => {
+          console.error("Connection check error:", err);
+          return { data: null, error: err };
+        }) as { data: any, error: any };
+        
+        clearTimeout(timeoutId);
+        
+        if (!mountedRef.current) return false;
+        
+        if (error) {
+          console.error("Connection check failed:", error);
+          setError("Connection to server lost");
+          attemptReconnection();
+          setIsPerformingConnectionCheck(false);
+          return false;
+        } 
+        
+        if (data) {
+          console.log("Connection check successful (query worked):", data);
+          setIsConnected();
+          setLastPingSuccess(Date.now());
+          
+          // If we got data, might as well refresh our state
+          refetch();
+          setIsPerformingConnectionCheck(false);
+          return true;
+        }
+      } catch (err) {
+        console.error("Error in fallback connection check:", err);
       }
       
       setIsPerformingConnectionCheck(false);
@@ -145,16 +211,18 @@ export function useRealtimeConnectionHandler({
       }
     }, 1500);
     
+    // Set up regular ping interval with reduced frequency (15s → 30s)
+    // to prevent possible rate limiting issues with Supabase
     pingIntervalRef.current = setInterval(() => {
       if (!mountedRef.current) return;
       
       // Check if it's been too long since last successful ping
       const timeSinceLastSuccess = Date.now() - lastPingSuccess;
-      if (timeSinceLastSuccess > 30000) { // 30 seconds
+      if (timeSinceLastSuccess > 60000) { // 60 seconds - increased from 30s
         console.log("Long time since last successful ping:", timeSinceLastSuccess / 1000, "seconds");
         
         // Show toast for extended connection issues
-        if (timeSinceLastSuccess > 45000 && isConnected && mountedRef.current) {
+        if (timeSinceLastSuccess > 90000 && isConnected && mountedRef.current) {
           toast({
             title: "Connection issues detected",
             description: "Trying to reconnect to the session...",
@@ -164,11 +232,11 @@ export function useRealtimeConnectionHandler({
       }
       
       // If we think we're disconnected or it's been a while, do a check
-      if ((!isConnected || timeSinceLastSuccess > 30000) && mountedRef.current) {
+      if ((!isConnected || timeSinceLastSuccess > 60000) && mountedRef.current) {
         console.log("Connection appears to be down or stale, attempting ping...");
         performConnectionCheck();
       }
-    }, 15000); // Check every 15 seconds
+    }, 30000); // Check every 30 seconds (increased from 15s)
     
     return () => {
       if (connectionCheckTimeoutRef.current !== null) {
@@ -179,6 +247,12 @@ export function useRealtimeConnectionHandler({
       if (pingIntervalRef.current !== null) {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
+      }
+      
+      // Clean up ping channel
+      if (pingChannelRef.current) {
+        removeChannel(pingChannelRef.current);
+        pingChannelRef.current = null;
       }
     };
   }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck, toast]);

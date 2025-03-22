@@ -267,20 +267,24 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
                   <div className="text-xs text-gray-500">Anonymous mode</div>
                 )}
               </div>
-              <div className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                Active
-              </div>
               
-              {/* Remove participant button - only visible on hover */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => removeParticipant(participant.id)}
-                title="Remove participant"
-              >
-                <UserX className="h-4 w-4 text-red-500" />
-              </Button>
+              {/* Modified layout to prevent overlap */}
+              <div className="flex items-center gap-2">
+                <div className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full whitespace-nowrap">
+                  Active
+                </div>
+                
+                {/* Remove participant button - visible on hover */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
+                  onClick={() => removeParticipant(participant.id)}
+                  title="Remove participant"
+                >
+                  <UserX className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

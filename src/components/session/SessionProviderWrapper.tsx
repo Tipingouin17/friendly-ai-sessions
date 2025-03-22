@@ -36,8 +36,11 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   children
 }) => {
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [hasToggledRetry, setHasToggledRetry] = useState(false);
-  const hasSetupRef = useRef(false);
+  // Use ref for tracking setup and retries to prevent re-renders
+  const stateRef = useRef({
+    hasSetup: false,
+    hasToggledRetry: false
+  });
   
   // Check URL path to distinguish between admin and participant routes
   const isOnAdminPath = window.location.pathname.includes('/admin');
@@ -72,21 +75,21 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   
   // CRITICAL FIX: Implement automatic retry for participants to ensure they can connect
   useEffect(() => {
-    // Only run setup once
-    if (hasSetupRef.current) return;
-    hasSetupRef.current = true;
+    // Only run setup once using the ref to prevent re-renders
+    if (stateRef.current.hasSetup) return;
+    stateRef.current.hasSetup = true;
     
     // Auto-retry for participants only, not for admin routes
-    if (isParticipantPath && !hasToggledRetry && !effectiveAdmin && connectionAttempts === 0) {
+    if (isParticipantPath && !stateRef.current.hasToggledRetry && !effectiveAdmin && connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {
         console.log("Auto-retrying connection for participant");
         retryConnection();
-        setHasToggledRetry(true);
+        stateRef.current.hasToggledRetry = true;
       }, 3000); // Short timeout to ensure participants can connect
       
       return () => clearTimeout(retryTimeout);
     }
-  }, [isParticipantPath, hasToggledRetry, effectiveAdmin, connectionAttempts, retryConnection]);
+  }, [isParticipantPath, effectiveAdmin, connectionAttempts, retryConnection]);
 
   return (
     <RefactoredSessionProvider 

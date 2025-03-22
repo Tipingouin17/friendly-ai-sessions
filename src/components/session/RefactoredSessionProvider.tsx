@@ -7,7 +7,7 @@ interface RefactoredSessionProviderProps {
   children: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
-  forceAdmin?: boolean; // Added forceAdmin prop
+  forceAdmin?: boolean;
 }
 
 export const RefactoredSessionProvider = ({ 
@@ -16,6 +16,11 @@ export const RefactoredSessionProvider = ({
   onError,
   forceAdmin 
 }: RefactoredSessionProviderProps) => {
+  // Set admin in session storage if forced - use direct DOM method to avoid state changes
+  if (forceAdmin) {
+    sessionStorage.setItem('isAdminSession', 'true');
+  }
+  
   return (
     <SessionProviderCore
       handleSessionFull={handleSessionFull}

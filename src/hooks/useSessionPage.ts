@@ -16,18 +16,18 @@ export function useSessionPage() {
   const { error, handleError } = useSessionErrorHandling();
   const { isCrossOrigin } = useSessionCrossOrigin();
   
-  // Preventing infinite state updates
-  const initialRenderRef = useRef(true);
-  const hasSetupInitialStateRef = useRef(false);
-  const renderCountRef = useRef(0);
+  // Use refs instead of state for tracking render info to prevent loops
+  const renderRef = useRef({
+    initialRender: true,
+    hasSetupInitialState: false,
+    renderCount: 0,
+    isOnAdminPath: window.location.pathname.includes('/admin')
+  });
   
-  // Use a ref for admin path detection to avoid re-renders
-  const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
-  
-  // Compute effective admin status once during initialization
+  // Compute effective admin status once during initialization to prevent re-renders
   const [effectiveIsAdmin] = useState(() => {
     const statusFromStorage = sessionStorage.getItem('isAdminSession') === 'true';
-    return isAdmin || isOnAdminPathRef.current || statusFromStorage;
+    return isAdmin || renderRef.current.isOnAdminPath || statusFromStorage;
   });
   
   const { 
@@ -58,10 +58,10 @@ export function useSessionPage() {
   // Debug logging - only log significant state changes
   useEffect(() => {
     // Increment render count (for debugging)
-    renderCountRef.current += 1;
+    renderRef.current.renderCount += 1;
     
-    if (!hasSetupInitialStateRef.current) {
-      hasSetupInitialStateRef.current = true;
+    if (!renderRef.current.hasSetupInitialState) {
+      renderRef.current.hasSetupInitialState = true;
       
       console.log("Session page rendered with:", {
         locationSearch: location.search,
@@ -73,7 +73,7 @@ export function useSessionPage() {
         isLoading,
         isCrossOrigin,
         hasInitializedProvider,
-        renderCount: renderCountRef.current
+        renderCount: renderRef.current.renderCount
       });
     }
   }, [location, effectiveIsAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);

@@ -26,18 +26,20 @@ const Session = () => {
   } = useSessionPage();
   
   const { toast } = useToast();
-  const pageLoadTime = useRef(Date.now());
-  const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasShownToastRef = useRef(false);
-  const hasSetupTimeoutRef = useRef(false);
   
-  // Check for admin status from URL path using a ref to avoid re-renders
-  const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
+  // Use refs for state that doesn't need to trigger re-renders
+  const stateRef = useRef({
+    pageLoadTime: Date.now(),
+    hasShownToast: false,
+    hasSetupTimeout: false,
+    initializeTimeout: null as NodeJS.Timeout | null,
+    isOnAdminPath: window.location.pathname.includes('/admin')
+  });
   
-  // Log initialization on mount and set up safety timeouts
+  // Log initialization on mount and set up safety timeouts - run only once
   useEffect(() => {
-    if (hasSetupTimeoutRef.current) return;
-    hasSetupTimeoutRef.current = true;
+    if (stateRef.current.hasSetupTimeout) return;
+    stateRef.current.hasSetupTimeout = true;
     
     console.log("Session page mounted", {
       time: new Date().toISOString(),
@@ -51,21 +53,21 @@ const Session = () => {
     sessionMountedRef.current = true;
     
     // Different timeouts based on user role - shorter for both
-    const initialTimeout = isOnAdminPathRef.current ? 3000 : 5000;
+    const initialTimeout = stateRef.current.isOnAdminPath ? 3000 : 5000;
     
     // Set a timeout to check if initialization takes too long
-    initializeTimeoutRef.current = setTimeout(() => {
-      if (sessionMountedRef.current && !hasShownToastRef.current) {
+    stateRef.current.initializeTimeout = setTimeout(() => {
+      if (sessionMountedRef.current && !stateRef.current.hasShownToast) {
         console.log("Session initialization status:", {
           isLoading,
           hasInitializedProvider
         });
         
         if (isLoading && !hasInitializedProvider) {
-          hasShownToastRef.current = true;
+          stateRef.current.hasShownToast = true;
           
           // Skip toast for admin
-          if (!isOnAdminPathRef.current && !isAdmin) {
+          if (!stateRef.current.isOnAdminPath && !isAdmin) {
             toast({
               title: "Loading your session",
               description: "Please wait while we connect you to the session.",
@@ -76,15 +78,15 @@ const Session = () => {
     }, initialTimeout);
     
     // Additional critical safety timeout - MUCH shorter now
-    const criticalTimeout = isOnAdminPathRef.current ? 5000 : 8000;
+    const criticalTimeout = stateRef.current.isOnAdminPath ? 5000 : 8000;
     
     setTimeout(() => {
       if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
-        if (!isOnAdminPathRef.current && !isAdmin && !hasShownToastRef.current) {
-          hasShownToastRef.current = true;
+        if (!stateRef.current.isOnAdminPath && !isAdmin && !stateRef.current.hasShownToast) {
+          stateRef.current.hasShownToast = true;
           toast({
             title: "Connection issue",
             description: "Having trouble loading the session. We'll keep trying to connect.",
@@ -92,9 +94,14 @@ const Session = () => {
           });
         }
         
-        // Force clean state to allow UI to render
-        setIsLoading(false);
-        setHasInitializedProvider(true);
+        // Force clean state to allow UI to render - ONLY if still needed
+        if (isLoading) {
+          setIsLoading(false);
+        }
+        
+        if (!hasInitializedProvider) {
+          setHasInitializedProvider(true);
+        }
         
         // Try to reconnect
         retryConnection();
@@ -102,14 +109,35 @@ const Session = () => {
     }, criticalTimeout);
     
     return () => {
-      if (initializeTimeoutRef.current) {
-        clearTimeout(initializeTimeoutRef.current);
-        initializeTimeoutRef.current = null;
+      if (stateRef.current.initializeTimeout) {
+        clearTimeout(stateRef.current.initializeTimeout);
+        stateRef.current.initializeTimeout = null;
       }
       sessionMountedRef.current = false;
     };
   }, [isAdmin, error, noSessionFound, isLoading, hasInitializedProvider, toast, 
      setIsLoading, setHasInitializedProvider, sessionMountedRef, retryConnection]);
+
+  const handleProviderInitialized = () => {
+    console.log(`Provider initialized after ${Date.now() - stateRef.current.pageLoadTime}ms`);
+    
+    // Clear initialization timeout
+    if (stateRef.current.initializeTimeout) {
+      clearTimeout(stateRef.current.initializeTimeout);
+      stateRef.current.initializeTimeout = null;
+    }
+    
+    // Use callback pattern for state updates
+    if (!hasInitializedProvider) {
+      setHasInitializedProvider(true);
+    }
+    
+    // For admin, ensure we're not stuck in loading
+    if ((isAdmin || stateRef.current.isOnAdminPath) && isLoading) {
+      console.log("Admin detected, clearing loading state");
+      setIsLoading(false);
+    }
+  };
 
   // Render the session page - this part doesn't change directly during re-renders
   return (
@@ -124,24 +152,7 @@ const Session = () => {
       isAdmin={isAdmin}
     >
       <SessionProviderWrapper
-        onInitialized={() => {
-          console.log(`Provider initialized after ${Date.now() - pageLoadTime.current}ms`);
-          
-          // Clear initialization timeout
-          if (initializeTimeoutRef.current) {
-            clearTimeout(initializeTimeoutRef.current);
-            initializeTimeoutRef.current = null;
-          }
-          
-          // Use callback pattern to prevent repeated state updates
-          setHasInitializedProvider(true);
-          
-          // For admin, ensure we're not stuck in loading
-          if ((isAdmin || isOnAdminPathRef.current) && isLoading) {
-            console.log("Admin detected, clearing loading state");
-            setIsLoading(false);
-          }
-        }}
+        onInitialized={handleProviderInitialized}
         onLoading={setIsLoading}
         onError={handleError}
         handleSessionFull={handleSessionFull}

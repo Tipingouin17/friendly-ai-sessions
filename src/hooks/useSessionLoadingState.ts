@@ -8,12 +8,12 @@ export function useSessionLoadingState(
   hasInitializedProvider: boolean
 ) {
   const [isLoading, setIsLoading] = useState(true);
-  const initialLoadingSetRef = useRef(false);
-  const loadingUpdateInProgressRef = useRef(false);
-  
-  // Guards against infinite updates by using useRef
-  const previousConnectionAttemptsRef = useRef(connectionAttempts);
-  const previousInitializedRef = useRef(hasInitializedProvider);
+  const stateRef = useRef({
+    initialLoadingSetRef: false,
+    loadingUpdateInProgress: false,
+    previousConnectionAttempts: connectionAttempts,
+    previousInitialized: hasInitializedProvider
+  });
   
   // Safer setIsLoading function that prevents rapid state changes
   const safeSetIsLoading = (newLoadingState: boolean) => {
@@ -21,27 +21,27 @@ export function useSessionLoadingState(
     if (newLoadingState === isLoading) return;
     
     // Prevent concurrent state updates
-    if (loadingUpdateInProgressRef.current) return;
+    if (stateRef.current.loadingUpdateInProgress) return;
     
-    loadingUpdateInProgressRef.current = true;
+    stateRef.current.loadingUpdateInProgress = true;
     setIsLoading(newLoadingState);
     
     // Reset the guard after a small delay
     setTimeout(() => {
-      loadingUpdateInProgressRef.current = false;
-    }, 50);
+      stateRef.current.loadingUpdateInProgress = false;
+    }, 100);
   };
   
   // Clear loading state under specific conditions
   useEffect(() => {
     const shouldUpdate = 
-      connectionAttempts !== previousConnectionAttemptsRef.current || 
-      hasInitializedProvider !== previousInitializedRef.current;
+      connectionAttempts !== stateRef.current.previousConnectionAttempts || 
+      hasInitializedProvider !== stateRef.current.previousInitialized;
     
     if (!shouldUpdate) return;
     
-    previousConnectionAttemptsRef.current = connectionAttempts;
-    previousInitializedRef.current = hasInitializedProvider;
+    stateRef.current.previousConnectionAttempts = connectionAttempts;
+    stateRef.current.previousInitialized = hasInitializedProvider;
     
     // If provider is initialized, we're no longer loading
     if (hasInitializedProvider && isLoading) {
@@ -50,8 +50,8 @@ export function useSessionLoadingState(
     }
     
     // Special case for when the connection attempt changes
-    if (connectionAttempts > 0 && !initialLoadingSetRef.current) {
-      initialLoadingSetRef.current = true;
+    if (connectionAttempts > 0 && !stateRef.current.initialLoadingSetRef) {
+      stateRef.current.initialLoadingSetRef = true;
       
       // Handle loading for reconnects - delay by reconnection attempts
       const loadingTimeout = setTimeout(() => {

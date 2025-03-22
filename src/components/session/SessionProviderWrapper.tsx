@@ -7,6 +7,7 @@ import { useSessionProviderInitialization } from "@/hooks/useSessionProviderInit
 import { useSessionProviderAdmin } from "@/hooks/useSessionProviderAdmin";
 import { useSessionWrapperInitialization } from "@/hooks/useSessionWrapperInitialization";
 import { useSessionWrapperEffects } from "@/hooks/useSessionWrapperEffects";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 interface SessionProviderWrapperProps {
   onInitialized?: () => void;
@@ -42,26 +43,26 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     hasToggledRetry: false
   });
   
+  // Get admin status from our hook
+  const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  
   // Check URL path to distinguish between admin and participant routes
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
   
-  // CRITICAL FIX: For participant paths, don't use admin status from session storage
-  // This prevents admin session conflicts with participant sessions
-  const effectiveAdmin = isParticipantPath ? 
-                       (isAdmin || forceAdmin) : 
-                       (isAdmin || forceAdmin || sessionStorage.getItem('isAdminSession') === 'true' || isOnAdminPath);
+  // Simplified admin status determination
+  const effectiveAdmin = isAdmin || forceAdmin || contextIsAdmin || isOnAdminPath;
   
   // Use admin status management hook
-  useSessionProviderAdmin({ forceAdmin: effectiveAdmin || isOnAdminPath });
+  useSessionProviderAdmin({ forceAdmin: effectiveAdmin });
 
   // Use initialization hook
   const { forcedInitialization } = useSessionProviderInitialization({
     onInitialized,
     onLoading,
     sessionMountedRef,
-    isAdmin: effectiveAdmin || isOnAdminPath,
-    forceAdmin: effectiveAdmin || isOnAdminPath
+    isAdmin: effectiveAdmin,
+    forceAdmin: effectiveAdmin
   });
 
   // Use wrapper initialization hook
@@ -95,7 +96,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
       onError={onError}
-      forceAdmin={effectiveAdmin || isOnAdminPath}
+      forceAdmin={effectiveAdmin}
     >
       {(props: SessionContextProps) => {
         // Use wrapper effects hook
@@ -115,7 +116,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         if (children) {
           return children({
             ...props,
-            isAdmin: props.isAdmin || effectiveAdmin || isOnAdminPath
+            isAdmin: props.isAdmin || effectiveAdmin
           });
         }
         
@@ -124,11 +125,11 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           <SessionStateRenderer
             props={{
               ...props,
-              isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || effectiveAdmin || isOnAdminPath)
+              isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || effectiveAdmin)
             }}
             isLoading={props.isLoading}
             error={error}
-            effectiveAdmin={effectiveAdmin || isOnAdminPath}
+            effectiveAdmin={effectiveAdmin}
             retryConnection={retryConnection}
             connectionAttempts={connectionAttempts}
             sessionStarted={sessionStarted}

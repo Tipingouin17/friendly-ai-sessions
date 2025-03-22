@@ -9,20 +9,10 @@ export function useAdminStatusPersistence() {
   const { setAdminStatus } = useSessionAdminStatus();
   
   useEffect(() => {
-    // Set admin status immediately and more aggressively
-    sessionStorage.setItem('isAdminSession', 'true');
+    // Set admin status once
     setAdminStatus(true);
     
-    // Create a safety timer to regularly check and enforce admin status
-    const adminCheckInterval = setInterval(() => {
-      // Re-establish admin status in case it got lost
-      sessionStorage.setItem('isAdminSession', 'true');
-      setAdminStatus(true);
-    }, 1000); // Check more frequently
-    
-    return () => {
-      clearInterval(adminCheckInterval);
-    };
+    // No need for interval checks anymore - our hook handles persistence
   }, [setAdminStatus]);
   
   return { forceAdmin: true };

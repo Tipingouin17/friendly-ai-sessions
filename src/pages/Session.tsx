@@ -52,8 +52,8 @@ const Session = () => {
     
     sessionMountedRef.current = true;
     
-    // Different timeouts based on user role - shorter for both
-    const initialTimeout = stateRef.current.isOnAdminPath ? 3000 : 5000;
+    // Different timeouts based on user role
+    const initialTimeout = isAdmin ? 3000 : 5000;
     
     // Set a timeout to check if initialization takes too long
     stateRef.current.initializeTimeout = setTimeout(() => {
@@ -67,7 +67,7 @@ const Session = () => {
           stateRef.current.hasShownToast = true;
           
           // Skip toast for admin
-          if (!stateRef.current.isOnAdminPath && !isAdmin) {
+          if (!isAdmin) {
             toast({
               title: "Loading your session",
               description: "Please wait while we connect you to the session.",
@@ -77,15 +77,15 @@ const Session = () => {
       }
     }, initialTimeout);
     
-    // Additional critical safety timeout - MUCH shorter now
-    const criticalTimeout = stateRef.current.isOnAdminPath ? 5000 : 8000;
+    // Additional critical safety timeout - force loading state to complete if stuck
+    const criticalTimeout = isAdmin ? 5000 : 8000;
     
     setTimeout(() => {
       if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
-        if (!stateRef.current.isOnAdminPath && !isAdmin && !stateRef.current.hasShownToast) {
+        if (!isAdmin && !stateRef.current.hasShownToast) {
           stateRef.current.hasShownToast = true;
           toast({
             title: "Connection issue",
@@ -133,13 +133,13 @@ const Session = () => {
     }
     
     // For admin, ensure we're not stuck in loading
-    if ((isAdmin || stateRef.current.isOnAdminPath) && isLoading) {
+    if (isAdmin && isLoading) {
       console.log("Admin detected, clearing loading state");
       setIsLoading(false);
     }
   };
 
-  // Render the session page - this part doesn't change directly during re-renders
+  // Render the session page with simplified props
   return (
     <SessionErrorBoundary
       error={error}

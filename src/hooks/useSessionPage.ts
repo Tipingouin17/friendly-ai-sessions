@@ -24,10 +24,9 @@ export function useSessionPage() {
     isOnAdminPath: window.location.pathname.includes('/admin')
   });
   
-  // Compute effective admin status once during initialization to prevent re-renders
+  // Calculate effective admin status only once during initialization
   const [effectiveIsAdmin] = useState(() => {
-    const statusFromStorage = sessionStorage.getItem('isAdminSession') === 'true';
-    return isAdmin || renderRef.current.isOnAdminPath || statusFromStorage;
+    return isAdmin || renderRef.current.isOnAdminPath;
   });
   
   const { 

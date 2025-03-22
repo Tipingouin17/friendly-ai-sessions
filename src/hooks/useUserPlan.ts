@@ -49,7 +49,7 @@ export const useUserPlan = (): UserPlanDetails => {
           
         if (planError) throw planError;
         
-        // Handle the case where plan_table_details might be missing
+        // Create empty plan_table_details if it doesn't exist
         const planTableDetails = freePlan.plan_table_details || {};
         
         // Create the plan restrictions object from the plan details
@@ -103,7 +103,7 @@ export const useUserPlan = (): UserPlanDetails => {
       
       if (planError) throw planError;
       
-      // Handle the case where plan_table_details might be missing
+      // Create empty plan_table_details if it doesn't exist
       const planTableDetails = planData.plan_table_details || {};
       
       // Create the plan restrictions object from the plan details

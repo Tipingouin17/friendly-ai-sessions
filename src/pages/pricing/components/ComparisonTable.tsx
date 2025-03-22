@@ -3,9 +3,11 @@ import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoIcon, DollarSign, Euro, PoundSterling, Infinity } from "lucide-react";
+
 interface ComparisonTableProps {
   plans: Plan[];
 }
+
 export const ComparisonTable = ({
   plans
 }: ComparisonTableProps) => {
@@ -84,6 +86,7 @@ export const ComparisonTable = ({
     // Return formatted price (no division by 100)
     return plan.price.toString();
   };
+
   return <div className="mt-16">
       <h2 className="text-3xl font-bold text-center mb-8">Compare Plans</h2>
       <div className="overflow-x-auto rounded-lg border shadow-sm">

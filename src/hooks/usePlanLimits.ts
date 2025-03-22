@@ -83,7 +83,7 @@ export const usePlanLimits = (): PlanLimits => {
     ? Infinity 
     : (planRestrictions?.question_limit || 10);
   
-  // Check if the user can create custom facilitators based on the new column
+  // Check if the user can create custom facilitators based on the plan_table_details
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
   
   // Check both the count limit and whether custom facilitators are allowed

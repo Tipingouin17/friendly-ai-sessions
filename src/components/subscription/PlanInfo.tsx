@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
@@ -7,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+
 export const PlanInfo = () => {
   const {
     plan,
@@ -27,13 +27,16 @@ export const PlanInfo = () => {
   } = usePlanLimits();
   const navigate = useNavigate();
   const isLoading = planLoading || limitsLoading;
+
   const getProgressValue = (current: number, max: number) => {
     if (max === Infinity) return 0; // Don't show progress for unlimited
     return Math.min(100, current / max * 100);
   };
+
   const handleUpgrade = () => {
     navigate('/pricing');
   };
+
   if (isLoading) {
     return <Card className="w-full">
         <CardHeader>
@@ -49,26 +52,19 @@ export const PlanInfo = () => {
       </Card>;
   }
 
-  // Format the price with correct currency symbol and decimal places
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined) return '';
 
-    // Extract currency information from plan metadata or default to USD
     const currency = plan?.currency || 'USD';
-
-    // Format price with appropriate currency symbol
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     });
-
-    // Return formatted value with /month appended
     return `${formatter.format(price / 100).replace(/[A-Z]{3}/, '').trim()}/month`;
   };
 
-  // Check if the plan is the highest tier (Premium or Enterprise)
   const isHighestTier = plan?.id === 3 || plan?.id === 4;
   return <Card className="w-full">
       <CardHeader>

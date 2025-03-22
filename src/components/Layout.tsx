@@ -26,7 +26,7 @@ export const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen flex flex-col text-left">
       {!shouldHideMainNav && <Navigation />}
-      <main className={`flex-grow ${isSessionPage || isAdminPage ? 'pt-0' : 'pt-16'}`}>
+      <main className={`flex-grow ${isSessionPage ? 'h-full' : 'pt-16'}`}>
         {children}
       </main>
       {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}

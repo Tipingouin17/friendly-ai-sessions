@@ -69,7 +69,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [currentParticipant, messages.length]);
   
   return (
-    <div className="flex-1 overflow-hidden flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full">
       <div className="flex-1 overflow-hidden relative">
         <MessageList 
           messages={messages} 
@@ -83,7 +83,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       </div>
       
       {/* Footer with input and participant info */}
-      <div className="mt-auto">
+      <div className="shrink-0">
         <InputFooter
           participantCount={maxParticipants}
           currentParticipant={currentParticipant}

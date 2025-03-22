@@ -91,7 +91,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   }, [messages.length, currentParticipant, hasAnswered]);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* Admin header in admin mode */}
       {isAdmin && (
         <AdminSessionHeader

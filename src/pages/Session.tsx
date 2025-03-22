@@ -35,11 +35,11 @@ const Session = () => {
   });
 
   return (
-    <>
+    <div className="flex flex-col h-screen">
       {/* Only show our custom navigation on mobile for participant view */}
       {isMobile && !isOnAdminPath && <SessionMobileNav />}
       
-      <div className={isMobile && !isOnAdminPath ? "pt-16" : ""}>
+      <div className="flex-1 overflow-hidden">
         <SessionContent
           isLoading={isLoading}
           hasInitializedProvider={hasInitializedProvider}
@@ -57,7 +57,7 @@ const Session = () => {
           forceAdmin={isOnAdminPath}
         />
       </div>
-    </>
+    </div>
   );
 };
 

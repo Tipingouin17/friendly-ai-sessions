@@ -1,12 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
-import SessionProviderWrapper from "@/components/session/SessionProviderWrapper";
-import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";
 import { useAdminStatusPersistence } from "@/hooks/useAdminStatusPersistence";
 import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
 import { useAdminMessages } from "@/hooks/useAdminMessages";
-import SessionView from "@/components/session/SessionView";
 import AdminSessionHeader from "@/components/session/AdminSessionHeader";
 import AdminSessionMessages from "@/components/session/AdminSessionMessages";
 import AdminParticipantList from "@/components/session/AdminParticipantList";
@@ -142,43 +139,7 @@ const SessionAdmin = () => {
     }
   }
 
-  // Show session provider when initialized
-  if ((!isLoading && (hasInitializedProvider || adminViewReady) && !error) || adminViewReady) {
-    return (
-      <SessionProviderWrapper
-        handleSessionFull={handleSessionFull}
-        onError={handleError}
-        forceAdmin={true}
-      >
-        {(props) => (
-          <SessionErrorBoundary
-            error={error}
-            noSessionFound={noSessionFound}
-            connectionAttempts={connectionAttempts}
-            retryConnection={retryConnection}
-            lastAttemptTime={lastAttemptTime || 0}
-            isAdmin={true}
-          >
-            <SessionView 
-              props={{
-                ...props,
-                onSendAdminMessage: handleSendAdminMessage,
-                isAdmin: true,
-                // Ensure sessionState.messages exists
-                sessionState: {
-                  ...props.sessionState,
-                  messages: props.sessionState?.messages || []
-                }
-              }} 
-              isAdmin={true} 
-            />
-          </SessionErrorBoundary>
-        )}
-      </SessionProviderWrapper>
-    );
-  }
-
-  // Show loading or admin panel UI
+  // Show the simple admin panel UI - this is now the only view we'll render
   return (
     <div className="flex flex-col min-h-screen pt-16">
       <AdminSessionHeader 

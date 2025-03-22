@@ -19,14 +19,16 @@ export function useSessionPage() {
   // Preventing infinite state updates
   const initialRenderRef = useRef(true);
   const hasSetupInitialStateRef = useRef(false);
+  const renderCountRef = useRef(0);
   
   // Use a ref for admin path detection to avoid re-renders
   const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
   
   // Compute effective admin status once during initialization
-  const [effectiveIsAdmin] = useState(() => 
-    isAdmin || isOnAdminPathRef.current || sessionStorage.getItem('isAdminSession') === 'true'
-  );
+  const [effectiveIsAdmin] = useState(() => {
+    const statusFromStorage = sessionStorage.getItem('isAdminSession') === 'true';
+    return isAdmin || isOnAdminPathRef.current || statusFromStorage;
+  });
   
   const { 
     sessionStarted, 
@@ -55,6 +57,9 @@ export function useSessionPage() {
 
   // Debug logging - only log significant state changes
   useEffect(() => {
+    // Increment render count (for debugging)
+    renderCountRef.current += 1;
+    
     if (!hasSetupInitialStateRef.current) {
       hasSetupInitialStateRef.current = true;
       
@@ -67,7 +72,8 @@ export function useSessionPage() {
         connectionAttempts,
         isLoading,
         isCrossOrigin,
-        hasInitializedProvider
+        hasInitializedProvider,
+        renderCount: renderCountRef.current
       });
     }
   }, [location, effectiveIsAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);

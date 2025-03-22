@@ -31,6 +31,12 @@ export function useSessionWrapperEffects({
   // Track if we've already initialized provider
   const hasInitializedRef = useRef(false);
   
+  // Track loading state update to prevent multiple updates
+  const hasUpdatedLoadingRef = useRef(false);
+  
+  // Track error handling to prevent multiple updates
+  const hasHandledErrorRef = useRef(false);
+  
   // Set admin status only once per component lifecycle
   useEffect(() => {
     if (isOnAdminPath && sessionMountedRef.current && !hasHandledAdminRef.current) {
@@ -62,7 +68,8 @@ export function useSessionWrapperEffects({
         
         // Force loading to false with minimum delay for admin
         timeoutId = setTimeout(() => {
-          if (sessionMountedRef.current) {
+          if (sessionMountedRef.current && !hasUpdatedLoadingRef.current) {
+            hasUpdatedLoadingRef.current = true;
             onLoading(false);
           }
         }, 100);
@@ -85,7 +92,8 @@ export function useSessionWrapperEffects({
         onInitialized();
         
         // Set loading to false immediately for valid sessions
-        if (props.isSessionStartedInDB || props.conversation) {
+        if ((props.isSessionStartedInDB || props.conversation) && !hasUpdatedLoadingRef.current) {
+          hasUpdatedLoadingRef.current = true;
           onLoading(false);
         }
       } else if (props.error) {
@@ -108,13 +116,15 @@ export function useSessionWrapperEffects({
   useEffect(() => {
     const isAdmin = effectiveAdmin || isOnAdminPath;
     
-    if (sessionMountedRef.current && isAdmin && props.isLoading) {
+    if (sessionMountedRef.current && isAdmin && props.isLoading && !hasUpdatedLoadingRef.current) {
       // For admin sessions, force loading to false only if currently loading
+      hasUpdatedLoadingRef.current = true;
       onLoading(false);
     } else if (sessionMountedRef.current && 
               (props.isSessionStartedInDB || props.conversation) && 
-              props.isLoading) {
+              props.isLoading && !hasUpdatedLoadingRef.current) {
       // For participants, clear loading when data is available
+      hasUpdatedLoadingRef.current = true;
       onLoading(false);
     }
   }, [props.isLoading, props.isSessionStartedInDB, props.conversation,
@@ -122,7 +132,9 @@ export function useSessionWrapperEffects({
 
   // Handle errors from provider - suppress for admin
   useEffect(() => {
-    if (props.error && sessionMountedRef.current) {
+    if (props.error && sessionMountedRef.current && !hasHandledErrorRef.current) {
+      hasHandledErrorRef.current = true;
+      
       // For admin sessions, suppress ALL errors
       if (effectiveAdmin || isOnAdminPath) {
         console.log("🔑 Suppressing all errors for admin user: ", props.error);

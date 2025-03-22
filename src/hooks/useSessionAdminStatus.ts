@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 export function useSessionAdminStatus() {
   const location = useLocation();
   const isOnAdminPath = location.pathname.includes('/admin');
+  const adminStatusSetRef = useRef(false);
   
   // Initialize admin status once, avoiding re-renders
   const [isAdmin, setIsAdmin] = useState(() => {
@@ -12,7 +13,8 @@ export function useSessionAdminStatus() {
     // 1. Check URL path - most reliable
     // 2. Check session storage
     // 3. Default to false
-    return isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true';
+    const initialStatus = isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true';
+    return initialStatus;
   });
   
   // Store if we already set admin status to prevent repeated updates
@@ -23,17 +25,28 @@ export function useSessionAdminStatus() {
 
   // Update admin status and persist it to sessionStorage, with guards against infinite updates
   const setAdminStatus = (status: boolean) => {
-    // Only update state if actually changing and not during initial render
-    if (status !== isAdmin) {
-      setIsAdmin(status);
-    }
+    // Skip if we're already in this state
+    if (status === isAdmin) return;
     
-    // Only update storage if needed - this prevents unnecessary re-renders from storage events
-    if (status && sessionStorage.getItem('isAdminSession') !== 'true') {
+    // Guard against too many updates
+    if (adminStatusSetRef.current) return;
+    adminStatusSetRef.current = true;
+    
+    // Only update state if actually changing and not during initial render
+    setIsAdmin(status);
+    
+    // Update session storage only when needed
+    const currentStorageValue = sessionStorage.getItem('isAdminSession');
+    if (status && currentStorageValue !== 'true') {
       sessionStorage.setItem('isAdminSession', 'true');
-    } else if (!status && sessionStorage.getItem('isAdminSession') === 'true') {
+    } else if (!status && currentStorageValue === 'true') {
       sessionStorage.removeItem('isAdminSession');
     }
+    
+    // Reset the guard after a small delay to allow future updates
+    setTimeout(() => {
+      adminStatusSetRef.current = false;
+    }, 50);
   };
 
   // Apply admin status from URL path - this should only run once

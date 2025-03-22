@@ -9,10 +9,28 @@ export function useSessionLoadingState(
 ) {
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadingSetRef = useRef(false);
+  const loadingUpdateInProgressRef = useRef(false);
   
   // Guards against infinite updates by using useRef
   const previousConnectionAttemptsRef = useRef(connectionAttempts);
   const previousInitializedRef = useRef(hasInitializedProvider);
+  
+  // Safer setIsLoading function that prevents rapid state changes
+  const safeSetIsLoading = (newLoadingState: boolean) => {
+    // Skip setting the same state again
+    if (newLoadingState === isLoading) return;
+    
+    // Prevent concurrent state updates
+    if (loadingUpdateInProgressRef.current) return;
+    
+    loadingUpdateInProgressRef.current = true;
+    setIsLoading(newLoadingState);
+    
+    // Reset the guard after a small delay
+    setTimeout(() => {
+      loadingUpdateInProgressRef.current = false;
+    }, 50);
+  };
   
   // Clear loading state under specific conditions
   useEffect(() => {
@@ -28,7 +46,7 @@ export function useSessionLoadingState(
     // If provider is initialized, we're no longer loading
     if (hasInitializedProvider && isLoading) {
       console.log("Provider initialized, clearing loading state");
-      setIsLoading(false);
+      safeSetIsLoading(false);
     }
     
     // Special case for when the connection attempt changes
@@ -40,7 +58,7 @@ export function useSessionLoadingState(
         if (sessionMountedRef.current && !hasInitializedProvider) {
           // Only show loading if needed
           console.log(`Setting loading state to true after connection attempt ${connectionAttempts}`);
-          setIsLoading(true);
+          safeSetIsLoading(true);
         }
       }, Math.min(connectionAttempts * 500, 1500));
       
@@ -48,5 +66,5 @@ export function useSessionLoadingState(
     }
   }, [connectionAttempts, hasInitializedProvider, isLoading, sessionMountedRef]);
   
-  return { isLoading, setIsLoading };
+  return { isLoading, setIsLoading: safeSetIsLoading };
 }

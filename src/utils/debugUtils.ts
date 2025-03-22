@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { createLogger } from './debugLogger';
 
 /**
  * Custom hook to log the render count of a component
@@ -7,11 +8,13 @@ import React from 'react';
  */
 export function useRenderCounter(componentName: string) {
   const renderCount = React.useRef(0);
-  console.log(`${componentName} render #${++renderCount.current}`);
+  const logger = createLogger(componentName, "rendering");
+  
+  logger.log(`render #${++renderCount.current}`);
   
   // If render count gets too high, warn about potential infinite loop
   if (renderCount.current > 25) {
-    console.warn(`⚠️ ${componentName} has rendered ${renderCount.current} times! Check for potential infinite render loops.`);
+    logger.warn(`Component has rendered ${renderCount.current} times! Check for potential infinite render loops.`);
   }
 }
 
@@ -22,6 +25,7 @@ export function useRenderCounter(componentName: string) {
  */
 export function trackChanges(props: Record<string, any>, componentName: string) {
   const prevProps = React.useRef<Record<string, any>>({});
+  const logger = createLogger(componentName, "state");
   
   // On first render, just store the props
   if (Object.keys(prevProps.current).length === 0) {
@@ -42,7 +46,7 @@ export function trackChanges(props: Record<string, any>, componentName: string) 
   });
   
   if (Object.keys(changedProps).length > 0) {
-    console.log(`${componentName} props changed:`, changedProps);
+    logger.log(`props changed:`, changedProps);
   }
   
   // Update stored props
@@ -64,6 +68,7 @@ export function isFunction(value: any): boolean {
  */
 export function logDependencyChanges(dependencies: any[], hookName: string) {
   const prevDepsRef = React.useRef<any[]>([]);
+  const logger = createLogger(hookName, "state");
   
   React.useEffect(() => {
     if (prevDepsRef.current.length === 0) {
@@ -84,7 +89,7 @@ export function logDependencyChanges(dependencies: any[], hookName: string) {
     });
     
     if (changes.length > 0) {
-      console.log(`${hookName} dependencies changed:`, changes);
+      logger.log(`dependencies changed:`, changes);
     }
     
     prevDepsRef.current = [...dependencies];
@@ -100,9 +105,10 @@ export function logDependencyChanges(dependencies: any[], hookName: string) {
 export function checkMemoization(value: any, dependencies: any[], valueName: string) {
   const prevValueRef = React.useRef<any>(null);
   const renderCountRef = React.useRef(0);
+  const logger = createLogger("MemoCheck", "rendering");
   
   if (renderCountRef.current > 0 && prevValueRef.current !== value) {
-    console.warn(`⚠️ Memoization failed for ${valueName}. Value changed when dependencies shouldn't have changed.`);
+    logger.warn(`Memoization failed for ${valueName}. Value changed when dependencies shouldn't have changed.`);
     
     // Try to find which dependency might have changed
     const prevDepsRef = React.useRef<any[]>([]);
@@ -116,9 +122,9 @@ export function checkMemoization(value: any, dependencies: any[], valueName: str
       }).filter(Boolean);
       
       if (changedDeps.length > 0) {
-        console.warn('Changes detected in the following dependencies:', changedDeps);
+        logger.warn('Changes detected in the following dependencies:', changedDeps);
       } else {
-        console.warn('No dependency changes detected, possible issue with the memoization logic');
+        logger.warn('No dependency changes detected, possible issue with the memoization logic');
       }
     }
     

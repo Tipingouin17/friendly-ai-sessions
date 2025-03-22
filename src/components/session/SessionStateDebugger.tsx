@@ -1,6 +1,7 @@
 
 import React from "react";
 import { SessionContextProps } from "@/types/session";
+import { createLogger } from "@/utils/debugLogger";
 
 interface SessionStateDebuggerProps {
   props: SessionContextProps;
@@ -20,9 +21,11 @@ const SessionStateDebugger: React.FC<SessionStateDebuggerProps> = ({
   currentParticipants,
   maxParticipants
 }) => {
+  const logger = createLogger("SessionStateDebugger", "state");
+  
   // Log session state for debugging
   React.useEffect(() => {
-    console.log("Session state:", {
+    logger.log("Session state", {
       shouldShowSession,
       isSessionStartedInDB: props.isSessionStartedInDB,
       sessionStarted,

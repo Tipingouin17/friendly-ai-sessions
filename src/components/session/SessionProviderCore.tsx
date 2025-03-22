@@ -173,54 +173,50 @@ export const SessionProviderCore = ({
     );
   }
 
-  // Helper function to build session context
-  function buildSessionContext(): SessionContextProps {
-    return {
-      isLoading: effectiveAdmin ? false : isLoading, // Always set loading to false for admin
-      conversation,
-      currentConversationId,
-      sessionState: {
-        messages: roomState.messages || [], // Ensure messages is an array
-        inputMessage: roomState.inputMessage,
-        setInputMessage: roomState.setInputMessage,
-        currentParticipant: roomState.currentParticipant,
-        isRecording: roomState.isRecording,
-        setIsRecording: roomState.setIsRecording,
-        handleGenerateReport: roomState.handleGenerateReport,
-        isGeneratingReport: roomState.isGeneratingReport,
-        setMessages: roomState.setMessages,
-        hasAnswered: roomState.hasAnswered,
-        totalResponses: roomState.totalResponses,
-        viewMode: roomState.viewMode,
-        setViewMode: roomState.setViewMode,
-        recordResponse: roomState.recordResponse,
-        error: roomState.error
-      },
-      participants,
-      participantColors,
-      isWaitingForResponse: roomState.isWaitingForResponse,
-      handleStartSession: enhancedHandleStartSession,
-      handleSendMessage: roomState.handleSendMessage,
-      handleLikeMessage: roomState.handleLikeMessage,
-      showQrCodeView,
-      sessionLink,
-      currentUserParticipantId,
-      anonymousState: roomState.anonymousState,
-      isSessionStartedInDB,
-      error: effectiveAdmin ? null : providerError, // Clear errors for admin
-      
-      // Add connection properties
-      isConnected: true, // Default to true, will be updated by connection hooks
-      connectionAttempts: 0,
-      refetch,
-      
-      // Ensure admin status is properly set
-      isAdmin: isAdmin || effectiveAdmin
-    };
-  }
+  // Build the session context value
+  const sessionContextValue: SessionContextProps = {
+    isLoading: effectiveAdmin ? false : isLoading, // Always set loading to false for admin
+    conversation,
+    currentConversationId,
+    sessionState: {
+      messages: roomState.messages || [], // Ensure messages is an array
+      inputMessage: roomState.inputMessage,
+      setInputMessage: roomState.setInputMessage,
+      currentParticipant: roomState.currentParticipant,
+      isRecording: roomState.isRecording,
+      setIsRecording: roomState.setIsRecording,
+      handleGenerateReport: roomState.handleGenerateReport,
+      isGeneratingReport: roomState.isGeneratingReport,
+      setMessages: roomState.setMessages,
+      hasAnswered: roomState.hasAnswered,
+      totalResponses: roomState.totalResponses,
+      viewMode: roomState.viewMode,
+      setViewMode: roomState.setViewMode,
+      recordResponse: roomState.recordResponse,
+      error: roomState.error
+    },
+    participants,
+    participantColors,
+    isWaitingForResponse: roomState.isWaitingForResponse,
+    handleStartSession: enhancedHandleStartSession,
+    handleSendMessage: roomState.handleSendMessage,
+    handleLikeMessage: roomState.handleLikeMessage,
+    showQrCodeView,
+    sessionLink,
+    currentUserParticipantId,
+    anonymousState: roomState.anonymousState,
+    isSessionStartedInDB,
+    error: effectiveAdmin ? null : providerError, // Clear errors for admin
+    
+    // Add connection properties
+    isConnected: true, // Default to true, will be updated by connection hooks
+    connectionAttempts: 0,
+    refetch,
+    
+    // Ensure admin status is properly set
+    isAdmin: isAdmin || effectiveAdmin
+  };
 
   // Return children with context
-  <SessionContext.Provider value={sessionContextValue}>
-      {children}
-    </SessionContext.Provider>
+  return children(sessionContextValue);
 };

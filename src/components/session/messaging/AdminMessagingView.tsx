@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { Message } from '@/types/chat';
 import AdminMessageFilters from './AdminMessageFilters';
@@ -6,7 +5,7 @@ import AdminMessageGroup from './AdminMessageGroup';
 import MessageEmptyState from './MessageEmptyState';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart2, MessageSquare, BarChart4, ListView } from 'lucide-react';
+import { BarChart2, MessageSquare, BarChart4, List } from 'lucide-react';
 
 interface AdminMessagingViewProps {
   messages: Message[];
@@ -29,7 +28,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
   
-  // Log all messages for debugging
   React.useEffect(() => {
     console.log("Admin view received messages:", 
       messages.map(m => ({
@@ -41,12 +39,9 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
     );
   }, [messages]);
 
-  // Group messages by facilitator question for admin view
   const groupedMessages = useMemo(() => {
     console.log("Grouping messages for admin view:", messages.length);
 
-    // If we don't have any assistant messages yet but have user messages,
-    // create a default group with a placeholder question
     if (messages.length > 0 && !messages.some(m => m.sender === "assistant")) {
       const userMessages = messages.filter(m => 
         m.sender === "user" && 
@@ -71,29 +66,23 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
     const groups = [];
     let currentGroup = { question: null, responses: [] };
 
-    // Loop through all messages to create question-answer groups
     for (const message of messages) {
       if (message.sender === "assistant" && !message.isReport) {
-        // If we have an existing group with responses, add it to our groups array
         if (currentGroup.question && currentGroup.responses.length > 0) {
           groups.push({ ...currentGroup });
         }
         
-        // Start a new group with this facilitator question
         currentGroup = { 
           question: message, 
           responses: [] 
         };
       } else if (message.sender === "user" && currentGroup.question) {
-        // Add participant response to the current group if it passes filters
         if (showAnonymous || !message.isAnonymous) {
           if (!searchTerm || message.content.toLowerCase().includes(searchTerm.toLowerCase())) {
             currentGroup.responses.push(message);
           }
         }
       } else if (message.sender === "user" && !currentGroup.question) {
-        // This is a user message without a preceding facilitator message
-        // Create a default group if needed
         if (groups.length === 0 && !currentGroup.question) {
           currentGroup = {
             question: {
@@ -106,7 +95,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
           };
         }
         
-        // Add to the current group
         if (showAnonymous || !message.isAnonymous) {
           if (!searchTerm || message.content.toLowerCase().includes(searchTerm.toLowerCase())) {
             currentGroup.responses.push(message);
@@ -115,7 +103,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
       }
     }
     
-    // Add the last group if it has responses
     if (currentGroup.question && currentGroup.responses.length > 0) {
       groups.push(currentGroup);
     }
@@ -124,10 +111,8 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
     return groups;
   }, [messages, showAnonymous, searchTerm]);
 
-  // Calculate total responses for the filter stats
   const totalResponses = groupedMessages.reduce((acc, group) => acc + group.responses.length, 0);
   
-  // Count total unique participants across all groups
   const uniqueParticipants = useMemo(() => {
     const participantSet = new Set();
     
@@ -164,7 +149,7 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
                 onClick={() => setViewMode('list')}
                 aria-label="List view"
               >
-                <ListView className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
               <button 
                 className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}

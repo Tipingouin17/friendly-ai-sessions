@@ -1,10 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
-import { Users } from "lucide-react";
+import { Users, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AdminParticipantListProps {
   participants: ParticipantInfo[];
@@ -23,6 +25,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
 }) => {
   const [displayCount, setDisplayCount] = useState(currentParticipantCount);
   const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
+  const { toast } = useToast();
   
   // Synchronize the component's local state with the incoming props
   useEffect(() => {
@@ -30,6 +33,80 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
       setParticipantsList(participants);
     }
   }, [participants]);
+  
+  // Function to remove a participant
+  const removeParticipant = async (participantId: number) => {
+    if (!conversationData?.id) return;
+    
+    const conversationId = conversationData.id;
+    
+    try {
+      // First, remove from session_participants table
+      const { error: removeError } = await supabase
+        .from('session_participants')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .eq('participant_id', participantId);
+        
+      if (removeError) {
+        console.error("Error removing participant:", removeError);
+        toast({
+          title: "Error",
+          description: "Could not remove participant",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Update participant count in conversations table
+      const newCount = Math.max(0, currentParticipantCount - 1);
+      
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({ current_participants: newCount })
+        .eq('id', conversationId);
+        
+      if (updateError) {
+        console.error("Error updating participant count:", updateError);
+        toast({
+          title: "Error",
+          description: "Could not update participant count",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Create a participant_removed event
+      await supabase
+        .from('session_events')
+        .insert({
+          conversation_id: conversationId,
+          event_type: 'participant_removed',
+          data: { 
+            participant_id: participantId,
+            current_count: newCount,
+            removed_by: 'admin',
+            timestamp: new Date().toISOString()
+          }
+        });
+      
+      // Update local state
+      setDisplayCount(newCount);
+      setParticipantsList(prev => prev.filter(p => p.id !== participantId));
+      
+      toast({
+        title: "Participant removed",
+        description: `Successfully removed participant ${participantId}`,
+      });
+    } catch (err) {
+      console.error("Exception removing participant:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
+  };
   
   // Set up realtime subscription for participant updates
   useEffect(() => {
@@ -101,6 +178,16 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
               });
             }
           }
+        } else if (payload.new && payload.new.event_type === 'participant_removed') {
+          const eventData = payload.new.data;
+          if (eventData && eventData.participant_id && eventData.current_count !== undefined) {
+            setDisplayCount(eventData.current_count);
+            
+            // Remove participant from list if we didn't remove them ourselves
+            if (eventData.removed_by !== 'admin') {
+              setParticipantsList(prev => prev.filter(p => p.id !== eventData.participant_id));
+            }
+          }
         }
       })
       .subscribe();
@@ -168,7 +255,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
           {participantsList.map((participant) => (
             <div 
               key={participant.id}
-              className="p-3 bg-white rounded-lg border border-gray-100 flex items-center gap-2 hover:border-gray-200 transition-colors"
+              className="p-3 bg-white rounded-lg border border-gray-100 flex items-center gap-2 hover:border-gray-200 transition-colors group relative"
             >
               <div 
                 className="w-2 h-2 rounded-full" 
@@ -183,6 +270,17 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
               <div className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                 Active
               </div>
+              
+              {/* Remove participant button - only visible on hover */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => removeParticipant(participant.id)}
+                title="Remove participant"
+              >
+                <UserX className="h-4 w-4 text-red-500" />
+              </Button>
             </div>
           ))}
         </div>

@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
 import { useSessionProviderState } from "@/hooks/useSessionProviderState";
@@ -32,15 +32,21 @@ export const SessionProviderCore = ({
   const location = useLocation();
   const { persistedParticipantData } = useParticipantPersistence();
   
+  // Log initialization only once
+  const hasInitializedRef = React.useRef(false);
+
   useEffect(() => {
-    console.log("SessionProviderCore initialized", {
-      pathname: location.pathname,
-      search: location.search,
-      hasLocationState: !!location.state,
-      hasPersistedData: !!persistedParticipantData,
-      forceAdmin,
-      isAdminInStorage: sessionStorage.getItem('isAdminSession') === 'true'
-    });
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      console.log("SessionProviderCore initialized", {
+        pathname: location.pathname,
+        search: location.search,
+        hasLocationState: !!location.state,
+        hasPersistedData: !!persistedParticipantData,
+        forceAdmin,
+        isAdminInStorage: sessionStorage.getItem('isAdminSession') === 'true'
+      });
+    }
   }, [location, persistedParticipantData, forceAdmin]);
   
   const locationState = useEnhancedLocationState(location.state);
@@ -51,8 +57,11 @@ export const SessionProviderCore = ({
     persistedParticipantData
   });
   
+  // Set admin status only once
+  const adminStatusSetRef = React.useRef(false);
   useEffect(() => {
-    if (effectiveAdmin) {
+    if (effectiveAdmin && !adminStatusSetRef.current) {
+      adminStatusSetRef.current = true;
       console.log("SessionProviderCore: Enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
     }
@@ -76,17 +85,22 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
+  // Memoize the error handler to prevent it from changing on each render
+  const memoizedHandleError = useCallback((error: string) => {
+    handleError(error);
+  }, [handleError]);
+
   const connection = useSessionRealtimeConnection({
     conversationId: currentConversationId,
     refetch,
-    onError: handleError,
+    onError: memoizedHandleError,
     isAdmin: effectiveAdmin
   });
 
   useSessionProviderErrorHandler({
     dataError,
     effectiveAdmin,
-    handleError
+    handleError: memoizedHandleError
   });
 
   const {
@@ -101,7 +115,7 @@ export const SessionProviderCore = ({
     conversation,
     locationState,
     refetch,
-    onError: handleError,
+    onError: memoizedHandleError,
     onSessionFull: handleSessionFull,
     forceAdmin: effectiveAdmin
   });
@@ -122,7 +136,7 @@ export const SessionProviderCore = ({
     conversationId: currentConversationId,
     currentUserParticipantId,
     participants,
-    onError: handleError,
+    onError: memoizedHandleError,
     forceAdmin: effectiveAdmin
   });
 
@@ -145,7 +159,8 @@ export const SessionProviderCore = ({
       effectiveAdmin
     });
 
-    return (
+    // Memoize the error component to prevent re-renders
+    const errorComponent = useMemo(() => (
       <SessionProviderCoreError
         providerError={providerError}
         effectiveAdmin={effectiveAdmin}
@@ -155,7 +170,9 @@ export const SessionProviderCore = ({
       >
         {children}
       </SessionProviderCoreError>
-    );
+    ), [providerError, effectiveAdmin, refetch, sessionContextValue, childrenFn, children]);
+
+    return errorComponent;
   } catch (error) {
     console.error("Fatal error in SessionProviderCore:", error);
     

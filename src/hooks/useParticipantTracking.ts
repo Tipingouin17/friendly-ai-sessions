@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useParticipantDatabase } from "./useParticipantDatabase";
@@ -20,6 +20,7 @@ export function useParticipantTracking(
   
   // State for loading
   const [isLoading, setIsLoading] = useState(true);
+  const loggedRef = useRef(false);
 
   // Update loading state based on database loading
   useEffect(() => {
@@ -40,9 +41,12 @@ export function useParticipantTracking(
     setParticipants
   });
   
-  // Log the current participants array for debugging
+  // Log the current participants array for debugging - only once
   useEffect(() => {
-    console.log("Current participants array:", dbParticipants);
+    if (!loggedRef.current && dbParticipants.length > 0) {
+      console.log("Current participants array:", dbParticipants);
+      loggedRef.current = true;
+    }
     // Return an empty cleanup function
     return () => {};
   }, [dbParticipants]);

@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,13 +23,14 @@ export function useParticipantRealtime({
 }: UseParticipantRealtimeProps) {
   const participantsChannelRef = useRef<any>(null);
   const eventsChannelRef = useRef<any>(null);
+  const hasSetupSubscription = useRef(false);
   
   useEffect(() => {
-    if (!conversationId) {
-      console.log("No conversationId provided to useParticipantRealtime, skipping subscription");
+    if (!conversationId || hasSetupSubscription.current) {
       return () => {};
     }
     
+    hasSetupSubscription.current = true;
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
     
     try {
@@ -148,6 +150,7 @@ export function useParticipantRealtime({
     }
       
     return () => {
+      hasSetupSubscription.current = false;
       try {
         if (participantsChannelRef.current) {
           removeChannel(participantsChannelRef.current);
@@ -166,5 +169,5 @@ export function useParticipantRealtime({
         console.error("Error removing events channel:", e);
       }
     };
-  }, [conversationId, participants, setParticipants, setIsLoading, maxParticipants]);
+  }, [conversationId, setParticipants, setIsLoading, maxParticipants]);
 }

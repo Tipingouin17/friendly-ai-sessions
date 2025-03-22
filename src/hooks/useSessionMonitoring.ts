@@ -22,13 +22,10 @@ export const useSessionMonitoring = ({
   onError,
   forceAdmin
 }: UseSessionMonitoringProps) => {
-  useEffect(() => {
-    console.log("useSessionMonitoring running...");
-  }, []);
-
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
   const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
   const adminStatusSetRef = useRef(false);
+  const hasMonitoredSessionRef = useRef(false);
   
   // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
@@ -41,8 +38,11 @@ export const useSessionMonitoring = ({
   }, [forceAdmin, setAdminStatus]);
   
   // Monitor session start status - fixed to pass the conversation object
+  // Only update state when there's an actual change
   useEffect(() => {
-    if (conversation) {
+    if (conversation && !hasMonitoredSessionRef.current) {
+      hasMonitoredSessionRef.current = true;
+      
       // Check if the session is already started in the DB
       const isStarted = Boolean(conversation.session_started);
       console.log("Session started status from conversation:", isStarted);
@@ -50,7 +50,7 @@ export const useSessionMonitoring = ({
     }
   }, [conversation]);
   
-  // Get room state - fixed to include isAdmin prop properly
+  // Get room state - using useMemo to avoid re-renders
   const roomState = useSessionRoomState({
     conversationId,
     conversation,

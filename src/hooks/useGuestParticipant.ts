@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { LocationStateType } from "@/hooks/useConversationId";
 
@@ -12,8 +12,16 @@ export function useGuestParticipant({
   locationState,
   setParticipants
 }: UseGuestParticipantProps) {
+  // Use a ref to track if we've already added this participant
+  const hasAddedParticipantRef = useRef(false);
+
   // Add participant from location state (for guests joining)
   useEffect(() => {
+    // Only run once per component lifecycle
+    if (hasAddedParticipantRef.current) {
+      return;
+    }
+
     if (locationState?.isGuest) {
       console.log("Guest participant joining with data:", locationState);
       
@@ -21,7 +29,9 @@ export function useGuestParticipant({
         const avatarUrl = locationState.avatarSeed 
           ? `/api/avatar?name=${locationState.avatarSeed}&variant=beam&palette=0` 
           : null;
-          
+        
+        hasAddedParticipantRef.current = true;
+        
         setParticipants(prev => {
           const exists = prev.some(p => p.id === locationState.participantId);
           if (exists) return prev;
@@ -39,7 +49,8 @@ export function useGuestParticipant({
       }
     }
     
-    // Return an empty cleanup function
-    return () => {};
+    return () => {
+      hasAddedParticipantRef.current = false;
+    };
   }, [locationState, setParticipants]);
 }

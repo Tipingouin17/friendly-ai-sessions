@@ -38,12 +38,8 @@ export function useSessionContextValue({
   handleStartSession,
   effectiveAdmin
 }: UseSessionContextValueProps): SessionContextProps {
-  useEffect(() => {
-    console.log("useSessionContextValue running...");
-  }, []);
-
   // Create safe defaults for any potentially undefined values
-  const safeRoomState = roomState || {
+  const safeRoomState = useMemo(() => roomState || {
     messages: [],
     inputMessage: "",
     setInputMessage: () => {},
@@ -59,7 +55,7 @@ export function useSessionContextValue({
     setViewMode: () => {},
     recordResponse: () => {},
     error: null
-  };
+  }, [roomState]);
 
   // Create the session context value with safe defaults
   const sessionContextValue = useMemo<SessionContextProps>(() => ({

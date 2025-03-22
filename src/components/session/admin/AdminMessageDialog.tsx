@@ -6,28 +6,39 @@ import {
   DialogHeader, 
   DialogTitle,
   DialogDescription,
-  DialogFooter
+  DialogFooter,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AdminMessageDialogProps } from './types';
+import { MessageSquare } from "lucide-react";
+
+interface AdminMessageDialogProps {
+  onSendMessage: (message: string) => void;
+}
 
 const AdminMessageDialog: React.FC<AdminMessageDialogProps> = ({
-  isOpen,
-  onOpenChange,
   onSendMessage
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
   const [adminMessage, setAdminMessage] = useState('');
 
   const handleSendMessage = () => {
     if (adminMessage.trim()) {
       onSendMessage(adminMessage);
       setAdminMessage('');
+      setIsOpen(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="flex items-center gap-1">
+          <MessageSquare className="h-4 w-4" />
+          <span>Send Message</span>
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Message to Participants</DialogTitle>
@@ -46,7 +57,7 @@ const AdminMessageDialog: React.FC<AdminMessageDialogProps> = ({
         <DialogFooter>
           <Button 
             variant="outline" 
-            onClick={() => onOpenChange(false)}
+            onClick={() => setIsOpen(false)}
           >
             Cancel
           </Button>

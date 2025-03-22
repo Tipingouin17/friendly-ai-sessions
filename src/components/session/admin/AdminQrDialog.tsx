@@ -1,38 +1,57 @@
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
-  DialogTitle
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Copy } from "lucide-react";
-import { AdminQrDialogProps } from './types';
+import { Copy, QrCode } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+
+interface AdminQrDialogProps {
+  conversationId: number | null;
+}
 
 const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
-  isOpen,
-  onOpenChange,
-  joinUrl,
-  currentParticipants,
-  maxParticipants,
-  onCopyLink
+  conversationId
 }) => {
-  // Auto-close dialog when session is full
+  const [isOpen, setIsOpen] = useState(false);
+  const [joinUrl, setJoinUrl] = useState("");
+  const { toast } = useToast();
+  
   useEffect(() => {
-    if (isOpen && maxParticipants > 0 && currentParticipants >= maxParticipants) {
-      console.log('Session is full, auto-closing QR dialog');
-      onOpenChange(false);
+    if (conversationId) {
+      const baseUrl = window.location.origin;
+      setJoinUrl(`${baseUrl}/join?id=${conversationId}`);
     }
-  }, [isOpen, currentParticipants, maxParticipants, onOpenChange]);
+  }, [conversationId]);
 
-  // Don't render the dialog at all if session is full
-  if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
+  const onCopyLink = () => {
+    if (joinUrl) {
+      navigator.clipboard.writeText(joinUrl);
+      toast({
+        title: "Link copied",
+        description: "Session join link copied to clipboard",
+      });
+    }
+  };
+
+  // Don't render the dialog at all if no conversation ID
+  if (!conversationId) {
     return null;
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="flex items-center gap-1">
+          <QrCode className="h-4 w-4" />
+          <span>QR Code</span>
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Session QR Code</DialogTitle>
@@ -65,7 +84,6 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
             </>
           )}
           <div className="mt-4 text-sm text-gray-600 text-center">
-            <p className="font-medium">Current participants: {currentParticipants}/{maxParticipants}</p>
             <p className="mt-1">Share this QR code or link with participants to join the session</p>
           </div>
         </div>

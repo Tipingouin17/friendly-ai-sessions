@@ -1,18 +1,9 @@
 
 export interface AdminHeaderProps {
-  sessionTitle: string;
-  facilitatorTitle?: string;
-  currentParticipants: number;
-  maxParticipants: number;
-  isSessionActive: boolean;
-  onToggleSessionState: () => void;
-  onSendAdminMessage: (message: string) => void;
-  onExportData: () => void;
-  sessionState?: {
-    objective?: string;
-    language?: string;
-    sessionStarted?: boolean;
-  };
+  conversation: any;
+  isSessionPaused: boolean;
+  toggleSessionState: () => void;
+  handleAdminMessage: (message: string) => void;
 }
 
 export interface AdminActionButtonProps {
@@ -23,16 +14,14 @@ export interface AdminActionButtonProps {
 }
 
 export interface AdminQrDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  joinUrl: string;
-  currentParticipants: number;
-  maxParticipants: number;
-  onCopyLink: () => void;
+  conversationId: number | null;
 }
 
 export interface AdminMessageDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
   onSendMessage: (message: string) => void;
+}
+
+export interface SessionStatusBadgeProps {
+  isActive: boolean;
+  sessionStarted?: boolean;
 }

@@ -21,6 +21,7 @@ interface SessionHeaderManagerProps {
   onSendAdminMessage?: (message: string) => void;
   isSessionActive?: boolean;
   onToggleSessionState?: () => void;
+  conversation?: any;
 }
 
 const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
@@ -35,21 +36,18 @@ const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
   canGenerateReports,
   messagesCount,
   viewMode,
-  onSendAdminMessage,
+  onSendAdminMessage = () => {},
   isSessionActive = true,
-  onToggleSessionState = () => {}
+  onToggleSessionState = () => {},
+  conversation
 }) => {
   if (isAdmin) {
     return (
       <AdminHeader 
-        sessionTitle={facilitator?.title || "Session"}
-        facilitatorTitle={facilitator?.title || ""}
-        currentParticipants={currentParticipantCount || participantCount}
-        maxParticipants={maxParticipants}
-        isSessionActive={isSessionActive}
-        onToggleSessionState={onToggleSessionState}
-        onSendAdminMessage={onSendAdminMessage}
-        onExportData={onGenerateReport}
+        conversation={conversation}
+        isSessionPaused={!isSessionActive}
+        toggleSessionState={onToggleSessionState}
+        handleAdminMessage={onSendAdminMessage}
       />
     );
   }

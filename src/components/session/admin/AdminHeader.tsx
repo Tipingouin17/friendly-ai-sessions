@@ -29,8 +29,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
   
   const handleBack = () => {
-    // Navigate to past workshops page instead of home
-    navigate('/past-workshops');
+    // Navigate to past workshops page with auto=true to automatically navigate to the latest active session
+    navigate('/past-workshops?auto=true');
   };
 
   // Get session title

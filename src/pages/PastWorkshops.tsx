@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 const fetchPastWorkshops = async () => {
   const { data, error } = await supabase
@@ -147,6 +149,7 @@ const EmptyState = ({ isActive = false }) => (
 
 const PastWorkshops = () => {
   const navigate = useNavigate();
+  const { setAdminStatus } = useSessionAdminStatus();
   
   const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
     queryKey: ['past-workshops'],
@@ -157,6 +160,28 @@ const PastWorkshops = () => {
     queryKey: ['active-workshops'],
     queryFn: fetchActiveWorkshops,
   });
+  
+  // Navigate to most recent active session automatically
+  useEffect(() => {
+    // Only navigate if there's at least one active workshop and we're coming from admin header
+    if (activeWorkshops && activeWorkshops.length > 0 && window.location.search.includes('auto=true')) {
+      const mostRecentSession = activeWorkshops[0];
+      console.log("Auto-navigating to most recent session:", mostRecentSession.id);
+      
+      // Set admin status
+      sessionStorage.setItem('isAdminSession', 'true');
+      setAdminStatus(true);
+      
+      // Navigate to the session admin page
+      navigate(`/session/admin?id=${mostRecentSession.id}`, {
+        state: {
+          isAdmin: true,
+          showMessaging: true,
+          conversationId: mostRecentSession.id
+        }
+      });
+    }
+  }, [activeWorkshops, navigate, setAdminStatus]);
   
   const handleCreateNew = () => {
     navigate('/my-facilitators');

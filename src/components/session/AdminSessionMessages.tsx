@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import AdminMessageView from './messaging/AdminMessageView';
 import AdminMessageLoadingState from './messaging/AdminMessageLoadingState';
@@ -22,6 +22,11 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
   conversationData,
   onSendMessage
 }) => {
+  // Debug log messages when they change
+  useEffect(() => {
+    console.log("AdminSessionMessages received messages:", messages.length);
+  }, [messages]);
+
   // Generate participant colors mapping
   const participantColors = participants.reduce((colors, participant) => {
     colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
@@ -32,7 +37,11 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
     return <AdminMessageLoadingState />;
   }
 
-  if (messages.length === 0) {
+  // Special case: Show messages even if length is 0, in case there's a welcome message
+  // but no participant responses yet
+  const hasWelcomeMessage = conversationData?.sessions?.welcome_message;
+
+  if (messages.length === 0 && !hasWelcomeMessage) {
     return <AdminMessageEmptyState conversationData={conversationData} />;
   }
 

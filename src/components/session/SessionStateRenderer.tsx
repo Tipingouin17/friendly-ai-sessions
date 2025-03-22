@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { SessionContextProps } from "@/types/session";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
@@ -30,7 +29,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
 }) => {
   const { toast } = useToast();
   
-  // Debug logging
   useEffect(() => {
     console.log("SessionStateRenderer state:", {
       isLoading,
@@ -47,22 +45,18 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     });
   }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
   
-  // If admin status detected but not reflected in props, update the UI
   useEffect(() => {
     if (effectiveAdmin && !props.isAdmin) {
       console.log("Admin status detected but not reflected in props. Forcing admin override in SessionStateRenderer");
     }
   }, [effectiveAdmin, props.isAdmin]);
 
-  // Separate handling for admin route specific rendering
   const isOnAdminRoute = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminRoute;
   
-  // CRITICAL FIX: For participant routes, don't use session storage admin status
   const shouldUseAdminPrivileges = isParticipantPath ? 
     (props.isAdmin || false) : effectiveAdmin;
   
-  // If on dedicated admin route, bypass most checks and show session directly
   if (isOnAdminRoute || (shouldUseAdminPrivileges && props.isAdmin)) {
     console.log("🔑 On admin route or confirmed admin - bypassing error screens");
     
@@ -86,11 +80,9 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     );
   }
 
-  // Special handling for session full errors
   const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity") || 
                            props.error?.includes("full") || props.error?.includes("maximum capacity");
   
-  // Admin users bypass session full errors even if not on admin route
   if (shouldUseAdminPrivileges && isSessionFullError) {
     console.log("🔑 Admin detected with session full error - bypassing error screen");
     
@@ -99,7 +91,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
       props.refetch();
     }
     
-    // For admin users, we'll bypass the error state and show the session
     return (
       <SessionStateHandler
         props={{
@@ -115,8 +106,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     );
   }
   
-  // CRITICAL FIX: Add clearer loading state transitions for participants
-  // If loading and no conversation, show loading state
   if ((isLoading || props.isLoading) && !props.conversation) {
     console.log("Showing provider loading state");
     return <JoinSessionLoadingState 
@@ -125,7 +114,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     />;
   }
   
-  // If error, show error state
   if (props.error || error) {
     console.log("Showing provider error state:", props.error || error);
     return <JoinSessionLoadingState 
@@ -135,7 +123,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     />;
   }
   
-  // If no conversation ID and not loading, show error
   if (!props.currentConversationId && !isLoading && !props.isLoading) {
     console.error("No conversation ID found in session provider, but no error was returned");
     return <JoinSessionLoadingState 
@@ -145,7 +132,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     />;
   }
   
-  // If we get here, we have a conversation and no errors, show session
   return (
     <SessionStateHandler
       props={{

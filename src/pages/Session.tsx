@@ -39,7 +39,7 @@ const Session = () => {
       {/* Only show our custom navigation on mobile for participant view */}
       {isMobile && !isOnAdminPath && <SessionMobileNav />}
       
-      <div className="flex-1 overflow-hidden">
+      <div className={`flex-1 overflow-hidden ${isMobile && !isOnAdminPath ? 'pt-16' : ''}`}>
         <SessionContent
           isLoading={isLoading}
           hasInitializedProvider={hasInitializedProvider}

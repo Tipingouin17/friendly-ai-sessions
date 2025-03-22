@@ -1,10 +1,11 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 
 export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId?: number | null) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [lastAttemptTime, setLastAttemptTime] = useState<number>(Date.now());
@@ -67,12 +68,19 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
           return;
         }
         
+        // IMPORTANT: Use React Router navigate instead of window.location
         if (connectionAttempts < 3) {
           const searchParams = new URLSearchParams(location.search);
           const sessionId = searchParams.get('id') || currentConversationId?.toString();
           
           if (sessionId) {
-            window.location.replace(`${window.location.origin}/session?id=${sessionId}`);
+            // Use navigate instead of window.location.replace
+            navigate(`/session?id=${sessionId}`, { replace: true });
+            
+            toast({
+              title: "Reconnecting",
+              description: "Attempting to reconnect to the session...",
+            });
           }
         } else {
           toast({
@@ -87,7 +95,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       }
     }, retryDelay);
     
-  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, isAdminSession]);
+  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, isAdminSession, navigate]);
 
   return { 
     connectionAttempts, 

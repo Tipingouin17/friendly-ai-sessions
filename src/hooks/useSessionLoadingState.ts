@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export function useSessionLoadingState(
   sessionMountedRef: React.RefObject<boolean>,
@@ -12,6 +13,7 @@ export function useSessionLoadingState(
   const [loadingStartTime] = useState(Date.now());
   const recoveryAttemptsMade = useRef(0);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const lastLoadingState = useRef<boolean>(true);
   const forceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isAdminSession = useRef(sessionStorage.getItem('isAdminSession') === 'true' || 
@@ -145,25 +147,31 @@ export function useSessionLoadingState(
     };
   }, [isLoading, toast, sessionMountedRef, hasInitializedProvider, connectionAttempts, loadingStartTime]);
 
-  // Detect and handle potential deadlocks
+  // Detect and handle potential deadlocks - use navigation instead of page reload
   useEffect(() => {
     const timeSinceStart = Date.now() - loadingStartTime;
     
-    // If we're still loading after 12 seconds regardless of state, force refresh
+    // If we're still loading after 12 seconds regardless of state, instead of refreshing, try recovery
     if (isLoading && timeSinceStart > 12000) {
-      console.log("DEADLOCK DETECTED: Session has been loading for too long, forcing page reload");
+      console.log("DEADLOCK DETECTED: Session has been loading for too long");
       toast({
         title: "Session Issue",
-        description: "We detected a problem with loading. Refreshing the page...",
+        description: "We detected a problem with loading. Trying to recover...",
         variant: "destructive"
       });
       
-      // Set a timeout to reload the page
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // Instead of page reload, navigate to the same page with a fresh state
+      const searchParams = new URLSearchParams(window.location.search);
+      const sessionId = searchParams.get('id');
+      
+      if (sessionId) {
+        // Add a timestamp to force a fresh load
+        navigate(`/session?id=${sessionId}&retry=${Date.now()}`, { replace: true });
+      } else {
+        setIsLoading(false); // As a fallback, at least turn off loading
+      }
     }
-  }, [isLoading, loadingStartTime, toast]);
+  }, [isLoading, loadingStartTime, toast, navigate]);
 
   return { isLoading, setIsLoading };
 }

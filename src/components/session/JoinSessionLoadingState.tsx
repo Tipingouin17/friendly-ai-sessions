@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface JoinSessionLoadingStateProps {
   onRetry?: () => void;
@@ -16,6 +17,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   retryCount = 0,
   loadingTimeElapsed = 0
 }) => {
+  const navigate = useNavigate();
   const [isLongWait, setIsLongWait] = useState(false);
   const [isVeryLongWait, setIsVeryLongWait] = useState(false);
   const [errorDescription, setErrorDescription] = useState<string | null>(null);
@@ -101,24 +103,40 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     }
   }, [loadingTimeElapsed, retryCount, error]);
 
-  // Prevent extremely long waits
+  // Prevent extremely long waits - using React Router navigation instead of page refresh
   useEffect(() => {
     const autoRefreshTimeout = setTimeout(() => {
       if (elapsed > 15 && mountedRef.current) {
-        console.log("Auto-refreshing page after extended loading time");
-        window.location.reload();
+        console.log("Session taking too long to load - navigating to session with retry param");
+        // Use navigateHandler instead of window.location.reload()
+        if (onRetry) {
+          onRetry();
+        }
       }
     }, 15000);
     
     return () => clearTimeout(autoRefreshTimeout);
-  }, [elapsed]);
+  }, [elapsed, onRetry]);
 
   const handleRefresh = () => {
     if (onRetry) {
       onRetry();
     } else {
-      window.location.reload();
+      // Use React Router instead of direct page reload
+      const searchParams = new URLSearchParams(window.location.search);
+      const sessionId = searchParams.get('id');
+      
+      if (sessionId) {
+        // Add a retry parameter to the URL to ensure state reset
+        navigate(`/session?id=${sessionId}&retry=${Date.now()}`, { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
+  };
+
+  const goToHome = () => {
+    navigate('/');
   };
 
   const getStatusMessage = () => {
@@ -197,7 +215,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
             {retryCount > 1 && (
               <div className="mt-2">
                 <Button 
-                  onClick={() => window.location.href = '/'}
+                  onClick={goToHome}
                   variant="outline"
                   className="text-sm"
                 >

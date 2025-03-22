@@ -4,6 +4,7 @@ import { AlertTriangle, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { useNavigate } from "react-router-dom";
 
 export interface SessionErrorBoundaryProps {
   children: React.ReactNode;
@@ -30,6 +31,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 }) => {
   const { toast } = useToast();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  const navigate = useNavigate();
   
   // Debug logging
   useEffect(() => {
@@ -130,7 +132,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
             <Button 
               variant="outline"
               className="w-full"
-              onClick={() => window.location.href = "/"}
+              onClick={() => navigate('/')}
             >
               Return Home
             </Button>

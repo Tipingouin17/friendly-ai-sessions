@@ -22,6 +22,10 @@ export const useSessionMonitoring = ({
   onError,
   forceAdmin
 }: UseSessionMonitoringProps) => {
+  useEffect(() => {
+    console.log("useSessionMonitoring running...");
+  }, []);
+
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
   const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
   const adminStatusSetRef = useRef(false);

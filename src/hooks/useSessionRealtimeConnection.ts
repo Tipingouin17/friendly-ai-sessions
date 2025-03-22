@@ -15,6 +15,10 @@ export function useSessionRealtimeConnection({
   onError,
   isAdmin
 }: UseSessionRealtimeConnectionProps) {
+  useEffect(() => {
+    console.log("useSessionRealtimeConnection running...");
+  }, []);
+
   // Set up realtime connection handling with better error handling
   const connection = useRealtimeConnectionHandler({
     conversationId,

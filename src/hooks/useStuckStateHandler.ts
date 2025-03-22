@@ -1,17 +1,14 @@
-
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { ConversationWithSession } from "@/types/database";
 
 interface UseStuckStateHandlerProps {
   isLoading: boolean;
   currentConversationId: number | null;
-  conversation: any;
+  conversation: ConversationWithSession | null;
   refetch: () => void;
-  forceRefreshParticipants?: () => void;
+  forceRefreshParticipants: () => void;
 }
 
-/**
- * Hook to handle stuck states by forcing a refresh after a timeout
- */
 export function useStuckStateHandler({
   isLoading,
   currentConversationId,
@@ -19,6 +16,10 @@ export function useStuckStateHandler({
   refetch,
   forceRefreshParticipants
 }: UseStuckStateHandlerProps) {
+  useEffect(() => {
+    console.log("useStuckStateHandler running...");
+  }, []);
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (isLoading && currentConversationId && !conversation) {

@@ -1,7 +1,5 @@
-
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
-import { participantColors } from "@/utils/sessionHelpers";
 
 interface UseSessionContextValueProps {
   isLoading: boolean;
@@ -9,17 +7,14 @@ interface UseSessionContextValueProps {
   currentConversationId: number | null;
   refetch: () => void;
   showQrCodeView: boolean;
-  sessionLink: string;
+  sessionLink: string | null;
   isSessionStartedInDB: boolean;
   roomState: any;
   participants: any[];
   currentUserParticipantId: number | null;
   isAdmin: boolean;
   providerError: string | null;
-  connection: {
-    isConnected: boolean;
-    connectionAttempts: number;
-  };
+  connection: any;
   handleStartSession: () => void;
   effectiveAdmin: boolean;
 }
@@ -41,6 +36,10 @@ export function useSessionContextValue({
   handleStartSession,
   effectiveAdmin
 }: UseSessionContextValueProps): SessionContextProps {
+  useEffect(() => {
+    console.log("useSessionContextValue running...");
+  }, []);
+
   // Create safe defaults for any potentially undefined values
   const safeRoomState = roomState || {
     messages: [],

@@ -15,6 +15,10 @@ export function useSessionProviderErrorHandler({
   effectiveAdmin,
   handleError
 }: UseSessionProviderErrorHandlerProps) {
+  useEffect(() => {
+    console.log("useSessionProviderErrorHandler running...");
+  }, []);
+
   // Handle data errors
   useEffect(() => {
     if (dataError) {

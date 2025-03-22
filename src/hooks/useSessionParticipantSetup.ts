@@ -1,17 +1,17 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSessionParticipants } from "@/hooks/useSessionParticipants";
-import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
+import { ConversationWithSession } from "@/types/database";
 import { LocationStateType } from "@/hooks/useConversationId";
+import { getParticipantInfo } from "@/utils/participantUtils";
+import { supabase } from "@/integrations/supabase/client";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
-import { useToast } from "@/components/ui/use-toast";
+import { useSessionRealtime } from "@/hooks/useSessionRealtime";
 
 type UseSessionParticipantSetupProps = {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
   locationState: LocationStateType | null;
-  refetch: () => Promise<any>; // Ensure this is a Promise
+  refetch: () => void;
   onError?: (error: string) => void;
   onSessionFull?: () => void;
   forceAdmin?: boolean;
@@ -26,155 +26,166 @@ export const useSessionParticipantSetup = ({
   onSessionFull,
   forceAdmin
 }: UseSessionParticipantSetupProps) => {
-  const [isSessionFull, setIsSessionFull] = useState(false);
-  const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
-  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  useEffect(() => {
+    console.log("useSessionParticipantSetup running...");
+  }, []);
+
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
-  const { toast } = useToast();
+  const [currentUserParticipantId, setCurrentUserParticipantId] = useState<number | null>(null);
+  const [currentParticipantCount, setCurrentParticipantCount] = useState(0);
+  const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
+  const [isSessionFull, setIsSessionFull] = useState(false);
+  const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  const adminStatusSetRef = useRef(false);
+  const sessionFullCalledRef = useRef(false);
   
-  // Use a ref to store and determine admin status just once to prevent loops
-  const adminStatusRef = useRef({
-    determined: false,
-    isAdmin: false,
-    adminStatusSet: false
-  });
-  
-  // Determine admin status once and store in ref
+  // Enforce admin status if forceAdmin is true
   useEffect(() => {
-    if (!adminStatusRef.current.determined) {
-      adminStatusRef.current.isAdmin = forceAdmin === true || 
-                                      locationState?.isAdmin === true || 
-                                      isAdmin === true || 
-                                      sessionStorage.getItem('isAdminSession') === 'true';
-      adminStatusRef.current.determined = true;
-      
-      // Log it
-      console.log("useSessionParticipantSetup admin status determined:", adminStatusRef.current.isAdmin);
-    }
-  }, [forceAdmin, locationState, isAdmin]);
-  
-  // Enforce admin status if needed - run only once
-  useEffect(() => {
-    if (adminStatusRef.current.isAdmin && !adminStatusRef.current.adminStatusSet) {
-      console.log("useSessionParticipantSetup: Enforcing admin status");
-      // This uses the safe version that won't cause re-renders if already set
+    if (forceAdmin && !adminStatusSetRef.current) {
+      console.log("useSessionParticipantSetup: Enforcing admin status with forceAdmin=true");
+      sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
-      adminStatusRef.current.adminStatusSet = true;
+      adminStatusSetRef.current = true;
     }
-  }, [setAdminStatus]);
+  }, [forceAdmin, setAdminStatus]);
   
-  // Get participants using the hook
-  const participantsData = useSessionParticipants(conversationId);
-  
-  // Extract needed properties from participantsData
-  const {
-    currentParticipantCount,
-    maxParticipantsForSession,
-  } = participantsData;
-  
-  // Debug logging
+  // Load participants when conversation changes
   useEffect(() => {
-    console.log("useSessionParticipantSetup current state:", {
-      conversationId,
-      currentParticipantCount,
-      maxParticipantsForSession,
-      effectiveIsAdmin: adminStatusRef.current.isAdmin,
-      isSessionFull,
-      currentUserParticipantId,
-      locationStateParticipantId: locationState?.participantId
-    });
-  }, [conversationId, currentParticipantCount, maxParticipantsForSession,
-      isSessionFull, currentUserParticipantId, locationState]);
-  
-  // Set current user participant ID from location state
-  useEffect(() => {
-    if (locationState?.participantId && currentUserParticipantId !== locationState.participantId) {
-      setCurrentUserParticipantId(locationState.participantId);
-    }
-  }, [locationState, currentUserParticipantId]);
-  
-  // Function to force refresh participants - must return a Promise
-  const forceRefreshParticipants = useCallback(async () => {
-    if (!conversationId) return Promise.resolve();
-    
-    try {
-      console.log("Forcibly refreshing participant data from useSessionParticipantSetup");
-      const result = await refetch();
-      return Promise.resolve(result);
-    } catch (err) {
-      console.error("Error in forceRefreshParticipants:", err);
-      return Promise.resolve();
-    }
-  }, [conversationId, refetch]);
-  
-  // Handle session full logic with improved admin detection
-  useEffect(() => {
-    // Skip entirely if we're an admin
-    if (adminStatusRef.current.isAdmin) {
-      console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
-      if (isSessionFull) {
-        setIsSessionFull(false); // Reset if previously set
+    const loadParticipants = async () => {
+      if (!conversationId) return;
+      
+      try {
+        console.log("Loading participants for conversation:", conversationId);
+        
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('conversation_id', conversationId);
+          
+        if (error) {
+          console.error("Error loading participants:", error);
+          if (onError) onError("Failed to load session participants");
+          return;
+        }
+        
+        if (!data || data.length === 0) {
+          console.log("No participants found for conversation:", conversationId);
+          return;
+        }
+        
+        // Process participants
+        const participantPromises = data.map(async (participant) => {
+          try {
+            return await getParticipantInfo(participant);
+          } catch (err) {
+            console.error("Error getting participant info:", err);
+            return null;
+          }
+        });
+        
+        const participantInfos = (await Promise.all(participantPromises)).filter(Boolean) as ParticipantInfo[];
+        console.log("Loaded participants:", participantInfos.length);
+        setParticipants(participantInfos);
+        
+        // Set current participant ID from location state if available
+        if (locationState?.participantId) {
+          console.log("Setting current participant ID from location state:", locationState.participantId);
+          setCurrentUserParticipantId(locationState.participantId);
+        }
+      } catch (err) {
+        console.error("Error in loadParticipants:", err);
+        if (onError) onError("Failed to load session participants");
       }
-      return;
-    }
+    };
     
-    // Skip check if the current user is already a participant (they're registered)
-    const isCurrentUserAlreadyRegistered = 
-      currentUserParticipantId !== null && 
-      locationState?.participantId !== undefined;
-    
-    if (isCurrentUserAlreadyRegistered) {
-      console.log("Current user is already registered as a participant, skipping session full check");
-      if (isSessionFull) {
-        setIsSessionFull(false); // Reset if previously set
-      }
-      return;
-    }
-    
-    // Use session-specific max or fall back to default
-    const effectiveMaxParticipants = maxParticipantsForSession > 0 ? maxParticipantsForSession : 10;
-    
-    // Check if session is full for non-admin users who aren't already participants
-    const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
-    
-    if (isFull && !isSessionFull && conversationId) {
-      console.log("Session is full, notifying:", {
-        currentCount: currentParticipantCount,
-        maxAllowed: effectiveMaxParticipants,
-        isAdmin: adminStatusRef.current.isAdmin
+    loadParticipants();
+  }, [conversationId, locationState, onError]);
+  
+  // Update participant counts when conversation or participants change
+  useEffect(() => {
+    if (conversation) {
+      const maxParticipants = conversation.participants || 0;
+      const currentCount = conversation.current_participants || 0;
+      
+      console.log("Participant counts:", {
+        max: maxParticipants,
+        current: currentCount,
+        fromArray: participants.length
       });
       
-      setIsSessionFull(true);
+      setMaxParticipantsForSession(maxParticipants);
+      setCurrentParticipantCount(currentCount);
       
-      if (onSessionFull) {
+      // Check if session is full
+      const isFull = maxParticipants > 0 && currentCount >= maxParticipants;
+      setIsSessionFull(isFull);
+      
+      // Call onSessionFull if session is full and not already called
+      if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin) {
+        console.log("Session is full, calling onSessionFull");
+        sessionFullCalledRef.current = true;
         onSessionFull();
       }
+    }
+  }, [conversation, participants, onSessionFull, forceAdmin]);
+  
+  // Set up realtime updates for participants
+  const { error: realtimeError } = useSessionRealtime({
+    currentConversationId: conversationId,
+    participants,
+    setParticipants,
+    conversation,
+    refetch,
+    handleSessionFull: onSessionFull,
+    onSessionStarted: () => {}
+  });
+  
+  // Handle realtime errors
+  useEffect(() => {
+    if (realtimeError && onError) {
+      onError(realtimeError);
+    }
+  }, [realtimeError, onError]);
+  
+  // Force refresh participants function
+  const forceRefreshParticipants = useCallback(async () => {
+    if (!conversationId) return;
+    
+    try {
+      console.log("Forcing refresh of participants");
       
-      if (onError) {
-        onError("This session is full and cannot accept more participants.");
+      const { data, error } = await supabase
+        .from('session_participants')
+        .select('*')
+        .eq('conversation_id', conversationId);
+        
+      if (error) {
+        console.error("Error refreshing participants:", error);
+        return;
       }
       
-      toast({
-        title: "Session Full",
-        description: "This session has reached its maximum capacity of participants.",
-        variant: "destructive",
+      if (!data || data.length === 0) {
+        console.log("No participants found during refresh");
+        return;
+      }
+      
+      // Process participants
+      const participantPromises = data.map(async (participant) => {
+        try {
+          return await getParticipantInfo(participant);
+        } catch (err) {
+          console.error("Error getting participant info during refresh:", err);
+          return null;
+        }
       });
-    } else if (!isFull && isSessionFull) {
-      // Reset the session full state if the conditions no longer apply
-      console.log("Session is no longer full, resetting state");
-      setIsSessionFull(false);
+      
+      const participantInfos = (await Promise.all(participantPromises)).filter(Boolean) as ParticipantInfo[];
+      console.log("Refreshed participants:", participantInfos.length);
+      setParticipants(participantInfos);
+    } catch (err) {
+      console.error("Error in forceRefreshParticipants:", err);
     }
-  }, [
-    currentParticipantCount, 
-    maxParticipantsForSession, 
-    isSessionFull, 
-    conversationId,
-    onSessionFull,
-    onError,
-    toast,
-    currentUserParticipantId,
-    locationState
-  ]);
+  }, [conversationId]);
   
   return {
     participants,
@@ -182,8 +193,6 @@ export const useSessionParticipantSetup = ({
     currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    isParticipantTracking: true,
-    forceRefreshParticipants,
-    isAdmin: adminStatusRef.current.isAdmin // Use the ref value to prevent loops
+    forceRefreshParticipants
   };
 };

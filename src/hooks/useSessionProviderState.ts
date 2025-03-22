@@ -13,6 +13,10 @@ export const useSessionProviderState = ({
   onError,
   forceAdmin 
 }: UseSessionProviderStateProps = {}) => {
+  useEffect(() => {
+    console.log("useSessionProviderState running...");
+  }, []);
+
   const [providerError, setProviderError] = useState<string | null>(null);
   const location = useLocation();
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();

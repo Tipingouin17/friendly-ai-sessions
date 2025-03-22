@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import { useParticipantPersistence } from "./useParticipantPersistence";
 import { LocationStateType } from "./useConversationId";
 
@@ -8,6 +9,10 @@ import { LocationStateType } from "./useConversationId";
 export function useEnhancedLocationState(
   originalState: any
 ): LocationStateType | null {
+  useEffect(() => {
+    console.log("useEnhancedLocationState running...");
+  }, []);
+
   const { persistedParticipantData } = useParticipantPersistence();
 
   // Enhanced location state logic extracted from SessionProviderCore

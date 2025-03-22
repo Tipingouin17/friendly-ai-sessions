@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 interface UseEffectiveAdminStatusProps {
@@ -15,6 +16,10 @@ export function useEffectiveAdminStatus({
   locationState,
   persistedParticipantData
 }: UseEffectiveAdminStatusProps): boolean {
+  useEffect(() => {
+    console.log("useEffectiveAdminStatus running...");
+  }, []);
+
   const location = useLocation();
   
   // Combined admin detection from all possible sources

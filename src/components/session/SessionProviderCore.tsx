@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -28,8 +29,6 @@ export const SessionProviderCore = ({
   onError,
   forceAdmin 
 }: SessionProviderCoreProps) => {
-  console.count("SessionProviderCore renders");
-  
   const location = useLocation();
   const { persistedParticipantData } = useParticipantPersistence();
   

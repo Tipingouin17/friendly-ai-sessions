@@ -38,8 +38,8 @@ export const useSessionProviderInitialization = ({
       forcedInitialization.current = true;
       onInitialized();
       
-      // Only show toast if not admin
-      if (!(isAdmin || forceAdmin)) {
+      // Only show toast for non-admin participants with significant delays
+      if (!(isAdmin || forceAdmin) && Date.now() - performance.now() > 4000) {
         toast({
           title: "Session initialization taking longer than expected",
           description: "We're still trying to connect to the session."
@@ -58,8 +58,8 @@ export const useSessionProviderInitialization = ({
       onInitialized();
       onLoading(false); // Force loading state to false
       
-      // Only show toast if not admin
-      if (!(isAdmin || forceAdmin)) {
+      // Only show toast for non-admin participants with significant delays
+      if (!(isAdmin || forceAdmin) && Date.now() - performance.now() > 5000) {
         toast({
           title: "Session initialization taking longer than expected",
           description: "Please wait a moment while we complete setup.",

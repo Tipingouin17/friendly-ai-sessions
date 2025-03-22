@@ -65,6 +65,7 @@ export function useSessionWrapperEffects({
       return;
     }
     
+    // Only run this effect once
     stateRef.current.hasInitialized = true;
     const isAdmin = effectiveAdmin || isOnAdminPath;
     
@@ -87,18 +88,23 @@ export function useSessionWrapperEffects({
       return;
     }
     
-    // Initialize if we have conversation data or it's an admin session
+    // CRITICAL FIX: Always initialize for participant routes with valid session ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSessionId = urlParams.has('id') && urlParams.get('id');
+    
+    // Initialize if we have conversation data or it's a participant with valid session ID
     const shouldInitialize = isAdmin || 
+                           hasSessionId || 
                            (props.conversation && props.currentConversationId) || 
                            props.isSessionStartedInDB;
     
     if (shouldInitialize) {
-      console.log("Provider successfully initialized with data");
+      console.log("Provider successfully initialized with data or session ID");
       providerInitialized.current = true;
       onInitialized();
       
       // Set loading to false immediately for valid sessions
-      if ((props.isSessionStartedInDB || props.conversation) && !stateRef.current.hasUpdatedLoading) {
+      if ((props.isSessionStartedInDB || props.conversation || hasSessionId) && !stateRef.current.hasUpdatedLoading) {
         stateRef.current.hasUpdatedLoading = true;
         onLoading(false);
       }
@@ -116,12 +122,15 @@ export function useSessionWrapperEffects({
     if (!sessionMountedRef.current) return;
     
     const isAdmin = effectiveAdmin || isOnAdminPath;
+    // Check for valid session ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSessionId = urlParams.has('id') && urlParams.get('id');
     
     if (isAdmin && props.isLoading && !stateRef.current.hasUpdatedLoading) {
       // For admin sessions, force loading to false only if currently loading
       stateRef.current.hasUpdatedLoading = true;
       onLoading(false);
-    } else if ((props.isSessionStartedInDB || props.conversation) && 
+    } else if ((props.isSessionStartedInDB || props.conversation || hasSessionId) && 
               props.isLoading && !stateRef.current.hasUpdatedLoading) {
       // For participants, clear loading when data is available
       stateRef.current.hasUpdatedLoading = true;

@@ -71,16 +71,11 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
     return <>{children}</>;
   }
   
-  // CRITICAL FIX: For participant paths, don't use admin status from session storage
-  // This ensures participants see proper errors and don't get admin privileges
-  const shouldBypassErrors = isParticipantPath ? 
-    (propIsAdmin || hasAdminQueryParam) : effectiveIsAdmin;
-  
-  // For admin users, bypass ALL errors completely
-  if (shouldBypassErrors) {
-    console.log("🔑 Admin user detected in error boundary - bypassing all errors");
-    
-    // Render children for admin users even when session has errors
+  // CRITICAL FIX: Make participant route see the session even when there are initial connection issues
+  // Previously, isParticipantPath was restricting bypass access to just admins - but participants should see the session too
+  if (effectiveIsAdmin || connectionAttempts < 2) {
+    // Allow bypassing errors for admins and also for initial participant connection attempts
+    console.log(`${effectiveIsAdmin ? "Admin user" : "Participant"} session - bypassing initial error boundary`);
     return <>{children}</>;
   }
 
@@ -89,6 +84,15 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   const waitedTooLong = connectionAttempts > 3 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 10000);
   
   if (hasError || waitedTooLong) {
+    // If there's an active session (based on URL parameter), bypass this error for participants too
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSessionId = urlParams.has('id') && urlParams.get('id');
+    
+    if (hasSessionId && connectionAttempts < 3) {
+      console.log("Session ID found in URL, bypassing error for participant");
+      return <>{children}</>;
+    }
+    
     const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
     const isSessionFullError = error?.includes("session is full") || error?.includes("maximum capacity") || 
                               error?.includes("full") || error?.includes("cannot accept more");

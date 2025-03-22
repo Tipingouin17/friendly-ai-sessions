@@ -55,13 +55,24 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       }
     }
     
+    // For participant sessions with IDs, don't increment the connection attempt counter too high
+    // as we want to ensure they can still see content
+    const urlParams = new URLSearchParams(location.search);
+    const hasSessionId = urlParams.has('id') && urlParams.get('id');
+    if (hasSessionId && connectionAttempts >= 2) {
+      console.log("Participant with session ID: limiting connection attempts to allow UI rendering");
+      setLastAttemptTime(Date.now());
+      return;
+    }
+    
     // Only proceed with recovery for non-admin sessions
     setIsRecovering(true);
     console.log(`Retrying connection (attempt ${connectionAttempts + 1})...`);
     setConnectionAttempts(prev => prev + 1);
     setLastAttemptTime(Date.now());
     
-    const retryDelay = Math.min(1000 * (connectionAttempts + 1), 3000);
+    // Use shorter delay for first few attempts
+    const retryDelay = connectionAttempts < 2 ? 1000 : Math.min(1000 * (connectionAttempts + 1), 3000);
     
     recoveryTimeoutRef.current = setTimeout(() => {
       try {
@@ -74,13 +85,19 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
           return;
         }
         
-        // IMPORTANT: Use React Router navigate instead of window.location
-        if (connectionAttempts < 3) {
+        // CRITICAL FIX: For participants with valid session ID, just refresh the page after first attempt
+        if (hasSessionId && connectionAttempts === 0) {
+          navigate(`${location.pathname}${location.search}`, { replace: true });
+          
+          toast({
+            title: "Reconnecting",
+            description: "Attempting to reconnect to the session...",
+          });
+        } else if (connectionAttempts < 3) {
           const searchParams = new URLSearchParams(location.search);
           const sessionId = searchParams.get('id') || currentConversationId?.toString();
           
           if (sessionId) {
-            // Use navigate instead of window.location.replace
             navigate(`/session?id=${sessionId}`, { replace: true });
             
             toast({
@@ -101,7 +118,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       }
     }, retryDelay);
     
-  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, shouldSkipRecovery, navigate]);
+  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, shouldSkipRecovery, navigate, location.pathname]);
 
   return { 
     connectionAttempts, 

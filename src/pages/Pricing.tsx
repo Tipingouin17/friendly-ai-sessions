@@ -18,8 +18,9 @@ const Pricing = () => {
   const { data: plans, isLoading, error } = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
+      // Use the plan_features view instead of the plans table
       const { data, error } = await supabase
-        .from('plans')
+        .from('plan_features')
         .select('*')
         .order('id', { ascending: true });
 
@@ -28,23 +29,23 @@ const Pricing = () => {
       const processedData = data.map(plan => {
         const currency = plan.currency || 'USD';
         const price = plan.price || 0;
-        const planTableDetails = plan.plan_table_details || {};
 
         return {
           id: plan.id,
           title: plan.title,
           price: price,
           plan_type: plan.plan_type,
+          // Since we're fetching from plan_features view, these fields are directly accessible
           plan_table_details: {
-            no_of_facilitator: planTableDetails.no_of_facilitator,
-            no_of_sessions: planTableDetails.no_of_sessions,
-            max_participants: planTableDetails.max_participants,
-            customisable_sessions: planTableDetails.customisable_sessions,
-            customisable_facilitators: planTableDetails.customisable_facilitators,
-            saved_sessions: planTableDetails.saved_sessions,
-            session_reports: planTableDetails.session_reports,
-            data_export: planTableDetails.data_export,
-            number_of_questions_per_session: planTableDetails.number_of_questions_per_session || 10
+            no_of_facilitator: plan.no_of_facilitator,
+            no_of_sessions: plan.no_of_sessions,
+            max_participants: plan.max_participants,
+            customisable_sessions: plan.customisable_sessions,
+            customisable_facilitators: plan.customisable_facilitators,
+            saved_sessions: plan.saved_sessions,
+            session_reports: plan.session_reports,
+            data_export: plan.data_export,
+            number_of_questions_per_session: plan.number_of_questions_per_session || 10
           },
           is_popular: plan.is_popular,
           stripe_plan_id: plan.stripe_plan_id,

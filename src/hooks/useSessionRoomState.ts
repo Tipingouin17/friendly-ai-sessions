@@ -5,6 +5,7 @@ import { ConversationWithSession } from "@/types/database";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
+import { logDependencyChanges } from "@/utils/debugUtils";
 
 interface UseSessionRoomStateProps {
   conversationId: number | null;
@@ -80,7 +81,10 @@ export const useSessionRoomState = ({
     }
   };
   
-  // Prepare the session state for interactions hook
+  // Create a type-safe default view mode
+  const safeViewMode: "participant" | "admin" = isAdmin ? "admin" : "participant";
+  
+  // Prepare the session state for interactions hook - ensure viewMode is properly typed
   const sessionState = useMemo(() => ({
     messages,
     setMessages,
@@ -90,7 +94,8 @@ export const useSessionRoomState = ({
     recordResponse,
     totalResponses,
     hasAnswered,
-    viewMode: isAdmin ? "admin" : "participant"
+    // Use the explicitly typed viewMode
+    viewMode: (viewMode as "participant" | "admin") || safeViewMode
   }), [
     messages, 
     inputMessage, 
@@ -98,9 +103,15 @@ export const useSessionRoomState = ({
     recordResponse, 
     totalResponses, 
     hasAnswered, 
-    isAdmin, 
-    viewMode
+    viewMode,
+    safeViewMode
   ]);
+  
+  // Log changes to dependencies
+  logDependencyChanges(
+    [messages, inputMessage, currentParticipant, viewMode, isAdmin, sessionMessages],
+    "useSessionRoomState"
+  );
   
   // Set up session interactions with memoized session state
   const {
@@ -132,7 +143,7 @@ export const useSessionRoomState = ({
     recordResponse,
     totalResponses,
     hasAnswered,
-    viewMode,
+    viewMode: sessionState.viewMode, // Use the properly typed viewMode from sessionState
     setViewMode,
     isWaitingForResponse,
     handleSendMessage,

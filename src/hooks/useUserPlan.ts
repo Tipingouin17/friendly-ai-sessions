@@ -71,7 +71,7 @@ export const useUserPlan = (): UserPlanDetails => {
           title: freePlan.title,
           price: freePlan.price || 0,
           plan_type: freePlan.plan_type || '',
-          plan_table_details: {
+          plan_table_details: planTableDetails ? {
             no_of_facilitator: planTableDetails.no_of_facilitator,
             no_of_sessions: planTableDetails.no_of_sessions,
             max_participants: planTableDetails.max_participants,
@@ -81,7 +81,7 @@ export const useUserPlan = (): UserPlanDetails => {
             session_reports: planTableDetails.session_reports,
             data_export: planTableDetails.data_export,
             number_of_questions_per_session: planTableDetails.number_of_questions_per_session
-          },
+          } : undefined,
           is_popular: freePlan.is_popular || false,
           stripe_plan_id: freePlan.stripe_plan_id || '',
           currency: freePlan.currency
@@ -125,7 +125,7 @@ export const useUserPlan = (): UserPlanDetails => {
         title: planData.title || '',
         price: planData.price || 0,
         plan_type: planData.plan_type || '',
-        plan_table_details: {
+        plan_table_details: planTableDetails ? {
           no_of_facilitator: planTableDetails.no_of_facilitator,
           no_of_sessions: planTableDetails.no_of_sessions,
           max_participants: planTableDetails.max_participants,
@@ -135,7 +135,7 @@ export const useUserPlan = (): UserPlanDetails => {
           session_reports: planTableDetails.session_reports,
           data_export: planTableDetails.data_export,
           number_of_questions_per_session: planTableDetails.number_of_questions_per_session
-        },
+        } : undefined,
         is_popular: planData.is_popular || false,
         stripe_plan_id: planData.stripe_plan_id || '',
         currency: planData.currency

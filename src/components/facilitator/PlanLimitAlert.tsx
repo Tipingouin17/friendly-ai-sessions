@@ -23,7 +23,7 @@ export const PlanLimitAlert = ({
   }
 
   // Don't show the alert if maxSessions is Infinity
-  if (hasReachedSessionLimit && maxSessions === Infinity) {
+  if (maxSessions === Infinity) {
     return null;
   }
 

@@ -90,7 +90,7 @@ export const usePlanLimits = (): PlanLimits => {
   const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators && maxFacilitators !== Infinity);
   
   // For session limit, only show the limit reached message if there's a finite limit and we've reached it
-  const hasReachedSessionLimit = (counts?.sessionCount || 0) >= maxSessions && maxSessions !== Infinity;
+  const hasReachedSessionLimit = maxSessions !== Infinity && (counts?.sessionCount || 0) >= maxSessions;
   
   return {
     hasReachedFacilitatorLimit,

@@ -39,6 +39,16 @@ export function useSessionAdminStatus() {
     
     // Ensure we're not leaking admin status from previous sessions
     const currentPath = location.pathname;
+    
+    // Special handling for admin URL paths - they should always retain admin status
+    if (currentPath.includes('/admin')) {
+      console.log("Admin path detected, enforcing admin status");
+      setIsAdmin(true);
+      sessionStorage.setItem(adminStorageKey, 'true');
+      isInitialized.current = true;
+      return;
+    }
+    
     if (!currentPath.includes('/admin') && !currentPath.includes('/session')) {
       // If not on admin or session path, clear any stored admin status
       if (storedAdminStatus === 'true') {

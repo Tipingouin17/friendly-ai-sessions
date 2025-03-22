@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useConversationId } from "@/hooks/useConversationId";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { useAdminSessions } from "@/hooks/useAdminSessions";
 import { 
   MessageSquare, 
   Pause,
@@ -16,6 +18,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AdminMessageDialog from './AdminMessageDialog';
 import AdminQrDialog from './AdminQrDialog';
+import SessionsDropdown from './SessionsDropdown';
 import { AdminHeaderProps } from './types';
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({ 
@@ -38,6 +41,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const { currentConversationId } = useConversationId();
   const [joinUrl, setJoinUrl] = useState('');
   const { setAdminStatus } = useSessionAdminStatus();
+  const { activeSessions, isLoading: isLoadingSessions, refreshSessions } = useAdminSessions();
   
   // Get session details
   const sessionObjective = sessionState?.objective || '';
@@ -151,6 +155,14 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Add the sessions dropdown */}
+              <SessionsDropdown 
+                currentSessionId={currentConversationId} 
+                activeSessions={activeSessions}
+                isLoading={isLoadingSessions}
+                onRefresh={refreshSessions}
+              />
+              
               <button 
                 onClick={() => handleAdminAction(() => setShowMessageDialog(true))}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"

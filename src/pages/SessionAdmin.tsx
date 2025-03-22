@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import { useAdminStatusPersistence } from "@/hooks/useAdminStatusPersistence";
 import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
@@ -17,6 +17,7 @@ const SessionAdmin = () => {
   const initialRenderRef = useRef(true);
   const adminViewMountedRef = useRef(true);
   const { toast } = useToast();
+  const location = useLocation();
 
   // Session page state
   const {
@@ -42,6 +43,19 @@ const SessionAdmin = () => {
     locationState,
     adminViewMounted
   } = useAdminSessionLoader();
+  
+  // Track URL params for session switching
+  useEffect(() => {
+    // When location changes (new session ID in URL), reset state
+    console.log("Location or conversation ID changed in SessionAdmin");
+    
+    // Reset initialized provider when switching sessions
+    setHasInitializedProvider(false);
+    setIsLoading(true);
+    
+    // Force admin status
+    sessionStorage.setItem('isAdminSession', 'true');
+  }, [location.search, location.pathname, setHasInitializedProvider, setIsLoading]);
   
   // Set admin status in session storage immediately
   useEffect(() => {
@@ -121,6 +135,13 @@ const SessionAdmin = () => {
       });
     }
   }, [isLoading, currentConversationId, locationState, conversationData, participants, toast]);
+  
+  // Reset messages when switching sessions
+  useEffect(() => {
+    if (currentConversationId) {
+      setSessionMessages([]);
+    }
+  }, [currentConversationId]);
   
   // Redirect if no conversation ID and not in loading state
   // Only redirect if BOTH: not loading AND no conversation ID AND no new conversation id AND not admin view ready

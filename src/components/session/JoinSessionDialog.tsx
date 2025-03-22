@@ -48,6 +48,7 @@ const JoinSessionDialog = ({
         setInternalJoinUrl(joinUrl);
       } else if (currentConversationId) {
         const baseUrl = window.location.origin;
+        // Update to use the correct path
         const generatedUrl = `${baseUrl}/join-session?id=${currentConversationId}`;
         setInternalJoinUrl(generatedUrl);
       }

@@ -25,7 +25,8 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
   useEffect(() => {
     if (conversationId) {
       const baseUrl = window.location.origin;
-      setJoinUrl(`${baseUrl}/join?id=${conversationId}`);
+      // Update to use the proper join-session path
+      setJoinUrl(`${baseUrl}/join-session?id=${conversationId}`);
     }
   }, [conversationId]);
 

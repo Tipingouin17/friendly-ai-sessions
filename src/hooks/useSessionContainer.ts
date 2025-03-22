@@ -21,6 +21,7 @@ export const useSessionContainer = ({
   
   // Generate join URL
   const baseUrl = window.location.origin;
+  // Update to use the correct join-session path
   const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
   
   // Check if we're on a mobile device

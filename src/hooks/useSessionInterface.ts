@@ -18,6 +18,7 @@ export function useSessionInterface(conversationId: number | null) {
   useEffect(() => {
     if (conversationId) {
       const baseUrl = window.location.origin;
+      // Update to use the correct join-session path
       setSessionLink(`${baseUrl}/join-session?id=${conversationId}`);
       
       // Check if session is already marked as started in the database

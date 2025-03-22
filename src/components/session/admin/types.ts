@@ -4,6 +4,7 @@ export interface AdminHeaderProps {
   isSessionPaused: boolean;
   toggleSessionState: () => void;
   handleAdminMessage: (message: string) => void;
+  onExportData?: () => void;
 }
 
 export interface AdminActionButtonProps {

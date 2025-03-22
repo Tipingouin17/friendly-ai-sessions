@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -15,6 +15,7 @@ interface AdminHeaderProps {
   isSessionPaused: boolean;
   toggleSessionState: () => void;
   handleAdminMessage: (message: string) => void;
+  onExportData?: () => void;
 }
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({
@@ -22,6 +23,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   isSessionPaused,
   toggleSessionState,
   handleAdminMessage,
+  onExportData
 }) => {
   const navigate = useNavigate();
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
@@ -56,6 +58,17 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
         
         <div className="flex items-center space-x-2">
+          {onExportData && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-1"
+              onClick={onExportData}
+            >
+              <FileText className="h-4 w-4" />
+              <span>Close & Get Report</span>
+            </Button>
+          )}
           <SessionsDropdown 
             currentSessionId={conversation?.id || null}
             activeSessions={activeSessions}

@@ -22,6 +22,7 @@ interface SessionHeaderManagerProps {
   isSessionActive?: boolean;
   onToggleSessionState?: () => void;
   conversation?: any;
+  onExportData?: () => void;
 }
 
 const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
@@ -39,7 +40,8 @@ const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
   onSendAdminMessage = () => {},
   isSessionActive = true,
   onToggleSessionState = () => {},
-  conversation
+  conversation,
+  onExportData
 }) => {
   if (isAdmin) {
     return (
@@ -48,6 +50,7 @@ const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
         isSessionPaused={!isSessionActive}
         toggleSessionState={onToggleSessionState}
         handleAdminMessage={onSendAdminMessage}
+        onExportData={onExportData}
       />
     );
   }

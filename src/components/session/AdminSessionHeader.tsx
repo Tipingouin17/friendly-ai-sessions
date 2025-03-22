@@ -15,7 +15,8 @@ const AdminSessionHeader: React.FC<AdminSessionHeaderProps> = ({
   conversationData,
   isSessionPaused,
   onToggleSessionState,
-  onSendAdminMessage
+  onSendAdminMessage,
+  onExportData
 }) => {
   return (
     <div className="pt-2">
@@ -24,6 +25,7 @@ const AdminSessionHeader: React.FC<AdminSessionHeaderProps> = ({
         isSessionPaused={isSessionPaused}
         toggleSessionState={onToggleSessionState}
         handleAdminMessage={onSendAdminMessage}
+        onExportData={onExportData}
       />
     </div>
   );

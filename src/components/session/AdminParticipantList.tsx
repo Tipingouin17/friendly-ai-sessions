@@ -52,7 +52,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     participants: participantsList,
     setParticipants: setParticipantsList,
     setIsLoading: setIsLoadingParticipants,
-    maxParticipants // Now we can pass this property correctly
+    maxParticipants
   });
 
   return (

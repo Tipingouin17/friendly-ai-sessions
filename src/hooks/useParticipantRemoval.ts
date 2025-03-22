@@ -18,6 +18,11 @@ export const useParticipantRemoval = ({
   const [displayCount, setDisplayCount] = useState(currentParticipantCount);
   const { toast } = useToast();
   
+  // Update display count when props change
+  useState(() => {
+    setDisplayCount(currentParticipantCount);
+  }, [currentParticipantCount]);
+  
   // Function to remove a participant
   const removeParticipant = async (participantId: number) => {
     if (!conversationId) return;
@@ -40,9 +45,10 @@ export const useParticipantRemoval = ({
         return;
       }
       
-      // Update participant count in conversations table
+      // Calculate new count
       const newCount = Math.max(0, currentParticipantCount - 1);
       
+      // Update participant count in conversations table
       const { error: updateError } = await supabase
         .from('conversations')
         .update({ current_participants: newCount })
@@ -82,6 +88,24 @@ export const useParticipantRemoval = ({
         title: "Participant removed",
         description: `Successfully removed participant from session`,
       });
+      
+      // Broadcast count update to ensure all clients get the update
+      try {
+        await supabase
+          .from('session_events')
+          .insert({
+            conversation_id: conversationId,
+            event_type: 'count_updated',
+            data: { 
+              current_count: newCount,
+              updated_by: 'admin',
+              timestamp: new Date().toISOString()
+            }
+          });
+      } catch (err) {
+        console.error("Error broadcasting count update:", err);
+      }
+      
     } catch (err) {
       console.error("Exception removing participant:", err);
       toast({

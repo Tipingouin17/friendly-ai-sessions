@@ -40,17 +40,28 @@ export const useSessionRoomState = ({
   
   // Get session messages
   const {
+    messages: sessionMessages,
+    setMessages: setSessionMessages,
     currentParticipant,
     recordResponse,
     totalResponses,
     hasAnswered,
     viewMode,
-    setViewMode
+    setViewMode,
+    error: messagesError
   } = useSessionMessages({
     conversationId,
     currentUserParticipantId,
-    isAdmin
+    isAdmin,
+    welcomeMessage
   });
+  
+  // Sync messages from session messages
+  useEffect(() => {
+    if (sessionMessages && sessionMessages.length > 0) {
+      setMessages(sessionMessages);
+    }
+  }, [sessionMessages]);
   
   // Handle report generation
   const handleGenerateReport = async () => {
@@ -73,7 +84,7 @@ export const useSessionRoomState = ({
     isWaitingForResponse,
     handleSendMessage,
     handleLikeMessage,
-    error
+    error: interactionsError
   } = useSessionInteractions({
     currentConversationId: conversationId,
     sessionState: {
@@ -91,6 +102,9 @@ export const useSessionRoomState = ({
     participants,
     isAnonymous: anonymousState.isAnonymous
   });
+  
+  // Combine errors
+  const error = messagesError || interactionsError || null;
   
   return {
     messages,

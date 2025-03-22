@@ -8,15 +8,42 @@ const WELCOME_MESSAGE_DELAY = 1000; // 1 second delay before showing welcome mes
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
-  welcomeMessage: string | null;
+  currentUserParticipantId: number | null;
+  isAdmin: boolean;
+  welcomeMessage?: string | null;
 }
 
 export const useSessionMessages = ({
   conversationId,
+  currentUserParticipantId,
+  isAdmin,
   welcomeMessage
 }: UseSessionMessagesProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentParticipant, setCurrentParticipant] = useState<number>(0);
+  const [hasAnswered, setHasAnswered] = useState<boolean>(false);
+  const [totalResponses, setTotalResponses] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<"participant" | "admin">(
+    isAdmin ? "admin" : "participant"
+  );
+  
+  // Function to record participant responses
+  const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
+    if (participantId === currentUserParticipantId) {
+      setHasAnswered(hasResponded);
+    }
+    if (hasResponded) {
+      setTotalResponses(prev => prev + 1);
+    }
+  }, [currentUserParticipantId]);
+  
+  // Set current participant based on the user participant ID
+  useEffect(() => {
+    if (currentUserParticipantId) {
+      setCurrentParticipant(currentUserParticipantId);
+    }
+  }, [currentUserParticipantId]);
   
   // Fetch messages for this conversation
   useEffect(() => {
@@ -128,6 +155,12 @@ export const useSessionMessages = ({
   return {
     messages,
     setMessages,
-    error
+    error,
+    currentParticipant,
+    recordResponse,
+    totalResponses,
+    hasAnswered,
+    viewMode,
+    setViewMode
   };
 };

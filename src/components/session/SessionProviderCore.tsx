@@ -27,6 +27,18 @@ export const SessionProviderCore = ({
   const { toast } = useToast();
   const { persistedParticipantData } = useParticipantPersistence();
   
+  // Debug logging
+  useEffect(() => {
+    console.log("SessionProviderCore initialized", {
+      pathname: location.pathname,
+      search: location.search,
+      hasLocationState: !!location.state,
+      hasPersistedData: !!persistedParticipantData,
+      forceAdmin,
+      isAdminInStorage: sessionStorage.getItem('isAdminSession') === 'true'
+    });
+  }, [location, persistedParticipantData, forceAdmin]);
+  
   // Enhance location state with persisted data if available
   let locationState = location.state as { 
     participantId?: number; 
@@ -60,15 +72,8 @@ export const SessionProviderCore = ({
     if (effectiveAdmin) {
       console.log("SessionProviderCore: Enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
-      
-      // Show toast for admin users
-      toast({
-        title: "Admin Mode",
-        description: "You have administrator access to this session."
-      });
     }
-    // No explicit return needed
-  }, [effectiveAdmin, toast]);
+  }, [effectiveAdmin]);
   
   // Load core provider state
   const {
@@ -102,7 +107,6 @@ export const SessionProviderCore = ({
         handleError(dataError);
       }
     }
-    // No explicit return needed
   }, [dataError, handleError, effectiveAdmin]);
 
   // Set up participant management
@@ -111,7 +115,8 @@ export const SessionProviderCore = ({
     currentUserParticipantId,
     currentParticipantCount,
     maxParticipantsForSession,
-    isSessionFull
+    isSessionFull,
+    forceRefreshParticipants
   } = useSessionParticipantSetup({
     conversationId: currentConversationId,
     conversation,
@@ -122,29 +127,22 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Log participant information for debugging
+  // Check for stuck states and force refresh
   useEffect(() => {
-    console.log("SessionProviderCore participant info:", {
-      currentConversationId,
-      conversationParticipants: conversation?.current_participants,
-      hookParticipants: currentParticipantCount,
-      participants: participants.length,
-      maxParticipants: maxParticipantsForSession,
-      isSessionFull,
-      forceAdmin,
-      locationStateIsAdmin: locationState?.isAdmin,
-      effectiveAdmin,
-      isAdmin,
-      persistedParticipantData
-    });
+    const timeoutId = setTimeout(() => {
+      if (isLoading && currentConversationId && !conversation) {
+        console.log("Session appears stuck in loading state - forcing data refresh");
+        refetch();
+        
+        // Also refresh participants
+        if (forceRefreshParticipants) {
+          forceRefreshParticipants();
+        }
+      }
+    }, 5000);
     
-    // If we're an admin, we should never see the session full error
-    if (isSessionFull && effectiveAdmin) {
-      console.error("Admin user incorrectly marked as session full - this should never happen");
-    }
-    // No explicit return needed
-  }, [currentConversationId, conversation, currentParticipantCount, participants.length, 
-      maxParticipantsForSession, isSessionFull, forceAdmin, locationState, effectiveAdmin, isAdmin, persistedParticipantData]);
+    return () => clearTimeout(timeoutId);
+  }, [isLoading, currentConversationId, conversation, refetch, forceRefreshParticipants]);
 
   // Set up session monitoring
   const {
@@ -160,23 +158,7 @@ export const SessionProviderCore = ({
   });
 
   // If we have serious errors, return error fallback
-  if (providerError) {
-    // Skip showing error fallback for session full errors when admin
-    const isSessionFullError = providerError.includes("full") || providerError.includes("maximum capacity");
-    
-    if (isSessionFullError && effectiveAdmin) {
-      console.log("🔑 Admin detected with session full error - bypassing error fallback");
-      
-      // Build session context with admin override
-      const overrideSessionContext: SessionContextProps = {
-        ...buildSessionContext(),
-        error: null, // Clear error for admin
-        isAdmin: true // Force admin status
-      };
-      
-      return children(overrideSessionContext);
-    }
-    
+  if (providerError && !effectiveAdmin) {
     return (
       <SessionProviderErrorFallback 
         errorMessage={providerError}
@@ -194,7 +176,7 @@ export const SessionProviderCore = ({
   // Helper function to build session context
   function buildSessionContext(): SessionContextProps {
     return {
-      isLoading,
+      isLoading: effectiveAdmin ? false : isLoading, // Always set loading to false for admin
       conversation,
       currentConversationId,
       sessionState: {
@@ -225,7 +207,7 @@ export const SessionProviderCore = ({
       currentUserParticipantId,
       anonymousState: roomState.anonymousState,
       isSessionStartedInDB,
-      error: providerError,
+      error: effectiveAdmin ? null : providerError, // Clear errors for admin
       
       // Add connection properties
       isConnected: true, // Default to true, will be updated by connection hooks

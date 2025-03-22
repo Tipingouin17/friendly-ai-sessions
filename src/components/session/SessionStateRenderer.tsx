@@ -30,6 +30,22 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
 }) => {
   const { toast } = useToast();
   
+  // Debug logging
+  useEffect(() => {
+    console.log("SessionStateRenderer state:", {
+      isLoading,
+      hasError: !!error || !!props.error,
+      errorMessage: error || props.error,
+      effectiveAdmin,
+      propsAdmin: props.isAdmin,
+      connectionAttempts,
+      hasConversation: !!props.conversation,
+      hasConversationId: !!props.currentConversationId,
+      isSessionStarted: props.isSessionStartedInDB,
+      sessionStarted
+    });
+  }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
+  
   // If admin status detected but not reflected in props, update the UI
   useEffect(() => {
     if (effectiveAdmin && !props.isAdmin) {
@@ -38,14 +54,16 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }, [effectiveAdmin, props.isAdmin]);
 
   // Special handling for admin users with session full errors
-  const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity");
+  const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity") || 
+                           props.error?.includes("full") || props.error?.includes("maximum capacity");
   
   if (effectiveAdmin && isSessionFullError) {
     console.log("🔑 Admin detected with session full error - bypassing error screen");
-    toast({
-      title: "Admin Override",
-      description: "Session is full, but you're connecting as an admin."
-    });
+    
+    if (!props.conversation) {
+      console.log("Admin bypass: No conversation data found, attempting to force refresh data");
+      props.refetch();
+    }
     
     // For admin users, we'll bypass the error state and show the session
     return (
@@ -63,7 +81,8 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     );
   }
   
-  if (props.isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
+  // If loading and no conversation, show loading state
+  if (isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
     console.log("Showing provider loading state");
     return <JoinSessionLoadingState 
       onRetry={retryConnection}
@@ -71,16 +90,18 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     />;
   }
   
-  if (props.error) {
-    console.log("Showing provider error state:", props.error);
+  // If error, show error state
+  if (props.error || error) {
+    console.log("Showing provider error state:", props.error || error);
     return <JoinSessionLoadingState 
-      error={props.error} 
+      error={props.error || error} 
       onRetry={retryConnection}
       retryCount={connectionAttempts} 
     />;
   }
   
-  if (!props.currentConversationId && !props.isLoading && !effectiveAdmin) {
+  // If no conversation ID and not loading, show error
+  if (!props.currentConversationId && !isLoading && !effectiveAdmin) {
     console.error("No conversation ID found in session provider, but no error was returned");
     return <JoinSessionLoadingState 
       error="Session not found. Please try again." 
@@ -89,6 +110,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     />;
   }
   
+  // If we get here, we have a conversation and no errors, show session
   return (
     <SessionStateHandler
       props={{

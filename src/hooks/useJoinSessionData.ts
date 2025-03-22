@@ -14,6 +14,16 @@ export function useJoinSessionData(conversationId: number | null) {
   const { toast } = useToast();
   const { isAdmin } = useSessionAdminStatus();
   
+  // Debug logging
+  useEffect(() => {
+    console.log("useJoinSessionData initialized", {
+      conversationId,
+      isAdmin,
+      storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
+      isOnAdminPath: window.location.pathname.includes('/admin')
+    });
+  }, [conversationId, isAdmin]);
+  
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
   
@@ -44,6 +54,11 @@ export function useJoinSessionData(conversationId: number | null) {
   }, [isAdmin, conversationId]);
 
   const handleJoinSession = async () => {
+    // Enhanced admin detection
+    const effectiveIsAdmin = isAdmin || 
+                           sessionStorage.getItem('isAdminSession') === 'true' ||
+                           window.location.pathname.includes('/admin');
+    
     // Force a refetch before joining to ensure we have the latest counts
     await refetch();
     
@@ -52,14 +67,25 @@ export function useJoinSessionData(conversationId: number | null) {
       maxParticipantsForSession : planMaxParticipants;
 
     console.log("Join session check:", {
+      participantName,
+      conversationId,
       currentParticipantCount,
       effectiveMaxParticipants,
       isFull: effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants,
-      isAdmin
+      isAdmin: effectiveIsAdmin
     });
 
+    if (!participantName.trim()) {
+      toast({
+        title: "Please enter your name",
+        description: "A name is required to join the session.",
+        variant: "destructive",
+      });
+      return Promise.resolve();
+    }
+
     // Skip check if admin - they should always be able to join
-    if (isAdmin) {
+    if (effectiveIsAdmin) {
       console.log("Admin user detected, bypassing session full check");
       // Continue with join process for admin users
       return joinSession({

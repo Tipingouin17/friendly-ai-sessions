@@ -1,6 +1,6 @@
 
 import React, { useEffect } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
@@ -30,6 +30,24 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 }) => {
   const { toast } = useToast();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log("SessionErrorBoundary state:", {
+      error,
+      noSessionFound,
+      connectionAttempts,
+      lastAttemptTime,
+      isLoading,
+      hasInitializedProvider,
+      propIsAdmin,
+      contextIsAdmin,
+      storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
+      isOnAdminPath: window.location.pathname.includes('/admin'),
+      hasAdminQueryParam: window.location.search.includes('admin=true')
+    });
+  }, [error, noSessionFound, connectionAttempts, lastAttemptTime, isLoading, 
+      hasInitializedProvider, propIsAdmin, contextIsAdmin]);
   
   // Enhanced admin detection - check all possible sources
   const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
@@ -61,7 +79,6 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 
   if (error || noSessionFound) {
     const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
-    // Define the missing variable
     const isSessionFullError = error?.includes("session is full") || error?.includes("maximum capacity");
     
     const errorTitle = isSessionFullError ? "Session Full" : 

@@ -45,24 +45,32 @@ export const useParticipantRemoval = ({
         return;
       }
       
-      // Calculate new count
-      const newCount = Math.max(0, currentParticipantCount - 1);
-      
-      // Update participant count in conversations table
-      const { error: updateError } = await supabase
-        .from('conversations')
-        .update({ current_participants: newCount })
-        .eq('id', conversationId);
+      // Calculate new count based on actual remaining participants
+      setParticipantsList(prev => {
+        const filteredList = prev.filter(p => p.id !== participantId);
+        const newCount = filteredList.length;
         
-      if (updateError) {
-        console.error("Error updating participant count:", updateError);
-        toast({
-          title: "Error",
-          description: "Could not update participant count",
-          variant: "destructive"
-        });
-        return;
-      }
+        // Update the display count
+        setDisplayCount(newCount);
+        
+        // Update conversations table with the new count
+        supabase
+          .from('conversations')
+          .update({ current_participants: newCount })
+          .eq('id', conversationId)
+          .then(({ error: updateError }) => {
+            if (updateError) {
+              console.error("Error updating participant count:", updateError);
+              toast({
+                title: "Error", 
+                description: "Could not update participant count",
+                variant: "destructive"
+              });
+            }
+          });
+          
+        return filteredList;
+      });
       
       // Create a participant_removed event with more detailed data to completely remove access
       await supabase
@@ -72,17 +80,13 @@ export const useParticipantRemoval = ({
           event_type: 'participant_removed',
           data: { 
             participant_id: participantId,
-            current_count: newCount,
+            current_count: displayCount - 1,
             removed_by: 'admin',
             timestamp: new Date().toISOString(),
             permanent_removal: true,  // Flag to indicate permanent removal
             access_revoked: true      // Flag to indicate access revocation
           }
         });
-      
-      // Update local state
-      setDisplayCount(newCount);
-      setParticipantsList(prev => prev.filter(p => p.id !== participantId));
       
       toast({
         title: "Participant removed",
@@ -97,7 +101,7 @@ export const useParticipantRemoval = ({
             conversation_id: conversationId,
             event_type: 'count_updated',
             data: { 
-              current_count: newCount,
+              current_count: displayCount - 1,
               updated_by: 'admin',
               timestamp: new Date().toISOString()
             }

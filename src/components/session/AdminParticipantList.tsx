@@ -42,9 +42,14 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     removeParticipant 
   } = useParticipantRemoval({
     conversationId: conversationData?.id || null,
-    currentParticipantCount,
+    currentParticipantCount: participantsList.length, // Use actual list length instead of passed count
     setParticipantsList
   });
+  
+  // Update display count whenever the participants list changes
+  useEffect(() => {
+    setDisplayCount(participantsList.length);
+  }, [participantsList, setDisplayCount]);
   
   // Set up realtime updates with the updated hook
   useParticipantRealtime({
@@ -59,11 +64,11 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-white hidden md:block">
       <h3 className="flex items-center gap-2 font-medium mb-4 text-gray-900">
         <Users className="h-5 w-5" /> 
-        Participants ({displayCount}/{maxParticipants || "∞"})
+        Participants ({participantsList.length}/{maxParticipants || "∞"})
       </h3>
       
       {isLoadingParticipants ? (
-        <ParticipantListSkeleton count={displayCount} />
+        <ParticipantListSkeleton count={participantsList.length || 1} />
       ) : participantsList.length > 0 ? (
         <div className="space-y-2">
           {participantsList.map((participant) => (

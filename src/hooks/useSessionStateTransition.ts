@@ -1,6 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";
 
 interface UseSessionStateTransitionProps {
@@ -8,7 +7,7 @@ interface UseSessionStateTransitionProps {
   isAdmin: boolean;
   sessionStarted: boolean;
   setSessionStarted: (started: boolean) => void;
-  onSessionFull: () => void;
+  onSessionFull?: () => void;
 }
 
 export function useSessionStateTransition({
@@ -18,73 +17,94 @@ export function useSessionStateTransition({
   setSessionStarted,
   onSessionFull
 }: UseSessionStateTransitionProps) {
-  // All hooks need to be called at the top level in the same order every render
-  const { toast } = useToast();
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [shouldShowSession, setShouldShowSession] = useState(false);
+  const lastSessionStartedRef = useRef(sessionStarted);
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isOnAdminPath = window.location.pathname.includes('/admin');
   
-  // Calculate variables that don't need useState
+  // Calculate values from conversation and participants if available
+  const currentParticipants = props.conversation?.current_participants || 
+                             props.participants?.length || 0;
   const maxParticipants = props.conversation?.participants || 0;
-  const currentParticipants = props.conversation?.current_participants || 0;
   const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
   
-  // For admin, we want to show the admin controls even before session is started
-  // For participants, we should show waiting screen until admin starts
-  const shouldShowSession = isAdmin ? true : (props.isSessionStartedInDB || sessionStarted || isSessionFull || isTransitioning);
-  
-  // Handle state transitions with a delay to avoid flashing
+  // Handle session full condition
   useEffect(() => {
-    if (props.isSessionStartedInDB && !sessionStarted) {
-      setIsTransitioning(true);
-      
-      // Shorter transition for admins
-      const transitionTime = isAdmin ? 200 : 500;
-      
-      const timer = setTimeout(() => {
-        setSessionStarted(true);
-        setIsTransitioning(false);
-        
-        if (isAdmin) {
-          console.log("Admin: Session started state updated");
-        } else {
-          toast({
-            title: "Session Started",
-            description: "The host has started the session.",
-          });
-        }
-      }, transitionTime);
-      
-      return () => clearTimeout(timer);
+    // Safety check to prevent duplicate calls
+    if (isSessionFull && onSessionFull && !lastSessionStartedRef.current) {
+      console.log("Session is full, triggering onSessionFull callback");
+      setSessionStarted(true);
+      if (onSessionFull) onSessionFull();
     }
-  }, [props.isSessionStartedInDB, sessionStarted, setSessionStarted, isAdmin, toast]);
+  }, [isSessionFull, onSessionFull, setSessionStarted]);
   
-  // Handler for starting the session - using useCallback to prevent recreation
-  const handleStartSession = useCallback(() => {
-    console.log("Start session button clicked");
-    setIsTransitioning(true);
-    
-    try {
-      props.handleStartSession();
-      toast({
-        title: "Starting session",
-        description: isAdmin ? "The session is starting for all participants..." : "Waiting for the session to start...",
-      });
+  // Reset transition state after a maximum timeout
+  useEffect(() => {
+    if (isTransitioning) {
+      // Clear any existing timeout
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
       
-      // Set a timer to transition state - shorter for admin
-      const transitionTime = isAdmin ? 500 : 1000;
-      setTimeout(() => {
-        setSessionStarted(true);
+      // Set a maximum transition time of 3 seconds
+      transitionTimeoutRef.current = setTimeout(() => {
+        console.log("Transition timeout reached, forcing completion");
         setIsTransitioning(false);
-      }, transitionTime);
-    } catch (error) {
-      console.error("Error starting session:", error);
-      setIsTransitioning(false);
-      toast({
-        title: "Error Starting Session",
-        description: "There was a problem starting the session. Please try again.",
-        variant: "destructive"
-      });
+        setShouldShowSession(true);
+      }, 3000);
     }
-  }, [props.handleStartSession, toast, setSessionStarted, isAdmin]);
+    
+    return () => {
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, [isTransitioning]);
+  
+  // Special handling for admin paths - always show session
+  useEffect(() => {
+    if (isOnAdminPath && !shouldShowSession) {
+      console.log("Admin path detected, forcing session display");
+      setShouldShowSession(true);
+      setSessionStarted(true);
+    }
+  }, [isOnAdminPath, shouldShowSession, setSessionStarted]);
+  
+  // Main transition effect
+  useEffect(() => {
+    // CRITICAL FIX: Always show session if it's already started in DB
+    if (props.isSessionStartedInDB && !shouldShowSession) {
+      console.log("Session already started in DB, showing session");
+      setShouldShowSession(true);
+      setSessionStarted(true);
+      return;
+    }
+    
+    // Track session started changes
+    if (sessionStarted !== lastSessionStartedRef.current) {
+      console.log(`Session started changed from ${lastSessionStartedRef.current} to ${sessionStarted}`);
+      lastSessionStartedRef.current = sessionStarted;
+      
+      if (sessionStarted) {
+        console.log("Transitioning to session view...");
+        setIsTransitioning(true);
+        
+        // Short timeout to simulate transition
+        setTimeout(() => {
+          setIsTransitioning(false);
+          setShouldShowSession(true);
+        }, 500);
+      }
+    }
+  }, [sessionStarted, props.isSessionStartedInDB, shouldShowSession, setSessionStarted]);
+  
+  // Handle start session action
+  const handleStartSession = useCallback(() => {
+    console.log("Starting session in useSessionStateTransition");
+    setSessionStarted(true);
+    props.handleStartSession();
+  }, [props, setSessionStarted]);
 
   return {
     isTransitioning,

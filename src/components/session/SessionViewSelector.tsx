@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
 import AdminQrView from "./AdminQrView";
@@ -29,6 +29,31 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   onSessionFull
 }) => {
   const { toast } = useToast();
+  const transitionTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hasResolvedTransition = useRef(false);
+  
+  // Force show session if stuck in transition
+  useEffect(() => {
+    // Clear any existing timeout
+    if (transitionTimeout.current) {
+      clearTimeout(transitionTimeout.current);
+    }
+
+    // If we're in a transition state, set a timeout to force complete it
+    if (isTransitioning && !hasResolvedTransition.current) {
+      transitionTimeout.current = setTimeout(() => {
+        console.log("Force resolving transition state after timeout");
+        hasResolvedTransition.current = true;
+      }, 2000);
+    }
+
+    // Cleanup
+    return () => {
+      if (transitionTimeout.current) {
+        clearTimeout(transitionTimeout.current);
+      }
+    };
+  }, [isTransitioning]);
   
   // Safety check for null values
   if (!props.conversation) {
@@ -48,12 +73,13 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
 
-  // Force showing the session view if we're on an admin route
-  // CRITICAL FIX: Always show sessions for admin paths
+  // Force showing the session view if we're on an admin route or session has started
   const isOnAdminPath = window.location.pathname.includes('/admin');
-  if (isOnAdminPath) {
-    console.log("Admin route detected, forcing session view");
-    return <SessionView props={props} isAdmin={true} />;
+  const forceShowSession = isOnAdminPath || props.isSessionStartedInDB || sessionStarted || hasResolvedTransition.current;
+  
+  if (forceShowSession) {
+    console.log("Force showing session view due to admin route, session started, or timeout");
+    return <SessionView props={props} isAdmin={isAdmin || isOnAdminPath} />;
   }
 
   // Admin view gets QR code view for sharing until session is started
@@ -91,8 +117,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
 
-  // Show loading if transitioning between states
-  if (isTransitioning) {
+  // Show loading if transitioning between states (but with a time limit now)
+  if (isTransitioning && !hasResolvedTransition.current) {
     console.log("Showing transition loading state");
     return <LoadingState />;
   }

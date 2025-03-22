@@ -1,7 +1,7 @@
 
 import { useLocation } from "react-router-dom";
 import { useParticipantPersistence } from "./useParticipantPersistence";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 export interface LocationStateType {
   conversationId?: number;
@@ -25,8 +25,28 @@ export const useConversationId = () => {
   // Get persisted participant data
   const { persistedParticipantData, getSessionByConversationId, updateSessionAccessTime } = useParticipantPersistence();
   
+  // Track processed data with ref to avoid re-processing on every render
+  const processedDataRef = useRef<{
+    id: number | null;
+    state: LocationStateType | null;
+    persistedData: any | null;
+  } | null>(null);
+  
   // Memoize calculation of conversation ID and persisted session data
   return useMemo(() => {
+    // Skip re-processing if we already have the same inputs
+    if (processedDataRef.current &&
+        ((idFromParams && processedDataRef.current.id === parseInt(idFromParams, 10)) ||
+         (locationState?.conversationId && processedDataRef.current.id === locationState.conversationId) ||
+         (locationState?.newConversationId && processedDataRef.current.id === locationState.newConversationId) ||
+         (persistedParticipantData?.conversationId && processedDataRef.current.id === persistedParticipantData.conversationId))) {
+      return {
+        currentConversationId: processedDataRef.current.id,
+        locationState: processedDataRef.current.state,
+        persistedSessionData: processedDataRef.current.persistedData
+      };
+    }
+    
     let currentConversationId: number | null = null;
     let persistedSessionData = null;
 
@@ -76,6 +96,13 @@ export const useConversationId = () => {
       };
       console.log("Enhanced location state with persisted data:", enhancedLocationState);
     }
+    
+    // Store the processed data for future reference
+    processedDataRef.current = {
+      id: currentConversationId,
+      state: enhancedLocationState,
+      persistedData: persistedSessionData
+    };
     
     return { 
       currentConversationId, 

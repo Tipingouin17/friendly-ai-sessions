@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSessionRoomState } from "@/hooks/useSessionRoomState";
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
@@ -26,6 +26,7 @@ export const useSessionMonitoring = ({
   const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
   const adminStatusSetRef = useRef(false);
   const hasMonitoredSessionRef = useRef(false);
+  const prevConversationRef = useRef<ConversationWithSession | null>(null);
   
   // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
@@ -37,28 +38,50 @@ export const useSessionMonitoring = ({
     }
   }, [forceAdmin, setAdminStatus]);
   
-  // Monitor session start status - fixed to pass the conversation object
-  // Only update state when there's an actual change
+  // Monitor session start status - only update when conversation changes
   useEffect(() => {
-    if (conversation && !hasMonitoredSessionRef.current) {
+    // Skip if this is the same conversation object or we've already monitored it
+    if (conversation === prevConversationRef.current || 
+        (!conversation && hasMonitoredSessionRef.current)) {
+      return;
+    }
+    
+    prevConversationRef.current = conversation;
+    
+    if (conversation) {
       hasMonitoredSessionRef.current = true;
       
       // Check if the session is already started in the DB
       const isStarted = Boolean(conversation.session_started);
       console.log("Session started status from conversation:", isStarted);
-      setIsSessionStartedInDB(isStarted);
+      
+      // Only update state if different to prevent render loops
+      if (isStarted !== isSessionStartedInDB) {
+        setIsSessionStartedInDB(isStarted);
+      }
     }
-  }, [conversation]);
+  }, [conversation, isSessionStartedInDB]);
   
-  // Get room state - using useMemo to avoid re-renders
-  const roomState = useSessionRoomState({
-    conversationId,
-    conversation,
-    currentUserParticipantId,
-    participants,
-    welcomeMessage: conversation?.sessions?.welcome_message || null,
-    isAdmin: forceAdmin || isAdmin
-  });
+  // Use memoized room state to prevent unnecessary re-renders
+  const roomState = useMemo(() => 
+    useSessionRoomState({
+      conversationId,
+      conversation,
+      currentUserParticipantId,
+      participants,
+      welcomeMessage: conversation?.sessions?.welcome_message || null,
+      isAdmin: forceAdmin || isAdmin
+    }),
+    [
+      conversationId,
+      conversation,
+      currentUserParticipantId,
+      participants,
+      forceAdmin,
+      isAdmin,
+      // Specifically don't include conversation.sessions?.welcome_message to reduce re-renders
+    ]
+  );
   
   return {
     isSessionStartedInDB,

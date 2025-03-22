@@ -17,40 +17,37 @@ export function useGuestParticipant({
 
   // Add participant from location state (for guests joining)
   useEffect(() => {
-    // Only run once per component lifecycle
-    if (hasAddedParticipantRef.current) {
+    // Only run once per component lifecycle and only when we have valid data
+    if (hasAddedParticipantRef.current || !locationState?.isGuest || 
+        !locationState.participantName || !locationState.participantId) {
       return;
     }
 
-    if (locationState?.isGuest) {
-      console.log("Guest participant joining with data:", locationState);
+    console.log("Guest participant joining with data:", locationState);
+    
+    const avatarUrl = locationState.avatarSeed 
+      ? `/api/avatar?name=${locationState.avatarSeed}&variant=beam&palette=0` 
+      : null;
+    
+    hasAddedParticipantRef.current = true;
+    
+    setParticipants(prev => {
+      const exists = prev.some(p => p.id === locationState.participantId);
+      if (exists) return prev;
       
-      if (locationState.participantName && locationState.participantId) {
-        const avatarUrl = locationState.avatarSeed 
-          ? `/api/avatar?name=${locationState.avatarSeed}&variant=beam&palette=0` 
-          : null;
-        
-        hasAddedParticipantRef.current = true;
-        
-        setParticipants(prev => {
-          const exists = prev.some(p => p.id === locationState.participantId);
-          if (exists) return prev;
-          
-          console.log("Adding participant with ID:", locationState.participantId);
-          console.log("Adding participant with name:", locationState.participantName);
-          
-          return [...prev, {
-            id: locationState.participantId!,
-            name: locationState.participantName!,
-            avatar: avatarUrl,
-            isAnonymous: false
-          }];
-        });
-      }
-    }
+      console.log("Adding participant with ID:", locationState.participantId);
+      console.log("Adding participant with name:", locationState.participantName);
+      
+      return [...prev, {
+        id: locationState.participantId!,
+        name: locationState.participantName!,
+        avatar: avatarUrl,
+        isAnonymous: false
+      }];
+    });
     
     return () => {
-      hasAddedParticipantRef.current = false;
+      // Only reset this when the component is unmounted, not on every locationState change
     };
   }, [locationState, setParticipants]);
 }

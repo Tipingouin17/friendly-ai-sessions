@@ -24,10 +24,29 @@ export function useParticipantRealtime({
   const participantsChannelRef = useRef<any>(null);
   const eventsChannelRef = useRef<any>(null);
   const hasSetupSubscription = useRef(false);
+  const currentConversationIdRef = useRef<number | null>(null);
   
   useEffect(() => {
-    if (!conversationId || hasSetupSubscription.current) {
+    // Only set up once per conversation id - prevent duplicate subscriptions
+    if (!conversationId || 
+        hasSetupSubscription.current || 
+        currentConversationIdRef.current === conversationId) {
       return () => {};
+    }
+    
+    // Clean up existing channels if they exist and we're switching to a new conversation
+    if (currentConversationIdRef.current !== conversationId) {
+      if (participantsChannelRef.current) {
+        removeChannel(participantsChannelRef.current);
+        participantsChannelRef.current = null;
+      }
+      
+      if (eventsChannelRef.current) {
+        removeChannel(eventsChannelRef.current);
+        eventsChannelRef.current = null;
+      }
+      
+      currentConversationIdRef.current = conversationId;
     }
     
     hasSetupSubscription.current = true;
@@ -150,24 +169,18 @@ export function useParticipantRealtime({
     }
       
     return () => {
-      hasSetupSubscription.current = false;
-      try {
-        if (participantsChannelRef.current) {
-          removeChannel(participantsChannelRef.current);
-          participantsChannelRef.current = null;
-        }
-      } catch (e) {
-        console.error("Error removing participants channel:", e);
+      // We'll only clean up on unmount, not on every dependency change
+      if (participantsChannelRef.current) {
+        removeChannel(participantsChannelRef.current);
+        participantsChannelRef.current = null;
       }
       
-      try {
-        if (eventsChannelRef.current) {
-          removeChannel(eventsChannelRef.current);
-          eventsChannelRef.current = null;
-        }
-      } catch (e) {
-        console.error("Error removing events channel:", e);
+      if (eventsChannelRef.current) {
+        removeChannel(eventsChannelRef.current);
+        eventsChannelRef.current = null;
       }
+      
+      hasSetupSubscription.current = false;
     };
   }, [conversationId, setParticipants, setIsLoading, maxParticipants]);
 }

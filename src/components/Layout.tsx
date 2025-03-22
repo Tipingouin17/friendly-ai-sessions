@@ -14,14 +14,15 @@ export const Layout = ({ children }: LayoutProps) => {
   // Check if we're on the admin page or session page to add proper spacing
   const sessionPages = ['/session-admin', '/session'];
   const isSessionPage = sessionPages.some(path => location.pathname.includes(path));
+  const isAdminPage = location.pathname.includes('admin');
 
   return (
     <div className="min-h-screen flex flex-col text-left">
       <Navigation />
-      <main className={`flex-grow ${isSessionPage ? 'pt-0' : 'pt-16'}`}>
+      <main className={`flex-grow ${isSessionPage || isAdminPage ? 'pt-0' : 'pt-16'}`}>
         {children}
       </main>
-      {!hideFooterPaths.includes(location.pathname) && <Footer />}
+      {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}
     </div>
   );
 };

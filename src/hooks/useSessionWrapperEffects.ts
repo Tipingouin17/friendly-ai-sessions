@@ -31,7 +31,7 @@ export function useSessionWrapperEffects({
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status");
     }
-    // No return statement needed
+    // No explicit return needed
   }, [effectiveAdmin, isOnAdminPath]);
 
   // Initialize session when data is available
@@ -115,7 +115,6 @@ export function useSessionWrapperEffects({
         }
       }
     }
-    // No return statement needed
   }, [props.isLoading, props.isAdmin, props.isSessionStartedInDB, 
      effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);
 
@@ -129,6 +128,5 @@ export function useSessionWrapperEffects({
         onError(props.error);
       }
     }
-    // No return statement needed
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

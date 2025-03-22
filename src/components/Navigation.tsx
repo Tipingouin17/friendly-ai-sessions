@@ -12,11 +12,17 @@ export const Navigation = () => {
   // Check if current path is related to facilitators
   const isFacilitatorSection = ['/my-facilitators', '/session'].includes(location.pathname);
   
-  // Check if we're on a session page
+  // Check if we're on a session page or admin page to hide the main navigation
   const isSessionPage = location.pathname.includes('session-admin') || location.pathname.includes('session');
+  const isAdminPage = location.pathname.includes('admin');
+  
+  // Hide the main navigation on admin pages
+  if (isAdminPage) {
+    return null;
+  }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
+    <nav className={`fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100 ${isSessionPage ? 'hidden md:flex' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">

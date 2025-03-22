@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLocation } from 'react-router-dom';
 
 interface SessionLayoutProps {
   children: React.ReactNode;
@@ -8,10 +9,12 @@ interface SessionLayoutProps {
 
 const SessionLayout = ({ children }: SessionLayoutProps) => {
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const isAdminPage = location.pathname.includes('admin');
   
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className={`container mx-auto h-full max-w-7xl flex flex-col ${isMobile ? 'p-0' : 'px-4 pt-6'}`}>
+      <div className={`container mx-auto h-full max-w-7xl flex flex-col ${isMobile ? 'p-0' : isAdminPage ? 'px-4 pt-0' : 'px-4 pt-6'}`}>
         <div className={`flex-1 bg-white ${isMobile ? 'rounded-none' : 'rounded-lg'} shadow-sm flex flex-col relative`}>
           {children}
         </div>

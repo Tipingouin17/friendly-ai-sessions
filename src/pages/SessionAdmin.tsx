@@ -189,7 +189,6 @@ const SessionAdmin = () => {
           maxParticipants={conversationData?.participants || 10}
           isLoading={isLoadingParticipants}
           conversationData={conversationData}
-          onSendAdminMessage={handleAdminMessage} // Pass the handler to the participant list
         />
       </div>
     </div>

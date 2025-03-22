@@ -14,18 +14,24 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Enhanced admin detection - check multiple sources
-  const isAdminSession = location.pathname.includes('/admin') || 
-                         sessionStorage.getItem('isAdminSession') === 'true' ||
-                         location.search.includes('admin=true');
+  // Enhanced admin detection - check URL path first as it's most reliable
+  const isOnAdminPath = location.pathname.includes('/admin');
+  
+  // For non-admin paths, check other sources but don't rely on session storage
+  // This prevents cross-contamination between admin/participant sessions
+  const isAdminSession = isOnAdminPath || 
+                         (location.search.includes('admin=true'));
 
+  // Skip all recovery for admin sessions
+  const shouldSkipRecovery = isAdminSession || isOnAdminPath;
+  
   // Set up component lifecycle
   useEffect(() => {
     console.log("Session recovery hook mounted, isAdmin:", isAdminSession);
     sessionMountedRef.current = true;
     
-    // If admin, store the status to ensure persistence
-    if (isAdminSession) {
+    // Only store status for actual admin paths to prevent conflicts
+    if (isOnAdminPath) {
       sessionStorage.setItem('isAdminSession', 'true');
     }
     
@@ -38,12 +44,12 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
         clearTimeout(recoveryTimeoutRef.current);
       }
     };
-  }, [isAdminSession]);
+  }, [isAdminSession, isOnAdminPath]);
 
   const retryConnection = useCallback(() => {
-    // IMPORTANT: Skip all recovery for admin sessions completely
-    if (!sessionMountedRef.current || isRecovering || isAdminSession) {
-      if (isAdminSession) {
+    // Skip all recovery for admin sessions
+    if (!sessionMountedRef.current || isRecovering || shouldSkipRecovery) {
+      if (shouldSkipRecovery) {
         console.log("Admin session: Skipping recovery entirely");
         return;
       }
@@ -62,7 +68,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
         if (!sessionMountedRef.current) return;
         
         // Skip recovery for admin sessions even if they somehow get here
-        if (isAdminSession) {
+        if (shouldSkipRecovery) {
           console.log("Admin session detected during recovery, aborting");
           setIsRecovering(false);
           return;
@@ -95,7 +101,7 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       }
     }, retryDelay);
     
-  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, isAdminSession, navigate]);
+  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, shouldSkipRecovery, navigate]);
 
   return { 
     connectionAttempts, 

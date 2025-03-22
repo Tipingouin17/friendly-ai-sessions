@@ -28,23 +28,24 @@ export function useSessionWrapperInitialization({
       clearTimeout(initTimeoutRef.current);
     }
 
-    // Use shorter timeout for admin sessions to prevent long loading states
-    const adminTimeout = (effectiveAdmin || isOnAdminPath) ? 2000 : 4000;
+    // Use shorter timeout for admin sessions
+    const adminTimeout = (effectiveAdmin || isOnAdminPath) ? 1500 : 3000;
     
-    // Set admin status immediately for session protection
-    if (effectiveAdmin || isOnAdminPath) {
+    // Set admin status immediately for admin paths
+    if (isOnAdminPath) {
       sessionStorage.setItem('isAdminSession', 'true');
     }
     
     initTimeoutRef.current = setTimeout(() => {
-      if (!providerInitialized.current) {
-        console.log(`Force initializing provider after ${adminTimeout}ms timeout, isAdmin:`, effectiveAdmin || isOnAdminPath);
+      if (!providerInitialized.current && sessionMountedRef.current) {
+        console.log(`Force initializing wrapper after ${adminTimeout}ms timeout, isAdmin:`, effectiveAdmin || isOnAdminPath);
         providerInitialized.current = true;
         onInitialized();
-        onLoading(false); // Force loading to false for admin sessions
         
+        // Force loading to false immediately for admin sessions
         if (effectiveAdmin || isOnAdminPath) {
-          sessionStorage.setItem('isAdminSession', 'true');
+          console.log("Admin session: Forcing loading to false immediately");
+          onLoading(false);
         }
       }
     }, adminTimeout);
@@ -54,14 +55,7 @@ export function useSessionWrapperInitialization({
         clearTimeout(initTimeoutRef.current);
       }
     };
-  }, [onInitialized, onLoading, effectiveAdmin, isOnAdminPath]);
-
-  useEffect(() => {
-    if ((effectiveAdmin || isOnAdminPath) && !showedAdminToast.current) {
-      showedAdminToast.current = true;
-      sessionStorage.setItem('isAdminSession', 'true');
-    }
-  }, [effectiveAdmin, isOnAdminPath, toast]);
+  }, [onInitialized, onLoading, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 
   return { providerInitialized };
 }

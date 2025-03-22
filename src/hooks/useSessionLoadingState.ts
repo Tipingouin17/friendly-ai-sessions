@@ -11,16 +11,19 @@ export function useSessionLoadingState(
 ) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStartTime] = useState(Date.now());
-  const recoveryAttemptsMade = useRef(0);
   const { toast } = useToast();
   const navigate = useNavigate();
   const lastLoadingState = useRef<boolean>(true);
   const forceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isAdminSession = useRef(sessionStorage.getItem('isAdminSession') === 'true' || 
-                              window.location.pathname.includes('/admin'));
-  const hasToastShown = useRef(false);
   const criticalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriedForceUnlock = useRef(false);
+  
+  // Check for admin status in the URL path - most reliable method
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  
+  // For participant paths, don't use session storage to detect admin status
+  // This prevents admin session conflicts affecting participant experience
+  const isAdminSession = useRef(isOnAdminPath || window.location.search.includes('admin=true'));
 
   // Debug loading state
   useEffect(() => {
@@ -32,18 +35,21 @@ export function useSessionLoadingState(
       pathName: window.location.pathname
     });
     
-    // Critical timeout for ALL sessions - after this, we must show content
-    const criticalTime = isAdminSession.current ? 7000 : 10000;
+    // Critical timeout - different for admin vs participant
+    const criticalTime = isAdminSession.current ? 5000 : 8000;
     
     criticalTimeoutRef.current = setTimeout(() => {
-      if (isLoading) {
+      if (isLoading && sessionMountedRef.current) {
         console.log("CRITICAL TIMEOUT: Forcing loading state to false after", criticalTime, "ms");
         setIsLoading(false);
         
-        toast({
-          title: "Session loaded",
-          description: "The session took longer than expected to load, but should be ready now.",
-        });
+        // Skip toast for admin sessions
+        if (!isAdminSession.current) {
+          toast({
+            title: "Session loaded",
+            description: "The session took longer than expected to load, but should be ready now.",
+          });
+        }
       }
     }, criticalTime);
     
@@ -52,11 +58,11 @@ export function useSessionLoadingState(
         clearTimeout(criticalTimeoutRef.current);
       }
     };
-  }, [loadingStartTime, connectionAttempts, toast]);
+  }, [loadingStartTime, connectionAttempts, toast, sessionMountedRef, isLoading]);
 
   // Track loading state changes
   useEffect(() => {
-    if (lastLoadingState.current !== isLoading) {
+    if (lastLoadingState.current !== isLoading && sessionMountedRef.current) {
       console.log(`Loading state changed: ${lastLoadingState.current} -> ${isLoading}`, {
         timeElapsed: Date.now() - loadingStartTime,
         connectionAttempts,
@@ -64,55 +70,43 @@ export function useSessionLoadingState(
       });
       lastLoadingState.current = isLoading;
     }
-  }, [isLoading, loadingStartTime, connectionAttempts, hasInitializedProvider]);
+  }, [isLoading, loadingStartTime, connectionAttempts, hasInitializedProvider, sessionMountedRef]);
 
   // Force unlock loading state if stuck for too long
   useEffect(() => {
-    if (!isLoading || hasTriedForceUnlock.current) return;
+    if (!isLoading || hasTriedForceUnlock.current || !sessionMountedRef.current) return;
     
     const timeElapsed = Date.now() - loadingStartTime;
     
-    // If we've been loading for more than 5 seconds and have provider initialized
-    if (timeElapsed > 5000 && hasInitializedProvider && isLoading) {
-      console.log("Force unlocking loading state after 5s with initialized provider");
+    // If we've been loading for more than 4 seconds and have provider initialized
+    if (timeElapsed > 4000 && hasInitializedProvider && isLoading) {
+      console.log("Force unlocking loading state with initialized provider");
       setIsLoading(false);
       hasTriedForceUnlock.current = true;
     }
     
     // For participant sessions that have attempted connections
-    if (timeElapsed > 8000 && connectionAttempts > 0 && isLoading && !isAdminSession.current) {
-      console.log("Force unlocking loading state after 8s for participant with connection attempts");
+    if (timeElapsed > 6000 && connectionAttempts > 0 && isLoading && !isAdminSession.current) {
+      console.log("Force unlocking loading state for participant with connection attempts");
       setIsLoading(false);
       hasTriedForceUnlock.current = true;
       
-      if (!hasToastShown.current) {
-        toast({
-          title: "Session Ready",
-          description: "You can now participate in the session."
-        });
-        hasToastShown.current = true;
-      }
+      toast({
+        title: "Session Ready",
+        description: "You can now participate in the session."
+      });
     }
-  }, [isLoading, loadingStartTime, hasInitializedProvider, connectionAttempts, toast]);
+  }, [isLoading, loadingStartTime, hasInitializedProvider, connectionAttempts, toast, sessionMountedRef]);
 
   // Handle loading timeout and initialization - different handling for admin
   useEffect(() => {
     if (!sessionMountedRef.current) return;
     
-    // For admin users, set loading to false much faster
+    // For admin, set loading to false immediately
     if (isAdminSession.current && isLoading) {
       console.log("Admin session detected - expediting loading state");
-      
-      // Almost immediate loading state clearing for admin
-      forceTimeoutRef.current = setTimeout(() => {
-        setIsLoading(false);
-      }, 1000); // Very short timeout for admin sessions
-      
-      return () => {
-        if (forceTimeoutRef.current) {
-          clearTimeout(forceTimeoutRef.current);
-        }
-      };
+      setIsLoading(false);
+      return;
     }
     
     // Force loading state to false if provider is initialized
@@ -122,21 +116,18 @@ export function useSessionLoadingState(
       return;
     }
     
-    // Regular timeout for participant sessions
-    const timeoutDuration = isAdminSession.current ? 2000 : 4000;
+    // Regular timeout for participant sessions (shorter now for better UX)
+    const timeoutDuration = 3000;
     
     forceTimeoutRef.current = setTimeout(() => {
       if (isLoading && sessionMountedRef.current) {
         console.log("Forcing loading state to false after timeout");
         setIsLoading(false);
         
-        if (!hasToastShown.current) {
-          hasToastShown.current = true;
-          toast({
-            title: "Session Ready",
-            description: "You can now participate in the session."
-          });
-        }
+        toast({
+          title: "Session Ready",
+          description: "You can now participate in the session."
+        });
       }
     }, timeoutDuration);
     
@@ -145,33 +136,7 @@ export function useSessionLoadingState(
         clearTimeout(forceTimeoutRef.current);
       }
     };
-  }, [isLoading, toast, sessionMountedRef, hasInitializedProvider, connectionAttempts, loadingStartTime]);
-
-  // Detect and handle potential deadlocks - use navigation instead of page reload
-  useEffect(() => {
-    const timeSinceStart = Date.now() - loadingStartTime;
-    
-    // If we're still loading after 12 seconds regardless of state, instead of refreshing, try recovery
-    if (isLoading && timeSinceStart > 12000) {
-      console.log("DEADLOCK DETECTED: Session has been loading for too long");
-      toast({
-        title: "Session Issue",
-        description: "We detected a problem with loading. Trying to recover...",
-        variant: "destructive"
-      });
-      
-      // Instead of page reload, navigate to the same page with a fresh state
-      const searchParams = new URLSearchParams(window.location.search);
-      const sessionId = searchParams.get('id');
-      
-      if (sessionId) {
-        // Add a timestamp to force a fresh load
-        navigate(`/session?id=${sessionId}&retry=${Date.now()}`, { replace: true });
-      } else {
-        setIsLoading(false); // As a fallback, at least turn off loading
-      }
-    }
-  }, [isLoading, loadingStartTime, toast, navigate]);
+  }, [isLoading, toast, sessionMountedRef, hasInitializedProvider]);
 
   return { isLoading, setIsLoading };
 }

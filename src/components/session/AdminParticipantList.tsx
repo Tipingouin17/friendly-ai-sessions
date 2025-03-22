@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
-import { Users, UserCheck, Award, Languages, Clock, BookText, BadgeCheck } from "lucide-react";
+import { Users, UserCheck, Award, Languages, Clock, BookText, BadgeCheck, Sparkles, GraduationCap } from "lucide-react";
 import { useParticipantRemoval } from "@/hooks/useParticipantRemoval";
 import { useParticipantRealtime } from "@/hooks/useParticipantRealtime";
 import ParticipantListItem from "@/components/session/participant/ParticipantListItem";
@@ -117,8 +117,15 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
               
               <p className="text-sm text-gray-600 mt-2">{facilitatorInfo.details}</p>
               
+              {facilitatorInfo.expertise_level && (
+                <div className="flex items-center gap-1 mt-3 text-xs text-gray-500">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span>Expertise: <span className="font-medium">{facilitatorInfo.expertise_level}</span></span>
+                </div>
+              )}
+
               {sessionInfo?.duration_minutes && (
-                <div className="flex items-center gap-1 mt-4 text-xs text-gray-500">
+                <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
                   <Clock className="h-3.5 w-3.5" />
                   <span>Duration: {sessionInfo.duration_minutes} minutes</span>
                 </div>
@@ -141,7 +148,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
               {facilitatorInfo.specialties && facilitatorInfo.specialties.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                    <Award className="h-3.5 w-3.5" />
+                    <Sparkles className="h-3.5 w-3.5" />
                     <span>Specialties:</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-1">

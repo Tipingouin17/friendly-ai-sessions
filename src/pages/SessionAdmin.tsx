@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -10,6 +11,9 @@ import AdminParticipantList from "@/components/session/AdminParticipantList";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
+import { Timer, ChevronRight, User2, CalendarClock, BookOpen } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 const SessionAdmin = () => {
   // Enforce admin status
@@ -160,7 +164,11 @@ const SessionAdmin = () => {
     }
   }
 
-  // Show the simple admin panel UI - this is now the only view we'll render
+  // Extract session details from conversation data
+  const sessionDetails = conversationData?.sessions || {};
+  const facilitatorDetails = sessionDetails?.facilitator_details || {};
+
+  // Show the enhanced admin panel UI
   return (
     <div className="flex flex-col min-h-screen pt-16">
       <AdminSessionHeader 
@@ -171,6 +179,39 @@ const SessionAdmin = () => {
         onSendAdminMessage={handleSendAdminMessage}
         onExportData={exportSessionData}
       />
+      
+      {sessionDetails && Object.keys(sessionDetails).length > 0 && (
+        <div className="bg-gray-50 p-2 border-b">
+          <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center gap-4 text-sm">
+            {sessionDetails.session_type && (
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                {sessionDetails.session_type.replace('_', ' ')}
+              </Badge>
+            )}
+            
+            {sessionDetails.skill_level && (
+              <div className="flex items-center gap-1 text-gray-600">
+                <User2 className="h-3.5 w-3.5" />
+                <span>Level: {sessionDetails.skill_level}</span>
+              </div>
+            )}
+            
+            {sessionDetails.duration_minutes && (
+              <div className="flex items-center gap-1 text-gray-600">
+                <Timer className="h-3.5 w-3.5" />
+                <span>{sessionDetails.duration_minutes} min</span>
+              </div>
+            )}
+            
+            {facilitatorDetails?.expertise_level && (
+              <div className="flex items-center gap-1 text-gray-600">
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Facilitator: {facilitatorDetails.expertise_level}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         <div className="flex-1 overflow-hidden flex flex-col">

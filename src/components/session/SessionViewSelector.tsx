@@ -8,6 +8,8 @@ import SessionView from "./SessionView";
 import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
 import JoinSessionLoadingState from "./JoinSessionLoadingState";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SessionViewSelectorProps {
   props: SessionContextProps;
@@ -29,8 +31,10 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   onSessionFull
 }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const transitionTimeout = useRef<NodeJS.Timeout | null>(null);
   const hasResolvedTransition = useRef(false);
+  const participantEventChannelRef = useRef<any>(null);
   
   // Force show session if stuck in transition
   useEffect(() => {
@@ -54,6 +58,69 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
       }
     };
   }, [isTransitioning]);
+  
+  // Listen for participant removal events
+  useEffect(() => {
+    if (!props.currentConversationId || !props.currentUserParticipantId) return;
+
+    const channelName = `participant-events-${props.currentConversationId}-${Date.now()}`;
+    
+    try {
+      participantEventChannelRef.current = supabase
+        .channel(channelName)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'session_events',
+          filter: `conversation_id=eq.${props.currentConversationId}`
+        }, (payload) => {
+          // Check if this is a participant removal event
+          if (payload.new && 
+              payload.new.event_type === 'participant_removed' && 
+              payload.new.data && 
+              payload.new.data.participant_id === props.currentUserParticipantId) {
+            
+            console.log("Current participant has been removed from session");
+            
+            // Show toast notification
+            toast({
+              title: "Removed from session",
+              description: "You have been removed from this session by the admin.",
+              variant: "destructive",
+            });
+            
+            // Clear local data and navigate away
+            setTimeout(() => {
+              // Clear any locally stored session data
+              try {
+                localStorage.removeItem('participant_session');
+                sessionStorage.removeItem('isAdminSession');
+              } catch (err) {
+                console.error("Error clearing session storage:", err);
+              }
+              
+              // Navigate back to home page
+              navigate('/');
+            }, 2000);
+          }
+        })
+        .subscribe();
+        
+      console.log("Subscribed to participant removal events");
+    } catch (err) {
+      console.error("Error subscribing to participant events:", err);
+    }
+    
+    return () => {
+      if (participantEventChannelRef.current) {
+        try {
+          supabase.removeChannel(participantEventChannelRef.current);
+        } catch (err) {
+          console.error("Error removing participant events channel:", err);
+        }
+      }
+    };
+  }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast]);
   
   // Safety check for null values
   if (!props.conversation) {

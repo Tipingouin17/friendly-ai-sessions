@@ -1,6 +1,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface UseSessionStateTransitionProps {
   props: SessionContextProps;
@@ -22,6 +25,59 @@ export function useSessionStateTransition({
   const lastSessionStartedRef = useRef(sessionStarted);
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isOnAdminPath = window.location.pathname.includes('/admin');
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // Track participant removal events for this participant
+  useEffect(() => {
+    if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
+    
+    // Check if this participant is still valid
+    const checkParticipantStatus = async () => {
+      try {
+        if (!props.currentConversationId || !props.currentUserParticipantId) return;
+        
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('conversation_id', props.currentConversationId)
+          .eq('participant_id', props.currentUserParticipantId)
+          .single();
+          
+        if (error || !data) {
+          console.log("Participant has been removed from the session");
+          
+          // Clear storage and redirect
+          try {
+            localStorage.removeItem('participant_session');
+            sessionStorage.removeItem('isAdminSession');
+          } catch (err) {
+            console.error("Error clearing session storage:", err);
+          }
+          
+          toast({
+            title: "Session access revoked",
+            description: "You can no longer access this session",
+            variant: "destructive"
+          });
+          
+          navigate('/');
+        }
+      } catch (err) {
+        console.error("Error checking participant status:", err);
+      }
+    };
+    
+    // Initial check
+    checkParticipantStatus();
+    
+    // Set up periodic check
+    const intervalId = setInterval(checkParticipantStatus, 15000); // Check every 15 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [props.currentConversationId, props.currentUserParticipantId, isAdmin, navigate, toast]);
   
   // Calculate values from conversation and participants if available
   const currentParticipants = props.conversation?.current_participants || 

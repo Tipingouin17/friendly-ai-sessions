@@ -58,7 +58,7 @@ export const useParticipantRemoval = ({
         return;
       }
       
-      // Create a participant_removed event
+      // Create a participant_removed event with more detailed data to completely remove access
       await supabase
         .from('session_events')
         .insert({
@@ -68,7 +68,9 @@ export const useParticipantRemoval = ({
             participant_id: participantId,
             current_count: newCount,
             removed_by: 'admin',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            permanent_removal: true,  // Flag to indicate permanent removal
+            access_revoked: true      // Flag to indicate access revocation
           }
         });
       
@@ -78,7 +80,7 @@ export const useParticipantRemoval = ({
       
       toast({
         title: "Participant removed",
-        description: `Successfully removed participant ${participantId}`,
+        description: `Successfully removed participant from session`,
       });
     } catch (err) {
       console.error("Exception removing participant:", err);

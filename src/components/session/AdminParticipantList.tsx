@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { Users } from "lucide-react";
 import { useParticipantRemoval } from "@/hooks/useParticipantRemoval";
@@ -23,14 +23,17 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   isLoading,
   conversationData
 }) => {
-  const [participantsList, setParticipantsList] = React.useState<ParticipantInfo[]>(participants);
+  const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(isLoading);
   
   // Synchronize the component's local state with the incoming props
   useEffect(() => {
     if (participants && participants.length > 0) {
       setParticipantsList(participants);
     }
-  }, [participants]);
+    
+    setIsLoadingParticipants(isLoading);
+  }, [participants, isLoading]);
   
   // Use custom hooks for participant management
   const { 
@@ -43,13 +46,13 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     setParticipantsList
   });
   
-  // Set up realtime updates
+  // Set up realtime updates with the updated hook
   useParticipantRealtime({
     conversationId: conversationData?.id || null,
     participants: participantsList,
-    maxParticipants,
-    setDisplayCount,
-    setParticipantsList
+    setParticipants: setParticipantsList,
+    setIsLoading: setIsLoadingParticipants,
+    maxParticipants // Now we can pass this property correctly
   });
 
   return (
@@ -59,7 +62,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
         Participants ({displayCount}/{maxParticipants || "∞"})
       </h3>
       
-      {isLoading ? (
+      {isLoadingParticipants ? (
         <ParticipantListSkeleton count={displayCount} />
       ) : participantsList.length > 0 ? (
         <div className="space-y-2">

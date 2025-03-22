@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,18 +10,19 @@ interface UseParticipantRealtimeProps {
   participants: ParticipantInfo[];
   setParticipants: React.Dispatch<React.SetStateAction<ParticipantInfo[]>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  maxParticipants?: number;
 }
 
 export function useParticipantRealtime({
   conversationId,
   participants,
   setParticipants,
-  setIsLoading
+  setIsLoading,
+  maxParticipants
 }: UseParticipantRealtimeProps) {
   const participantsChannelRef = useRef<any>(null);
   const eventsChannelRef = useRef<any>(null);
   
-  // Set up realtime subscription for participant updates
   useEffect(() => {
     if (!conversationId) {
       console.log("No conversationId provided to useParticipantRealtime, skipping subscription");
@@ -31,7 +31,6 @@ export function useParticipantRealtime({
     
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
     
-    // Listen for new participant registrations
     try {
       const participantsChannel = supabase
         .channel(`admin-session-participants-${conversationId}`)
@@ -47,7 +46,6 @@ export function useParticipantRealtime({
             const participant = payload.new;
             
             setParticipants(prev => {
-              // Check if we already have this participant
               if (prev.some(p => p.id === participant.participant_id)) return prev;
               
               console.log("Adding participant from realtime event:", participant);
@@ -68,7 +66,6 @@ export function useParticipantRealtime({
           console.log(`Participants channel subscription status: ${status}`);
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             console.log("Successfully subscribed to participant updates");
-            // Force loading state to false after successful channel subscription
             setIsLoading(false);
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant updates");
@@ -82,7 +79,6 @@ export function useParticipantRealtime({
       setIsLoading(false);
     }
     
-    // Listen for participant_joined events
     try {
       const eventsChannel = supabase
         .channel(`admin-participant-events-${conversationId}`)
@@ -107,7 +103,6 @@ export function useParticipantRealtime({
               
               if (participantId && participantName) {
                 setParticipants(prev => {
-                  // Check if we already have this participant
                   if (prev.some(p => p.id === participantId)) return prev;
                   
                   console.log("Adding new participant from event:", eventData);
@@ -120,13 +115,25 @@ export function useParticipantRealtime({
                 });
               }
             }
+            
+            if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
+              console.log(`Maximum participants (${maxParticipants}) reached, updating session_started flag`);
+              supabase
+                .from('conversations')
+                .update({ session_started: true })
+                .eq('id', conversationId)
+                .then(({ error }) => {
+                  if (error) {
+                    console.error("Error starting session automatically:", error);
+                  }
+                });
+            }
           }
         })
         .subscribe((status) => {
           console.log(`Participant events channel status: ${status}`);
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             console.log("Successfully subscribed to participant events");
-            // Second chance to set loading to false after event channel subscription
             setIsLoading(false);
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant events");
@@ -140,9 +147,7 @@ export function useParticipantRealtime({
       setIsLoading(false);
     }
       
-    // Clean up function
     return () => {
-      // Safe cleanup of channels
       try {
         if (participantsChannelRef.current) {
           removeChannel(participantsChannelRef.current);
@@ -161,5 +166,5 @@ export function useParticipantRealtime({
         console.error("Error removing events channel:", e);
       }
     };
-  }, [conversationId, participants, setParticipants, setIsLoading]);
+  }, [conversationId, participants, setParticipants, setIsLoading, maxParticipants]);
 }

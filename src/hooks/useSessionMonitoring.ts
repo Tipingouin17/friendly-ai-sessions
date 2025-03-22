@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { useSessionRoomState } from "@/hooks/useSessionRoomState";
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
@@ -10,7 +11,7 @@ type UseSessionMonitoringProps = {
   currentUserParticipantId: number | null;
   participants: ParticipantInfo[];
   onError?: (error: string) => void;
-  forceAdmin?: boolean; // Added forceAdmin prop
+  forceAdmin?: boolean;
 };
 
 export const useSessionMonitoring = ({
@@ -23,13 +24,15 @@ export const useSessionMonitoring = ({
 }: UseSessionMonitoringProps) => {
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
   const [isSessionStartedInDB, setIsSessionStartedInDB] = useState(false);
+  const adminStatusSetRef = useRef(false);
   
-  // Enforce admin status if forceAdmin is true
+  // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
-    if (forceAdmin) {
+    if (forceAdmin && !adminStatusSetRef.current) {
       console.log("useSessionMonitoring: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
+      adminStatusSetRef.current = true;
     }
   }, [forceAdmin, setAdminStatus]);
   

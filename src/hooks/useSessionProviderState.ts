@@ -1,12 +1,12 @@
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useRefactoredSessionData } from "@/hooks/useRefactoredSessionData";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 type UseSessionProviderStateProps = {
   onError?: (error: string) => void;
-  forceAdmin?: boolean; // Added forceAdmin prop
+  forceAdmin?: boolean;
 };
 
 export const useSessionProviderState = ({ 
@@ -16,13 +16,15 @@ export const useSessionProviderState = ({
   const [providerError, setProviderError] = useState<string | null>(null);
   const location = useLocation();
   const { isAdmin, setAdminStatus } = useSessionAdminStatus();
+  const adminStatusSetRef = useRef(false);
   
-  // Enforce admin status if forceAdmin is true
+  // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
-    if (forceAdmin) {
+    if (forceAdmin && !adminStatusSetRef.current) {
       console.log("useSessionProviderState: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
+      adminStatusSetRef.current = true;
     }
   }, [forceAdmin, setAdminStatus]);
   

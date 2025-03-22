@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -14,7 +15,7 @@ import { useSessionProviderErrorHandler } from "@/hooks/useSessionProviderErrorH
 import { SessionProviderCoreError } from "./SessionProviderCoreError";
 
 interface SessionProviderCoreProps {
-  children: (props: SessionContextProps) => React.ReactElement;
+  children: React.ReactNode;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
   forceAdmin?: boolean;
@@ -153,6 +154,11 @@ export const SessionProviderCore = ({
       effectiveAdmin
     });
 
+    // Create a React element with the session context value
+    const sessionElement = React.isValidElement(children) 
+      ? children 
+      : React.createElement(React.Fragment, {}, children);
+
     // Return children with context or error fallback
     return (
       <SessionProviderCoreError
@@ -160,15 +166,7 @@ export const SessionProviderCore = ({
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
       >
-        {(errorFallbackProps) => {
-          // If we have serious errors, use the fallback
-          if (providerError && !effectiveAdmin) {
-            return children(errorFallbackProps);
-          }
-          
-          // Otherwise, use the normal context
-          return children(sessionContextValue);
-        }}
+        {sessionContextValue ? React.cloneElement(sessionElement, sessionContextValue) : sessionElement}
       </SessionProviderCoreError>
     );
   } catch (error) {
@@ -181,7 +179,7 @@ export const SessionProviderCore = ({
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
       >
-        {(errorContext) => children(errorContext)}
+        {React.isValidElement(children) ? children : React.createElement(React.Fragment, {}, children)}
       </SessionProviderCoreError>
     );
   }

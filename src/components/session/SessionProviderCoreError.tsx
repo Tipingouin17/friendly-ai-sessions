@@ -8,7 +8,7 @@ interface SessionProviderCoreErrorProps {
   providerError: string | null;
   effectiveAdmin: boolean;
   refetch: () => void;
-  children: (props: SessionContextProps) => React.ReactElement;
+  children: React.ReactNode;
 }
 
 export const SessionProviderCoreError = ({
@@ -71,11 +71,11 @@ export const SessionProviderCoreError = ({
           refetch();
         }}
       >
-        {() => children(emergencyContext)}
+        {children}
       </SessionProviderErrorFallback>
     );
   }
 
-  // For admin or no errors, render children with emergency context
-  return children(emergencyContext);
+  // For admin or no errors, render children directly
+  return <>{children}</>;
 };

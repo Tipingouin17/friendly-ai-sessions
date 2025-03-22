@@ -35,27 +35,31 @@ export const useSessionParticipantSetup = ({
   // Use a ref to store and determine admin status just once to prevent loops
   const adminStatusRef = useRef({
     determined: false,
-    isAdmin: false
+    isAdmin: false,
+    adminStatusSet: false
   });
   
   // Determine admin status once and store in ref
-  if (!adminStatusRef.current.determined) {
-    adminStatusRef.current.isAdmin = forceAdmin === true || 
-                                    locationState?.isAdmin === true || 
-                                    isAdmin === true || 
-                                    sessionStorage.getItem('isAdminSession') === 'true';
-    adminStatusRef.current.determined = true;
-    
-    // Log it
-    console.log("useSessionParticipantSetup admin status determined:", adminStatusRef.current.isAdmin);
-  }
+  useEffect(() => {
+    if (!adminStatusRef.current.determined) {
+      adminStatusRef.current.isAdmin = forceAdmin === true || 
+                                      locationState?.isAdmin === true || 
+                                      isAdmin === true || 
+                                      sessionStorage.getItem('isAdminSession') === 'true';
+      adminStatusRef.current.determined = true;
+      
+      // Log it
+      console.log("useSessionParticipantSetup admin status determined:", adminStatusRef.current.isAdmin);
+    }
+  }, [forceAdmin, locationState, isAdmin]);
   
   // Enforce admin status if needed - run only once
   useEffect(() => {
-    if (adminStatusRef.current.isAdmin) {
+    if (adminStatusRef.current.isAdmin && !adminStatusRef.current.adminStatusSet) {
       console.log("useSessionParticipantSetup: Enforcing admin status");
       // This uses the safe version that won't cause re-renders if already set
       setAdminStatus(true);
+      adminStatusRef.current.adminStatusSet = true;
     }
   }, [setAdminStatus]);
   
@@ -84,10 +88,10 @@ export const useSessionParticipantSetup = ({
   
   // Set current user participant ID from location state
   useEffect(() => {
-    if (locationState?.participantId) {
+    if (locationState?.participantId && currentUserParticipantId !== locationState.participantId) {
       setCurrentUserParticipantId(locationState.participantId);
     }
-  }, [locationState]);
+  }, [locationState, currentUserParticipantId]);
   
   // Function to force refresh participants - must return a Promise
   const forceRefreshParticipants = useCallback(async () => {

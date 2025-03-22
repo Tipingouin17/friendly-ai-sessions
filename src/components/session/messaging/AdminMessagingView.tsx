@@ -1,9 +1,12 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Message } from '@/types/chat';
 import AdminMessageFilters from './AdminMessageFilters';
 import AdminMessageGroup from './AdminMessageGroup';
 import MessageEmptyState from './MessageEmptyState';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart2, MessageSquare, BarChart4, ListView } from 'lucide-react';
 
 interface AdminMessagingViewProps {
   messages: Message[];
@@ -24,6 +27,8 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
   showAnonymous,
   setShowAnonymous
 }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
+  
   // Log all messages for debugging
   React.useEffect(() => {
     console.log("Admin view received messages:", 
@@ -121,39 +126,99 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
 
   // Calculate total responses for the filter stats
   const totalResponses = groupedMessages.reduce((acc, group) => acc + group.responses.length, 0);
+  
+  // Count total unique participants across all groups
+  const uniqueParticipants = useMemo(() => {
+    const participantSet = new Set();
+    
+    groupedMessages.forEach(group => {
+      group.responses.forEach(response => {
+        if (response.participant) {
+          participantSet.add(response.participant);
+        }
+      });
+    });
+    
+    return participantSet.size;
+  }, [groupedMessages]);
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      <AdminMessageFilters
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        showAnonymous={showAnonymous}
-        setShowAnonymous={setShowAnonymous}
-        totalResponses={totalResponses}
-        currentParticipantCount={currentParticipantCount}
-      />
-
-      <div className="flex-1 overflow-hidden">
-        {groupedMessages.length > 0 ? (
-          <div className="h-full overflow-y-auto">
-            <div className="px-6 py-6 space-y-8">
-              {groupedMessages.map((group, groupIndex) => (
-                <AdminMessageGroup
-                  key={`group-${groupIndex}-${group.question.id}`}
-                  group={group}
-                  groupIndex={groupIndex}
-                  participantColors={participantColors}
-                />
-              ))}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <Tabs defaultValue="questions" className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <TabsList>
+              <TabsTrigger value="questions" className="flex items-center gap-1">
+                <MessageSquare className="w-4 h-4" />
+                Questions
+              </TabsTrigger>
+              <TabsTrigger value="insights" className="flex items-center gap-1">
+                <BarChart2 className="w-4 h-4" />
+                Insights
+              </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex gap-2">
+              <button 
+                className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                onClick={() => setViewMode('list')}
+                aria-label="List view"
+              >
+                <ListView className="w-4 h-4" />
+              </button>
+              <button 
+                className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                onClick={() => setViewMode('compact')}
+                aria-label="Compact view"
+              >
+                <BarChart4 className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        ) : (
-          <MessageEmptyState
-            isAdmin={true}
-            messagesLength={messages.length}
-            viewMode="admin"
+          
+          <AdminMessageFilters
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            showAnonymous={showAnonymous}
+            setShowAnonymous={setShowAnonymous}
+            totalResponses={totalResponses}
+            currentParticipantCount={currentParticipantCount}
+            totalQuestions={groupedMessages.length}
+            uniqueParticipants={uniqueParticipants}
           />
-        )}
+          
+          <TabsContent value="questions" className="m-0 mt-2">
+            {groupedMessages.length > 0 ? (
+              <ScrollArea className="h-[calc(100vh-250px)]">
+                <div className={`space-y-${viewMode === 'compact' ? '4' : '8'} p-1`}>
+                  {groupedMessages.map((group, groupIndex) => (
+                    <AdminMessageGroup
+                      key={`group-${groupIndex}-${group.question.id}`}
+                      group={group}
+                      groupIndex={groupIndex}
+                      participantColors={participantColors}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <MessageEmptyState
+                isAdmin={true}
+                messagesLength={messages.length}
+                viewMode="admin"
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="insights" className="m-0 mt-4">
+            <div className="p-8 text-center bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-lg font-medium text-gray-700 mb-2">Insights coming soon</p>
+              <p className="text-gray-500">
+                Visual analytics and insights for your session will be available here.
+              </p>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -1,15 +1,12 @@
 
 import React from 'react';
+import { Search, Filter, EyeOff, Eye, SlidersHorizontal } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Toggle } from '@/components/ui/toggle';
-import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, Filter } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 interface AdminMessageFiltersProps {
   searchTerm: string;
@@ -18,6 +15,8 @@ interface AdminMessageFiltersProps {
   setShowAnonymous: (show: boolean) => void;
   totalResponses: number;
   currentParticipantCount: number;
+  totalQuestions?: number;
+  uniqueParticipants?: number;
 }
 
 const AdminMessageFilters: React.FC<AdminMessageFiltersProps> = ({
@@ -26,52 +25,111 @@ const AdminMessageFilters: React.FC<AdminMessageFiltersProps> = ({
   showAnonymous,
   setShowAnonymous,
   totalResponses,
-  currentParticipantCount
+  currentParticipantCount,
+  totalQuestions = 0,
+  uniqueParticipants = 0
 }) => {
   return (
-    <div className="p-4 border-b border-gray-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <div className="flex-1">
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search responses..."
+            className="pl-9"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <Toggle 
-          pressed={showAnonymous} 
-          onPressedChange={setShowAnonymous}
-          size="sm"
-          aria-label="Toggle anonymous responses"
-          className="flex items-center gap-1"
-        >
-          {showAnonymous ? 
-            <Eye className="h-4 w-4" /> : 
-            <EyeOff className="h-4 w-4" />
-          }
-          Anonymous
-        </Toggle>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center gap-1">
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => setShowAnonymous(!showAnonymous)}>
-              {showAnonymous ? "Hide Anonymous" : "Show Anonymous"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setSearchTerm('')}>
-              Clear Search
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAnonymous(!showAnonymous)}
+            className={`px-3 py-2 text-sm rounded-md border flex items-center gap-2 ${
+              showAnonymous ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'
+            }`}
+          >
+            {showAnonymous ? (
+              <>
+                <Eye className="h-4 w-4" />
+                <span className="hidden sm:inline">Show anonymous</span>
+              </>
+            ) : (
+              <>
+                <EyeOff className="h-4 w-4" />
+                <span className="hidden sm:inline">Hide anonymous</span>
+              </>
+            )}
+          </button>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="px-3 py-2 text-sm rounded-md border border-gray-200 flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">Filters</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div className="space-y-4">
+                <h4 className="font-medium">Filter options</h4>
+                <Separator />
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="show-anonymous" className="flex items-center gap-2">
+                    <span>Show anonymous responses</span>
+                  </Label>
+                  <Switch
+                    id="show-anonymous"
+                    checked={showAnonymous}
+                    onCheckedChange={setShowAnonymous}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="show-empty" className="flex items-center gap-2">
+                    <span>Show questions with no responses</span>
+                  </Label>
+                  <Switch id="show-empty" />
+                </div>
+                
+                <Separator />
+                
+                <div className="pt-2 flex justify-end gap-2">
+                  <button className="text-sm text-gray-500">Reset filters</button>
+                  <button className="text-sm font-medium text-primary">Apply</button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
-      <div className="text-sm text-gray-500">
-        Showing {totalResponses} responses 
-        from {currentParticipantCount || 0} participants
+      
+      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+        {totalQuestions > 0 && (
+          <Badge variant="outline">
+            {totalQuestions} question{totalQuestions !== 1 ? 's' : ''}
+          </Badge>
+        )}
+        
+        <Badge variant="outline">
+          {totalResponses} response{totalResponses !== 1 ? 's' : ''}
+        </Badge>
+        
+        <Badge variant="outline">
+          {uniqueParticipants} of {currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} responded
+        </Badge>
+        
+        {searchTerm && (
+          <Badge className="ml-auto bg-primary/10 text-primary border-primary/20">
+            Search: "{searchTerm}"
+            <button 
+              className="ml-1 text-primary" 
+              onClick={() => setSearchTerm('')}
+            >
+              ×
+            </button>
+          </Badge>
+        )}
       </div>
     </div>
   );

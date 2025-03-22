@@ -1,7 +1,6 @@
 
 import { useRef, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import { SessionContextProps } from "@/types/session";
 
 interface UseSessionProviderInitializationProps {
   onInitialized: () => void;
@@ -25,6 +24,7 @@ export const useSessionProviderInitialization = ({
 
   useEffect(() => {
     if (initializationAttempted.current) return;
+    initializationAttempted.current = true;
     
     console.log("Setting up initialization safety timeout, isAdmin:", isAdmin || forceAdmin);
     
@@ -32,10 +32,14 @@ export const useSessionProviderInitialization = ({
     const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 3000;
     
     initializeTimeoutRef.current = setTimeout(() => {
-      if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Forcing provider initialization after timeout, isAdmin:", isAdmin || forceAdmin);
-        forcedInitialization.current = true;
-        onInitialized();
+      if (!sessionMountedRef.current || forcedInitialization.current) return;
+      
+      console.log("Forcing provider initialization after timeout, isAdmin:", isAdmin || forceAdmin);
+      forcedInitialization.current = true;
+      onInitialized();
+      
+      // Only show toast if not admin
+      if (!(isAdmin || forceAdmin)) {
         toast({
           title: "Session initialization taking longer than expected",
           description: "We're still trying to connect to the session."
@@ -46,26 +50,30 @@ export const useSessionProviderInitialization = ({
     // Shorter critical timeout for participants
     const criticalTimeout = (isAdmin || forceAdmin) ? 4000 : 6000;
     
-    setTimeout(() => {
-      if (sessionMountedRef.current && !forcedInitialization.current) {
-        console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
-        forcedInitialization.current = true;
-        onInitialized();
-        onLoading(false); // Force loading state to false
+    const criticalTimeoutId = setTimeout(() => {
+      if (!sessionMountedRef.current || forcedInitialization.current) return;
+      
+      console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
+      forcedInitialization.current = true;
+      onInitialized();
+      onLoading(false); // Force loading state to false
+      
+      // Only show toast if not admin
+      if (!(isAdmin || forceAdmin)) {
         toast({
           title: "Session initialization taking longer than expected",
           description: "Please wait a moment while we complete setup.",
-          variant: (isAdmin || forceAdmin) ? "default" : "destructive"
+          variant: "destructive"
         });
       }
     }, criticalTimeout);
     
-    initializationAttempted.current = true;
-    
     return () => {
       if (initializeTimeoutRef.current) {
         clearTimeout(initializeTimeoutRef.current);
+        initializeTimeoutRef.current = null;
       }
+      clearTimeout(criticalTimeoutId);
     };
   }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin, forceAdmin]);
 

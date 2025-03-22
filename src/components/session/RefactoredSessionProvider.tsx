@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 import { SessionProviderCore } from "./SessionProviderCore";
 
@@ -16,10 +16,12 @@ export const RefactoredSessionProvider = ({
   onError,
   forceAdmin 
 }: RefactoredSessionProviderProps) => {
-  // Set admin in session storage if forced - use direct DOM method to avoid state changes
-  if (forceAdmin) {
-    sessionStorage.setItem('isAdminSession', 'true');
-  }
+  // Move sessionStorage access to an effect to prevent render-time DOM manipulation
+  useEffect(() => {
+    if (forceAdmin) {
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [forceAdmin]);
   
   return (
     <SessionProviderCore

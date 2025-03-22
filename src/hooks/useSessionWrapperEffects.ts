@@ -36,7 +36,9 @@ export function useSessionWrapperEffects({
   
   // Set admin status only once per component lifecycle
   useEffect(() => {
-    if (isOnAdminPath && sessionMountedRef.current && !stateRef.current.hasHandledAdmin) {
+    if (!sessionMountedRef.current) return;
+    
+    if (isOnAdminPath && !stateRef.current.hasHandledAdmin) {
       stateRef.current.hasHandledAdmin = true;
       
       // Only set if not already set
@@ -56,8 +58,10 @@ export function useSessionWrapperEffects({
 
   // Initialize session when data is available or for admin sessions - with protection against re-renders
   useEffect(() => {
-    if (!sessionMountedRef.current || forcedInitialization.current || 
-        providerInitialized.current || stateRef.current.hasInitialized) {
+    if (!sessionMountedRef.current || 
+        forcedInitialization.current || 
+        providerInitialized.current || 
+        stateRef.current.hasInitialized) {
       return;
     }
     
@@ -72,7 +76,9 @@ export function useSessionWrapperEffects({
       
       // Force loading to false with minimum delay for admin
       stateRef.current.initTimeoutID = setTimeout(() => {
-        if (sessionMountedRef.current && !stateRef.current.hasUpdatedLoading) {
+        if (!sessionMountedRef.current) return;
+        
+        if (!stateRef.current.hasUpdatedLoading) {
           stateRef.current.hasUpdatedLoading = true;
           onLoading(false);
         }
@@ -107,14 +113,15 @@ export function useSessionWrapperEffects({
 
   // Loading state management - single update only
   useEffect(() => {
+    if (!sessionMountedRef.current) return;
+    
     const isAdmin = effectiveAdmin || isOnAdminPath;
     
-    if (sessionMountedRef.current && isAdmin && props.isLoading && !stateRef.current.hasUpdatedLoading) {
+    if (isAdmin && props.isLoading && !stateRef.current.hasUpdatedLoading) {
       // For admin sessions, force loading to false only if currently loading
       stateRef.current.hasUpdatedLoading = true;
       onLoading(false);
-    } else if (sessionMountedRef.current && 
-              (props.isSessionStartedInDB || props.conversation) && 
+    } else if ((props.isSessionStartedInDB || props.conversation) && 
               props.isLoading && !stateRef.current.hasUpdatedLoading) {
       // For participants, clear loading when data is available
       stateRef.current.hasUpdatedLoading = true;
@@ -125,15 +132,15 @@ export function useSessionWrapperEffects({
 
   // Handle errors from provider - suppress for admin
   useEffect(() => {
-    if (props.error && sessionMountedRef.current && !stateRef.current.hasHandledError) {
-      stateRef.current.hasHandledError = true;
-      
-      // For admin sessions, suppress ALL errors
-      if (effectiveAdmin || isOnAdminPath) {
-        console.log("🔑 Suppressing all errors for admin user: ", props.error);
-      } else {
-        onError(props.error);
-      }
+    if (!sessionMountedRef.current || !props.error || stateRef.current.hasHandledError) return;
+    
+    stateRef.current.hasHandledError = true;
+    
+    // For admin sessions, suppress ALL errors
+    if (effectiveAdmin || isOnAdminPath) {
+      console.log("🔑 Suppressing all errors for admin user: ", props.error);
+    } else {
+      onError(props.error);
     }
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);
 }

@@ -4,10 +4,8 @@ import { RefactoredSessionProvider } from "./RefactoredSessionProvider";
 import { SessionContextProps } from "@/types/session";
 import SessionStateRenderer from "./SessionStateRenderer";
 import { useSessionProviderInitialization } from "@/hooks/useSessionProviderInitialization";
-import { useSessionProviderAdmin } from "@/hooks/useSessionProviderAdmin";
 import { useSessionWrapperInitialization } from "@/hooks/useSessionWrapperInitialization";
 import { useSessionWrapperEffects } from "@/hooks/useSessionWrapperEffects";
-import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 
 interface SessionProviderWrapperProps {
   onInitialized?: () => void;
@@ -45,30 +43,23 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     effectiveAdmin: false
   });
   
-  // Get admin status from our hook
-  const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
-  
   // Check URL path to distinguish between admin and participant routes
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
   
   // Determine the admin status once and store in ref to prevent loops
   if (!stateRef.current.adminStatusDetermined) {
-    stateRef.current.effectiveAdmin = isAdmin || forceAdmin || contextIsAdmin || isOnAdminPath;
+    stateRef.current.effectiveAdmin = isAdmin || forceAdmin || isOnAdminPath;
     stateRef.current.adminStatusDetermined = true;
     
     // Log it once
     console.log("SessionProviderWrapper admin status determined:", {
       isAdmin, 
       forceAdmin, 
-      contextIsAdmin, 
       isOnAdminPath,
       effectiveAdmin: stateRef.current.effectiveAdmin
     });
   }
-  
-  // Use admin status management hook - with safeguards to prevent loops
-  useSessionProviderAdmin({ forceAdmin: stateRef.current.effectiveAdmin });
 
   // Use initialization hook
   const { forcedInitialization } = useSessionProviderInitialization({
@@ -90,6 +81,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   
   // CRITICAL FIX: Implement automatic retry for participants to ensure they can connect
   useEffect(() => {
+    if (!sessionMountedRef.current) return;
+    
     // Only run setup once using the ref to prevent re-renders
     if (stateRef.current.hasSetup) return;
     stateRef.current.hasSetup = true;
@@ -98,6 +91,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     if (isParticipantPath && !stateRef.current.hasToggledRetry && 
         !stateRef.current.effectiveAdmin && connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {
+        if (!sessionMountedRef.current) return;
+        
         console.log("Auto-retrying connection for participant");
         retryConnection();
         stateRef.current.hasToggledRetry = true;
@@ -105,7 +100,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       
       return () => clearTimeout(retryTimeout);
     }
-  }, [isParticipantPath, connectionAttempts, retryConnection]);
+  }, [isParticipantPath, connectionAttempts, retryConnection, sessionMountedRef]);
 
   return (
     <RefactoredSessionProvider 

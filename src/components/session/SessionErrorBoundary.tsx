@@ -1,9 +1,8 @@
 
 import React, { useEffect } from "react";
-import { AlertTriangle, RefreshCw, WifiOff } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useNavigate } from "react-router-dom";
 
 export interface SessionErrorBoundaryProps {
@@ -16,6 +15,7 @@ export interface SessionErrorBoundaryProps {
   isLoading?: boolean;
   hasInitializedProvider?: boolean;
   isAdmin?: boolean;
+  sessionMountedRef?: React.RefObject<boolean>;
 }
 
 const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
@@ -27,10 +27,10 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   lastAttemptTime = 0,
   isLoading = false,
   hasInitializedProvider = false,
-  isAdmin: propIsAdmin = false
+  isAdmin: propIsAdmin = false,
+  sessionMountedRef
 }) => {
   const { toast } = useToast();
-  const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
   const navigate = useNavigate();
   
   // Debug logging
@@ -43,14 +43,13 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
       isLoading,
       hasInitializedProvider,
       propIsAdmin,
-      contextIsAdmin,
       storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
       isOnAdminPath: window.location.pathname.includes('/admin'),
       hasAdminQueryParam: window.location.search.includes('admin=true'),
       currentPath: window.location.pathname
     });
   }, [error, noSessionFound, connectionAttempts, lastAttemptTime, isLoading, 
-      hasInitializedProvider, propIsAdmin, contextIsAdmin]);
+      hasInitializedProvider, propIsAdmin]);
   
   // Check if we're on the dedicated admin route
   const isOnAdminPath = window.location.pathname.includes('/admin');
@@ -62,7 +61,6 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   
   // Combined admin detection from all possible sources
   const effectiveIsAdmin = propIsAdmin || 
-                         contextIsAdmin || 
                          storedIsAdmin || 
                          isOnAdminPath || 
                          hasAdminQueryParam;
@@ -76,7 +74,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   // CRITICAL FIX: For participant paths, don't use admin status from session storage
   // This ensures participants see proper errors and don't get admin privileges
   const shouldBypassErrors = isParticipantPath ? 
-    (propIsAdmin || contextIsAdmin || hasAdminQueryParam) : effectiveIsAdmin;
+    (propIsAdmin || hasAdminQueryParam) : effectiveIsAdmin;
   
   // For admin users, bypass ALL errors completely
   if (shouldBypassErrors) {
@@ -117,10 +115,14 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
               onClick={() => {
                 console.log("Retry connection clicked, reconnecting...");
                 retryConnection();
-                toast({
-                  title: "Reconnecting...",
-                  description: "Attempting to reconnect to the session.",
-                });
+                
+                // Check if component is still mounted before showing toast
+                if (sessionMountedRef?.current) {
+                  toast({
+                    title: "Reconnecting...",
+                    description: "Attempting to reconnect to the session.",
+                  });
+                }
               }}
               className="w-full bg-amber-400 hover:bg-amber-500 text-black"
               disabled={connectionAttempts > 5 && Date.now() - lastAttemptTime < 10000}

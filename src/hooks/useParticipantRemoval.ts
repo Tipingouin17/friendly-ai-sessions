@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ParticipantInfo } from "@/types/chat";
@@ -19,7 +19,7 @@ export const useParticipantRemoval = ({
   const { toast } = useToast();
   
   // Update display count when props change
-  useState(() => {
+  useEffect(() => {
     setDisplayCount(currentParticipantCount);
   }, [currentParticipantCount]);
   

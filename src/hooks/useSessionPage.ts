@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSessionCrossOrigin } from "./useSessionCrossOrigin";
 import { useSessionAdminStatus } from "./useSessionAdminStatus";
 import { useSessionErrorHandling } from "./useSessionErrorHandling";
@@ -15,6 +15,21 @@ export function useSessionPage() {
   const { isAdmin } = useSessionAdminStatus();
   const { error, handleError } = useSessionErrorHandling();
   const { isCrossOrigin } = useSessionCrossOrigin();
+  
+  // Preventing infinite state updates
+  const initialRenderRef = useRef(true);
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  const effectiveIsAdmin = isAdmin || isOnAdminPath;
+  
+  // Only on first render, immediately set admin status in session storage to prevent re-renders
+  useEffect(() => {
+    if (initialRenderRef.current && isOnAdminPath) {
+      initialRenderRef.current = false;
+      console.log("Session page: Setting admin status immediately on admin path");
+      sessionStorage.setItem('isAdminSession', 'true');
+    }
+  }, [isOnAdminPath]);
+  
   const { 
     sessionStarted, 
     setSessionStarted,
@@ -40,24 +55,24 @@ export function useSessionPage() {
 
   const location = useLocation();
 
-  // Debug logging
+  // Debug logging - only log significant state changes
   useEffect(() => {
     console.log("Session page rendered with:", {
       locationSearch: location.search,
       locationState: location.state,
       currentConversationId,
-      isAdmin,
+      isAdmin: effectiveIsAdmin,
       error,
       connectionAttempts,
       isLoading,
       isCrossOrigin,
       hasInitializedProvider
     });
-  }, [location, isAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
+  }, [location, effectiveIsAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
 
   return {
     currentConversationId,
-    isAdmin,
+    isAdmin: effectiveIsAdmin, // Use the computed value to prevent re-renders
     sessionStarted,
     setSessionStarted,
     isLoading,

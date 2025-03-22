@@ -28,6 +28,7 @@ const Session = () => {
   const { toast } = useToast();
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownToastRef = useRef(false);
   
   // Check for admin status from URL path - most reliable method
   const isOnAdminPath = window.location.pathname.includes('/admin');
@@ -43,13 +44,16 @@ const Session = () => {
       path: window.location.pathname
     });
     
+    sessionMountedRef.current = true;
+    
     // Different timeouts based on user role - shorter for both
     const initialTimeout = isOnAdminPath ? 3000 : 5000;
     
     // Set a timeout to check if initialization takes too long
     initializeTimeoutRef.current = setTimeout(() => {
-      if (isLoading && !hasInitializedProvider && sessionMountedRef.current) {
+      if (isLoading && !hasInitializedProvider && sessionMountedRef.current && !hasShownToastRef.current) {
         console.log("Session initialization taking longer than expected");
+        hasShownToastRef.current = true;
         
         // Skip toast for admin
         if (!isOnAdminPath && !isAdmin) {
@@ -69,7 +73,8 @@ const Session = () => {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
-        if (!isOnAdminPath && !isAdmin) {
+        if (!isOnAdminPath && !isAdmin && !hasShownToastRef.current) {
+          hasShownToastRef.current = true;
           toast({
             title: "Connection issue",
             description: "Having trouble loading the session. We'll keep trying to connect.",

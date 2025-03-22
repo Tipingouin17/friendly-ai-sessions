@@ -25,13 +25,13 @@ export function useSessionWrapperEffects({
   onError,
   sessionMountedRef
 }: UseSessionWrapperEffectsProps) {
-  // Always set admin status only for admin paths
+  // Set admin status only once per component lifecycle
   useEffect(() => {
-    if (isOnAdminPath) {
+    if (isOnAdminPath && sessionMountedRef.current) {
       sessionStorage.setItem('isAdminSession', 'true');
-      console.log("useSessionWrapperEffects: Setting admin status for admin path");
+      console.log("useSessionWrapperEffects: Setting admin status for admin path (once)");
     }
-  }, [isOnAdminPath]);
+  }, [isOnAdminPath, sessionMountedRef]);
 
   // Initialize session when data is available or for admin sessions
   useEffect(() => {
@@ -48,7 +48,9 @@ export function useSessionWrapperEffects({
         
         // Force loading to false with minimum delay for admin
         timeoutId = setTimeout(() => {
-          onLoading(false);
+          if (sessionMountedRef.current) {
+            onLoading(false);
+          }
         }, 100);
         
         return () => {
@@ -86,13 +88,13 @@ export function useSessionWrapperEffects({
      props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, 
      isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
 
-  // More aggressive loading state management for admin
+  // More aggressive loading state management for admin - guard against multiple state updates
   useEffect(() => {
     if (sessionMountedRef.current) {
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
-      if (isAdmin) {
-        // For admin sessions, always force loading to false
+      if (isAdmin && props.isLoading) {
+        // For admin sessions, force loading to false only if currently loading
         onLoading(false);
       } else if (props.isSessionStartedInDB || props.conversation) {
         // For participants, clear loading when data is available

@@ -29,12 +29,16 @@ const Session = () => {
   const pageLoadTime = useRef(Date.now());
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownToastRef = useRef(false);
+  const hasSetupTimeoutRef = useRef(false);
   
   // Check for admin status from URL path using a ref to avoid re-renders
   const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
   
   // Log initialization on mount and set up safety timeouts
   useEffect(() => {
+    if (hasSetupTimeoutRef.current) return;
+    hasSetupTimeoutRef.current = true;
+    
     console.log("Session page mounted", {
       time: new Date().toISOString(),
       isAdmin,
@@ -51,16 +55,22 @@ const Session = () => {
     
     // Set a timeout to check if initialization takes too long
     initializeTimeoutRef.current = setTimeout(() => {
-      if (isLoading && !hasInitializedProvider && sessionMountedRef.current && !hasShownToastRef.current) {
-        console.log("Session initialization taking longer than expected");
-        hasShownToastRef.current = true;
+      if (sessionMountedRef.current && !hasShownToastRef.current) {
+        console.log("Session initialization status:", {
+          isLoading,
+          hasInitializedProvider
+        });
         
-        // Skip toast for admin
-        if (!isOnAdminPathRef.current && !isAdmin) {
-          toast({
-            title: "Loading your session",
-            description: "Please wait while we connect you to the session.",
-          });
+        if (isLoading && !hasInitializedProvider) {
+          hasShownToastRef.current = true;
+          
+          // Skip toast for admin
+          if (!isOnAdminPathRef.current && !isAdmin) {
+            toast({
+              title: "Loading your session",
+              description: "Please wait while we connect you to the session.",
+            });
+          }
         }
       }
     }, initialTimeout);
@@ -69,7 +79,7 @@ const Session = () => {
     const criticalTimeout = isOnAdminPathRef.current ? 5000 : 8000;
     
     setTimeout(() => {
-      if (isLoading && !hasInitializedProvider && sessionMountedRef.current) {
+      if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
@@ -101,7 +111,7 @@ const Session = () => {
   }, [isAdmin, error, noSessionFound, isLoading, hasInitializedProvider, toast, 
      setIsLoading, setHasInitializedProvider, sessionMountedRef, retryConnection]);
 
-  // Render the session page
+  // Render the session page - this part doesn't change directly during re-renders
   return (
     <SessionErrorBoundary
       error={error}
@@ -123,6 +133,7 @@ const Session = () => {
             initializeTimeoutRef.current = null;
           }
           
+          // Use callback pattern to prevent repeated state updates
           setHasInitializedProvider(true);
           
           // For admin, ensure we're not stuck in loading

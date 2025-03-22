@@ -35,8 +35,12 @@ export function useSessionWrapperEffects({
   useEffect(() => {
     if (isOnAdminPath && sessionMountedRef.current && !hasHandledAdminRef.current) {
       hasHandledAdminRef.current = true;
-      sessionStorage.setItem('isAdminSession', 'true');
-      console.log("useSessionWrapperEffects: Setting admin status for admin path (once)");
+      
+      // Only set if not already set
+      if (sessionStorage.getItem('isAdminSession') !== 'true') {
+        sessionStorage.setItem('isAdminSession', 'true');
+        console.log("useSessionWrapperEffects: Setting admin status for admin path (once)");
+      }
     }
   }, [isOnAdminPath, sessionMountedRef]);
 

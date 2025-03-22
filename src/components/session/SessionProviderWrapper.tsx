@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { RefactoredSessionProvider } from "./RefactoredSessionProvider";
 import { SessionContextProps } from "@/types/session";
 import SessionStateRenderer from "./SessionStateRenderer";
@@ -37,6 +37,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
 }) => {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [hasToggledRetry, setHasToggledRetry] = useState(false);
+  const hasSetupRef = useRef(false);
   
   // Check URL path to distinguish between admin and participant routes
   const isOnAdminPath = window.location.pathname.includes('/admin');
@@ -71,6 +72,10 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   
   // CRITICAL FIX: Implement automatic retry for participants to ensure they can connect
   useEffect(() => {
+    // Only run setup once
+    if (hasSetupRef.current) return;
+    hasSetupRef.current = true;
+    
     // Auto-retry for participants only, not for admin routes
     if (isParticipantPath && !hasToggledRetry && !effectiveAdmin && connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {

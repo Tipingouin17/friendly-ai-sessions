@@ -17,15 +17,18 @@ export function useSessionAdminStatus() {
   
   // Store if we already set admin status to prevent repeated updates
   const hasSetAdminStatus = useRef(false);
+  
+  // Track initial state to avoid unnecessary updates
+  const initialAdminState = useRef(isAdmin);
 
   // Update admin status and persist it to sessionStorage, with guards against infinite updates
   const setAdminStatus = (status: boolean) => {
-    // Only update state if actually changing
+    // Only update state if actually changing and not during initial render
     if (status !== isAdmin) {
       setIsAdmin(status);
     }
     
-    // Only update storage if needed
+    // Only update storage if needed - this prevents unnecessary re-renders from storage events
     if (status && sessionStorage.getItem('isAdminSession') !== 'true') {
       sessionStorage.setItem('isAdminSession', 'true');
     } else if (!status && sessionStorage.getItem('isAdminSession') === 'true') {
@@ -37,10 +40,16 @@ export function useSessionAdminStatus() {
   useEffect(() => {
     if (isOnAdminPath && !hasSetAdminStatus.current) {
       hasSetAdminStatus.current = true;
+      
+      // Only update if we need to change the state
       if (!isAdmin) {
         setIsAdmin(true);
       }
-      sessionStorage.setItem('isAdminSession', 'true');
+      
+      // Ensure consistent storage state
+      if (sessionStorage.getItem('isAdminSession') !== 'true') {
+        sessionStorage.setItem('isAdminSession', 'true');
+      }
     }
   }, [isOnAdminPath, isAdmin]);
 

@@ -18,7 +18,7 @@ export function useSessionPage() {
   
   // Preventing infinite state updates
   const initialRenderRef = useRef(true);
-  const hasSetAdminStatusRef = useRef(false);
+  const hasSetupInitialStateRef = useRef(false);
   
   // Use a ref for admin path detection to avoid re-renders
   const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
@@ -27,16 +27,6 @@ export function useSessionPage() {
   const [effectiveIsAdmin] = useState(() => 
     isAdmin || isOnAdminPathRef.current || sessionStorage.getItem('isAdminSession') === 'true'
   );
-  
-  // Only once, on first render, set admin status in session storage
-  useEffect(() => {
-    if (initialRenderRef.current && isOnAdminPathRef.current && !hasSetAdminStatusRef.current) {
-      hasSetAdminStatusRef.current = true;
-      initialRenderRef.current = false;
-      console.log("Session page: Setting admin status immediately on admin path");
-      sessionStorage.setItem('isAdminSession', 'true');
-    }
-  }, []); // No dependencies to ensure it only runs once
   
   const { 
     sessionStarted, 
@@ -65,17 +55,21 @@ export function useSessionPage() {
 
   // Debug logging - only log significant state changes
   useEffect(() => {
-    console.log("Session page rendered with:", {
-      locationSearch: location.search,
-      locationState: location.state,
-      currentConversationId,
-      isAdmin: effectiveIsAdmin,
-      error,
-      connectionAttempts,
-      isLoading,
-      isCrossOrigin,
-      hasInitializedProvider
-    });
+    if (!hasSetupInitialStateRef.current) {
+      hasSetupInitialStateRef.current = true;
+      
+      console.log("Session page rendered with:", {
+        locationSearch: location.search,
+        locationState: location.state,
+        currentConversationId,
+        isAdmin: effectiveIsAdmin,
+        error,
+        connectionAttempts,
+        isLoading,
+        isCrossOrigin,
+        hasInitializedProvider
+      });
+    }
   }, [location, effectiveIsAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
 
   return {

@@ -42,7 +42,8 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
       hasConversation: !!props.conversation,
       hasConversationId: !!props.currentConversationId,
       isSessionStarted: props.isSessionStartedInDB,
-      sessionStarted
+      sessionStarted,
+      pathname: window.location.pathname
     });
   }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
   
@@ -53,10 +54,38 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     }
   }, [effectiveAdmin, props.isAdmin]);
 
-  // Special handling for admin users with session full errors
+  // Separate handling for admin route specific rendering
+  const isOnAdminRoute = window.location.pathname.includes('/admin');
+  
+  // If on dedicated admin route, bypass most checks and show session directly
+  if (isOnAdminRoute || (effectiveAdmin && props.isAdmin)) {
+    console.log("🔑 On admin route or confirmed admin - bypassing error screens");
+    
+    if (!props.conversation && props.refetch) {
+      console.log("Admin view: No conversation data found, attempting to force refresh data");
+      props.refetch();
+    }
+    
+    return (
+      <SessionStateHandler
+        props={{
+          ...props,
+          isAdmin: true, // Force admin status
+          error: null // Clear the error for admin
+        }}
+        isAdmin={true}
+        sessionStarted={sessionStarted}
+        setSessionStarted={setSessionStarted}
+        onSessionFull={handleSessionFull}
+      />
+    );
+  }
+
+  // Special handling for session full errors
   const isSessionFullError = error?.includes("full") || error?.includes("maximum capacity") || 
                            props.error?.includes("full") || props.error?.includes("maximum capacity");
   
+  // Admin users bypass session full errors even if not on admin route
   if (effectiveAdmin && isSessionFullError) {
     console.log("🔑 Admin detected with session full error - bypassing error screen");
     
@@ -82,7 +111,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }
   
   // If loading and no conversation, show loading state
-  if (isLoading && !props.conversation && !(effectiveAdmin && props.isAdmin)) {
+  if (isLoading && !props.conversation) {
     console.log("Showing provider loading state");
     return <JoinSessionLoadingState 
       onRetry={retryConnection}

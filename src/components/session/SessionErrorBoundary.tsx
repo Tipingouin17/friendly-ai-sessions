@@ -44,14 +44,17 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
       contextIsAdmin,
       storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
       isOnAdminPath: window.location.pathname.includes('/admin'),
-      hasAdminQueryParam: window.location.search.includes('admin=true')
+      hasAdminQueryParam: window.location.search.includes('admin=true'),
+      currentPath: window.location.pathname
     });
   }, [error, noSessionFound, connectionAttempts, lastAttemptTime, isLoading, 
       hasInitializedProvider, propIsAdmin, contextIsAdmin]);
   
+  // Check if we're on the dedicated admin route
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  
   // Enhanced admin detection - check all possible sources
   const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
-  const isOnAdminPath = window.location.pathname.includes('/admin');
   const hasAdminQueryParam = window.location.search.includes('admin=true');
   
   // Combined admin detection from all possible sources
@@ -61,14 +64,12 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
                          isOnAdminPath || 
                          hasAdminQueryParam;
   
-  // Enforce admin status if needed
-  useEffect(() => {
-    if (effectiveIsAdmin) {
-      console.log("🔑 Admin detected in SessionErrorBoundary - ensuring admin status is set");
-      sessionStorage.setItem('isAdminSession', 'true');
-    }
-  }, [effectiveIsAdmin]);
-
+  // If on dedicated admin route, always bypass errors
+  if (isOnAdminPath) {
+    console.log("🔑 On dedicated admin route - always bypassing error boundary");
+    return <>{children}</>;
+  }
+  
   // For admin users, bypass ALL errors completely
   if (effectiveIsAdmin) {
     console.log("🔑 Admin user detected in error boundary - bypassing all errors");
@@ -79,7 +80,8 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 
   if (error || noSessionFound) {
     const isSessionNotFoundError = noSessionFound || error?.includes("not found") || error?.includes("no longer available");
-    const isSessionFullError = error?.includes("session is full") || error?.includes("maximum capacity");
+    const isSessionFullError = error?.includes("session is full") || error?.includes("maximum capacity") || 
+                              error?.includes("full") || error?.includes("cannot accept more");
     
     const errorTitle = isSessionFullError ? "Session Full" : 
                       isSessionNotFoundError ? "Session Not Found" : 

@@ -7,16 +7,17 @@ export function useSessionAdminStatus() {
   const [isAdmin, setIsAdmin] = useState(false);
   const isInitialized = useRef(false);
   
-  // Determine if user is admin - improved with more reliable detection and persistence
+  // Determine if user is admin - improved with more reliable detection and storage separation
   useEffect(() => {
-    // Strictly respect the current path first, before checking other indicators
+    // Check if on admin route - this is the most reliable indicator
     const isAdminPath = location.pathname.includes('/admin');
+    const adminStorageKey = 'isAdminSession';
     
     // If we're explicitly on the admin path, always set admin to true immediately
     if (isAdminPath && !isAdmin) {
       console.log("Setting admin=true based on admin path");
       setIsAdmin(true);
-      sessionStorage.setItem('isAdminSession', 'true');
+      sessionStorage.setItem(adminStorageKey, 'true');
       return;
     }
     
@@ -34,7 +35,17 @@ export function useSessionAdminStatus() {
     const isAdminParam = searchParams.get('admin') === 'true';
     
     // Check if we've stored admin status in sessionStorage
-    const storedAdminStatus = sessionStorage.getItem('isAdminSession');
+    const storedAdminStatus = sessionStorage.getItem(adminStorageKey);
+    
+    // Ensure we're not leaking admin status from previous sessions
+    const currentPath = location.pathname;
+    if (!currentPath.includes('/admin') && !currentPath.includes('/session')) {
+      // If not on admin or session path, clear any stored admin status
+      if (storedAdminStatus === 'true') {
+        console.log("Clearing admin status when not on session or admin path");
+        sessionStorage.removeItem(adminStorageKey);
+      }
+    }
     
     // More robust admin detection with clear precedence:
     // 1. Check if we're on the /admin path (already handled above)
@@ -80,7 +91,7 @@ export function useSessionAdminStatus() {
     
     // Store in sessionStorage if admin
     if (adminStatus) {
-      sessionStorage.setItem('isAdminSession', 'true');
+      sessionStorage.setItem(adminStorageKey, 'true');
     }
     
     setIsAdmin(adminStatus);

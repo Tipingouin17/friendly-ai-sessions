@@ -14,15 +14,21 @@ export function useJoinSessionData(conversationId: number | null) {
   const { toast } = useToast();
   const { isAdmin } = useSessionAdminStatus();
   
+  // Check if on admin route for stronger admin override
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  const effectiveIsAdmin = isAdmin || isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true';
+  
   // Debug logging
   useEffect(() => {
     console.log("useJoinSessionData initialized", {
       conversationId,
       isAdmin,
+      effectiveIsAdmin,
+      isOnAdminPath,
       storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
-      isOnAdminPath: window.location.pathname.includes('/admin')
+      currentPath: window.location.pathname
     });
-  }, [conversationId, isAdmin]);
+  }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath]);
   
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
@@ -48,14 +54,15 @@ export function useJoinSessionData(conversationId: number | null) {
 
   // Check if this is an admin joining
   useEffect(() => {
-    if (isAdmin && conversationId) {
+    if (effectiveIsAdmin && conversationId) {
       console.log("Admin detected in useJoinSessionData - should bypass session full checks");
     }
-  }, [isAdmin, conversationId]);
+  }, [effectiveIsAdmin, conversationId]);
 
   const handleJoinSession = async () => {
-    // Enhanced admin detection
+    // Enhanced admin detection - check all sources
     const effectiveIsAdmin = isAdmin || 
+                           isOnAdminPath ||
                            sessionStorage.getItem('isAdminSession') === 'true' ||
                            window.location.pathname.includes('/admin');
     
@@ -72,7 +79,8 @@ export function useJoinSessionData(conversationId: number | null) {
       currentParticipantCount,
       effectiveMaxParticipants,
       isFull: effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants,
-      isAdmin: effectiveIsAdmin
+      isAdmin: effectiveIsAdmin,
+      isOnAdminPath
     });
 
     if (!participantName.trim()) {
@@ -84,8 +92,8 @@ export function useJoinSessionData(conversationId: number | null) {
       return Promise.resolve();
     }
 
-    // Skip check if admin - they should always be able to join
-    if (effectiveIsAdmin) {
+    // Skip check if on admin route or admin user - they should always be able to join
+    if (isOnAdminPath || effectiveIsAdmin) {
       console.log("Admin user detected, bypassing session full check");
       // Continue with join process for admin users
       return joinSession({
@@ -128,7 +136,10 @@ export function useJoinSessionData(conversationId: number | null) {
     
   // Only consider session full if effectiveMaxParticipants is greater than 0
   // And we're not an admin
-  const isFull = !isAdmin && effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
+  const isFull = !effectiveIsAdmin && 
+                !isOnAdminPath && 
+                effectiveMaxParticipants > 0 && 
+                currentParticipantCount >= effectiveMaxParticipants;
 
   return {
     participantName,

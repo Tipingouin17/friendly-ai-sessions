@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationWithSession } from "@/types/database";
@@ -15,6 +16,10 @@ export async function checkSessionCapacity(
 ): Promise<SessionCapacityResult> {
   console.log("Checking session capacity with admin status:", isAdmin);
   
+  // Check if on admin route for stronger admin override
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  const effectiveIsAdmin = isAdmin || isOnAdminPath;
+  
   const { data: latestConversation, error: fetchError } = await supabase
     .from('conversations')
     .select('id, current_participants, participants')
@@ -23,14 +28,35 @@ export async function checkSessionCapacity(
     
   if (fetchError) {
     console.error("Error fetching latest conversation data:", fetchError);
+    
+    // For admin route, return success even if error occurs
+    if (isOnAdminPath) {
+      console.log("🔑 On admin route - bypassing fetch error");
+      return {
+        canJoin: true,
+        latestConversation: null,
+        newParticipantId: 1
+      };
+    }
+    
     throw new Error(`Error fetching latest session data: ${fetchError.message}`);
   }
   
   if (!latestConversation) {
+    // For admin route, allow joining even without conversation data
+    if (isOnAdminPath) {
+      console.log("🔑 On admin route - bypassing missing conversation data");
+      return {
+        canJoin: true,
+        latestConversation: null, 
+        newParticipantId: 1
+      };
+    }
+    
     throw new Error("Could not fetch the latest session data");
   }
   
-  if (isAdmin) {
+  if (effectiveIsAdmin) {
     console.log("🔑 Admin user detected - bypassing ALL session full checks");
     return {
       canJoin: true,
@@ -59,7 +85,7 @@ export async function checkSessionCapacity(
       console.log("Session auto-started successfully");
     }
     
-    if (!isAdmin) {
+    if (!effectiveIsAdmin) {
       return {
         canJoin: false,
         latestConversation,
@@ -89,12 +115,17 @@ export function useSessionCapacityCheck() {
     setIsCheckingCapacity(true);
     console.log("Checking capacity with admin status:", isAdmin);
     
+    // Check if on admin route for stronger admin override
+    const isOnAdminPath = window.location.pathname.includes('/admin');
+    const effectiveIsAdmin = isAdmin || isOnAdminPath;
+    
     try {
-      const capacityResult = await checkSessionCapacity(conversationId, isAdmin);
+      const capacityResult = await checkSessionCapacity(conversationId, effectiveIsAdmin);
       
-      const effectiveCanJoin = isAdmin ? true : capacityResult.canJoin;
+      // If on admin route, always allow joining regardless of capacity
+      const finalCanJoin = isOnAdminPath ? true : (effectiveIsAdmin ? true : capacityResult.canJoin);
       
-      if (effectiveCanJoin) {
+      if (finalCanJoin) {
         const { data: updateData, error: updateError } = await supabase
           .from('conversations')
           .update({ current_participants: capacityResult.newParticipantId })
@@ -104,10 +135,22 @@ export function useSessionCapacityCheck() {
           
         if (updateError) {
           console.error("Error updating participant count:", updateError);
+          
+          // For admin route, continue even if update fails
+          if (isOnAdminPath) {
+            console.log("🔑 On admin route - bypassing update error");
+            setIsCheckingCapacity(false);
+            return {
+              canJoin: true,
+              latestConversation: capacityResult.latestConversation,
+              newParticipantId: capacityResult.newParticipantId
+            };
+          }
+          
           throw new Error(`Failed to join: ${updateError.message}`);
         }
 
-        if (!updateData) {
+        if (!updateData && !isOnAdminPath) {
           throw new Error("Failed to update participant count");
         }
 
@@ -138,7 +181,7 @@ export function useSessionCapacityCheck() {
       
       setIsCheckingCapacity(false);
       
-      if (isAdmin && !capacityResult.canJoin) {
+      if (effectiveIsAdmin && !capacityResult.canJoin) {
         console.log("🔑 Admin override: forcing canJoin=true despite session being full");
         return {
           ...capacityResult,
@@ -151,7 +194,7 @@ export function useSessionCapacityCheck() {
     } catch (error) {
       setIsCheckingCapacity(false);
       
-      if (isAdmin) {
+      if (effectiveIsAdmin) {
         console.log("🔑 Admin exception handling: forcing success despite error:", error);
         return {
           canJoin: true,

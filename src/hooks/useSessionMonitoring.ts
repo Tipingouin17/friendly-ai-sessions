@@ -62,26 +62,21 @@ export const useSessionMonitoring = ({
     }
   }, [conversation, isSessionStartedInDB]);
   
-  // Use memoized room state to prevent unnecessary re-renders
-  const roomState = useMemo(() => 
-    useSessionRoomState({
-      conversationId,
-      conversation,
-      currentUserParticipantId,
-      participants,
-      welcomeMessage: conversation?.sessions?.welcome_message || null,
-      isAdmin: forceAdmin || isAdmin
-    }),
-    [
-      conversationId,
-      conversation,
-      currentUserParticipantId,
-      participants,
-      forceAdmin,
-      isAdmin,
-      // Specifically don't include conversation.sessions?.welcome_message to reduce re-renders
-    ]
+  // Extract welcome message outside of roomState to prevent memoization issues
+  const welcomeMessage = useMemo(() => 
+    conversation?.sessions?.welcome_message || null,
+    [conversation?.sessions?.welcome_message]
   );
+  
+  // Create roomState with proper parameters
+  const roomState = useSessionRoomState({
+    conversationId,
+    conversation,
+    currentUserParticipantId,
+    participants,
+    welcomeMessage,
+    isAdmin: forceAdmin || isAdmin
+  });
   
   return {
     isSessionStartedInDB,

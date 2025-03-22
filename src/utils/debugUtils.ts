@@ -11,7 +11,7 @@ export function useRenderCounter(componentName: string) {
   
   // If render count gets too high, warn about potential infinite loop
   if (renderCount.current > 25) {
-    console.warn(`⚠️ ${componentName} has rendered ${renderCount.current} times! Check for infinite render loops.`);
+    console.warn(`⚠️ ${componentName} has rendered ${renderCount.current} times! Check for potential infinite render loops.`);
   }
 }
 
@@ -47,4 +47,84 @@ export function trackChanges(props: Record<string, any>, componentName: string) 
   
   // Update stored props
   prevProps.current = { ...props };
+}
+
+/**
+ * Check if a value is a function
+ * @param value Value to check
+ */
+export function isFunction(value: any): boolean {
+  return typeof value === 'function';
+}
+
+/**
+ * Helper to debug React hook dependencies
+ * @param dependencies Array of dependencies
+ * @param hookName Name of the hook 
+ */
+export function logDependencyChanges(dependencies: any[], hookName: string) {
+  const prevDepsRef = React.useRef<any[]>([]);
+  
+  React.useEffect(() => {
+    if (prevDepsRef.current.length === 0) {
+      prevDepsRef.current = [...dependencies];
+      return;
+    }
+    
+    const changes: {index: number, from: any, to: any}[] = [];
+    
+    dependencies.forEach((dep, index) => {
+      if (dep !== prevDepsRef.current[index]) {
+        changes.push({
+          index,
+          from: prevDepsRef.current[index],
+          to: dep
+        });
+      }
+    });
+    
+    if (changes.length > 0) {
+      console.log(`${hookName} dependencies changed:`, changes);
+    }
+    
+    prevDepsRef.current = [...dependencies];
+  }, dependencies);
+}
+
+/**
+ * Detect memoization issues by logging when expected memoized values change
+ * @param value The value to monitor
+ * @param dependencies The expected dependencies
+ * @param valueName Name of the value for logging
+ */
+export function checkMemoization(value: any, dependencies: any[], valueName: string) {
+  const prevValueRef = React.useRef<any>(null);
+  const renderCountRef = React.useRef(0);
+  
+  if (renderCountRef.current > 0 && prevValueRef.current !== value) {
+    console.warn(`⚠️ Memoization failed for ${valueName}. Value changed when dependencies shouldn't have changed.`);
+    
+    // Try to find which dependency might have changed
+    const prevDepsRef = React.useRef<any[]>([]);
+    
+    if (prevDepsRef.current.length > 0) {
+      const changedDeps = dependencies.map((dep, i) => {
+        if (prevDepsRef.current[i] !== dep) {
+          return { index: i, value: dep };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      if (changedDeps.length > 0) {
+        console.warn('Changes detected in the following dependencies:', changedDeps);
+      } else {
+        console.warn('No dependency changes detected, possible issue with the memoization logic');
+      }
+    }
+    
+    prevDepsRef.current = [...dependencies];
+  }
+  
+  prevValueRef.current = value;
+  renderCountRef.current++;
 }

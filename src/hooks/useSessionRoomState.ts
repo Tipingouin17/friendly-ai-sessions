@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
@@ -23,6 +23,7 @@ export const useSessionRoomState = ({
   welcomeMessage,
   isAdmin
 }: UseSessionRoomStateProps) => {
+  // Log initialization once
   useEffect(() => {
     console.log("useSessionRoomState running...");
   }, []);
@@ -79,7 +80,29 @@ export const useSessionRoomState = ({
     }
   };
   
-  // Set up session interactions
+  // Prepare the session state for interactions hook
+  const sessionState = useMemo(() => ({
+    messages,
+    setMessages,
+    inputMessage,
+    setInputMessage,
+    currentParticipant,
+    recordResponse,
+    totalResponses,
+    hasAnswered,
+    viewMode: isAdmin ? "admin" : "participant"
+  }), [
+    messages, 
+    inputMessage, 
+    currentParticipant, 
+    recordResponse, 
+    totalResponses, 
+    hasAnswered, 
+    isAdmin, 
+    viewMode
+  ]);
+  
+  // Set up session interactions with memoized session state
   const {
     isWaitingForResponse,
     handleSendMessage,
@@ -87,17 +110,7 @@ export const useSessionRoomState = ({
     error: interactionsError
   } = useSessionInteractions({
     currentConversationId: conversationId,
-    sessionState: {
-      messages,
-      setMessages,
-      inputMessage,
-      setInputMessage,
-      currentParticipant,
-      recordResponse,
-      totalResponses,
-      hasAnswered,
-      viewMode: isAdmin ? "admin" : "participant"
-    },
+    sessionState,
     conversation,
     participants,
     isAnonymous: anonymousState.isAnonymous

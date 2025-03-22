@@ -71,7 +71,7 @@ export const SessionProviderCoreError = ({
           refetch();
         }}
       >
-        {children}
+        {() => children(emergencyContext)}
       </SessionProviderErrorFallback>
     );
   }

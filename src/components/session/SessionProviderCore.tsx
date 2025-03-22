@@ -159,7 +159,6 @@ export const SessionProviderCore = ({
         providerError={providerError}
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
-        children={children}
       >
         {(errorFallbackProps) => {
           // If we have serious errors, use the fallback
@@ -181,8 +180,9 @@ export const SessionProviderCore = ({
         providerError={error instanceof Error ? error.message : "Unknown error in SessionProviderCore"}
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
-        children={children}
-      />
+      >
+        {(errorContext) => children(errorContext)}
+      </SessionProviderCoreError>
     );
   }
 };

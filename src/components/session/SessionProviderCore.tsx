@@ -1,15 +1,17 @@
-
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
-import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
 import { useSessionProviderState } from "@/hooks/useSessionProviderState";
 import { useSessionParticipantSetup } from "@/hooks/useSessionParticipantSetup";
 import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
-import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { useSessionRealtimeConnection } from "@/hooks/useSessionRealtimeConnection";
 import { useSessionContextValue } from "@/hooks/useSessionContextValue";
+import { useEnhancedLocationState } from "@/hooks/useEnhancedLocationState";
+import { useEffectiveAdminStatus } from "@/hooks/useEffectiveAdminStatus";
+import { useStuckStateHandler } from "@/hooks/useStuckStateHandler";
+import { useSessionProviderErrorHandler } from "@/hooks/useSessionProviderErrorHandler";
+import { SessionProviderCoreError } from "./SessionProviderCoreError";
 
 interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -25,7 +27,6 @@ export const SessionProviderCore = ({
   forceAdmin 
 }: SessionProviderCoreProps) => {
   const location = useLocation();
-  const { toast } = useToast();
   const { persistedParticipantData } = useParticipantPersistence();
   
   // Debug logging
@@ -41,15 +42,14 @@ export const SessionProviderCore = ({
   }, [location, persistedParticipantData, forceAdmin]);
   
   // Enhance location state with persisted data if available
-  let locationState = getEnhancedLocationState(location.state, persistedParticipantData);
+  const locationState = useEnhancedLocationState(location.state);
   
   // Determine effective admin status from all sources
-  const effectiveAdmin = determineAdminStatus(
+  const effectiveAdmin = useEffectiveAdminStatus({
     forceAdmin, 
     locationState, 
-    persistedParticipantData, 
-    location
-  );
+    persistedParticipantData
+  });
   
   // Force admin status if detected from any source
   useEffect(() => {
@@ -87,19 +87,11 @@ export const SessionProviderCore = ({
   });
 
   // Handle data errors
-  useEffect(() => {
-    if (dataError) {
-      // Skip reporting session full errors for admin users
-      const isSessionFullError = dataError.includes("full") || dataError.includes("maximum capacity");
-      
-      if (isSessionFullError && effectiveAdmin) {
-        console.log("🔑 Suppressing session full error for admin in SessionProviderCore");
-      } else {
-        console.error("Session data error:", dataError);
-        handleError(dataError);
-      }
-    }
-  }, [dataError, handleError, effectiveAdmin]);
+  useSessionProviderErrorHandler({
+    dataError,
+    effectiveAdmin,
+    handleError
+  });
 
   // Set up participant management
   const {
@@ -141,25 +133,6 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Create a safe roomState with defaults to prevent errors
-  const safeRoomState = roomState || {
-    messages: [],
-    inputMessage: "",
-    setInputMessage: () => {},
-    currentParticipant: 0,
-    isRecording: false,
-    setIsRecording: () => {},
-    handleGenerateReport: async () => Promise.resolve(),
-    isGeneratingReport: false,
-    setMessages: () => {},
-    hasAnswered: false,
-    totalResponses: 0,
-    viewMode: "participant",
-    setViewMode: () => {},
-    recordResponse: () => {},
-    error: null
-  };
-
   // Get the session context value using our hook
   try {
     const sessionContextValue = useSessionContextValue({
@@ -170,7 +143,7 @@ export const SessionProviderCore = ({
       showQrCodeView,
       sessionLink,
       isSessionStartedInDB,
-      roomState: safeRoomState,
+      roomState,
       participants,
       currentUserParticipantId,
       isAdmin,
@@ -180,145 +153,36 @@ export const SessionProviderCore = ({
       effectiveAdmin
     });
 
-    // If we have serious errors, return error fallback
-    if (providerError && !effectiveAdmin) {
-      return (
-        <SessionProviderErrorFallback 
-          errorMessage={providerError}
-          isAdmin={effectiveAdmin}
-          onRetry={() => {
-            console.log("Retry requested from error fallback");
-            refetch();
-          }}
-        >
-          {children}
-        </SessionProviderErrorFallback>
-      );
-    }
-
-    // Return children with context
-    return children(sessionContextValue);
+    // Return children with context or error fallback
+    return (
+      <SessionProviderCoreError
+        providerError={providerError}
+        effectiveAdmin={effectiveAdmin}
+        refetch={refetch}
+        children={children}
+      >
+        {(errorFallbackProps) => {
+          // If we have serious errors, use the fallback
+          if (providerError && !effectiveAdmin) {
+            return children(errorFallbackProps);
+          }
+          
+          // Otherwise, use the normal context
+          return children(sessionContextValue);
+        }}
+      </SessionProviderCoreError>
+    );
   } catch (error) {
     console.error("Fatal error in SessionProviderCore:", error);
-    // Create emergency fallback context
-    const emergencyContext: SessionContextProps = {
-      isLoading: false,
-      conversation: null,
-      currentConversationId: null,
-      sessionState: {
-        messages: [],
-        inputMessage: "",
-        setInputMessage: () => {},
-        currentParticipant: 0,
-        isRecording: false,
-        setIsRecording: () => {},
-        hasAnswered: false,
-        totalResponses: 0,
-        viewMode: "participant",
-        setViewMode: () => {},
-        handleGenerateReport: async () => { return Promise.resolve(); },
-        isGeneratingReport: false,
-        setMessages: () => {},
-        recordResponse: () => {},
-        error: null
-      },
-      participants: [],
-      participantColors,
-      isWaitingForResponse: false,
-      handleStartSession: () => {},
-      handleSendMessage: async () => { return Promise.resolve(); },
-      handleLikeMessage: () => {},
-      showQrCodeView: false,
-      sessionLink: '',
-      currentUserParticipantId: null,
-      anonymousState: {
-        isAnonymous: false,
-        toggleAnonymous: () => {}
-      },
-      isSessionStartedInDB: false,
-      error: error instanceof Error ? error.message : "Unknown error in SessionProviderCore",
-      isConnected: false,
-      connectionAttempts: 0,
-      refetch: () => {},
-      isAdmin: effectiveAdmin
-    };
     
-    return children(emergencyContext);
+    // Use the error component to handle the fallback rendering
+    return (
+      <SessionProviderCoreError
+        providerError={error instanceof Error ? error.message : "Unknown error in SessionProviderCore"}
+        effectiveAdmin={effectiveAdmin}
+        refetch={refetch}
+        children={children}
+      />
+    );
   }
 };
-
-// Helper function to enhance location state with persisted data if available
-function getEnhancedLocationState(
-  originalState: any, 
-  persistedParticipantData: any
-) {
-  let locationState = originalState as { 
-    participantId?: number; 
-    isGuest?: boolean; 
-    participantName?: string;
-    showMessaging?: boolean;
-    isAdmin?: boolean;
-  } | null;
-  
-  // If we have persisted data but no participant ID in location state, use the persisted data
-  if (!locationState?.participantId && persistedParticipantData) {
-    locationState = {
-      ...locationState,
-      participantId: persistedParticipantData.participantId,
-      isGuest: true,
-      participantName: persistedParticipantData.name,
-      isAdmin: persistedParticipantData.isAdmin
-    };
-    console.log("Enhanced provider location state with persisted data:", locationState);
-  }
-  
-  return locationState;
-}
-
-// Helper function to determine admin status from all sources
-function determineAdminStatus(
-  forceAdmin: boolean | undefined,
-  locationState: any,
-  persistedParticipantData: any,
-  location: any
-) {
-  return forceAdmin === true || 
-         locationState?.isAdmin === true ||
-         persistedParticipantData?.isAdmin === true ||
-         sessionStorage.getItem('isAdminSession') === 'true' ||
-         location.pathname.includes('/admin');
-}
-
-// Custom hook to handle stuck states
-function useStuckStateHandler({
-  isLoading,
-  currentConversationId,
-  conversation,
-  refetch,
-  forceRefreshParticipants
-}: {
-  isLoading: boolean;
-  currentConversationId: number | null;
-  conversation: any;
-  refetch: () => void;
-  forceRefreshParticipants?: () => void;
-}) {
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (isLoading && currentConversationId && !conversation) {
-        console.log("Session appears stuck in loading state - forcing data refresh");
-        refetch();
-        
-        // Also refresh participants
-        if (forceRefreshParticipants) {
-          forceRefreshParticipants();
-        }
-      }
-    }, 5000);
-    
-    return () => clearTimeout(timeoutId);
-  }, [isLoading, currentConversationId, conversation, refetch, forceRefreshParticipants]);
-}
-
-// Import participantColors to ensure error fallback has access
-import { participantColors } from "@/utils/sessionHelpers";

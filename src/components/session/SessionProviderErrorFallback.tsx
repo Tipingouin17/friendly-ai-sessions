@@ -1,9 +1,10 @@
+
 import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
-  children: (props: SessionContextProps) => React.ReactElement;
+  children: React.ReactNode;
   isAdmin?: boolean;
   onRetry?: () => void;
 }
@@ -92,7 +93,9 @@ export const SessionProviderErrorFallback = ({
   // Return error state with a retry button if onRetry is provided
   return (
     <div className="flex-1 flex flex-col">
-      {children(fallbackSessionContext)}
+      {React.isValidElement(children)
+        ? React.cloneElement(children as React.ReactElement, fallbackSessionContext)
+        : children}
       
       {onRetry && (
         <div className="fixed bottom-4 right-4">

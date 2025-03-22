@@ -154,11 +154,6 @@ export const SessionProviderCore = ({
       effectiveAdmin
     });
 
-    // Create a React element with the session context value
-    const sessionElement = React.isValidElement(children) 
-      ? children 
-      : React.createElement(React.Fragment, {}, children);
-
     // Return children with context or error fallback
     return (
       <SessionProviderCoreError
@@ -166,7 +161,9 @@ export const SessionProviderCore = ({
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
       >
-        {sessionContextValue ? React.cloneElement(sessionElement, sessionContextValue) : sessionElement}
+        {React.isValidElement(children) 
+          ? React.cloneElement(children as React.ReactElement, sessionContextValue) 
+          : children}
       </SessionProviderCoreError>
     );
   } catch (error) {
@@ -179,7 +176,7 @@ export const SessionProviderCore = ({
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
       >
-        {React.isValidElement(children) ? children : React.createElement(React.Fragment, {}, children)}
+        {children}
       </SessionProviderCoreError>
     );
   }

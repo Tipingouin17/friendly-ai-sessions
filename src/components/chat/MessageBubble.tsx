@@ -44,8 +44,8 @@ const MessageBubble = ({
         backgroundColor: sender === "user" ? backgroundColor || "#FFC8C8" : undefined
       }}
     >
-      {/* Participant name for user messages */}
-      {(sender === "user" && participantName && isFirstMessageOfGroup) && (
+      {/* Participant name for user messages - hide on mobile */}
+      {(sender === "user" && participantName && isFirstMessageOfGroup && !isMobile) && (
         <div 
           className={cn(
             nameSize, "font-medium mb-1 flex items-center gap-1",

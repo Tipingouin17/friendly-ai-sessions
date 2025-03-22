@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SessionContextProps } from "@/types/session";
 
 interface UseSessionWrapperEffectsProps {
@@ -25,19 +25,29 @@ export function useSessionWrapperEffects({
   onError,
   sessionMountedRef
 }: UseSessionWrapperEffectsProps) {
+  // Track if we've already handled admin status
+  const hasHandledAdminRef = useRef(false);
+  
+  // Track if we've already initialized provider
+  const hasInitializedRef = useRef(false);
+  
   // Set admin status only once per component lifecycle
   useEffect(() => {
-    if (isOnAdminPath && sessionMountedRef.current) {
+    if (isOnAdminPath && sessionMountedRef.current && !hasHandledAdminRef.current) {
+      hasHandledAdminRef.current = true;
       sessionStorage.setItem('isAdminSession', 'true');
       console.log("useSessionWrapperEffects: Setting admin status for admin path (once)");
     }
   }, [isOnAdminPath, sessionMountedRef]);
 
-  // Initialize session when data is available or for admin sessions
+  // Initialize session when data is available or for admin sessions - with protection against re-renders
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
     
-    if (sessionMountedRef.current && !forcedInitialization.current && !providerInitialized.current) {
+    if (sessionMountedRef.current && !forcedInitialization.current && 
+        !providerInitialized.current && !hasInitializedRef.current) {
+      
+      hasInitializedRef.current = true;
       const isAdmin = effectiveAdmin || isOnAdminPath;
       
       // For admin sessions, initialize IMMEDIATELY
@@ -61,7 +71,9 @@ export function useSessionWrapperEffects({
       }
       
       // Initialize if we have conversation data or it's an admin session
-      const shouldInitialize = isAdmin || (props.conversation && props.currentConversationId) || props.isSessionStartedInDB;
+      const shouldInitialize = isAdmin || 
+                              (props.conversation && props.currentConversationId) || 
+                              props.isSessionStartedInDB;
       
       if (shouldInitialize) {
         console.log("Provider successfully initialized with data");
@@ -88,18 +100,18 @@ export function useSessionWrapperEffects({
      props.isSessionStartedInDB, onInitialized, onLoading, effectiveAdmin, 
      isOnAdminPath, forcedInitialization, providerInitialized, sessionMountedRef]);
 
-  // More aggressive loading state management for admin - guard against multiple state updates
+  // More aggressive loading state management for admin - with guard against multiple state updates
   useEffect(() => {
-    if (sessionMountedRef.current) {
-      const isAdmin = effectiveAdmin || isOnAdminPath;
-      
-      if (isAdmin && props.isLoading) {
-        // For admin sessions, force loading to false only if currently loading
-        onLoading(false);
-      } else if (props.isSessionStartedInDB || props.conversation) {
-        // For participants, clear loading when data is available
-        onLoading(false);
-      }
+    const isAdmin = effectiveAdmin || isOnAdminPath;
+    
+    if (sessionMountedRef.current && isAdmin && props.isLoading) {
+      // For admin sessions, force loading to false only if currently loading
+      onLoading(false);
+    } else if (sessionMountedRef.current && 
+              (props.isSessionStartedInDB || props.conversation) && 
+              props.isLoading) {
+      // For participants, clear loading when data is available
+      onLoading(false);
     }
   }, [props.isLoading, props.isSessionStartedInDB, props.conversation,
      effectiveAdmin, isOnAdminPath, onLoading, sessionMountedRef]);

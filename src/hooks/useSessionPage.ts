@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSessionCrossOrigin } from "./useSessionCrossOrigin";
 import { useSessionAdminStatus } from "./useSessionAdminStatus";
 import { useSessionErrorHandling } from "./useSessionErrorHandling";
@@ -18,17 +18,25 @@ export function useSessionPage() {
   
   // Preventing infinite state updates
   const initialRenderRef = useRef(true);
-  const isOnAdminPath = window.location.pathname.includes('/admin');
-  const effectiveIsAdmin = isAdmin || isOnAdminPath;
+  const hasSetAdminStatusRef = useRef(false);
   
-  // Only on first render, immediately set admin status in session storage to prevent re-renders
+  // Use a ref for admin path detection to avoid re-renders
+  const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
+  
+  // Compute effective admin status once during initialization
+  const [effectiveIsAdmin] = useState(() => 
+    isAdmin || isOnAdminPathRef.current || sessionStorage.getItem('isAdminSession') === 'true'
+  );
+  
+  // Only once, on first render, set admin status in session storage
   useEffect(() => {
-    if (initialRenderRef.current && isOnAdminPath) {
+    if (initialRenderRef.current && isOnAdminPathRef.current && !hasSetAdminStatusRef.current) {
+      hasSetAdminStatusRef.current = true;
       initialRenderRef.current = false;
       console.log("Session page: Setting admin status immediately on admin path");
       sessionStorage.setItem('isAdminSession', 'true');
     }
-  }, [isOnAdminPath]);
+  }, []); // No dependencies to ensure it only runs once
   
   const { 
     sessionStarted, 

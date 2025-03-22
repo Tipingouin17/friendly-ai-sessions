@@ -17,16 +17,22 @@ export function useSessionLoadingState(
   const forceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const criticalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriedForceUnlock = useRef(false);
+  const timeoutSetRef = useRef(false);
   
-  // Check for admin status in the URL path - most reliable method
-  const isOnAdminPath = window.location.pathname.includes('/admin');
+  // Check for admin status in the URL path using a ref - most reliable method
+  const isOnAdminPath = useRef(window.location.pathname.includes('/admin'));
   
-  // For participant paths, don't use session storage to detect admin status
+  // For participant paths, don't use session storage to detect admin status in a way that causes re-renders
   // This prevents admin session conflicts affecting participant experience
-  const isAdminSession = useRef(isOnAdminPath || window.location.search.includes('admin=true'));
+  const isAdminSession = useRef(isOnAdminPath.current || window.location.search.includes('admin=true'));
 
   // Debug loading state
   useEffect(() => {
+    // Don't set up timeouts if they've already been set
+    if (timeoutSetRef.current) return;
+    
+    timeoutSetRef.current = true;
+    
     console.log(`Session loading state initialized at ${new Date().toISOString()}`, {
       loadingStartTime,
       connectionAttempts,
@@ -72,7 +78,7 @@ export function useSessionLoadingState(
     }
   }, [isLoading, loadingStartTime, connectionAttempts, hasInitializedProvider, sessionMountedRef]);
 
-  // Force unlock loading state if stuck for too long
+  // Force unlock loading state if stuck for too long - but only once
   useEffect(() => {
     if (!isLoading || hasTriedForceUnlock.current || !sessionMountedRef.current) return;
     
@@ -102,7 +108,10 @@ export function useSessionLoadingState(
   useEffect(() => {
     if (!sessionMountedRef.current) return;
     
-    // For admin, set loading to false immediately
+    // Don't set up a new timeout if one exists
+    if (forceTimeoutRef.current) return;
+    
+    // For admin, set loading to false immediately without changing state during render
     if (isAdminSession.current && isLoading) {
       console.log("Admin session detected - expediting loading state");
       setIsLoading(false);

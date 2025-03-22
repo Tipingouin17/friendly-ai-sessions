@@ -30,8 +30,8 @@ const Session = () => {
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownToastRef = useRef(false);
   
-  // Check for admin status from URL path - most reliable method
-  const isOnAdminPath = window.location.pathname.includes('/admin');
+  // Check for admin status from URL path using a ref to avoid re-renders
+  const isOnAdminPathRef = useRef(window.location.pathname.includes('/admin'));
   
   // Log initialization on mount and set up safety timeouts
   useEffect(() => {
@@ -47,7 +47,7 @@ const Session = () => {
     sessionMountedRef.current = true;
     
     // Different timeouts based on user role - shorter for both
-    const initialTimeout = isOnAdminPath ? 3000 : 5000;
+    const initialTimeout = isOnAdminPathRef.current ? 3000 : 5000;
     
     // Set a timeout to check if initialization takes too long
     initializeTimeoutRef.current = setTimeout(() => {
@@ -56,7 +56,7 @@ const Session = () => {
         hasShownToastRef.current = true;
         
         // Skip toast for admin
-        if (!isOnAdminPath && !isAdmin) {
+        if (!isOnAdminPathRef.current && !isAdmin) {
           toast({
             title: "Loading your session",
             description: "Please wait while we connect you to the session.",
@@ -66,14 +66,14 @@ const Session = () => {
     }, initialTimeout);
     
     // Additional critical safety timeout - MUCH shorter now
-    const criticalTimeout = isOnAdminPath ? 5000 : 8000;
+    const criticalTimeout = isOnAdminPathRef.current ? 5000 : 8000;
     
     setTimeout(() => {
       if (isLoading && !hasInitializedProvider && sessionMountedRef.current) {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
-        if (!isOnAdminPath && !isAdmin && !hasShownToastRef.current) {
+        if (!isOnAdminPathRef.current && !isAdmin && !hasShownToastRef.current) {
           hasShownToastRef.current = true;
           toast({
             title: "Connection issue",
@@ -99,7 +99,7 @@ const Session = () => {
       sessionMountedRef.current = false;
     };
   }, [isAdmin, error, noSessionFound, isLoading, hasInitializedProvider, toast, 
-     setIsLoading, setHasInitializedProvider, sessionMountedRef, retryConnection, isOnAdminPath]);
+     setIsLoading, setHasInitializedProvider, sessionMountedRef, retryConnection]);
 
   // Render the session page
   return (
@@ -111,7 +111,7 @@ const Session = () => {
       isLoading={isLoading}
       hasInitializedProvider={hasInitializedProvider}
       lastAttemptTime={lastAttemptTime}
-      isAdmin={isAdmin || isOnAdminPath}
+      isAdmin={isAdmin}
     >
       <SessionProviderWrapper
         onInitialized={() => {
@@ -126,7 +126,7 @@ const Session = () => {
           setHasInitializedProvider(true);
           
           // For admin, ensure we're not stuck in loading
-          if ((isAdmin || isOnAdminPath) && isLoading) {
+          if ((isAdmin || isOnAdminPathRef.current) && isLoading) {
             console.log("Admin detected, clearing loading state");
             setIsLoading(false);
           }
@@ -138,7 +138,7 @@ const Session = () => {
         connectionAttempts={connectionAttempts}
         error={error}
         sessionMountedRef={sessionMountedRef}
-        isAdmin={isAdmin || isOnAdminPath}
+        isAdmin={isAdmin}
       />
     </SessionErrorBoundary>
   );

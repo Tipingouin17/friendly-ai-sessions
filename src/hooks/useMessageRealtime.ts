@@ -132,8 +132,8 @@ export const useMessageRealtime = ({
           .subscribe((status) => {
             console.log(`Message channel subscription status: ${status}`);
             
-            // Handle disconnections explicitly
-            if (status === 'CHANNEL_ERROR' || status === 'SUBSCRIPTION_ERROR') {
+            // Handle disconnections explicitly - fixed TS error by using enum values
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
               console.log("Channel error detected, will clean up and restart");
               
               if (messageChannelRef.current && mountedRef.current) {

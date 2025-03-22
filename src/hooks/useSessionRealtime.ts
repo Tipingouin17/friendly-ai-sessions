@@ -5,9 +5,9 @@ import { ConversationWithSession } from "@/types/database";
 import { 
   createConversationChannel, 
   createParticipantsChannel, 
-  createMessagesChannel,
-  removeChannel
+  createMessagesChannel
 } from "@/utils/realtimeConnectionManager";
+import { removeChannel } from "@/utils/realtimeHelpers";
 import { getParticipantInfo } from "@/utils/participantUtils";
 
 type UseSessionRealtimeProps = {

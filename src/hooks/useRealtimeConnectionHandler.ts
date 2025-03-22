@@ -101,7 +101,7 @@ export function useRealtimeConnectionHandler({
                 clearTimeout(timeoutId);
                 pingSuccess = true;
                 resolve(true);
-              } else if (status === 'CHANNEL_ERROR' || status === 'SUBSCRIPTION_ERROR') {
+              } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
                 clearTimeout(timeoutId);
                 resolve(false);
               }

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { 
@@ -33,13 +33,21 @@ export const useSessionRealtime = ({
   const [sessionStartedCalled, setSessionStartedCalled] = useState(false);
   const [sessionFullCalled, setSessionFullCalled] = useState(false);
   
+  // Use refs to track active channels and prevent duplicate subscriptions
+  const conversationChannelRef = useRef<any>(null);
+  const participantsChannelRef = useRef<any>(null);
+  const messagesChannelRef = useRef<any>(null);
+  const setupCompletedRef = useRef(false);
+  
   // Set up realtime channels
   useEffect(() => {
-    if (!currentConversationId) {
-      console.log("No conversation ID provided, skipping realtime setup");
-      return () => {}; // Empty cleanup function
+    if (!currentConversationId || setupCompletedRef.current) {
+      return;
     }
 
+    // Mark setup as completed
+    setupCompletedRef.current = true;
+    
     // Check initial state
     if (conversation) {
       // Check if session is already started
@@ -60,12 +68,8 @@ export const useSessionRealtime = ({
     }
     
     // Create conversation channel
-    let conversationChannel = null;
-    let participantsChannel = null;
-    let messagesChannel = null;
-    
     try {
-      conversationChannel = createConversationChannel(
+      conversationChannelRef.current = createConversationChannel(
         currentConversationId,
         (payload) => {
           console.log("Conversation update:", payload);
@@ -94,7 +98,7 @@ export const useSessionRealtime = ({
       );
       
       // Create participants channel
-      participantsChannel = createParticipantsChannel(
+      participantsChannelRef.current = createParticipantsChannel(
         currentConversationId,
         async (payload) => {
           console.log("Participant update:", payload);
@@ -121,7 +125,7 @@ export const useSessionRealtime = ({
       );
       
       // Create messages channel
-      messagesChannel = createMessagesChannel(
+      messagesChannelRef.current = createMessagesChannel(
         currentConversationId,
         (payload) => {
           console.log("Message update:", payload);
@@ -133,35 +137,54 @@ export const useSessionRealtime = ({
       setError("Failed to establish realtime connection");
     }
     
-    // Cleanup function with null checks
+    // Cleanup function
     return () => {
+      setupCompletedRef.current = false;
       try {
-        if (conversationChannel) {
-          removeChannel(conversationChannel);
+        if (conversationChannelRef.current) {
+          removeChannel(conversationChannelRef.current);
+          conversationChannelRef.current = null;
         }
         
-        if (participantsChannel) {
-          removeChannel(participantsChannel);
+        if (participantsChannelRef.current) {
+          removeChannel(participantsChannelRef.current);
+          participantsChannelRef.current = null;
         }
         
-        if (messagesChannel) {
-          removeChannel(messagesChannel);
+        if (messagesChannelRef.current) {
+          removeChannel(messagesChannelRef.current);
+          messagesChannelRef.current = null;
         }
       } catch (err) {
         console.error("Error removing channels:", err);
       }
     };
-  }, [
-    currentConversationId, 
-    participants, 
-    setParticipants, 
-    conversation, 
-    refetch, 
-    handleSessionFull, 
-    onSessionStarted, 
-    sessionStartedCalled, 
-    sessionFullCalled
-  ]);
+  }, [currentConversationId]);
   
+  // Secondary effect to check conversation state from props
+  useEffect(() => {
+    if (conversation && currentConversationId) {
+      // Check for session status
+      if (conversation.session_started && !sessionStartedCalled) {
+        console.log("Session already started from props, triggering onSessionStarted");
+        setSessionStartedCalled(true);
+        if (onSessionStarted && typeof onSessionStarted === 'function') {
+          onSessionStarted();
+        }
+      }
+      
+      // Check if session is full
+      if (conversation.current_participants >= (conversation.participants || 0) && 
+          (conversation.participants || 0) > 0 && 
+          !sessionFullCalled) {
+        console.log("Session is full from props, triggering handleSessionFull");
+        setSessionFullCalled(true);
+        if (handleSessionFull && typeof handleSessionFull === 'function') {
+          handleSessionFull();
+        }
+      }
+    }
+  }, [conversation, currentConversationId, onSessionStarted, handleSessionFull]);
+
   return { error };
 };

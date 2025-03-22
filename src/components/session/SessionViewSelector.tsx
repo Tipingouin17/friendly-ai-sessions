@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
 import AdminQrView from "./AdminQrView";
@@ -46,6 +46,14 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         retryCount={props.connectionAttempts}
       />
     );
+  }
+
+  // Force showing the session view if we're on an admin route
+  // CRITICAL FIX: Always show sessions for admin paths
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  if (isOnAdminPath) {
+    console.log("Admin route detected, forcing session view");
+    return <SessionView props={props} isAdmin={true} />;
   }
 
   // Admin view gets QR code view for sharing until session is started

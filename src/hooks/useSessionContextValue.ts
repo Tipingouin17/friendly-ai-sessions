@@ -104,25 +104,20 @@ export function useSessionContextValue({
     sessionLink: sessionLink || '',
     currentUserParticipantId,
     anonymousState,
-    isSessionStartedInDB: isSessionStartedInDB || false,
-    error: effectiveAdmin ? null : providerError,
-    
-    // Add connection properties
-    ...connectionProps,
-    refetch: refetch || (() => Promise.resolve({})),
-    
-    // Ensure admin status is properly set
-    isAdmin: isAdmin || effectiveAdmin
+    isSessionStartedInDB,
+    refetch,
+    error: providerError,
+    ...connectionProps
   }), [
-    isLoading, 
-    conversation, 
+    isLoading,
+    conversation,
     currentConversationId,
     sessionState,
     participants,
     safeRoomState.isWaitingForResponse,
+    handleStartSession,
     safeRoomState.handleSendMessage,
     safeRoomState.handleLikeMessage,
-    handleStartSession,
     showQrCodeView,
     sessionLink,
     currentUserParticipantId,
@@ -131,7 +126,6 @@ export function useSessionContextValue({
     providerError,
     connectionProps,
     refetch,
-    isAdmin,
     effectiveAdmin
   ]);
 }

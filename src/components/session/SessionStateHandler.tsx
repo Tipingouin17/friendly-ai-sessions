@@ -45,6 +45,15 @@ const SessionContent: React.FC<{
   transitionState
 }) => {
   const { toast } = useToast();
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  
+  // Force session to be shown when on admin route
+  useEffect(() => {
+    if (isOnAdminPath && !sessionStarted) {
+      console.log("Forcing session started state for admin route");
+      setSessionStarted(true);
+    }
+  }, [isOnAdminPath, sessionStarted, setSessionStarted]);
   
   // When admin loads the page, check if they need to be notified of anything
   useEffect(() => {
@@ -84,6 +93,36 @@ const SessionContent: React.FC<{
   if (!props.currentConversationId) {
     console.log("No conversation ID, showing empty state");
     return <EmptyState />;
+  }
+
+  // Always show session for admin route
+  if (isOnAdminPath) {
+    console.log("Admin route detected in SessionContent, bypassing transition logic");
+    return (
+      <SessionStateProvider 
+        sessionData={props}
+        isAdmin={true}
+        onSessionFull={onSessionFull}
+        onError={(error) => {
+          console.error("Session error:", error);
+          toast({
+            title: "Session Error",
+            description: error,
+            variant: "destructive"
+          });
+        }}
+      >
+        <SessionViewSelector
+          props={props}
+          isAdmin={true}
+          sessionStarted={true}
+          isTransitioning={false}
+          shouldShowSession={true}
+          onStartSession={transitionState.handleStartSession}
+          onSessionFull={onSessionFull}
+        />
+      </SessionStateProvider>
+    );
   }
 
   // Destructure transition state for cleaner usage
@@ -151,18 +190,29 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   // Always call all hooks unconditionally at the top level in the same order
   const { toast } = useToast();
   
+  // Check if on admin route
+  const isOnAdminPath = window.location.pathname.includes('/admin');
+  
+  // Force start session if on admin route
+  useEffect(() => {
+    if (isOnAdminPath && !sessionStarted) {
+      console.log("Admin route detected, forcing session start");
+      setSessionStarted(true);
+    }
+  }, [isOnAdminPath, sessionStarted, setSessionStarted]);
+  
   // Use initialization hook - called unconditionally
   const { initializing } = useSessionInitialization({
     props,
     setSessionStarted,
-    isAdmin
+    isAdmin: isAdmin || isOnAdminPath
   });
   
   // Use transition state hook - called unconditionally
   const transitionState = useSessionStateTransition({
     props,
-    isAdmin,
-    sessionStarted,
+    isAdmin: isAdmin || isOnAdminPath,
+    sessionStarted: sessionStarted || isOnAdminPath,
     setSessionStarted,
     onSessionFull
   });
@@ -171,8 +221,8 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   return (
     <SessionContent
       props={props}
-      isAdmin={isAdmin}
-      sessionStarted={sessionStarted}
+      isAdmin={isAdmin || isOnAdminPath}
+      sessionStarted={sessionStarted || isOnAdminPath}
       setSessionStarted={setSessionStarted}
       onSessionFull={onSessionFull}
       initializing={initializing}

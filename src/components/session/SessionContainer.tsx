@@ -15,7 +15,6 @@ interface SessionContainerProps {
   setInputMessage: (message: string) => void;
   currentParticipant: number;
   onSendMessage: () => void;
-  onLikeMessage: (messageId: string) => void;
   onGenerateReport: () => void;
   isGeneratingReport: boolean;
   isWaitingForResponse: boolean;
@@ -47,7 +46,6 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   setInputMessage,
   currentParticipant,
   onSendMessage,
-  onLikeMessage,
   onGenerateReport,
   isGeneratingReport,
   isWaitingForResponse,
@@ -111,7 +109,6 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           participantColors={enhancedParticipantColors}
           currentParticipant={currentParticipant}
           isWaitingForResponse={isWaitingForResponse}
-          onLikeMessage={onLikeMessage}
           participants={participants}
           conversationId={conversationId}
           currentParticipantCount={currentParticipantCount}

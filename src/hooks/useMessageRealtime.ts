@@ -129,8 +129,7 @@ export const useMessageRealtime = ({
                 participant: participantId,
                 timestamp: new Date(payload.new.created_at),
                 color: participantId ? getParticipantColor(participantId) : undefined,
-                isAnonymous,
-                likes: []
+                isAnonymous
               };
               
               // Add to messages state if it doesn't already exist
@@ -267,8 +266,7 @@ export const useMessageRealtime = ({
           participant: participantId,
           timestamp: new Date(msg.created_at),
           color: participantId ? getParticipantColor(participantId) : undefined,
-          isAnonymous,
-          likes: []
+          isAnonymous
         } as Message;
       }).filter(Boolean) as Message[]; // Filter out null values
       

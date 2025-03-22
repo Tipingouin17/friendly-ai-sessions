@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
 
@@ -70,7 +69,6 @@ export const SessionProviderErrorFallback = ({
     isWaitingForResponse: false,
     handleStartSession: () => {},
     handleSendMessage: async () => { return Promise.resolve(); },
-    handleLikeMessage: () => {},
     showQrCodeView: false,
     sessionLink: '',
     currentUserParticipantId: null,

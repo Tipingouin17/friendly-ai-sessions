@@ -122,7 +122,6 @@ export const SessionProvider = ({
     isWaitingForResponse: roomState.isWaitingForResponse || false,
     handleStartSession: enhancedHandleStartSession,
     handleSendMessage: roomState.handleSendMessage || (async () => Promise.resolve()),
-    handleLikeMessage: roomState.handleLikeMessage || (() => {}),
     showQrCodeView,
     sessionLink,
     currentUserParticipantId,

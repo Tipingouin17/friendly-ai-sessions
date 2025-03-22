@@ -27,7 +27,12 @@ export function useSessionJoiner() {
   const { navigateToSession } = useNavigateToSession();
   const { isCheckingCapacity, checkCapacityAndUpdate } = useSessionCapacityCheck();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
-  const { persistParticipantData, persistedParticipantData } = useParticipantPersistence();
+  const { 
+    persistParticipantData, 
+    persistedParticipantData, 
+    getSessionByConversationId,
+    updateSessionAccessTime
+  } = useParticipantPersistence();
 
   const joinSession = async ({
     conversationId,
@@ -48,18 +53,31 @@ export function useSessionJoiner() {
       return Promise.resolve();
     }
 
-    // Check if we already have persisted data for this conversation
-    if (persistedParticipantData && persistedParticipantData.conversationId === conversationId) {
-      console.log("Using persisted participant data:", persistedParticipantData);
+    // Check if we have persisted data for this conversation
+    const sessionData = conversationId ? getSessionByConversationId(conversationId) : null;
+    
+    if (sessionData) {
+      console.log("Using persisted participant data to rejoin session:", sessionData);
+      
+      // Update the last accessed time
+      if (conversationId) {
+        updateSessionAccessTime(conversationId);
+      }
+      
+      // Show rejoining toast
+      toast({
+        title: "Rejoining Session",
+        description: `Welcome back, ${sessionData.name || participantName}!`,
+      });
       
       // Navigate directly using persisted data
       setTimeout(() => {
         navigateToSession(
           conversationId!, 
-          participantName, 
-          persistedParticipantData.participantId, 
-          avatarSeed,
-          persistedParticipantData.isAdmin || false
+          sessionData.name || participantName, 
+          sessionData.participantId, 
+          sessionData.avatarSeed || avatarSeed,
+          sessionData.isAdmin || false
         );
       }, 500);
       

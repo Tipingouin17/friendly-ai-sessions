@@ -6,6 +6,7 @@ import { useSessionJoiner } from "@/hooks/session-joining/useSessionJoiner";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";
+import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
 export function useJoinSessionData(conversationId: number | null) {
   // Participant state
@@ -18,6 +19,23 @@ export function useJoinSessionData(conversationId: number | null) {
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const effectiveIsAdmin = isAdmin || isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true';
   
+  // Get persisted participant data
+  const { getSessionByConversationId } = useParticipantPersistence();
+  const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
+  
+  // Pre-fill participant name if we have existing session data
+  useEffect(() => {
+    if (existingSessionData?.name && !participantName) {
+      console.log("Pre-filling participant name from stored session data:", existingSessionData.name);
+      setParticipantName(existingSessionData.name);
+      
+      // Also use the persisted avatar seed if available
+      if (existingSessionData.avatarSeed) {
+        setAvatarSeed(existingSessionData.avatarSeed);
+      }
+    }
+  }, [existingSessionData, participantName]);
+  
   // Debug logging
   useEffect(() => {
     console.log("useJoinSessionData initialized", {
@@ -26,9 +44,10 @@ export function useJoinSessionData(conversationId: number | null) {
       effectiveIsAdmin,
       isOnAdminPath,
       storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
-      currentPath: window.location.pathname
+      currentPath: window.location.pathname,
+      existingSessionData
     });
-  }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath]);
+  }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath, existingSessionData]);
   
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
@@ -153,6 +172,7 @@ export function useJoinSessionData(conversationId: number | null) {
     conversation,
     isLoading: !conversation && !error,
     error,
-    handleJoinSession
+    handleJoinSession,
+    existingSessionData
   };
 }

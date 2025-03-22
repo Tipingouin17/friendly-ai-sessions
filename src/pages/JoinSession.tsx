@@ -1,3 +1,4 @@
+
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -5,8 +6,10 @@ import JoinForm from "@/components/session/JoinForm";
 import SessionFullAlert from "@/components/session/SessionFullAlert";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
+import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
@@ -17,6 +20,14 @@ const JoinSession = () => {
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
   const conversationId = idParam && !isNaN(Number(idParam)) ? Number(idParam) : null;
+  
+  // Participant persistence hooks
+  const { getSessionByConversationId } = useParticipantPersistence();
+  const { navigateToSession } = useNavigateToSession();
+  
+  // Check for existing session data
+  const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
+  const [showRejoinPrompt, setShowRejoinPrompt] = useState(!!existingSessionData);
   
   // Validate that we have a valid conversation ID
   useEffect(() => {
@@ -48,6 +59,25 @@ const JoinSession = () => {
     }
   }, [conversationId, queryClient]);
   
+  // Handle rejoining the session with existing data
+  const handleRejoin = useCallback(() => {
+    if (existingSessionData && conversationId) {
+      console.log("Rejoining session with existing data:", existingSessionData);
+      navigateToSession(
+        conversationId,
+        existingSessionData.name || "Participant",
+        existingSessionData.participantId,
+        existingSessionData.avatarSeed || "",
+        existingSessionData.isAdmin || false
+      );
+    }
+  }, [existingSessionData, conversationId, navigateToSession]);
+  
+  // Handle joining as a new participant
+  const handleJoinAsNew = useCallback(() => {
+    setShowRejoinPrompt(false);
+  }, []);
+  
   const {
     participantName,
     setParticipantName,
@@ -62,6 +92,13 @@ const JoinSession = () => {
     error,
     handleJoinSession
   } = useJoinSessionData(conversationId);
+
+  // Pre-fill participant name from existing session data
+  useEffect(() => {
+    if (existingSessionData?.name && !participantName) {
+      setParticipantName(existingSessionData.name);
+    }
+  }, [existingSessionData, participantName, setParticipantName]);
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
@@ -92,6 +129,44 @@ const JoinSession = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
               Try Again
             </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show rejoin prompt if we have existing session data
+  if (showRejoinPrompt && existingSessionData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-4">
+              <UserCheck className="h-12 w-12 text-green-500" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Welcome Back!</h1>
+            <p className="text-gray-600">
+              You've previously joined this session as <span className="font-medium">{existingSessionData.name}</span>.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <Button 
+              onClick={handleRejoin} 
+              className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
+            >
+              Rejoin as {existingSessionData.name}
+            </Button>
+            
+            <div className="text-center">
+              <Button 
+                onClick={handleJoinAsNew}
+                variant="ghost" 
+                className="text-gray-500 hover:text-gray-800"
+              >
+                Join as a different participant
+              </Button>
+            </div>
           </div>
         </div>
       </div>

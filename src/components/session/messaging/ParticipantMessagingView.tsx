@@ -30,6 +30,7 @@ interface ParticipantMessagingViewProps {
   viewMode?: "participant" | "admin";
   participantNames?: { [key: number]: string };
   currentUserParticipantId?: number | null;
+  showResponseStats?: boolean;
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -57,6 +58,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   viewMode = "participant",
   participantNames = {},
   currentUserParticipantId = null,
+  showResponseStats = false,
 }) => {
   // Use the mobile hook to get current screen size
   const mobileState = useIsMobile();
@@ -101,6 +103,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           totalResponses={totalResponses}
           viewMode={viewMode}
           messages={messages}
+          showResponseStats={showResponseStats}
         />
       </div>
     </div>

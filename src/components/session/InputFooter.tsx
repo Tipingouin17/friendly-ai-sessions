@@ -5,7 +5,7 @@ import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { EyeOff, Users, CheckCircle2 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface InputFooterProps {
@@ -25,6 +25,7 @@ interface InputFooterProps {
   totalResponses: number;
   viewMode: "participant" | "admin";
   messages?: Message[];
+  showResponseStats?: boolean;
 }
 
 const InputFooter = ({
@@ -43,7 +44,8 @@ const InputFooter = ({
   hasAnswered,
   totalResponses,
   viewMode,
-  messages = []
+  messages = [],
+  showResponseStats = false
 }: InputFooterProps) => {
   // Use the mobile hook
   const mobileState = useIsMobile();
@@ -83,10 +85,12 @@ const InputFooter = ({
   return (
     <>
       <div className={`px-2 py-1.5 border-t border-gray-100 bg-white flex items-center justify-between ${isMobile ? 'text-xs' : ''}`}>
-        <Badge variant="outline" className="bg-gray-50 text-xs px-1.5 py-0.5">
-          <Users className="w-3 h-3 mr-1" />
-          <span>{totalResponses} of {participantCount} answered</span>
-        </Badge>
+        {showResponseStats && (
+          <Badge variant="outline" className="bg-gray-50 text-xs px-1.5 py-0.5">
+            <Users className="w-3 h-3 mr-1" />
+            <span>{totalResponses} of {participantCount} answered</span>
+          </Badge>
+        )}
         
         {shouldAllowAnswer && (
           <TooltipProvider>

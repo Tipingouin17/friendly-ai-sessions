@@ -136,6 +136,7 @@ const MessagingArea = ({
       viewMode={viewMode}
       participantNames={participantNames}
       currentUserParticipantId={currentUserParticipantId}
+      showResponseStats={false} // Don't show response stats in participant view
     />
   );
 };

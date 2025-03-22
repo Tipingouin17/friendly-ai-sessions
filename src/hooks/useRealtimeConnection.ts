@@ -1,17 +1,15 @@
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { isInCrossOriginContext } from "@/utils/crossOriginUtils";
+import { useConnectionRecovery } from "@/hooks/useConnectionRecovery";
 
 export function useRealtimeConnection(
   conversationId: number | null,
   refetch: () => void
 ) {
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isCrossOrigin, setIsCrossOrigin] = useState(false);
-  const [lastConnectionTime, setLastConnectionTime] = useState<number>(0);
-  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
   
   // Check for cross-origin context on mount
@@ -25,48 +23,18 @@ export function useRealtimeConnection(
     };
   }, []);
   
-  // Reset connection state when conversation ID changes
-  useEffect(() => {
-    if (conversationId) {
-      console.log(`Connection setup for conversation ID: ${conversationId}`);
-      // Reset state for new conversation
-      if (lastConnectionTime === 0) {
-        setLastConnectionTime(Date.now());
-      }
-    }
-  }, [conversationId, lastConnectionTime]);
-  
-  // Retry function for reconnection attempts with backoff strategy
-  const attemptReconnection = useCallback(() => {
-    if (!mountedRef.current) return;
-
-    if (connectionAttempts < 5 && conversationId) {
-      console.log(`Attempting reconnection (attempt ${connectionAttempts + 1}/5) for ID:`, conversationId);
-      setConnectionAttempts(prev => prev + 1);
-      
-      // Clear any existing timers
-      if (reconnectTimerRef.current !== null) {
-        window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      
-      // Use exponential backoff for retries
-      const backoffTime = Math.min(1000 * Math.pow(2, connectionAttempts), 10000);
-      console.log(`Using backoff time of ${backoffTime}ms`);
-      
-      reconnectTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) {
-          console.log(`Executing reconnection attempt ${connectionAttempts + 1}`);
-          refetch();
-          setLastConnectionTime(Date.now());
-        }
-      }, backoffTime);
-    } else if (connectionAttempts >= 5) {
-      setError(isCrossOrigin 
-        ? "Unable to establish a connection. This may be due to cross-origin restrictions."
-        : "Unable to establish a stable connection after multiple attempts");
-    }
-  }, [connectionAttempts, conversationId, refetch, isCrossOrigin]);
+  // Use connection recovery hook
+  const {
+    connectionAttempts,
+    setConnectionAttempts,
+    lastConnectionTime,
+    attemptReconnection,
+    handleConnectionEstablished
+  } = useConnectionRecovery({
+    conversationId,
+    refetch,
+    isCrossOrigin
+  });
 
   // Connection recovery mechanism
   useEffect(() => {
@@ -87,30 +55,25 @@ export function useRealtimeConnection(
     return undefined;
   }, [isConnected, conversationId, error, attemptReconnection]);
 
-  // Handle successful connection
-  const handleConnectionEstablished = useCallback(() => {
+  // Wrapper for setting "connected" state
+  const setConnectedState = useCallback(() => {
     if (!mountedRef.current) return;
-    
-    console.log("Connection established successfully");
     setIsConnected(true);
-    setConnectionAttempts(0);
-    setLastConnectionTime(Date.now());
-  }, []);
+    handleConnectionEstablished();
+  }, [handleConnectionEstablished]);
 
-  // Cleanup on unmount
+  // Update error state with cross-origin context info if needed
   useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-    };
-  }, []);
+    if (connectionAttempts >= 5 && !error) {
+      setError(isCrossOrigin 
+        ? "Unable to establish a connection. This may be due to cross-origin restrictions."
+        : "Unable to establish a stable connection after multiple attempts");
+    }
+  }, [connectionAttempts, isCrossOrigin, error]);
 
   return {
     isConnected,
-    setIsConnected: handleConnectionEstablished,
+    setIsConnected: setConnectedState,
     connectionAttempts,
     setConnectionAttempts,
     error,

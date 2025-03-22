@@ -16,6 +16,7 @@ import { SessionProviderCoreError } from "./SessionProviderCoreError";
 
 interface SessionProviderCoreProps {
   children: React.ReactNode;
+  childrenFn?: (props: SessionContextProps) => React.ReactElement;
   handleSessionFull?: () => void;
   onError?: (error: string) => void;
   forceAdmin?: boolean;
@@ -23,6 +24,7 @@ interface SessionProviderCoreProps {
 
 export const SessionProviderCore = ({ 
   children, 
+  childrenFn,
   handleSessionFull, 
   onError,
   forceAdmin 
@@ -160,10 +162,10 @@ export const SessionProviderCore = ({
         providerError={providerError}
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
+        sessionContextValue={sessionContextValue}
+        childrenFn={childrenFn}
       >
-        {React.isValidElement(children) 
-          ? React.cloneElement(children as React.ReactElement, sessionContextValue) 
-          : children}
+        {children}
       </SessionProviderCoreError>
     );
   } catch (error) {
@@ -175,6 +177,7 @@ export const SessionProviderCore = ({
         providerError={error instanceof Error ? error.message : "Unknown error in SessionProviderCore"}
         effectiveAdmin={effectiveAdmin}
         refetch={refetch}
+        childrenFn={childrenFn}
       >
         {children}
       </SessionProviderCoreError>

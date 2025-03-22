@@ -2,80 +2,42 @@
 import React from "react";
 import { SessionContextProps } from "@/types/session";
 import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
-import { participantColors } from "@/utils/sessionHelpers";
 
 interface SessionProviderCoreErrorProps {
+  children: React.ReactNode;
+  childrenFn?: (props: SessionContextProps) => React.ReactElement;
   providerError: string | null;
   effectiveAdmin: boolean;
   refetch: () => void;
-  children: React.ReactNode;
+  sessionContextValue?: SessionContextProps;
 }
 
 export const SessionProviderCoreError = ({
+  children,
+  childrenFn,
   providerError,
   effectiveAdmin,
   refetch,
-  children
+  sessionContextValue
 }: SessionProviderCoreErrorProps) => {
-  // Create emergency fallback context
-  const emergencyContext: SessionContextProps = {
-    isLoading: false,
-    conversation: null,
-    currentConversationId: null,
-    sessionState: {
-      messages: [],
-      inputMessage: "",
-      setInputMessage: () => {},
-      currentParticipant: 0,
-      isRecording: false,
-      setIsRecording: () => {},
-      hasAnswered: false,
-      totalResponses: 0,
-      viewMode: "participant",
-      setViewMode: () => {},
-      handleGenerateReport: async () => { return Promise.resolve(); },
-      isGeneratingReport: false,
-      setMessages: () => {},
-      recordResponse: () => {},
-      error: null
-    },
-    participants: [],
-    participantColors,
-    isWaitingForResponse: false,
-    handleStartSession: () => {},
-    handleSendMessage: async () => { return Promise.resolve(); },
-    handleLikeMessage: () => {},
-    showQrCodeView: false,
-    sessionLink: '',
-    currentUserParticipantId: null,
-    anonymousState: {
-      isAnonymous: false,
-      toggleAnonymous: () => {}
-    },
-    isSessionStartedInDB: false,
-    error: providerError,
-    isConnected: false,
-    connectionAttempts: 0,
-    refetch: () => {},
-    isAdmin: effectiveAdmin
-  };
-
-  // If we have serious errors, return error fallback
-  if (providerError && !effectiveAdmin) {
+  // If there's no error and we have the context value, render with context
+  if (!providerError && sessionContextValue && childrenFn) {
+    return childrenFn(sessionContextValue);
+  }
+  
+  // If there's an error, show the error fallback
+  if (providerError) {
     return (
-      <SessionProviderErrorFallback 
+      <SessionProviderErrorFallback
         errorMessage={providerError}
         isAdmin={effectiveAdmin}
-        onRetry={() => {
-          console.log("Retry requested from error fallback");
-          refetch();
-        }}
+        onRetry={refetch}
       >
         {children}
       </SessionProviderErrorFallback>
     );
   }
-
-  // For admin or no errors, render children directly
+  
+  // Fallback for when we don't have a context value but also don't have an error
   return <>{children}</>;
 };

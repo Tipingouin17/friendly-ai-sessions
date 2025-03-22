@@ -43,7 +43,7 @@ export const SessionProviderErrorFallback = ({
     }
   }, [isAdmin, isSessionFullError, onRetry]);
   
-  // Create safe default props
+  // Create safe default props for fallback context
   const fallbackSessionContext: SessionContextProps = {
     isLoading: false,
     conversation: null,

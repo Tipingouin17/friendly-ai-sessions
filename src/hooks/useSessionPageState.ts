@@ -1,76 +1,90 @@
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 
-export const useSessionPageState = () => {
-  const { toast } = useToast();
+export function useSessionPageState() {
   const location = useLocation();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const { toast } = useToast();
+  const isOnAdminPath = location.pathname.includes('/admin');
+  
+  // Use refs for state that doesn't need to trigger re-renders
+  const stateRef = useRef({
+    isOnAdminPath,
+    isAdmin: isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true',
+    connectionAttempts: 0,
+    error: null as string | null,
+    noSessionFound: false
+  });
+  
+  // Mutable state that requires re-renders
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Determine if user is admin based on location state
-  useEffect(() => {
-    const locationState = location.state as { 
-      isGuest?: boolean; 
-      showMessaging?: boolean;
-      isAdmin?: boolean;
-    } | null;
+  const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(false);
+  
+  // Handle error function that doesn't cause re-renders
+  const handleError = useCallback((errorMessage: string) => {
+    stateRef.current.error = errorMessage;
+    console.error("Session error:", errorMessage);
     
-    // User is considered admin if:
-    // 1. They're explicitly marked as admin in the state
-    // 2. They're not a guest (implying they created the session)
-    // 3. They're not accessing via the join flow
-    const adminStatus = Boolean(locationState?.isAdmin) || 
-      (locationState?.isGuest !== true);
-    
-    setIsAdmin(adminStatus);
-    console.log("Session page - isAdmin determined as:", adminStatus, "from state:", locationState);
-  }, [location]);
-
-  // Log initial state for debugging
-  useEffect(() => {
-    console.log("Session page loaded with state:", location.state);
-  }, [location.state]);
-
-  // Reset error state if we navigate away and back
-  useEffect(() => {
-    return () => {
-      setError(null);
-    };
-  }, []);
-
-  const handleSessionFull = () => {
-    // Auto-start session when it's full
+    if (!stateRef.current.hasShownToast) {
+      stateRef.current.hasShownToast = true;
+      toast({
+        title: "Session Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+  
+  // Session full handler
+  const handleSessionFull = useCallback(() => {
     setSessionStarted(true);
     
     toast({
       title: "Session is full",
       description: "The maximum number of participants has joined. Starting session automatically.",
     });
-  };
-
-  const handleError = (errorMessage: string) => {
-    setError(errorMessage);
-    console.error("Session error:", errorMessage);
+  }, [toast]);
+  
+  // Retry connection handler
+  const retryConnection = useCallback(() => {
+    stateRef.current.connectionAttempts++;
+    console.log(`Retrying connection (attempt ${stateRef.current.connectionAttempts})`);
     
-    toast({
-      title: "Session Error",
-      description: errorMessage,
-      variant: "destructive",
-    });
-  };
+    // Force loading state during retry
+    setIsLoading(true);
+    
+    // Reset provider initialized state to trigger reconnection
+    setHasInitializedProvider(false);
+  }, []);
+
+  // Handler for provider initialization
+  const handleProviderInitialized = useCallback(() => {
+    console.log(`Provider initialized after ${Date.now() - stateRef.current.pageLoadTime}ms`);
+    
+    // Update provider initialization state
+    setHasInitializedProvider(true);
+    
+    // For admin, ensure we're not stuck in loading
+    if ((stateRef.current.isAdmin || stateRef.current.isOnAdminPath) && isLoading) {
+      console.log("Admin detected, clearing loading state");
+      setIsLoading(false);
+    }
+  }, [isLoading]);
 
   return {
-    isAdmin,
-    sessionStarted,
-    setSessionStarted,
     isLoading,
     setIsLoading,
-    error,
+    hasInitializedProvider,
+    setHasInitializedProvider,
+    sessionStarted,
+    setSessionStarted,
+    handleError,
     handleSessionFull,
-    handleError
+    retryConnection,
+    handleProviderInitialized,
+    stateRef,
+    isOnAdminPath
   };
-};
+}

@@ -23,18 +23,14 @@ export const RefactoredSessionProvider = ({
     }
   }, [forceAdmin]);
   
-  // Create a component that will receive the context and call the children function
-  const ChildrenRenderer = (props: SessionContextProps) => {
-    return children(props);
-  };
-  
   return (
     <SessionProviderCore
       handleSessionFull={handleSessionFull}
       onError={onError}
       forceAdmin={forceAdmin}
+      childrenFn={children}
     >
-      <ChildrenRenderer />
+      {null}
     </SessionProviderCore>
   );
 };

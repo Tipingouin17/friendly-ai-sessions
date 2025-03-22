@@ -18,8 +18,10 @@ export const Layout = ({ children }: LayoutProps) => {
   const isSessionPage = sessionPages.some(path => location.pathname.includes(path));
   const isAdminPage = location.pathname.includes('admin');
   
-  // Don't show the main navigation on session pages on mobile
-  const shouldHideMainNav = isMobile && isSessionPage;
+  // Don't show the main navigation on any session pages on mobile
+  // And also don't show it on desktop for regular session pages
+  const shouldHideMainNav = (isMobile && isSessionPage) || 
+                           (location.pathname === '/session');
 
   return (
     <div className="min-h-screen flex flex-col text-left">

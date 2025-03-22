@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { Message } from '@/types/chat';
 import AdminMessageFilters from './AdminMessageFilters';
@@ -37,6 +38,25 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
         participant: m.participant
       }))
     );
+  }, [messages]);
+
+  // Create a mapping of participant IDs to names
+  const participantNameMap = useMemo(() => {
+    const nameMap: { [key: string]: string } = {};
+    
+    messages.forEach(message => {
+      if (message.participant && typeof message.participant === 'string') {
+        // If the participant field already contains a name and not just an ID
+        if (!message.participant.startsWith('P') || message.participant.includes(' ')) {
+          const participantId = message.participant.startsWith('P') 
+            ? message.participant 
+            : `P${message.participant}`;
+          nameMap[participantId] = message.participant;
+        }
+      }
+    });
+    
+    return nameMap;
   }, [messages]);
 
   const groupedMessages = useMemo(() => {
@@ -182,6 +202,7 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
                       group={group}
                       groupIndex={groupIndex}
                       participantColors={participantColors}
+                      participantNameMap={participantNameMap}
                     />
                   ))}
                 </div>

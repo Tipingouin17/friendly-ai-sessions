@@ -15,12 +15,14 @@ interface AdminMessageGroupProps {
   };
   groupIndex: number;
   participantColors: { [key: string]: string };
+  participantNameMap?: { [key: string]: string };
 }
 
 const AdminMessageGroup: React.FC<AdminMessageGroupProps> = ({
   group,
   groupIndex,
-  participantColors
+  participantColors,
+  participantNameMap = {}
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,10 +33,34 @@ const AdminMessageGroup: React.FC<AdminMessageGroupProps> = ({
   // Number of responses to show per page
   const RESPONSES_PER_PAGE = 10;
   
+  // Helper function to get participant display name
+  const getParticipantDisplayName = (participant: string | undefined): string => {
+    if (!participant) return "Unknown Participant";
+    
+    // If it's already a name (not starting with P or contains spaces), return as is
+    if (!participant.startsWith('P') || participant.includes(' ')) {
+      return participant;
+    }
+    
+    // Try to find the name in the map
+    if (participantNameMap[participant]) {
+      return participantNameMap[participant];
+    }
+    
+    // If it starts with P and has a number, use "Participant X"
+    const participantNumber = participant.substring(1);
+    if (!isNaN(Number(participantNumber))) {
+      return `Participant ${participantNumber}`;
+    }
+    
+    // Fallback
+    return participant;
+  };
+  
   // Filter responses based on search term
   const filteredResponses = group.responses.filter(response => 
     response.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (typeof response.participant === 'string' && response.participant.toLowerCase().includes(searchTerm.toLowerCase()))
+    (typeof response.participant === 'string' && getParticipantDisplayName(response.participant).toLowerCase().includes(searchTerm.toLowerCase()))
   );
   
   // Sort responses based on current sort settings
@@ -44,8 +70,8 @@ const AdminMessageGroup: React.FC<AdminMessageGroupProps> = ({
       const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
       return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
     } else {
-      const nameA = typeof a.participant === 'string' ? a.participant : '';
-      const nameB = typeof b.participant === 'string' ? b.participant : '';
+      const nameA = typeof a.participant === 'string' ? getParticipantDisplayName(a.participant) : '';
+      const nameB = typeof b.participant === 'string' ? getParticipantDisplayName(b.participant) : '';
       return sortDirection === 'asc' 
         ? nameA.localeCompare(nameB) 
         : nameB.localeCompare(nameA);
@@ -152,7 +178,7 @@ const AdminMessageGroup: React.FC<AdminMessageGroupProps> = ({
                       style={{ backgroundColor: participantColors[response.participant] || '#888' }} 
                     />
                     <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                      {response.isAnonymous ? 'Anonymous participant' : response.participant}
+                      {response.isAnonymous ? 'Anonymous participant' : getParticipantDisplayName(response.participant)}
                       {response.isAnonymous && 
                         <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">anonymous</span>
                       }

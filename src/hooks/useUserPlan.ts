@@ -49,7 +49,7 @@ export const useUserPlan = (): UserPlanDetails => {
           
         if (planError) throw planError;
         
-        // Extract plan details from the plan_table_details JSON
+        // Handle the case where plan_table_details might be missing
         const planTableDetails = freePlan.plan_table_details || {};
         
         // Create the plan restrictions object from the plan details
@@ -69,8 +69,8 @@ export const useUserPlan = (): UserPlanDetails => {
         const planForUI: Plan = {
           id: freePlan.id,
           title: freePlan.title,
-          price: freePlan.price,
-          plan_type: freePlan.plan_type,
+          price: freePlan.price || 0,
+          plan_type: freePlan.plan_type || '',
           plan_table_details: {
             no_of_facilitator: planTableDetails.no_of_facilitator,
             no_of_sessions: planTableDetails.no_of_sessions,
@@ -82,8 +82,8 @@ export const useUserPlan = (): UserPlanDetails => {
             data_export: planTableDetails.data_export,
             number_of_questions_per_session: planTableDetails.number_of_questions_per_session
           },
-          is_popular: freePlan.is_popular,
-          stripe_plan_id: freePlan.stripe_plan_id,
+          is_popular: freePlan.is_popular || false,
+          stripe_plan_id: freePlan.stripe_plan_id || '',
           currency: freePlan.currency
         };
         
@@ -103,7 +103,7 @@ export const useUserPlan = (): UserPlanDetails => {
       
       if (planError) throw planError;
       
-      // Extract plan details from the plan_table_details JSON
+      // Handle the case where plan_table_details might be missing
       const planTableDetails = planData.plan_table_details || {};
       
       // Create the plan restrictions object from the plan details
@@ -122,9 +122,9 @@ export const useUserPlan = (): UserPlanDetails => {
       // Create a compatible plan object for the UI
       const planForUI: Plan = {
         id: planData.id,
-        title: planData.title,
-        price: planData.price,
-        plan_type: planData.plan_type,
+        title: planData.title || '',
+        price: planData.price || 0,
+        plan_type: planData.plan_type || '',
         plan_table_details: {
           no_of_facilitator: planTableDetails.no_of_facilitator,
           no_of_sessions: planTableDetails.no_of_sessions,
@@ -136,8 +136,8 @@ export const useUserPlan = (): UserPlanDetails => {
           data_export: planTableDetails.data_export,
           number_of_questions_per_session: planTableDetails.number_of_questions_per_session
         },
-        is_popular: planData.is_popular,
-        stripe_plan_id: planData.stripe_plan_id,
+        is_popular: planData.is_popular || false,
+        stripe_plan_id: planData.stripe_plan_id || '',
         currency: planData.currency
       };
       

@@ -21,6 +21,19 @@ export const isInCrossOriginContext = (): boolean => {
 };
 
 /**
+ * Checks if the current execution context is in any iframe
+ * @returns boolean indicating if in an iframe
+ */
+export const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    // If we can't access window.top, we're definitely in a cross-origin iframe
+    return true;
+  }
+};
+
+/**
  * Determines if two origins match
  * @param url1 First URL to compare
  * @param url2 Second URL to compare
@@ -33,19 +46,6 @@ export const doOriginsMatch = (url1: string, url2: string): boolean => {
     return origin1 === origin2;
   } catch (e) {
     return false;
-  }
-};
-
-/**
- * Checks if the current execution context is in any iframe
- * @returns boolean indicating if in an iframe
- */
-export const isInIframe = (): boolean => {
-  try {
-    return window.self !== window.top;
-  } catch (e) {
-    // If we can't access window.top, we're definitely in a cross-origin iframe
-    return true;
   }
 };
 

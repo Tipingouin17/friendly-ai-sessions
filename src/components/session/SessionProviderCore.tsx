@@ -9,6 +9,7 @@ import { useSessionParticipantSetup } from "@/hooks/useSessionParticipantSetup";
 import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
+import { useSessionRealtimeConnection } from "@/hooks/useSessionRealtimeConnection";
 
 interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -40,32 +41,15 @@ export const SessionProviderCore = ({
   }, [location, persistedParticipantData, forceAdmin]);
   
   // Enhance location state with persisted data if available
-  let locationState = location.state as { 
-    participantId?: number; 
-    isGuest?: boolean; 
-    participantName?: string;
-    showMessaging?: boolean;
-    isAdmin?: boolean;
-  } | null;
-  
-  // If we have persisted data but no participant ID in location state, use the persisted data
-  if (!locationState?.participantId && persistedParticipantData) {
-    locationState = {
-      ...locationState,
-      participantId: persistedParticipantData.participantId,
-      isGuest: true,
-      participantName: persistedParticipantData.name,
-      isAdmin: persistedParticipantData.isAdmin
-    };
-    console.log("Enhanced provider location state with persisted data:", locationState);
-  }
+  let locationState = getEnhancedLocationState(location.state, persistedParticipantData);
   
   // Determine effective admin status from all sources
-  const effectiveAdmin = forceAdmin === true || 
-                       locationState?.isAdmin === true ||
-                       persistedParticipantData?.isAdmin === true ||
-                       sessionStorage.getItem('isAdminSession') === 'true' ||
-                       location.pathname.includes('/admin');
+  const effectiveAdmin = determineAdminStatus(
+    forceAdmin, 
+    locationState, 
+    persistedParticipantData, 
+    location
+  );
   
   // Force admin status if detected from any source
   useEffect(() => {
@@ -92,6 +76,14 @@ export const SessionProviderCore = ({
   } = useSessionProviderState({ 
     onError, 
     forceAdmin: effectiveAdmin
+  });
+
+  // Set up realtime connection
+  const connection = useSessionRealtimeConnection({
+    conversationId: currentConversationId,
+    refetch,
+    onError: handleError,
+    isAdmin: effectiveAdmin
   });
 
   // Handle data errors
@@ -128,21 +120,13 @@ export const SessionProviderCore = ({
   });
 
   // Check for stuck states and force refresh
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (isLoading && currentConversationId && !conversation) {
-        console.log("Session appears stuck in loading state - forcing data refresh");
-        refetch();
-        
-        // Also refresh participants
-        if (forceRefreshParticipants) {
-          forceRefreshParticipants();
-        }
-      }
-    }, 5000);
-    
-    return () => clearTimeout(timeoutId);
-  }, [isLoading, currentConversationId, conversation, refetch, forceRefreshParticipants]);
+  useStuckStateHandler({
+    isLoading,
+    currentConversationId,
+    conversation, 
+    refetch,
+    forceRefreshParticipants
+  });
 
   // Set up session monitoring
   const {
@@ -209,8 +193,8 @@ export const SessionProviderCore = ({
     error: effectiveAdmin ? null : providerError, // Clear errors for admin
     
     // Add connection properties
-    isConnected: true, // Default to true, will be updated by connection hooks
-    connectionAttempts: 0,
+    isConnected: connection.isConnected,
+    connectionAttempts: connection.connectionAttempts,
     refetch,
     
     // Ensure admin status is properly set
@@ -220,3 +204,76 @@ export const SessionProviderCore = ({
   // Return children with context
   return children(sessionContextValue);
 };
+
+// Helper function to enhance location state with persisted data if available
+function getEnhancedLocationState(
+  originalState: any, 
+  persistedParticipantData: any
+) {
+  let locationState = originalState as { 
+    participantId?: number; 
+    isGuest?: boolean; 
+    participantName?: string;
+    showMessaging?: boolean;
+    isAdmin?: boolean;
+  } | null;
+  
+  // If we have persisted data but no participant ID in location state, use the persisted data
+  if (!locationState?.participantId && persistedParticipantData) {
+    locationState = {
+      ...locationState,
+      participantId: persistedParticipantData.participantId,
+      isGuest: true,
+      participantName: persistedParticipantData.name,
+      isAdmin: persistedParticipantData.isAdmin
+    };
+    console.log("Enhanced provider location state with persisted data:", locationState);
+  }
+  
+  return locationState;
+}
+
+// Helper function to determine admin status from all sources
+function determineAdminStatus(
+  forceAdmin: boolean | undefined,
+  locationState: any,
+  persistedParticipantData: any,
+  location: any
+) {
+  return forceAdmin === true || 
+         locationState?.isAdmin === true ||
+         persistedParticipantData?.isAdmin === true ||
+         sessionStorage.getItem('isAdminSession') === 'true' ||
+         location.pathname.includes('/admin');
+}
+
+// Custom hook to handle stuck states
+function useStuckStateHandler({
+  isLoading,
+  currentConversationId,
+  conversation,
+  refetch,
+  forceRefreshParticipants
+}: {
+  isLoading: boolean;
+  currentConversationId: number | null;
+  conversation: any;
+  refetch: () => void;
+  forceRefreshParticipants?: () => void;
+}) {
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (isLoading && currentConversationId && !conversation) {
+        console.log("Session appears stuck in loading state - forcing data refresh");
+        refetch();
+        
+        // Also refresh participants
+        if (forceRefreshParticipants) {
+          forceRefreshParticipants();
+        }
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isLoading, currentConversationId, conversation, refetch, forceRefreshParticipants]);
+}

@@ -27,21 +27,22 @@ const Session = () => {
   
   const { toast } = useToast();
   
-  // Use refs for state that doesn't need to trigger re-renders
+  // Use a single ref object to store all state that doesn't need to trigger re-renders
   const stateRef = useRef({
     pageLoadTime: Date.now(),
     hasShownToast: false,
     hasSetupTimeout: false,
     initializeTimeout: null as NodeJS.Timeout | null,
     isOnAdminPath: window.location.pathname.includes('/admin'),
-    // Store admin status in ref to prevent loops
-    effectiveAdminStatus: isAdmin
+    effectiveAdminStatus: isAdmin,
+    componentMounted: false
   });
   
   // Log initialization on mount and set up safety timeouts - run only once
   useEffect(() => {
     if (stateRef.current.hasSetupTimeout) return;
     stateRef.current.hasSetupTimeout = true;
+    stateRef.current.componentMounted = true;
     
     console.log("Session page mounted", {
       time: new Date().toISOString(),
@@ -59,22 +60,22 @@ const Session = () => {
     
     // Set a timeout to check if initialization takes too long
     stateRef.current.initializeTimeout = setTimeout(() => {
-      if (sessionMountedRef.current && !stateRef.current.hasShownToast) {
-        console.log("Session initialization status:", {
-          isLoading,
-          hasInitializedProvider
-        });
+      if (!stateRef.current.componentMounted) return;
+      
+      console.log("Session initialization status:", {
+        isLoading,
+        hasInitializedProvider
+      });
+      
+      if (isLoading && !hasInitializedProvider && !stateRef.current.hasShownToast) {
+        stateRef.current.hasShownToast = true;
         
-        if (isLoading && !hasInitializedProvider) {
-          stateRef.current.hasShownToast = true;
-          
-          // Skip toast for admin
-          if (!stateRef.current.effectiveAdminStatus) {
-            toast({
-              title: "Loading your session",
-              description: "Please wait while we connect you to the session.",
-            });
-          }
+        // Skip toast for admin
+        if (!stateRef.current.effectiveAdminStatus) {
+          toast({
+            title: "Loading your session",
+            description: "Please wait while we connect you to the session.",
+          });
         }
       }
     }, initialTimeout);
@@ -82,8 +83,10 @@ const Session = () => {
     // Additional critical safety timeout - force loading state to complete if stuck
     const criticalTimeout = stateRef.current.effectiveAdminStatus ? 5000 : 8000;
     
-    setTimeout(() => {
-      if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
+    const criticalTimeoutId = setTimeout(() => {
+      if (!stateRef.current.componentMounted) return;
+      
+      if (isLoading && !hasInitializedProvider) {
         console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
@@ -111,11 +114,15 @@ const Session = () => {
     }, criticalTimeout);
     
     return () => {
+      stateRef.current.componentMounted = false;
+      sessionMountedRef.current = false;
+      
       if (stateRef.current.initializeTimeout) {
         clearTimeout(stateRef.current.initializeTimeout);
         stateRef.current.initializeTimeout = null;
       }
-      sessionMountedRef.current = false;
+      
+      clearTimeout(criticalTimeoutId);
     };
   }, [error, noSessionFound, isLoading, hasInitializedProvider, toast, 
      setIsLoading, setHasInitializedProvider, sessionMountedRef, retryConnection]);
@@ -128,6 +135,9 @@ const Session = () => {
       clearTimeout(stateRef.current.initializeTimeout);
       stateRef.current.initializeTimeout = null;
     }
+    
+    // Check if component is still mounted before updating state
+    if (!stateRef.current.componentMounted) return;
     
     // Use callback pattern for state updates
     if (!hasInitializedProvider) {

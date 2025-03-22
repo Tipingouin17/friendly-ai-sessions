@@ -117,7 +117,6 @@ export const useSessionRoomState = ({
   const {
     isWaitingForResponse,
     handleSendMessage,
-    handleLikeMessage,
     error: interactionsError
   } = useSessionInteractions({
     currentConversationId: conversationId,
@@ -147,7 +146,6 @@ export const useSessionRoomState = ({
     setViewMode,
     isWaitingForResponse,
     handleSendMessage,
-    handleLikeMessage,
     anonymousState,
     error
   };

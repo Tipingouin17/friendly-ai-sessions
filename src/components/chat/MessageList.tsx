@@ -11,7 +11,6 @@ interface MessageListProps {
   messages: Message[];
   participantColors?: {[key: string]: string};
   currentParticipant?: string;
-  onLikeMessage?: (messageId: string) => void;
   isWaitingForResponse?: boolean;
   participants?: ParticipantInfo[];
   isMobile?: boolean;
@@ -21,7 +20,6 @@ const MessageList = ({
   messages, 
   participantColors = {},
   currentParticipant,
-  onLikeMessage,
   isWaitingForResponse = false,
   participants = [],
   isMobile = false
@@ -93,7 +91,6 @@ const MessageList = ({
             isFirstMessageOfGroup={isFirstMessageOfGroup}
             isLastMessageOfGroup={isLastMessageOfGroup}
             currentParticipant={currentParticipant}
-            onLikeMessage={onLikeMessage}
             participantInfo={participantInfo}
             isMobile={isMobile}
           />

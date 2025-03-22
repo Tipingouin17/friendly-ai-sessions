@@ -28,7 +28,6 @@ export interface SessionContextProps {
   isWaitingForResponse: boolean;
   handleStartSession: () => void;
   handleSendMessage: () => Promise<void>;
-  handleLikeMessage: (messageId: string) => void;
   showQrCodeView: boolean;
   sessionLink: string;
   currentUserParticipantId: number | null;

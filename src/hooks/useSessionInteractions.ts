@@ -1,7 +1,6 @@
 
 import { useMessageSender } from "./useMessageSender";
 import { useMessageRealtime } from "./useMessageRealtime";
-import { useMessageLikes } from "./useMessageLikes";
 import { Message } from "@/types/chat";
 
 type UseSessionInteractionsProps = {
@@ -49,16 +48,9 @@ export const useSessionInteractions = ({
     setMessages: sessionState.setMessages
   });
 
-  // Set up message likes functionality
-  const { handleLikeMessage } = useMessageLikes({
-    currentParticipant: sessionState.currentParticipant,
-    setMessages: sessionState.setMessages
-  });
-
   return {
     isWaitingForResponse,
     handleSendMessage,
-    handleLikeMessage,
     error
   };
 };

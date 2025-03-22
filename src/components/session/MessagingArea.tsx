@@ -9,7 +9,6 @@ interface MessagingAreaProps {
   participantColors: { [key: string]: string };
   currentParticipant: number;
   isWaitingForResponse?: boolean;
-  onLikeMessage?: (messageId: string) => void;
   participants: ParticipantInfo[];
   conversationId: number | null;
   currentParticipantCount: number;
@@ -37,7 +36,6 @@ const MessagingArea = ({
   participantColors,
   currentParticipant,
   isWaitingForResponse = false,
-  onLikeMessage,
   participants,
   conversationId,
   currentParticipantCount,
@@ -116,7 +114,6 @@ const MessagingArea = ({
       participantColors={participantColors}
       currentParticipant={currentParticipant}
       isWaitingForResponse={isWaitingForResponse}
-      onLikeMessage={onLikeMessage}
       participants={participants}
       conversationId={conversationId}
       currentParticipantCount={currentParticipantCount}

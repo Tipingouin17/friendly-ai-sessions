@@ -27,7 +27,6 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       setInputMessage={props.sessionState.setInputMessage}
       currentParticipant={props.sessionState.currentParticipant}
       onSendMessage={props.handleSendMessage}
-      onLikeMessage={props.handleLikeMessage}
       isWaitingForResponse={props.isWaitingForResponse}
       onGenerateReport={props.sessionState.handleGenerateReport}
       isGeneratingReport={props.sessionState.isGeneratingReport}

@@ -8,7 +8,6 @@ export interface Message {
   participant?: string;
   color?: string;
   isReport?: boolean;
-  likes?: string[]; // Array of participant identifiers who liked the message
   avatar?: string; // Added for participant avatar
   isAnonymous?: boolean; // Flag for anonymous messages
   isPinned?: boolean; // Flag for pinned messages

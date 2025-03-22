@@ -3,7 +3,6 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageAvatar from './MessageAvatar';
-import MessageLikeButton from './MessageLikeButton';
 import MessageBubble from './MessageBubble';
 
 interface MessageItemProps {
@@ -11,7 +10,6 @@ interface MessageItemProps {
   isFirstMessageOfGroup: boolean;
   isLastMessageOfGroup: boolean;
   currentParticipant?: string;
-  onLikeMessage?: (messageId: string) => void;
   participantInfo?: ParticipantInfo | null;
   isMobile?: boolean;
 }
@@ -21,13 +19,9 @@ const MessageItem = ({
   isFirstMessageOfGroup,
   isLastMessageOfGroup,
   currentParticipant,
-  onLikeMessage,
   participantInfo,
   isMobile = false
 }: MessageItemProps) => {
-  const isLikedByCurrentParticipant = message.likes?.includes(currentParticipant || '');
-  const likeCount = message.likes?.length || 0;
-  
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";
   
@@ -40,12 +34,6 @@ const MessageItem = ({
   if (displayParticipantName.startsWith("Participant") && participantInfo?.name) {
     displayParticipantName = participantInfo.name;
   }
-
-  const handleLike = () => {
-    if (onLikeMessage) {
-      onLikeMessage(message.id);
-    }
-  };
 
   // Use more compact layout on mobile
   const spacing = isMobile ? "mt-1" : "mt-2";
@@ -61,15 +49,6 @@ const MessageItem = ({
       )}
     >
       <div className="flex items-end gap-1 sm:gap-2 max-w-full">
-        {/* Show like button to the left for assistant messages */}
-        {message.sender === "assistant" && (
-          <MessageLikeButton 
-            isLiked={!!isLikedByCurrentParticipant}
-            likeCount={likeCount}
-            onClick={handleLike}
-          />
-        )}
-        
         {/* Show avatar for first message in a group */}
         {message.sender === "assistant" && isFirstMessageOfGroup && (
           <div className="mb-1 hidden sm:block">
@@ -92,15 +71,6 @@ const MessageItem = ({
           isAnonymous={isAnonymous}
           isMobile={isMobile}
         />
-        
-        {/* Show like button to the right for user messages */}
-        {message.sender !== "assistant" && (
-          <MessageLikeButton 
-            isLiked={!!isLikedByCurrentParticipant}
-            likeCount={likeCount}
-            onClick={handleLike}
-          />
-        )}
         
         {/* Show avatar for user messages (not anonymous) */}
         {message.sender === "user" && isFirstMessageOfGroup && !isAnonymous && (

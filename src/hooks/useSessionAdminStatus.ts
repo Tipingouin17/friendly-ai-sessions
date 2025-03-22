@@ -1,12 +1,16 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
+/**
+ * Hook to manage admin status with prevention of infinite loops
+ */
 export function useSessionAdminStatus() {
   const location = useLocation();
   const isOnAdminPath = location.pathname.includes('/admin');
+  const hasInitialized = useRef(false);
   
-  // Initialize state once and read from sessionStorage only during initialization
+  // Get initial admin status from session storage only once during initialization
   const [isAdmin, setIsAdmin] = useState(() => {
     // For admin paths, always return true
     if (isOnAdminPath) {
@@ -17,29 +21,42 @@ export function useSessionAdminStatus() {
     return sessionStorage.getItem('isAdminSession') === 'true';
   });
 
-  // Update admin status in sessionStorage when isAdmin changes
-  useEffect(() => {
-    if (isAdmin) {
-      sessionStorage.setItem('isAdminSession', 'true');
-    } else if (sessionStorage.getItem('isAdminSession') === 'true') {
-      // Only remove if it exists (prevents unnecessary storage operations)
-      sessionStorage.removeItem('isAdminSession');
+  // We use a separate function to update session storage to avoid loops
+  const persistAdminStatus = useCallback((status: boolean) => {
+    if (status) {
+      if (sessionStorage.getItem('isAdminSession') !== 'true') {
+        sessionStorage.setItem('isAdminSession', 'true');
+      }
+    } else {
+      if (sessionStorage.getItem('isAdminSession') === 'true') {
+        sessionStorage.removeItem('isAdminSession');
+      }
     }
-  }, [isAdmin]);
+  }, []);
+
+  // Update session storage when admin status changes, but only once
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      persistAdminStatus(isAdmin);
+    }
+  }, [isAdmin, persistAdminStatus]);
 
   // When on admin paths, ensure admin status is true
   useEffect(() => {
     if (isOnAdminPath && !isAdmin) {
       setIsAdmin(true);
+      persistAdminStatus(true);
     }
-  }, [isOnAdminPath, isAdmin]);
+  }, [isOnAdminPath, isAdmin, persistAdminStatus]);
 
-  // Simplified setter function that doesn't cause loops
-  const setAdminStatus = (status: boolean) => {
+  // Provide a safe way to update admin status without causing loops
+  const setAdminStatus = useCallback((status: boolean) => {
     if (status !== isAdmin) {
       setIsAdmin(status);
+      persistAdminStatus(status);
     }
-  };
+  }, [isAdmin, persistAdminStatus]);
 
   return { isAdmin, setAdminStatus };
 }

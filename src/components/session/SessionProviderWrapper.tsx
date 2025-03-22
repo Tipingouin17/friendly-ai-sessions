@@ -40,7 +40,9 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   // Use ref for tracking setup and retries to prevent re-renders
   const stateRef = useRef({
     hasSetup: false,
-    hasToggledRetry: false
+    hasToggledRetry: false,
+    adminStatusDetermined: false,
+    effectiveAdmin: false
   });
   
   // Get admin status from our hook
@@ -50,19 +52,31 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
   
-  // Simplified admin status determination
-  const effectiveAdmin = isAdmin || forceAdmin || contextIsAdmin || isOnAdminPath;
+  // Determine the admin status once and store in ref to prevent loops
+  if (!stateRef.current.adminStatusDetermined) {
+    stateRef.current.effectiveAdmin = isAdmin || forceAdmin || contextIsAdmin || isOnAdminPath;
+    stateRef.current.adminStatusDetermined = true;
+    
+    // Log it once
+    console.log("SessionProviderWrapper admin status determined:", {
+      isAdmin, 
+      forceAdmin, 
+      contextIsAdmin, 
+      isOnAdminPath,
+      effectiveAdmin: stateRef.current.effectiveAdmin
+    });
+  }
   
-  // Use admin status management hook
-  useSessionProviderAdmin({ forceAdmin: effectiveAdmin });
+  // Use admin status management hook - with safeguards to prevent loops
+  useSessionProviderAdmin({ forceAdmin: stateRef.current.effectiveAdmin });
 
   // Use initialization hook
   const { forcedInitialization } = useSessionProviderInitialization({
     onInitialized,
     onLoading,
     sessionMountedRef,
-    isAdmin: effectiveAdmin,
-    forceAdmin: effectiveAdmin
+    isAdmin: stateRef.current.effectiveAdmin,
+    forceAdmin: stateRef.current.effectiveAdmin
   });
 
   // Use wrapper initialization hook
@@ -70,7 +84,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     onInitialized,
     onLoading,
     sessionMountedRef,
-    effectiveAdmin,
+    effectiveAdmin: stateRef.current.effectiveAdmin,
     isOnAdminPath
   });
   
@@ -81,7 +95,8 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     stateRef.current.hasSetup = true;
     
     // Auto-retry for participants only, not for admin routes
-    if (isParticipantPath && !stateRef.current.hasToggledRetry && !effectiveAdmin && connectionAttempts === 0) {
+    if (isParticipantPath && !stateRef.current.hasToggledRetry && 
+        !stateRef.current.effectiveAdmin && connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {
         console.log("Auto-retrying connection for participant");
         retryConnection();
@@ -90,19 +105,19 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       
       return () => clearTimeout(retryTimeout);
     }
-  }, [isParticipantPath, effectiveAdmin, connectionAttempts, retryConnection]);
+  }, [isParticipantPath, connectionAttempts, retryConnection]);
 
   return (
     <RefactoredSessionProvider 
       handleSessionFull={handleSessionFull}
       onError={onError}
-      forceAdmin={effectiveAdmin}
+      forceAdmin={stateRef.current.effectiveAdmin}
     >
       {(props: SessionContextProps) => {
         // Use wrapper effects hook
         useSessionWrapperEffects({
           props,
-          effectiveAdmin,
+          effectiveAdmin: stateRef.current.effectiveAdmin,
           isOnAdminPath,
           forcedInitialization,
           providerInitialized,
@@ -116,7 +131,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         if (children) {
           return children({
             ...props,
-            isAdmin: props.isAdmin || effectiveAdmin
+            isAdmin: props.isAdmin || stateRef.current.effectiveAdmin
           });
         }
         
@@ -125,11 +140,11 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           <SessionStateRenderer
             props={{
               ...props,
-              isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || effectiveAdmin)
+              isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || stateRef.current.effectiveAdmin)
             }}
             isLoading={props.isLoading}
             error={error}
-            effectiveAdmin={effectiveAdmin}
+            effectiveAdmin={stateRef.current.effectiveAdmin}
             retryConnection={retryConnection}
             connectionAttempts={connectionAttempts}
             sessionStarted={sessionStarted}

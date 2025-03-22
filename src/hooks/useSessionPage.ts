@@ -24,10 +24,12 @@ export function useSessionPage() {
     isOnAdminPath: window.location.pathname.includes('/admin')
   });
   
-  // Calculate effective admin status only once during initialization
-  const [effectiveIsAdmin] = useState(() => {
-    return isAdmin || renderRef.current.isOnAdminPath;
-  });
+  // Calculate effective admin status only once during initialization using ref
+  // This is crucial to prevent re-renders
+  const adminStatusRef = useRef<boolean | null>(null);
+  if (adminStatusRef.current === null) {
+    adminStatusRef.current = isAdmin || renderRef.current.isOnAdminPath;
+  }
   
   const { 
     sessionStarted, 
@@ -66,7 +68,7 @@ export function useSessionPage() {
         locationSearch: location.search,
         locationState: location.state,
         currentConversationId,
-        isAdmin: effectiveIsAdmin,
+        isAdmin: adminStatusRef.current,
         error,
         connectionAttempts,
         isLoading,
@@ -75,11 +77,11 @@ export function useSessionPage() {
         renderCount: renderRef.current.renderCount
       });
     }
-  }, [location, effectiveIsAdmin, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
+  }, [location, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
 
   return {
     currentConversationId,
-    isAdmin: effectiveIsAdmin, // Use the computed value to prevent re-renders
+    isAdmin: adminStatusRef.current, // Use the computed value from ref to prevent re-renders
     sessionStarted,
     setSessionStarted,
     isLoading,

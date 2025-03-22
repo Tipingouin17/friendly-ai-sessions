@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
@@ -32,20 +32,32 @@ export const useSessionParticipantSetup = ({
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const { toast } = useToast();
   
-  // This will store if we're processing as admin to use throughout the component
-  const effectiveIsAdmin = forceAdmin === true || 
-                          locationState?.isAdmin === true || 
-                          isAdmin === true || 
-                          sessionStorage.getItem('isAdminSession') === 'true';
+  // Use a ref to store and determine admin status just once to prevent loops
+  const adminStatusRef = useRef({
+    determined: false,
+    isAdmin: false
+  });
   
-  // Enforce admin status if detected from any source
+  // Determine admin status once and store in ref
+  if (!adminStatusRef.current.determined) {
+    adminStatusRef.current.isAdmin = forceAdmin === true || 
+                                    locationState?.isAdmin === true || 
+                                    isAdmin === true || 
+                                    sessionStorage.getItem('isAdminSession') === 'true';
+    adminStatusRef.current.determined = true;
+    
+    // Log it
+    console.log("useSessionParticipantSetup admin status determined:", adminStatusRef.current.isAdmin);
+  }
+  
+  // Enforce admin status if needed - run only once
   useEffect(() => {
-    if (effectiveIsAdmin) {
+    if (adminStatusRef.current.isAdmin) {
       console.log("useSessionParticipantSetup: Enforcing admin status");
-      sessionStorage.setItem('isAdminSession', 'true');
+      // This uses the safe version that won't cause re-renders if already set
       setAdminStatus(true);
     }
-  }, [forceAdmin, locationState, isAdmin, setAdminStatus, effectiveIsAdmin]);
+  }, [setAdminStatus]);
   
   // Get participants using the hook
   const participantsData = useSessionParticipants(conversationId);
@@ -62,15 +74,13 @@ export const useSessionParticipantSetup = ({
       conversationId,
       currentParticipantCount,
       maxParticipantsForSession,
-      isAdmin,
-      effectiveIsAdmin,
-      forceAdmin,
+      effectiveIsAdmin: adminStatusRef.current.isAdmin,
       isSessionFull,
       currentUserParticipantId,
       locationStateParticipantId: locationState?.participantId
     });
-  }, [conversationId, currentParticipantCount, maxParticipantsForSession, isAdmin, 
-      effectiveIsAdmin, forceAdmin, isSessionFull, currentUserParticipantId, locationState]);
+  }, [conversationId, currentParticipantCount, maxParticipantsForSession,
+      isSessionFull, currentUserParticipantId, locationState]);
   
   // Set current user participant ID from location state
   useEffect(() => {
@@ -96,7 +106,7 @@ export const useSessionParticipantSetup = ({
   // Handle session full logic with improved admin detection
   useEffect(() => {
     // Skip entirely if we're an admin
-    if (effectiveIsAdmin) {
+    if (adminStatusRef.current.isAdmin) {
       console.log("Admin user detected in useSessionParticipantSetup, skipping session full check");
       if (isSessionFull) {
         setIsSessionFull(false); // Reset if previously set
@@ -127,7 +137,7 @@ export const useSessionParticipantSetup = ({
       console.log("Session is full, notifying:", {
         currentCount: currentParticipantCount,
         maxAllowed: effectiveMaxParticipants,
-        isAdmin: effectiveIsAdmin
+        isAdmin: adminStatusRef.current.isAdmin
       });
       
       setIsSessionFull(true);
@@ -157,7 +167,6 @@ export const useSessionParticipantSetup = ({
     conversationId,
     onSessionFull,
     onError,
-    effectiveIsAdmin,
     toast,
     currentUserParticipantId,
     locationState
@@ -171,6 +180,6 @@ export const useSessionParticipantSetup = ({
     isSessionFull,
     isParticipantTracking: true,
     forceRefreshParticipants,
-    isAdmin: effectiveIsAdmin // Expose the calculated admin status
+    isAdmin: adminStatusRef.current.isAdmin // Use the ref value to prevent loops
   };
 };

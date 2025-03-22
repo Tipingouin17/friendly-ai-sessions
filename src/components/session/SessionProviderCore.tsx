@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -10,6 +9,7 @@ import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { useSessionRealtimeConnection } from "@/hooks/useSessionRealtimeConnection";
+import { useSessionContextValue } from "@/hooks/useSessionContextValue";
 
 interface SessionProviderCoreProps {
   children: (props: SessionContextProps) => React.ReactElement;
@@ -141,6 +141,25 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
+  // Get the session context value using our new hook
+  const sessionContextValue = useSessionContextValue({
+    isLoading,
+    conversation,
+    currentConversationId,
+    refetch,
+    showQrCodeView,
+    sessionLink,
+    isSessionStartedInDB,
+    roomState,
+    participants,
+    currentUserParticipantId,
+    isAdmin,
+    providerError,
+    connection,
+    handleStartSession: enhancedHandleStartSession,
+    effectiveAdmin
+  });
+
   // If we have serious errors, return error fallback
   if (providerError && !effectiveAdmin) {
     return (
@@ -156,50 +175,6 @@ export const SessionProviderCore = ({
       </SessionProviderErrorFallback>
     );
   }
-
-  // Build the session context value
-  const sessionContextValue: SessionContextProps = {
-    isLoading: effectiveAdmin ? false : isLoading, // Always set loading to false for admin
-    conversation,
-    currentConversationId,
-    sessionState: {
-      messages: roomState.messages || [], // Ensure messages is an array
-      inputMessage: roomState.inputMessage,
-      setInputMessage: roomState.setInputMessage,
-      currentParticipant: roomState.currentParticipant,
-      isRecording: roomState.isRecording,
-      setIsRecording: roomState.setIsRecording,
-      handleGenerateReport: roomState.handleGenerateReport,
-      isGeneratingReport: roomState.isGeneratingReport,
-      setMessages: roomState.setMessages,
-      hasAnswered: roomState.hasAnswered,
-      totalResponses: roomState.totalResponses,
-      viewMode: roomState.viewMode,
-      setViewMode: roomState.setViewMode,
-      recordResponse: roomState.recordResponse,
-      error: roomState.error
-    },
-    participants,
-    participantColors,
-    isWaitingForResponse: roomState.isWaitingForResponse,
-    handleStartSession: enhancedHandleStartSession,
-    handleSendMessage: roomState.handleSendMessage,
-    handleLikeMessage: roomState.handleLikeMessage,
-    showQrCodeView,
-    sessionLink,
-    currentUserParticipantId,
-    anonymousState: roomState.anonymousState,
-    isSessionStartedInDB,
-    error: effectiveAdmin ? null : providerError, // Clear errors for admin
-    
-    // Add connection properties
-    isConnected: connection.isConnected,
-    connectionAttempts: connection.connectionAttempts,
-    refetch,
-    
-    // Ensure admin status is properly set
-    isAdmin: isAdmin || effectiveAdmin
-  };
 
   // Return children with context
   return children(sessionContextValue);

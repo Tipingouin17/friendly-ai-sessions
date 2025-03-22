@@ -28,6 +28,8 @@ export const SessionProviderCore = ({
   onError,
   forceAdmin 
 }: SessionProviderCoreProps) => {
+  console.count("SessionProviderCore renders");
+  
   const location = useLocation();
   const { persistedParticipantData } = useParticipantPersistence();
   

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -18,6 +18,19 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
   maxParticipants,
   onCopyLink
 }) => {
+  // Auto-close dialog when session is full
+  useEffect(() => {
+    if (isOpen && maxParticipants > 0 && currentParticipants >= maxParticipants) {
+      console.log('Session is full, auto-closing QR dialog');
+      onOpenChange(false);
+    }
+  }, [isOpen, currentParticipants, maxParticipants, onOpenChange]);
+
+  // Don't render the dialog at all if session is full
+  if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
+    return null;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">

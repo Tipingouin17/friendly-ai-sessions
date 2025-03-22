@@ -33,6 +33,14 @@ const JoinSessionDialog = ({
   const { currentConversationId } = useConversationId();
   const [internalJoinUrl, setInternalJoinUrl] = useState('');
 
+  // Auto-close dialog when session is full
+  useEffect(() => {
+    if (isOpen && maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+      console.log('Session is full, auto-closing QR dialog');
+      setIsOpen(false);
+    }
+  }, [isOpen, currentParticipantCount, maxParticipants, setIsOpen]);
+
   useEffect(() => {
     // Generate the join URL if it's not provided but we have a conversation ID
     const generateJoinUrl = () => {
@@ -65,6 +73,11 @@ const JoinSessionDialog = ({
       });
     }
   };
+
+  // Don't render the dialog trigger or dialog if session is full
+  if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

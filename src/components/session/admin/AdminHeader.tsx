@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, LayoutDashboard } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -29,7 +29,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
   
   const handleBack = () => {
-    navigate('/');
+    // Navigate to past workshops page instead of home
+    navigate('/past-workshops');
   };
 
   // Get session title
@@ -42,8 +43,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b pb-2">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={handleBack} title="Back to Sessions Dashboard">
+            <LayoutDashboard className="h-5 w-5" />
           </Button>
           
           <div className="flex flex-col">

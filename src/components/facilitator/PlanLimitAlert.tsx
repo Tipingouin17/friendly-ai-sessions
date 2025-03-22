@@ -22,6 +22,11 @@ export const PlanLimitAlert = ({
     return null;
   }
 
+  // Don't show the alert if maxSessions is Infinity
+  if (hasReachedSessionLimit && maxSessions === Infinity) {
+    return null;
+  }
+
   return (
     <Alert variant="destructive" className="mb-6">
       <AlertCircle className="h-4 w-4" />

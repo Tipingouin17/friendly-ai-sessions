@@ -87,11 +87,14 @@ export const usePlanLimits = (): PlanLimits => {
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
   
   // Check both the count limit and whether custom facilitators are allowed
-  const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators);
+  const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators && maxFacilitators !== Infinity);
+  
+  // For session limit, only show the limit reached message if there's a finite limit and we've reached it
+  const hasReachedSessionLimit = (counts?.sessionCount || 0) >= maxSessions && maxSessions !== Infinity;
   
   return {
     hasReachedFacilitatorLimit,
-    hasReachedSessionLimit: (counts?.sessionCount || 0) >= maxSessions,
+    hasReachedSessionLimit,
     hasReachedParticipantLimit: false, // This will be checked when selecting participants
     maxParticipants,
     maxFacilitators,

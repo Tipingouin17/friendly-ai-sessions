@@ -54,15 +54,15 @@ export const useUserPlan = (): UserPlanDetails => {
         
         // Create the plan restrictions object from the plan details
         const planRestrictions = {
-          facilitator_limit: planTableDetails.no_of_facilitator, 
-          session_limit: planTableDetails.no_of_sessions,
-          max_participants: planTableDetails.max_participants,
+          facilitator_limit: parseNumberOrNull(planTableDetails.no_of_facilitator), 
+          session_limit: parseNumberOrNull(planTableDetails.no_of_sessions),
+          max_participants: parseNumberOrNull(planTableDetails.max_participants),
           customisable_sessions: planTableDetails.customisable_sessions,
           customisable_facilitators: planTableDetails.customisable_facilitators,
           saved_sessions: planTableDetails.saved_sessions,
           session_reports: planTableDetails.session_reports,
           data_export: planTableDetails.data_export,
-          question_limit: planTableDetails.number_of_questions_per_session || 10
+          question_limit: parseNumberOrNull(planTableDetails.number_of_questions_per_session) || 10
         };
         
         // Create a compatible plan object for the UI
@@ -108,15 +108,15 @@ export const useUserPlan = (): UserPlanDetails => {
       
       // Create the plan restrictions object from the plan details
       const planRestrictions = {
-        facilitator_limit: planTableDetails.no_of_facilitator,
-        session_limit: planTableDetails.no_of_sessions,
-        max_participants: planTableDetails.max_participants,
+        facilitator_limit: parseNumberOrNull(planTableDetails.no_of_facilitator),
+        session_limit: parseNumberOrNull(planTableDetails.no_of_sessions),
+        max_participants: parseNumberOrNull(planTableDetails.max_participants),
         customisable_sessions: planTableDetails.customisable_sessions,
         customisable_facilitators: planTableDetails.customisable_facilitators,
         saved_sessions: planTableDetails.saved_sessions,
         session_reports: planTableDetails.session_reports,
         data_export: planTableDetails.data_export,
-        question_limit: planTableDetails.number_of_questions_per_session || 10
+        question_limit: parseNumberOrNull(planTableDetails.number_of_questions_per_session) || 10
       };
 
       // Create a compatible plan object for the UI
@@ -149,6 +149,13 @@ export const useUserPlan = (): UserPlanDetails => {
     },
     enabled: !!user,
   });
+
+  // Helper function to parse numbers or null values
+  function parseNumberOrNull(value: any): number | null {
+    if (value === null) return null;
+    const num = Number(value);
+    return isNaN(num) ? null : num;
+  }
   
   return {
     currentPlanId: data?.currentPlanId || null,

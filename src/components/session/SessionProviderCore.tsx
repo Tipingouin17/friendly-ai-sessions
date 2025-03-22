@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
@@ -32,7 +31,6 @@ export const SessionProviderCore = ({
   const location = useLocation();
   const { persistedParticipantData } = useParticipantPersistence();
   
-  // Debug logging
   useEffect(() => {
     console.log("SessionProviderCore initialized", {
       pathname: location.pathname,
@@ -44,17 +42,14 @@ export const SessionProviderCore = ({
     });
   }, [location, persistedParticipantData, forceAdmin]);
   
-  // Enhance location state with persisted data if available
   const locationState = useEnhancedLocationState(location.state);
   
-  // Determine effective admin status from all sources
   const effectiveAdmin = useEffectiveAdminStatus({
     forceAdmin, 
     locationState, 
     persistedParticipantData
   });
   
-  // Force admin status if detected from any source
   useEffect(() => {
     if (effectiveAdmin) {
       console.log("SessionProviderCore: Enforcing admin status");
@@ -62,7 +57,6 @@ export const SessionProviderCore = ({
     }
   }, [effectiveAdmin]);
   
-  // Load core provider state
   const {
     currentConversationId,
     conversation,
@@ -81,7 +75,6 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Set up realtime connection
   const connection = useSessionRealtimeConnection({
     conversationId: currentConversationId,
     refetch,
@@ -89,14 +82,12 @@ export const SessionProviderCore = ({
     isAdmin: effectiveAdmin
   });
 
-  // Handle data errors
   useSessionProviderErrorHandler({
     dataError,
     effectiveAdmin,
     handleError
   });
 
-  // Set up participant management
   const {
     participants,
     currentUserParticipantId,
@@ -114,7 +105,6 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Check for stuck states and force refresh
   useStuckStateHandler({
     isLoading,
     currentConversationId,
@@ -123,7 +113,6 @@ export const SessionProviderCore = ({
     forceRefreshParticipants
   });
 
-  // Set up session monitoring
   const {
     isSessionStartedInDB,
     roomState
@@ -136,7 +125,6 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Get the session context value using our hook
   try {
     const sessionContextValue = useSessionContextValue({
       isLoading,
@@ -156,7 +144,6 @@ export const SessionProviderCore = ({
       effectiveAdmin
     });
 
-    // Return children with context or error fallback
     return (
       <SessionProviderCoreError
         providerError={providerError}
@@ -171,7 +158,6 @@ export const SessionProviderCore = ({
   } catch (error) {
     console.error("Fatal error in SessionProviderCore:", error);
     
-    // Use the error component to handle the fallback rendering
     return (
       <SessionProviderCoreError
         providerError={error instanceof Error ? error.message : "Unknown error in SessionProviderCore"}

@@ -82,8 +82,12 @@ export const SessionProvider = ({
   // If we have serious errors, return error fallback
   if (providerError || error) {
     return (
-      <SessionProviderErrorFallback errorMessage={providerError || error}>
-        {children}
+      <SessionProviderErrorFallback 
+        errorMessage={providerError || error}
+        isAdmin={false}
+        onRetry={() => refetch()}
+      >
+        <div>Error loading session</div>
       </SessionProviderErrorFallback>
     );
   }

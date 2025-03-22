@@ -14,7 +14,9 @@ export function useSessionPageState() {
     isAdmin: isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true',
     connectionAttempts: 0,
     error: null as string | null,
-    noSessionFound: false
+    noSessionFound: false,
+    hasShownToast: false,
+    pageLoadTime: Date.now()
   });
   
   // Mutable state that requires re-renders

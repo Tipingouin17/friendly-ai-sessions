@@ -56,9 +56,14 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
 
   // Separate handling for admin route specific rendering
   const isOnAdminRoute = window.location.pathname.includes('/admin');
+  const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminRoute;
+  
+  // CRITICAL FIX: For participant routes, don't use session storage admin status
+  const shouldUseAdminPrivileges = isParticipantPath ? 
+    (props.isAdmin || false) : effectiveAdmin;
   
   // If on dedicated admin route, bypass most checks and show session directly
-  if (isOnAdminRoute || (effectiveAdmin && props.isAdmin)) {
+  if (isOnAdminRoute || (shouldUseAdminPrivileges && props.isAdmin)) {
     console.log("🔑 On admin route or confirmed admin - bypassing error screens");
     
     if (!props.conversation && props.refetch) {
@@ -86,7 +91,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
                            props.error?.includes("full") || props.error?.includes("maximum capacity");
   
   // Admin users bypass session full errors even if not on admin route
-  if (effectiveAdmin && isSessionFullError) {
+  if (shouldUseAdminPrivileges && isSessionFullError) {
     console.log("🔑 Admin detected with session full error - bypassing error screen");
     
     if (!props.conversation) {
@@ -110,8 +115,9 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     );
   }
   
+  // CRITICAL FIX: Add clearer loading state transitions for participants
   // If loading and no conversation, show loading state
-  if (isLoading && !props.conversation) {
+  if ((isLoading || props.isLoading) && !props.conversation) {
     console.log("Showing provider loading state");
     return <JoinSessionLoadingState 
       onRetry={retryConnection}
@@ -130,7 +136,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }
   
   // If no conversation ID and not loading, show error
-  if (!props.currentConversationId && !isLoading && !effectiveAdmin) {
+  if (!props.currentConversationId && !isLoading && !props.isLoading) {
     console.error("No conversation ID found in session provider, but no error was returned");
     return <JoinSessionLoadingState 
       error="Session not found. Please try again." 
@@ -144,9 +150,9 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     <SessionStateHandler
       props={{
         ...props,
-        isAdmin: props.isAdmin || effectiveAdmin
+        isAdmin: props.isAdmin
       }}
-      isAdmin={props.isAdmin || effectiveAdmin}
+      isAdmin={props.isAdmin}
       sessionStarted={sessionStarted}
       setSessionStarted={setSessionStarted}
       onSessionFull={handleSessionFull}

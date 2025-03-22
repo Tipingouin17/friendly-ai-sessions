@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { RefactoredSessionProvider } from "./RefactoredSessionProvider";
 import { SessionContextProps } from "@/types/session";
 import SessionStateRenderer from "./SessionStateRenderer";
@@ -36,8 +36,17 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   children
 }) => {
   const [sessionStarted, setSessionStarted] = useState(false);
-  const effectiveAdmin = isAdmin || forceAdmin || sessionStorage.getItem('isAdminSession') === 'true';
+  const [hasToggledRetry, setHasToggledRetry] = useState(false);
+  
+  // Check URL path to distinguish between admin and participant routes
   const isOnAdminPath = window.location.pathname.includes('/admin');
+  const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
+  
+  // CRITICAL FIX: For participant paths, don't use admin status from session storage
+  // This prevents admin session conflicts with participant sessions
+  const effectiveAdmin = isParticipantPath ? 
+                       (isAdmin || forceAdmin) : 
+                       (isAdmin || forceAdmin || sessionStorage.getItem('isAdminSession') === 'true' || isOnAdminPath);
   
   // Use admin status management hook
   useSessionProviderAdmin({ forceAdmin: effectiveAdmin || isOnAdminPath });
@@ -59,6 +68,20 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     effectiveAdmin,
     isOnAdminPath
   });
+  
+  // CRITICAL FIX: Implement automatic retry for participants to ensure they can connect
+  useEffect(() => {
+    // Auto-retry for participants only, not for admin routes
+    if (isParticipantPath && !hasToggledRetry && !effectiveAdmin && connectionAttempts === 0) {
+      const retryTimeout = setTimeout(() => {
+        console.log("Auto-retrying connection for participant");
+        retryConnection();
+        setHasToggledRetry(true);
+      }, 3000); // Short timeout to ensure participants can connect
+      
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [isParticipantPath, hasToggledRetry, effectiveAdmin, connectionAttempts, retryConnection]);
 
   return (
     <RefactoredSessionProvider 
@@ -93,7 +116,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           <SessionStateRenderer
             props={{
               ...props,
-              isAdmin: props.isAdmin || effectiveAdmin || isOnAdminPath
+              isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || effectiveAdmin || isOnAdminPath)
             }}
             isLoading={props.isLoading}
             error={error}

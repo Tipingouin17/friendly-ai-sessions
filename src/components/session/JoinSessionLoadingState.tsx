@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,26 +23,33 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   const startTime = useRef(Date.now());
   const mountedRef = useRef(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRetryAttempted = useRef(false);
   
   useEffect(() => {
     console.log("JoinSessionLoadingState mounted", { error, retryCount });
     mountedRef.current = true;
     
+    // CRITICAL FIX: Automatically retry connection sooner for better participant experience
     timerRef.current = setInterval(() => {
       if (mountedRef.current) {
         const newElapsed = (Date.now() - startTime.current) / 1000;
         setElapsed(newElapsed);
         
-        if (newElapsed > 3 && !isLongWait) {
+        if (newElapsed > 2 && !isLongWait) {
           setIsLongWait(true);
         }
-        if (newElapsed > 6 && !isVeryLongWait) {
+        if (newElapsed > 5 && !isVeryLongWait) {
           setIsVeryLongWait(true);
         }
         
-        if (newElapsed > 8 && onRetry && retryCount < 1) {
-          console.log("Auto-retrying connection after long wait");
-          onRetry();
+        // Auto-retry logic - more aggressive for better user experience
+        if (onRetry && !autoRetryAttempted.current) {
+          if ((newElapsed > 3 && retryCount === 0) || 
+              (error && newElapsed > 2)) {
+            console.log("Auto-retrying connection after wait or error");
+            onRetry();
+            autoRetryAttempted.current = true;
+          }
         }
       }
     }, 1000);
@@ -52,8 +60,9 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [onRetry, retryCount]);
+  }, [onRetry, retryCount, error, isLongWait, isVeryLongWait]);
   
+  // Improved error handling for better user feedback
   useEffect(() => {
     if (!error) {
       setErrorDescription(null);
@@ -68,6 +77,8 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
       setErrorDescription("The session data couldn't be loaded properly. Please try again.");
     } else if (error.includes("websocket") || error.includes("WebSocket")) {
       setErrorDescription("We're having trouble establishing a real-time connection. This might be due to network restrictions.");
+    } else if (error.includes("full") || error.includes("maximum capacity")) {
+      setErrorDescription("This session has reached its maximum capacity and cannot accept more participants. Please try again later or contact the session organizer.");
     } else {
       setErrorDescription(error);
     }
@@ -90,6 +101,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
     }
   }, [loadingTimeElapsed, retryCount, error]);
 
+  // Prevent extremely long waits
   useEffect(() => {
     const autoRefreshTimeout = setTimeout(() => {
       if (elapsed > 15 && mountedRef.current) {

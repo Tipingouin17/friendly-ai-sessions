@@ -47,6 +47,23 @@ export function useSessionAdminStatus() {
       }
     }
     
+    // CRITICAL FIX: Add path-specific storage to prevent non-admin/admin session conflicts
+    const isParticipantPath = currentPath.includes('/session') && !currentPath.includes('/admin');
+    if (isParticipantPath) {
+      // Participants should only get admin status from their specific state or params
+      // NOT from the general session storage that might be set by a previous admin session
+      if (locationState?.isAdmin === true || isAdminParam) {
+        setIsAdmin(true);
+        console.log("Participant path: Setting admin=true based on explicit flags");
+      } else {
+        // For participant paths, explicitly clear admin status unless they have direct admin flags
+        setIsAdmin(false);
+        console.log("Participant path: Ensuring admin=false for regular participants");
+      }
+      isInitialized.current = true;
+      return;
+    }
+    
     // More robust admin detection with clear precedence:
     // 1. Check if we're on the /admin path (already handled above)
     // 2. Check sessionStorage for persistence 
@@ -81,6 +98,7 @@ export function useSessionAdminStatus() {
       JSON.stringify({
         path: location.pathname,
         isAdminPath,
+        isParticipantPath,
         isAdminInState: locationState?.isAdmin,
         isAdminInQuery: isAdminParam,
         isGuest: locationState?.isGuest,

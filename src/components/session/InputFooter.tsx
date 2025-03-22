@@ -3,8 +3,7 @@ import React, { useEffect } from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { EyeOff, Users, CheckCircle2 } from "lucide-react";
-import { Toggle } from "@/components/ui/toggle";
+import { Users, CheckCircle2 } from "lucide-react";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -92,27 +91,7 @@ const InputFooter = ({
           </Badge>
         )}
         
-        {shouldAllowAnswer && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Toggle 
-                  pressed={isAnonymous} 
-                  onPressedChange={toggleAnonymous}
-                  size="sm"
-                  variant="outline"
-                  className={`text-xs ${isAnonymous ? "bg-gray-100" : ""}`}
-                >
-                  <EyeOff className="h-3 w-3 mr-1" />
-                  <span className={isMobile ? "sr-only" : ""}>Anonymous</span>
-                </Toggle>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>When enabled, your name will not be shown with your messages</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        {/* Anonymous toggle removed */}
       </div>
       
       <div className="w-full border-t border-gray-100 bg-white/80 backdrop-blur-sm">

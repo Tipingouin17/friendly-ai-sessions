@@ -15,19 +15,24 @@ export function useSessionRealtimeConnection({
   onError,
   isAdmin
 }: UseSessionRealtimeConnectionProps) {
-  // Set up realtime connection handling
+  // Set up realtime connection handling with better error handling
   const connection = useRealtimeConnectionHandler({
     conversationId,
     refetch,
-    onConnectionError: onError
+    onConnectionError: (error) => {
+      // Only pass errors to parent if not in admin mode
+      if (!isAdmin && onError) {
+        onError(error);
+      } else if (isAdmin) {
+        console.log("🔑 Suppressing connection error for admin user:", error);
+      }
+    }
   });
   
-  // Skip connection error handling for admin users
-  useEffect(() => {
-    if (isAdmin && connection.connectionError) {
-      console.log("🔑 Suppressing connection errors for admin user");
-    }
-  }, [isAdmin, connection.connectionError]);
-  
-  return connection;
+  // Return a safe connection object with defaults for any potentially undefined values
+  return {
+    isConnected: connection?.isConnected ?? false,
+    connectionAttempts: connection?.connectionAttempts ?? 0,
+    connectionError: connection?.connectionError ?? null
+  };
 }

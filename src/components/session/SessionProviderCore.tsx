@@ -1,7 +1,7 @@
+
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SessionContextProps } from "@/types/session";
-import { participantColors } from "@/utils/sessionHelpers";
 import { SessionProviderErrorFallback } from "./SessionProviderErrorFallback";
 import { useSessionProviderState } from "@/hooks/useSessionProviderState";
 import { useSessionParticipantSetup } from "@/hooks/useSessionParticipantSetup";
@@ -141,43 +141,110 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  // Get the session context value using our new hook
-  const sessionContextValue = useSessionContextValue({
-    isLoading,
-    conversation,
-    currentConversationId,
-    refetch,
-    showQrCodeView,
-    sessionLink,
-    isSessionStartedInDB,
-    roomState,
-    participants,
-    currentUserParticipantId,
-    isAdmin,
-    providerError,
-    connection,
-    handleStartSession: enhancedHandleStartSession,
-    effectiveAdmin
-  });
+  // Create a safe roomState with defaults to prevent errors
+  const safeRoomState = roomState || {
+    messages: [],
+    inputMessage: "",
+    setInputMessage: () => {},
+    currentParticipant: 0,
+    isRecording: false,
+    setIsRecording: () => {},
+    handleGenerateReport: async () => Promise.resolve(),
+    isGeneratingReport: false,
+    setMessages: () => {},
+    hasAnswered: false,
+    totalResponses: 0,
+    viewMode: "participant",
+    setViewMode: () => {},
+    recordResponse: () => {},
+    error: null
+  };
 
-  // If we have serious errors, return error fallback
-  if (providerError && !effectiveAdmin) {
-    return (
-      <SessionProviderErrorFallback 
-        errorMessage={providerError}
-        isAdmin={effectiveAdmin}
-        onRetry={() => {
-          console.log("Retry requested from error fallback");
-          refetch();
-        }}
-      >
-        {children}
-      </SessionProviderErrorFallback>
-    );
+  // Get the session context value using our hook
+  try {
+    const sessionContextValue = useSessionContextValue({
+      isLoading,
+      conversation,
+      currentConversationId,
+      refetch,
+      showQrCodeView,
+      sessionLink,
+      isSessionStartedInDB,
+      roomState: safeRoomState,
+      participants,
+      currentUserParticipantId,
+      isAdmin,
+      providerError,
+      connection,
+      handleStartSession: enhancedHandleStartSession,
+      effectiveAdmin
+    });
+
+    // If we have serious errors, return error fallback
+    if (providerError && !effectiveAdmin) {
+      return (
+        <SessionProviderErrorFallback 
+          errorMessage={providerError}
+          isAdmin={effectiveAdmin}
+          onRetry={() => {
+            console.log("Retry requested from error fallback");
+            refetch();
+          }}
+        >
+          {children}
+        </SessionProviderErrorFallback>
+      );
+    }
+
+    // Return children with context
+    return children(sessionContextValue);
+  } catch (error) {
+    console.error("Fatal error in SessionProviderCore:", error);
+    // Create emergency fallback context
+    const emergencyContext: SessionContextProps = {
+      isLoading: false,
+      conversation: null,
+      currentConversationId: null,
+      sessionState: {
+        messages: [],
+        inputMessage: "",
+        setInputMessage: () => {},
+        currentParticipant: 0,
+        isRecording: false,
+        setIsRecording: () => {},
+        hasAnswered: false,
+        totalResponses: 0,
+        viewMode: "participant",
+        setViewMode: () => {},
+        handleGenerateReport: async () => { return Promise.resolve(); },
+        isGeneratingReport: false,
+        setMessages: () => {},
+        recordResponse: () => {},
+        error: null
+      },
+      participants: [],
+      participantColors,
+      isWaitingForResponse: false,
+      handleStartSession: () => {},
+      handleSendMessage: async () => { return Promise.resolve(); },
+      handleLikeMessage: () => {},
+      showQrCodeView: false,
+      sessionLink: '',
+      currentUserParticipantId: null,
+      anonymousState: {
+        isAnonymous: false,
+        toggleAnonymous: () => {}
+      },
+      isSessionStartedInDB: false,
+      error: error instanceof Error ? error.message : "Unknown error in SessionProviderCore",
+      isConnected: false,
+      connectionAttempts: 0,
+      refetch: () => {},
+      isAdmin: effectiveAdmin
+    };
+    
+    return children(emergencyContext);
   }
-
-  // Return children with context
-  return children(sessionContextValue);
 };
 
 // Helper function to enhance location state with persisted data if available
@@ -252,3 +319,6 @@ function useStuckStateHandler({
     return () => clearTimeout(timeoutId);
   }, [isLoading, currentConversationId, conversation, refetch, forceRefreshParticipants]);
 }
+
+// Import participantColors to ensure error fallback has access
+import { participantColors } from "@/utils/sessionHelpers";

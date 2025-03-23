@@ -8,7 +8,7 @@ import { removeChannel, createUniqueChannelName, createReliableChannel } from ".
  */
 export const removeChannels = (channels: any[]) => {
   if (channels && channels.length > 0) {
-    console.log(`Cleaning up ${channels.length} realtime channels`);
+    //console.log(`Cleaning up ${channels.length} realtime channels`);
     channels.forEach(channel => removeChannel(channel));
   }
 };
@@ -23,7 +23,7 @@ export const createConversationChannel = (
   conversationId: number,
   onUpdate: (payload: any) => void
 ) => {
-  console.log(`Creating conversation channel for ID: ${conversationId}`);
+  //console.log(`Creating conversation channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`conversation-${conversationId}`);
@@ -41,7 +41,7 @@ export const createConversationChannel = (
         console.log(`Conversation channel subscription status: ${status}`);
       });
   } catch (error) {
-    console.error("Error creating conversation channel:", error);
+    //console.error("Error creating conversation channel:", error);
     return null;
   }
 };

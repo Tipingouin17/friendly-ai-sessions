@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot, Image, AlertCircle } from 'lucide-react';
@@ -27,11 +28,12 @@ const MessageAvatar = ({
     lg: 'h-10 w-10'
   };
 
+  // Only log when component is first mounted, not on every render
   useEffect(() => {
     if (isAssistant && avatarUrl) {
-      debugLog('all', `Facilitator avatar in MessageAvatar: ${avatarUrl}`);
+      debugLog('all', `Facilitator avatar loaded: ${avatarUrl}`);
     }
-  }, [avatarUrl, isAssistant]);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   if (anonymized) {
     return (
@@ -53,7 +55,7 @@ const MessageAvatar = ({
     if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl)) {
       const cleanUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
       
-      console.log('Using normalized facilitator avatar URL:', cleanUrl);
+      // Remove console.log to reduce noise
       
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
@@ -69,7 +71,7 @@ const MessageAvatar = ({
       );
     }
     
-    console.log('Using default bot icon for facilitator');
+    // Remove console.log to reduce noise
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">

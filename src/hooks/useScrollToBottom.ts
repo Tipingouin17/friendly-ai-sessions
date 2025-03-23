@@ -16,7 +16,7 @@ export function useScrollToBottom<T extends HTMLElement>(
     // Use a small timeout to ensure rendering is complete before scrolling
     const timeoutId = setTimeout(() => {
       scrollToBottom();
-    }, 100);
+    }, 150);
     
     return () => clearTimeout(timeoutId);
   }, [...dependencies]);

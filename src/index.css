@@ -98,7 +98,9 @@
   
   /* Message area container to ensure proper layout with fixed footer */
   .message-area-container {
-    @apply flex flex-col h-[calc(100vh-64px)];
+    @apply flex flex-col h-full min-h-[calc(100vh-16rem)];
+    padding-top: 4rem;
+    padding-bottom: 4rem;
   }
   
   /* Mobile-optimized message bubbles */

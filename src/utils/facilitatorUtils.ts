@@ -122,8 +122,11 @@ export const validateImageUrl = async (url: string): Promise<boolean> => {
     });
     
     clearTimeout(timeoutId);
+    
+    // Fix: Ensure we return a boolean by using a separate check for file extension
+    const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|svg)$/i) !== null;
     const isValid = response.ok && 
-      (response.headers.get('content-type')?.includes('image') || url.match(/\.(jpg|jpeg|png|gif|svg)$/i));
+      (response.headers.get('content-type')?.includes('image') || hasImageExtension);
     
     debugLog('participants', `URL validation result for ${url}: ${isValid}`);
     return isValid;

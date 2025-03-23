@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { SessionContextProps } from "@/types/session";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
@@ -30,7 +31,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   const { toast } = useToast();
   
   useEffect(() => {
-    //console.log("SessionStateRenderer state:", {
+    /* console.log("SessionStateRenderer state:", {
       isLoading,
       hasError: !!error || !!props.error,
       errorMessage: error || props.error,
@@ -42,7 +43,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
       isSessionStarted: props.isSessionStartedInDB,
       sessionStarted,
       pathname: window.location.pathname
-    });
+    }); */
   }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
   
   useEffect(() => {

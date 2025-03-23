@@ -46,7 +46,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     // If we're in a transition state, set a timeout to force complete it
     if (isTransitioning && !hasResolvedTransition.current) {
       transitionTimeout.current = setTimeout(() => {
-        //console.log("Force resolving transition state after timeout");
+        /* console.log("Force resolving transition state after timeout"); */
         hasResolvedTransition.current = true;
       }, 2000);
     }
@@ -80,7 +80,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
               payload.new.data && 
               payload.new.data.participant_id === props.currentUserParticipantId) {
             
-            //console.log("Current participant has been removed from session");
+            /* console.log("Current participant has been removed from session"); */
             
             // Show toast notification
             toast({
@@ -106,7 +106,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         })
         .subscribe();
         
-      //console.log("Subscribed to participant removal events");
+      /* console.log("Subscribed to participant removal events"); */
     } catch (err) {
       console.error("Error subscribing to participant events:", err);
     }
@@ -124,13 +124,13 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   
   // Safety check for null values
   if (!props.conversation) {
-    //console.log("No conversation in SessionViewSelector");
+    /* console.log("No conversation in SessionViewSelector"); */
     return <EmptyState />;
   }
 
   // Error handling
   if (props.error) {
-    //console.log("Showing error state:", props.error);
+    /* console.log("Showing error state:", props.error); */
     return (
       <JoinSessionLoadingState 
         error={props.error} 
@@ -145,13 +145,13 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const forceShowSession = isOnAdminPath || props.isSessionStartedInDB || sessionStarted || hasResolvedTransition.current;
   
   if (forceShowSession) {
-    //console.log("Force showing session view due to admin route, session started, or timeout");
+    /* console.log("Force showing session view due to admin route, session started, or timeout"); */
     return <SessionView props={props} isAdmin={isAdmin || isOnAdminPath} />;
   }
 
   // Admin view gets QR code view for sharing until session is started
   if (isAdmin && !shouldShowSession && props.showQrCodeView) {
-    //console.log("Rendering AdminQrView");
+    /* console.log("Rendering AdminQrView"); */
     return (
       <AdminQrView
         conversationId={props.currentConversationId as number}
@@ -169,7 +169,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   
   // For non-admins, show waiting screen until admin starts the session
   if (!isAdmin && !shouldShowSession) {
-    //console.log("Rendering ParticipantWaitingScreen");
+    /* console.log("Rendering ParticipantWaitingScreen"); */
     return (
       <ParticipantWaitingScreen
         conversationId={props.currentConversationId as number}
@@ -186,12 +186,12 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // Show loading if transitioning between states (but with a time limit now)
   if (isTransitioning && !hasResolvedTransition.current) {
-    //console.log("Showing transition loading state");
+    /* console.log("Showing transition loading state"); */
     return <LoadingState />;
   }
 
   // Show the main session view
-  c//onsole.log("Rendering main SessionView");
+  /* console.log("Rendering main SessionView"); */
   return <SessionView props={props} isAdmin={isAdmin} />;
 };
 

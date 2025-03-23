@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import { normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
 interface UseMessageProcessorProps {
   messages: Message[];
@@ -34,15 +33,10 @@ export const useMessageProcessor = ({
       // Admin sees all messages
       return messages.map(message => {
         // First ensure facilitator avatars are properly set
-        if (message.sender === "assistant") {
-          // If there's an avatar already, normalize it
-          const normalizedAvatar = message.avatar 
-            ? normalizeFacilitatorAvatarUrl(message.avatar)
-            : "/api/avatar?name=Facilitator&variant=beam&palette=2";
-          
+        if (message.sender === "assistant" && !message.avatar) {
           message = {
             ...message,
-            avatar: normalizedAvatar
+            avatar: message.avatar || "/api/avatar?name=Facilitator&variant=beam&palette=2"
           };
         }
         
@@ -101,18 +95,12 @@ export const useMessageProcessor = ({
       
       // Process the filtered messages
       return filteredMessages.map(message => {
-        // Ensure all facilitator messages have a normalized avatar
+        // Ensure all facilitator messages have an avatar
         if (message.sender === "assistant") {
-          const normalizedAvatar = message.avatar 
-            ? normalizeFacilitatorAvatarUrl(message.avatar)
-            : "/api/avatar?name=Facilitator&variant=beam&palette=2";
-          
           message = {
             ...message,
-            avatar: normalizedAvatar
+            avatar: message.avatar || "/api/avatar?name=Facilitator&variant=beam&palette=2"
           };
-          
-          console.log(`Normalized facilitator avatar in message: ${message.avatar} -> ${normalizedAvatar}`);
         }
         
         // Special handling for participant messages

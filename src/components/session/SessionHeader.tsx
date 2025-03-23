@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
-import { getFacilitatorAvatarUrl, handleAvatarError, normalizeFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -37,15 +37,6 @@ const SessionHeader = ({
       try {
         if (facilitator) {
           console.log('Loading facilitator avatar with data:', facilitator);
-          
-          // If we already have a profile picture, normalize it immediately for faster display
-          if (facilitator.profile_picture) {
-            const normalizedUrl = normalizeFacilitatorAvatarUrl(facilitator.profile_picture);
-            console.log('Immediately normalized facilitator URL:', normalizedUrl);
-            setProfilePicture(normalizedUrl);
-          }
-          
-          // Then get the fully resolved URL (which might make an API call)
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
           console.log('Resolved facilitator avatar URL:', avatarUrl);
           setProfilePicture(avatarUrl);

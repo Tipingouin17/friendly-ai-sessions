@@ -1,9 +1,7 @@
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
-import { normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
@@ -20,23 +18,6 @@ const MessageAvatar = ({
   anonymized = false,
   isAssistant = false
 }: MessageAvatarProps) => {
-  const [normalizedUrl, setNormalizedUrl] = useState<string>(avatarUrl || '/placeholder.svg');
-  const [hasError, setHasError] = useState(false);
-  
-  useEffect(() => {
-    // For assistants/facilitators, normalize the URL
-    if (isAssistant && avatarUrl) {
-      const fixed = normalizeFacilitatorAvatarUrl(avatarUrl);
-      console.log(`MessageAvatar: Normalized facilitator URL from ${avatarUrl} to ${fixed}`);
-      setNormalizedUrl(fixed);
-    } else {
-      setNormalizedUrl(avatarUrl || '/placeholder.svg');
-    }
-    
-    // Reset error state when avatarUrl changes
-    setHasError(false);
-  }, [avatarUrl, isAssistant]);
-  
   const dimensions = {
     sm: 'h-7 w-7',
     md: 'h-8 w-8',
@@ -57,24 +38,14 @@ const MessageAvatar = ({
   // For assistant/facilitator avatars
   if (isAssistant) {
     // If we have a valid facilitator avatar URL that's not a placeholder or API-generated avatar
-    // and there's no error loading it
-    if (!hasError && 
-        normalizedUrl && 
-        normalizedUrl !== '/placeholder.svg' && 
-        !normalizedUrl.includes('api.qrserver.com') &&
-        !normalizedUrl.startsWith('/api/avatar')) {
+    if (avatarUrl && 
+        avatarUrl !== '/placeholder.svg' && 
+        !avatarUrl.includes('api.qrserver.com') &&
+        !avatarUrl.startsWith('/api/avatar')) {
       
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
-          <AvatarImage 
-            src={normalizedUrl} 
-            alt={name || "Facilitator"} 
-            onError={(e) => {
-              console.log(`Error loading facilitator avatar: ${normalizedUrl}`);
-              setHasError(true);
-              e.currentTarget.src = '/placeholder.svg';
-            }}
-          />
+          <AvatarImage src={avatarUrl} alt={name || "Facilitator"} />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
           </AvatarFallback>
@@ -102,8 +73,8 @@ const MessageAvatar = ({
   ];
 
   // Generate avatar for users with no specific avatar
-  if (!normalizedUrl || normalizedUrl === '' || normalizedUrl === '/placeholder.svg' || 
-      normalizedUrl?.startsWith('/api/avatar') || normalizedUrl?.includes('api.qrserver.com') || hasError) {
+  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg' || 
+      avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
     // Use name as avatar seed
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
@@ -124,15 +95,7 @@ const MessageAvatar = ({
   // Regular avatar with image or fallback
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
-      <AvatarImage 
-        src={normalizedUrl} 
-        alt={name} 
-        onError={(e) => {
-          console.log(`Error loading avatar: ${normalizedUrl}`);
-          setHasError(true);
-          e.currentTarget.src = '/placeholder.svg';
-        }}
-      />
+      <AvatarImage src={avatarUrl} alt={name} />
       <AvatarFallback>
         {isAssistant ? 
           <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> : 

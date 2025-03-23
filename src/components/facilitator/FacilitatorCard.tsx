@@ -45,6 +45,9 @@ export const FacilitatorCard = ({
     setImageLoading(false);
   };
   
+  // Set a default placeholder if the URL is empty or undefined
+  const displayUrl = avatarUrl || '/placeholder.svg';
+  
   return (
     <div
       className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-4 transition-all ${
@@ -58,7 +61,7 @@ export const FacilitatorCard = ({
         ) : (
           <Avatar className="h-full w-full">
             <AvatarImage 
-              src={avatarUrl} 
+              src={displayUrl} 
               alt={facilitator.title || 'Facilitator'} 
               onError={handleImageError}
               onLoad={handleImageLoad}

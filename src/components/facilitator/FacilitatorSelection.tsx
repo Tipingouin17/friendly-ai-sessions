@@ -51,24 +51,29 @@ export const FacilitatorSelection = ({
 
       setLoadingImages(true);
       const imageMap: Record<number, string> = {};
+      let loadedCount = 0;
       
       try {
         debugLog('participants', `Loading images for ${facilitators.length} facilitators`);
         
-        // Load images sequentially to avoid overwhelming Supabase storage
-        for (const facilitator of facilitators) {
+        // Create an array of promises to load all images concurrently
+        const imagePromises = facilitators.map(async (facilitator) => {
           if (facilitator.id) {
             try {
               // Try to get the avatar URL
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
               imageMap[facilitator.id] = avatarUrl;
-              debugLog('participants', `Loaded avatar for facilitator ${facilitator.id}: ${avatarUrl}`);
+              loadedCount++;
+              debugLog('participants', `Loaded avatar for facilitator ${facilitator.id}: ${avatarUrl} (${loadedCount}/${facilitators.length})`);
             } catch (error) {
               console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
               imageMap[facilitator.id] = '/placeholder.svg';
             }
           }
-        }
+        });
+        
+        // Wait for all images to load (or fail)
+        await Promise.allSettled(imagePromises);
         
         setFacilitatorImages(imageMap);
         debugLog('participants', 'Finished loading facilitator images', imageMap);

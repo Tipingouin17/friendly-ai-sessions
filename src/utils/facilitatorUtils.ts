@@ -33,13 +33,20 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.id) {
       debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
       
+      // Get the public URL for the avatar using the standardized bucket name
       const { data } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (data?.publicUrl) {
         debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
-        return data.publicUrl;
+        // Verify the URL is valid before returning it
+        const isValid = await validateImageUrl(data.publicUrl);
+        if (isValid) {
+          return data.publicUrl;
+        } else {
+          debugLog('participants', `Avatar URL validation failed for: ${data.publicUrl}`);
+        }
       }
       
       debugLog('participants', `No avatar found in facilitator-avatars bucket for facilitator ${facilitator.id}`);
@@ -72,7 +79,16 @@ export const validateImageUrl = async (url: string): Promise<boolean> => {
   
   try {
     debugLog('participants', `Validating image URL: ${url}`);
-    const response = await fetch(url, { method: 'HEAD' });
+    // Use a timeout to prevent hanging on unresponsive URLs
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    const response = await fetch(url, { 
+      method: 'HEAD',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
     const isValid = response.ok;
     debugLog('participants', `URL validation result for ${url}: ${isValid}`);
     return isValid;

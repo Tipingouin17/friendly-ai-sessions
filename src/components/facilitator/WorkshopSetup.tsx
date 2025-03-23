@@ -5,8 +5,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 interface WorkshopSetupProps {
   participantCount: number;
   setParticipantCount: (count: number) => void;
@@ -17,6 +19,7 @@ interface WorkshopSetupProps {
   agreed: boolean;
   setAgreed: (agreed: boolean) => void;
 }
+
 export const WorkshopSetup = ({
   participantCount,
   setParticipantCount,
@@ -33,18 +36,23 @@ export const WorkshopSetup = ({
     hasReachedParticipantLimit,
     isLoading
   } = usePlanLimits();
+  
   const handleIncrement = () => {
     if (participantCount < maxParticipants) {
       setParticipantCount(participantCount + 1);
     }
   };
+  
   const handleDecrement = () => {
     setParticipantCount(Math.max(1, participantCount - 1));
   };
+  
   const handleUpgradePlan = () => {
     navigate('/pricing');
   };
+  
   const limitReached = participantCount >= maxParticipants;
+  
   return <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium mb-2 text-left">
@@ -73,8 +81,30 @@ export const WorkshopSetup = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2 text-left">Description of the participants</label>
-        <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your participants..." className="min-h-[100px]" />
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-left">Description of the participants</label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5">
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Describe your participants (e.g., "Marketing team members", "Engineering students", "Executive team") to help the AI facilitator adapt its language and examples.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <Textarea 
+          value={description} 
+          onChange={e => setDescription(e.target.value)} 
+          placeholder="Describe your participants (e.g., job roles, expertise level, background)..." 
+          className="min-h-[100px]" 
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          This helps the AI facilitator adapt its approach to your audience.
+        </p>
       </div>
 
       <div>

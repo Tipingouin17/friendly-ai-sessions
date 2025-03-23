@@ -24,9 +24,19 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       isAdmin,
       viewMode: props.sessionState.viewMode,
       participantId: props.currentUserParticipantId,
-      messagesCount: props.sessionState.messages.length
+      messagesCount: props.sessionState.messages.length,
+      participantCount: props.conversation?.participants || props.participants.length,
+      participantDescription: props.conversation?.participant_description || ""
     });
-  }, [isAdmin, props.sessionState.viewMode, props.currentUserParticipantId, props.sessionState.messages.length]);
+  }, [
+    isAdmin, 
+    props.sessionState.viewMode, 
+    props.currentUserParticipantId, 
+    props.sessionState.messages.length,
+    props.conversation?.participants,
+    props.participants.length,
+    props.conversation?.participant_description
+  ]);
 
   return (
     <SessionContainer

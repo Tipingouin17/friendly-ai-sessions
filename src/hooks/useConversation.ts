@@ -50,11 +50,13 @@ const fetchConversation = async (id: number | null) => {
   
   console.log('Fetching conversation with ID:', id);
   try {
-    // Use a public query that doesn't depend on authentication
+    // Ensure we also fetch participant_description field
     const { data, error } = await supabase
       .from('conversations')
       .select(`
         *,
+        participants,
+        participant_description,
         sessions!conversations_sessions_id_fkey (
           id,
           title,

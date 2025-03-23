@@ -1,3 +1,4 @@
+
 // Import required dependencies
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -102,8 +103,8 @@ serve(async (req) => {
       )
     }
 
-    // IMPROVEMENT 1: ENHANCED CONTEXT MANAGEMENT
-    // Get conversation data with more detailed session information
+    // IMPROVED: ENHANCED CONTEXT MANAGEMENT WITH PARTICIPANT INFORMATION
+    // Get conversation data with more detailed session information and participant description
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .select(`
@@ -138,7 +139,7 @@ serve(async (req) => {
       console.error("Error fetching participants:", participantsError.message)
     }
 
-    // Track participation metrics
+    // Track participation metrics with enhanced participant awareness
     const participantStats = analyzeParticipation(messages, participants || [])
     
     // Determine session progress (time-based estimate)
@@ -152,7 +153,13 @@ serve(async (req) => {
       else if (progressPercent > 40) sessionProgress = "middle"
     }
 
-    // IMPROVEMENT 2: BETTER OPENAI INTEGRATION
+    // Extract participant description and count information
+    const participantCount = conversation?.participants || participants?.length || 0
+    const participantDescription = conversation?.participant_description || ""
+    
+    console.log(`Participant count: ${participantCount}, Description: ${participantDescription}`)
+
+    // IMPROVEMENT: BETTER OPENAI INTEGRATION WITH PARTICIPANT AWARENESS
     let responseContent = ""
     let responseMetrics = {
       generationMethod: "template",
@@ -182,16 +189,27 @@ serve(async (req) => {
         // Extract user questions and topics
         const userTopics = extractUserTopics(prunedMessages)
         
+        // ENHANCEMENT: Incorporate participant count and description into the prompt
         // Prepare messages for AI with better formatting and context
         const prompt = conversation.sessions.prompt || 
           `You are an expert facilitator leading a ${sessionType} session titled "${sessionTitle}". 
           Your objective is to ${sessionObjective}. 
           
           Current session progress: ${sessionProgress} stage.
-          Participant count: ${participants?.length || 0}
+          
+          PARTICIPANT INFORMATION:
+          Number of participants: ${participantCount}
+          Participant description: ${participantDescription || "No specific description provided"}
           
           Use these facilitation techniques: ${strategies.techniques.join(", ")}.
           When needed, redirect the conversation with questions like: ${strategies.redirections.join(" Or, ")}
+          
+          Adapt your facilitation style to the participant count:
+          - For small groups (1-3): Use more direct questioning and personal engagement
+          - For medium groups (4-8): Balance group discussion with individual contributions
+          - For large groups (9+): Focus on structured sharing and synthesizing multiple viewpoints
+          
+          Tailor your language and examples to match the described participants' background and context.
           
           For less active participants, ask direct but gentle questions to include them.
           Balance the conversation by acknowledging frequent contributors while encouraging others.
@@ -200,6 +218,11 @@ serve(async (req) => {
 
         // Format the most recent conversation context for the AI
         let promptContent = `Here's the current state of the discussion:\n\n`;
+        
+        // Add participant context information 
+        promptContent += `PARTICIPANT CONTEXT:\n`;
+        promptContent += `- Number of participants: ${participantCount}\n`;
+        promptContent += `- Description: ${participantDescription || "No specific description provided"}\n\n`;
         
         // Add key topics being discussed
         if (userTopics.length > 0) {
@@ -230,12 +253,14 @@ serve(async (req) => {
             promptContent += `- ${section.title}: ${section.description}\n`;
           });
           promptContent += "\nAnalyze the discussion to identify patterns, key insights, action items, and recommendations.";
+          promptContent += "\nInclude information about the participant demographics and how it influenced the discussion.";
         } else {
-          promptContent += `\nBased on this conversation, provide a thoughtful facilitator response that:
+          promptContent += `\nBased on this conversation and the participant information provided (${participantCount} participants described as: "${participantDescription}"), provide a thoughtful facilitator response that:
           1. Acknowledges key points raised
           2. Guides the discussion forward
           3. Encourages deeper exploration
-          4. Involves less active participants when appropriate`;
+          4. Involves less active participants when appropriate
+          5. Uses language and examples appropriate for the described participants`;
         }
         
         // Call OpenAI with improved formatting and context
@@ -279,7 +304,9 @@ serve(async (req) => {
                 metrics: responseMetrics,
                 contentLength: responseContent.length,
                 topics: userTopics,
-                participationStats: participantStats
+                participationStats: participantStats,
+                participantCount,
+                participantDescription
               }
             });
           } catch (error) {
@@ -294,7 +321,9 @@ serve(async (req) => {
             conversation, 
             sessionProgress, 
             participantStats, 
-            userTopics
+            userTopics,
+            participantCount,
+            participantDescription
           );
         }
       } catch (error) {
@@ -313,7 +342,9 @@ serve(async (req) => {
           conversation, 
           sessionProgress, 
           participantStats, 
-          extractUserTopics(messages)
+          extractUserTopics(messages),
+          participantCount,
+          participantDescription
         );
       }
     } else {
@@ -333,7 +364,9 @@ serve(async (req) => {
         conversation, 
         sessionProgress, 
         participantStats, 
-        extractUserTopics(messages)
+        extractUserTopics(messages),
+        participantCount,
+        participantDescription
       );
     }
 
@@ -373,6 +406,7 @@ serve(async (req) => {
 
 /**
  * Generate an enhanced template-based response with better context awareness
+ * Now includes participant count and description
  */
 function generateEnhancedTemplateResponse(
   messages: any[], 
@@ -380,9 +414,11 @@ function generateEnhancedTemplateResponse(
   conversation: any,
   sessionProgress: string,
   participantStats: any,
-  userTopics: string[]
+  userTopics: string[],
+  participantCount: number,
+  participantDescription: string
 ) {
-  // IMPROVEMENT 6: IMPROVED TEMPLATES
+  // IMPROVEMENT: ENHANCED TEMPLATES WITH PARTICIPANT AWARENESS
   const sessionType = conversation?.sessions?.session_type || "workshop";
   const sessionTitle = conversation?.sessions?.title || "Discussion Session";
   const sessionObjective = conversation?.sessions?.objective || "facilitate a productive discussion";
@@ -396,16 +432,39 @@ function generateEnhancedTemplateResponse(
     .slice(-5)
     .map(m => m.content);
   
+  // Determine appropriate facilitation approach based on participant count
+  let groupSizeApproach = "";
+  if (participantCount <= 3) {
+    groupSizeApproach = "small group";
+  } else if (participantCount <= 8) {
+    groupSizeApproach = "medium group"; 
+  } else {
+    groupSizeApproach = "large group";
+  }
+  
+  // Determine language style based on participant description
+  let languageStyle = "professional";
+  if (participantDescription) {
+    const descLower = participantDescription.toLowerCase();
+    if (descLower.includes("student") || descLower.includes("young") || descLower.includes("beginner")) {
+      languageStyle = "accessible";
+    } else if (descLower.includes("expert") || descLower.includes("technical") || descLower.includes("professional")) {
+      languageStyle = "technical";
+    } else if (descLower.includes("executive") || descLower.includes("leader") || descLower.includes("senior")) {
+      languageStyle = "executive";
+    }
+  }
+  
   if (generateReport) {
-    // IMPROVEMENT 3: BETTER REPORT GENERATION
+    // ENHANCED REPORT GENERATION WITH PARTICIPANT AWARENESS
     const reportTemplate = REPORT_TEMPLATES[sessionType as keyof typeof REPORT_TEMPLATES] || REPORT_TEMPLATES.default;
     
     let reportContent = `# ${sessionTitle} - Session Report\n\n`;
     
-    // Add session context
+    // Add session context with participant information
     reportContent += `## Session Overview\n`;
     reportContent += `- **Objective**: ${sessionObjective}\n`;
-    reportContent += `- **Participants**: ${participantStats.totalParticipants}\n`;
+    reportContent += `- **Participants**: ${participantCount} ${participantDescription ? `(${participantDescription})` : ""}\n`;
     reportContent += `- **Messages**: ${messages.filter(m => m.sender === 'user').length}\n\n`;
     
     // Add key discussion points
@@ -420,9 +479,10 @@ function generateEnhancedTemplateResponse(
     }
     reportContent += `\n`;
     
-    // Add participation summary
+    // Add participation summary with context awareness
     reportContent += `## Participation Summary\n`;
-    reportContent += `${participantStats.summary}\n\n`;
+    reportContent += `${participantStats.summary}\n`;
+    reportContent += `This ${groupSizeApproach} of ${participantCount} ${participantDescription ? `(${participantDescription})` : "participants"} showed ${participantStats.participationBalance > 0.7 ? "strong" : participantStats.participationBalance > 0.4 ? "moderate" : "variable"} engagement.\n\n`;
     
     // Add action items
     reportContent += `## Action Items\n`;
@@ -438,20 +498,55 @@ function generateEnhancedTemplateResponse(
     
     return reportContent;
   } else if (recentUserMessages.length === 0) {
-    // Welcome message
-    return `Welcome to our ${sessionType} session on ${sessionTitle}. ${sessionObjective ? `Our objective today is to ${sessionObjective}.` : ''} I'm here to facilitate our discussion. Please share your initial thoughts on the topic.`;
+    // Welcome message with participant awareness
+    let welcome = `Welcome to our ${sessionType} session on ${sessionTitle}. ${sessionObjective ? `Our objective today is to ${sessionObjective}.` : ''} I'm here to facilitate our discussion.`;
+    
+    // Adapt based on participant count and description
+    if (participantCount > 1) {
+      welcome += ` I see we have ${participantCount} participants today${participantDescription ? ` described as ${participantDescription}` : ""}.`;
+    }
+    
+    // Add group-size appropriate opener
+    if (participantCount <= 3) {
+      welcome += " Since we're a small group, we'll have plenty of opportunity for each of you to share your thoughts in depth.";
+    } else if (participantCount <= 8) {
+      welcome += " With our medium-sized group, we'll aim for a balance of individual contributions and group discussion.";
+    } else {
+      welcome += " With our larger group, I'll help ensure everyone has a chance to contribute as we explore the topic together.";
+    }
+    
+    welcome += " Please share your initial thoughts on the topic.";
+    
+    return welcome;
   } else {
-    // IMPROVEMENT 4: FACILITATION INTELLIGENCE
-    // Create a more thoughtful response based on session progress and participation
+    // FACILITATION INTELLIGENCE WITH PARTICIPANT AWARENESS
+    // Create a more thoughtful response based on session progress, participation, and participant context
     let response = '';
     
+    // Add appropriate greeting based on language style
+    if (languageStyle === "accessible") {
+      response = `Thanks for sharing your thoughts! `;
+    } else if (languageStyle === "technical") {
+      response = `Thank you for your detailed contributions. `;
+    } else if (languageStyle === "executive") {
+      response = `Thank you for those insights. `;
+    } else {
+      response = `Thank you for sharing your perspectives. `;
+    }
+    
+    // Add topic acknowledgment
+    response += `I notice we're discussing ${userTopics.length > 0 ? userTopics.join(", ") : "several interesting points"}.\n\n`;
+    
+    // Add stage-appropriate facilitation
     if (sessionProgress === "early") {
       // Early stage facilitation focuses on exploration
-      response = `Thank you for sharing your thoughts. I notice we're discussing ${userTopics.length > 0 ? userTopics.join(", ") : "several interesting points"}.\n\n`;
-      
       if (participantStats.participationBalance < 0.5) {
         // Low participation balance - encourage quieter participants
-        response += `I'd like to hear from more participants. What are your thoughts on what's been shared so far?\n\n`;
+        if (participantCount > 3) {
+          response += `I'd like to hear from more participants. What are your thoughts on what's been shared so far?\n\n`;
+        } else {
+          response += `I'd love to hear your perspective on this topic.\n\n`;
+        }
       } else {
         // Good participation - keep momentum
         response += `You've raised some interesting points. Let's explore them further:\n\n`;
@@ -470,7 +565,14 @@ function generateEnhancedTemplateResponse(
         response += `- ${msg.substring(0, 100)}${msg.length > 100 ? '...' : ''}\n`;
       });
       
-      response += `\nTo deepen our exploration: ${strategies.redirections[1]} What connections do you see between these different perspectives?\n\n`;
+      // Adapt question based on group size and language style
+      if (groupSizeApproach === "small group") {
+        response += `\nTo deepen our exploration: ${strategies.redirections[1]} What personal examples can you share related to this topic?\n\n`;
+      } else if (groupSizeApproach === "large group") {
+        response += `\nTo build on these ideas: How do these concepts apply in your specific contexts? Feel free to share brief examples.\n\n`;
+      } else {
+        response += `\nTo deepen our exploration: ${strategies.redirections[1]} What connections do you see between these different perspectives?\n\n`;
+      }
     }
     else {
       // Concluding stage facilitation focuses on consolidation and next steps
@@ -484,8 +586,12 @@ function generateEnhancedTemplateResponse(
         response += `- ${msg.substring(0, 80)}${msg.length > 80 ? '...' : ''}\n`;
       });
       
-      // Add reflection prompt
-      response += `\nAs we conclude, what do you see as the most valuable takeaway from our discussion? What specific actions might you consider based on today's conversation?`;
+      // Add reflection prompt based on group size
+      if (groupSizeApproach === "large group") {
+        response += `\nAs we conclude, take a moment to reflect: What is your main takeaway from today's discussion? What specific actions might you consider based on our conversation?`;
+      } else {
+        response += `\nAs we conclude, what do you see as the most valuable takeaway from our discussion? What specific actions might you consider based on today's conversation?`;
+      }
     }
     
     return response;

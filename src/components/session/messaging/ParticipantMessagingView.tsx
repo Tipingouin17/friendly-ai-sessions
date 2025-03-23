@@ -76,7 +76,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   useEffect(() => {
     console.log(`ParticipantMessagingView - Current participant ID: P${currentParticipant}`);
     console.log(`Original messages: ${messages.length}, Filtered messages: ${filteredMessages.length}`);
-  }, [messages.length, filteredMessages.length, currentParticipant]);
+    console.log(`Current participants: ${currentParticipantCount}/${maxParticipants}`);
+  }, [
+    messages.length, 
+    filteredMessages.length, 
+    currentParticipant, 
+    currentParticipantCount, 
+    maxParticipants
+  ]);
   
   return (
     <div className="flex-1 flex flex-col h-full">

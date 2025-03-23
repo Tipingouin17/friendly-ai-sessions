@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationWithSession } from "@/types/database";
+import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
 export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null, Error>({
@@ -28,16 +29,20 @@ export const useConversation = (conversationId: number | null) => {
         }
         
         // Process facilitator profile picture to ensure it's a complete URL
-        if (data.sessions?.facilitator_details?.profile_picture) {
-          let profilePic = data.sessions.facilitator_details.profile_picture;
+        if (data.sessions?.facilitator_details) {
+          const facilitator = data.sessions.facilitator_details;
           
-          // Ensure profile picture is a complete URL
-          if (profilePic && !profilePic.startsWith('http') && !profilePic.startsWith('/')) {
-            profilePic = `/${profilePic}`;
-            data.sessions.facilitator_details.profile_picture = profilePic;
+          // Use the centralized facilitator avatar URL function
+          if (facilitator.id) {
+            try {
+              const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+              facilitator.profile_picture = avatarUrl;
+              console.log('Facilitator profile picture:', avatarUrl);
+            } catch (error) {
+              console.error('Error processing facilitator avatar:', error);
+              facilitator.profile_picture = '/placeholder.svg';
+            }
           }
-          
-          console.log('Facilitator profile picture:', profilePic);
         } else {
           console.log('No facilitator profile picture found');
         }

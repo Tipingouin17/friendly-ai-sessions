@@ -33,7 +33,7 @@ export function useConnectionChecker({
     setIsPerformingConnectionCheck(true);
     
     try {
-      console.log("Performing connection check...");
+      //console.log("Performing connection check...");
       
       // Try channel-based ping first
       const pingResult = await createPingChannel(conversationId);
@@ -41,7 +41,7 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
       
       if (pingResult) {
-        console.log("Connection check successful (channel subscription worked)");
+        //console.log("Connection check successful (channel subscription worked)");
         setIsConnected();
         
         // If we got a successful ping, might as well refresh our state
@@ -56,7 +56,7 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
       
       if (databasePingResult) {
-        console.log("Connection check successful (query worked)");
+        //console.log("Connection check successful (query worked)");
         setIsConnected();
         
         // If we got data, might as well refresh our state
@@ -66,14 +66,14 @@ export function useConnectionChecker({
       }
       
       // If we get here, all connection checks failed
-      console.log("All connection checks failed");
+      //console.log("All connection checks failed");
       setError("Connection to server lost");
       setIsPerformingConnectionCheck(false);
       return false;
     } catch (err) {
       if (!mountedRef.current) return false;
       
-      console.error("Error in performConnectionCheck:", err);
+      //console.error("Error in performConnectionCheck:", err);
       setError("Unable to check connection status");
       setIsPerformingConnectionCheck(false);
       return false;

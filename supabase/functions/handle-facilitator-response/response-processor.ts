@@ -11,6 +11,7 @@ import {
 import { 
   generateEnhancedTemplateResponse 
 } from "../_shared/response-generation.ts";
+import { determineSessionProgress } from "../_shared/context-analyzer.ts";
 import { FACILITATION_STRATEGIES } from "../_shared/facilitation-strategies.ts";
 import { REPORT_TEMPLATES } from "../_shared/report-templates.ts";
 import { 
@@ -48,15 +49,7 @@ export async function processResponse(
   let responseMetrics = createResponseMetrics('template', 0, participantStats.participationBalance);
   
   // Determine session progress
-  let sessionProgress = "early";
-  if (conversation?.sessions?.duration_minutes) {
-    const firstMessageTime = messages.length > 0 ? new Date(messages[0].timestamp) : new Date();
-    const elapsed = (new Date().getTime() - firstMessageTime.getTime()) / (1000 * 60);
-    const progressPercent = Math.min(100, Math.round((elapsed / conversation.sessions.duration_minutes) * 100));
-    
-    if (progressPercent > 80) sessionProgress = "concluding";
-    else if (progressPercent > 40) sessionProgress = "middle";
-  }
+  const sessionProgress = determineSessionProgress(messages, conversation?.sessions?.duration_minutes);
   
   // Use OpenAI if available
   if (openaiApiKey && conversation?.sessions) {

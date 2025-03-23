@@ -128,10 +128,10 @@ export const useSessionMessages = ({
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
-          // Set default avatar for assistant messages
-          const avatar = msg.role === 'assistant' ? 
-            (msg.avatar || '/api/avatar?name=Facilitator&variant=beam&palette=2') : 
-            undefined;
+          // Set default avatar for assistant messages - fixed the avatar property assignment here
+          // The 'avatar' property isn't in the database schema, so let's create it only for the Message object
+          const defaultAssistantAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+          const avatarUrl = msg.role === 'assistant' ? defaultAssistantAvatar : undefined;
           
           return {
             id: String(msg.id),
@@ -144,7 +144,7 @@ export const useSessionMessages = ({
             likes: likesArray,
             isReport,
             isAnonymous,
-            avatar
+            avatar: avatarUrl
           } as Message; // Type assertion to ensure it matches the Message type
         });
         

@@ -34,6 +34,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
       
       // Get the public URL for the avatar using the standardized bucket name
+      // IMPORTANT: Use 'facilitator-avatars' consistently
       const { data } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);

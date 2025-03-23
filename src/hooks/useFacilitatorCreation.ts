@@ -56,8 +56,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         const base64Response = await fetch(profilePicture);
         const blob = await base64Response.blob();
         
-        // Upload to storage with the facilitator ID as the filename
-        // Make sure we're using the correct bucket name: facilitator-avatars
+        // IMPORTANT: Use 'facilitator-avatars' consistently
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {
@@ -75,7 +74,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
             variant: "destructive",
           });
         } else {
-          // Get the public URL
+          // Get the public URL - ensure we use the correct bucket name
           const { data: publicUrlData } = supabase.storage
             .from('facilitator-avatars')
             .getPublicUrl(`${facilitator.id}.jpg`);

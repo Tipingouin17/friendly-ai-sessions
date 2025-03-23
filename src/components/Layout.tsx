@@ -3,6 +3,7 @@ import { Navigation } from "./Navigation";
 import { Footer } from "./Footer";
 import { useLocation } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import SessionMobileNav from "./session/SessionMobileNav";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,19 +15,16 @@ export const Layout = ({ children }: LayoutProps) => {
   const hideFooterPaths = ['/my-facilitators', '/session'];
   
   // Check if we're on the admin page or session page to add proper spacing
-  const sessionPages = ['/session-admin', '/session'];
-  const isSessionPage = sessionPages.some(path => location.pathname.includes(path));
+  const isSessionPage = location.pathname.includes('/session');
   const isAdminPage = location.pathname.includes('admin');
   
-  // Don't show the main navigation on any session pages on mobile
-  // And also don't show it on desktop for regular session pages
-  const shouldHideMainNav = (isMobile && isSessionPage) || 
-                           (location.pathname === '/session');
+  // Determine if we need the mobile session navigation
+  const needsMobileSessionNav = isMobile && isSessionPage && !isAdminPage;
 
   return (
     <div className="min-h-screen flex flex-col text-left">
-      {!shouldHideMainNav && <Navigation />}
-      <main className={`flex-grow ${isSessionPage ? 'h-full' : 'pt-16'}`}>
+      {needsMobileSessionNav ? <SessionMobileNav /> : <Navigation />}
+      <main className={`flex-grow ${isSessionPage && !isAdminPage ? 'pt-16' : 'pt-16'}`}>
         {children}
       </main>
       {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}

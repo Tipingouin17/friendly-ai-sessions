@@ -1,25 +1,20 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserCircle, Settings, BookOpen, ChevronDown, Menu } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+
 export const Navigation = () => {
   const location = useLocation();
-  const {
-    isAuthenticated,
-    user,
-    logout
-  } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const isMobile = useIsMobile();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Check if current path is related to facilitators
-  const isFacilitatorSection = ['/my-facilitators', '/session'].includes(location.pathname);
 
   // Check if we're on a session page or admin page
-  const isSessionPage = location.pathname.includes('session-admin') || location.pathname.includes('session');
+  const isSessionPage = location.pathname.includes('/session');
   const isAdminPage = location.pathname.includes('admin');
 
   // Different styling for admin pages
@@ -29,89 +24,113 @@ export const Navigation = () => {
   if (isMobile && isSessionPage) {
     return null;
   }
-  return <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage && !isAdminPage ? 'hidden md:flex' : ''}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
+
+  return (
+    <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage ? 'hidden md:flex' : 'flex'}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link to="/" className="text-xl font-bold text-primary">
-              AI Facilitator
-            </Link>
-          </div>
-          
-          {isMobile ? <div className="flex items-center">
-              <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                <Menu className="h-6 w-6" />
-              </Button>
-              
-              {mobileMenuOpen && <div className="absolute top-16 left-0 right-0 bg-white shadow-lg z-50 border-b border-gray-200">
-                  <div className="flex flex-col p-4 space-y-4">
-                    {isAuthenticated && <Link to="/my-facilitators" className={`${isFacilitatorSection ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`} onClick={() => setMobileMenuOpen(false)}>
-                        My Facilitators
-                      </Link>}
-                    <Link to="/" className={`${location.pathname === '/' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`} onClick={() => setMobileMenuOpen(false)}>
-                      Home
+          <Link to="/" className="text-xl font-bold text-yellow-500">
+            AI Facilitator
+          </Link>
+
+          {isMobile ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 p-0">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="flex flex-col">
+                <div className="flex flex-col space-y-6 mt-8">
+                  {isAuthenticated && (
+                    <Link to="/my-facilitators" className="text-gray-800 hover:text-yellow-500 font-medium text-lg">
+                      My Facilitators
                     </Link>
-                    <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`} onClick={() => setMobileMenuOpen(false)}>
-                      Pricing
-                    </Link>
-                    <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`} onClick={() => setMobileMenuOpen(false)}>
-                      FAQs
-                    </Link>
-                    <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`} onClick={() => setMobileMenuOpen(false)}>
-                      Contact Us
-                    </Link>
-                    {isAuthenticated ? <>
-                        <div className="pt-2 border-t border-gray-100">
-                          <div className="text-sm text-gray-600 mb-2">Hi, {user?.name}</div>
-                          <div className="flex flex-col space-y-2">
-                            <Link to="/profile" className="text-gray-600 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>
-                              Profile
-                            </Link>
-                            <Link to="/settings" className="text-gray-600 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>
-                              Settings
-                            </Link>
-                            <Link to="/past-workshops" className="text-gray-600 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>
-                              Past Workshops
-                            </Link>
-                            <Button variant="ghost" className="justify-start px-0" onClick={() => {
-                      logout();
-                      setMobileMenuOpen(false);
-                    }}>
-                              Log out
-                            </Button>
-                          </div>
-                        </div>
-                      </> : <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
-                        <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full">Log in</Button>
-                        </Link>
-                        <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
-                          <Button className="w-full">Sign up</Button>
-                        </Link>
-                      </div>}
-                  </div>
-                </div>}
-            </div> : <div className="hidden md:flex items-center space-x-8">
-              {isAuthenticated && <Link to="/my-facilitators" className={`${isFacilitatorSection ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
+                  )}
+                  <Link to="/" className={`${location.pathname === '/' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                    Home
+                  </Link>
+                  <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                    Pricing
+                  </Link>
+                  <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                    FAQs
+                  </Link>
+                  <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                    Contact Us
+                  </Link>
+                </div>
+                
+                <div className="mt-auto mb-8">
+                  {!isAuthenticated ? (
+                    <div className="flex flex-col space-y-3">
+                      <Link to="/login" className="w-full">
+                        <Button variant="outline" className="w-full text-center rounded-full">
+                          Log in
+                        </Button>
+                      </Link>
+                      <Link to="/signup" className="w-full">
+                        <Button className="w-full text-center bg-yellow-500 hover:bg-yellow-600 rounded-full">
+                          Sign up
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-3">
+                      <div className="text-sm text-gray-600 mb-2">Hi, {user?.name}</div>
+                      <Link to="/profile" className="w-full">
+                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                          <UserCircle className="h-4 w-4" /> Profile
+                        </Button>
+                      </Link>
+                      <Link to="/settings" className="w-full">
+                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                          <Settings className="h-4 w-4" /> Settings
+                        </Button>
+                      </Link>
+                      <Link to="/past-workshops" className="w-full">
+                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                          <BookOpen className="h-4 w-4" /> Past Workshops
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="outline" 
+                        className="w-full text-center rounded-full"
+                        onClick={logout}
+                      >
+                        Log out
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <div className="hidden md:flex items-center space-x-8">
+              {isAuthenticated && (
+                <Link to="/my-facilitators" className={`${location.pathname.includes('/my-facilitators') ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
                   My Facilitators
-                </Link>}
-              <Link to="/" className={`${location.pathname === '/' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
+                </Link>
+              )}
+              <Link to="/" className={`${location.pathname === '/' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
                 Home
               </Link>
-              <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
+              <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
                 Pricing
               </Link>
-              <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
+              <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
                 FAQs
               </Link>
-              <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-primary font-medium' : 'text-gray-600'} hover:text-primary`}>
+              <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
                 Contact Us
               </Link>
-              {isAuthenticated ? <div className="flex items-center gap-4">
+              
+              {isAuthenticated ? (
+                <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-600">Hi, {user?.name}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2">
+                      <Button variant="outline" className="gap-2 rounded-full">
                         My Account <ChevronDown className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -136,16 +155,21 @@ export const Navigation = () => {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div> : <div className="flex items-center gap-4">
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
                   <Link to="/login">
-                    <Button variant="outline">Log in</Button>
+                    <Button variant="outline" className="rounded-full">Log in</Button>
                   </Link>
                   <Link to="/signup">
-                    <Button>Sign up</Button>
+                    <Button className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Sign up</Button>
                   </Link>
-                </div>}
-            </div>}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    </nav>;
+    </nav>
+  );
 };

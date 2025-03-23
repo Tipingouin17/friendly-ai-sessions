@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 
 const SessionMobileNav = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white p-4 flex items-center justify-between border-b border-gray-100 h-16">
@@ -17,8 +17,8 @@ const SessionMobileNav = () => {
       
       <Sheet>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="bg-yellow-50 rounded-full w-10 h-10 flex items-center justify-center">
-            <Menu className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="h-10 w-10 p-0">
+            <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
         <SheetContent className="flex flex-col">
@@ -63,6 +63,13 @@ const SessionMobileNav = () => {
                     Profile
                   </Button>
                 </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full text-center rounded-full"
+                  onClick={logout}
+                >
+                  Log out
+                </Button>
               </div>
             )}
           </div>

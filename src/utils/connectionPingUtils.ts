@@ -8,7 +8,7 @@ import { removeChannel } from "@/utils/realtimeHelpers";
  * @returns A promise that resolves to true if connection is successful
  */
 export const createPingChannel = async (conversationId: number): Promise<boolean> => {
-  console.log("Creating ping channel to test connection...");
+  //console.log("Creating ping channel to test connection...");
   
   // Create a lightweight ping channel
   const channelName = `ping-${conversationId}-${Date.now()}`;
@@ -49,7 +49,7 @@ export const createPingChannel = async (conversationId: number): Promise<boolean
     
     return pingResult;
   } catch (err) {
-    console.error("Error in ping channel:", err);
+    //console.error("Error in ping channel:", err);
     
     // Clean up ping channel
     if (pingChannel) {
@@ -93,7 +93,7 @@ export const performDatabasePing = async (conversationId: number): Promise<boole
         throw new Error('Request timed out');
       })
     ]).catch(err => {
-      console.error("Connection check error:", err);
+      //console.error("Connection check error:", err);
       return { data: null, error: err };
     }) as { data: any, error: any };
     
@@ -105,13 +105,13 @@ export const performDatabasePing = async (conversationId: number): Promise<boole
     } 
     
     if (data) {
-      console.log("Database ping successful:", data);
+      //console.log("Database ping successful:", data);
       return true;
     }
     
     return false;
   } catch (err) {
-    console.error("Error in database ping:", err);
+    //console.error("Error in database ping:", err);
     return false;
   }
 };

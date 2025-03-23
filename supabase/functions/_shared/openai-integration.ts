@@ -63,6 +63,19 @@ export function prepareOpenAIPrompt(
   const sessionType = conversation?.sessions?.session_type || "workshop";
   const sessionObjective = conversation?.sessions?.objective || "facilitate a productive discussion";
   const sessionTitle = conversation?.sessions?.title || "Discussion Session";
+  const languageCode = conversation?.language || "en";
+  
+  let languageInstruction = "";
+  if (languageCode && languageCode !== "en" && languageCode !== "English") {
+    const displayLanguage = 
+      languageCode === "es" ? "Spanish" : 
+      languageCode === "fr" ? "French" : 
+      languageCode === "de" ? "German" : 
+      languageCode === "zh" ? "Chinese" : 
+      languageCode === "ar" ? "Arabic" : languageCode;
+    
+    languageInstruction = `\n\nIMPORTANT: Please respond in ${displayLanguage} language only. The entire response should be in ${displayLanguage} language.`;
+  }
   
   return conversation?.sessions?.prompt || 
     `You are an expert facilitator leading a ${sessionType} session titled "${sessionTitle}". 
@@ -85,7 +98,7 @@ export function prepareOpenAIPrompt(
     Tailor your language and examples to match the described participants' background and context.
     
     For less active participants, ask direct but gentle questions to include them.
-    Balance the conversation by acknowledging frequent contributors while encouraging others.`;
+    Balance the conversation by acknowledging frequent contributors while encouraging others.${languageInstruction}`;
 }
 
 /**

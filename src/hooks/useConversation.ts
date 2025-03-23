@@ -50,13 +50,14 @@ const fetchConversation = async (id: number | null) => {
   
   console.log('Fetching conversation with ID:', id);
   try {
-    // Ensure we also fetch participant_description field
+    // Ensure we also fetch language and participant_description fields
     const { data, error } = await supabase
       .from('conversations')
       .select(`
         *,
         participants,
         participant_description,
+        language,
         sessions!conversations_sessions_id_fkey (
           id,
           title,

@@ -71,3 +71,19 @@ export function getFacilitatorAvatar(conversation: any) {
   const facilitatorTitle = conversation.sessions?.facilitator_details?.title || 'Facilitator';
   return `/api/avatar?name=${encodeURIComponent(facilitatorTitle)}&variant=beam&palette=2`;
 }
+
+/**
+ * Convert display language to language code for API
+ */
+export function getLanguageCode(displayLanguage: string): string {
+  const languageMap: Record<string, string> = {
+    'English': 'en',
+    'Spanish': 'es',
+    'French': 'fr',
+    'German': 'de',
+    'Chinese': 'zh',
+    'Arabic': 'ar',
+  };
+  
+  return languageMap[displayLanguage] || 'en';
+}

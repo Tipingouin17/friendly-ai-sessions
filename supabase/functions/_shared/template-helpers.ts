@@ -1,3 +1,4 @@
+
 import { FACILITATION_STRATEGIES } from "./facilitation-strategies.ts";
 import { REPORT_TEMPLATES } from "./report-templates.ts";
 
@@ -16,15 +17,15 @@ export function generateWelcomeMessage(
   let welcome = "";
   
   // Use basic translations for common welcome phrases based on language
-  if (sessionLanguage === "es") {
+  if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
     welcome = `Bienvenido a nuestra sesión de ${sessionType} sobre ${sessionTitle}. ${sessionObjective ? `Nuestro objetivo hoy es ${sessionObjective}.` : ''} Estoy aquí para facilitar nuestra discusión.`;
-  } else if (sessionLanguage === "fr") {
+  } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
     welcome = `Bienvenue à notre session de ${sessionType} sur ${sessionTitle}. ${sessionObjective ? `Notre objectif aujourd'hui est de ${sessionObjective}.` : ''} Je suis là pour faciliter notre discussion.`;
-  } else if (sessionLanguage === "de") {
+  } else if (sessionLanguage === "de" || sessionLanguage === "German") {
     welcome = `Willkommen zu unserer ${sessionType}-Sitzung zum Thema ${sessionTitle}. ${sessionObjective ? `Unser Ziel heute ist es, ${sessionObjective}.` : ''} Ich bin hier, um unsere Diskussion zu moderieren.`;
-  } else if (sessionLanguage === "zh") {
+  } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
     welcome = `欢迎参加我们关于${sessionTitle}的${sessionType}会议。${sessionObjective ? `今天我们的目标是${sessionObjective}。` : ''} 我在这里是为了促进我们的讨论。`;
-  } else if (sessionLanguage === "ar") {
+  } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
     welcome = `مرحبًا بك في جلسة ${sessionType} حول ${sessionTitle}. ${sessionObjective ? `هدفنا اليوم هو ${sessionObjective}.` : ''} أنا هنا لتسهيل مناقشتنا.`;
   } else {
     // Default to English
@@ -33,15 +34,15 @@ export function generateWelcomeMessage(
   
   // Adapt based on participant count and description (keep in selected language)
   if (participantCount > 1) {
-    if (sessionLanguage === "es") {
+    if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
       welcome += ` Veo que tenemos ${participantCount} participantes hoy${participantDescription ? ` descritos como ${participantDescription}` : ""}.`;
-    } else if (sessionLanguage === "fr") {
+    } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
       welcome += ` Je vois que nous avons ${participantCount} participants aujourd'hui${participantDescription ? ` décrits comme ${participantDescription}` : ""}.`;
-    } else if (sessionLanguage === "de") {
+    } else if (sessionLanguage === "de" || sessionLanguage === "German") {
       welcome += ` Ich sehe, dass wir heute ${participantCount} Teilnehmer haben${participantDescription ? `, die als ${participantDescription} beschrieben werden` : ""}.`;
-    } else if (sessionLanguage === "zh") {
+    } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
       welcome += ` 我看到我们今天有${participantCount}名参与者${participantDescription ? `，被描述为${participantDescription}` : ""}。`;
-    } else if (sessionLanguage === "ar") {
+    } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
       welcome += ` أرى أن لدينا ${participantCount} مشاركين اليوم${participantDescription ? ` وصفهم بأنهم ${participantDescription}` : ""}.`;
     } else {
       welcome += ` I see we have ${participantCount} participants today${participantDescription ? ` described as ${participantDescription}` : ""}.`;
@@ -49,15 +50,15 @@ export function generateWelcomeMessage(
   }
   
   // Add final prompt in the selected language
-  if (sessionLanguage === "es") {
+  if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
     welcome += " Por favor, comparta sus pensamientos iniciales sobre el tema.";
-  } else if (sessionLanguage === "fr") {
+  } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
     welcome += " Veuillez partager vos réflexions initiales sur le sujet.";
-  } else if (sessionLanguage === "de") {
+  } else if (sessionLanguage === "de" || sessionLanguage === "German") {
     welcome += " Bitte teilen Sie Ihre ersten Gedanken zum Thema mit.";
-  } else if (sessionLanguage === "zh") {
+  } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
     welcome += " 请分享您对该主题的初步想法。";
-  } else if (sessionLanguage === "ar") {
+  } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
     welcome += " يرجى مشاركة أفكارك الأولية حول الموضوع.";
   } else {
     welcome += " Please share your initial thoughts on the topic.";

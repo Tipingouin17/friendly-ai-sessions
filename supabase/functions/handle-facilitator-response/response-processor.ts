@@ -11,7 +11,11 @@ import {
 import { 
   generateEnhancedTemplateResponse 
 } from "../_shared/response-generation.ts";
-import { determineSessionProgress, getFacilitatorAvatar } from "../_shared/context-analyzer.ts";
+import { 
+  determineSessionProgress, 
+  getFacilitatorAvatar,
+  getLanguageCode 
+} from "../_shared/context-analyzer.ts";
 import { FACILITATION_STRATEGIES } from "../_shared/facilitation-strategies.ts";
 import { REPORT_TEMPLATES } from "../_shared/report-templates.ts";
 import { 
@@ -37,7 +41,14 @@ export async function processResponse(
   // Extract participant description and count information
   const participantCount = conversation?.participants || participants?.length || 0;
   const participantDescription = conversation?.participant_description || "";
-  const sessionLanguage = conversation?.language || "en";
+  
+  // Extract and process language setting
+  let sessionLanguage = conversation?.language || "en";
+  // Convert from display name to code if needed
+  if (sessionLanguage !== "en" && sessionLanguage !== "es" && sessionLanguage !== "fr" && 
+      sessionLanguage !== "de" && sessionLanguage !== "zh" && sessionLanguage !== "ar") {
+    sessionLanguage = getLanguageCode(sessionLanguage);
+  }
   
   console.log(`Participant count: ${participantCount}, Description: ${participantDescription}, Language: ${sessionLanguage}`);
 
@@ -81,9 +92,16 @@ export async function processResponse(
         strategies
       );
       
-      // Add language instruction to the prompt
-      if (sessionLanguage && sessionLanguage !== "en") {
-        basePrompt += `\n\nIMPORTANT: Please respond in ${sessionLanguage} language only. The entire response should be in ${sessionLanguage} language.`;
+      // Add language instruction to the prompt if not already present
+      if (sessionLanguage && sessionLanguage !== "en" && !basePrompt.includes(`respond in ${sessionLanguage}`)) {
+        const languageName = 
+          sessionLanguage === "es" ? "Spanish" : 
+          sessionLanguage === "fr" ? "French" : 
+          sessionLanguage === "de" ? "German" :
+          sessionLanguage === "zh" ? "Chinese" :
+          sessionLanguage === "ar" ? "Arabic" : sessionLanguage;
+        
+        basePrompt += `\n\nIMPORTANT: Please respond in ${languageName} language only. The entire response should be in ${languageName} language.`;
       }
       
       // Prepare content for OpenAI based on context

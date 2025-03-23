@@ -114,9 +114,12 @@ export const WorkshopSetup = ({
             <SelectValue placeholder="Select a language" />
           </SelectTrigger>
           <SelectContent className="bg-white">
-            <SelectItem value="English">English</SelectItem>
-            <SelectItem value="Spanish">Spanish</SelectItem>
-            <SelectItem value="French">French</SelectItem>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="es">Spanish</SelectItem>
+            <SelectItem value="fr">French</SelectItem>
+            <SelectItem value="de">German</SelectItem>
+            <SelectItem value="zh">Chinese</SelectItem>
+            <SelectItem value="ar">Arabic</SelectItem>
           </SelectContent>
         </Select>
       </div>

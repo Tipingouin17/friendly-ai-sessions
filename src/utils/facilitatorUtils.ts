@@ -25,20 +25,31 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       
       try {
         // Get the public URL for the facilitator's avatar using their ID
-        const { data } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from('facilitator-avatars')
           .getPublicUrl(`${facilitator.id}.jpg`);
+        
+        if (error) {
+          debugLog('participants', `Error getting public URL: ${error.message}`);
+        }
         
         if (data?.publicUrl) {
           debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
           
-          // Verify the URL actually returns a valid image before using it
-          const isValid = await validateImageUrl(data.publicUrl);
-          if (isValid) {
-            debugLog('participants', `Avatar URL validated successfully: ${data.publicUrl}`);
-            return data.publicUrl;
-          } else {
-            debugLog('participants', `Avatar URL validation failed for: ${data.publicUrl}`);
+          // Add a cache-busting parameter to avoid browser caching issues
+          const cacheBustUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+          
+          // Try to fetch the image to verify it exists
+          try {
+            const response = await fetch(cacheBustUrl, { method: 'HEAD' });
+            if (response.ok) {
+              debugLog('participants', `Avatar URL validated successfully: ${cacheBustUrl}`);
+              return cacheBustUrl;
+            } else {
+              debugLog('participants', `Avatar not found for facilitator ${facilitator.id} (status: ${response.status})`);
+            }
+          } catch (fetchError) {
+            debugLog('participants', `Error fetching avatar: ${fetchError}`);
           }
         }
       } catch (error) {
@@ -52,12 +63,16 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       
       // If it's already a complete URL, use it directly
       if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
-        const isValid = await validateImageUrl(facilitator.profile_picture);
-        if (isValid) {
-          debugLog('participants', `Using valid profile_picture URL: ${facilitator.profile_picture}`);
-          return facilitator.profile_picture;
-        } else {
-          debugLog('participants', `profile_picture URL validation failed: ${facilitator.profile_picture}`);
+        try {
+          const response = await fetch(facilitator.profile_picture, { method: 'HEAD' });
+          if (response.ok) {
+            debugLog('participants', `Using valid profile_picture URL: ${facilitator.profile_picture}`);
+            return facilitator.profile_picture;
+          } else {
+            debugLog('participants', `profile_picture URL validation failed: ${facilitator.profile_picture}`);
+          }
+        } catch (error) {
+          debugLog('participants', `Error validating profile_picture URL: ${error}`);
         }
       }
       
@@ -71,10 +86,14 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
               .getPublicUrl(fileName);
               
             if (data?.publicUrl) {
-              const isValid = await validateImageUrl(data.publicUrl);
-              if (isValid) {
-                debugLog('participants', `Using storage reference in profile_picture: ${data.publicUrl}`);
-                return data.publicUrl;
+              try {
+                const response = await fetch(data.publicUrl, { method: 'HEAD' });
+                if (response.ok) {
+                  debugLog('participants', `Using storage reference in profile_picture: ${data.publicUrl}`);
+                  return data.publicUrl;
+                }
+              } catch (error) {
+                debugLog('participants', `Error validating storage URL: ${error}`);
               }
             }
           }
@@ -123,7 +142,7 @@ export const validateImageUrl = async (url: string): Promise<boolean> => {
     
     clearTimeout(timeoutId);
     
-    // Fix: Ensure we return a boolean by using a separate check for file extension
+    // Ensure we return a boolean by using a separate check for file extension
     const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|svg)$/i) !== null;
     const isValid = response.ok && 
       (response.headers.get('content-type')?.includes('image') || hasImageExtension);

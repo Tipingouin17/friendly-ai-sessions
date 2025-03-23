@@ -24,8 +24,8 @@ export const FacilitatorCard = ({
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   
+  // Reset loading state when avatarUrl changes
   useEffect(() => {
-    // Reset loading state when avatarUrl changes
     if (avatarUrl) {
       setImageLoading(true);
       setImageError(false);

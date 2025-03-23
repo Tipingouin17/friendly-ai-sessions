@@ -103,7 +103,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
       )}
       
       {/* Main content area */}
-      <div className="flex-1 overflow-hidden">
+      <div className={`flex-1 overflow-hidden ${!isAdmin && 'pt-2'}`}>
         <MessagingArea
           messages={messages}
           participantColors={enhancedParticipantColors}

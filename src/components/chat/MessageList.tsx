@@ -83,7 +83,7 @@ const MessageList = ({
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
-      <div className="px-3 py-2 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
+      <div className="px-3 py-4 sm:px-4 sm:py-6 space-y-1 sm:space-y-2">
         {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
           <MessageItem
             key={`${message.id || index}-${index}`}

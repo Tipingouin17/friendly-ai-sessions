@@ -14,7 +14,7 @@ const SessionLayout = ({ children }: SessionLayoutProps) => {
   
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className={`container mx-auto flex-1 max-w-7xl flex flex-col ${isMobile ? 'p-0' : isAdminPage ? 'px-4 py-16' : 'px-4 pt-6'}`}>
+      <div className={`container mx-auto flex-1 max-w-7xl flex flex-col ${isMobile ? 'p-0' : isAdminPage ? 'px-4 py-16' : 'px-4 pt-20'}`}>
         <div className={`flex-1 bg-white ${isMobile ? 'rounded-none' : 'rounded-lg'} shadow-sm flex flex-col relative`}>
           {children}
         </div>

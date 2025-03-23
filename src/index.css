@@ -73,6 +73,15 @@
     @apply bg-amber-100 text-amber-800;
   }
   
+  /* Session specific spacing */
+  .session-content {
+    @apply pt-16 md:pt-20;
+  }
+  
+  .session-message-container {
+    @apply pt-2 md:pt-4;
+  }
+  
   /* Mobile-optimized message bubbles */
   @media (max-width: 640px) {
     .message-bubble-user {

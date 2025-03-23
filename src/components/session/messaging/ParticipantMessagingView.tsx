@@ -1,9 +1,10 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -62,17 +63,26 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const mobileState = useIsMobile();
   const currentIsMobile = mobileState === true;
   
-  // Log messages for debugging - removed excessive logging that could cause rerenders
+  // Filter messages for this participant using the messageProcessor hook
+  const filteredMessages = useMessageProcessor({
+    messages,
+    viewMode: "participant", // Force participant view mode to ensure filtering
+    participants,
+    participantNames,
+    currentParticipant: currentUserParticipantId || currentParticipant
+  });
+  
+  // Debug logging
   useEffect(() => {
-    console.log("ParticipantMessagingView - Current participant:", `P${currentParticipant}`);
-    console.log("Messages in ParticipantMessagingView:", messages.length);
-  }, [currentParticipant, messages.length]);
+    console.log(`ParticipantMessagingView - Current participant ID: P${currentParticipant}`);
+    console.log(`Original messages: ${messages.length}, Filtered messages: ${filteredMessages.length}`);
+  }, [messages.length, filteredMessages.length, currentParticipant]);
   
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="flex-1 overflow-hidden relative">
         <MessageList 
-          messages={messages} 
+          messages={filteredMessages} 
           participantColors={participantColors}
           currentParticipant={`P${currentParticipant}`}
           isWaitingForResponse={isWaitingForResponse}

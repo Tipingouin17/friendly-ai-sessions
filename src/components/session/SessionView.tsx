@@ -18,6 +18,16 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
     }
   }, [isAdmin, props.sessionState]);
 
+  // Log key properties for debugging
+  useEffect(() => {
+    console.log("SessionView rendering with:", {
+      isAdmin,
+      viewMode: props.sessionState.viewMode,
+      participantId: props.currentUserParticipantId,
+      messagesCount: props.sessionState.messages.length
+    });
+  }, [isAdmin, props.sessionState.viewMode, props.currentUserParticipantId, props.sessionState.messages.length]);
+
   return (
     <SessionContainer
       participantCount={props.conversation?.participants || props.participants.length}

@@ -25,7 +25,6 @@ export const useMessageProcessor = ({
     
     // Log the inputs for debugging
     console.log(`useMessageProcessor - Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
-    console.log("Available participants data:", participants);
     
     // Create a mapping of participant IDs to names for quicker lookup
     const participantMap = participants.reduce((map, p) => {
@@ -42,7 +41,6 @@ export const useMessageProcessor = ({
           // First priority: Look for participant in the participants array (from db)
           const participant = participantMap[participantNumber];
           if (participant) {
-            console.log(`Found participant in map: ${participant.name} for ID ${participantNumber}`);
             return {
               ...message,
               participant: participant.name,
@@ -54,7 +52,6 @@ export const useMessageProcessor = ({
           // Second priority: Check participantNames dictionary
           const name = participantNames[participantNumber];
           if (name) {
-            console.log(`Found participant in names map: ${name} for ID ${participantNumber}`);
             return {
               ...message,
               participant: name
@@ -62,7 +59,6 @@ export const useMessageProcessor = ({
           }
           
           // Fallback: Use participant number as a last resort
-          console.log(`No participant info found for ID ${participantNumber}, using default`);
           return {
             ...message,
             participant: `Participant ${participantNumber}`
@@ -71,8 +67,13 @@ export const useMessageProcessor = ({
         return message;
       });
     } else {
-      // Participant mode - filter messages for this participant
+      // Participant mode - IMPORTANT: filter messages strictly to only show:
+      // 1. Messages from the facilitator (assistant)
+      // 2. Messages from this specific participant
       const participantKey = `P${currentParticipant}`;
+      
+      // Log for debugging
+      console.log(`Filtering messages for participant ${participantKey} only`);
       
       // Filter to only include facilitator messages and this participant's messages
       const filteredMessages = messages.filter(message => {
@@ -89,6 +90,8 @@ export const useMessageProcessor = ({
         // Exclude all other participant messages
         return false;
       });
+      
+      console.log(`Original message count: ${messages.length}, filtered count: ${filteredMessages.length}`);
       
       // Process the filtered messages
       return filteredMessages.map(message => {

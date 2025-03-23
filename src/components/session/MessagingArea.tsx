@@ -70,28 +70,23 @@ const MessagingArea = ({
   
   // Log messages count for debugging
   useEffect(() => {
-    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`, 
-      messages.map(m => ({
-        id: m.id,
-        sender: m.sender,
-        content: m.content.substring(0, 20) + "...",
-        participant: m.participant
-      }))
-    );
-  }, [messages, viewMode]);
-  
-  // For participant view, show all messages when in participant view
-  // We're no longer filtering messages here as this was causing the participant's messages to be hidden
-  const filteredMessages = React.useMemo(() => {
-    if (!messages || messages.length === 0) {
-      return [];
-    }
+    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
     
-    // In participant view, we show ALL messages
-    console.log("Using all messages for participant view");
-    return messages;
-  }, [messages]);
-
+    // Check if we're in participant view
+    if (viewMode === "participant" && !isAdmin) {
+      // Log participant filtering information for debugging
+      const participantKey = `P${currentParticipant}`;
+      const userMsgCount = messages.filter(m => m.sender === "user" && m.participant === participantKey).length;
+      const facilitatorMsgCount = messages.filter(m => m.sender === "assistant").length;
+      const otherMsgCount = messages.length - userMsgCount - facilitatorMsgCount;
+      
+      console.log(`For participant ${participantKey}: user messages=${userMsgCount}, facilitator messages=${facilitatorMsgCount}, other messages=${otherMsgCount}`);
+    }
+  }, [messages, viewMode, isAdmin, currentParticipant]);
+  
+  // For participant view, we'll handle filtering in the MessageItem component
+  // No filtering happens here, as it would be redundant with useMessageProcessor hook
+  
   // Always use admin view if isAdmin=true or viewMode is admin
   if (isAdmin || viewMode === "admin") {
     return (
@@ -110,7 +105,7 @@ const MessagingArea = ({
   // Default to participant view
   return (
     <ParticipantMessagingView
-      messages={filteredMessages}
+      messages={messages} // Let ParticipantMessagingView handle filtering using the hooks
       participantColors={participantColors}
       currentParticipant={currentParticipant}
       isWaitingForResponse={isWaitingForResponse}

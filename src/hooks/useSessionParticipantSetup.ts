@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
@@ -107,11 +108,11 @@ export const useSessionParticipantSetup = ({
       const maxParticipants = conversation.participants || 0;
       const currentCount = conversation.current_participants || 0;
       
-      //console.log("Participant counts:", {
+      /*console.log("Participant counts:", {
         max: maxParticipants,
         current: currentCount,
         fromArray: participants.length
-      });
+      });*/
       
       setMaxParticipantsForSession(maxParticipants);
       setCurrentParticipantCount(currentCount);

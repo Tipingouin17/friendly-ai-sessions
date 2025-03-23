@@ -4,7 +4,7 @@ import { debugLog } from "@/utils/debugLogger";
 
 /**
  * Generates a URL for a facilitator's avatar
- * Follows this NEW priority:
+ * Follows this priority:
  * 1. URL from the facilitator's profile_picture field if available
  * 2. Custom uploaded avatar from facilitator-avatars bucket if available
  * 3. Default placeholder as fallback
@@ -26,12 +26,15 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       // If it's already a complete URL, use it directly
       if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
         try {
-          const response = await fetch(facilitator.profile_picture, { method: 'HEAD' });
+          // Fix any issues with URLs that might have double slashes
+          const cleanUrl = facilitator.profile_picture.replace('//facilitators-avatars/', '/facilitator-avatars/');
+          
+          const response = await fetch(cleanUrl, { method: 'HEAD' });
           if (response.ok) {
-            debugLog('participants', `Using valid profile_picture URL: ${facilitator.profile_picture}`);
-            return facilitator.profile_picture;
+            debugLog('participants', `Using valid profile_picture URL: ${cleanUrl}`);
+            return cleanUrl;
           } else {
-            debugLog('participants', `profile_picture URL validation failed: ${facilitator.profile_picture}`);
+            debugLog('participants', `profile_picture URL validation failed: ${cleanUrl}`);
           }
         } catch (error) {
           debugLog('participants', `Error validating profile_picture URL: ${error}`);
@@ -39,23 +42,33 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
       
       // If it's a storage path reference, convert it to a public URL
-      if (facilitator.profile_picture.includes('facilitator-avatars')) {
+      if (facilitator.profile_picture.includes('facilitator')) {
         try {
-          const fileName = facilitator.profile_picture.split('/').pop();
-          if (fileName) {
-            const { data } = await supabase.storage
-              .from('facilitator-avatars')
-              .getPublicUrl(fileName);
-              
-            if (data?.publicUrl) {
-              try {
-                const response = await fetch(data.publicUrl, { method: 'HEAD' });
-                if (response.ok) {
-                  debugLog('participants', `Using storage reference in profile_picture: ${data.publicUrl}`);
-                  return data.publicUrl;
+          // Extract the bucket name and file path correctly
+          const urlParts = facilitator.profile_picture.split('/');
+          const bucketIndex = urlParts.findIndex(part => 
+            part === 'facilitator-avatars' || part === 'facilitators-avatars'
+          );
+          
+          if (bucketIndex >= 0) {
+            const bucketName = 'facilitator-avatars'; // Use the correct bucket name
+            const fileName = urlParts.slice(bucketIndex + 1).join('/').replace(/^\/+/, '');
+            
+            if (fileName) {
+              const { data } = await supabase.storage
+                .from(bucketName)
+                .getPublicUrl(fileName);
+                
+              if (data?.publicUrl) {
+                try {
+                  const response = await fetch(data.publicUrl, { method: 'HEAD' });
+                  if (response.ok) {
+                    debugLog('participants', `Using storage reference in profile_picture: ${data.publicUrl}`);
+                    return data.publicUrl;
+                  }
+                } catch (error) {
+                  debugLog('participants', `Error validating storage URL: ${error}`);
                 }
-              } catch (error) {
-                debugLog('participants', `Error validating storage URL: ${error}`);
               }
             }
           }
@@ -71,7 +84,6 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       
       try {
         // Get the public URL for the facilitator's avatar using their ID
-        // Note: getPublicUrl doesn't return an error property in its response type
         const { data } = await supabase.storage
           .from('facilitator-avatars')
           .getPublicUrl(`${facilitator.id}.jpg`);

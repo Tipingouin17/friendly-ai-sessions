@@ -61,5 +61,6 @@ export const isImageUrl = (url: string): boolean => {
   if (!url) return false;
   return url.match(/\.(jpeg|jpg|gif|png|svg)$/i) !== null || 
          url.includes('/api/avatar') ||
-         url.includes('facilitator-avatars');
+         url.includes('facilitator-avatars') || 
+         url.includes('supabase.co/storage');
 };

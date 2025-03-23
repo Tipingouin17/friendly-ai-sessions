@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
+import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
 interface UseMessageProcessorProps {
   messages: Message[];
@@ -29,9 +30,22 @@ export const useMessageProcessor = ({
       return map;
     }, {} as { [key: number]: ParticipantInfo });
     
+    // Process facilitator avatar URLs to ensure they're correctly formatted
+    const processedMessages = [...messages].map(message => {
+      // For assistant/facilitator messages, ensure avatar URL is correct
+      if (message.sender === "assistant" && (!message.avatar || message.avatar?.includes('facilitators-avatars'))) {
+        return {
+          ...message,
+          avatar: message.avatar?.replace('facilitators-avatars', 'facilitator-avatars').replace(/([^:]\/)\/+/g, "$1") || 
+                 `/api/avatar?name=Facilitator&variant=beam&palette=2`
+        };
+      }
+      return message;
+    });
+    
     if (viewMode === "admin") {
       // Admin sees all messages
-      return messages.map(message => {
+      return processedMessages.map(message => {
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
           
@@ -70,7 +84,7 @@ export const useMessageProcessor = ({
       const participantKey = `P${currentParticipant}`;
       
       // Filter to only include facilitator messages and this participant's messages
-      const filteredMessages = messages.filter(message => {
+      const filteredMessages = processedMessages.filter(message => {
         // Include all facilitator messages
         if (message.sender === "assistant") {
           return true;
@@ -115,15 +129,6 @@ export const useMessageProcessor = ({
           return {
             ...message,
             participant: participantNumber === currentParticipant ? "You" : `Participant ${participantNumber}`
-          };
-        }
-        
-        // For assistant messages, ensure proper avatar
-        if (message.sender === "assistant" && !message.avatar) {
-          // If no avatar is set, ensure we at least provide a placeholder
-          return {
-            ...message,
-            avatar: "/api/avatar?name=Facilitator&variant=beam&palette=2"
           };
         }
         

@@ -3,6 +3,7 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
+import { handleAvatarError, isImageUrl } from '@/utils/facilitatorUtils';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
@@ -36,19 +37,17 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars with specific URLs
+  // For assistant/facilitator avatars
   if (isAssistant) {
-    console.log('Rendering assistant avatar with URL:', avatarUrl);
-    
     // If we have a specific facilitator avatar URL, use it
-    if (avatarUrl && 
-        avatarUrl !== '/placeholder.svg' && 
-        !avatarUrl.includes('api.qrserver.com') &&
-        !avatarUrl.startsWith('/api/avatar')) {
-      
+    if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl)) {
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
-          <AvatarImage src={avatarUrl} alt={name || "Facilitator"} />
+          <AvatarImage 
+            src={avatarUrl} 
+            alt={name || "Facilitator"} 
+            onError={handleAvatarError}
+          />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
           </AvatarFallback>
@@ -75,7 +74,7 @@ const MessageAvatar = ({
     ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
   ];
 
-  // Always generate an avatar for users with no specific avatar
+  // Generate an avatar for users with no specific avatar
   if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg') {
     // Use name as avatar seed
     const avatarName = name || 'User';
@@ -94,7 +93,7 @@ const MessageAvatar = ({
     );
   }
 
-  // Handle existing avatar URLs
+  // Handle avatar URLs that already contain API avatar URLs
   if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
     // Use name as avatar seed if it's an API avatar
     const avatarName = name || 'User';
@@ -116,7 +115,11 @@ const MessageAvatar = ({
   // Regular avatar with image or fallback
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
-      <AvatarImage src={avatarUrl} alt={name} />
+      <AvatarImage 
+        src={avatarUrl} 
+        alt={name} 
+        onError={handleAvatarError}
+      />
       <AvatarFallback>
         {isAssistant ? 
           <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> : 

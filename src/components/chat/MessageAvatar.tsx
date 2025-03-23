@@ -41,10 +41,18 @@ const MessageAvatar = ({
   if (isAssistant) {
     // If we have a specific facilitator avatar URL, use it
     if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl)) {
+      // Fix facilitator bucket name if needed
+      const correctedUrl = avatarUrl.includes('facilitators-avatars') 
+        ? avatarUrl.replace('facilitators-avatars', 'facilitator-avatars')
+        : avatarUrl;
+      
+      // Fix any double slashes in the URL except after protocol
+      const cleanUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+      
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
           <AvatarImage 
-            src={avatarUrl} 
+            src={cleanUrl} 
             alt={name || "Facilitator"} 
             onError={handleAvatarError}
           />

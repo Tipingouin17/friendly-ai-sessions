@@ -33,11 +33,26 @@ export const useMessageProcessor = ({
     // Process facilitator avatar URLs to ensure they're correctly formatted
     const processedMessages = [...messages].map(message => {
       // For assistant/facilitator messages, ensure avatar URL is correct
-      if (message.sender === "assistant" && (!message.avatar || message.avatar?.includes('facilitators-avatars'))) {
+      if (message.sender === "assistant") {
+        // Fix any URL issues with facilitator avatars
+        let correctedAvatar = message.avatar;
+        
+        if (correctedAvatar) {
+          // Fix incorrect bucket name if present
+          if (correctedAvatar.includes('facilitators-avatars')) {
+            correctedAvatar = correctedAvatar.replace('facilitators-avatars', 'facilitator-avatars');
+          }
+          
+          // Fix double slashes in the URL (except after protocol)
+          correctedAvatar = correctedAvatar.replace(/([^:]\/)\/+/g, "$1");
+        } else {
+          // If no avatar, provide a default
+          correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
+        }
+        
         return {
           ...message,
-          avatar: message.avatar?.replace('facilitators-avatars', 'facilitator-avatars').replace(/([^:]\/)\/+/g, "$1") || 
-                 `/api/avatar?name=Facilitator&variant=beam&palette=2`
+          avatar: correctedAvatar
         };
       }
       return message;

@@ -14,17 +14,8 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   try {
     // Case 1: If profile_picture exists and appears to be a valid URL, use it directly
     if (facilitator.profile_picture) {
-      const url = facilitator.profile_picture;
-      
-      // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
-      const correctedUrl = url.includes('facilitators-avatars') 
-        ? url.replace('facilitators-avatars', 'facilitator-avatars')
-        : url;
-      
-      // Clean up any double slashes in the URL (except after protocol)
-      const cleanUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
-      
-      return cleanUrl;
+      // Apply URL normalization to ensure consistency
+      return normalizeFacilitatorAvatarUrl(facilitator.profile_picture);
     }
     
     // Case 2: Try to generate a URL from the facilitator ID
@@ -34,7 +25,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (data?.publicUrl) {
-        return data.publicUrl;
+        return normalizeFacilitatorAvatarUrl(data.publicUrl);
       }
     }
     
@@ -45,6 +36,23 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     console.error('Error generating avatar URL:', error);
     return '/placeholder.svg';
   }
+};
+
+/**
+ * Normalizes a facilitator avatar URL to fix common issues
+ */
+export const normalizeFacilitatorAvatarUrl = (url: string): string => {
+  if (!url) return '/placeholder.svg';
+  
+  // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
+  let correctedUrl = url.includes('facilitators-avatars') 
+    ? url.replace('facilitators-avatars', 'facilitator-avatars')
+    : url;
+  
+  // Clean up any double slashes in the URL (except after protocol)
+  correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+  
+  return correctedUrl;
 };
 
 /**
@@ -62,5 +70,6 @@ export const isImageUrl = (url: string): boolean => {
   return url.match(/\.(jpeg|jpg|gif|png|svg)$/i) !== null || 
          url.includes('/api/avatar') ||
          url.includes('facilitator-avatars') || 
+         url.includes('facilitators-avatars') ||
          url.includes('supabase.co/storage');
 };

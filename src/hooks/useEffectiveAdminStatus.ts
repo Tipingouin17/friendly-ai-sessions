@@ -17,7 +17,7 @@ export function useEffectiveAdminStatus({
   persistedParticipantData
 }: UseEffectiveAdminStatusProps): boolean {
   useEffect(() => {
-    console.log("useEffectiveAdminStatus running...");
+    //console.log("useEffectiveAdminStatus running...");
   }, []);
 
   const location = useLocation();

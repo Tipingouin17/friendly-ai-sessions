@@ -4,6 +4,55 @@ import { supabase } from "@/integrations/supabase/client";
 import { ConversationWithSession } from "@/types/database";
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
+// Define the fetch conversation function first
+const fetchConversation = async (id: number | null) => {
+  if (!id) return null;
+  
+  console.log('Fetching conversation with ID:', id);
+  try {
+    // Ensure we also fetch language and participant_description fields
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        participants,
+        participant_description,
+        language,
+        sessions!conversations_sessions_id_fkey (
+          id,
+          title,
+          objective,
+          welcome_message,
+          facilitator,
+          facilitator_details:facilitators (
+            id,
+            title,
+            profile_picture,
+            details
+          )
+        )
+      `)
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      //console.error('Error fetching conversation from Supabase:', error);
+      throw new Error(error.message || "Could not load session data");
+    }
+    
+    if (!data) {
+      //console.error('No conversation found with ID:', id);
+      return null;
+    }
+    
+    //console.log('Successfully fetched conversation:', data);
+    return data as ConversationWithSession;
+  } catch (error) {
+    //console.error('Exception in fetchConversation:', error);
+    throw error;
+  }
+};
+
 export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null, Error>({
     queryKey: ['conversation', conversationId],
@@ -63,52 +112,4 @@ export const useConversation = (conversationId: number | null) => {
     refetchOnMount: true,
     refetchOnReconnect: true
   });
-};
-
-//const fetchConversation = async (id: number | null) => {
-  if (!id) return null;
-  
-  console.log('Fetching conversation with ID:', id);
-  try {
-    // Ensure we also fetch language and participant_description fields
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        participants,
-        participant_description,
-        language,
-        sessions!conversations_sessions_id_fkey (
-          id,
-          title,
-          objective,
-          welcome_message,
-          facilitator,
-          facilitator_details:facilitators (
-            id,
-            title,
-            profile_picture,
-            details
-          )
-        )
-      `)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      //console.error('Error fetching conversation from Supabase:', error);
-      throw new Error(error.message || "Could not load session data");
-    }
-    
-    if (!data) {
-      //console.error('No conversation found with ID:', id);
-      return null;
-    }
-    
-    //console.log('Successfully fetched conversation:', data);
-    return data as ConversationWithSession;
-  } catch (error) {
-    //console.error('Exception in fetchConversation:', error);
-    throw error;
-  }
 };

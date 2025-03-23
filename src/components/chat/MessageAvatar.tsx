@@ -36,8 +36,8 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars, show a special icon if no avatar
-  if (isAssistant && (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg')) {
+  // For assistant/facilitator avatars, we'll use a consistent blue avatar with bot icon
+  if (isAssistant) {
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">

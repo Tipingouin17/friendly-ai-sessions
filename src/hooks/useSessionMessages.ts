@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
@@ -167,10 +168,10 @@ export const useSessionMessages = ({
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
-          // Set default avatar for assistant messages - fixed the avatar property assignment here
-          // The 'avatar' property isn't in the database schema, so let's create it only for the Message object
-          const defaultAssistantAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
-          const avatarUrl = msg.role === 'assistant' ? defaultAssistantAvatar : undefined;
+          // Use a consistent, professional facilitator avatar
+          const assistantAvatar = msg.role === 'assistant' 
+            ? '/api/avatar?name=Facilitator&variant=beam&palette=2' 
+            : undefined;
           
           return {
             id: String(msg.id),
@@ -183,8 +184,8 @@ export const useSessionMessages = ({
             likes: likesArray,
             isReport,
             isAnonymous,
-            avatar: avatarUrl
-          } as Message; // Type assertion to ensure it matches the Message type
+            avatar: assistantAvatar
+          } as Message;
         });
         
         console.log('Successfully fetched messages:', formattedMessages.length);

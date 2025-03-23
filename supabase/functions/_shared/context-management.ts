@@ -29,7 +29,15 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
         difficulty_level,
         learning_outcomes,
         prerequisites,
-        welcome_message
+        welcome_message,
+        facilitator_id
+      ),
+      facilitator:facilitator_id (
+        id,
+        title,
+        profile_picture,
+        expertise_level,
+        language_preference
       )
     `)
     .eq('id', conversationId)

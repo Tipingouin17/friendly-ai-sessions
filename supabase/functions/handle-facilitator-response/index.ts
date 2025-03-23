@@ -121,7 +121,7 @@ serve(async (req) => {
         
         // Add language instruction to the prompt
         if (sessionLanguage && sessionLanguage !== "en") {
-          basePrompt += `\n\nIMPORTANT: Please respond in ${sessionLanguage} language.`;
+          basePrompt += `\n\nIMPORTANT: Please respond in ${sessionLanguage} language only. The entire response should be in ${sessionLanguage} language.`;
         }
         
         // Prepare content for OpenAI based on context
@@ -222,12 +222,16 @@ serve(async (req) => {
       );
     }
 
+    // Set a standard avatar for the facilitator
+    const facilitatorAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+
     // Create response object with metrics
     const responseObject = {
       id: `resp-${Date.now()}`,
       content: responseContent,
       is_report: generateReport,
-      metrics: responseMetrics
+      metrics: responseMetrics,
+      avatar: facilitatorAvatar
     };
 
     console.log("Sending facilitator response:", {

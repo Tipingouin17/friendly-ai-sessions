@@ -63,7 +63,7 @@ export function useSessionPageState() {
 
   // Handler for provider initialization
   const handleProviderInitialized = useCallback(() => {
-    console.log(`Provider initialized after ${Date.now() - stateRef.current.pageLoadTime}ms`);
+    //console.log(`Provider initialized after ${Date.now() - stateRef.current.pageLoadTime}ms`);
     
     // Update provider initialization state
     setHasInitializedProvider(true);

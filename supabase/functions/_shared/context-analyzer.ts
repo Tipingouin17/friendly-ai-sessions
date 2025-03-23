@@ -55,3 +55,19 @@ export function determineSessionProgress(
   
   return sessionProgress;
 }
+
+/**
+ * Get the appropriate facilitator avatar URL based on conversation data
+ */
+export function getFacilitatorAvatar(conversation: any) {
+  if (!conversation) return null;
+  
+  // Check if there's a profile picture in the facilitator details
+  if (conversation.sessions?.facilitator_details?.profile_picture) {
+    return conversation.sessions.facilitator_details.profile_picture;
+  }
+  
+  // Fall back to a consistent avatar pattern
+  const facilitatorTitle = conversation.sessions?.facilitator_details?.title || 'Facilitator';
+  return `/api/avatar?name=${encodeURIComponent(facilitatorTitle)}&variant=beam&palette=2`;
+}

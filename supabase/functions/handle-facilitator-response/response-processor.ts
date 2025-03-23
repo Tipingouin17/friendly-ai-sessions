@@ -11,7 +11,7 @@ import {
 import { 
   generateEnhancedTemplateResponse 
 } from "../_shared/response-generation.ts";
-import { determineSessionProgress } from "../_shared/context-analyzer.ts";
+import { determineSessionProgress, getFacilitatorAvatar } from "../_shared/context-analyzer.ts";
 import { FACILITATION_STRATEGIES } from "../_shared/facilitation-strategies.ts";
 import { REPORT_TEMPLATES } from "../_shared/report-templates.ts";
 import { 
@@ -50,6 +50,9 @@ export async function processResponse(
   
   // Determine session progress
   const sessionProgress = determineSessionProgress(messages, conversation?.sessions?.duration_minutes);
+  
+  // Get the appropriate facilitator avatar
+  const facilitatorAvatar = getFacilitatorAvatar(conversation);
   
   // Use OpenAI if available
   if (openaiApiKey && conversation?.sessions) {
@@ -170,15 +173,12 @@ export async function processResponse(
     );
   }
 
-  // Set a standard avatar for the facilitator
-  const facilitatorAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
-
-  // Create response object with metrics
+  // Create response object with metrics and avatar
   return {
     id: `resp-${Date.now()}`,
     content: responseContent,
     is_report: generateReport,
     metrics: responseMetrics,
-    avatar: facilitatorAvatar
+    avatar: facilitatorAvatar || '/api/avatar?name=Facilitator&variant=beam&palette=2'
   };
 }

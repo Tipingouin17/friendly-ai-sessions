@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
@@ -36,8 +35,21 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars, we'll use a consistent blue avatar with bot icon
+  // For assistant/facilitator avatars
   if (isAssistant) {
+    // If we have a specific facilitator avatar URL, use it
+    if (avatarUrl && avatarUrl !== '/placeholder.svg' && !avatarUrl.startsWith('/api/avatar')) {
+      return (
+        <Avatar className={`${dimensions[size]} avatar-container`}>
+          <AvatarImage src={avatarUrl} alt={name || "Facilitator"} />
+          <AvatarFallback className="bg-blue-100 text-blue-500">
+            <Bot className="h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
+      );
+    }
+    
+    // Otherwise use a consistent blue avatar with bot icon
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">
@@ -57,7 +69,7 @@ const MessageAvatar = ({
   ];
 
   // Always generate an avatar for users with no specific avatar
-  if (!avatarUrl || avatarUrl === '') {
+  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg') {
     // Use name as avatar seed
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
@@ -97,16 +109,13 @@ const MessageAvatar = ({
   // Regular avatar with image or fallback
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
-      {avatarUrl ? (
-        <AvatarImage src={avatarUrl} alt={name} />
-      ) : (
-        <AvatarFallback>
-          {isAssistant ? 
-            <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> : 
-            <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-          }
-        </AvatarFallback>
-      )}
+      <AvatarImage src={avatarUrl} alt={name} />
+      <AvatarFallback>
+        {isAssistant ? 
+          <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> : 
+          <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+        }
+      </AvatarFallback>
     </Avatar>
   );
 };

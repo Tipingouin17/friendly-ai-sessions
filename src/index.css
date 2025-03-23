@@ -93,7 +93,12 @@
   
   /* Fixed input footer */
   .fixed-input-footer {
-    @apply sticky bottom-0 z-10 bg-white border-t border-gray-100 shadow-sm;
+    @apply fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-100 shadow-sm;
+  }
+  
+  /* Message area container to ensure proper layout with fixed footer */
+  .message-area-container {
+    @apply flex flex-col h-[calc(100vh-64px)];
   }
   
   /* Mobile-optimized message bubbles */

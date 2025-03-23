@@ -72,9 +72,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   });
   
   return (
-    <div className="flex flex-col h-full">
+    <div className="message-area-container">
       {/* Message list with flex-1 to take all available space */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="message-container">
         <MessageList 
           messages={filteredMessages} 
           participantColors={participantColors}
@@ -86,7 +86,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       </div>
       
       {/* Fixed footer with input */}
-      <div className="sticky bottom-0 z-10 bg-white border-t border-gray-100">
+      <div className="fixed-input-footer">
         <InputFooter
           participantCount={maxParticipants}
           currentParticipant={currentParticipant}

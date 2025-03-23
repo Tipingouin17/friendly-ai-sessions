@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Maximum number of messages to include in context window
@@ -14,6 +15,9 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
     .from('conversations')
     .select(`
       *,
+      language,
+      participants,
+      participant_description,
       sessions:sessions_id (
         id,
         title,
@@ -24,7 +28,8 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
         skill_level,
         difficulty_level,
         learning_outcomes,
-        prerequisites
+        prerequisites,
+        welcome_message
       )
     `)
     .eq('id', conversationId)

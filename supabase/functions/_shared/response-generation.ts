@@ -19,6 +19,7 @@ export function generateEnhancedTemplateResponse(
   const sessionType = conversation?.sessions?.session_type || "workshop";
   const sessionTitle = conversation?.sessions?.title || "Discussion Session";
   const sessionObjective = conversation?.sessions?.objective || "facilitate a productive discussion";
+  const sessionLanguage = conversation?.language || "en";
   
   // Get the appropriate facilitation strategies
   const strategies = FACILITATION_STRATEGIES[sessionType as keyof typeof FACILITATION_STRATEGIES] || FACILITATION_STRATEGIES.workshop;
@@ -95,24 +96,56 @@ export function generateEnhancedTemplateResponse(
     
     return reportContent;
   } else if (recentUserMessages.length === 0) {
-    // Welcome message with participant awareness
-    let welcome = `Welcome to our ${sessionType} session on ${sessionTitle}. ${sessionObjective ? `Our objective today is to ${sessionObjective}.` : ''} I'm here to facilitate our discussion.`;
+    // Welcome message with participant awareness and proper language
+    let welcome = "";
     
-    // Adapt based on participant count and description
-    if (participantCount > 1) {
-      welcome += ` I see we have ${participantCount} participants today${participantDescription ? ` described as ${participantDescription}` : ""}.`;
-    }
-    
-    // Add group-size appropriate opener
-    if (participantCount <= 3) {
-      welcome += " Since we're a small group, we'll have plenty of opportunity for each of you to share your thoughts in depth.";
-    } else if (participantCount <= 8) {
-      welcome += " With our medium-sized group, we'll aim for a balance of individual contributions and group discussion.";
+    // Use basic translations for common welcome phrases based on language
+    if (sessionLanguage === "es") {
+      welcome = `Bienvenido a nuestra sesión de ${sessionType} sobre ${sessionTitle}. ${sessionObjective ? `Nuestro objetivo hoy es ${sessionObjective}.` : ''} Estoy aquí para facilitar nuestra discusión.`;
+    } else if (sessionLanguage === "fr") {
+      welcome = `Bienvenue à notre session de ${sessionType} sur ${sessionTitle}. ${sessionObjective ? `Notre objectif aujourd'hui est de ${sessionObjective}.` : ''} Je suis là pour faciliter notre discussion.`;
+    } else if (sessionLanguage === "de") {
+      welcome = `Willkommen zu unserer ${sessionType}-Sitzung zum Thema ${sessionTitle}. ${sessionObjective ? `Unser Ziel heute ist es, ${sessionObjective}.` : ''} Ich bin hier, um unsere Diskussion zu moderieren.`;
+    } else if (sessionLanguage === "zh") {
+      welcome = `欢迎参加我们关于${sessionTitle}的${sessionType}会议。${sessionObjective ? `今天我们的目标是${sessionObjective}。` : ''} 我在这里是为了促进我们的讨论。`;
+    } else if (sessionLanguage === "ar") {
+      welcome = `مرحبًا بك في جلسة ${sessionType} حول ${sessionTitle}. ${sessionObjective ? `هدفنا اليوم هو ${sessionObjective}.` : ''} أنا هنا لتسهيل مناقشتنا.`;
     } else {
-      welcome += " With our larger group, I'll help ensure everyone has a chance to contribute as we explore the topic together.";
+      // Default to English
+      welcome = `Welcome to our ${sessionType} session on ${sessionTitle}. ${sessionObjective ? `Our objective today is to ${sessionObjective}.` : ''} I'm here to facilitate our discussion.`;
     }
     
-    welcome += " Please share your initial thoughts on the topic.";
+    // Adapt based on participant count and description (keep in selected language)
+    if (participantCount > 1) {
+      if (sessionLanguage === "es") {
+        welcome += ` Veo que tenemos ${participantCount} participantes hoy${participantDescription ? ` descritos como ${participantDescription}` : ""}.`;
+      } else if (sessionLanguage === "fr") {
+        welcome += ` Je vois que nous avons ${participantCount} participants aujourd'hui${participantDescription ? ` décrits comme ${participantDescription}` : ""}.`;
+      } else if (sessionLanguage === "de") {
+        welcome += ` Ich sehe, dass wir heute ${participantCount} Teilnehmer haben${participantDescription ? `, die als ${participantDescription} beschrieben werden` : ""}.`;
+      } else if (sessionLanguage === "zh") {
+        welcome += ` 我看到我们今天有${participantCount}名参与者${participantDescription ? `，被描述为${participantDescription}` : ""}。`;
+      } else if (sessionLanguage === "ar") {
+        welcome += ` أرى أن لدينا ${participantCount} مشاركين اليوم${participantDescription ? ` وصفهم بأنهم ${participantDescription}` : ""}.`;
+      } else {
+        welcome += ` I see we have ${participantCount} participants today${participantDescription ? ` described as ${participantDescription}` : ""}.`;
+      }
+    }
+    
+    // Add final prompt in the selected language
+    if (sessionLanguage === "es") {
+      welcome += " Por favor, comparta sus pensamientos iniciales sobre el tema.";
+    } else if (sessionLanguage === "fr") {
+      welcome += " Veuillez partager vos réflexions initiales sur le sujet.";
+    } else if (sessionLanguage === "de") {
+      welcome += " Bitte teilen Sie Ihre ersten Gedanken zum Thema mit.";
+    } else if (sessionLanguage === "zh") {
+      welcome += " 请分享您对该主题的初步想法。";
+    } else if (sessionLanguage === "ar") {
+      welcome += " يرجى مشاركة أفكارك الأولية حول الموضوع.";
+    } else {
+      welcome += " Please share your initial thoughts on the topic.";
+    }
     
     return welcome;
   } else {

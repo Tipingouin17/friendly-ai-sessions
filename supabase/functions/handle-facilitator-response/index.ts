@@ -78,8 +78,9 @@ serve(async (req) => {
     // Extract participant description and count information
     const participantCount = conversation?.participants || participants?.length || 0;
     const participantDescription = conversation?.participant_description || "";
+    const sessionLanguage = conversation?.language || "en";
     
-    console.log(`Participant count: ${participantCount}, Description: ${participantDescription}`);
+    console.log(`Participant count: ${participantCount}, Description: ${participantDescription}, Language: ${sessionLanguage}`);
 
     // Response generation setup
     let responseContent = "";
@@ -109,14 +110,19 @@ serve(async (req) => {
         // Extract user questions and topics
         const userTopics = extractUserTopics(prunedMessages);
         
-        // Prepare OpenAI prompt
-        const prompt = prepareOpenAIPrompt(
+        // Prepare OpenAI prompt with language awareness
+        let basePrompt = prepareOpenAIPrompt(
           conversation, 
           sessionProgress, 
           participantCount, 
           participantDescription, 
           strategies
         );
+        
+        // Add language instruction to the prompt
+        if (sessionLanguage && sessionLanguage !== "en") {
+          basePrompt += `\n\nIMPORTANT: Please respond in ${sessionLanguage} language.`;
+        }
         
         // Prepare content for OpenAI based on context
         const reportTemplate = REPORT_TEMPLATES[sessionType as keyof typeof REPORT_TEMPLATES] || REPORT_TEMPLATES.default;
@@ -134,7 +140,7 @@ serve(async (req) => {
         // Call OpenAI
         const openAIResult = await generateOpenAIResponse(
           openaiApiKey,
-          prompt,
+          basePrompt,
           promptContent,
           generateReport
         );
@@ -164,7 +170,8 @@ serve(async (req) => {
                 topics: userTopics,
                 participationStats: participantStats,
                 participantCount,
-                participantDescription
+                participantDescription,
+                language: sessionLanguage
               }
             });
           } catch (error) {

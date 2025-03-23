@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 
 const WELCOME_MESSAGE_DELAY = 700; // Reduced delay to show welcome message faster
+const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
@@ -45,6 +45,33 @@ export const useSessionMessages = ({
     }
   }, [currentUserParticipantId]);
   
+  // Helper function to get welcome message from storage
+  const getCachedWelcomeMessage = useCallback(() => {
+    if (!conversationId) return null;
+    try {
+      const storageKey = `${WELCOME_MESSAGE_STORAGE_KEY}${conversationId}`;
+      const cachedMessageData = localStorage.getItem(storageKey);
+      if (cachedMessageData) {
+        return JSON.parse(cachedMessageData) as Message;
+      }
+      return null;
+    } catch (e) {
+      console.error('Error retrieving cached welcome message:', e);
+      return null;
+    }
+  }, [conversationId]);
+  
+  // Helper function to store welcome message
+  const cacheWelcomeMessage = useCallback((welcomeMsg: Message) => {
+    if (!conversationId) return;
+    try {
+      const storageKey = `${WELCOME_MESSAGE_STORAGE_KEY}${conversationId}`;
+      localStorage.setItem(storageKey, JSON.stringify(welcomeMsg));
+    } catch (e) {
+      console.error('Error caching welcome message:', e);
+    }
+  }, [conversationId]);
+  
   // Fetch messages for this conversation
   useEffect(() => {
     if (!conversationId) {
@@ -55,6 +82,9 @@ export const useSessionMessages = ({
     const fetchMessages = async () => {
       try {
         console.log('Fetching messages for conversation:', conversationId);
+        
+        // Check if we have a cached welcome message first
+        const cachedWelcomeMsg = getCachedWelcomeMessage();
         
         const { data, error } = await supabase
           .from('messages')
@@ -70,7 +100,14 @@ export const useSessionMessages = ({
         
         if (!data || data.length === 0) {
           console.log('No messages found for conversation', conversationId);
-          // Add welcome message immediately if one is provided
+          // If we have a cached welcome message, use it
+          if (cachedWelcomeMsg) {
+            console.log('Using cached welcome message');
+            setMessages([cachedWelcomeMsg]);
+            return;
+          }
+          
+          // Otherwise, add welcome message if one is provided
           if (welcomeMessage) {
             setTimeout(() => {
               const welcomeMsg: Message = {
@@ -82,6 +119,8 @@ export const useSessionMessages = ({
                 avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
               };
               setMessages([welcomeMsg]);
+              // Cache the welcome message for persistence
+              cacheWelcomeMessage(welcomeMsg);
             }, WELCOME_MESSAGE_DELAY);
           }
           return;
@@ -149,7 +188,15 @@ export const useSessionMessages = ({
         });
         
         console.log('Successfully fetched messages:', formattedMessages.length);
-        setMessages(formattedMessages);
+        
+        // If we have a cached welcome message and no assistant messages in the DB data
+        const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
+        if (cachedWelcomeMsg && !hasAssistantMessage && welcomeMessage) {
+          // Add the cached welcome message at the beginning
+          setMessages([cachedWelcomeMsg, ...formattedMessages]);
+        } else {
+          setMessages(formattedMessages);
+        }
       } catch (err) {
         console.error('Exception fetching messages:', err);
         setError('Failed to load session messages');
@@ -157,7 +204,7 @@ export const useSessionMessages = ({
     };
 
     fetchMessages();
-  }, [conversationId, welcomeMessage]);
+  }, [conversationId, welcomeMessage, getCachedWelcomeMessage, cacheWelcomeMessage]);
   
   return {
     messages,

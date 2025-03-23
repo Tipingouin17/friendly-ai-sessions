@@ -52,7 +52,7 @@ const MessageList = ({
       if (message.sender === "user" && message.participant && !messageColor) {
         messageColor = participantColors[message.participant] || getParticipantColor(message.participant);
       } else if (message.sender === "assistant" && !messageColor) {
-        messageColor = "#FFFFFF";
+        messageColor = "#FFFFFF"; // Default color for assistant messages
       }
 
       // Get participant info if this is a user message

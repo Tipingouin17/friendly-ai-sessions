@@ -10,21 +10,21 @@ export const useConversation = (conversationId: number | null) => {
     queryFn: async () => {
       try {
         if (!conversationId) {
-          console.log('No conversation ID provided to useConversation');
+          //console.log('No conversation ID provided to useConversation');
           throw new Error("No conversation ID provided");
         }
         
-        console.log('Fetching conversation with ID:', conversationId);
+        //console.log('Fetching conversation with ID:', conversationId);
         const data = await fetchConversation(conversationId);
         
         if (!data) {
-          console.log(`Conversation not found with ID: ${conversationId}`);
+          //console.log(`Conversation not found with ID: ${conversationId}`);
           throw new Error("Session not found or no longer available");
         }
         
         // Check if session is active
         if (data.status !== 'active' || data.is_session_ended) {
-          console.log(`Session is not active or has ended: ${conversationId}`);
+          //console.log(`Session is not active or has ended: ${conversationId}`);
           throw new Error("This session has ended or is no longer available");
         }
         
@@ -37,9 +37,9 @@ export const useConversation = (conversationId: number | null) => {
             try {
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
               facilitator.profile_picture = avatarUrl;
-              console.log('Facilitator profile picture:', avatarUrl);
+              //console.log('Facilitator profile picture:', avatarUrl);
             } catch (error) {
-              console.error('Error processing facilitator avatar:', error);
+              //console.error('Error processing facilitator avatar:', error);
               facilitator.profile_picture = '/placeholder.svg';
             }
           }
@@ -47,10 +47,10 @@ export const useConversation = (conversationId: number | null) => {
           console.log('No facilitator profile picture found');
         }
         
-        console.log('Successfully fetched conversation data:', data);
+        //console.log('Successfully fetched conversation data:', data);
         return data as ConversationWithSession;
       } catch (error) {
-        console.error('Error in query function:', error);
+        //console.error('Error in query function:', error);
         throw error instanceof Error ? error : new Error("Failed to load session");
       }
     },
@@ -96,19 +96,19 @@ const fetchConversation = async (id: number | null) => {
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching conversation from Supabase:', error);
+      //console.error('Error fetching conversation from Supabase:', error);
       throw new Error(error.message || "Could not load session data");
     }
     
     if (!data) {
-      console.error('No conversation found with ID:', id);
+      //console.error('No conversation found with ID:', id);
       return null;
     }
     
-    console.log('Successfully fetched conversation:', data);
+    //console.log('Successfully fetched conversation:', data);
     return data as ConversationWithSession;
   } catch (error) {
-    console.error('Exception in fetchConversation:', error);
+    //console.error('Exception in fetchConversation:', error);
     throw error;
   }
 };

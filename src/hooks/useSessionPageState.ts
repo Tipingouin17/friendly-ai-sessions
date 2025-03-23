@@ -27,7 +27,7 @@ export function useSessionPageState() {
   // Handle error function that doesn't cause re-renders
   const handleError = useCallback((errorMessage: string) => {
     stateRef.current.error = errorMessage;
-    console.error("Session error:", errorMessage);
+    //console.error("Session error:", errorMessage);
     
     if (!stateRef.current.hasShownToast) {
       stateRef.current.hasShownToast = true;

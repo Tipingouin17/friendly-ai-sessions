@@ -23,9 +23,6 @@ export const useMessageProcessor = ({
       return [];
     }
     
-    // Log the inputs for debugging
-    console.log(`useMessageProcessor - Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
-    
     // Create a mapping of participant IDs to names for quicker lookup
     const participantMap = participants.reduce((map, p) => {
       map[p.id] = p;
@@ -72,9 +69,6 @@ export const useMessageProcessor = ({
       // 2. Messages from this specific participant
       const participantKey = `P${currentParticipant}`;
       
-      // Log for debugging
-      console.log(`Filtering messages for participant ${participantKey} only`);
-      
       // Filter to only include facilitator messages and this participant's messages
       const filteredMessages = messages.filter(message => {
         // Include all facilitator messages
@@ -91,12 +85,10 @@ export const useMessageProcessor = ({
         return false;
       });
       
-      console.log(`Original message count: ${messages.length}, filtered count: ${filteredMessages.length}`);
-      
       // Process the filtered messages
       return filteredMessages.map(message => {
-        // Process the message the same way as in admin view
-        if (message.participant && message.participant.startsWith('P')) {
+        // Special handling for participant messages
+        if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
           
           // First priority: Check participants array for database info
@@ -125,6 +117,16 @@ export const useMessageProcessor = ({
             participant: participantNumber === currentParticipant ? "You" : `Participant ${participantNumber}`
           };
         }
+        
+        // For assistant messages, ensure proper avatar
+        if (message.sender === "assistant" && !message.avatar) {
+          // If no avatar is set, ensure we at least provide a placeholder
+          return {
+            ...message,
+            avatar: "/api/avatar?name=Facilitator&variant=beam&palette=2"
+          };
+        }
+        
         return message;
       });
     }

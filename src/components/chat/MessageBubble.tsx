@@ -24,8 +24,8 @@ const MessageBubble = ({
   isAnonymous = false,
   isMobile = false
 }: MessageBubbleProps) => {
-  // Use responsive sizing based on mobile state
-  const maxWidth = isMobile ? "max-w-[80%]" : "max-w-[70%]";
+  // Improve responsive sizing for better width adaptation
+  const maxWidth = isMobile ? "max-w-[85%] w-fit" : "max-w-[75%] w-fit";
   const padding = isMobile ? "px-3 py-2" : "px-4 py-3";
   const fontSize = isMobile ? "text-[14px]" : "text-[15px]";
   const nameSize = isMobile ? "text-[11px]" : "text-xs";
@@ -41,7 +41,8 @@ const MessageBubble = ({
         isFirstMessageOfGroup && "mt-1"
       )}
       style={{
-        backgroundColor: sender === "user" ? backgroundColor || "#FFC8C8" : undefined
+        backgroundColor: sender === "user" ? backgroundColor || "#FFC8C8" : undefined,
+        wordBreak: "break-word"
       }}
     >
       {/* Participant name for user messages */}

@@ -34,6 +34,11 @@ const MessageItem = ({
   if (displayParticipantName.startsWith("Participant") && participantInfo?.name) {
     displayParticipantName = participantInfo.name;
   }
+  
+  // Special handling for "You"
+  if (currentParticipant && message.participant === currentParticipant && !isAnonymous) {
+    displayParticipantName = "You";
+  }
 
   // Use more compact layout on mobile
   const spacing = isMobile ? "mt-1" : "mt-1.5";

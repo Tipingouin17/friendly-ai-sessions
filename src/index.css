@@ -107,10 +107,16 @@
   @media (max-width: 640px) {
     .message-bubble-user {
       @apply rounded-lg shadow-sm bg-[#FFC8C8] text-gray-800;
+      width: fit-content;
+      max-width: 85%;
+      word-break: break-word;
     }
     
     .message-bubble-assistant {
       @apply rounded-lg shadow-sm bg-white text-gray-800 border border-gray-100;
+      width: fit-content;
+      max-width: 85%;
+      word-break: break-word;
     }
     
     /* Optimize textarea for mobile */
@@ -122,4 +128,23 @@
 
 .glass-morphism {
   @apply bg-white/70 backdrop-blur-lg border border-white/20;
+}
+
+/* Add explicit message width controls */
+.message-width-control {
+  width: fit-content !important;
+  max-width: 85% !important;
+  word-break: break-word !important;
+}
+
+/* Ensure consistent text direction for mixed language content */
+[dir="auto"] {
+  text-align: left;
+}
+
+/* Ensure avatars are always visible */
+.avatar-container {
+  display: flex !important;
+  min-width: 32px;
+  min-height: 32px;
 }

@@ -43,11 +43,30 @@ const MessageAvatar = ({
     ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
   ];
 
-  // Handle boring-avatars or custom/api avatars
+  // Always generate an avatar for users with no specific avatar
+  if (!avatarUrl || avatarUrl === '') {
+    // Use name as avatar seed
+    const avatarName = name || 'User';
+    const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
+    
+    return (
+      <div className={`overflow-hidden rounded-full ${dimensions[size]}`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <BoringAvatar
+          size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
+          name={avatarName}
+          variant="beam"
+          colors={AVATAR_PALETTES[paletteIndex]}
+          square={false}
+        />
+      </div>
+    );
+  }
+
+  // Handle existing avatar URLs
   if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
     // Use name as avatar seed if it's an API avatar
-    const avatarName = name;
-    const paletteIndex = 0; // Default to first palette
+    const avatarName = name || 'User';
+    const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
     return (
       <div className={`overflow-hidden rounded-full ${dimensions[size]}`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>

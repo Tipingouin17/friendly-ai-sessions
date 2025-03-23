@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
@@ -59,9 +59,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   currentUserParticipantId = null,
   showResponseStats = false,
 }) => {
-  // Use the mobile hook to get current screen size
-  const mobileState = useIsMobile();
-  const currentIsMobile = mobileState === true;
+  // Get current mobile state
+  const isMobileDevice = useIsMobile();
   
   // Filter messages for this participant using the messageProcessor hook
   const filteredMessages = useMessageProcessor({
@@ -72,19 +71,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     currentParticipant: currentUserParticipantId || currentParticipant
   });
   
-  // Debug logging
-  useEffect(() => {
-    console.log(`ParticipantMessagingView - Current participant ID: P${currentParticipant}`);
-    console.log(`Original messages: ${messages.length}, Filtered messages: ${filteredMessages.length}`);
-    console.log(`Current participants: ${currentParticipantCount}/${maxParticipants}`);
-  }, [
-    messages.length, 
-    filteredMessages.length, 
-    currentParticipant, 
-    currentParticipantCount, 
-    maxParticipants
-  ]);
-  
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="flex-1 overflow-hidden relative">
@@ -94,11 +80,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           currentParticipant={`P${currentParticipant}`}
           isWaitingForResponse={isWaitingForResponse}
           participants={participants}
-          isMobile={isMobile || currentIsMobile}
+          isMobile={isMobile || isMobileDevice}
         />
       </div>
       
-      {/* Footer with input and participant info */}
+      {/* Footer with input */}
       <div className="shrink-0">
         <InputFooter
           participantCount={maxParticipants}

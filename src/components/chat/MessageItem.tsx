@@ -36,8 +36,8 @@ const MessageItem = ({
   }
 
   // Use more compact layout on mobile
-  const spacing = isMobile ? "mt-1" : "mt-2";
-  const groupSpacing = isMobile ? "mt-2.5" : "mt-4";
+  const spacing = isMobile ? "mt-1" : "mt-1.5";
+  const groupSpacing = isMobile ? "mt-2" : "mt-3";
 
   return (
     <div
@@ -48,10 +48,10 @@ const MessageItem = ({
         isFirstMessageOfGroup && groupSpacing
       )}
     >
-      <div className="flex items-end gap-1 sm:gap-2 max-w-full">
-        {/* Show avatar for first message in a group */}
+      <div className="flex items-end gap-1.5 max-w-full">
+        {/* Show avatar for facilitator messages */}
         {message.sender === "assistant" && isFirstMessageOfGroup && (
-          <div className="mb-1 hidden sm:block">
+          <div className="mb-1">
             <MessageAvatar 
               avatarUrl={message.avatar} 
               name="Facilitator" 
@@ -74,7 +74,7 @@ const MessageItem = ({
         
         {/* Show avatar for user messages (not anonymous) */}
         {message.sender === "user" && isFirstMessageOfGroup && !isAnonymous && (
-          <div className="mb-1 hidden sm:block">
+          <div className="mb-1">
             <MessageAvatar 
               avatarUrl={participantInfo?.avatar} 
               name={participantInfo?.name || displayParticipantName} 
@@ -85,7 +85,7 @@ const MessageItem = ({
         
         {/* Show anonymized avatar */}
         {message.sender === "user" && isFirstMessageOfGroup && isAnonymous && (
-          <div className="mb-1 hidden sm:block">
+          <div className="mb-1">
             <MessageAvatar 
               anonymized={true}
               name="Anonymous"

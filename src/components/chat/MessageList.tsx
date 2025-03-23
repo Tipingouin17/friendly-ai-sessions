@@ -69,12 +69,12 @@ const MessageList = ({
   // Empty state for no messages
   if (processedMessages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4 sm:p-8">
-        <div className="mb-4 p-4 bg-gray-50 rounded-full">
-          <MessagesSquare className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
+        <div className="mb-3 p-3 bg-gray-50 rounded-full">
+          <MessagesSquare className="w-6 h-6 text-gray-400" />
         </div>
-        <p className="text-base sm:text-lg font-medium mb-2">No messages yet</p>
-        <p className="max-w-md text-xs sm:text-sm">
+        <p className="text-base font-medium mb-1">No messages yet</p>
+        <p className="text-sm">
           When the session begins, messages will appear here.
         </p>
       </div>
@@ -83,7 +83,7 @@ const MessageList = ({
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
-      <div className={`px-3 py-3 sm:px-4 sm:py-6 space-y-2 sm:space-y-4`}>
+      <div className="px-3 py-2 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
         {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
           <MessageItem
             key={`${message.id || index}-${index}`}
@@ -98,7 +98,7 @@ const MessageList = ({
         
         {/* Thinking indicator */}
         {isWaitingForResponse && (
-          <div className="py-2">
+          <div className="py-1">
             <ThinkingIndicator />
           </div>
         )}

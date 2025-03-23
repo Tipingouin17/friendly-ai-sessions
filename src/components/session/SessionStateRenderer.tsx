@@ -30,7 +30,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   const { toast } = useToast();
   
   useEffect(() => {
-    console.log("SessionStateRenderer state:", {
+    //console.log("SessionStateRenderer state:", {
       isLoading,
       hasError: !!error || !!props.error,
       errorMessage: error || props.error,

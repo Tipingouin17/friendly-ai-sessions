@@ -65,7 +65,7 @@ export const useConversation = (conversationId: number | null) => {
   });
 };
 
-const fetchConversation = async (id: number | null) => {
+//const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
   console.log('Fetching conversation with ID:', id);

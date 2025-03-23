@@ -8,7 +8,7 @@ import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
-  console.log('Fetching conversation with ID:', id);
+  //console.log('Fetching conversation with ID:', id);
   try {
     // Ensure we also fetch language and participant_description fields
     const { data, error } = await supabase

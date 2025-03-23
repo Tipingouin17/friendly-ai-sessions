@@ -25,13 +25,16 @@ export const FacilitatorCard = ({
   
   useEffect(() => {
     // Reset loading state when avatarUrl changes
-    setImageLoading(true);
-    setImageError(false);
+    if (avatarUrl) {
+      setImageLoading(true);
+      setImageError(false);
+    }
   }, [avatarUrl]);
   
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.log(`Image error for facilitator ${facilitator.id} with URL ${avatarUrl}`);
+    console.error(`Image error for facilitator ${facilitator.id} with URL ${avatarUrl}`);
     setImageError(true);
+    setImageLoading(false);
     handleAvatarError(e);
   };
   
@@ -39,11 +42,6 @@ export const FacilitatorCard = ({
     console.log(`Image loaded successfully for facilitator ${facilitator.id}`);
     setImageLoading(false);
   };
-  
-  // Use a cleaned URL to avoid double slashes
-  const cleanAvatarUrl = avatarUrl?.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
-    return protocol || '/';
-  }) || '/placeholder.svg';
   
   return (
     <div
@@ -53,10 +51,12 @@ export const FacilitatorCard = ({
       onClick={onClick}
     >
       <div className="relative mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-        {(isLoading || imageLoading) && <Skeleton className="absolute inset-0 z-10 bg-gray-200" />}
+        {(isLoading || imageLoading) && !imageError && (
+          <Skeleton className="absolute inset-0 z-10 bg-gray-200" />
+        )}
         <Avatar className="h-full w-full">
           <AvatarImage 
-            src={cleanAvatarUrl} 
+            src={avatarUrl} 
             alt={facilitator.title || 'Facilitator'} 
             onError={handleImageError}
             onLoad={handleImageLoad}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Facilitator } from "@/types/facilitator";
 import { CreateFacilitatorModal } from "./CreateFacilitatorModal";
@@ -43,6 +42,11 @@ export const FacilitatorSelection = ({
   // Load all facilitator images
   useEffect(() => {
     const loadFacilitatorImages = async () => {
+      if (!facilitators || facilitators.length === 0) {
+        setLoadingImages(false);
+        return;
+      }
+
       setLoadingImages(true);
       const imageMap: Record<number, string> = {};
       
@@ -52,7 +56,6 @@ export const FacilitatorSelection = ({
         const loadPromises = facilitators.map(async (facilitator) => {
           if (facilitator.id) {
             console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
-            console.log(`Profile picture value: ${facilitator.profile_picture}`);
             
             try {
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);

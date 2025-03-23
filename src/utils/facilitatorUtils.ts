@@ -48,7 +48,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
       // Try first with "facilitator-avatars" bucket (singular)
-      const { data: singularData } = supabase.storage
+      let { data: singularData } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
@@ -72,7 +72,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
       
       // Try with "facilitators-avatars" bucket (plural) as fallback
-      const { data: pluralData } = supabase.storage
+      let { data: pluralData } = await supabase.storage
         .from('facilitators-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
@@ -111,7 +111,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
  * Handles image loading errors by setting a fallback image
  */
 export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
-  console.log(`Image load error for ${e.currentTarget.src}, using fallback`);
+  console.error(`Image load error for ${e.currentTarget.src}, using fallback`);
   e.currentTarget.src = '/placeholder.svg';
 };
 

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
 import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
+import { debugLog } from "@/utils/debugLogger";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -38,6 +39,7 @@ const SessionHeader = ({
         if (facilitator) {
           // Use the simplified avatar URL resolution
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+          debugLog('all', `Loaded facilitator avatar in header: ${avatarUrl}`);
           setProfilePicture(avatarUrl);
         } else {
           setProfilePicture('/placeholder.svg');

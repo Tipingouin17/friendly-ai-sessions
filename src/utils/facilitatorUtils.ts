@@ -25,13 +25,16 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (data?.publicUrl) {
+        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${data.publicUrl}`);
         return normalizeFacilitatorAvatarUrl(data.publicUrl);
       }
     }
     
     // Case 3: Fall back to a generated avatar
     const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
-    return `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    const fallbackUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    debugLog('all', `Using fallback avatar for facilitator: ${fallbackUrl}`);
+    return fallbackUrl;
   } catch (error) {
     console.error('Error generating avatar URL:', error);
     return '/placeholder.svg';
@@ -44,15 +47,26 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
 export const normalizeFacilitatorAvatarUrl = (url: string): string => {
   if (!url) return '/placeholder.svg';
   
-  // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
-  let correctedUrl = url.includes('facilitators-avatars') 
-    ? url.replace('facilitators-avatars', 'facilitator-avatars')
-    : url;
-  
-  // Clean up any double slashes in the URL (except after protocol)
-  correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
-  
-  return correctedUrl;
+  try {
+    // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
+    let correctedUrl = url.includes('facilitators-avatars') 
+      ? url.replace('facilitators-avatars', 'facilitator-avatars')
+      : url;
+    
+    // Clean up any double slashes in the URL (except after protocol)
+    correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+    
+    // Ensure full URL for relative paths that aren't API routes
+    if (correctedUrl.startsWith('/') && !correctedUrl.startsWith('/api/')) {
+      const baseUrl = window.location.origin;
+      correctedUrl = `${baseUrl}${correctedUrl}`;
+    }
+    
+    return correctedUrl;
+  } catch (error) {
+    console.error('Error normalizing URL:', error);
+    return url; // Return original URL if normalization fails
+  }
 };
 
 /**
@@ -67,7 +81,7 @@ export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): vo
  */
 export const isImageUrl = (url: string): boolean => {
   if (!url) return false;
-  return url.match(/\.(jpeg|jpg|gif|png|svg)$/i) !== null || 
+  return url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i) !== null || 
          url.includes('/api/avatar') ||
          url.includes('facilitator-avatars') || 
          url.includes('facilitators-avatars') ||

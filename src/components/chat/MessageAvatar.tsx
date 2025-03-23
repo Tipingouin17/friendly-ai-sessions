@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRound, EyeOff, Bot, Image, AlertCircle } from 'lucide-react';
+import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
 import { handleAvatarError, isImageUrl, normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 import { debugLog } from '@/utils/debugLogger';
@@ -52,10 +52,8 @@ const MessageAvatar = ({
   };
 
   if (isAssistant) {
-    if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl)) {
+    if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl) && !imageError) {
       const cleanUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-      
-      // Remove console.log to reduce noise
       
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
@@ -71,7 +69,6 @@ const MessageAvatar = ({
       );
     }
     
-    // Remove console.log to reduce noise
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">

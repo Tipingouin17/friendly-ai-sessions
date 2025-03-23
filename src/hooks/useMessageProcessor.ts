@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { normalizeFacilitatorAvatarUrl, isImageUrl } from "@/utils/facilitatorUtils";
+import { debugLog } from "@/utils/debugLogger";
 
 interface UseMessageProcessorProps {
   messages: Message[];
@@ -37,16 +38,11 @@ export const useMessageProcessor = ({
         // Fix any URL issues with facilitator avatars
         let correctedAvatar = message.avatar;
         
-        if (correctedAvatar) {
-          // Fix incorrect bucket name if present
-          if (correctedAvatar.includes('facilitators-avatars')) {
-            correctedAvatar = correctedAvatar.replace('facilitators-avatars', 'facilitator-avatars');
-          }
-          
-          // Fix double slashes in the URL (except after protocol)
-          correctedAvatar = correctedAvatar.replace(/([^:]\/)\/+/g, "$1");
+        if (correctedAvatar && isImageUrl(correctedAvatar)) {
+          // Apply URL normalization to ensure consistency
+          correctedAvatar = normalizeFacilitatorAvatarUrl(correctedAvatar);
         } else {
-          // If no avatar, provide a default
+          // If no avatar or invalid image URL, provide a default
           correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
         }
         
@@ -93,7 +89,7 @@ export const useMessageProcessor = ({
         return message;
       });
     } else {
-      // Participant mode - IMPORTANT: filter messages strictly to only show:
+      // Participant mode - filter messages strictly to only show:
       // 1. Messages from the facilitator (assistant)
       // 2. Messages from this specific participant
       const participantKey = `P${currentParticipant}`;

@@ -24,7 +24,12 @@ const MessageList = ({
   participants = [],
   isMobile = false
 }: MessageListProps) => {
-  const { ref } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
+  const { ref, scrollToBottom } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
+  
+  // Additional effect to scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, scrollToBottom]);
   
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
@@ -82,7 +87,7 @@ const MessageList = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain">
+    <div className="h-full overflow-y-auto overscroll-contain pb-4">
       <div className="px-3 py-4 sm:px-4 sm:py-6 space-y-1 sm:space-y-2">
         {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
           <MessageItem

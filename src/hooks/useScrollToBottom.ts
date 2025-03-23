@@ -7,11 +7,18 @@ export function useScrollToBottom<T extends HTMLElement>(
   const ref = useRef<T>(null);
 
   const scrollToBottom = () => {
-    ref.current?.scrollIntoView({ behavior: 'smooth' });
+    if (ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Use a small timeout to ensure rendering is complete before scrolling
+    const timeoutId = setTimeout(() => {
+      scrollToBottom();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [...dependencies]);
 
   return { ref, scrollToBottom };

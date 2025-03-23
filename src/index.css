@@ -29,6 +29,10 @@
 
   body {
     @apply bg-background text-foreground font-['Inter'] text-left;
+    /* Force the body to be at least viewport height */
+    min-height: 100vh;
+    /* Prevent content from being hidden behind sticky footers */
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   p, h1, h2, h3, h4, h5, h6, span, div, label {
@@ -80,6 +84,16 @@
   
   .session-message-container {
     @apply pt-2 md:pt-4;
+  }
+  
+  /* Message list container */
+  .message-container {
+    @apply flex-1 overflow-y-auto pb-16;
+  }
+  
+  /* Fixed input footer */
+  .fixed-input-footer {
+    @apply sticky bottom-0 z-10 bg-white border-t border-gray-100 shadow-sm;
   }
   
   /* Mobile-optimized message bubbles */

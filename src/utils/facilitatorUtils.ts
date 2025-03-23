@@ -23,96 +23,106 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.profile_picture) {
       debugLog('participants', `Checking profile_picture field: ${facilitator.profile_picture}`);
       
-      // If it's already a complete URL, use it directly
-      if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
+      // Case 1: If it's a direct URL that points to the correct bucket
+      if (facilitator.profile_picture.includes('facilitator-avatars') && 
+          !facilitator.profile_picture.includes('facilitators-avatars')) {
+        // Fix any double slashes in the URL
+        const cleanUrl = facilitator.profile_picture.replace(/([^:]\/)\/+/g, "$1");
         try {
-          // Fix any issues with URLs that might have double slashes
-          const cleanUrl = facilitator.profile_picture.replace('//facilitators-avatars/', '/facilitator-avatars/');
-          
           const response = await fetch(cleanUrl, { method: 'HEAD' });
           if (response.ok) {
             debugLog('participants', `Using valid profile_picture URL: ${cleanUrl}`);
             return cleanUrl;
-          } else {
-            debugLog('participants', `profile_picture URL validation failed: ${cleanUrl}`);
           }
         } catch (error) {
-          debugLog('participants', `Error validating profile_picture URL: ${error}`);
+          debugLog('participants', `Error validating direct URL: ${error}`);
         }
       }
       
-      // If it's a storage path reference, convert it to a public URL
-      if (facilitator.profile_picture.includes('facilitator')) {
+      // Case 2: If it's a URL with the wrong bucket name, fix it
+      if (facilitator.profile_picture.includes('facilitators-avatars')) {
+        const correctedUrl = facilitator.profile_picture.replace(
+          'facilitators-avatars', 
+          'facilitator-avatars'
+        ).replace(/([^:]\/)\/+/g, "$1"); // Also fix any double slashes
+        
         try {
-          // Extract the bucket name and file path correctly
-          const urlParts = facilitator.profile_picture.split('/');
-          const bucketIndex = urlParts.findIndex(part => 
-            part === 'facilitator-avatars' || part === 'facilitators-avatars'
-          );
+          const response = await fetch(correctedUrl, { method: 'HEAD' });
+          if (response.ok) {
+            debugLog('participants', `Using corrected profile_picture URL: ${correctedUrl}`);
+            return correctedUrl;
+          }
+        } catch (error) {
+          debugLog('participants', `Error validating corrected URL: ${error}`);
+        }
+      }
+      
+      // Case 3: If it contains a path but isn't a full URL, try to resolve it
+      if (!facilitator.profile_picture.startsWith('http') && 
+          (facilitator.profile_picture.includes('facilitator') || 
+           facilitator.profile_picture.includes('/'))) {
+        try {
+          // Extract the file name, handling both path formats
+          let fileName = '';
+          if (facilitator.profile_picture.includes('/')) {
+            // It's a path with slashes
+            const parts = facilitator.profile_picture.split('/');
+            fileName = parts[parts.length - 1];
+          } else {
+            // It might just be a filename
+            fileName = facilitator.profile_picture;
+          }
           
-          if (bucketIndex >= 0) {
-            const bucketName = 'facilitator-avatars'; // Use the correct bucket name
-            const fileName = urlParts.slice(bucketIndex + 1).join('/').replace(/^\/+/, '');
-            
-            if (fileName) {
-              const { data } = await supabase.storage
-                .from(bucketName)
-                .getPublicUrl(fileName);
-                
-              if (data?.publicUrl) {
-                try {
-                  const response = await fetch(data.publicUrl, { method: 'HEAD' });
-                  if (response.ok) {
-                    debugLog('participants', `Using storage reference in profile_picture: ${data.publicUrl}`);
-                    return data.publicUrl;
-                  }
-                } catch (error) {
-                  debugLog('participants', `Error validating storage URL: ${error}`);
+          if (fileName) {
+            const { data } = await supabase.storage
+              .from('facilitator-avatars')
+              .getPublicUrl(fileName);
+              
+            if (data?.publicUrl) {
+              try {
+                const response = await fetch(data.publicUrl, { method: 'HEAD' });
+                if (response.ok) {
+                  debugLog('participants', `Resolved file path to URL: ${data.publicUrl}`);
+                  return data.publicUrl;
                 }
+              } catch (error) {
+                debugLog('participants', `Error validating resolved URL: ${error}`);
               }
             }
           }
         } catch (error) {
-          debugLog('participants', `Error processing profile_picture storage path: ${facilitator.profile_picture}`, error);
+          debugLog('participants', `Error processing profile_picture path: ${error}`);
         }
       }
     }
     
-    // SECOND PRIORITY: Check for custom avatar in the storage bucket by ID
+    // SECOND PRIORITY: Check for avatar in storage using facilitator ID
     if (facilitator.id) {
-      debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
-      
       try {
-        // Get the public URL for the facilitator's avatar using their ID
         const { data } = await supabase.storage
           .from('facilitator-avatars')
           .getPublicUrl(`${facilitator.id}.jpg`);
         
         if (data?.publicUrl) {
-          debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
-          
-          // Add a cache-busting parameter to avoid browser caching issues
+          // Add cache busting to prevent browser caching
           const cacheBustUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
           
-          // Try to fetch the image to verify it exists
           try {
             const response = await fetch(cacheBustUrl, { method: 'HEAD' });
             if (response.ok) {
-              debugLog('participants', `Avatar URL validated successfully: ${cacheBustUrl}`);
+              debugLog('participants', `Found avatar by ID: ${cacheBustUrl}`);
               return cacheBustUrl;
-            } else {
-              debugLog('participants', `Avatar not found for facilitator ${facilitator.id} (status: ${response.status})`);
             }
-          } catch (fetchError) {
-            debugLog('participants', `Error fetching avatar: ${fetchError}`);
+          } catch (error) {
+            debugLog('participants', `Error checking ID-based avatar: ${error}`);
           }
         }
       } catch (error) {
-        debugLog('participants', `Error getting public URL for facilitator ${facilitator.id}:`, error);
+        debugLog('participants', `Error getting ID-based public URL: ${error}`);
       }
     }
     
-    // THIRD PRIORITY: Generate an avatar based on title or ID
+    // THIRD PRIORITY: Fall back to generated avatar
     const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
     const fallbackUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
     debugLog('participants', `Using generated avatar: ${fallbackUrl}`);

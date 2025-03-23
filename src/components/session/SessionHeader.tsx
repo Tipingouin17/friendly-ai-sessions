@@ -36,10 +36,12 @@ const SessionHeader = ({
       setIsLoading(true);
       try {
         if (facilitator) {
-          // Use the simplified avatar URL resolution
+          console.log('Loading facilitator avatar with data:', facilitator);
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+          console.log('Resolved facilitator avatar URL:', avatarUrl);
           setProfilePicture(avatarUrl);
         } else {
+          console.log('No facilitator data provided, using placeholder');
           setProfilePicture('/placeholder.svg');
         }
       } catch (error) {

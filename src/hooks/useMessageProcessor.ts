@@ -32,6 +32,14 @@ export const useMessageProcessor = ({
     if (viewMode === "admin") {
       // Admin sees all messages
       return messages.map(message => {
+        // First ensure facilitator avatars are properly set
+        if (message.sender === "assistant" && !message.avatar) {
+          message = {
+            ...message,
+            avatar: message.avatar || "/api/avatar?name=Facilitator&variant=beam&palette=2"
+          };
+        }
+        
         if (message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
           
@@ -42,7 +50,7 @@ export const useMessageProcessor = ({
               ...message,
               participant: participant.name,
               avatar: participant.avatar,
-              isAnonymous: participant.isAnonymous
+              isAnonymous: !!participant.isAnonymous
             };
           }
           
@@ -87,6 +95,14 @@ export const useMessageProcessor = ({
       
       // Process the filtered messages
       return filteredMessages.map(message => {
+        // Ensure all facilitator messages have an avatar
+        if (message.sender === "assistant") {
+          message = {
+            ...message,
+            avatar: message.avatar || "/api/avatar?name=Facilitator&variant=beam&palette=2"
+          };
+        }
+        
         // Special handling for participant messages
         if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));
@@ -98,7 +114,7 @@ export const useMessageProcessor = ({
               ...message,
               participant: participantNumber === currentParticipant ? "You" : participant.name,
               avatar: participant.avatar,
-              isAnonymous: participant.isAnonymous
+              isAnonymous: !!participant.isAnonymous
             };
           }
           
@@ -115,15 +131,6 @@ export const useMessageProcessor = ({
           return {
             ...message,
             participant: participantNumber === currentParticipant ? "You" : `Participant ${participantNumber}`
-          };
-        }
-        
-        // For assistant messages, ensure proper avatar
-        if (message.sender === "assistant" && !message.avatar) {
-          // If no avatar is set, ensure we at least provide a placeholder
-          return {
-            ...message,
-            avatar: "/api/avatar?name=Facilitator&variant=beam&palette=2"
           };
         }
         

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
 
 /**
- * Gets a facilitator's avatar URL with simplified fallback logic
+ * Gets a facilitator's avatar URL with simplified and robust fallback logic
  */
 export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null, title?: string }): Promise<string> => {
   // If no facilitator data provided, return placeholder
@@ -14,17 +14,23 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   try {
     // Case 1: If profile_picture exists and appears to be a valid URL, use it directly
     if (facilitator.profile_picture) {
-      const url = facilitator.profile_picture;
+      let url = facilitator.profile_picture;
       
       // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
-      const correctedUrl = url.includes('facilitators-avatars') 
-        ? url.replace('facilitators-avatars', 'facilitator-avatars')
-        : url;
+      if (url.includes('facilitators-avatars')) {
+        url = url.replace('facilitators-avatars', 'facilitator-avatars');
+      }
       
       // Clean up any double slashes in the URL (except after protocol)
-      const cleanUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+      url = url.replace(/([^:]\/)\/+/g, "$1");
       
-      return cleanUrl;
+      // Remove any double slashes between bucket and filename
+      if (url.includes('//')) {
+        url = url.replace('//', '/');
+      }
+      
+      console.log('Using facilitator avatar URL:', url);
+      return url;
     }
     
     // Case 2: Try to generate a URL from the facilitator ID
@@ -34,13 +40,16 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (data?.publicUrl) {
+        console.log('Generated public URL for facilitator:', data.publicUrl);
         return data.publicUrl;
       }
     }
     
     // Case 3: Fall back to a generated avatar
     const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
-    return `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    const fallbackUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    console.log('Using fallback avatar URL:', fallbackUrl);
+    return fallbackUrl;
   } catch (error) {
     console.error('Error generating avatar URL:', error);
     return '/placeholder.svg';
@@ -51,6 +60,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
  * Handles image loading errors by setting a fallback image
  */
 export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
+  console.log('Avatar image error, using placeholder');
   e.currentTarget.src = '/placeholder.svg';
 };
 

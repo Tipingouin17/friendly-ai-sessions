@@ -1,4 +1,3 @@
-
 import { 
   analyzeParticipation, 
   extractUserTopics 
@@ -63,7 +62,8 @@ export async function processResponse(
   const sessionProgress = determineSessionProgress(messages, conversation?.sessions?.duration_minutes);
   
   // Get the appropriate facilitator avatar
-  const facilitatorAvatar = getFacilitatorAvatar(conversation);
+  let facilitatorAvatar = getFacilitatorAvatar(conversation);
+  console.log('Facilitator avatar for response:', facilitatorAvatar);
   
   // Use OpenAI if available
   if (openaiApiKey && conversation?.sessions) {
@@ -191,7 +191,7 @@ export async function processResponse(
     );
   }
 
-  // Create response object with metrics and avatar
+  // Create response object with metrics and normalized avatar
   return {
     id: `resp-${Date.now()}`,
     content: responseContent,

@@ -67,15 +67,24 @@ export function getFacilitatorAvatar(conversation: any): string | null {
   if (conversation.sessions?.facilitator_details?.profile_picture) {
     const profilePicture = conversation.sessions.facilitator_details.profile_picture;
     
+    // Fix incorrect bucket name if needed
+    const correctedUrl = profilePicture.includes('facilitators-avatars') 
+      ? profilePicture.replace('facilitators-avatars', 'facilitator-avatars')
+      : profilePicture;
+    
+    // Fix double slashes in the URL except after protocol
+    const cleanUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+    
     // If it's already a full URL or path, use it directly
-    if (profilePicture.startsWith('http') || profilePicture.startsWith('/')) {
-      console.log('Using direct facilitator profile picture:', profilePicture);
-      return profilePicture;
+    if (cleanUrl.startsWith('http') || cleanUrl.startsWith('/')) {
+      console.log('Using normalized facilitator profile picture:', cleanUrl);
+      return cleanUrl;
     }
     
     // Otherwise ensure it has a leading slash
-    console.log('Adding leading slash to profile picture:', profilePicture);
-    return `/${profilePicture}`;
+    const finalUrl = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+    console.log('Using normalized facilitator profile picture with leading slash:', finalUrl);
+    return finalUrl;
   }
   
   // Generate an avatar based on facilitator title as fallback

@@ -1,9 +1,9 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRound, EyeOff, Bot } from 'lucide-react';
+import { UserRound, EyeOff, Bot, Image, AlertCircle } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
-import { handleAvatarError, isImageUrl } from '@/utils/facilitatorUtils';
+import { handleAvatarError, isImageUrl, normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
+import { debugLog } from '@/utils/debugLogger';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
@@ -20,13 +20,19 @@ const MessageAvatar = ({
   anonymized = false,
   isAssistant = false
 }: MessageAvatarProps) => {
+  const [imageError, setImageError] = useState(false);
   const dimensions = {
     sm: 'h-7 w-7',
     md: 'h-8 w-8',
     lg: 'h-10 w-10'
   };
 
-  // For anonymized avatars, show a special avatar
+  useEffect(() => {
+    if (isAssistant && avatarUrl) {
+      debugLog('all', `Facilitator avatar in MessageAvatar: ${avatarUrl}`);
+    }
+  }, [avatarUrl, isAssistant]);
+
   if (anonymized) {
     return (
       <Avatar className={`${dimensions[size]} bg-gray-100 avatar-container`}>
@@ -37,24 +43,24 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error(`Avatar image failed to load: ${avatarUrl}`);
+    setImageError(true);
+    handleAvatarError(e);
+  };
+
   if (isAssistant) {
-    // If we have a specific facilitator avatar URL, use it
     if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl)) {
-      // Fix facilitator bucket name if needed
-      const correctedUrl = avatarUrl.includes('facilitators-avatars') 
-        ? avatarUrl.replace('facilitators-avatars', 'facilitator-avatars')
-        : avatarUrl;
+      const cleanUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
       
-      // Fix any double slashes in the URL except after protocol
-      const cleanUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+      console.log('Using normalized facilitator avatar URL:', cleanUrl);
       
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
           <AvatarImage 
             src={cleanUrl} 
             alt={name || "Facilitator"} 
-            onError={handleAvatarError}
+            onError={handleImageError}
           />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
@@ -63,7 +69,7 @@ const MessageAvatar = ({
       );
     }
     
-    // Otherwise use a consistent blue avatar with bot icon
+    console.log('Using default bot icon for facilitator');
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">
@@ -73,7 +79,6 @@ const MessageAvatar = ({
     );
   }
 
-  // Define avatar palettes
   const AVATAR_PALETTES = [
     ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'],
     ['#FFAD08', '#EDD75A', '#73B06F', '#0C8F8F', '#405059'],
@@ -82,9 +87,7 @@ const MessageAvatar = ({
     ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
   ];
 
-  // Generate an avatar for users with no specific avatar
-  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg') {
-    // Use name as avatar seed
+  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg' || imageError) {
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
@@ -101,9 +104,7 @@ const MessageAvatar = ({
     );
   }
 
-  // Handle avatar URLs that already contain API avatar URLs
   if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
-    // Use name as avatar seed if it's an API avatar
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
@@ -120,13 +121,12 @@ const MessageAvatar = ({
     );
   }
 
-  // Regular avatar with image or fallback
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
       <AvatarImage 
         src={avatarUrl} 
         alt={name} 
-        onError={handleAvatarError}
+        onError={handleImageError}
       />
       <AvatarFallback>
         {isAssistant ? 

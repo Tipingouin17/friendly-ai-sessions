@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageAvatar from './MessageAvatar';
 import MessageBubble from './MessageBubble';
+import { debugLog } from '@/utils/debugLogger';
 
 interface MessageItemProps {
   message: Message;
@@ -22,6 +23,13 @@ const MessageItem = ({
   participantInfo,
   isMobile = false
 }: MessageItemProps) => {
+  // Log avatar usage for debugging
+  React.useEffect(() => {
+    if (message.sender === "assistant") {
+      debugLog('all', `MessageItem - assistant avatar: ${message.avatar}`);
+    }
+  }, [message]);
+
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";
   

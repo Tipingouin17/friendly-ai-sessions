@@ -1,8 +1,8 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
+import { normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
 const WELCOME_MESSAGE_DELAY = 700; // Reduced delay to show welcome message faster
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
@@ -29,7 +29,6 @@ export const useSessionMessages = ({
     isAdmin ? "admin" : "participant"
   );
   
-  // Function to record participant responses
   const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
     if (participantId === currentUserParticipantId) {
       setHasAnswered(hasResponded);
@@ -39,14 +38,12 @@ export const useSessionMessages = ({
     }
   }, [currentUserParticipantId]);
   
-  // Set current participant based on the user participant ID
   useEffect(() => {
     if (currentUserParticipantId) {
       setCurrentParticipant(currentUserParticipantId);
     }
   }, [currentUserParticipantId]);
   
-  // Helper function to get welcome message from storage
   const getCachedWelcomeMessage = useCallback(() => {
     if (!conversationId) return null;
     try {
@@ -62,7 +59,6 @@ export const useSessionMessages = ({
     }
   }, [conversationId]);
   
-  // Helper function to store welcome message
   const cacheWelcomeMessage = useCallback((welcomeMsg: Message) => {
     if (!conversationId) return;
     try {
@@ -73,7 +69,6 @@ export const useSessionMessages = ({
     }
   }, [conversationId]);
   
-  // Fetch messages for this conversation
   useEffect(() => {
     if (!conversationId) {
       console.log('No conversation ID provided, skipping message fetch');
@@ -84,7 +79,6 @@ export const useSessionMessages = ({
       try {
         console.log('Fetching messages for conversation:', conversationId);
         
-        // Check if we have a cached welcome message first
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         
         const { data, error } = await supabase
@@ -100,15 +94,12 @@ export const useSessionMessages = ({
         }
         
         if (!data || data.length === 0) {
-          console.log('No messages found for conversation', conversationId);
-          // If we have a cached welcome message, use it
           if (cachedWelcomeMsg) {
             console.log('Using cached welcome message');
             setMessages([cachedWelcomeMsg]);
             return;
           }
           
-          // Otherwise, add welcome message if one is provided
           if (welcomeMessage) {
             setTimeout(() => {
               const welcomeMsg: Message = {
@@ -120,58 +111,58 @@ export const useSessionMessages = ({
                 avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
               };
               setMessages([welcomeMsg]);
-              // Cache the welcome message for persistence
               cacheWelcomeMessage(welcomeMsg);
             }, WELCOME_MESSAGE_DELAY);
           }
           return;
         }
         
-        // Transform database messages to UI message format
         const formattedMessages = data.map(msg => {
-          // Extract content data - handle both string and object formats
           let messageContent = '';
           let participantId: string | undefined = undefined;
           let likesArray: string[] = [];
           let isReport = false;
           let isAnonymous = false;
+          let avatarUrl = undefined;
           
-          // Check if content is an object or string
           if (typeof msg.content === 'string') {
             messageContent = msg.content;
           } else if (msg.content && typeof msg.content === 'object') {
-            // It's an object, safely access properties
             const contentObj = msg.content as Record<string, any>;
             
-            // Handle text content
             if ('text' in contentObj) {
               messageContent = contentObj.text as string;
             } else {
-              // Fallback to stringifying the object if no text property
               messageContent = JSON.stringify(contentObj);
             }
             
-            // Handle participant ID
             if ('participant_id' in contentObj) {
               participantId = `P${contentObj.participant_id}`;
             }
             
-            // Handle likes safely
             if ('likes' in contentObj && Array.isArray(contentObj.likes)) {
               likesArray = contentObj.likes as string[];
             }
             
-            // Handle report and anonymous flags
+            if ('avatar' in contentObj && contentObj.avatar) {
+              avatarUrl = contentObj.avatar as string;
+              console.log('Found avatar in message content:', avatarUrl);
+            }
+            
             isReport = 'is_report' in contentObj ? Boolean(contentObj.is_report) : false;
             isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
           }
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
-          // Use a consistent, professional facilitator avatar
-          const assistantAvatar = msg.role === 'assistant' 
-            ? '/api/avatar?name=Facilitator&variant=beam&palette=2' 
-            : undefined;
+          if (msg.role === 'assistant') {
+            if (avatarUrl) {
+              console.log('Using avatar from message content:', avatarUrl);
+            } else {
+              avatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+              console.log('Using default facilitator avatar');
+            }
+          }
           
           return {
             id: String(msg.id),
@@ -184,16 +175,14 @@ export const useSessionMessages = ({
             likes: likesArray,
             isReport,
             isAnonymous,
-            avatar: assistantAvatar
+            avatar: avatarUrl
           } as Message;
         });
         
         console.log('Successfully fetched messages:', formattedMessages.length);
         
-        // If we have a cached welcome message and no assistant messages in the DB data
         const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
         if (cachedWelcomeMsg && !hasAssistantMessage && welcomeMessage) {
-          // Add the cached welcome message at the beginning
           setMessages([cachedWelcomeMsg, ...formattedMessages]);
         } else {
           setMessages(formattedMessages);

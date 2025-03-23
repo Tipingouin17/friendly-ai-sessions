@@ -1,10 +1,10 @@
-
 import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
 import { nanoid } from "nanoid";
+import { normalizeFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -37,18 +37,15 @@ export const useMessageSender = ({
   const requestInProgressRef = useRef(false);
   
   const handleSendMessage = useCallback(async () => {
-    // Prevent concurrent requests
     if (requestInProgressRef.current || isWaitingForResponse) {
       console.log("Request already in progress, ignoring duplicate send");
       return;
     }
     
-    // Don't allow sending in admin view
     if (sessionState.viewMode === "admin") return;
     
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
-    // Get the current participant info
     const currentParticipant = sessionState.currentParticipant;
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
@@ -63,7 +60,6 @@ export const useMessageSender = ({
     try {
       requestInProgressRef.current = true;
       
-      // Create the message object
       const messageId = nanoid();
       const newMessage = {
         id: messageId,
@@ -78,28 +74,22 @@ export const useMessageSender = ({
 
       console.log("Adding new message to UI:", newMessage);
 
-      // Add the participant's message to the displayed messages immediately
       sessionState.setMessages(prev => [...prev, newMessage]);
-      
-      // Clear the input message immediately to prevent duplicate sends
       const sentMessage = sessionState.inputMessage;
       sessionState.setInputMessage("");
       
-      // Record this participant has responded - after adding the message
       sessionState.recordResponse(currentParticipant, true);
       
-      // Store message in database for sync - now using JSONB content field to hold participant info
       const { data, error: dbError } = await supabase.from('messages').insert({
         conversation_id: currentConversationId,
         content: {
           text: sentMessage,
-          participant_id: currentParticipant, // Store participant ID in the content field
+          participant_id: currentParticipant,
           name: participantInfo?.name || `Participant ${currentParticipant}`,
           is_anonymous: isAnonymous
         },
         role: 'user',
         name: participantInfo?.name || `Participant ${currentParticipant}`
-        // Removed participant_id as it doesn't exist in the database schema
       }).select();
       
       if (dbError) {
@@ -109,8 +99,6 @@ export const useMessageSender = ({
       
       console.log("Message saved to database:", data);
       
-      // For single participant sessions, immediately trigger AI response
-      // Also trigger if all participants have answered
       const totalParticipants = conversation?.participants ?? 1;
       const updatedTotalResponses = sessionState.totalResponses + 1;
       
@@ -119,9 +107,6 @@ export const useMessageSender = ({
       console.log("Single participant check:", totalParticipants <= 1);
       console.log("All participants responded check:", updatedTotalResponses >= totalParticipants);
       
-      // Always get AI response if either:
-      // 1. This is the only participant (totalParticipants == 1)
-      // 2. All participants have now responded
       if (totalParticipants <= 1 || updatedTotalResponses >= totalParticipants) {
         setIsWaitingForResponse(true);
 
@@ -145,30 +130,37 @@ export const useMessageSender = ({
             throw new Error('No response data received from AI');
           }
 
+          let avatarUrl = response.data.avatar;
+          console.log('Avatar URL from response:', avatarUrl);
+          
+          if (!avatarUrl && conversation?.sessions?.facilitator_details?.profile_picture) {
+            avatarUrl = normalizeFacilitatorAvatarUrl(conversation.sessions.facilitator_details.profile_picture);
+            console.log('Using facilitator profile from conversation:', avatarUrl);
+          }
+
           const aiResponse = {
             id: response.data.id || nanoid(),
             content: response.data.content,
             sender: "assistant" as const,
             timestamp: new Date(),
-            avatar: conversation?.sessions?.facilitator_details?.profile_picture || null
+            avatar: avatarUrl
           };
           
-          console.log("Got AI response:", aiResponse);
+          console.log("Got AI response with avatar:", aiResponse.avatar);
           
-          // Save AI response to database
           try {
             await supabase.from('messages').insert({
               conversation_id: currentConversationId,
               content: {
-                text: aiResponse.content
+                text: aiResponse.content,
+                avatar: avatarUrl
               },
               role: 'assistant',
               user_id: null
             });
             
-            console.log("AI response saved to database");
+            console.log("AI response saved to database with avatar");
             
-            // Add the AI response to the messages
             sessionState.setMessages(prev => [...prev, aiResponse]);
           } catch (error) {
             console.error("Error saving AI response to database:", error);

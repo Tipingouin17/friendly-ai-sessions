@@ -29,8 +29,10 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
     }
     
-    // If we have a facilitator ID, check for custom avatar in the primary bucket
+    // If we have a facilitator ID, check for custom avatar in the facilitator-avatars bucket
     if (facilitator.id) {
+      debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
+      
       const { data } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
@@ -40,7 +42,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         return data.publicUrl;
       }
       
-      debugLog('participants', `No avatar found in primary bucket for facilitator ${facilitator.id}`);
+      debugLog('participants', `No avatar found in facilitator-avatars bucket for facilitator ${facilitator.id}`);
     }
     
     // Generate an avatar based on title or ID as last resort

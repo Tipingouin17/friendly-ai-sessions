@@ -4,9 +4,9 @@ import { debugLog } from "@/utils/debugLogger";
 
 /**
  * Generates a URL for a facilitator's avatar
- * Follows this priority:
- * 1. Custom uploaded avatar from facilitator-avatars bucket if available
- * 2. URL from the facilitator's profile_picture field if available
+ * Follows this NEW priority:
+ * 1. URL from the facilitator's profile_picture field if available
+ * 2. Custom uploaded avatar from facilitator-avatars bucket if available
  * 3. Default placeholder as fallback
  */
 export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null, title?: string }): Promise<string> => {
@@ -19,42 +19,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   try {
     debugLog('participants', `Getting avatar URL for facilitator: ${facilitator.id}`, facilitator);
     
-    // FIRST PRIORITY: Check for custom avatar in the storage bucket by ID
-    if (facilitator.id) {
-      debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
-      
-      try {
-        // Get the public URL for the facilitator's avatar using their ID
-        // Note: getPublicUrl doesn't return an error property in its response type
-        const { data } = await supabase.storage
-          .from('facilitator-avatars')
-          .getPublicUrl(`${facilitator.id}.jpg`);
-        
-        if (data?.publicUrl) {
-          debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
-          
-          // Add a cache-busting parameter to avoid browser caching issues
-          const cacheBustUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
-          
-          // Try to fetch the image to verify it exists
-          try {
-            const response = await fetch(cacheBustUrl, { method: 'HEAD' });
-            if (response.ok) {
-              debugLog('participants', `Avatar URL validated successfully: ${cacheBustUrl}`);
-              return cacheBustUrl;
-            } else {
-              debugLog('participants', `Avatar not found for facilitator ${facilitator.id} (status: ${response.status})`);
-            }
-          } catch (fetchError) {
-            debugLog('participants', `Error fetching avatar: ${fetchError}`);
-          }
-        }
-      } catch (error) {
-        debugLog('participants', `Error getting public URL for facilitator ${facilitator.id}:`, error);
-      }
-    }
-    
-    // SECOND PRIORITY: Use profile_picture field if it's a complete URL
+    // FIRST PRIORITY: Use profile_picture field if it's available
     if (facilitator.profile_picture) {
       debugLog('participants', `Checking profile_picture field: ${facilitator.profile_picture}`);
       
@@ -97,6 +62,41 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         } catch (error) {
           debugLog('participants', `Error processing profile_picture storage path: ${facilitator.profile_picture}`, error);
         }
+      }
+    }
+    
+    // SECOND PRIORITY: Check for custom avatar in the storage bucket by ID
+    if (facilitator.id) {
+      debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
+      
+      try {
+        // Get the public URL for the facilitator's avatar using their ID
+        // Note: getPublicUrl doesn't return an error property in its response type
+        const { data } = await supabase.storage
+          .from('facilitator-avatars')
+          .getPublicUrl(`${facilitator.id}.jpg`);
+        
+        if (data?.publicUrl) {
+          debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
+          
+          // Add a cache-busting parameter to avoid browser caching issues
+          const cacheBustUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+          
+          // Try to fetch the image to verify it exists
+          try {
+            const response = await fetch(cacheBustUrl, { method: 'HEAD' });
+            if (response.ok) {
+              debugLog('participants', `Avatar URL validated successfully: ${cacheBustUrl}`);
+              return cacheBustUrl;
+            } else {
+              debugLog('participants', `Avatar not found for facilitator ${facilitator.id} (status: ${response.status})`);
+            }
+          } catch (fetchError) {
+            debugLog('participants', `Error fetching avatar: ${fetchError}`);
+          }
+        }
+      } catch (error) {
+        debugLog('participants', `Error getting public URL for facilitator ${facilitator.id}:`, error);
       }
     }
     

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
@@ -35,9 +36,11 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars
+  // For assistant/facilitator avatars with specific URLs
   if (isAssistant) {
-    // If we have a valid facilitator avatar URL that's not a placeholder or API-generated avatar
+    console.log('Rendering assistant avatar with URL:', avatarUrl);
+    
+    // If we have a specific facilitator avatar URL, use it
     if (avatarUrl && 
         avatarUrl !== '/placeholder.svg' && 
         !avatarUrl.includes('api.qrserver.com') &&
@@ -63,7 +66,7 @@ const MessageAvatar = ({
     );
   }
 
-  // Define avatar palettes for participant avatars
+  // Define avatar palettes
   const AVATAR_PALETTES = [
     ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'],
     ['#FFAD08', '#EDD75A', '#73B06F', '#0C8F8F', '#405059'],
@@ -72,10 +75,28 @@ const MessageAvatar = ({
     ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
   ];
 
-  // Generate avatar for users with no specific avatar
-  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg' || 
-      avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
+  // Always generate an avatar for users with no specific avatar
+  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg') {
     // Use name as avatar seed
+    const avatarName = name || 'User';
+    const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
+    
+    return (
+      <div className={`overflow-hidden rounded-full ${dimensions[size]} avatar-container`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <BoringAvatar
+          size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
+          name={avatarName}
+          variant="beam"
+          colors={AVATAR_PALETTES[paletteIndex]}
+          square={false}
+        />
+      </div>
+    );
+  }
+
+  // Handle existing avatar URLs
+  if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
+    // Use name as avatar seed if it's an API avatar
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     

@@ -34,7 +34,7 @@ export function useParticipantPersistence() {
         const isValid = Date.now() - parsedData.timestamp < 24 * 60 * 60 * 1000;
         
         if (isValid) {
-          console.log('Loaded persisted participant data:', parsedData);
+          //console.log('Loaded persisted participant data:', parsedData);
           setPersistedData(parsedData);
         } else {
           console.log('Persisted participant data expired, clearing');
@@ -55,7 +55,7 @@ export function useParticipantPersistence() {
         setRecentSessions(validRecentSessions);
       }
     } catch (error) {
-      console.error('Error loading persisted participant data:', error);
+      //console.error('Error loading persisted participant data:', error);
       localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
@@ -71,7 +71,7 @@ export function useParticipantPersistence() {
       };
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
-      console.log('Persisted participant data:', dataToStore);
+      //console.log('Persisted participant data:', dataToStore);
       setPersistedData(dataToStore);
       
       // Update recent sessions

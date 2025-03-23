@@ -9,6 +9,7 @@ import { FacilitatorCarousel } from "./FacilitatorCarousel";
 import { FacilitatorDetailsPanel } from "./FacilitatorDetailsPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { debugLog } from "@/utils/debugLogger";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -52,32 +53,25 @@ export const FacilitatorSelection = ({
       const imageMap: Record<number, string> = {};
       
       try {
-        // Load images in parallel
-        const loadPromises = facilitators.map(async (facilitator) => {
+        debugLog('participants', `Loading images for ${facilitators.length} facilitators`);
+        
+        // Load images sequentially to avoid overwhelming Supabase storage
+        for (const facilitator of facilitators) {
           if (facilitator.id) {
             try {
               // Try to get the avatar URL
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-              return { id: facilitator.id, url: avatarUrl };
+              imageMap[facilitator.id] = avatarUrl;
+              debugLog('participants', `Loaded avatar for facilitator ${facilitator.id}: ${avatarUrl}`);
             } catch (error) {
               console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
-              return { id: facilitator.id, url: '/placeholder.svg' };
+              imageMap[facilitator.id] = '/placeholder.svg';
             }
           }
-          return null;
-        });
-
-        // Wait for all promises to resolve
-        const results = await Promise.all(loadPromises);
-        
-        // Process the results
-        results.forEach(result => {
-          if (result) {
-            imageMap[result.id] = result.url;
-          }
-        });
+        }
         
         setFacilitatorImages(imageMap);
+        debugLog('participants', 'Finished loading facilitator images', imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
         toast({

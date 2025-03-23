@@ -4,6 +4,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { handleAvatarError } from "@/utils/facilitatorUtils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect } from "react";
+import { debugLog } from "@/utils/debugLogger";
 
 interface FacilitatorCardProps {
   facilitator: Facilitator;
@@ -28,8 +29,9 @@ export const FacilitatorCard = ({
     if (avatarUrl) {
       setImageLoading(true);
       setImageError(false);
+      debugLog('participants', `Reset image state for facilitator ${facilitator.id}, new URL: ${avatarUrl}`);
     }
-  }, [avatarUrl]);
+  }, [avatarUrl, facilitator.id]);
   
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     console.error(`Image error for facilitator ${facilitator.id} with URL ${avatarUrl}`);
@@ -39,7 +41,7 @@ export const FacilitatorCard = ({
   };
   
   const handleImageLoad = () => {
-    console.log(`Image loaded successfully for facilitator ${facilitator.id}`);
+    debugLog('participants', `Image loaded successfully for facilitator ${facilitator.id}`);
     setImageLoading(false);
   };
   

@@ -1,10 +1,11 @@
 
-import { ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";
 import { FacilitatorCard } from "./FacilitatorCard";
 import { CreateFacilitatorButton } from "./CreateFacilitatorButton";
 import { useState, useEffect } from "react";
+import { debugLog } from "@/utils/debugLogger";
 
 interface FacilitatorCarouselProps {
   facilitators: Facilitator[];
@@ -50,9 +51,12 @@ export const FacilitatorCarousel = ({
   const getAvatarUrl = (facilitator: Facilitator) => {
     if (!facilitator.id) return '/placeholder.svg';
     
-    return facilitator.id && facilitatorImages[facilitator.id] 
+    const url = facilitator.id && facilitatorImages[facilitator.id] 
       ? facilitatorImages[facilitator.id] 
       : '/placeholder.svg';
+      
+    debugLog('participants', `Using avatar URL for facilitator ${facilitator.id}: ${url}`);
+    return url;
   };
 
   return (

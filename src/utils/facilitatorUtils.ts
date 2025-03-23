@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { debugLog } from "@/utils/debugLogger";
 
 /**
  * Generates a URL for a facilitator's avatar
@@ -11,53 +12,42 @@ import { supabase } from "@/integrations/supabase/client";
 export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null, title?: string }): Promise<string> => {
   // If no facilitator data provided, return placeholder
   if (!facilitator) {
+    debugLog('participants', 'No facilitator data provided, returning placeholder');
     return '/placeholder.svg';
   }
   
   try {
+    debugLog('participants', `Getting avatar URL for facilitator: ${facilitator.id}`, facilitator);
+    
     // If a profile_picture is directly provided and it's a complete URL, use it
     if (facilitator.profile_picture) {
-      let profilePicture = facilitator.profile_picture;
+      debugLog('participants', `Facilitator has profile_picture: ${facilitator.profile_picture}`);
       
-      // If it's already a complete URL or path, use it directly
-      if (profilePicture.startsWith('http') || profilePicture.startsWith('/')) {
-        // Check for any double slashes in the URL path (except after protocol)
-        profilePicture = profilePicture.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
-          return protocol || '/';
-        });
-        
-        return profilePicture;
-      } else {
-        // Add leading slash if missing for relative paths
-        return `/${profilePicture}`;
+      // If it's already a complete URL, use it directly
+      if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
+        return facilitator.profile_picture;
       }
     }
     
-    // If we have a facilitator ID, check for custom avatar
+    // If we have a facilitator ID, check for custom avatar in the primary bucket
     if (facilitator.id) {
-      // Try with "facilitator-avatars" bucket (singular form)
-      const { data: singularData } = await supabase.storage
+      const { data } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
-      // Check if the URL exists
-      if (singularData?.publicUrl) {
-        return singularData.publicUrl;
+      if (data?.publicUrl) {
+        debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
+        return data.publicUrl;
       }
       
-      // Try with "facilitators-avatars" bucket (plural form) as fallback
-      const { data: pluralData } = await supabase.storage
-        .from('facilitators-avatars')
-        .getPublicUrl(`${facilitator.id}.jpg`);
-      
-      if (pluralData?.publicUrl) {
-        return pluralData.publicUrl;
-      }
+      debugLog('participants', `No avatar found in primary bucket for facilitator ${facilitator.id}`);
     }
     
-    // If nothing works, generate an avatar based on title or ID
+    // Generate an avatar based on title or ID as last resort
     const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
-    return `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    const fallbackUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
+    debugLog('participants', `Using generated avatar: ${fallbackUrl}`);
+    return fallbackUrl;
   } catch (error) {
     console.error('Error generating avatar URL:', error);
     return '/placeholder.svg';
@@ -68,6 +58,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
  * Handles image loading errors by setting a fallback image
  */
 export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
+  debugLog('participants', `Avatar image error, setting fallback for: ${e.currentTarget.src}`);
   e.currentTarget.src = '/placeholder.svg';
 };
 
@@ -78,9 +69,13 @@ export const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url || url === '/placeholder.svg') return false;
   
   try {
+    debugLog('participants', `Validating image URL: ${url}`);
     const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
+    const isValid = response.ok;
+    debugLog('participants', `URL validation result for ${url}: ${isValid}`);
+    return isValid;
   } catch (error) {
+    debugLog('participants', `URL validation error for ${url}:`, error);
     return false;
   }
 };

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRound, EyeOff } from 'lucide-react';
+import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
 
 interface MessageAvatarProps {
@@ -9,13 +9,15 @@ interface MessageAvatarProps {
   name: string;
   size?: 'sm' | 'md' | 'lg';
   anonymized?: boolean;
+  isAssistant?: boolean;
 }
 
 const MessageAvatar = ({ 
   avatarUrl, 
   name, 
   size = 'md',
-  anonymized = false 
+  anonymized = false,
+  isAssistant = false
 }: MessageAvatarProps) => {
   const dimensions = {
     sm: 'h-7 w-7',
@@ -26,9 +28,20 @@ const MessageAvatar = ({
   // For anonymized avatars, show a special avatar
   if (anonymized) {
     return (
-      <Avatar className={`${dimensions[size]} bg-gray-100`}>
+      <Avatar className={`${dimensions[size]} bg-gray-100 avatar-container`}>
         <AvatarFallback className="bg-gray-100 text-gray-500">
           <EyeOff className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+
+  // For assistant/facilitator avatars, show a special icon if no avatar
+  if (isAssistant && (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg')) {
+    return (
+      <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
+        <AvatarFallback className="bg-blue-100 text-blue-500">
+          <Bot className="h-4 w-4" />
         </AvatarFallback>
       </Avatar>
     );
@@ -50,7 +63,7 @@ const MessageAvatar = ({
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
     return (
-      <div className={`overflow-hidden rounded-full ${dimensions[size]}`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+      <div className={`overflow-hidden rounded-full ${dimensions[size]} avatar-container`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
         <BoringAvatar
           size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
           name={avatarName}
@@ -69,7 +82,7 @@ const MessageAvatar = ({
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
     return (
-      <div className={`overflow-hidden rounded-full ${dimensions[size]}`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+      <div className={`overflow-hidden rounded-full ${dimensions[size]} avatar-container`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
         <BoringAvatar
           size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
           name={avatarName}
@@ -83,12 +96,15 @@ const MessageAvatar = ({
 
   // Regular avatar with image or fallback
   return (
-    <Avatar className={dimensions[size]}>
+    <Avatar className={`${dimensions[size]} avatar-container`}>
       {avatarUrl ? (
         <AvatarImage src={avatarUrl} alt={name} />
       ) : (
         <AvatarFallback>
-          <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+          {isAssistant ? 
+            <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> : 
+            <UserRound className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+          }
         </AvatarFallback>
       )}
     </Avatar>

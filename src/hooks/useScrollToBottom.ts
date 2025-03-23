@@ -27,16 +27,22 @@ export function useScrollToBottom<T extends HTMLElement>(
     // Follow-up scroll after short delay
     const timeoutId = setTimeout(() => {
       scrollToBottom();
-    }, 150);
+    }, 100);
     
     // Final scroll after longer delay to catch any lazy-loaded content
     const finalTimeoutId = setTimeout(() => {
       scrollToBottom();
-    }, 500);
+    }, 300);
+    
+    // Add one more scroll attempt for good measure
+    const lastTimeoutId = setTimeout(() => {
+      scrollToBottom();
+    }, 800);
     
     return () => {
       clearTimeout(timeoutId);
       clearTimeout(finalTimeoutId);
+      clearTimeout(lastTimeoutId);
     };
   }, [...dependencies]);
 

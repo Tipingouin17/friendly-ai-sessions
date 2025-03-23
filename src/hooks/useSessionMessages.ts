@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 
-const WELCOME_MESSAGE_DELAY = 1000; // 1 second delay before showing welcome message
+const WELCOME_MESSAGE_DELAY = 700; // Reduced delay to show welcome message faster
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
@@ -70,7 +70,7 @@ export const useSessionMessages = ({
         
         if (!data || data.length === 0) {
           console.log('No messages found for conversation', conversationId);
-          // Add welcome message after a delay if one is provided
+          // Add welcome message immediately if one is provided
           if (welcomeMessage) {
             setTimeout(() => {
               const welcomeMsg: Message = {
@@ -78,7 +78,8 @@ export const useSessionMessages = ({
                 content: welcomeMessage,
                 sender: 'assistant',
                 timestamp: new Date(),
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
               };
               setMessages([welcomeMsg]);
             }, WELCOME_MESSAGE_DELAY);
@@ -127,6 +128,11 @@ export const useSessionMessages = ({
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
+          // Set default avatar for assistant messages
+          const avatar = msg.role === 'assistant' ? 
+            (msg.avatar || '/api/avatar?name=Facilitator&variant=beam&palette=2') : 
+            undefined;
+          
           return {
             id: String(msg.id),
             content: messageContent,
@@ -137,7 +143,8 @@ export const useSessionMessages = ({
             created_at: msg.created_at,
             likes: likesArray,
             isReport,
-            isAnonymous
+            isAnonymous,
+            avatar
           } as Message; // Type assertion to ensure it matches the Message type
         });
         

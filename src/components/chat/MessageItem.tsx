@@ -55,12 +55,13 @@ const MessageItem = ({
     >
       <div className="flex items-end gap-1.5 max-w-full">
         {/* Show avatar for facilitator messages */}
-        {message.sender === "assistant" && isFirstMessageOfGroup && (
+        {message.sender === "assistant" && (
           <div className="mb-1">
             <MessageAvatar 
               avatarUrl={message.avatar} 
               name="Facilitator" 
               size={isMobile ? "sm" : "md"}
+              isAssistant={true}
             />
           </div>
         )}
@@ -78,7 +79,7 @@ const MessageItem = ({
         />
         
         {/* Show avatar for user messages (not anonymous) */}
-        {message.sender === "user" && isFirstMessageOfGroup && !isAnonymous && (
+        {message.sender === "user" && !isAnonymous && (
           <div className="mb-1">
             <MessageAvatar 
               avatarUrl={participantInfo?.avatar} 
@@ -89,7 +90,7 @@ const MessageItem = ({
         )}
         
         {/* Show anonymized avatar */}
-        {message.sender === "user" && isFirstMessageOfGroup && isAnonymous && (
+        {message.sender === "user" && isAnonymous && (
           <div className="mb-1">
             <MessageAvatar 
               anonymized={true}

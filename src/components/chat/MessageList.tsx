@@ -55,6 +55,11 @@ const MessageList = ({
         messageColor = "#FFFFFF"; // Default color for assistant messages
       }
 
+      // Default avatar for assistant
+      if (message.sender === "assistant" && !message.avatar) {
+        message.avatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+      }
+
       // Get participant info if this is a user message
       let participantInfo = null;
       if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
@@ -102,7 +107,7 @@ const MessageList = ({
           <MessageItem
             key={`${message.id || index}-${index}`}
             message={message}
-            isFirstMessageOfGroup={isFirstMessageOfGroup}
+            isFirstMessageOfGroup={true} // Always show avatar for each message for now
             isLastMessageOfGroup={isLastMessageOfGroup}
             currentParticipant={currentParticipant}
             participantInfo={participantInfo}

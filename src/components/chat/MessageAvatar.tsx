@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
@@ -35,10 +36,16 @@ const MessageAvatar = ({
     );
   }
 
-  // For assistant/facilitator avatars
+  // For assistant/facilitator avatars with specific URLs
   if (isAssistant) {
+    console.log('Rendering assistant avatar with URL:', avatarUrl);
+    
     // If we have a specific facilitator avatar URL, use it
-    if (avatarUrl && avatarUrl !== '/placeholder.svg' && !avatarUrl.startsWith('/api/avatar')) {
+    if (avatarUrl && 
+        avatarUrl !== '/placeholder.svg' && 
+        !avatarUrl.includes('api.qrserver.com') &&
+        !avatarUrl.startsWith('/api/avatar')) {
+      
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
           <AvatarImage src={avatarUrl} alt={name || "Facilitator"} />

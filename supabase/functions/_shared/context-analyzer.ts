@@ -1,4 +1,3 @@
-
 /**
  * Analyze session context and determine appropriate facilitation approach
  */
@@ -59,17 +58,31 @@ export function determineSessionProgress(
 /**
  * Get the appropriate facilitator avatar URL based on conversation data
  */
-export function getFacilitatorAvatar(conversation: any) {
+export function getFacilitatorAvatar(conversation: any): string | null {
   if (!conversation) return null;
   
-  // Check if there's a profile picture in the facilitator details
+  console.log('Getting facilitator avatar from conversation data:', conversation?.sessions?.facilitator_details);
+  
+  // Direct profile picture path is highest priority
   if (conversation.sessions?.facilitator_details?.profile_picture) {
-    return conversation.sessions.facilitator_details.profile_picture;
+    const profilePicture = conversation.sessions.facilitator_details.profile_picture;
+    
+    // If it's already a full URL or path, use it directly
+    if (profilePicture.startsWith('http') || profilePicture.startsWith('/')) {
+      console.log('Using direct facilitator profile picture:', profilePicture);
+      return profilePicture;
+    }
+    
+    // Otherwise ensure it has a leading slash
+    console.log('Adding leading slash to profile picture:', profilePicture);
+    return `/${profilePicture}`;
   }
   
-  // Fall back to a consistent avatar pattern
+  // Generate an avatar based on facilitator title as fallback
   const facilitatorTitle = conversation.sessions?.facilitator_details?.title || 'Facilitator';
-  return `/api/avatar?name=${encodeURIComponent(facilitatorTitle)}&variant=beam&palette=2`;
+  const avatarUrl = `/api/avatar?name=${encodeURIComponent(facilitatorTitle)}&variant=beam&palette=2`;
+  console.log('Using generated avatar URL:', avatarUrl);
+  return avatarUrl;
 }
 
 /**

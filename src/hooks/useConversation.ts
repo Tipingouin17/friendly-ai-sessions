@@ -27,6 +27,21 @@ export const useConversation = (conversationId: number | null) => {
           throw new Error("This session has ended or is no longer available");
         }
         
+        // Process facilitator profile picture to ensure it's a complete URL
+        if (data.sessions?.facilitator_details?.profile_picture) {
+          let profilePic = data.sessions.facilitator_details.profile_picture;
+          
+          // Ensure profile picture is a complete URL
+          if (profilePic && !profilePic.startsWith('http') && !profilePic.startsWith('/')) {
+            profilePic = `/${profilePic}`;
+            data.sessions.facilitator_details.profile_picture = profilePic;
+          }
+          
+          console.log('Facilitator profile picture:', profilePic);
+        } else {
+          console.log('No facilitator profile picture found');
+        }
+        
         console.log('Successfully fetched conversation data:', data);
         return data as ConversationWithSession;
       } catch (error) {

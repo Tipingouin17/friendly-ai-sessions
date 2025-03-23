@@ -16,7 +16,20 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   }
   
   try {
-    // First check if there's a custom avatar in the facilitator-avatars bucket
+    // If a profile_picture is directly provided, use it as highest priority
+    if (facilitator.profile_picture) {
+      console.log(`Using provided profile_picture: ${facilitator.profile_picture}`);
+      
+      // Ensure it has proper URL formatting
+      if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
+        return facilitator.profile_picture;
+      } else {
+        // Add leading slash if missing
+        return `/${facilitator.profile_picture}`;
+      }
+    }
+    
+    // Check for custom avatar in the facilitator-avatars bucket if we have a facilitator ID
     if (facilitator.id) {
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
@@ -46,37 +59,11 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
     }
     
-    // Then check the profile_picture field from the database
-    if (facilitator.profile_picture) {
-      console.log(`Using profile_picture URL for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
-      
-      // Fix any potential double slashes in the URL that aren't part of the protocol
-      const fixedUrl = facilitator.profile_picture.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
-        return protocol || '/';
-      });
-      
-      // Skip HEAD request validation for Supabase URLs to avoid CORS issues
-      if (fixedUrl.includes('supabase')) {
-        console.log(`Using Supabase URL without validation: ${fixedUrl}`);
-        return fixedUrl;
-      }
-      
-      // Only validate non-Supabase URLs
-      try {
-        const isValid = await validateImageUrl(fixedUrl);
-        if (isValid) {
-          return fixedUrl;
-        } else {
-          console.log(`Profile picture URL validation failed: ${fixedUrl}`);
-        }
-      } catch (err) {
-        console.error('Error validating profile_picture URL:', err);
-      }
-    }
-    
-    // If nothing works, return placeholder
-    console.log('No valid avatar found, using placeholder');
-    return '/placeholder.svg';
+    // If nothing works, generate an avatar based on title or ID
+    const titleOrId = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
+    const avatarUrl = `/api/avatar?name=${encodeURIComponent(titleOrId)}&variant=beam&palette=2`;
+    console.log('Using generated avatar URL:', avatarUrl);
+    return avatarUrl;
   } catch (error) {
     console.error('Error generating avatar URL:', error);
     return '/placeholder.svg';

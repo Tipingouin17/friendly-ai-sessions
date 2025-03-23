@@ -45,27 +45,30 @@ export const FacilitatorCard = ({
   
   return (
     <div
-      className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
-        isSelected ? 'border-primary' : 'border-gray-200'
+      className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-4 transition-all ${
+        isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
       }`}
       onClick={onClick}
     >
-      <div className="relative mb-4 h-24 w-24 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-        {(isLoading || imageLoading) && !imageError && (
-          <Skeleton className="absolute inset-0 z-10 bg-gray-200" />
+      <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full">
+        {(isLoading || imageLoading) && !imageError ? (
+          <Skeleton className="absolute inset-0 h-full w-full rounded-full" />
+        ) : (
+          <Avatar className="h-full w-full">
+            <AvatarImage 
+              src={avatarUrl} 
+              alt={facilitator.title || 'Facilitator'} 
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+              className="h-full w-full object-cover"
+            />
+            <AvatarFallback delayMs={600}>
+              {facilitator.title?.charAt(0) || 'F'}
+            </AvatarFallback>
+          </Avatar>
         )}
-        <Avatar className="h-full w-full">
-          <AvatarImage 
-            src={avatarUrl} 
-            alt={facilitator.title || 'Facilitator'} 
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-            className="object-cover"
-          />
-          <AvatarFallback>{facilitator.title?.charAt(0) || 'F'}</AvatarFallback>
-        </Avatar>
       </div>
-      <h3 className="text-center text-lg font-semibold leading-tight">{facilitator.title}</h3>
+      <h3 className="text-center text-sm font-medium">{facilitator.title}</h3>
     </div>
   );
 };

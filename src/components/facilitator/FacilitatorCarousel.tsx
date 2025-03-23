@@ -1,5 +1,5 @@
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";
 import { FacilitatorCard } from "./FacilitatorCard";
@@ -47,8 +47,16 @@ export const FacilitatorCarousel = ({
     setStartIndex(Math.min(facilitators.length - itemsToShow, startIndex + 1));
   };
 
+  const getAvatarUrl = (facilitator: Facilitator) => {
+    if (!facilitator.id) return '/placeholder.svg';
+    
+    return facilitator.id && facilitatorImages[facilitator.id] 
+      ? facilitatorImages[facilitator.id] 
+      : '/placeholder.svg';
+  };
+
   return (
-    <div className="relative">
+    <div className="relative mb-8">
       <div className="flex items-center">
         <Button
           variant="ghost"
@@ -62,9 +70,7 @@ export const FacilitatorCarousel = ({
 
         <div className="mx-12 flex gap-4 overflow-hidden">
           {facilitators.slice(startIndex, startIndex + itemsToShow).map((facilitator) => {
-            const avatarUrl = facilitator.id && facilitatorImages[facilitator.id] 
-              ? facilitatorImages[facilitator.id] 
-              : '/placeholder.svg';
+            const avatarUrl = getAvatarUrl(facilitator);
             
             return (
               <FacilitatorCard
@@ -72,7 +78,7 @@ export const FacilitatorCarousel = ({
                 facilitator={facilitator}
                 isSelected={selectedFacilitator === facilitator.id}
                 avatarUrl={avatarUrl}
-                onClick={() => onSelect(facilitator.id)}
+                onClick={() => facilitator.id && onSelect(facilitator.id)}
                 isLoading={isLoading}
               />
             );

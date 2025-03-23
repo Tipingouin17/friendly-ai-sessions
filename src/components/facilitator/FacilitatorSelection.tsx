@@ -51,16 +51,13 @@ export const FacilitatorSelection = ({
       setLoadingImages(true);
       const imageMap: Record<number, string> = {};
       
-      console.log('Loading facilitator images for', facilitators.length, 'facilitators');
-      
       try {
+        // Load images in parallel
         const loadPromises = facilitators.map(async (facilitator) => {
           if (facilitator.id) {
-            console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
-            
             try {
+              // Try to get the avatar URL
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-              console.log(`Resolved avatar URL for facilitator ${facilitator.id}: ${avatarUrl}`);
               return { id: facilitator.id, url: avatarUrl };
             } catch (error) {
               console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
@@ -70,15 +67,16 @@ export const FacilitatorSelection = ({
           return null;
         });
 
+        // Wait for all promises to resolve
         const results = await Promise.all(loadPromises);
         
+        // Process the results
         results.forEach(result => {
           if (result) {
             imageMap[result.id] = result.url;
           }
         });
         
-        console.log('All facilitator images loaded:', imageMap);
         setFacilitatorImages(imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
@@ -105,7 +103,7 @@ export const FacilitatorSelection = ({
         <div className="flex gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="w-1/4 p-4">
-              <Skeleton className="mx-auto mb-4 h-24 w-24 rounded-full" />
+              <Skeleton className="mx-auto mb-4 h-20 w-20 rounded-full" />
               <Skeleton className="mx-auto h-6 w-3/4" />
             </div>
           ))}

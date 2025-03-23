@@ -1,9 +1,10 @@
 
 import { Facilitator } from "@/types/facilitator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { handleAvatarError } from "@/utils/facilitatorUtils";
+import { handleAvatarError, normalizeFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { debugLog } from "@/utils/debugLogger";
 
 interface FacilitatorCardProps {
   facilitator: Facilitator;
@@ -21,9 +22,21 @@ export const FacilitatorCard = ({
   isLoading = false
 }: FacilitatorCardProps) => {
   const [imageLoading, setImageLoading] = useState(true);
+  const [normalizedUrl, setNormalizedUrl] = useState<string>('');
+  
+  useEffect(() => {
+    // Process the avatar URL on mount
+    if (avatarUrl) {
+      const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
+      setNormalizedUrl(processedUrl);
+      debugLog('all', `FacilitatorCard - Using normalized avatar URL: ${processedUrl.substring(0, 50)}...`);
+    } else {
+      setNormalizedUrl('/placeholder.svg');
+    }
+  }, [avatarUrl]);
   
   // Display a placeholder if the URL is empty
-  const displayUrl = avatarUrl || '/placeholder.svg';
+  const displayUrl = normalizedUrl || '/placeholder.svg';
   
   return (
     <div

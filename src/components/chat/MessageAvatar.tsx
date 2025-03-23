@@ -31,7 +31,7 @@ const MessageAvatar = ({
   // Only log when component is first mounted, not on every render
   useEffect(() => {
     if (isAssistant && avatarUrl) {
-      debugLog('all', `Facilitator avatar loaded: ${avatarUrl}`);
+      debugLog('all', `Facilitator avatar loaded in MessageAvatar: ${avatarUrl.substring(0, 50)}...`);
     }
   }, []); // Empty dependency array ensures this runs only once on mount
 
@@ -46,7 +46,7 @@ const MessageAvatar = ({
   }
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.error(`Avatar image failed to load: ${avatarUrl}`);
+    console.warn(`Avatar image failed to load: ${avatarUrl}`);
     setImageError(true);
     handleAvatarError(e);
   };
@@ -61,6 +61,7 @@ const MessageAvatar = ({
             src={cleanUrl} 
             alt={name || "Facilitator"} 
             onError={handleImageError}
+            className="object-cover"
           />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
@@ -126,6 +127,7 @@ const MessageAvatar = ({
         src={avatarUrl} 
         alt={name} 
         onError={handleImageError}
+        className="object-cover"
       />
       <AvatarFallback>
         {isAssistant ? 

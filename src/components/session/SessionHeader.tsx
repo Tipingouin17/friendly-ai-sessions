@@ -37,9 +37,9 @@ const SessionHeader = ({
       setIsLoading(true);
       try {
         if (facilitator) {
-          // Use the simplified avatar URL resolution
+          // Use the improved avatar URL resolution
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-          debugLog('all', `Loaded facilitator avatar in header: ${avatarUrl}`);
+          debugLog('all', `Loaded facilitator avatar in header: ${avatarUrl.substring(0, 50)}...`);
           setProfilePicture(avatarUrl);
         } else {
           setProfilePicture('/placeholder.svg');
@@ -57,7 +57,7 @@ const SessionHeader = ({
 
   return (
     <ChatHeader 
-      title={facilitator?.title}
+      title={facilitator?.title || 'Facilitator'}
       objective={objective}
       profilePicture={profilePicture}
       participantCount={participantCount}

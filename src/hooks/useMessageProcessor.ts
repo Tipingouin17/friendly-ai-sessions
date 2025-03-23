@@ -41,9 +41,11 @@ export const useMessageProcessor = ({
         if (correctedAvatar && isImageUrl(correctedAvatar)) {
           // Apply URL normalization to ensure consistency
           correctedAvatar = normalizeFacilitatorAvatarUrl(correctedAvatar);
+          debugLog('all', `Normalized facilitator avatar in message: ${correctedAvatar.substring(0, 50)}...`);
         } else {
-          // If no avatar or invalid image URL, provide a default
+          // If no avatar or invalid image URL, provide a better default
           correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
+          debugLog('all', `Using default facilitator avatar for message`);
         }
         
         return {

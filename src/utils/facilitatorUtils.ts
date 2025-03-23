@@ -3,17 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
 
 /**
- * Gets a facilitator's avatar URL with simplified fallback logic
+ * Gets a facilitator's avatar URL with improved error handling
  */
 export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null, title?: string }): Promise<string> => {
   // If no facilitator data provided, return placeholder
   if (!facilitator) {
+    debugLog('all', 'No facilitator data provided, using placeholder avatar');
     return '/placeholder.svg';
   }
   
   try {
     // Case 1: If profile_picture exists and appears to be a valid URL, use it directly
     if (facilitator.profile_picture) {
+      debugLog('all', `Using facilitator profile picture: ${facilitator.profile_picture.substring(0, 50)}...`);
       // Apply URL normalization to ensure consistency
       return normalizeFacilitatorAvatarUrl(facilitator.profile_picture);
     }
@@ -25,15 +27,15 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (data?.publicUrl) {
-        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${data.publicUrl}`);
+        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${data.publicUrl.substring(0, 50)}...`);
         return normalizeFacilitatorAvatarUrl(data.publicUrl);
       }
     }
     
-    // Case 3: Fall back to a generated avatar
+    // Case 3: Fall back to a generated avatar with the facilitator's title as seed
     const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
     const fallbackUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam`;
-    debugLog('all', `Using fallback avatar for facilitator: ${fallbackUrl}`);
+    debugLog('all', `Using generated avatar for facilitator: ${nameSeed}`);
     return fallbackUrl;
   } catch (error) {
     console.error('Error generating avatar URL:', error);
@@ -58,10 +60,14 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
     
     // Ensure full URL for relative paths that aren't API routes
     if (correctedUrl.startsWith('/') && !correctedUrl.startsWith('/api/')) {
-      const baseUrl = window.location.origin;
-      correctedUrl = `${baseUrl}${correctedUrl}`;
+      // In browser environment, use window.location.origin
+      if (typeof window !== 'undefined') {
+        const baseUrl = window.location.origin;
+        correctedUrl = `${baseUrl}${correctedUrl}`;
+      }
     }
     
+    debugLog('all', `Normalized facilitator avatar URL: ${correctedUrl.substring(0, 50)}...`);
     return correctedUrl;
   } catch (error) {
     console.error('Error normalizing URL:', error);
@@ -73,17 +79,27 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
  * Handles image loading errors by setting a fallback image
  */
 export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
+  console.warn('Avatar image failed to load, using placeholder', e.currentTarget.src);
   e.currentTarget.src = '/placeholder.svg';
 };
 
 /**
- * A simple check if the URL is for an image
+ * A more robust check if the URL is for an image
  */
 export const isImageUrl = (url: string): boolean => {
   if (!url) return false;
-  return url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i) !== null || 
-         url.includes('/api/avatar') ||
-         url.includes('facilitator-avatars') || 
-         url.includes('facilitators-avatars') ||
-         url.includes('supabase.co/storage');
+  
+  // Common image extensions
+  if (url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i) !== null) return true;
+  
+  // Special cases for our application
+  if (url.includes('/api/avatar')) return true;
+  if (url.includes('facilitator-avatars')) return true;
+  if (url.includes('facilitators-avatars')) return true;
+  if (url.includes('supabase.co/storage')) return true;
+  
+  // Check for image URLs with query parameters
+  if (url.match(/\.(jpeg|jpg|gif|png|svg|webp)\?/i) !== null) return true;
+  
+  return false;
 };

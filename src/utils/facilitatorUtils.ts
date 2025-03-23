@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
  * 2. URL from the facilitator's profile_picture field if available
  * 3. Default placeholder as fallback
  */
-export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null }): Promise<string> => {
+export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profile_picture?: string | null, title?: string }): Promise<string> => {
   // If no facilitator data provided, return placeholder
   if (!facilitator) {
     console.log('No facilitator data provided, using placeholder');
@@ -60,8 +60,8 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     }
     
     // If nothing works, generate an avatar based on title or ID
-    const titleOrId = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
-    const avatarUrl = `/api/avatar?name=${encodeURIComponent(titleOrId)}&variant=beam&palette=2`;
+    const nameSeed = facilitator.title || `Facilitator-${facilitator.id || 'Unknown'}`;
+    const avatarUrl = `/api/avatar?name=${encodeURIComponent(nameSeed)}&variant=beam&palette=2`;
     console.log('Using generated avatar URL:', avatarUrl);
     return avatarUrl;
   } catch (error) {

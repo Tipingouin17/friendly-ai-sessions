@@ -29,25 +29,28 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       }
     }
     
-    // If we have a facilitator ID, check for custom avatar in the facilitator-avatars bucket
+    // If we have a facilitator ID, check for custom avatar in the storage bucket
     if (facilitator.id) {
       debugLog('participants', `Checking facilitator-avatars bucket for ID: ${facilitator.id}`);
       
-      // Get the public URL for the avatar using the standardized bucket name
-      // IMPORTANT: Use 'facilitator-avatars' consistently
-      const { data } = await supabase.storage
-        .from('facilitator-avatars')
-        .getPublicUrl(`${facilitator.id}.jpg`);
-      
-      if (data?.publicUrl) {
-        debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
-        // Verify the URL is valid before returning it
-        const isValid = await validateImageUrl(data.publicUrl);
-        if (isValid) {
-          return data.publicUrl;
-        } else {
-          debugLog('participants', `Avatar URL validation failed for: ${data.publicUrl}`);
+      try {
+        // IMPORTANT: Using 'facilitator-avatars' consistently across the application
+        const { data } = await supabase.storage
+          .from('facilitator-avatars')
+          .getPublicUrl(`${facilitator.id}.jpg`);
+        
+        if (data?.publicUrl) {
+          debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);
+          // Verify the URL is valid before returning it
+          const isValid = await validateImageUrl(data.publicUrl);
+          if (isValid) {
+            return data.publicUrl;
+          } else {
+            debugLog('participants', `Avatar URL validation failed for: ${data.publicUrl}`);
+          }
         }
+      } catch (error) {
+        debugLog('participants', `Error getting public URL for facilitator ${facilitator.id}:`, error);
       }
       
       debugLog('participants', `No avatar found in facilitator-avatars bucket for facilitator ${facilitator.id}`);

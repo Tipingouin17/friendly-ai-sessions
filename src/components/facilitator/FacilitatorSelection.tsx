@@ -51,7 +51,6 @@ export const FacilitatorSelection = ({
 
       setLoadingImages(true);
       const imageMap: Record<number, string> = {};
-      let loadedCount = 0;
       
       try {
         debugLog('participants', `Loading images for ${facilitators.length} facilitators`);
@@ -60,20 +59,27 @@ export const FacilitatorSelection = ({
         const imagePromises = facilitators.map(async (facilitator) => {
           if (facilitator.id) {
             try {
-              // Try to get the avatar URL
+              // Try to get the avatar URL using the centralized function
               const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-              imageMap[facilitator.id] = avatarUrl;
-              loadedCount++;
-              debugLog('participants', `Loaded avatar for facilitator ${facilitator.id}: ${avatarUrl} (${loadedCount}/${facilitators.length})`);
+              return { id: facilitator.id, url: avatarUrl };
             } catch (error) {
               console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
-              imageMap[facilitator.id] = '/placeholder.svg';
+              return { id: facilitator.id, url: '/placeholder.svg' };
             }
           }
+          return null;
         });
         
         // Wait for all images to load (or fail)
-        await Promise.allSettled(imagePromises);
+        const results = await Promise.all(imagePromises.filter(Boolean));
+        
+        // Process results into the image map
+        results.forEach(result => {
+          if (result && result.id) {
+            imageMap[result.id] = result.url;
+            debugLog('participants', `Loaded avatar for facilitator ${result.id}: ${result.url}`);
+          }
+        });
         
         setFacilitatorImages(imageMap);
         debugLog('participants', 'Finished loading facilitator images', imageMap);

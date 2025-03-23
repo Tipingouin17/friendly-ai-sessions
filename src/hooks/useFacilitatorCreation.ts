@@ -56,7 +56,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         const base64Response = await fetch(profilePicture);
         const blob = await base64Response.blob();
         
-        // IMPORTANT: Use 'facilitator-avatars' consistently
+        // IMPORTANT: MUST use 'facilitator-avatars' as the bucket name consistently across the app
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {

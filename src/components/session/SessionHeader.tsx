@@ -38,26 +38,10 @@ const SessionHeader = ({
         if (facilitator) {
           console.log('SessionHeader: Loading profile picture for facilitator:', facilitator);
           
-          // Use profile_picture directly if provided and it's a complete URL or path
-          if (facilitator.profile_picture) {
-            const profilePic = facilitator.profile_picture;
-            
-            // Ensure it has a proper path format
-            if (profilePic.startsWith('http') || profilePic.startsWith('/')) {
-              console.log('SessionHeader: Using direct profile picture URL:', profilePic);
-              setProfilePicture(profilePic);
-            } else {
-              // Add leading slash if missing
-              const fixedPath = `/${profilePic}`;
-              console.log('SessionHeader: Fixed profile picture path:', fixedPath);
-              setProfilePicture(fixedPath);
-            }
-          } else {
-            // Fallback to generated avatar URL
-            const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-            console.log('SessionHeader: Generated avatar URL:', avatarUrl);
-            setProfilePicture(avatarUrl);
-          }
+          // Get the avatar URL using our centralized function
+          const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+          console.log('SessionHeader: Generated avatar URL:', avatarUrl);
+          setProfilePicture(avatarUrl);
         } else {
           console.log('SessionHeader: No facilitator data provided');
           setProfilePicture('/placeholder.svg');

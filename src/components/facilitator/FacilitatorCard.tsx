@@ -40,6 +40,11 @@ export const FacilitatorCard = ({
     setImageLoading(false);
   };
   
+  // Use a cleaned URL to avoid double slashes
+  const cleanAvatarUrl = avatarUrl?.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+    return protocol || '/';
+  }) || '/placeholder.svg';
+  
   return (
     <div
       className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
@@ -51,7 +56,7 @@ export const FacilitatorCard = ({
         {(isLoading || imageLoading) && <Skeleton className="absolute inset-0 z-10 bg-gray-200" />}
         <Avatar className="h-full w-full">
           <AvatarImage 
-            src={avatarUrl} 
+            src={cleanAvatarUrl} 
             alt={facilitator.title || 'Facilitator'} 
             onError={handleImageError}
             onLoad={handleImageLoad}

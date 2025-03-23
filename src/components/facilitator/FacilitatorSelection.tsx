@@ -8,6 +8,7 @@ import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 import { FacilitatorCarousel } from "./FacilitatorCarousel";
 import { FacilitatorDetailsPanel } from "./FacilitatorDetailsPanel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -25,6 +26,7 @@ export const FacilitatorSelection = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({});
   const [loadingImages, setLoadingImages] = useState(true);
+  const { toast } = useToast();
   
   const { planRestrictions } = useUserPlan();
   const { 
@@ -52,9 +54,14 @@ export const FacilitatorSelection = ({
             console.log(`Loading avatar for facilitator ID ${facilitator.id} (${facilitator.title})`);
             console.log(`Profile picture value: ${facilitator.profile_picture}`);
             
-            const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-            console.log(`Resolved avatar URL for facilitator ${facilitator.id}: ${avatarUrl}`);
-            return { id: facilitator.id, url: avatarUrl };
+            try {
+              const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+              console.log(`Resolved avatar URL for facilitator ${facilitator.id}: ${avatarUrl}`);
+              return { id: facilitator.id, url: avatarUrl };
+            } catch (error) {
+              console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
+              return { id: facilitator.id, url: '/placeholder.svg' };
+            }
           }
           return null;
         });
@@ -71,6 +78,11 @@ export const FacilitatorSelection = ({
         setFacilitatorImages(imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
+        toast({
+          title: "Warning",
+          description: "Some facilitator images could not be loaded",
+          variant: "destructive",
+        });
       } finally {
         setLoadingImages(false);
       }
@@ -81,7 +93,7 @@ export const FacilitatorSelection = ({
     } else {
       setLoadingImages(false);
     }
-  }, [facilitators]);
+  }, [facilitators, toast]);
 
   if (isLoading) {
     return (

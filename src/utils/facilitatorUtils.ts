@@ -20,12 +20,26 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.profile_picture) {
       console.log(`Using provided profile_picture: ${facilitator.profile_picture}`);
       
+      // Check for and fix double slashes that might appear in URLs
+      let profilePicture = facilitator.profile_picture;
+      
+      // Fix double slashes in the URL path (except after protocol)
+      profilePicture = profilePicture.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+        return protocol || '/';
+      });
+      
+      // Handle both bucket naming conventions (facilitator-avatars and facilitators-avatars)
+      if (profilePicture.includes('facilitators-avatars') || profilePicture.includes('facilitator-avatars')) {
+        console.log(`Using fixed profile picture URL: ${profilePicture}`);
+        return profilePicture;
+      }
+      
       // Ensure it has proper URL formatting
-      if (facilitator.profile_picture.startsWith('http') || facilitator.profile_picture.startsWith('/')) {
-        return facilitator.profile_picture;
+      if (profilePicture.startsWith('http') || profilePicture.startsWith('/')) {
+        return profilePicture;
       } else {
         // Add leading slash if missing
-        return `/${facilitator.profile_picture}`;
+        return `/${profilePicture}`;
       }
     }
     
@@ -33,28 +47,51 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.id) {
       console.log(`Checking for custom avatar for facilitator ${facilitator.id}`);
       
-      // Try with jpg extension
-      const { data: jpgData } = supabase.storage
+      // Try first with "facilitator-avatars" bucket (singular)
+      const { data: singularData } = supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
-      if (jpgData && jpgData.publicUrl) {
+      if (singularData && singularData.publicUrl) {
         // Fix any double slashes in the URL
-        const fixedUrl = jpgData.publicUrl.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+        const fixedUrl = singularData.publicUrl.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
           return protocol || '/';
         });
         
-        console.log(`Found jpg avatar: ${fixedUrl}`);
+        console.log(`Found avatar in facilitator-avatars bucket: ${fixedUrl}`);
+        
         // Check if the URL exists before returning it
         try {
           const isValid = await validateImageUrl(fixedUrl);
           if (isValid) {
             return fixedUrl;
-          } else {
-            console.log(`The jpg URL exists but image validation failed: ${fixedUrl}`);
           }
         } catch (err) {
-          console.error('Error validating jpg URL:', err);
+          console.error('Error validating singular bucket URL:', err);
+        }
+      }
+      
+      // Try with "facilitators-avatars" bucket (plural) as fallback
+      const { data: pluralData } = supabase.storage
+        .from('facilitators-avatars')
+        .getPublicUrl(`${facilitator.id}.jpg`);
+      
+      if (pluralData && pluralData.publicUrl) {
+        // Fix any double slashes in the URL
+        const fixedUrl = pluralData.publicUrl.replace(/(https?:\/\/)|(\/\/+)/g, (match, protocol) => {
+          return protocol || '/';
+        });
+        
+        console.log(`Found avatar in facilitators-avatars bucket: ${fixedUrl}`);
+        
+        // Check if the URL exists
+        try {
+          const isValid = await validateImageUrl(fixedUrl);
+          if (isValid) {
+            return fixedUrl;
+          }
+        } catch (err) {
+          console.error('Error validating plural bucket URL:', err);
         }
       }
     }
@@ -85,7 +122,7 @@ export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): vo
 export const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url || url === '/placeholder.svg') return false;
   
-  // Skip validation for Supabase URLs
+  // Skip validation for Supabase URLs - assume they're valid
   if (url.includes('supabase')) return true;
   
   try {

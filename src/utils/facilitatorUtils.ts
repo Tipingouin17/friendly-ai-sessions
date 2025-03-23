@@ -25,13 +25,10 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
       
       try {
         // Get the public URL for the facilitator's avatar using their ID
-        const { data, error } = await supabase.storage
+        // Note: getPublicUrl doesn't return an error property in its response type
+        const { data } = await supabase.storage
           .from('facilitator-avatars')
           .getPublicUrl(`${facilitator.id}.jpg`);
-        
-        if (error) {
-          debugLog('participants', `Error getting public URL: ${error.message}`);
-        }
         
         if (data?.publicUrl) {
           debugLog('participants', `Found avatar in facilitator-avatars bucket: ${data.publicUrl}`);

@@ -42,7 +42,7 @@ export const useSessionParticipantSetup = ({
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
     if (forceAdmin && !adminStatusSetRef.current) {
-      console.log("useSessionParticipantSetup: Enforcing admin status with forceAdmin=true");
+      //console.log("useSessionParticipantSetup: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
       adminStatusSetRef.current = true;
@@ -55,7 +55,7 @@ export const useSessionParticipantSetup = ({
       if (!conversationId) return;
       
       try {
-        console.log("Loading participants for conversation:", conversationId);
+        //console.log("Loading participants for conversation:", conversationId);
         
         const { data, error } = await supabase
           .from('session_participants')
@@ -69,7 +69,7 @@ export const useSessionParticipantSetup = ({
         }
         
         if (!data || data.length === 0) {
-          console.log("No participants found for conversation:", conversationId);
+          //console.log("No participants found for conversation:", conversationId);
           return;
         }
         
@@ -78,22 +78,22 @@ export const useSessionParticipantSetup = ({
           try {
             return await getParticipantInfo(participant);
           } catch (err) {
-            console.error("Error getting participant info:", err);
+            //console.error("Error getting participant info:", err);
             return null;
           }
         });
         
         const participantInfos = (await Promise.all(participantPromises)).filter(Boolean) as ParticipantInfo[];
-        console.log("Loaded participants:", participantInfos.length);
+        //console.log("Loaded participants:", participantInfos.length);
         setParticipants(participantInfos);
         
         // Set current participant ID from location state if available
         if (locationState?.participantId) {
-          console.log("Setting current participant ID from location state:", locationState.participantId);
+          //console.log("Setting current participant ID from location state:", locationState.participantId);
           setCurrentUserParticipantId(locationState.participantId);
         }
       } catch (err) {
-        console.error("Error in loadParticipants:", err);
+        //console.error("Error in loadParticipants:", err);
         if (onError) onError("Failed to load session participants");
       }
     };
@@ -107,7 +107,7 @@ export const useSessionParticipantSetup = ({
       const maxParticipants = conversation.participants || 0;
       const currentCount = conversation.current_participants || 0;
       
-      console.log("Participant counts:", {
+      //console.log("Participant counts:", {
         max: maxParticipants,
         current: currentCount,
         fromArray: participants.length
@@ -122,7 +122,7 @@ export const useSessionParticipantSetup = ({
       
       // Call onSessionFull if session is full and not already called
       if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin) {
-        console.log("Session is full, calling onSessionFull");
+        //console.log("Session is full, calling onSessionFull");
         sessionFullCalledRef.current = true;
         onSessionFull();
       }
@@ -152,7 +152,7 @@ export const useSessionParticipantSetup = ({
     if (!conversationId) return;
     
     try {
-      console.log("Forcing refresh of participants");
+      //console.log("Forcing refresh of participants");
       
       const { data, error } = await supabase
         .from('session_participants')
@@ -165,7 +165,7 @@ export const useSessionParticipantSetup = ({
       }
       
       if (!data || data.length === 0) {
-        console.log("No participants found during refresh");
+        //console.log("No participants found during refresh");
         return;
       }
       
@@ -183,7 +183,7 @@ export const useSessionParticipantSetup = ({
       console.log("Refreshed participants:", participantInfos.length);
       setParticipants(participantInfos);
     } catch (err) {
-      console.error("Error in forceRefreshParticipants:", err);
+      //console.error("Error in forceRefreshParticipants:", err);
     }
   }, [conversationId]);
   

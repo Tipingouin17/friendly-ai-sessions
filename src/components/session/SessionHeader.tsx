@@ -36,14 +36,10 @@ const SessionHeader = ({
       setIsLoading(true);
       try {
         if (facilitator) {
-          console.log('SessionHeader: Loading profile picture for facilitator:', facilitator);
-          
-          // Get the avatar URL using our centralized function
+          // Use the simplified avatar URL resolution
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-          console.log('SessionHeader: Generated avatar URL:', avatarUrl);
           setProfilePicture(avatarUrl);
         } else {
-          console.log('SessionHeader: No facilitator data provided');
           setProfilePicture('/placeholder.svg');
         }
       } catch (error) {

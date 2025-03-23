@@ -5,7 +5,6 @@ import { Facilitator } from "@/types/facilitator";
 import { FacilitatorCard } from "./FacilitatorCard";
 import { CreateFacilitatorButton } from "./CreateFacilitatorButton";
 import { useState, useEffect } from "react";
-import { debugLog } from "@/utils/debugLogger";
 
 interface FacilitatorCarouselProps {
   facilitators: Facilitator[];
@@ -50,13 +49,9 @@ export const FacilitatorCarousel = ({
 
   const getAvatarUrl = (facilitator: Facilitator) => {
     if (!facilitator.id) return '/placeholder.svg';
-    
-    const url = facilitator.id && facilitatorImages[facilitator.id] 
+    return facilitator.id && facilitatorImages[facilitator.id] 
       ? facilitatorImages[facilitator.id] 
       : '/placeholder.svg';
-      
-    debugLog('participants', `Using avatar URL for facilitator ${facilitator.id}: ${url}`);
-    return url;
   };
 
   return (

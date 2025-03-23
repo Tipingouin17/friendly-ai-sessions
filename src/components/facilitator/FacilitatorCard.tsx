@@ -3,8 +3,7 @@ import { Facilitator } from "@/types/facilitator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { handleAvatarError } from "@/utils/facilitatorUtils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect } from "react";
-import { debugLog } from "@/utils/debugLogger";
+import { useState } from "react";
 
 interface FacilitatorCardProps {
   facilitator: Facilitator;
@@ -22,30 +21,8 @@ export const FacilitatorCard = ({
   isLoading = false
 }: FacilitatorCardProps) => {
   const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
   
-  // Reset loading state when avatarUrl changes
-  useEffect(() => {
-    if (avatarUrl) {
-      setImageLoading(true);
-      setImageError(false);
-      debugLog('participants', `Reset image state for facilitator ${facilitator.id}, new URL: ${avatarUrl}`);
-    }
-  }, [avatarUrl, facilitator.id]);
-  
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.error(`Image error for facilitator ${facilitator.id} with URL ${avatarUrl}`);
-    setImageError(true);
-    setImageLoading(false);
-    handleAvatarError(e);
-  };
-  
-  const handleImageLoad = () => {
-    debugLog('participants', `Image loaded successfully for facilitator ${facilitator.id}`);
-    setImageLoading(false);
-  };
-  
-  // Set a default placeholder if the URL is empty or undefined
+  // Display a placeholder if the URL is empty
   const displayUrl = avatarUrl || '/placeholder.svg';
   
   return (
@@ -56,22 +33,22 @@ export const FacilitatorCard = ({
       onClick={onClick}
     >
       <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full">
-        {(isLoading || imageLoading) && !imageError ? (
+        {(isLoading || imageLoading) ? (
           <Skeleton className="absolute inset-0 h-full w-full rounded-full" />
-        ) : (
-          <Avatar className="h-full w-full">
-            <AvatarImage 
-              src={displayUrl} 
-              alt={facilitator.title || 'Facilitator'} 
-              onError={handleImageError}
-              onLoad={handleImageLoad}
-              className="h-full w-full object-cover"
-            />
-            <AvatarFallback delayMs={600}>
-              {facilitator.title?.charAt(0) || 'F'}
-            </AvatarFallback>
-          </Avatar>
-        )}
+        ) : null}
+        
+        <Avatar className="h-full w-full">
+          <AvatarImage 
+            src={displayUrl} 
+            alt={facilitator.title || 'Facilitator'} 
+            onError={handleAvatarError}
+            onLoad={() => setImageLoading(false)}
+            className="h-full w-full object-cover"
+          />
+          <AvatarFallback delayMs={600}>
+            {facilitator.title?.charAt(0) || 'F'}
+          </AvatarFallback>
+        </Avatar>
       </div>
       <h3 className="text-center text-sm font-medium">{facilitator.title}</h3>
     </div>

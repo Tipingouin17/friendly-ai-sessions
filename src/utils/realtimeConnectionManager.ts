@@ -38,7 +38,7 @@ export const createConversationChannel = (
         filter: `id=eq.${conversationId}`
       }, onUpdate)
       .subscribe((status) => {
-        console.log(`Conversation channel subscription status: ${status}`);
+        //console.log(`Conversation channel subscription status: ${status}`);
       });
   } catch (error) {
     //console.error("Error creating conversation channel:", error);
@@ -56,7 +56,7 @@ export const createParticipantsChannel = (
   conversationId: number,
   onParticipantJoin: (payload: any) => void
 ) => {
-  console.log(`Creating participants channel for ID: ${conversationId}`);
+  //console.log(`Creating participants channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`participants-${conversationId}`);
@@ -74,7 +74,7 @@ export const createParticipantsChannel = (
         console.log(`Participants channel subscription status: ${status}`);
       });
   } catch (error) {
-    console.error("Error creating participants channel:", error);
+    //console.error("Error creating participants channel:", error);
     return null;
   }
 };
@@ -89,7 +89,7 @@ export const createMessagesChannel = (
   conversationId: number,
   onMessageChange: (payload: any) => void
 ) => {
-  console.log(`Creating messages channel for ID: ${conversationId}`);
+  //console.log(`Creating messages channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`messages-${conversationId}`);
@@ -104,10 +104,10 @@ export const createMessagesChannel = (
         filter: `conversation_id=eq.${conversationId}`
       }, onMessageChange)
       .subscribe((status) => {
-        console.log(`Messages channel subscription status: ${status}`);
+        //console.log(`Messages channel subscription status: ${status}`);
       });
   } catch (error) {
-    console.error("Error creating messages channel:", error);
+    //console.error("Error creating messages channel:", error);
     return null;
   }
 };

@@ -33,14 +33,24 @@ const MessageAvatar = ({
   useEffect(() => {
     if (avatarUrl) {
       debugLog('all', `MessageAvatar - Processing avatar URL: ${avatarUrl}`);
-      const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-      setNormalizedUrl(processedUrl);
-      setImageError(false);
-      debugLog('all', `MessageAvatar - Using normalized avatar URL: ${processedUrl}`);
+      
+      // Only normalize if it's not already normalized (avoid double normalization)
+      if (isAssistant) {
+        // Always normalize facilitator/assistant avatars to ensure they work
+        const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
+        setNormalizedUrl(processedUrl);
+        setImageError(false);
+        debugLog('all', `MessageAvatar (Assistant) - Using normalized avatar URL: ${processedUrl}`);
+      } else {
+        // For participant avatars, just use the URL as-is in most cases
+        setNormalizedUrl(avatarUrl);
+        setImageError(false);
+        debugLog('all', `MessageAvatar (Participant) - Using avatar URL: ${avatarUrl}`);
+      }
     } else {
       setNormalizedUrl(null);
     }
-  }, [avatarUrl]); // Re-run when avatar URL changes
+  }, [avatarUrl, isAssistant]); // Re-run when avatar URL or assistant status changes
 
   // Handle anonymized avatars
   if (anonymized) {

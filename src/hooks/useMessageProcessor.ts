@@ -41,8 +41,8 @@ export const useMessageProcessor = ({
         if (correctedAvatar && isImageUrl(correctedAvatar)) {
           // Apply URL normalization to ensure consistency
           correctedAvatar = normalizeFacilitatorAvatarUrl(correctedAvatar);
-          debugLog('all', `Normalized facilitator avatar in message: ${correctedAvatar.substring(0, 50)}...`);
-        } else {
+          debugLog('all', `Normalized facilitator avatar in message processor: ${correctedAvatar}`);
+        } else if (!correctedAvatar || correctedAvatar === '/placeholder.svg') {
           // If no avatar or invalid image URL, provide a better default
           correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
           debugLog('all', `Using default facilitator avatar for message`);
@@ -112,8 +112,26 @@ export const useMessageProcessor = ({
         return false;
       });
       
+      // Log the filtered messages for debugging
+      debugLog('all', `Participant view filtered messages: ${filteredMessages.length} out of ${messages.length}`);
+      
       // Process the filtered messages
       return filteredMessages.map(message => {
+        // For assistant/facilitator messages, ensure avatar URL is correct
+        if (message.sender === "assistant") {
+          let correctedAvatar = message.avatar;
+          
+          if (!correctedAvatar || !isImageUrl(correctedAvatar)) {
+            correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
+            debugLog('all', `Using default facilitator avatar for message in participant view`);
+          }
+          
+          return {
+            ...message,
+            avatar: correctedAvatar
+          };
+        }
+        
         // Special handling for participant messages
         if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
           const participantNumber = parseInt(message.participant.slice(1));

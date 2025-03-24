@@ -35,9 +35,10 @@ const ChatHeader = ({
           <div className="relative">
             <img
               src={profilePicture || "/placeholder.svg"}
-              alt={title}
+              alt={title || "Facilitator"}
               className="w-16 h-16 rounded-full object-cover border border-gray-200"
               onError={onImageError}
+              crossOrigin="anonymous"
             />
             {viewMode === "admin" && (
               <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs rounded-full px-1.5 py-0.5 font-medium border border-white">

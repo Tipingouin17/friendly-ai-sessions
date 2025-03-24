@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
 
@@ -13,6 +12,8 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   }
   
   try {
+    debugLog('all', `Getting avatar for facilitator: ${JSON.stringify(facilitator)}`);
+    
     // Case 1: If profile_picture exists and appears to be a valid URL, use it directly
     if (facilitator.profile_picture) {
       debugLog('all', `Using facilitator profile picture: ${facilitator.profile_picture}`);
@@ -28,8 +29,9 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.jpg`);
       
       if (bucketData?.publicUrl) {
-        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${bucketData.publicUrl}`);
-        return normalizeFacilitatorAvatarUrl(bucketData.publicUrl);
+        const normalizedUrl = normalizeFacilitatorAvatarUrl(bucketData.publicUrl);
+        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${normalizedUrl}`);
+        return normalizedUrl;
       }
       
       // Second try - check if there's an avatar with .png extension
@@ -38,14 +40,16 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         .getPublicUrl(`${facilitator.id}.png`);
         
       if (pngData?.publicUrl) {
-        debugLog('all', `Generated PNG storage URL for facilitator ${facilitator.id}: ${pngData.publicUrl}`);
-        return normalizeFacilitatorAvatarUrl(pngData.publicUrl);
+        const normalizedUrl = normalizeFacilitatorAvatarUrl(pngData.publicUrl);
+        debugLog('all', `Generated PNG storage URL for facilitator ${facilitator.id}: ${normalizedUrl}`);
+        return normalizedUrl;
       }
       
       // Direct URL construction - for older setups
       const directUrl = `https://msahrdujupfcotujyluy.supabase.co/storage/v1/object/public/facilitator-avatars/${facilitator.id}.jpg`;
-      debugLog('all', `Using direct URL for facilitator ${facilitator.id}: ${directUrl}`);
-      return directUrl;
+      const normalizedUrl = normalizeFacilitatorAvatarUrl(directUrl);
+      debugLog('all', `Using direct URL for facilitator ${facilitator.id}: ${normalizedUrl}`);
+      return normalizedUrl;
     }
     
     // Case 3: Fall back to a generated avatar with the facilitator's title as seed
@@ -61,12 +65,32 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
 
 /**
  * Normalizes a facilitator avatar URL to fix common issues
+ * This function is critical for CORS and image loading
  */
 export const normalizeFacilitatorAvatarUrl = (url: string): string => {
   if (!url) return '/placeholder.svg';
   
   try {
+    debugLog('all', `Normalizing facilitator URL: ${url}`);
+    
+    // Handle placeholder URLs explicitly
+    if (url === '/placeholder.svg' || url.includes('placeholder')) {
+      return '/placeholder.svg';
+    }
+    
+    // If URL is a data URL, return it unchanged
+    if (url.startsWith('data:')) {
+      return url;
+    }
+    
+    // Handle absolute URLs that point to the current domain
+    if (typeof window !== 'undefined' && url.startsWith(window.location.origin)) {
+      // For URLs on the same domain, we can use them directly
+      return url;
+    }
+    
     // If URL already contains the Supabase storage path, it's likely correct
+    // but may need CORS handling
     if (url.includes('supabase.co/storage/v1/object/public/facilitator-avatars')) {
       // Ensure CORS is properly handled by removing any cache-busting parameters
       const cleanUrl = url.split('?')[0]; // Remove any query parameters that might cause caching issues

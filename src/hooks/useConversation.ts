@@ -123,16 +123,18 @@ export const useConversation = (conversationId: number | null) => {
       // Only poll every 30 seconds for active admin sessions
       const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
       
-      // Properly access the data from the query object using queryData.data
-      const conversationData = queryData.data;
-      
-      if (conversationData) {
-        const isActive = conversationData.status === 'active' && !conversationData.is_session_ended;
+      // Fix: In @tanstack/react-query v5, access the data through queryData directly
+      if (queryData && queryData.state && queryData.state.data) {
+        const conversationData = queryData.state.data;
         
-        if (isAdmin && isActive) {
-          return 30000; // 30 seconds for active admin sessions
-        } else if (isActive) {
-          return 60000; // 1 minute for active non-admin sessions
+        if (conversationData) {
+          const isActive = conversationData.status === 'active' && !conversationData.is_session_ended;
+          
+          if (isAdmin && isActive) {
+            return 30000; // 30 seconds for active admin sessions
+          } else if (isActive) {
+            return 60000; // 1 minute for active non-admin sessions
+          }
         }
       }
       return false; // Don't poll for inactive sessions or if data is null

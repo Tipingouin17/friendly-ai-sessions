@@ -12,7 +12,7 @@ export const useWorkshopCreation = () => {
   const [selectedWorkshop, setSelectedWorkshop] = useState<number | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [description, setDescription] = useState("");
-  const [language, setLanguage] = useState("English");
+  const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();

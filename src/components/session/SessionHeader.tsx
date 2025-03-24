@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
 import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 import { debugLog } from "@/utils/debugLogger";
+import { isInCrossOriginContext } from "@/utils/crossOriginUtils";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -33,41 +34,74 @@ const SessionHeader = ({
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    let isMounted = true;
     const loadProfilePicture = async () => {
       setIsLoading(true);
       try {
         if (facilitator) {
-          debugLog('all', `Loading facilitator avatar for: ${JSON.stringify(facilitator)}`);
+          debugLog('all', `SessionHeader - Loading facilitator avatar for: ${JSON.stringify(facilitator)}`);
           
-          // Check if we already have a valid profile picture URL
-          if (facilitator.profile_picture && facilitator.profile_picture !== '/placeholder.svg') {
-            // Don't normalize here - we'll do that in the utility function
-            debugLog('all', `Using provided facilitator.profile_picture: ${facilitator.profile_picture}`);
+          // Check if we already have a valid profile picture URL and avoid double normalization
+          if (facilitator.profile_picture && 
+              facilitator.profile_picture !== '/placeholder.svg') {
+            
+            // Check if the URL has already been normalized (contains crossorigin marker)
+            if (facilitator.profile_picture.includes('crossorigin=anonymous')) {
+              if (isMounted) {
+                setProfilePicture(facilitator.profile_picture);
+                setIsLoading(false);
+              }
+              debugLog('all', `SessionHeader - Using already normalized profile picture: ${facilitator.profile_picture}`);
+              return;
+            }
+            
+            // Use the utility function to get a normalized URL
             const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-            setProfilePicture(avatarUrl);
+            if (isMounted) {
+              setProfilePicture(avatarUrl);
+              setIsLoading(false);
+            }
+            debugLog('all', `SessionHeader - Using normalized facilitator.profile_picture: ${avatarUrl}`);
           } else if (facilitator.id) {
             // If we have an ID but no picture, try to get one from the ID
-            debugLog('all', `Getting avatar by facilitator ID: ${facilitator.id}`);
+            debugLog('all', `SessionHeader - Getting avatar by facilitator ID: ${facilitator.id}`);
             const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-            setProfilePicture(avatarUrl);
+            if (isMounted) {
+              setProfilePicture(avatarUrl);
+              setIsLoading(false);
+            }
           } else {
             // No ID or picture, use placeholder
-            debugLog('all', 'No facilitator ID or picture, using placeholder');
-            setProfilePicture('/placeholder.svg');
+            debugLog('all', 'SessionHeader - No facilitator ID or picture, using placeholder');
+            if (isMounted) {
+              setProfilePicture('/placeholder.svg');
+              setIsLoading(false);
+            }
           }
         } else {
-          setProfilePicture('/placeholder.svg');
+          if (isMounted) {
+            setProfilePicture('/placeholder.svg');
+            setIsLoading(false);
+          }
         }
       } catch (error) {
-        console.error('Error loading facilitator avatar:', error);
-        setProfilePicture('/placeholder.svg');
-      } finally {
-        setIsLoading(false);
+        console.error('Error loading facilitator avatar in SessionHeader:', error);
+        if (isMounted) {
+          setProfilePicture('/placeholder.svg');
+          setIsLoading(false);
+        }
       }
     };
     
     loadProfilePicture();
+    
+    return () => { isMounted = false; };
   }, [facilitator]);
+
+  // Determine if cross-origin handling is needed
+  const needsCrossOrigin = isInCrossOriginContext() || 
+    profilePicture.includes('crossorigin=anonymous') ||
+    profilePicture.includes('supabase.co');
 
   return (
     <ChatHeader 
@@ -81,6 +115,7 @@ const SessionHeader = ({
       viewMode={viewMode}
       onImageError={handleAvatarError}
       isLoading={isLoading}
+      needsCrossOrigin={needsCrossOrigin}
     />
   );
 };

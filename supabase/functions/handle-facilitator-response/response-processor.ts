@@ -63,6 +63,18 @@ export async function processResponse(
   
   // Get the appropriate facilitator avatar
   let facilitatorAvatar = getFacilitatorAvatar(conversation);
+  
+  // Normalize avatar URL to avoid double slashes
+  if (facilitatorAvatar && typeof facilitatorAvatar === 'string') {
+    facilitatorAvatar = facilitatorAvatar.replace(/([^:])\/\//g, '$1/');
+    
+    // Ensure crossOrigin attribute will be used by adding a marker parameter
+    if (!facilitatorAvatar.includes('crossorigin=anonymous') && 
+        (facilitatorAvatar.startsWith('http') || facilitatorAvatar.includes('supabase.co'))) {
+      facilitatorAvatar += (facilitatorAvatar.includes('?') ? '&' : '?') + 'crossorigin=anonymous';
+    }
+  }
+  
   console.log('Facilitator avatar for response:', facilitatorAvatar);
   
   // Use OpenAI if available

@@ -5,6 +5,7 @@ import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
 import { handleAvatarError, isImageUrl, getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 import { debugLog } from '@/utils/debugLogger';
+import { isInCrossOriginContext } from '@/utils/crossOriginUtils';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
@@ -23,6 +24,7 @@ const MessageAvatar = ({
 }: MessageAvatarProps) => {
   const [imageError, setImageError] = useState(false);
   const [normalizedUrl, setNormalizedUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const dimensions = {
     sm: 'h-7 w-7',
     md: 'h-8 w-8',
@@ -31,29 +33,70 @@ const MessageAvatar = ({
 
   // Process and normalize avatar URL on mount or when URL changes
   useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    
     if (avatarUrl) {
       debugLog('all', `MessageAvatar - Processing avatar URL: ${avatarUrl}`);
       
-      // Only normalize if it's not already normalized (avoid double normalization)
-      if (isAssistant) {
-        // Always normalize facilitator/assistant avatars to ensure they work
-        const processUrl = async () => {
-          const processedUrl = await getFacilitatorAvatarUrl({ profile_picture: avatarUrl });
-          setNormalizedUrl(processedUrl);
-          setImageError(false);
-          debugLog('all', `MessageAvatar (Assistant) - Using normalized avatar URL: ${processedUrl}`);
-        };
-        processUrl();
-      } else {
-        // For participant avatars, just use the URL as-is in most cases
-        setNormalizedUrl(avatarUrl);
-        setImageError(false);
-        debugLog('all', `MessageAvatar (Participant) - Using avatar URL: ${avatarUrl}`);
-      }
+      const processUrl = async () => {
+        try {
+          if (isAssistant) {
+            // For facilitator/assistant avatars, ensure proper normalization
+            // Check if URL already contains 'crossorigin' marker - avoid double processing
+            if (avatarUrl.includes('crossorigin=anonymous')) {
+              if (isMounted) {
+                setNormalizedUrl(avatarUrl);
+                setImageError(false);
+                setIsLoading(false);
+              }
+              debugLog('all', `MessageAvatar (Assistant) - URL already normalized: ${avatarUrl}`);
+              return;
+            }
+            
+            // Always normalize facilitator/assistant avatars to ensure they work
+            const processedUrl = await getFacilitatorAvatarUrl({ profile_picture: avatarUrl });
+            if (isMounted) {
+              setNormalizedUrl(processedUrl);
+              setImageError(false);
+              setIsLoading(false);
+            }
+            debugLog('all', `MessageAvatar (Assistant) - Using normalized avatar URL: ${processedUrl}`);
+          } else {
+            // For participant avatars, just normalize the URL for any double slashes
+            let processedUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
+            
+            // Add crossorigin marker if needed
+            if (isInCrossOriginContext() && isImageUrl(processedUrl)) {
+              processedUrl += (processedUrl.includes('?') ? '&' : '?') + 'crossorigin=anonymous';
+            }
+            
+            if (isMounted) {
+              setNormalizedUrl(processedUrl);
+              setImageError(false);
+              setIsLoading(false);
+            }
+            debugLog('all', `MessageAvatar (Participant) - Using avatar URL: ${processedUrl}`);
+          }
+        } catch (error) {
+          console.error('Error processing avatar URL:', error);
+          if (isMounted) {
+            setNormalizedUrl(null);
+            setImageError(true);
+            setIsLoading(false);
+          }
+        }
+      };
+      
+      processUrl();
     } else {
       setNormalizedUrl(null);
+      setImageError(false);
+      setIsLoading(false);
     }
-  }, [avatarUrl, isAssistant]); // Re-run when avatar URL or assistant status changes
+    
+    return () => { isMounted = false; };
+  }, [avatarUrl, isAssistant]);
 
   // Handle anonymized avatars
   if (anonymized) {
@@ -77,14 +120,21 @@ const MessageAvatar = ({
     // If we have a valid avatar URL that looks like an image URL, use it
     if (normalizedUrl && normalizedUrl !== '/placeholder.svg' && isImageUrl(normalizedUrl) && !imageError) {
       debugLog('all', `Displaying facilitator avatar with URL: ${normalizedUrl}`);
+      
+      // Check if URL needs crossOrigin attribute
+      const needsCrossOrigin = 
+        isInCrossOriginContext() || 
+        normalizedUrl.includes('crossorigin=anonymous') ||
+        normalizedUrl.includes('supabase.co');
+      
       return (
-        <Avatar className={`${dimensions[size]} avatar-container`}>
+        <Avatar className={`${dimensions[size]} avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>
           <AvatarImage 
             src={normalizedUrl} 
             alt={name || "Facilitator"} 
             onError={handleImageError}
             className="object-cover"
-            crossOrigin="anonymous"
+            crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
           />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
@@ -130,15 +180,21 @@ const MessageAvatar = ({
     );
   }
 
+  // Check if URL needs crossOrigin attribute
+  const needsCrossOrigin = 
+    isInCrossOriginContext() || 
+    normalizedUrl.includes('crossorigin=anonymous') ||
+    normalizedUrl.includes('supabase.co');
+
   // Use provided avatar URL
   return (
-    <Avatar className={`${dimensions[size]} avatar-container`}>
+    <Avatar className={`${dimensions[size]} avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>
       <AvatarImage 
         src={normalizedUrl} 
         alt={name} 
         onError={handleImageError}
         className="object-cover"
-        crossOrigin="anonymous"
+        crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
       />
       <AvatarFallback>
         {isAssistant ? 

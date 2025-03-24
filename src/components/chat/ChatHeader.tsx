@@ -1,10 +1,15 @@
 
-import { Button } from "@/components/ui/button";
-import { FileText, Users } from "lucide-react";
-import React from "react";
+import React from 'react';
+import { ChevronLeft, UserRound, MessageSquare, Bot, BookOpen, ArrowUpDown, Users, BarChart2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import Badge from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChatHeaderProps {
-  title?: string;
+  title: string;
   objective?: string;
   profilePicture?: string;
   participantCount?: number;
@@ -14,62 +19,96 @@ interface ChatHeaderProps {
   viewMode?: "participant" | "admin";
   onImageError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
   isLoading?: boolean;
+  needsCrossOrigin?: boolean;
 }
 
-const ChatHeader = ({ 
+const ChatHeader: React.FC<ChatHeaderProps> = ({ 
   title, 
   objective, 
-  profilePicture,
-  participantCount = 1,
+  profilePicture, 
+  participantCount = 0,
   onGenerateReport,
-  isGeneratingReport,
-  canGenerateReport,
+  isGeneratingReport = false,
+  canGenerateReport = false,
   viewMode = "participant",
   onImageError,
-  isLoading = false
-}: ChatHeaderProps) => {
+  isLoading = false,
+  needsCrossOrigin = false
+}) => {
   return (
-    <div className="border-b border-gray-200 p-6 bg-white">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <img
-              src={profilePicture || "/placeholder.svg"}
-              alt={title || "Facilitator"}
-              className="w-16 h-16 rounded-full object-cover border border-gray-200"
+    <div className="w-full relative px-4 py-3 flex items-center gap-3 border-b bg-white">
+      <div className="flex items-center gap-3">
+        {/* Profile picture with loading state */}
+        {isLoading ? (
+          <Skeleton className="h-10 w-10 rounded-full" />
+        ) : (
+          <Avatar className="h-10 w-10">
+            <AvatarImage 
+              src={profilePicture} 
+              alt={title || 'Chat profile'} 
               onError={onImageError}
-              crossOrigin="anonymous"
+              crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
             />
-            {viewMode === "admin" && (
-              <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs rounded-full px-1.5 py-0.5 font-medium border border-white">
-                Admin
-              </div>
-            )}
-          </div>
-          <div className="max-w-xl">
-            <h2 className="text-xl font-semibold text-gray-800">{title || "Untitled Session"}</h2>
-            <p className="text-gray-600 text-sm line-clamp-2 mt-1">{objective || "No objective set"}</p>
-            {viewMode === "admin" && (
-              <div className="flex items-center gap-1.5 mt-1.5 text-sm text-primary">
-                <Users className="w-4 h-4" />
-                <span className="font-medium">{participantCount}</span>
-                <span>{participantCount === 1 ? 'participant' : 'participants'}</span>
-              </div>
-            )}
-          </div>
+            <AvatarFallback className="bg-primary/10 text-primary">
+              <Bot className="h-5 w-5" />
+            </AvatarFallback>
+          </Avatar>
+        )}
+        
+        <div className="flex-1 min-w-0">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-5 w-32 mb-1" />
+              <Skeleton className="h-4 w-48" />
+            </>
+          ) : (
+            <>
+              <h2 className="font-semibold text-base flex items-center gap-1.5">
+                {title}
+                {viewMode === "admin" && (
+                  <Badge className="bg-blue-100 hover:bg-blue-200 text-blue-800">Admin</Badge>
+                )}
+              </h2>
+              {objective && (
+                <p className="text-sm text-gray-600 truncate">{objective}</p>
+              )}
+            </>
+          )}
         </div>
-        {onGenerateReport && viewMode === "admin" && (
-          <div>
-            <Button
-              onClick={onGenerateReport}
-              disabled={isGeneratingReport || !canGenerateReport}
-              variant="outline"
-              className="flex items-center gap-2 shadow-sm"
-            >
-              <FileText className="w-4 h-4" />
-              {isGeneratingReport ? "Generating..." : "Generate Report"}
-            </Button>
-          </div>
+      </div>
+      
+      <div className="ml-auto flex items-center gap-2">
+        {/* Participant count */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-md text-sm text-gray-600">
+                <Users className="h-3.5 w-3.5" />
+                <span>{participantCount}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {participantCount === 1 
+                  ? "1 participant in this session" 
+                  : `${participantCount} participants in this session`}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
+        {/* Report generation button - only show for participant view */}
+        {viewMode === "participant" && onGenerateReport && canGenerateReport && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={onGenerateReport}
+            disabled={isGeneratingReport}
+            className="text-xs h-8"
+          >
+            <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
+            {isGeneratingReport ? "Generating Report..." : "Get Report"}
+          </Button>
         )}
       </div>
     </div>

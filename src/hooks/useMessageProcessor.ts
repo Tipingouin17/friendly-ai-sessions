@@ -2,6 +2,7 @@ import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import { getFacilitatorAvatarUrl, isImageUrl } from "@/utils/facilitatorUtils";
 import { debugLog } from "@/utils/debugLogger";
+import { isInCrossOriginContext } from "@/utils/crossOriginUtils";
 
 interface UseMessageProcessorProps {
   messages: Message[];
@@ -34,16 +35,36 @@ export const useMessageProcessor = ({
     const processedMessages = [...messages].map(message => {
       // For assistant/facilitator messages, ensure avatar URL is correct
       if (message.sender === "assistant") {
+        // Skip processing if we already have a normalized URL (contains crossorigin marker)
+        if (message.avatar && message.avatar.includes('crossorigin=anonymous')) {
+          debugLog('all', `MessageProcessor - Using already normalized facilitator avatar: ${message.avatar}`);
+          return message;
+        }
+        
         // Fix any URL issues with facilitator avatars
         let correctedAvatar = message.avatar;
         
-        if (correctedAvatar && isImageUrl(correctedAvatar)) {
-          // We'll handle URL normalization asynchronously later if needed
-          debugLog('all', `Facilitator avatar in message processor: ${correctedAvatar}`);
+        if (correctedAvatar && correctedAvatar !== '/placeholder.svg') {
+          // Normalize URLs with double slashes
+          correctedAvatar = correctedAvatar.replace(/([^:])\/\//g, '$1/');
+          
+          // Check if the URL is a valid image URL
+          if (isImageUrl(correctedAvatar)) {
+            // Add crossorigin marker if needed
+            if (isInCrossOriginContext() && !correctedAvatar.includes('crossorigin=anonymous')) {
+              correctedAvatar += (correctedAvatar.includes('?') ? '&' : '?') + 'crossorigin=anonymous';
+            }
+            
+            debugLog('all', `MessageProcessor - Normalized facilitator avatar: ${correctedAvatar}`);
+          } else {
+            // If it's not a valid image URL, use a default
+            correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
+            debugLog('all', `MessageProcessor - Invalid image URL, using default: ${correctedAvatar}`);
+          }
         } else if (!correctedAvatar || correctedAvatar === '/placeholder.svg') {
           // If no avatar or invalid image URL, provide a better default
           correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
-          debugLog('all', `Using default facilitator avatar for message`);
+          debugLog('all', `MessageProcessor - Using default facilitator avatar for message`);
         }
         
         return {
@@ -117,11 +138,19 @@ export const useMessageProcessor = ({
       return filteredMessages.map(message => {
         // For assistant/facilitator messages, ensure avatar URL is correct
         if (message.sender === "assistant") {
+          // Skip reprocessing if already normalized
+          if (message.avatar && message.avatar.includes('crossorigin=anonymous')) {
+            return message;
+          }
+          
           let correctedAvatar = message.avatar;
           
           if (!correctedAvatar || !isImageUrl(correctedAvatar)) {
             correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;
             debugLog('all', `Using default facilitator avatar for message in participant view`);
+          } else if (isInCrossOriginContext()) {
+            // Add crossorigin marker if needed
+            correctedAvatar += (correctedAvatar.includes('?') ? '&' : '?') + 'crossorigin=anonymous';
           }
           
           return {

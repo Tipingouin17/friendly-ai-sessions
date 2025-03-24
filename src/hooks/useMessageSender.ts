@@ -134,12 +134,25 @@ export const useMessageSender = ({
           let avatarUrl = response.data.avatar;
           console.log('Avatar URL from response:', avatarUrl);
           
+          // Normalize avatar URL to avoid double slashes
+          if (avatarUrl && typeof avatarUrl === 'string') {
+            avatarUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
+          }
+          
           if (!avatarUrl && conversation?.sessions?.facilitator_details?.profile_picture) {
             if (conversation.sessions.facilitator_details.id) {
               avatarUrl = await getFacilitatorAvatarUrl(conversation.sessions.facilitator_details);
               console.log('Using facilitator profile from conversation with ID:', avatarUrl);
             } else {
-              avatarUrl = conversation.sessions.facilitator_details.profile_picture;
+              // Normalize the URL right away to avoid issues later
+              let picUrl = conversation.sessions.facilitator_details.profile_picture;
+              if (picUrl && typeof picUrl === 'string') {
+                picUrl = picUrl.replace(/([^:])\/\//g, '$1/');
+              }
+              avatarUrl = await getFacilitatorAvatarUrl({
+                profile_picture: picUrl,
+                title: conversation.sessions.facilitator_details.title
+              });
               console.log('Using facilitator profile from conversation:', avatarUrl);
             }
           }

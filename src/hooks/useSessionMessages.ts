@@ -1,8 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
-import { normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
+import { getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
 const WELCOME_MESSAGE_DELAY = 500; // Reduced delay to show welcome message faster
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
@@ -173,8 +174,8 @@ export const useSessionMessages = ({
               console.log('Found avatar in message content:', avatarUrl);
               
               if (msg.role === 'assistant') {
-                avatarUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-                console.log('Normalized facilitator avatar URL:', avatarUrl);
+                // We can use the proper function to get the avatar URL when needed
+                console.log('Assistant avatar URL found in message:', avatarUrl);
               }
             }
             

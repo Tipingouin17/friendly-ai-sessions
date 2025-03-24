@@ -1,10 +1,11 @@
+
 import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
 import { nanoid } from "nanoid";
-import { normalizeFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -134,8 +135,13 @@ export const useMessageSender = ({
           console.log('Avatar URL from response:', avatarUrl);
           
           if (!avatarUrl && conversation?.sessions?.facilitator_details?.profile_picture) {
-            avatarUrl = normalizeFacilitatorAvatarUrl(conversation.sessions.facilitator_details.profile_picture);
-            console.log('Using facilitator profile from conversation:', avatarUrl);
+            if (conversation.sessions.facilitator_details.id) {
+              avatarUrl = await getFacilitatorAvatarUrl(conversation.sessions.facilitator_details);
+              console.log('Using facilitator profile from conversation with ID:', avatarUrl);
+            } else {
+              avatarUrl = conversation.sessions.facilitator_details.profile_picture;
+              console.log('Using facilitator profile from conversation:', avatarUrl);
+            }
           }
 
           const aiResponse = {
@@ -198,6 +204,7 @@ export const useMessageSender = ({
     isAnonymous, 
     conversation?.participants,
     conversation?.sessions?.facilitator_details?.profile_picture,
+    conversation?.sessions?.facilitator_details?.id,
     toast
   ]);
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRound, EyeOff, Bot } from 'lucide-react';
 import BoringAvatar from 'boring-avatars';
-import { handleAvatarError, isImageUrl, normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
+import { handleAvatarError, isImageUrl, getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 import { debugLog } from '@/utils/debugLogger';
 
 interface MessageAvatarProps {
@@ -37,10 +37,13 @@ const MessageAvatar = ({
       // Only normalize if it's not already normalized (avoid double normalization)
       if (isAssistant) {
         // Always normalize facilitator/assistant avatars to ensure they work
-        const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-        setNormalizedUrl(processedUrl);
-        setImageError(false);
-        debugLog('all', `MessageAvatar (Assistant) - Using normalized avatar URL: ${processedUrl}`);
+        const processUrl = async () => {
+          const processedUrl = await getFacilitatorAvatarUrl({ profile_picture: avatarUrl });
+          setNormalizedUrl(processedUrl);
+          setImageError(false);
+          debugLog('all', `MessageAvatar (Assistant) - Using normalized avatar URL: ${processedUrl}`);
+        };
+        processUrl();
       } else {
         // For participant avatars, just use the URL as-is in most cases
         setNormalizedUrl(avatarUrl);

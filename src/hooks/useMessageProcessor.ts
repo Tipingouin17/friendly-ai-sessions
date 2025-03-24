@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import { normalizeFacilitatorAvatarUrl, isImageUrl } from "@/utils/facilitatorUtils";
+import { getFacilitatorAvatarUrl, isImageUrl } from "@/utils/facilitatorUtils";
 import { debugLog } from "@/utils/debugLogger";
 
 interface UseMessageProcessorProps {
@@ -39,9 +38,8 @@ export const useMessageProcessor = ({
         let correctedAvatar = message.avatar;
         
         if (correctedAvatar && isImageUrl(correctedAvatar)) {
-          // Apply URL normalization to ensure consistency
-          correctedAvatar = normalizeFacilitatorAvatarUrl(correctedAvatar);
-          debugLog('all', `Normalized facilitator avatar in message processor: ${correctedAvatar}`);
+          // We'll handle URL normalization asynchronously later if needed
+          debugLog('all', `Facilitator avatar in message processor: ${correctedAvatar}`);
         } else if (!correctedAvatar || correctedAvatar === '/placeholder.svg') {
           // If no avatar or invalid image URL, provide a better default
           correctedAvatar = `/api/avatar?name=Facilitator&variant=beam&palette=2`;

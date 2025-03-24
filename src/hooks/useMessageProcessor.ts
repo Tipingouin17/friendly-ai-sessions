@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import { getFacilitatorAvatarUrl, isImageUrl } from "@/utils/facilitatorUtils";

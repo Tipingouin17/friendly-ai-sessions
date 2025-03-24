@@ -32,6 +32,7 @@ const MessageAvatar = ({
   // Process and normalize avatar URL on mount or when URL changes
   useEffect(() => {
     if (avatarUrl) {
+      debugLog('all', `MessageAvatar - Processing avatar URL: ${avatarUrl}`);
       const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
       setNormalizedUrl(processedUrl);
       setImageError(false);
@@ -62,6 +63,7 @@ const MessageAvatar = ({
   if (isAssistant) {
     // If we have a valid avatar URL that looks like an image URL, use it
     if (normalizedUrl && normalizedUrl !== '/placeholder.svg' && isImageUrl(normalizedUrl) && !imageError) {
+      debugLog('all', `Displaying facilitator avatar with URL: ${normalizedUrl}`);
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
           <AvatarImage 
@@ -69,6 +71,7 @@ const MessageAvatar = ({
             alt={name || "Facilitator"} 
             onError={handleImageError}
             className="object-cover"
+            crossOrigin="anonymous"
           />
           <AvatarFallback className="bg-blue-100 text-blue-500">
             <Bot className="h-4 w-4" />
@@ -122,6 +125,7 @@ const MessageAvatar = ({
         alt={name} 
         onError={handleImageError}
         className="object-cover"
+        crossOrigin="anonymous"
       />
       <AvatarFallback>
         {isAssistant ? 

@@ -102,13 +102,15 @@ export const useSessionMessages = ({
           
           if (welcomeMessage) {
             console.log('Adding welcome message to messages list');
+            const facilitatorAvatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+            
             const welcomeMsg: Message = {
               id: 'welcome',
               content: welcomeMessage,
               sender: 'assistant',
               timestamp: new Date(),
               created_at: new Date().toISOString(),
-              avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
+              avatar: facilitatorAvatarUrl
             };
             setMessages([welcomeMsg]);
             cacheWelcomeMessage(welcomeMsg);
@@ -122,7 +124,7 @@ export const useSessionMessages = ({
                     conversation_id: conversationId,
                     content: { 
                       text: welcomeMessage,
-                      avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
+                      avatar: facilitatorAvatarUrl
                     },
                     role: 'assistant',
                     created_at: new Date().toISOString()
@@ -169,6 +171,11 @@ export const useSessionMessages = ({
             if ('avatar' in contentObj && contentObj.avatar) {
               avatarUrl = contentObj.avatar as string;
               console.log('Found avatar in message content:', avatarUrl);
+              
+              if (msg.role === 'assistant') {
+                avatarUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
+                console.log('Normalized facilitator avatar URL:', avatarUrl);
+              }
             }
             
             isReport = 'is_report' in contentObj ? Boolean(contentObj.is_report) : false;
@@ -178,10 +185,7 @@ export const useSessionMessages = ({
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
           if (msg.role === 'assistant') {
-            if (avatarUrl) {
-              console.log('Using avatar from message content:', avatarUrl);
-              avatarUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-            } else {
+            if (!avatarUrl) {
               avatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
               console.log('Using default facilitator avatar');
             }

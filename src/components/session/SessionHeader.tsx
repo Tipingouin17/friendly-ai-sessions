@@ -58,8 +58,9 @@ const SessionHeader = ({
   // Log the props for debugging
   useEffect(() => {
     debugLog('all', `SessionHeader rendered with facilitator: ${JSON.stringify(facilitator || {})}`);
+    debugLog('all', `SessionHeader profilePicture: ${profilePicture}`);
     debugLog('all', `SessionHeader viewMode: ${viewMode}, messagesCount: ${messagesCount}`);
-  }, [facilitator, viewMode, messagesCount]);
+  }, [facilitator, viewMode, messagesCount, profilePicture]);
 
   return (
     <ChatHeader 

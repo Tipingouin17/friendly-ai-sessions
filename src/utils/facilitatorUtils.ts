@@ -68,7 +68,9 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
   try {
     // If URL already contains the Supabase storage path, it's likely correct
     if (url.includes('supabase.co/storage/v1/object/public/facilitator-avatars')) {
-      return url;
+      // Ensure CORS is properly handled by removing any cache-busting parameters
+      const cleanUrl = url.split('?')[0]; // Remove any query parameters that might cause caching issues
+      return cleanUrl;
     }
     
     // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
@@ -79,6 +81,11 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
     // Convert any relative URLs that look like partial storage paths
     if (correctedUrl.startsWith('/storage/') || correctedUrl.includes('/object/public/')) {
       correctedUrl = `https://msahrdujupfcotujyluy.supabase.co${correctedUrl.startsWith('/') ? '' : '/'}${correctedUrl}`;
+    }
+    
+    // Handle API avatar URLs by just passing them through
+    if (correctedUrl.includes('/api/avatar')) {
+      return correctedUrl;
     }
     
     // Check if URL is a relative path but not a complete URL or API path
@@ -92,6 +99,9 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
     
     // Clean up any double slashes in the URL (except after protocol)
     correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
+    
+    // Remove any query parameters or cache-busting timestamps that might cause CORS issues
+    correctedUrl = correctedUrl.split('?')[0];
     
     debugLog('all', `Normalized facilitator avatar URL: ${correctedUrl}`);
     return correctedUrl;

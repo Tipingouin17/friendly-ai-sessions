@@ -23,12 +23,12 @@ const MessageItem = ({
   participantInfo,
   isMobile = false
 }: MessageItemProps) => {
-  // Log avatar usage for debugging
+  // Debug log for assistant avatars
   React.useEffect(() => {
-    if (message.sender === "assistant" && isFirstMessageOfGroup && message.avatar) {
-      debugLog('all', `MessageItem - assistant message with avatar: ${message.avatar}`);
+    if (message.sender === "assistant" && isFirstMessageOfGroup) {
+      debugLog('all', `MessageItem - assistant message with avatar: ${message.avatar || 'No avatar provided'}`);
     }
-  }, []); 
+  }, [message, isFirstMessageOfGroup]); 
 
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";

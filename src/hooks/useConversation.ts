@@ -48,6 +48,10 @@ const fetchConversation = async (id: number | null) => {
   }
 };
 
+// Cache for processed avatar URLs to prevent redundant processing
+const facilitatorAvatarCache = new Map<number, { url: string, timestamp: number }>();
+const AVATAR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null, Error>({
     queryKey: ['conversation', conversationId],
@@ -72,15 +76,32 @@ export const useConversation = (conversationId: number | null) => {
         if (data.sessions?.facilitator_details) {
           const facilitator = data.sessions.facilitator_details;
           
-          // Use the centralized facilitator avatar URL function
+          // Use cached avatar URL if available and not expired
           if (facilitator.id) {
-            try {
-              const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-              facilitator.profile_picture = avatarUrl;
-              console.log('Processed facilitator profile picture:', avatarUrl);
-            } catch (error) {
-              console.error('Error processing facilitator avatar:', error);
-              facilitator.profile_picture = '/placeholder.svg';
+            const cachedAvatar = facilitatorAvatarCache.get(facilitator.id);
+            const now = Date.now();
+            
+            if (cachedAvatar && (now - cachedAvatar.timestamp) < AVATAR_CACHE_TTL) {
+              // Use cached avatar URL
+              facilitator.profile_picture = cachedAvatar.url;
+              console.log('Using cached facilitator profile picture:', cachedAvatar.url);
+            } else {
+              // Process and cache the new avatar URL
+              try {
+                const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+                facilitator.profile_picture = avatarUrl;
+                
+                // Cache the processed URL
+                facilitatorAvatarCache.set(facilitator.id, {
+                  url: avatarUrl,
+                  timestamp: now
+                });
+                
+                console.log('Processed and cached facilitator profile picture:', avatarUrl);
+              } catch (error) {
+                console.error('Error processing facilitator avatar:', error);
+                facilitator.profile_picture = '/placeholder.svg';
+              }
             }
           }
         }
@@ -93,10 +114,22 @@ export const useConversation = (conversationId: number | null) => {
     enabled: !!conversationId,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 3000,
-    gcTime: 60000, // Updated from cacheTime to gcTime for React Query v5
+    staleTime: 30000, // Increase from 3000ms to 30000ms (30 seconds) to reduce refresh frequency
+    gcTime: 300000, // Increase from 60000ms to 300000ms (5 minutes)
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    refetchOnReconnect: true
+    refetchOnReconnect: true,
+    refetchInterval: (data) => {
+      // Only poll every 30 seconds for active admin sessions
+      const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
+      const isActive = data?.status === 'active' && !data?.is_session_ended;
+      
+      if (isAdmin && isActive) {
+        return 30000; // 30 seconds for active admin sessions
+      } else if (isActive) {
+        return 60000; // 1 minute for active non-admin sessions
+      }
+      return false; // Don't poll for inactive sessions
+    }
   });
 };

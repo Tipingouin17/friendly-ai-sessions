@@ -29,16 +29,16 @@ const MessageAvatar = ({
     lg: 'h-10 w-10'
   };
 
-  // Process and normalize avatar URL on mount
+  // Process and normalize avatar URL on mount or when URL changes
   useEffect(() => {
     if (avatarUrl) {
       const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
       setNormalizedUrl(processedUrl);
-      debugLog('all', `MessageAvatar - Using normalized avatar URL: ${processedUrl.substring(0, 50)}...`);
+      setImageError(false);
+      debugLog('all', `MessageAvatar - Using normalized avatar URL: ${processedUrl}`);
     } else {
       setNormalizedUrl(null);
     }
-    setImageError(false);
   }, [avatarUrl]); // Re-run when avatar URL changes
 
   // Handle anonymized avatars

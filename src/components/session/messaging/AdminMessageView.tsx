@@ -1,5 +1,6 @@
+
 import React, { useMemo, useState, useCallback } from 'react';
-import { Message } from '@/types/chat';
+import { Message, ParticipantInfo } from '@/types/chat';
 import AdminMessageFilters from './AdminMessageFilters';
 import AdminMessageGroup from './AdminMessageGroup';
 import MessageEmptyState from './MessageEmptyState';
@@ -10,21 +11,23 @@ import { BarChart2, MessageSquare, BarChart4, List } from 'lucide-react';
 interface AdminMessagingViewProps {
   messages: Message[];
   participantColors: { [key: string]: string };
-  currentParticipantCount: number;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  showAnonymous: boolean;
-  setShowAnonymous: (show: boolean) => void;
+  currentParticipantCount?: number;
+  searchTerm?: string;
+  setSearchTerm?: (term: string) => void;
+  showAnonymous?: boolean;
+  setShowAnonymous?: (show: boolean) => void;
+  participants?: ParticipantInfo[]; // Add this prop to the interface
 }
 
 const AdminMessageView: React.FC<AdminMessagingViewProps> = ({
   messages,
   participantColors,
-  currentParticipantCount,
-  searchTerm,
-  setSearchTerm,
-  showAnonymous,
-  setShowAnonymous
+  currentParticipantCount = 0,
+  searchTerm = '',
+  setSearchTerm = () => {},
+  showAnonymous = true,
+  setShowAnonymous = () => {},
+  participants = []
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
   

@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import AdminMessageView from './messaging/AdminMessageView';
 import AdminMessageLoadingState from './messaging/AdminMessageLoadingState';
@@ -22,6 +22,10 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
   conversationData,
   onSendMessage
 }) => {
+  // State for search and filtering
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAnonymous, setShowAnonymous] = useState(true);
+
   // Debug log messages when they change
   useEffect(() => {
     console.log("AdminSessionMessages received messages:", messages.length);
@@ -50,8 +54,13 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
       <div className="flex-1 overflow-hidden">
         <AdminMessageView
           messages={messages}
-          participants={participants}
           participantColors={participantColors}
+          participants={participants}
+          currentParticipantCount={participants.length}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          showAnonymous={showAnonymous}
+          setShowAnonymous={setShowAnonymous}
         />
       </div>
       

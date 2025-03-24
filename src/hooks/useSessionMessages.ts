@@ -1,11 +1,10 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import { getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
-const WELCOME_MESSAGE_DELAY = 500; // Reduced delay to show welcome message faster
+const WELCOME_MESSAGE_DELAY = 500;
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
 
 interface UseSessionMessagesProps {
@@ -103,7 +102,9 @@ export const useSessionMessages = ({
           
           if (welcomeMessage) {
             console.log('Adding welcome message to messages list');
-            const facilitatorAvatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+            const facilitatorAvatarUrl = await getFacilitatorAvatarUrl({
+              title: 'Facilitator'
+            });
             
             const welcomeMsg: Message = {
               id: 'welcome',
@@ -142,7 +143,7 @@ export const useSessionMessages = ({
           return;
         }
         
-        const formattedMessages = data.map(msg => {
+        const formattedMessages = await Promise.all(data.map(async msg => {
           let messageContent = '';
           let participantId: string | undefined = undefined;
           let likesArray: string[] = [];
@@ -172,11 +173,6 @@ export const useSessionMessages = ({
             if ('avatar' in contentObj && contentObj.avatar) {
               avatarUrl = contentObj.avatar as string;
               console.log('Found avatar in message content:', avatarUrl);
-              
-              if (msg.role === 'assistant') {
-                // We can use the proper function to get the avatar URL when needed
-                console.log('Assistant avatar URL found in message:', avatarUrl);
-              }
             }
             
             isReport = 'is_report' in contentObj ? Boolean(contentObj.is_report) : false;
@@ -187,8 +183,10 @@ export const useSessionMessages = ({
           
           if (msg.role === 'assistant') {
             if (!avatarUrl) {
-              avatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
-              console.log('Using default facilitator avatar');
+              avatarUrl = await getFacilitatorAvatarUrl({
+                title: 'Facilitator'
+              });
+              console.log('Generated facilitator avatar URL:', avatarUrl);
             }
           }
           
@@ -205,7 +203,7 @@ export const useSessionMessages = ({
             isAnonymous,
             avatar: avatarUrl
           } as Message;
-        });
+        }));
         
         console.log('Successfully fetched messages:', formattedMessages.length);
         

@@ -123,15 +123,18 @@ export const useConversation = (conversationId: number | null) => {
       // Only poll every 30 seconds for active admin sessions
       const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
       
-      // Fix: Access status and is_session_ended from data, not from the query object
-      const isActive = data?.status === 'active' && !data?.is_session_ended;
-      
-      if (isAdmin && isActive) {
-        return 30000; // 30 seconds for active admin sessions
-      } else if (isActive) {
-        return 60000; // 1 minute for active non-admin sessions
+      // Fix: The data parameter here is the actual ConversationWithSession object,
+      // not the query result, so we should access the properties directly
+      if (data) {
+        const isActive = data.status === 'active' && !data.is_session_ended;
+        
+        if (isAdmin && isActive) {
+          return 30000; // 30 seconds for active admin sessions
+        } else if (isActive) {
+          return 60000; // 1 minute for active non-admin sessions
+        }
       }
-      return false; // Don't poll for inactive sessions
+      return false; // Don't poll for inactive sessions or if data is null
     }
   });
 };

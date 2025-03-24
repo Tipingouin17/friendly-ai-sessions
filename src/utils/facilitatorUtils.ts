@@ -22,13 +22,24 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     
     // Case 2: Try to generate a URL from the facilitator ID
     if (facilitator.id) {
-      const { data } = await supabase.storage
+      // First try - storage bucket path with proper naming
+      const { data: bucketData } = await supabase.storage
         .from('facilitator-avatars')
         .getPublicUrl(`${facilitator.id}.jpg`);
       
-      if (data?.publicUrl) {
-        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${data.publicUrl.substring(0, 50)}...`);
-        return normalizeFacilitatorAvatarUrl(data.publicUrl);
+      if (bucketData?.publicUrl) {
+        debugLog('all', `Generated storage URL for facilitator ${facilitator.id}: ${bucketData.publicUrl.substring(0, 50)}...`);
+        return normalizeFacilitatorAvatarUrl(bucketData.publicUrl);
+      }
+      
+      // Second try - check if there's an avatar with .png extension
+      const { data: pngData } = await supabase.storage
+        .from('facilitator-avatars')
+        .getPublicUrl(`${facilitator.id}.png`);
+        
+      if (pngData?.publicUrl) {
+        debugLog('all', `Generated PNG storage URL for facilitator ${facilitator.id}: ${pngData.publicUrl.substring(0, 50)}...`);
+        return normalizeFacilitatorAvatarUrl(pngData.publicUrl);
       }
     }
     
@@ -55,17 +66,17 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
       ? url.replace('facilitators-avatars', 'facilitator-avatars')
       : url;
     
-    // Clean up any double slashes in the URL (except after protocol)
-    correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
-    
-    // Ensure full URL for relative paths that aren't API routes
+    // Check if URL is a relative path but not a complete URL
     if (correctedUrl.startsWith('/') && !correctedUrl.startsWith('/api/')) {
-      // In browser environment, use window.location.origin
+      // For relative paths like /lovable-uploads/..., ensure they have the proper base
       if (typeof window !== 'undefined') {
         const baseUrl = window.location.origin;
         correctedUrl = `${baseUrl}${correctedUrl}`;
       }
     }
+    
+    // Clean up any double slashes in the URL (except after protocol)
+    correctedUrl = correctedUrl.replace(/([^:]\/)\/+/g, "$1");
     
     debugLog('all', `Normalized facilitator avatar URL: ${correctedUrl.substring(0, 50)}...`);
     return correctedUrl;
@@ -97,6 +108,7 @@ export const isImageUrl = (url: string): boolean => {
   if (url.includes('facilitator-avatars')) return true;
   if (url.includes('facilitators-avatars')) return true;
   if (url.includes('supabase.co/storage')) return true;
+  if (url.includes('lovable-uploads')) return true;
   
   // Check for image URLs with query parameters
   if (url.match(/\.(jpeg|jpg|gif|png|svg|webp)\?/i) !== null) return true;

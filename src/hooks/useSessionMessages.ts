@@ -120,7 +120,10 @@ export const useSessionMessages = ({
                   .from('messages')
                   .insert({
                     conversation_id: conversationId,
-                    content: { text: welcomeMessage },
+                    content: { 
+                      text: welcomeMessage,
+                      avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
+                    },
                     role: 'assistant',
                     created_at: new Date().toISOString()
                   });
@@ -177,6 +180,7 @@ export const useSessionMessages = ({
           if (msg.role === 'assistant') {
             if (avatarUrl) {
               console.log('Using avatar from message content:', avatarUrl);
+              avatarUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
             } else {
               avatarUrl = '/api/avatar?name=Facilitator&variant=beam&palette=2';
               console.log('Using default facilitator avatar');

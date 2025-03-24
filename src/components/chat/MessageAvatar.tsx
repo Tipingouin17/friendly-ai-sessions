@@ -28,10 +28,10 @@ const MessageAvatar = ({
     lg: 'h-10 w-10'
   };
 
-  // Only log when component is first mounted, not on every render
+  // Log avatar URL on mount for facilitator avatars only
   useEffect(() => {
     if (isAssistant && avatarUrl) {
-      debugLog('all', `Facilitator avatar loaded in MessageAvatar: ${avatarUrl.substring(0, 50)}...`);
+      debugLog('all', `Facilitator avatar URL in MessageAvatar: ${avatarUrl}`);
     }
   }, []); // Empty dependency array ensures this runs only once on mount
 
@@ -51,8 +51,11 @@ const MessageAvatar = ({
     handleAvatarError(e);
   };
 
+  // Special handling for facilitator/assistant avatars
   if (isAssistant) {
+    // If we have a valid avatar URL that looks like an image URL, use it
     if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl) && !imageError) {
+      // Apply normalization to avatar URL
       const cleanUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
       
       return (
@@ -70,6 +73,7 @@ const MessageAvatar = ({
       );
     }
     
+    // Fallback for facilitator with no avatar
     return (
       <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
         <AvatarFallback className="bg-blue-100 text-blue-500">
@@ -79,6 +83,7 @@ const MessageAvatar = ({
     );
   }
 
+  // Configure avatar palettes for consistency
   const AVATAR_PALETTES = [
     ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'],
     ['#FFAD08', '#EDD75A', '#73B06F', '#0C8F8F', '#405059'],
@@ -87,6 +92,7 @@ const MessageAvatar = ({
     ['#D9A5B3', '#F5D6C6', '#F7EBD9', '#36382E', '#7FACAA'],
   ];
 
+  // Default to Boring Avatar if no avatar URL or image failed to load
   if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg' || imageError) {
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
@@ -104,6 +110,7 @@ const MessageAvatar = ({
     );
   }
 
+  // Special case for API-generated avatars
   if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
@@ -121,6 +128,7 @@ const MessageAvatar = ({
     );
   }
 
+  // Use provided avatar URL
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
       <AvatarImage 

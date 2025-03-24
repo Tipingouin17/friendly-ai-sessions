@@ -122,6 +122,8 @@ export const useConversation = (conversationId: number | null) => {
     refetchInterval: (data) => {
       // Only poll every 30 seconds for active admin sessions
       const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
+      
+      // Fix: Access status and is_session_ended from data, not from the query object
       const isActive = data?.status === 'active' && !data?.is_session_ended;
       
       if (isAdmin && isActive) {

@@ -23,7 +23,11 @@ export const useSessionData = () => {
   useSessionStatus(currentConversationId, refetch);
   
   // Set up participant tracking
-  const { participants, setParticipants } = useParticipantTracking(locationState, conversation as ConversationWithSession);
+  const { participants, setParticipants } = useParticipantTracking(
+    locationState, 
+    conversation as ConversationWithSession,
+    currentConversationId
+  );
   
   // Set up session interface (QR code, links, etc.)
   const { sessionLink, showQrCodeView, handleStartSession } = useSessionInterface(currentConversationId);

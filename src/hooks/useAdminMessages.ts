@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message, ParticipantInfo } from '@/types/chat';
@@ -100,16 +99,26 @@ export function useAdminMessages({
         
         // Map database messages to Message type
         const parsedMessages: Message[] = dbMessages.map(msg => {
+          const messageContent = typeof msg.content === 'string' 
+            ? msg.content 
+            : typeof msg.content === 'object' && msg.content !== null && 'message' in msg.content
+              ? String(msg.content.message)
+              : '';
+          
           return {
             id: `msg-${msg.id}`,
-            content: typeof msg.content === 'string' ? msg.content : msg.content?.message || '',
+            content: messageContent,
             sender: msg.role === 'user' ? 'user' : 'assistant',
             timestamp: new Date(msg.created_at),
-            isAnonymous: msg.is_anonymous,
+            isAnonymous: Boolean(msg.is_anonymous),
             participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
-            isPinned: msg.content?.isPinned || false,
+            isPinned: typeof msg.content === 'object' && msg.content !== null && 'isPinned' in msg.content 
+              ? Boolean(msg.content.isPinned) 
+              : false,
             isAdminMessage: msg.role === 'admin',
-            recipientId: msg.content?.recipientId
+            recipientId: typeof msg.content === 'object' && msg.content !== null && 'recipientId' in msg.content
+              ? String(msg.content.recipientId)
+              : undefined
           };
         });
         

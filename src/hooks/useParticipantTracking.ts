@@ -45,11 +45,12 @@ export function useParticipantTracking(
         const participantInfos: ParticipantInfo[] = data.map(p => ({
           id: p.participant_id,
           name: p.name || `Participant ${p.participant_id}`,
+          avatar: p.avatar_seed ? `/api/avatar?name=${p.avatar_seed}&variant=beam&palette=0` : null,
           avatarSeed: p.avatar_seed || null,
           isAnonymous: p.is_anonymous || false,
           isAdmin: p.is_admin || false,
           joinedAt: new Date(p.created_at),
-          lastActive: new Date(p.updated_at || p.created_at),
+          lastActive: new Date(p.created_at), // Use created_at as fallback since updated_at might not exist
         }));
         
         setParticipants(participantInfos);
@@ -109,11 +110,12 @@ export function useParticipantTracking(
             const participantInfo: ParticipantInfo = {
               id: newParticipant.participant_id,
               name: newParticipant.name || `Participant ${newParticipant.participant_id}`,
+              avatar: newParticipant.avatar_seed ? `/api/avatar?name=${newParticipant.avatar_seed}&variant=beam&palette=0` : null,
               avatarSeed: newParticipant.avatar_seed || null,
               isAnonymous: newParticipant.is_anonymous || false,
               isAdmin: newParticipant.is_admin || false,
               joinedAt: new Date(newParticipant.created_at),
-              lastActive: new Date(newParticipant.updated_at || newParticipant.created_at),
+              lastActive: new Date(newParticipant.created_at),
             };
             
             setParticipants(prev => [...prev, participantInfo]);
@@ -126,10 +128,11 @@ export function useParticipantTracking(
                 return {
                   ...p,
                   name: updatedParticipant.name || p.name,
+                  avatar: updatedParticipant.avatar_seed ? `/api/avatar?name=${updatedParticipant.avatar_seed}&variant=beam&palette=0` : p.avatar,
                   avatarSeed: updatedParticipant.avatar_seed || p.avatarSeed,
                   isAnonymous: updatedParticipant.is_anonymous || p.isAnonymous,
                   isAdmin: updatedParticipant.is_admin || p.isAdmin,
-                  lastActive: new Date(updatedParticipant.updated_at),
+                  lastActive: new Date(updatedParticipant.created_at),
                 };
               }
               return p;

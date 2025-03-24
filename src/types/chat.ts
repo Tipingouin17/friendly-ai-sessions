@@ -13,13 +13,18 @@ export interface Message {
   isPinned?: boolean; // Flag for pinned messages
   recipientId?: string; // For directed messages
   isAdminMessage?: boolean; // Flag for admin messages
+  isWelcomeMessage?: boolean; // Flag for welcome messages
 }
 
 export interface ParticipantInfo {
   id: number;
   name: string;
-  avatar: string;
-  isAnonymous?: boolean; // Changed from is_anonymous to isAnonymous for consistency
+  avatar?: string; // Changed from required to optional
+  avatarSeed?: string | null; // Added to match the data structure in useParticipantTracking
+  isAnonymous?: boolean;
+  isAdmin?: boolean; // Added to match usage in useParticipantTracking
+  joinedAt?: Date; // Added for tracking when participants joined
+  lastActive?: Date; // Added for tracking participant activity
 }
 
 export interface SpeechRecognition extends EventTarget {

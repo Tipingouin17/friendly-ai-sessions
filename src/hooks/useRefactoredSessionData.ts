@@ -31,7 +31,8 @@ export const useRefactoredSessionData = () => {
   // Set up participant tracking
   const { participants, setParticipants } = useParticipantTracking(
     locationState, 
-    conversation as ConversationWithSession
+    conversation as ConversationWithSession,
+    currentConversationId
   );
   
   // Set up session interface (QR code, links, etc.)

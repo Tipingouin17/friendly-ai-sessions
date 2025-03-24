@@ -1,30 +1,45 @@
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Message, ParticipantInfo } from "@/types/chat";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAdminSessionState } from "@/hooks/useAdminSessionState";
-import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
-import { useMessageRealtime } from "@/hooks/useMessageRealtime";
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Message, ParticipantInfo } from '@/types/chat';
+import { ConversationWithSession } from '@/types/database';
+import { useToast } from '@/components/ui/use-toast';
+import { useAdminSessionState } from './useAdminSessionState';
+
+// Create a function to log channel information in a controlled way
+const logChannelStatus = (channelRef: any, label: string) => {
+  if (!channelRef?.current) return;
+  
+  try {
+    const status = channelRef.current?.state || 'UNKNOWN';
+    console.info(`Message channel subscription status (${label}): ${status}`);
+  } catch (err) {
+    // Silently ignore errors from logging
+  }
+};
 
 interface UseAdminMessagesProps {
   conversationId: number | null;
   participants: ParticipantInfo[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  conversationData?: ConversationWithSession | null;
 }
 
-export function useAdminMessages({ 
-  conversationId, 
-  participants = [], 
-  messages = [], 
-  setMessages 
+export function useAdminMessages({
+  conversationId,
+  participants,
+  messages,
+  setMessages,
+  conversationData
 }: UseAdminMessagesProps) {
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
+  const messageSubscriptionRef = useRef<any>(null);
+  const cleanupAttemptedRef = useRef(false);
+  const [hasInitializedChannel, setHasInitializedChannel] = useState(false);
   const { toast } = useToast();
-  const { setAdminStatus } = useSessionAdminStatus();
-  const loadingRef = useRef(false);
-  const welcomeMessageFetchedRef = useRef(false);
   
+  // Use the admin session state hook
   const {
     isSessionPaused,
     isExporting,
@@ -34,221 +49,196 @@ export function useAdminMessages({
   } = useAdminSessionState({
     conversationId,
     currentUserParticipantId: null,
-    participants: participants || [],
-    messages: messages || [], 
+    participants,
+    messages,
     setMessages
   });
-
-  // Set up realtime message listening with enhanced hook
-  const { forceRefresh } = useMessageRealtime({
-    currentConversationId: conversationId,
-    viewMode: "admin",
-    setMessages
-  });
-
-  // Initial message fetch - optimized to reduce redundant fetches
+  
+  // Load initial messages from the database when conversation ID changes
   useEffect(() => {
-    if (!conversationId || loadingRef.current) {
-      return;
-    }
+    if (!conversationId) return;
     
-    const fetchInitialMessages = async () => {
+    const loadInitialMessages = async () => {
       try {
-        loadingRef.current = true;
-        console.log('Admin: Fetching initial messages for conversation:', conversationId);
+        console.info(`Admin: Fetching initial messages for conversation: ${conversationId}`);
         
-        // Only fetch welcome message if we haven't already
-        if (!welcomeMessageFetchedRef.current) {
-          const { data: conversationData, error: convError } = await supabase
-            .from('conversations')
-            .select(`
-              sessions!conversations_sessions_id_fkey (
-                welcome_message
-              )
-            `)
-            .eq('id', conversationId)
-            .maybeSingle();
-          
-          if (!convError && conversationData?.sessions?.welcome_message) {
-            const welcomeMessage = conversationData.sessions.welcome_message;
-            console.log('Admin: Found welcome message:', welcomeMessage.substring(0, 50) + '...');
-            
-            setMessages(prev => {
-              // Check if welcome message already exists
-              if (!prev.some(m => m.id.startsWith('welcome-') || m.content === welcomeMessage)) {
-                const welcomeMsg: Message = {
-                  id: 'welcome-' + Date.now(),
-                  content: welcomeMessage,
-                  sender: 'assistant',
-                  timestamp: new Date(),
-                  avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
-                };
-                
-                return [welcomeMsg];
-              }
-              
-              return prev;
-            });
-            
-            welcomeMessageFetchedRef.current = true;
-          }
-        }
-        
-        // Fetch all messages from the database
-        const { data, error } = await supabase
+        // Query the database for messages
+        const { data: dbMessages, error } = await supabase
           .from('messages')
           .select('*')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: true });
           
         if (error) {
-          console.error('Error fetching messages in admin view:', error);
-          loadingRef.current = false;
+          console.error('Error fetching initial messages:', error);
           return;
         }
         
-        if (!data || data.length === 0) {
-          console.log('No database messages found for admin view');
-          loadingRef.current = false;
-          return;
-        }
-        
-        // Transform messages to our format
-        const formattedMessages = data.map(msg => {
-          let messageContent = '';
-          let participantId: string | undefined = undefined;
-          let isAnonymous = false;
+        if (!dbMessages || dbMessages.length === 0) {
+          console.info('No database messages found for admin view');
           
-          if (typeof msg.content === 'string') {
-            messageContent = msg.content;
-          } else if (msg.content && typeof msg.content === 'object') {
-            const contentObj = msg.content as Record<string, any>;
+          // If there are no messages but we have conversation data with welcome_message, use that
+          if (conversationData?.sessions?.welcome_message) {
+            const welcomeMsg = conversationData.sessions.welcome_message;
+            console.info(`Admin: Found welcome message: ${welcomeMsg.substring(0, 50)}...`);
+            setWelcomeMessage(welcomeMsg);
             
-            if ('text' in contentObj) {
-              messageContent = contentObj.text as string;
-            } else if ('message' in contentObj) {
-              messageContent = contentObj.message as string;
-            } else {
-              messageContent = JSON.stringify(contentObj);
-            }
+            // Create welcome message in the expected format
+            const initialWelcomeMessage: Message = {
+              id: 'welcome-message',
+              content: welcomeMsg,
+              sender: 'assistant',
+              timestamp: new Date(),
+              isWelcomeMessage: true
+            };
             
-            if ('participant_id' in contentObj) {
-              participantId = `P${contentObj.participant_id}`;
-            }
-            
-            isAnonymous = 'is_anonymous' in contentObj ? Boolean(contentObj.is_anonymous) : false;
+            // Set it as the first message
+            setMessages([initialWelcomeMessage]);
           }
-          
+          return;
+        }
+        
+        // Map database messages to Message type
+        const parsedMessages: Message[] = dbMessages.map(msg => {
           return {
-            id: String(msg.id),
-            content: messageContent,
-            sender: msg.role === 'assistant' ? 'assistant' : 'user',
-            participant: participantId,
+            id: `msg-${msg.id}`,
+            content: typeof msg.content === 'string' ? msg.content : msg.content?.message || '',
+            sender: msg.role === 'user' ? 'user' : 'assistant',
             timestamp: new Date(msg.created_at),
-            isAnonymous,
-            avatar: msg.role === 'assistant' ? '/api/avatar?name=Facilitator&variant=beam&palette=2' : undefined
-          } as Message;
+            isAnonymous: msg.is_anonymous,
+            participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
+            isPinned: msg.content?.isPinned || false,
+            isAdminMessage: msg.role === 'admin',
+            recipientId: msg.content?.recipientId
+          };
         });
         
-        console.log('Admin: Loaded initial messages:', formattedMessages.length);
-        
-        // Update messages state with deduplicated messages
-        setMessages(prev => {
-          // Get existing welcome messages
-          const welcomeMessages = prev.filter(m => m.id.startsWith('welcome-'));
-          
-          // Create a map of message IDs for quick lookup
-          const existingIds = new Set(prev.map(m => m.id));
-          
-          // Filter out duplicates from formatted messages
-          const newMessages = formattedMessages.filter(m => !existingIds.has(m.id));
-          
-          // Combine welcome messages and new messages
-          return [...welcomeMessages, ...newMessages];
-        });
-      } catch (err) {
-        console.error('Error in admin message initialization:', err);
-      } finally {
-        loadingRef.current = false;
+        // Set messages
+        setMessages(parsedMessages);
+      } catch (error) {
+        console.error('Error in loadInitialMessages:', error);
       }
     };
     
-    fetchInitialMessages();
-  }, [conversationId, setMessages]);
-
-  const handleSendAdminMessage = useCallback((message: string) => {
-    if (!message.trim() || !conversationId) return;
+    loadInitialMessages();
+  }, [conversationId, conversationData, setMessages]);
+  
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    // Skip if no conversation ID or channel is already initialized
+    if (!conversationId || hasInitializedChannel) return;
     
-    // Ensure admin status
-    sessionStorage.setItem('isAdminSession', 'true');
-    setAdminStatus(true);
+    console.info(`Setting up realtime subscription for messages in conversation: ${conversationId} (admin view)`);
+    
+    // Clean up any existing subscription to avoid duplicate listeners
+    if (messageSubscriptionRef.current) {
+      try {
+        console.info('Cleaning up existing message subscription before creating new one');
+        supabase.removeChannel(messageSubscriptionRef.current);
+        messageSubscriptionRef.current = null;
+        cleanupAttemptedRef.current = true;
+      } catch (err) {
+        console.error('Error cleaning up message subscription:', err);
+      }
+    }
+    
+    // Generate a unique channel name to prevent conflicts
+    const channelName = `admin-messages-${conversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     
     try {
-      const notificationContent = {
-        type: "admin_notification",
-        message: message
-      };
-      
-      supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          content: notificationContent,
-          role: 'admin',
-          created_at: new Date().toISOString()
-        })
-        .then(({ error }) => {
-          if (error) {
-            console.error("Error sending admin notification:", error);
-            toast({
-              title: "Error",
-              description: "Failed to send notification to participants",
-              variant: "destructive"
-            });
-          } else {
-            toast({
-              title: "Notification sent",
-              description: "Your message has been sent to all participants",
-            });
+      const subscription = supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        }, (payload) => {
+          // Process new message
+          if (payload.new) {
+            const newMsg = payload.new;
             
-            // Force a refresh of messages after sending
-            setTimeout(() => forceRefresh(), 500);
+            // Skip if we already have this message (check by database ID)
+            const existingMsg = messages.find(m => m.id === `msg-${newMsg.id}`);
+            if (existingMsg) return;
+            
+            // Transform to our Message type
+            const message: Message = {
+              id: `msg-${newMsg.id}`,
+              content: typeof newMsg.content === 'string' ? newMsg.content : newMsg.content?.message || '',
+              sender: newMsg.role === 'user' ? 'user' : 'assistant',
+              timestamp: new Date(newMsg.created_at),
+              isAnonymous: newMsg.is_anonymous,
+              participant: newMsg.participant_id ? `P${newMsg.participant_id}` : undefined,
+              isPinned: newMsg.content?.isPinned || false,
+              isAdminMessage: newMsg.role === 'admin',
+              recipientId: newMsg.content?.recipientId
+            };
+            
+            // Add to messages state
+            setMessages(prev => [...prev, message]);
           }
+        })
+        .subscribe(status => {
+          console.info(`Admin message channel subscription status: ${status}`);
         });
       
-      sendAdminMessage(message, true);
-    } catch (error) {
-      console.error("Error in handleSendAdminMessage:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send message to participants",
-        variant: "destructive"
-      });
+      // Store the subscription ref for cleanup
+      messageSubscriptionRef.current = subscription;
+      setHasInitializedChannel(true);
+      
+    } catch (err) {
+      console.error('Error subscribing to messages:', err);
+      
+      // Mark as initialized anyway to prevent constant retries
+      setHasInitializedChannel(true);
     }
-  }, [conversationId, forceRefresh, setAdminStatus, sendAdminMessage, toast]);
-
-  const handleAdminMessage = useCallback((message: string, isPinned: boolean = false, recipientId?: string) => {
-    // Ensure admin status
-    sessionStorage.setItem('isAdminSession', 'true');
-    setAdminStatus(true);
     
-    handleSendAdminMessage(message);
-  }, [handleSendAdminMessage, setAdminStatus]);
+    // Cleanup function
+    return () => {
+      try {
+        console.info('Cleaning up message sync channel for admin');
+        logChannelStatus(messageSubscriptionRef, 'admin');
+        
+        // Only attempt cleanup if there's a valid subscription
+        if (messageSubscriptionRef.current && !cleanupAttemptedRef.current) {
+          const channel = messageSubscriptionRef.current;
+          messageSubscriptionRef.current = null; // Clear ref before removing to prevent loops
+          cleanupAttemptedRef.current = true;
+          
+          // Remove the channel
+          supabase.removeChannel(channel);
+        }
+      } catch (err) {
+        console.info('Channel error detected in admin view, will clean up and restart');
+        logChannelStatus(messageSubscriptionRef, 'admin');
+        
+        // Ensure the ref is cleared to avoid infinite recursion
+        messageSubscriptionRef.current = null;
+        cleanupAttemptedRef.current = true;
+      }
+    };
+  }, [conversationId, hasInitializedChannel, messages, setMessages]);
   
-  // Force initial refresh only once
-  useEffect(() => {
-    if (conversationId && !loadingRef.current) {
-      forceRefresh();
-    }
-  }, [conversationId, forceRefresh]);
+  // Handle sending a message as admin
+  const handleAdminMessage = useCallback((message: string, isPinned: boolean = false, recipientId?: string) => {
+    return sendAdminMessage(message, isPinned, recipientId);
+  }, [sendAdminMessage]);
+  
+  // Handle sending a quick admin message
+  const handleSendAdminMessage = useCallback((message: string) => {
+    return sendAdminMessage(message, false);
+  }, [sendAdminMessage]);
   
   return {
+    welcomeMessage,
     isSessionPaused,
     isExporting,
     toggleSessionState,
     exportSessionData,
     handleAdminMessage,
-    handleSendAdminMessage,
-    refreshMessages: forceRefresh
+    handleSendAdminMessage
   };
 }
+
+export default useAdminMessages;

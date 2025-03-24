@@ -63,10 +63,12 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   useEffect(() => {
     if (!props.currentConversationId || !props.currentUserParticipantId) return;
 
-    const channelName = `participant-events-${props.currentConversationId}-${Date.now()}`;
+    // Using a more unique channel name with current timestamp
+    // to avoid conflicts and ensure unique channels
+    const channelName = `participant-events-${props.currentConversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
     try {
-      participantEventChannelRef.current = supabase
+      const channel = supabase
         .channel(channelName)
         .on('postgres_changes', { 
           event: 'INSERT', 
@@ -107,6 +109,9 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         .subscribe();
         
       /* console.log("Subscribed to participant removal events"); */
+      
+      // Store the channel in the ref for cleanup
+      participantEventChannelRef.current = channel;
     } catch (err) {
       console.error("Error subscribing to participant events:", err);
     }
@@ -114,7 +119,12 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     return () => {
       if (participantEventChannelRef.current) {
         try {
-          supabase.removeChannel(participantEventChannelRef.current);
+          // Use a safer approach to cleanup channels
+          const channel = participantEventChannelRef.current;
+          participantEventChannelRef.current = null; // Clear the ref first
+          
+          // Then attempt to remove the channel
+          supabase.removeChannel(channel);
         } catch (err) {
           console.error("Error removing participant events channel:", err);
         }

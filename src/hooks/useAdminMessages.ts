@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message, ParticipantInfo } from '@/types/chat';
@@ -99,26 +100,52 @@ export function useAdminMessages({
         
         // Map database messages to Message type
         const parsedMessages: Message[] = dbMessages.map(msg => {
-          const messageContent = typeof msg.content === 'string' 
-            ? msg.content 
-            : typeof msg.content === 'object' && msg.content !== null && 'message' in msg.content
-              ? String(msg.content.message)
-              : '';
+          // Extract message content safely
+          let messageContent = '';
+          let isAnonymous = false;
+          let participantId: string | undefined = undefined;
+          let isPinned = false;
+          let recipientId: string | undefined = undefined;
+          
+          // Handle content based on its type
+          if (typeof msg.content === 'string') {
+            messageContent = msg.content;
+          } else if (msg.content && typeof msg.content === 'object') {
+            // Extract message from content object
+            if ('message' in msg.content && msg.content.message) {
+              messageContent = String(msg.content.message);
+            } else if ('text' in msg.content && msg.content.text) {
+              messageContent = String(msg.content.text);
+            }
+            
+            // Extract other properties
+            if ('is_anonymous' in msg.content) {
+              isAnonymous = Boolean(msg.content.is_anonymous);
+            }
+            
+            if ('participant_id' in msg.content) {
+              participantId = `P${msg.content.participant_id}`;
+            }
+            
+            if ('isPinned' in msg.content) {
+              isPinned = Boolean(msg.content.isPinned);
+            }
+            
+            if ('recipientId' in msg.content) {
+              recipientId = String(msg.content.recipientId);
+            }
+          }
           
           return {
             id: `msg-${msg.id}`,
             content: messageContent,
             sender: msg.role === 'user' ? 'user' : 'assistant',
             timestamp: new Date(msg.created_at),
-            isAnonymous: Boolean(msg.is_anonymous),
-            participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
-            isPinned: typeof msg.content === 'object' && msg.content !== null && 'isPinned' in msg.content 
-              ? Boolean(msg.content.isPinned) 
-              : false,
+            isAnonymous: isAnonymous,
+            participant: participantId,
+            isPinned: isPinned,
             isAdminMessage: msg.role === 'admin',
-            recipientId: typeof msg.content === 'object' && msg.content !== null && 'recipientId' in msg.content
-              ? String(msg.content.recipientId)
-              : undefined
+            recipientId: recipientId
           };
         });
         

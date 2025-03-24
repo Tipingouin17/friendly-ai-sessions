@@ -22,19 +22,26 @@ const MessageAvatar = ({
   isAssistant = false
 }: MessageAvatarProps) => {
   const [imageError, setImageError] = useState(false);
+  const [normalizedUrl, setNormalizedUrl] = useState<string | null>(null);
   const dimensions = {
     sm: 'h-7 w-7',
     md: 'h-8 w-8',
     lg: 'h-10 w-10'
   };
 
-  // Log avatar URL on mount for facilitator avatars only
+  // Process and normalize avatar URL on mount
   useEffect(() => {
-    if (isAssistant && avatarUrl) {
-      debugLog('all', `Facilitator avatar URL in MessageAvatar: ${avatarUrl}`);
+    if (avatarUrl) {
+      const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
+      setNormalizedUrl(processedUrl);
+      debugLog('all', `MessageAvatar - Using normalized avatar URL: ${processedUrl.substring(0, 50)}...`);
+    } else {
+      setNormalizedUrl(null);
     }
-  }, []); // Empty dependency array ensures this runs only once on mount
+    setImageError(false);
+  }, [avatarUrl]); // Re-run when avatar URL changes
 
+  // Handle anonymized avatars
   if (anonymized) {
     return (
       <Avatar className={`${dimensions[size]} bg-gray-100 avatar-container`}>
@@ -46,7 +53,7 @@ const MessageAvatar = ({
   }
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.warn(`Avatar image failed to load: ${avatarUrl}`);
+    console.warn(`Avatar image failed to load: ${normalizedUrl || avatarUrl}`);
     setImageError(true);
     handleAvatarError(e);
   };
@@ -54,14 +61,11 @@ const MessageAvatar = ({
   // Special handling for facilitator/assistant avatars
   if (isAssistant) {
     // If we have a valid avatar URL that looks like an image URL, use it
-    if (avatarUrl && avatarUrl !== '/placeholder.svg' && isImageUrl(avatarUrl) && !imageError) {
-      // Apply normalization to avatar URL
-      const cleanUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-      
+    if (normalizedUrl && normalizedUrl !== '/placeholder.svg' && isImageUrl(normalizedUrl) && !imageError) {
       return (
         <Avatar className={`${dimensions[size]} avatar-container`}>
           <AvatarImage 
-            src={cleanUrl} 
+            src={normalizedUrl} 
             alt={name || "Facilitator"} 
             onError={handleImageError}
             className="object-cover"
@@ -93,25 +97,7 @@ const MessageAvatar = ({
   ];
 
   // Default to Boring Avatar if no avatar URL or image failed to load
-  if (!avatarUrl || avatarUrl === '' || avatarUrl === '/placeholder.svg' || imageError) {
-    const avatarName = name || 'User';
-    const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
-    
-    return (
-      <div className={`overflow-hidden rounded-full ${dimensions[size]} avatar-container`} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-        <BoringAvatar
-          size={size === 'sm' ? 28 : size === 'md' ? 32 : 40}
-          name={avatarName}
-          variant="beam"
-          colors={AVATAR_PALETTES[paletteIndex]}
-          square={false}
-        />
-      </div>
-    );
-  }
-
-  // Special case for API-generated avatars
-  if (avatarUrl?.startsWith('/api/avatar') || avatarUrl?.includes('api.qrserver.com')) {
+  if (!normalizedUrl || normalizedUrl === '/placeholder.svg' || imageError) {
     const avatarName = name || 'User';
     const paletteIndex = Math.abs(avatarName.charCodeAt(0) % AVATAR_PALETTES.length);
     
@@ -132,7 +118,7 @@ const MessageAvatar = ({
   return (
     <Avatar className={`${dimensions[size]} avatar-container`}>
       <AvatarImage 
-        src={avatarUrl} 
+        src={normalizedUrl} 
         alt={name} 
         onError={handleImageError}
         className="object-cover"

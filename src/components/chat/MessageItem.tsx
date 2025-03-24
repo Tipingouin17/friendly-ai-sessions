@@ -23,10 +23,10 @@ const MessageItem = ({
   participantInfo,
   isMobile = false
 }: MessageItemProps) => {
-  // Log avatar usage only once on first render (for debugging)
+  // Log avatar usage for debugging
   React.useEffect(() => {
-    if (message.sender === "assistant" && isFirstMessageOfGroup) {
-      debugLog('all', `MessageItem - assistant message with avatar: ${message.avatar?.substring(0, 30)}...`);
+    if (message.sender === "assistant" && isFirstMessageOfGroup && message.avatar) {
+      debugLog('all', `MessageItem - assistant message with avatar: ${message.avatar}`);
     }
   }, []); 
 

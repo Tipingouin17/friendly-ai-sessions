@@ -1,10 +1,10 @@
+
 import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
-import { nanoid } from "nanoid";
-import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { useMessageSaver } from "./messageSender/useMessageSaver";
+import { useFacilitatorResponse } from "./messageSender/useFacilitatorResponse";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -36,14 +36,21 @@ export const useMessageSender = ({
   const { toast } = useToast();
   const requestInProgressRef = useRef(false);
   
+  // Import our helper hooks
+  const { saveUserMessage } = useMessageSaver();
+  const { requestFacilitatorResponse } = useFacilitatorResponse();
+  
   const handleSendMessage = useCallback(async () => {
+    // Prevent duplicate sends
     if (requestInProgressRef.current || isWaitingForResponse) {
       console.log("Request already in progress, ignoring duplicate send");
       return;
     }
     
+    // Block sending in admin mode
     if (sessionState.viewMode === "admin") return;
     
+    // Don't send empty messages
     if (!sessionState.inputMessage.trim() || !currentConversationId) return;
 
     const currentParticipant = sessionState.currentParticipant;
@@ -60,45 +67,25 @@ export const useMessageSender = ({
     try {
       requestInProgressRef.current = true;
       
-      const messageId = nanoid();
-      const newMessage = {
-        id: messageId,
-        content: sessionState.inputMessage,
-        sender: "user" as const,
-        participant: currentParticipantKey,
-        timestamp: new Date(),
-        color: participantColors[currentParticipantKey] || "#CCCCCC",
-        avatar: participantInfo?.avatar,
-        isAnonymous: isAnonymous
-      };
+      // Save user message
+      const newMessage = await saveUserMessage({
+        message: sessionState.inputMessage,
+        currentConversationId,
+        currentParticipant,
+        participantInfo,
+        isAnonymous,
+        color: participantColors[currentParticipantKey] || "#CCCCCC"
+      });
 
-      console.log("Adding new message to UI:", newMessage);
-
+      // Update UI
       sessionState.setMessages(prev => [...prev, newMessage]);
       const sentMessage = sessionState.inputMessage;
       sessionState.setInputMessage("");
       
+      // Record that this participant has responded
       sessionState.recordResponse(currentParticipant, true);
       
-      const { data, error: dbError } = await supabase.from('messages').insert({
-        conversation_id: currentConversationId,
-        content: {
-          text: sentMessage,
-          participant_id: currentParticipant,
-          name: participantInfo?.name || `Participant ${currentParticipant}`,
-          is_anonymous: isAnonymous
-        },
-        role: 'user',
-        name: participantInfo?.name || `Participant ${currentParticipant}`
-      }).select();
-      
-      if (dbError) {
-        console.error("Error saving message to database:", dbError);
-        throw new Error(dbError.message);
-      }
-      
-      console.log("Message saved to database:", data);
-      
+      // Check if we need a facilitator response
       const totalParticipants = conversation?.participants ?? 1;
       const updatedTotalResponses = sessionState.totalResponses + 1;
       
@@ -111,90 +98,15 @@ export const useMessageSender = ({
         setIsWaitingForResponse(true);
 
         try {
-          console.log('Calling edge function for facilitator response');
-
-          const response = await supabase.functions.invoke('handle-facilitator-response', {
-            body: {
-              messages: sessionState.messages,
-              conversationId: currentConversationId
-            }
-          });
-
-          if (response.error) {
-            console.error('Error from edge function:', response.error);
-            throw new Error(response.error.message || 'Failed to get AI response');
-          }
+          // Get facilitator response
+          const aiResponse = await requestFacilitatorResponse(
+            currentConversationId, 
+            sessionState.messages,
+            conversation
+          );
           
-          if (!response.data) {
-            console.error('No response data received from AI');
-            throw new Error('No response data received from AI');
-          }
-
-          let avatarUrl = conversation?.sessions?.facilitator_details?.profile_picture;
-          
-          if (!avatarUrl && response.data.avatar) {
-            avatarUrl = response.data.avatar;
-            console.log('Using avatar URL from AI response:', avatarUrl);
-          }
-          
-          if (!avatarUrl && conversation?.sessions?.facilitator_details) {
-            if (conversation.sessions.facilitator_details.id) {
-              avatarUrl = await getFacilitatorAvatarUrl(conversation.sessions.facilitator_details);
-              console.log('Using facilitator profile from conversation with ID:', avatarUrl);
-            } else {
-              let picUrl = conversation.sessions.facilitator_details.profile_picture;
-              if (picUrl && typeof picUrl === 'string') {
-                picUrl = picUrl.replace(/([^:])\/\//g, '$1/');
-              }
-              avatarUrl = await getFacilitatorAvatarUrl({
-                profile_picture: picUrl,
-                title: conversation.sessions.facilitator_details.title
-              });
-              console.log('Using facilitator profile from conversation:', avatarUrl);
-            }
-          }
-
-          if (avatarUrl && typeof avatarUrl === 'string') {
-            avatarUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
-          }
-
-          const aiResponse = {
-            id: response.data.id || nanoid(),
-            content: response.data.content,
-            sender: "assistant" as const,
-            timestamp: new Date(),
-            avatar: avatarUrl
-          };
-          
-          console.log("Got AI response with avatar:", aiResponse.avatar);
-          
-          try {
-            await supabase.from('messages').insert({
-              conversation_id: currentConversationId,
-              content: {
-                text: aiResponse.content,
-                avatar: avatarUrl
-              },
-              role: 'assistant',
-              user_id: null
-            });
-            
-            console.log("AI response saved to database with avatar");
-            
-            sessionState.setMessages(prev => [...prev, aiResponse]);
-          } catch (error) {
-            console.error("Error saving AI response to database:", error);
-            setError("Failed to save AI response. Please try again.");
-          }
-        } catch (error) {
-          console.error('Error getting AI response:', error);
-          const errorMessage = error instanceof Error ? error.message : "Failed to get facilitator's response. Please try again.";
-          setError(errorMessage);
-          toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
+          // Add AI response to UI
+          sessionState.setMessages(prev => [...prev, aiResponse]);
         } finally {
           setIsWaitingForResponse(false);
         }
@@ -219,7 +131,9 @@ export const useMessageSender = ({
     conversation?.participants,
     conversation?.sessions?.facilitator_details?.profile_picture,
     conversation?.sessions?.facilitator_details?.id,
-    toast
+    toast,
+    saveUserMessage,
+    requestFacilitatorResponse
   ]);
 
   return {

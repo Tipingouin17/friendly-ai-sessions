@@ -1,8 +1,12 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import { getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
+import { resolveFacilitatorAvatar } from '@/utils/avatarUtils';
+import { debugLog } from '@/utils/debugLogger';
+import { isInCrossOriginContext } from '@/utils/crossOriginUtils';
 
 const WELCOME_MESSAGE_DELAY = 500;
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
@@ -69,15 +73,33 @@ export const useSessionMessages = ({
     }
   }, [conversationId]);
   
+  // Process a facilitator avatar URL to ensure it's properly formatted
+  const processFacilitatorAvatar = useCallback((avatarUrl: string | undefined): string => {
+    if (!avatarUrl || avatarUrl === '/placeholder.svg') {
+      return `/api/avatar?name=Facilitator&variant=beam&palette=2`;
+    }
+    
+    // Normalize URLs with double slashes
+    let processedUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
+    
+    // Add crossorigin parameter if needed
+    if (isInCrossOriginContext() && !processedUrl.includes('crossorigin=anonymous')) {
+      processedUrl += (processedUrl.includes('?') ? '&' : '?') + 'crossorigin=anonymous';
+    }
+    
+    debugLog('all', `Processed facilitator avatar: ${processedUrl}`);
+    return processedUrl;
+  }, []);
+  
   useEffect(() => {
     if (!conversationId) {
-      console.log('No conversation ID provided, skipping message fetch');
+      debugLog('all', 'No conversation ID provided, skipping message fetch');
       return;
     }
     
     const fetchMessages = async () => {
       try {
-        console.log('Fetching messages for conversation:', conversationId);
+        debugLog('all', `Fetching messages for conversation: ${conversationId}`);
         
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         
@@ -95,16 +117,21 @@ export const useSessionMessages = ({
         
         if (!data || data.length === 0) {
           if (cachedWelcomeMsg) {
-            console.log('Using cached welcome message');
+            debugLog('all', 'Using cached welcome message');
             setMessages([cachedWelcomeMsg]);
             return;
           }
           
           if (welcomeMessage) {
-            console.log('Adding welcome message to messages list');
+            debugLog('all', 'Adding welcome message to messages list');
+            
+            // Get the facilitator avatar URL
             const facilitatorAvatarUrl = await getFacilitatorAvatarUrl({
               title: 'Facilitator'
             });
+            
+            // Process the URL to ensure it's correctly formatted
+            const processedAvatarUrl = processFacilitatorAvatar(facilitatorAvatarUrl);
             
             const welcomeMsg: Message = {
               id: 'welcome',
@@ -112,13 +139,14 @@ export const useSessionMessages = ({
               sender: 'assistant',
               timestamp: new Date(),
               created_at: new Date().toISOString(),
-              avatar: facilitatorAvatarUrl
+              avatar: processedAvatarUrl
             };
+            
             setMessages([welcomeMsg]);
             cacheWelcomeMessage(welcomeMsg);
             
             if (isAdmin) {
-              console.log('Admin: Adding welcome message to database for other clients');
+              debugLog('all', 'Admin: Adding welcome message to database for other clients');
               try {
                 const { error } = await supabase
                   .from('messages')
@@ -126,7 +154,7 @@ export const useSessionMessages = ({
                     conversation_id: conversationId,
                     content: { 
                       text: welcomeMessage,
-                      avatar: facilitatorAvatarUrl
+                      avatar: processedAvatarUrl
                     },
                     role: 'assistant',
                     created_at: new Date().toISOString()
@@ -143,7 +171,8 @@ export const useSessionMessages = ({
           return;
         }
         
-        const formattedMessages = await Promise.all(data.map(async msg => {
+        // Process messages with async processing
+        const formattedMessagesPromises = data.map(async msg => {
           let messageContent = '';
           let participantId: string | undefined = undefined;
           let likesArray: string[] = [];
@@ -172,7 +201,7 @@ export const useSessionMessages = ({
             
             if ('avatar' in contentObj && contentObj.avatar) {
               avatarUrl = contentObj.avatar as string;
-              console.log('Found avatar in message content:', avatarUrl);
+              debugLog('all', `Found avatar in message content: ${avatarUrl}`);
             }
             
             isReport = 'is_report' in contentObj ? Boolean(contentObj.is_report) : false;
@@ -181,12 +210,18 @@ export const useSessionMessages = ({
           
           const color = participantId ? getParticipantColor(participantId) : undefined;
           
+          // Handle facilitator avatar for assistant messages
           if (msg.role === 'assistant') {
             if (!avatarUrl) {
               avatarUrl = await getFacilitatorAvatarUrl({
                 title: 'Facilitator'
               });
-              console.log('Generated facilitator avatar URL:', avatarUrl);
+              debugLog('all', `Generated facilitator avatar URL: ${avatarUrl}`);
+            }
+            
+            // Ensure avatar URL is properly formatted
+            if (avatarUrl) {
+              avatarUrl = processFacilitatorAvatar(avatarUrl);
             }
           }
           
@@ -203,10 +238,14 @@ export const useSessionMessages = ({
             isAnonymous,
             avatar: avatarUrl
           } as Message;
-        }));
+        });
         
-        console.log('Successfully fetched messages:', formattedMessages.length);
+        // Wait for all message processing to complete
+        const formattedMessages = await Promise.all(formattedMessagesPromises);
         
+        debugLog('all', `Successfully fetched messages: ${formattedMessages.length}`);
+        
+        // Determine if we need to include the cached welcome message
         const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
         if (cachedWelcomeMsg && !hasAssistantMessage && welcomeMessage) {
           setMessages([cachedWelcomeMsg, ...formattedMessages]);
@@ -220,7 +259,7 @@ export const useSessionMessages = ({
     };
 
     fetchMessages();
-  }, [conversationId, welcomeMessage, getCachedWelcomeMessage, cacheWelcomeMessage, isAdmin]);
+  }, [conversationId, welcomeMessage, getCachedWelcomeMessage, cacheWelcomeMessage, isAdmin, processFacilitatorAvatar]);
   
   return {
     messages,
@@ -234,3 +273,4 @@ export const useSessionMessages = ({
     setViewMode
   };
 };
+

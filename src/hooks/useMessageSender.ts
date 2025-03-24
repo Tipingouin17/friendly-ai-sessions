@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -131,20 +130,18 @@ export const useMessageSender = ({
             throw new Error('No response data received from AI');
           }
 
-          let avatarUrl = response.data.avatar;
-          console.log('Avatar URL from response:', avatarUrl);
+          let avatarUrl = conversation?.sessions?.facilitator_details?.profile_picture;
           
-          // Normalize avatar URL to avoid double slashes
-          if (avatarUrl && typeof avatarUrl === 'string') {
-            avatarUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
+          if (!avatarUrl && response.data.avatar) {
+            avatarUrl = response.data.avatar;
+            console.log('Using avatar URL from AI response:', avatarUrl);
           }
           
-          if (!avatarUrl && conversation?.sessions?.facilitator_details?.profile_picture) {
+          if (!avatarUrl && conversation?.sessions?.facilitator_details) {
             if (conversation.sessions.facilitator_details.id) {
               avatarUrl = await getFacilitatorAvatarUrl(conversation.sessions.facilitator_details);
               console.log('Using facilitator profile from conversation with ID:', avatarUrl);
             } else {
-              // Normalize the URL right away to avoid issues later
               let picUrl = conversation.sessions.facilitator_details.profile_picture;
               if (picUrl && typeof picUrl === 'string') {
                 picUrl = picUrl.replace(/([^:])\/\//g, '$1/');
@@ -155,6 +152,10 @@ export const useMessageSender = ({
               });
               console.log('Using facilitator profile from conversation:', avatarUrl);
             }
+          }
+
+          if (avatarUrl && typeof avatarUrl === 'string') {
+            avatarUrl = avatarUrl.replace(/([^:])\/\//g, '$1/');
           }
 
           const aiResponse = {

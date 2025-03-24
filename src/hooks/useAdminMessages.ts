@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
@@ -51,6 +50,40 @@ export function useAdminMessages({
         try {
           console.log('Admin: Fetching initial messages for conversation:', conversationId);
           
+          // First, check if there's a welcome message in the conversation data
+          const { data: conversationData, error: convError } = await supabase
+            .from('conversations')
+            .select(`
+              sessions!conversations_sessions_id_fkey (
+                welcome_message
+              )
+            `)
+            .eq('id', conversationId)
+            .maybeSingle();
+          
+          if (!convError && conversationData?.sessions?.welcome_message) {
+            const welcomeMessage = conversationData.sessions.welcome_message;
+            console.log('Admin: Found welcome message:', welcomeMessage.substring(0, 50) + '...');
+            
+            // Add welcome message to the message list first
+            const welcomeMsg: Message = {
+              id: 'welcome-' + Date.now(),
+              content: welcomeMessage,
+              sender: 'assistant',
+              timestamp: new Date(),
+              avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
+            };
+            
+            setMessages(prev => {
+              // Only add if not already present
+              if (!prev.some(m => m.content === welcomeMessage && m.sender === 'assistant')) {
+                return [welcomeMsg];
+              }
+              return prev;
+            });
+          }
+          
+          // Then fetch all messages
           const { data, error } = await supabase
             .from('messages')
             .select('*')
@@ -99,12 +132,20 @@ export function useAdminMessages({
               sender: msg.role === 'assistant' ? 'assistant' : 'user',
               participant: participantId,
               timestamp: new Date(msg.created_at),
-              isAnonymous
+              isAnonymous,
+              avatar: msg.role === 'assistant' ? '/api/avatar?name=Facilitator&variant=beam&palette=2' : undefined
             } as Message;
           });
           
           console.log('Admin: Loaded initial messages:', formattedMessages.length);
-          setMessages(formattedMessages);
+          
+          // Combine with any welcome message we already added
+          setMessages(prev => {
+            const welcomeMessages = prev.filter(m => m.id.startsWith('welcome-'));
+            
+            // Add welcome messages first, then the rest
+            return [...welcomeMessages, ...formattedMessages];
+          });
         } catch (err) {
           console.error('Error in admin message initialization:', err);
         }

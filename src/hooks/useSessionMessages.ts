@@ -4,7 +4,7 @@ import { Message } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import { normalizeFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 
-const WELCOME_MESSAGE_DELAY = 700; // Reduced delay to show welcome message faster
+const WELCOME_MESSAGE_DELAY = 500; // Reduced delay to show welcome message faster
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
 
 interface UseSessionMessagesProps {
@@ -101,18 +101,37 @@ export const useSessionMessages = ({
           }
           
           if (welcomeMessage) {
-            setTimeout(() => {
-              const welcomeMsg: Message = {
-                id: 'welcome',
-                content: welcomeMessage,
-                sender: 'assistant',
-                timestamp: new Date(),
-                created_at: new Date().toISOString(),
-                avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
-              };
-              setMessages([welcomeMsg]);
-              cacheWelcomeMessage(welcomeMsg);
-            }, WELCOME_MESSAGE_DELAY);
+            console.log('Adding welcome message to messages list');
+            const welcomeMsg: Message = {
+              id: 'welcome',
+              content: welcomeMessage,
+              sender: 'assistant',
+              timestamp: new Date(),
+              created_at: new Date().toISOString(),
+              avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
+            };
+            setMessages([welcomeMsg]);
+            cacheWelcomeMessage(welcomeMsg);
+            
+            if (isAdmin) {
+              console.log('Admin: Adding welcome message to database for other clients');
+              try {
+                const { error } = await supabase
+                  .from('messages')
+                  .insert({
+                    conversation_id: conversationId,
+                    content: { text: welcomeMessage },
+                    role: 'assistant',
+                    created_at: new Date().toISOString()
+                  });
+                  
+                if (error) {
+                  console.error('Error saving welcome message to database:', error);
+                }
+              } catch (err) {
+                console.error('Exception saving welcome message:', err);
+              }
+            }
           }
           return;
         }
@@ -194,7 +213,7 @@ export const useSessionMessages = ({
     };
 
     fetchMessages();
-  }, [conversationId, welcomeMessage, getCachedWelcomeMessage, cacheWelcomeMessage]);
+  }, [conversationId, welcomeMessage, getCachedWelcomeMessage, cacheWelcomeMessage, isAdmin]);
   
   return {
     messages,

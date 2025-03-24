@@ -39,7 +39,7 @@ const SessionHeader = ({
         if (facilitator) {
           // Use the improved avatar URL resolution
           const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-          debugLog('all', `Loaded facilitator avatar in header: ${avatarUrl.substring(0, 50)}...`);
+          debugLog('all', `Loaded facilitator avatar in header: ${avatarUrl}`);
           setProfilePicture(avatarUrl);
         } else {
           setProfilePicture('/placeholder.svg');
@@ -54,6 +54,12 @@ const SessionHeader = ({
     
     loadProfilePicture();
   }, [facilitator]);
+
+  // Log the props for debugging
+  useEffect(() => {
+    debugLog('all', `SessionHeader rendered with facilitator: ${JSON.stringify(facilitator || {})}`);
+    debugLog('all', `SessionHeader viewMode: ${viewMode}, messagesCount: ${messagesCount}`);
+  }, [facilitator, viewMode, messagesCount]);
 
   return (
     <ChatHeader 

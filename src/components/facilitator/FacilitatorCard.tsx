@@ -1,7 +1,7 @@
 
 import { Facilitator } from "@/types/facilitator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { handleAvatarError, normalizeFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
+import { handleAvatarError } from "@/utils/facilitatorUtils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect } from "react";
 import { debugLog } from "@/utils/debugLogger";
@@ -22,21 +22,14 @@ export const FacilitatorCard = ({
   isLoading = false
 }: FacilitatorCardProps) => {
   const [imageLoading, setImageLoading] = useState(true);
-  const [normalizedUrl, setNormalizedUrl] = useState<string>('');
-  
-  useEffect(() => {
-    // Process the avatar URL on mount
-    if (avatarUrl) {
-      const processedUrl = normalizeFacilitatorAvatarUrl(avatarUrl);
-      setNormalizedUrl(processedUrl);
-      debugLog('all', `FacilitatorCard - Using normalized avatar URL: ${processedUrl.substring(0, 50)}...`);
-    } else {
-      setNormalizedUrl('/placeholder.svg');
-    }
-  }, [avatarUrl]);
   
   // Display a placeholder if the URL is empty
-  const displayUrl = normalizedUrl || '/placeholder.svg';
+  const displayUrl = avatarUrl || '/placeholder.svg';
+  
+  // Add debugging to see what URLs we're getting
+  useEffect(() => {
+    debugLog('all', `FacilitatorCard - Displaying avatar for ${facilitator.title}: ${displayUrl}`);
+  }, [displayUrl, facilitator.title]);
   
   return (
     <div
@@ -57,6 +50,7 @@ export const FacilitatorCard = ({
             onError={handleAvatarError}
             onLoad={() => setImageLoading(false)}
             className="h-full w-full object-cover"
+            crossOrigin="anonymous"
           />
           <AvatarFallback delayMs={600}>
             {facilitator.title?.charAt(0) || 'F'}

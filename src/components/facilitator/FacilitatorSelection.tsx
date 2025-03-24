@@ -53,36 +53,52 @@ export const FacilitatorSelection = ({
       const imageMap: Record<number, string> = {};
       
       try {
-        debugLog('participants', `Loading images for ${facilitators.length} facilitators`);
+        debugLog('all', `Loading images for ${facilitators.length} facilitators`);
+        console.log('Loading facilitator images for:', facilitators);
         
-        // Create an array of promises to load all images concurrently
-        const imagePromises = facilitators.map(async (facilitator) => {
-          if (facilitator.id) {
-            try {
-              // Try to get the avatar URL using the centralized function
-              const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-              return { id: facilitator.id, url: avatarUrl };
-            } catch (error) {
-              console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
-              return { id: facilitator.id, url: '/placeholder.svg' };
+        // First priority: Use direct profile_picture URLs for public uploads
+        facilitators.forEach(facilitator => {
+          if (facilitator.id && facilitator.profile_picture && facilitator.profile_picture.startsWith('/lovable-uploads/')) {
+            imageMap[facilitator.id] = facilitator.profile_picture;
+            debugLog('all', `Using direct profile_picture for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
+          }
+        });
+        
+        // Second priority: Load any remaining images that need processing
+        const remainingFacilitators = facilitators.filter(f => 
+          f.id && !imageMap[f.id]
+        );
+        
+        if (remainingFacilitators.length > 0) {
+          // Create an array of promises to load all images concurrently
+          const imagePromises = remainingFacilitators.map(async (facilitator) => {
+            if (facilitator.id) {
+              try {
+                // Try to get the avatar URL using the centralized function
+                const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
+                return { id: facilitator.id, url: avatarUrl };
+              } catch (error) {
+                console.error(`Error loading avatar for facilitator ${facilitator.id}:`, error);
+                return { id: facilitator.id, url: '/placeholder.svg' };
+              }
             }
-          }
-          return null;
-        });
-        
-        // Wait for all images to load (or fail)
-        const results = await Promise.all(imagePromises.filter(Boolean));
-        
-        // Process results into the image map
-        results.forEach(result => {
-          if (result && result.id) {
-            imageMap[result.id] = result.url;
-            debugLog('participants', `Loaded avatar for facilitator ${result.id}: ${result.url}`);
-          }
-        });
+            return null;
+          });
+          
+          // Wait for all images to load (or fail)
+          const results = await Promise.all(imagePromises.filter(Boolean));
+          
+          // Process results into the image map
+          results.forEach(result => {
+            if (result && result.id) {
+              imageMap[result.id] = result.url;
+              debugLog('all', `Loaded avatar for facilitator ${result.id}: ${result.url}`);
+            }
+          });
+        }
         
         setFacilitatorImages(imageMap);
-        debugLog('participants', 'Finished loading facilitator images', imageMap);
+        console.log('Finished loading facilitator images:', imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
         toast({
@@ -101,6 +117,19 @@ export const FacilitatorSelection = ({
       setLoadingImages(false);
     }
   }, [facilitators, toast]);
+
+  useEffect(() => {
+    // Debug log all facilitators and their profile_picture values
+    if (facilitators && facilitators.length > 0) {
+      console.log('Facilitator data with profile pictures:', 
+        facilitators.map(f => ({
+          id: f.id,
+          title: f.title,
+          profile_picture: f.profile_picture
+        }))
+      );
+    }
+  }, [facilitators]);
 
   if (isLoading) {
     return (

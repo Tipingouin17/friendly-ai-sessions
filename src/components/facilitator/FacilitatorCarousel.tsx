@@ -1,4 +1,3 @@
-
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";
@@ -32,7 +31,6 @@ export const FacilitatorCarousel = ({
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 4;
   
-  // Adjust startIndex if needed when the facilitators list changes
   useEffect(() => {
     if (startIndex > 0 && startIndex >= facilitators.length - itemsToShow) {
       setStartIndex(Math.max(0, facilitators.length - itemsToShow));
@@ -49,6 +47,11 @@ export const FacilitatorCarousel = ({
 
   const getAvatarUrl = (facilitator: Facilitator) => {
     if (!facilitator.id) return '/placeholder.svg';
+    
+    if (facilitator.profile_picture && facilitator.profile_picture.startsWith('/lovable-uploads/')) {
+      return facilitator.profile_picture;
+    }
+    
     return facilitator.id && facilitatorImages[facilitator.id] 
       ? facilitatorImages[facilitator.id] 
       : '/placeholder.svg';

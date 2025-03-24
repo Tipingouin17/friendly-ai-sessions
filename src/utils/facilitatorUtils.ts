@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
 
@@ -14,10 +15,16 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   try {
     debugLog('all', `Getting avatar for facilitator: ${JSON.stringify(facilitator)}`);
     
-    // Case 1: If profile_picture exists and appears to be a valid URL, use it directly
+    // Case 1: If profile_picture exists and appears to be a valid path, use it directly
     if (facilitator.profile_picture) {
       debugLog('all', `Using facilitator profile picture: ${facilitator.profile_picture}`);
-      // Apply URL normalization to ensure consistency
+      
+      // Check if it's a relative path to a public file
+      if (facilitator.profile_picture.startsWith('/lovable-uploads/')) {
+        return facilitator.profile_picture; // Return as-is, these are in public folder
+      }
+      
+      // Apply URL normalization for other cases
       return normalizeFacilitatorAvatarUrl(facilitator.profile_picture);
     }
     
@@ -73,6 +80,11 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
   try {
     debugLog('all', `Normalizing facilitator URL: ${url}`);
     
+    // Handle direct paths to public folder
+    if (url.startsWith('/lovable-uploads/')) {
+      return url; // These are already in the correct format
+    }
+    
     // Handle placeholder URLs explicitly
     if (url === '/placeholder.svg' || url.includes('placeholder')) {
       return '/placeholder.svg';
@@ -87,14 +99,6 @@ export const normalizeFacilitatorAvatarUrl = (url: string): string => {
     if (typeof window !== 'undefined' && url.startsWith(window.location.origin)) {
       // For URLs on the same domain, we can use them directly
       return url;
-    }
-    
-    // If URL already contains the Supabase storage path, it's likely correct
-    // but may need CORS handling
-    if (url.includes('supabase.co/storage/v1/object/public/facilitator-avatars')) {
-      // Ensure CORS is properly handled by removing any cache-busting parameters
-      const cleanUrl = url.split('?')[0]; // Remove any query parameters that might cause caching issues
-      return cleanUrl;
     }
     
     // Fix incorrect bucket name if present (facilitators-avatars → facilitator-avatars)
@@ -148,6 +152,9 @@ export const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>): vo
  */
 export const isImageUrl = (url: string): boolean => {
   if (!url) return false;
+  
+  // First, check if it's a direct path to public images
+  if (url.startsWith('/lovable-uploads/')) return true;
   
   // Check for Supabase storage URLs which are definitely images
   if (url.includes('supabase.co/storage/v1/object/public/facilitator-avatars')) return true;

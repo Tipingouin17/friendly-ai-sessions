@@ -119,14 +119,15 @@ export const useConversation = (conversationId: number | null) => {
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: true,
-    refetchInterval: (data) => {
+    refetchInterval: (queryData) => {
       // Only poll every 30 seconds for active admin sessions
       const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
       
-      // Fix: The data parameter here is the actual ConversationWithSession object,
-      // not the query result, so we should access the properties directly
-      if (data) {
-        const isActive = data.status === 'active' && !data.is_session_ended;
+      // Properly access the data from the query object using queryData.data
+      const conversationData = queryData.data;
+      
+      if (conversationData) {
+        const isActive = conversationData.status === 'active' && !conversationData.is_session_ended;
         
         if (isAdmin && isActive) {
           return 30000; // 30 seconds for active admin sessions

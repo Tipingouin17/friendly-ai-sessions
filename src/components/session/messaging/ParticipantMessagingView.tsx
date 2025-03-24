@@ -63,6 +63,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const isMobileDevice = useIsMobile();
   
   // Filter messages for this participant using the messageProcessor hook
+  // The hook is now guaranteed to return Message[] type
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant", // Force participant view mode to ensure filtering

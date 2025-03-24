@@ -62,7 +62,11 @@ export const useMessageProcessor = ({
       );
     }
 
-    // For admin mode, group messages
-    return groupMessages(processedMessages, "", true);
+    // For admin mode, we need to flatten the grouped messages
+    // instead of returning the groups directly
+    const groupedMessages = groupMessages(processedMessages, "", true);
+    
+    // Return processed messages directly instead of groups
+    return processedMessages;
   }, [messages, viewMode, participants, participantNames, currentParticipant, processMessageAvatar, groupMessages]);
 };

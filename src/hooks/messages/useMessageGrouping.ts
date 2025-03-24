@@ -1,7 +1,7 @@
 
 import { Message } from "@/types/chat";
 
-interface MessageGroup {
+export interface MessageGroup {
   question: Message;
   responses: Message[];
 }

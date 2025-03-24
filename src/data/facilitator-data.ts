@@ -1,4 +1,3 @@
-
 import { Facilitator, Workshop } from "../types/facilitator";
 
 export const facilitators: Facilitator[] = [

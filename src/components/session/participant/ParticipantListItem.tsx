@@ -67,7 +67,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            {participant.isAnonymous && <Badge variant="outline" size="sm" className="text-[10px] h-4 px-1">Anonymous</Badge>}
+            {participant.isAnonymous && <Badge variant="outline" className="text-[10px] h-4 px-1">Anonymous</Badge>}
             
             {messageCount > 0 && (
               <div className="flex items-center gap-0.5">

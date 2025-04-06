@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import AdminMessageFilters from './AdminMessageFilters';
@@ -16,7 +15,7 @@ interface AdminMessagingViewProps {
   setSearchTerm?: (term: string) => void;
   showAnonymous?: boolean;
   setShowAnonymous?: (show: boolean) => void;
-  participants?: ParticipantInfo[]; // Add this prop to the interface
+  participants?: ParticipantInfo[]; 
 }
 
 const AdminMessageView: React.FC<AdminMessagingViewProps> = ({

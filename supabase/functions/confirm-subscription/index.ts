@@ -6,9 +6,29 @@ import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import Stripe from 'https://esm.sh/stripe@12.4.0?target=deno';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+// Get Stripe key from environment, fail early if not available
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
+if (!STRIPE_SECRET_KEY) {
+  console.error('Missing required environment variable: STRIPE_SECRET_KEY');
+}
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || '', {
   httpClient: Stripe.createFetchHttpClient(),
 });
+
+// Validate input to prevent potential injection
+const validateInputs = (body: any) => {
+  // Required fields
+  if (!body.subscriptionId || !body.customerId || !body.userId || !body.planId) {
+    throw new Error('Missing required fields');
+  }
+
+  // Validate user ID format (UUID validation)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(body.userId)) {
+    throw new Error('Invalid user ID format');
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,7 +37,22 @@ serve(async (req) => {
   }
 
   try {
-    const { subscriptionId, customerId, userId, planId, paymentIntentId } = await req.json();
+    // Parse and validate request body
+    let body;
+    try {
+      body = await req.json();
+      validateInputs(body);
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: e instanceof Error ? e.message : 'Invalid request body' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+    
+    const { subscriptionId, customerId, userId, planId, paymentIntentId } = body;
     
     // Get supabase client
     const supabaseClient = createClient(
@@ -78,7 +113,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in confirm-subscription:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

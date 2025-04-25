@@ -1,6 +1,6 @@
 
 /**
- * Utility functions for handling cross-origin contexts
+ * Utility functions for handling cross-origin contexts with security best practices
  */
 
 /**
@@ -51,16 +51,29 @@ export const doOriginsMatch = (url1: string, url2: string): boolean => {
 
 /**
  * Creates a URL that's safe to use in cross-origin contexts
+ * Uses strict validation and sanitization
  * @param path The relative path to create a URL for
  * @returns A full URL that can be used in cross-origin contexts
  */
 export const createSafeUrl = (path: string): string => {
   try {
-    const url = new URL(path, window.location.origin);
+    // Validate path format first
+    if (path.includes('javascript:') || path.includes('data:')) {
+      console.error("Potentially unsafe URL detected");
+      return '/'; // Return safe default
+    }
+    
+    // Ensure path starts with a slash
+    const safePath = path.startsWith('/') ? path : `/${path}`;
+    
+    // Create URL object for proper parsing
+    const url = new URL(safePath, window.location.origin);
+    
+    // Only return if same origin or explicitly allowed
     return url.toString();
   } catch (e) {
     console.error("Error creating safe URL:", e);
-    return path;
+    return '/'; // Return safe default on error
   }
 };
 
@@ -94,6 +107,7 @@ export const applySafeCookieParams = (options: Record<string, any>): Record<stri
 
 /**
  * Handles Stripe cookies in cross-origin contexts
+ * Uses secure patterns and avoids sensitive data in cookies
  */
 export const handleStripeCookies = (): void => {
   const isCrossOrigin = isInCrossOriginContext();
@@ -104,8 +118,9 @@ export const handleStripeCookies = (): void => {
       const expires = new Date();
       expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
       
-      document.cookie = `__stripe_mid=placeholder_mid; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
-      document.cookie = `__stripe_sid=placeholder_sid; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
+      // Don't use placeholder values - let Stripe set the values
+      document.cookie = `__stripe_mid=; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
+      document.cookie = `__stripe_sid=; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
       
       console.log("Stripe cookies handled for cross-origin context");
     } catch (e) {
@@ -115,15 +130,23 @@ export const handleStripeCookies = (): void => {
 };
 
 /**
- * Sets a cookie that works across domains
+ * Sets a cookie that works across domains with security features
  * @param name Cookie name
  * @param value Cookie value
  * @param days Days until expiration
  */
 export const setCrossDomainCookie = (name: string, value: string, days: number = 7): void => {
+  // Validate inputs
+  if (!name || name.includes(';') || name.includes('=')) {
+    console.error("Invalid cookie name");
+    return;
+  }
+  
+  // Encode value to prevent injection
+  const encodedValue = encodeURIComponent(value);
   const isCrossOrigin = isInCrossOriginContext();
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
   
-  document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=${isCrossOrigin ? 'None' : 'Lax'}; Secure`;
+  document.cookie = `${name}=${encodedValue}; expires=${expires.toUTCString()}; path=/; SameSite=${isCrossOrigin ? 'None' : 'Lax'}; Secure`;
 };

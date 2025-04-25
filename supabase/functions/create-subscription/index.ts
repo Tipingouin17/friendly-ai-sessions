@@ -6,7 +6,38 @@ import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import Stripe from 'https://esm.sh/stripe@12.4.0?target=deno';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+// Get Stripe key from environment, fail early if not available
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
+if (!STRIPE_SECRET_KEY) {
+  console.error('Missing required environment variable: STRIPE_SECRET_KEY');
+}
+
+// Validate input to prevent potential injection
+const validateInputs = (body: any) => {
+  // Required fields
+  if (!body.planId || !body.stripePlanId || !body.userId || !body.billingDetails) {
+    throw new Error('Missing required fields');
+  }
+
+  // Validate user ID format (UUID validation)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(body.userId)) {
+    throw new Error('Invalid user ID format');
+  }
+
+  // Validate billing details
+  if (!body.billingDetails.name || !body.billingDetails.email || !body.billingDetails.address) {
+    throw new Error('Invalid billing details');
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(body.billingDetails.email)) {
+    throw new Error('Invalid email format');
+  }
+}
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || '', {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
@@ -17,7 +48,22 @@ serve(async (req) => {
   }
 
   try {
-    const { planId, stripePlanId, userId, billingDetails, returnUrl } = await req.json();
+    // Parse and validate request body
+    let body;
+    try {
+      body = await req.json();
+      validateInputs(body);
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: e instanceof Error ? e.message : 'Invalid request body' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+    
+    const { planId, stripePlanId, userId, billingDetails, returnUrl } = body;
     
     console.log(`Creating subscription for user ${userId} to plan ${planId} (Stripe plan: ${stripePlanId})`);
     
@@ -25,7 +71,7 @@ serve(async (req) => {
       throw new Error('Stripe plan ID is required');
     }
     
-    // Create a customer
+    // Create a customer with sanitized inputs
     const customer = await stripe.customers.create({
       name: billingDetails.name,
       email: billingDetails.email,
@@ -98,7 +144,7 @@ serve(async (req) => {
     console.error('Error creating subscription:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

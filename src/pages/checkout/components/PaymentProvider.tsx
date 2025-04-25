@@ -4,9 +4,9 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { getSafeCookieParams, handleStripeCookies, isInCrossOriginContext, isInIframe } from '@/utils/crossOriginUtils';
 
-// Initialize Stripe with a valid publishable key
-// Use the proper Stripe test publishable key format that starts with pk_test_
-const stripePromise = loadStripe('pk_test_51Ov1xjH5dusncBPeU9Cy97XPSXWQlTcK8VQJGwkbEJJbgzVZXqE7gvEwjD98JiW1DxIBphB0JMnDYNsxxp1OkPm100X0XG7Gl5');
+// Initialize Stripe with environment variable instead of hardcoded key
+// Use safe loading pattern to prevent exposure
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 interface PaymentProviderProps {
   children: React.ReactNode;
@@ -30,25 +30,20 @@ export const PaymentProvider = ({ children }: PaymentProviderProps) => {
       // Always use 'None' for SameSite in cross-origin contexts
       const sameSite = isCrossOrigin ? 'None' : 'Lax';
       
-      // Set the cookies with the appropriate attributes
-      document.cookie = `__stripe_mid=placeholder_mid; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
-      document.cookie = `__stripe_sid=placeholder_sid; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
-      
-      console.log("PaymentProvider: Stripe cookies set with SameSite=" + sameSite);
+      // Set the cookies with the appropriate attributes - avoid using placeholder values
+      document.cookie = `__stripe_mid=; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
+      document.cookie = `__stripe_sid=; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
     };
     
     // Call immediately
     setStripeCookies();
-    
-    // Call again after a short delay to ensure cookies are set
-    setTimeout(setStripeCookies, 100);
     
     // Set up interval to periodically check and fix Stripe cookies
     // This is especially important in cross-origin contexts
     const intervalId = setInterval(() => {
       handleStripeCookies();
       setStripeCookies();
-    }, 3000); // Check every 3 seconds (reduced from 5)
+    }, 3000);
     
     // Cleanup function to clear interval
     return () => {

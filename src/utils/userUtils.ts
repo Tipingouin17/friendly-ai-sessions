@@ -7,7 +7,6 @@ export const getUserName = (user: User | null): string => {
   // Try different places where the name might be stored
   const name = 
     user.user_metadata?.name ||
-    user.raw_user_meta_data?.name ||
     user.user_metadata?.full_name ||
     user.email?.split('@')[0] ||
     'User';

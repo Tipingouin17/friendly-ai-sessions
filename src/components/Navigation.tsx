@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { UserCircle, Settings, BookOpen, ChevronDown, Menu } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { getUserDisplayName } from "@/utils/userUtils";
 
 export const Navigation = () => {
   const location = useLocation();
@@ -24,6 +24,8 @@ export const Navigation = () => {
   if (isMobile && isSessionPage) {
     return null;
   }
+
+  const userDisplayName = getUserDisplayName(user);
 
   return (
     <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage ? 'hidden md:flex' : 'flex'}`}>
@@ -77,7 +79,7 @@ export const Navigation = () => {
                     </div>
                   ) : (
                     <div className="flex flex-col space-y-3">
-                      <div className="text-sm text-gray-600 mb-2">Hi, {user?.name}</div>
+                      <div className="text-sm text-gray-600 mb-2">Hi, {userDisplayName}</div>
                       <Link to="/profile" className="w-full">
                         <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
                           <UserCircle className="h-4 w-4" /> Profile
@@ -127,7 +129,7 @@ export const Navigation = () => {
               
               {isAuthenticated ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">Hi, {user?.name}</span>
+                  <span className="text-sm text-gray-600">Hi, {userDisplayName}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="gap-2 rounded-full">

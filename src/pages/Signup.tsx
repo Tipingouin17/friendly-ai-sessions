@@ -1,6 +1,7 @@
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,7 +99,7 @@ const Signup = () => {
   };
 
   // Reset attempts after 5 minutes
-  React.useEffect(() => {
+  useEffect(() => {
     if (attempts > 0) {
       const timer = setTimeout(() => setAttempts(0), 5 * 60 * 1000);
       return () => clearTimeout(timer);

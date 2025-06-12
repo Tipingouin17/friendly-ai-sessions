@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlanInfo } from '@/components/subscription/PlanInfo';
@@ -7,29 +8,32 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Edit, Key, LogOut, User, Shield, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getUserDisplayName } from '@/utils/userUtils';
+
 const Profile = () => {
-  const {
-    user,
-    logout
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+  
+  const userDisplayName = getUserDisplayName(user);
+
   const getInitials = (name: string) => {
     return name.split(' ').map(part => part[0]).join('').toUpperCase();
   };
+
   const handleEditProfile = () => {
     toast({
       title: "Edit Profile",
       description: "This feature will be available soon."
     });
   };
+
   const handleChangePassword = () => {
     toast({
       title: "Change Password",
       description: "This feature will be available soon."
     });
   };
+
   const handleLogout = () => {
     logout();
     toast({
@@ -37,7 +41,9 @@ const Profile = () => {
       description: "You have been successfully logged out."
     });
   };
-  return <div className="min-h-screen pt-24 pb-16 bg-gray-50">
+
+  return (
+    <div className="min-h-screen pt-24 pb-16 bg-gray-50">
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
         
@@ -50,11 +56,11 @@ const Profile = () => {
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end -mt-12 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                     <Avatar className="h-24 w-24 border-4 border-white bg-white shadow-md">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || user?.email}`} alt={user?.name || "User"} />
-                      <AvatarFallback className="text-2xl">{user?.name ? getInitials(user.name) : user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${userDisplayName}`} alt={userDisplayName} />
+                      <AvatarFallback className="text-2xl">{getInitials(userDisplayName)}</AvatarFallback>
                     </Avatar>
                     <div className="mt-4 sm:mt-0">
-                      <h2 className="text-2xl font-bold">{user?.name || "User"}</h2>
+                      <h2 className="text-2xl font-bold">{userDisplayName}</h2>
                       <p className="text-gray-500">{user?.email}</p>
                     </div>
                   </div>
@@ -168,6 +174,8 @@ const Profile = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Profile;

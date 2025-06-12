@@ -7,6 +7,7 @@ export const nameSchema = z.string().min(1, 'Name is required').max(100, 'Name m
 export const messageSchema = z.string().min(1, 'Message is required').max(5000, 'Message must be less than 5000 characters');
 export const participantIdSchema = z.number().int().positive('Participant ID must be a positive integer');
 export const conversationIdSchema = z.number().int().positive('Conversation ID must be a positive integer');
+export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
 
 // Session-related validation
 export const sessionJoinSchema = z.object({
@@ -39,6 +40,13 @@ export const facilitatorSchema = z.object({
   specialties: z.array(z.string().max(50)).max(10, 'Too many specialties'),
   languages: z.array(z.string().max(30)).max(5, 'Too many languages'),
   expertise_level: z.enum(['beginner', 'intermediate', 'advanced', 'expert'])
+});
+
+// Signup validation schema
+export const signupSchema = z.object({
+  name: nameSchema,
+  email: emailSchema,
+  password: passwordSchema
 });
 
 // Sanitization utilities

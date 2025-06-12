@@ -8,6 +8,9 @@ import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { supabase } from "@/integrations/supabase/client";
+import { sessionJoinSchema } from "@/utils/inputValidation";
+import { sanitizeInput, createRateLimiter } from "@/utils/inputValidation";
+import { validateSessionAccess } from "@/utils/securityHelpers";
 
 interface SessionJoinParams {
   conversationId: number | null;
@@ -19,6 +22,9 @@ interface SessionJoinParams {
   isAnonymous?: boolean;
   isAdmin?: boolean;
 }
+
+// Create rate limiter: max 5 join attempts per minute
+const joinRateLimiter = createRateLimiter(5, 60000);
 
 export function useSessionJoiner() {
   const { toast } = useToast();
@@ -44,50 +50,75 @@ export function useSessionJoiner() {
     isAnonymous = false,
     isAdmin: forceAdmin = false
   }: SessionJoinParams) => {
-    if (!participantName.trim()) {
-      toast({
-        title: "Please enter your name",
-        description: "A name is required to join the session.",
-        variant: "destructive",
-      });
-      return Promise.resolve();
-    }
-
-    // Check if we have persisted data for this conversation
-    const sessionData = conversationId ? getSessionByConversationId(conversationId) : null;
-    
-    if (sessionData) {
-      console.log("Using persisted participant data to rejoin session:", sessionData);
-      
-      // Update the last accessed time
-      if (conversationId) {
-        updateSessionAccessTime(conversationId);
-      }
-      
-      // Show rejoining toast
-      toast({
-        title: "Rejoining Session",
-        description: `Welcome back, ${sessionData.name || participantName}!`,
-      });
-      
-      // Navigate directly using persisted data
-      setTimeout(() => {
-        navigateToSession(
-          conversationId!, 
-          sessionData.name || participantName, 
-          sessionData.participantId, 
-          sessionData.avatarSeed || avatarSeed,
-          sessionData.isAdmin || false
-        );
-      }, 500);
-      
-      return Promise.resolve();
-    }
-
-    setIsJoining(true);
-    setError(null);
-
     try {
+      // Validate input parameters
+      const validatedData = sessionJoinSchema.parse({
+        participantName: sanitizeInput(participantName),
+        avatarSeed: sanitizeInput(avatarSeed),
+        conversationId,
+        isAnonymous
+      });
+
+      // Rate limiting check
+      const rateLimitKey = `join_${conversationId}_${Date.now().toString().slice(0, -3)}`; // Per minute
+      if (!joinRateLimiter(rateLimitKey)) {
+        toast({
+          title: "Too many attempts",
+          description: "Please wait a moment before trying to join again.",
+          variant: "destructive",
+        });
+        return Promise.resolve();
+      }
+
+      if (!validatedData.participantName.trim()) {
+        toast({
+          title: "Please enter your name",
+          description: "A name is required to join the session.",
+          variant: "destructive",
+        });
+        return Promise.resolve();
+      }
+
+      // Check if we have persisted data for this conversation
+      const sessionData = conversationId ? getSessionByConversationId(conversationId) : null;
+      
+      if (sessionData) {
+        console.log("Using persisted participant data to rejoin session:", sessionData);
+        
+        // Validate session access
+        const hasAccess = await validateSessionAccess(conversationId!, sessionData.participantId?.toString());
+        if (!hasAccess && !sessionData.isAdmin) {
+          throw new Error("You don't have permission to access this session");
+        }
+        
+        // Update the last accessed time
+        if (conversationId) {
+          updateSessionAccessTime(conversationId);
+        }
+        
+        // Show rejoining toast
+        toast({
+          title: "Rejoining Session",
+          description: `Welcome back, ${sessionData.name || validatedData.participantName}!`,
+        });
+        
+        // Navigate directly using persisted data
+        setTimeout(() => {
+          navigateToSession(
+            conversationId!, 
+            sessionData.name || validatedData.participantName, 
+            sessionData.participantId, 
+            sessionData.avatarSeed || validatedData.avatarSeed,
+            sessionData.isAdmin || false
+          );
+        }, 500);
+        
+        return Promise.resolve();
+      }
+
+      setIsJoining(true);
+      setError(null);
+
       // Force refresh data before joining to ensure we have latest counts
       await refetch();
       
@@ -121,14 +152,13 @@ export function useSessionJoiner() {
       await registerParticipant({
         conversationId, 
         participantId: newParticipantId,
-        participantName,
-        avatarSeed,
+        participantName: validatedData.participantName,
+        avatarSeed: validatedData.avatarSeed,
         isAnonymous,
         isAdmin: effectiveIsAdmin
       });
       
       // Create a session_event to log the participant joining
-      // This helps with realtime tracking of participants
       try {
         await supabase
           .from('session_events')
@@ -137,8 +167,8 @@ export function useSessionJoiner() {
             event_type: 'participant_joined',
             data: {
               participant_id: newParticipantId,
-              participant_name: participantName,
-              avatar_url: avatarSeed ? `/api/avatar?name=${avatarSeed}&variant=beam&palette=0` : null,
+              participant_name: validatedData.participantName,
+              avatar_url: validatedData.avatarSeed ? `/api/avatar?name=${validatedData.avatarSeed}&variant=beam&palette=0` : null,
               is_anonymous: isAnonymous,
               is_admin: effectiveIsAdmin,
               current_count: currentParticipantCount + 1
@@ -153,8 +183,8 @@ export function useSessionJoiner() {
       persistParticipantData({
         participantId: newParticipantId,
         conversationId,
-        name: participantName,
-        avatarSeed,
+        name: validatedData.participantName,
+        avatarSeed: validatedData.avatarSeed,
         isAnonymous,
         isAdmin: effectiveIsAdmin
       });
@@ -165,7 +195,7 @@ export function useSessionJoiner() {
       // Add a short delay to allow for Supabase to process the update
       setTimeout(() => {
         console.log("Navigating to session with admin status:", effectiveIsAdmin);
-        navigateToSession(conversationId, participantName, newParticipantId, avatarSeed, effectiveIsAdmin);
+        navigateToSession(conversationId, validatedData.participantName, newParticipantId, validatedData.avatarSeed, effectiveIsAdmin);
       }, 500);
       
       return Promise.resolve();
@@ -186,8 +216,8 @@ export function useSessionJoiner() {
         await registerParticipant({
           conversationId: conversationId!, 
           participantId: adminParticipantId,
-          participantName,
-          avatarSeed,
+          participantName: sanitizeInput(participantName),
+          avatarSeed: sanitizeInput(avatarSeed),
           isAnonymous,
           isAdmin: true // Force admin for this registration
         });
@@ -196,8 +226,8 @@ export function useSessionJoiner() {
         persistParticipantData({
           participantId: adminParticipantId,
           conversationId: conversationId!,
-          name: participantName,
-          avatarSeed,
+          name: sanitizeInput(participantName),
+          avatarSeed: sanitizeInput(avatarSeed),
           isAnonymous,
           isAdmin: true
         });
@@ -210,7 +240,7 @@ export function useSessionJoiner() {
         
         // Navigate with admin status
         setTimeout(() => {
-          navigateToSession(conversationId, participantName, adminParticipantId, avatarSeed, true);
+          navigateToSession(conversationId, sanitizeInput(participantName), adminParticipantId, sanitizeInput(avatarSeed), true);
         }, 500);
         
         return Promise.resolve();

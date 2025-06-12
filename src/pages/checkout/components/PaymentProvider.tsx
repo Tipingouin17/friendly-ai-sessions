@@ -4,9 +4,26 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { getSafeCookieParams, handleStripeCookies, isInCrossOriginContext, isInIframe } from '@/utils/crossOriginUtils';
 
-// Initialize Stripe with environment variable instead of hardcoded key
-// Use safe loading pattern to prevent exposure
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// Use environment variable for Stripe publishable key with validation
+const getStripePublishableKey = (): string => {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  
+  if (!key) {
+    console.error('VITE_STRIPE_PUBLISHABLE_KEY environment variable is not set');
+    throw new Error('Stripe configuration is missing');
+  }
+  
+  // Validate that it's a publishable key (starts with pk_)
+  if (!key.startsWith('pk_')) {
+    console.error('Invalid Stripe publishable key format');
+    throw new Error('Invalid Stripe key configuration');
+  }
+  
+  return key;
+};
+
+// Initialize Stripe with validated key
+const stripePromise = loadStripe(getStripePublishableKey());
 
 interface PaymentProviderProps {
   children: React.ReactNode;
@@ -30,7 +47,7 @@ export const PaymentProvider = ({ children }: PaymentProviderProps) => {
       // Always use 'None' for SameSite in cross-origin contexts
       const sameSite = isCrossOrigin ? 'None' : 'Lax';
       
-      // Set the cookies with the appropriate attributes - avoid using placeholder values
+      // Set the cookies with the appropriate attributes
       document.cookie = `__stripe_mid=; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
       document.cookie = `__stripe_sid=; expires=${expires.toUTCString()}; path=/; SameSite=${sameSite}; Secure`;
     };
@@ -39,7 +56,6 @@ export const PaymentProvider = ({ children }: PaymentProviderProps) => {
     setStripeCookies();
     
     // Set up interval to periodically check and fix Stripe cookies
-    // This is especially important in cross-origin contexts
     const intervalId = setInterval(() => {
       handleStripeCookies();
       setStripeCookies();

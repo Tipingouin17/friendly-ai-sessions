@@ -5,21 +5,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { z } from 'zod';
+import { signupSchema } from '@/utils/inputValidation';
+import { sanitizeInput } from '@/utils/inputValidation';
 
 // Define validation schema
-const signupSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters")
+const signupFormSchema = signupSchema.extend({
+  confirmPassword: z.string().min(8, "Password confirmation must be at least 8 characters")
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [attempts, setAttempts] = useState(0);
   
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -27,7 +31,12 @@ const Signup = () => {
 
   const validateForm = () => {
     try {
-      signupSchema.parse({ name, email, password });
+      signupFormSchema.parse({ 
+        name: sanitizeInput(name), 
+        email: sanitizeInput(email), 
+        password, 
+        confirmPassword 
+      });
       setErrors({});
       return true;
     } catch (error) {
@@ -47,14 +56,25 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Rate limiting - max 3 attempts per 5 minutes
+    if (attempts >= 3) {
+      toast({
+        title: "Too many attempts",
+        description: "Please wait 5 minutes before trying again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Validate inputs
     if (!validateForm()) {
+      setAttempts(prev => prev + 1);
       return;
     }
     
     setIsLoading(true);
     try {
-      await signup(email, password, name);
+      await signup(sanitizeInput(email), password, sanitizeInput(name));
       toast({
         title: "Account created",
         description: "Please check your email to verify your account."
@@ -66,6 +86,7 @@ const Signup = () => {
       });
     } catch (error: any) {
       console.error('Signup error:', error);
+      setAttempts(prev => prev + 1);
       toast({
         title: "Signup failed",
         description: error.message || "An error occurred during signup",
@@ -75,6 +96,14 @@ const Signup = () => {
       setIsLoading(false);
     }
   };
+
+  // Reset attempts after 5 minutes
+  React.useEffect(() => {
+    if (attempts > 0) {
+      const timer = setTimeout(() => setAttempts(0), 5 * 60 * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [attempts]);
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
@@ -94,6 +123,7 @@ const Signup = () => {
                 onChange={e => setName(e.target.value)} 
                 className={errors.name ? "border-red-500" : ""}
                 aria-invalid={!!errors.name}
+                maxLength={100}
                 required 
               />
               {errors.name && (
@@ -112,6 +142,7 @@ const Signup = () => {
                 onChange={e => setEmail(e.target.value)} 
                 className={errors.email ? "border-red-500" : ""}
                 aria-invalid={!!errors.email}
+                maxLength={255}
                 required 
               />
               {errors.email && (
@@ -130,13 +161,33 @@ const Signup = () => {
                 onChange={e => setPassword(e.target.value)} 
                 className={errors.password ? "border-red-500" : ""}
                 aria-invalid={!!errors.password}
+                minLength={8}
                 required 
               />
               {errors.password && (
                 <p className="text-red-500 text-xs mt-1">{errors.password}</p>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2 text-left">
+                Confirm Password
+              </label>
+              <Input 
+                id="confirmPassword" 
+                type="password" 
+                placeholder="Confirm your password" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)} 
+                className={errors.confirmPassword ? "border-red-500" : ""}
+                aria-invalid={!!errors.confirmPassword}
+                minLength={8}
+                required 
+              />
+              {errors.confirmPassword && (
+                <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading || attempts >= 3}>
               {isLoading ? 'Creating account...' : 'Sign up'}
             </Button>
           </form>
@@ -151,4 +202,5 @@ const Signup = () => {
     </div>
   );
 };
+
 export default Signup;

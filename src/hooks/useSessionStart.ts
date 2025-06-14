@@ -41,21 +41,11 @@ export const useSessionStart = ({
         throw updateError;
       }
 
-      // Prepare participant data for the facilitator response
-      const participantDescriptions = participants.map(p => p.name || `Participant ${p.id}`).join(', ');
-      const sessionType = conversationData?.sessions?.session_type || 'workshop';
-      const sessionTitle = conversationData?.sessions?.title || 'Session';
-      const sessionObjective = conversationData?.sessions?.objective || 'facilitate discussion';
-      const participantDescription = conversationData?.participant_description || 'participants';
-      
-      console.log('Generating initial facilitator message with context:', {
-        participantCount: participants.length,
-        participantDescription,
-        sessionType,
-        sessionTitle
-      });
+      console.log('Session marked as started in database');
 
-      // Call the facilitator response edge function to generate the welcome message
+      // Generate the initial facilitator welcome message
+      console.log('Generating initial facilitator welcome message');
+
       const { data: responseData, error: responseError } = await supabase.functions.invoke(
         'handle-facilitator-response',
         {

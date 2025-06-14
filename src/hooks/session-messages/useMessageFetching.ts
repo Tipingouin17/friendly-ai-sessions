@@ -36,7 +36,7 @@ export const useMessageFetching = ({
   const { formatDatabaseMessages } = useMessageFormatting({ conversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
-  // Main fetch function
+  // Main fetch function - FIXED to not show welcome message until session starts
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       debugLog('all', 'No conversation ID provided, skipping message fetch');
@@ -46,7 +46,18 @@ export const useMessageFetching = ({
     try {
       debugLog('all', `Fetching messages for conversation: ${conversationId}`);
       
-      const cachedWelcomeMsg = getCachedWelcomeMessage();
+      // Check if session has started
+      const { data: conversationData, error: convError } = await supabase
+        .from('conversations')
+        .select('session_started')
+        .eq('id', conversationId)
+        .single();
+        
+      if (convError) {
+        console.error('Error checking session status:', convError);
+      }
+      
+      const sessionStarted = conversationData?.session_started || false;
       
       const { data, error } = await supabase
         .from('messages')
@@ -60,7 +71,15 @@ export const useMessageFetching = ({
         return;
       }
       
+      // FIXED: Only show messages if session has started or if there are actual database messages
       if (!data || data.length === 0) {
+        if (!sessionStarted) {
+          debugLog('all', 'Session not started yet - showing no messages');
+          setMessages([]);
+          return;
+        }
+        
+        const cachedWelcomeMsg = getCachedWelcomeMessage();
         if (cachedWelcomeMsg) {
           debugLog('all', 'Using cached welcome message');
           setMessages([cachedWelcomeMsg]);
@@ -68,7 +87,7 @@ export const useMessageFetching = ({
         }
         
         if (welcomeMessage) {
-          debugLog('all', 'Adding welcome message to messages list');
+          debugLog('all', 'Session started - adding welcome message to messages list');
           
           const welcomeMsg = await createWelcomeMessage();
           if (welcomeMsg) {
@@ -86,8 +105,13 @@ export const useMessageFetching = ({
       
       // Determine if we need to include the cached welcome message
       const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
-      if (cachedWelcomeMsg && !hasAssistantMessage && welcomeMessage) {
-        setMessages([cachedWelcomeMsg, ...formattedMessages]);
+      if (sessionStarted && !hasAssistantMessage && welcomeMessage) {
+        const cachedWelcomeMsg = getCachedWelcomeMessage();
+        if (cachedWelcomeMsg) {
+          setMessages([cachedWelcomeMsg, ...formattedMessages]);
+        } else {
+          setMessages(formattedMessages);
+        }
       } else {
         setMessages(formattedMessages);
       }

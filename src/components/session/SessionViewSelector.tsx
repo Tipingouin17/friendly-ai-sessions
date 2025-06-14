@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -192,11 +191,10 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // Check session state to determine what view to show
   const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
-  const showQrView = props.showQrCodeView && !sessionStartedInDB;
   
-  // Admin gets QR code view initially to allow participants to join
-  if (isAdmin && showQrView) {
-    console.log("Rendering AdminQrView for participants to join");
+  // FIXED LOGIC: Admin should see QR view when session hasn't started yet
+  if (isAdmin && !sessionStartedInDB) {
+    console.log("Rendering AdminQrView - session not started yet");
     return (
       <AdminQrView
         conversationId={props.currentConversationId as number}

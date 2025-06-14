@@ -87,10 +87,11 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     return lastMessage.timestamp || (lastMessage.created_at ? new Date(lastMessage.created_at) : undefined);
   };
   
-  const filteredParticipants = participantsList.filter(participant => 
-    participant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    `Participant ${participant.id}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter participants based on their actual name, always showing the name
+  const filteredParticipants = participantsList.filter(participant => {
+    const displayName = participant.name || `Participant ${participant.id}`;
+    return displayName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const actualParticipantCount = participantsList.length;
 

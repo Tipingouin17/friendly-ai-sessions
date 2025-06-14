@@ -44,9 +44,9 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
     return "bg-gray-400";
   };
   
-  // Use the actual participant name from the database
+  // Always display the participant's actual name from the database
+  // If no name is set, show a default format but still show the name field
   const displayName = participant.name || `Participant ${participant.id}`;
-  const isDefaultName = !participant.name || participant.name === `Participant ${participant.id}`;
 
   return (
     <div className="group flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 transition-colors">
@@ -87,7 +87,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className={`text-sm font-medium text-gray-900 truncate ${isDefaultName ? 'italic text-gray-600' : ''}`}>
+                <span className="text-sm font-medium text-gray-900 truncate">
                   {displayName}
                 </span>
               </TooltipTrigger>

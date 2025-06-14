@@ -3,10 +3,12 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 export const HeroSection = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { plan, isLoading: planLoading } = useUserPlan();
 
   const handleButtonClick = () => {
     if (isAuthenticated) {
@@ -15,6 +17,12 @@ export const HeroSection = () => {
       navigate("/login");
     }
   };
+
+  // Show "no credit card required" text when:
+  // - User is not authenticated, OR
+  // - User is authenticated but on a free plan, OR
+  // - Plan data is still loading (to avoid layout shifts)
+  const showNoCreditCardText = !isAuthenticated || planLoading || (plan && plan.title === 'Free');
 
   return <div className="min-h-[90vh] flex items-center justify-center px-4 pt-16">
       <div className="max-w-4xl mx-auto text-center animate-fade-up">
@@ -29,7 +37,9 @@ export const HeroSection = () => {
           <Button size="lg" className="hover-lift" onClick={handleButtonClick}>
             {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          <p className="text-sm text-muted-foreground">*no credit card required</p>
+          {showNoCreditCardText && (
+            <p className="text-sm text-muted-foreground">*no credit card required</p>
+          )}
         </div>
       </div>
     </div>;

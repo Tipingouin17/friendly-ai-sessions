@@ -4,10 +4,12 @@ import { FeatureCard } from "./FeatureCard";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 export const Features = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { plan, isLoading: planLoading } = useUserPlan();
 
   const handleButtonClick = () => {
     if (isAuthenticated) {
@@ -16,6 +18,12 @@ export const Features = () => {
       navigate("/login");
     }
   };
+
+  // Show "no credit card required" text when:
+  // - User is not authenticated, OR
+  // - User is authenticated but on a free plan, OR
+  // - Plan data is still loading (to avoid layout shifts)
+  const showNoCreditCardText = !isAuthenticated || planLoading || (plan && plan.title === 'Free');
 
   const features = [{
     title: "Customizable & Advanced AI capabilities",
@@ -49,7 +57,9 @@ export const Features = () => {
             <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
               {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
             </Button>
-            <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
+            {showNoCreditCardText && (
+              <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
+            )}
           </div>
         </div>
       </div>
@@ -66,7 +76,9 @@ export const Features = () => {
           <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
             {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
           </Button>
-          <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
+          {showNoCreditCardText && (
+            <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
+          )}
         </div>
       </div>
     </>;

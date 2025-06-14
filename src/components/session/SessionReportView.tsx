@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -92,7 +91,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         .from('session_reports')
         .select('*')
         .eq('conversation_id', reportConversationId)
-        .order('created_at', { ascending: false })
+        .order('generated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 

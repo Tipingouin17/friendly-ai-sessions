@@ -3,14 +3,11 @@ import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useNavigateToSession } from "./useNavigateToSession";
-import { useSessionCapacityCheck } from "./useSessionCapacityCheck";
-import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
-import { supabase } from "@/integrations/supabase/client";
-import { sessionJoinSchema } from "@/utils/inputValidation";
-import { sanitizeInput, createRateLimiter } from "@/utils/inputValidation";
-import { validateSessionAccess } from "@/utils/securityHelpers";
+import { useSessionValidation } from "./useSessionValidation";
+import { useParticipantJoining } from "./useParticipantJoining";
+import { useAdminOverride } from "./useAdminOverride";
 
 interface SessionJoinParams {
   conversationId: number | null;
@@ -23,22 +20,16 @@ interface SessionJoinParams {
   isAdmin?: boolean;
 }
 
-// Create rate limiter: max 5 join attempts per minute
-const joinRateLimiter = createRateLimiter(5, 60000);
-
 export function useSessionJoiner() {
   const { toast } = useToast();
   const [isJoining, setIsJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { navigateToSession } = useNavigateToSession();
-  const { isCheckingCapacity, checkCapacityAndUpdate } = useSessionCapacityCheck();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
-  const { 
-    persistParticipantData, 
-    persistedParticipantData, 
-    getSessionByConversationId,
-    updateSessionAccessTime
-  } = useParticipantPersistence();
+  const { persistedParticipantData } = useParticipantPersistence();
+  
+  const { validateSessionJoin, error, setError } = useSessionValidation();
+  const { handleExistingParticipant, joinAsNewParticipant } = useParticipantJoining();
+  const { handleAdminOverride } = useAdminOverride();
 
   const joinSession = async ({
     conversationId,
@@ -52,64 +43,31 @@ export function useSessionJoiner() {
   }: SessionJoinParams) => {
     try {
       // Validate input parameters
-      const validatedData = sessionJoinSchema.parse({
-        participantName: sanitizeInput(participantName),
-        avatarSeed: sanitizeInput(avatarSeed),
+      const validatedData = await validateSessionJoin({
         conversationId,
+        participantName,
+        avatarSeed,
         isAnonymous
       });
 
-      // Rate limiting check
-      const rateLimitKey = `join_${conversationId}_${Date.now().toString().slice(0, -3)}`; // Per minute
-      if (!joinRateLimiter(rateLimitKey)) {
-        toast({
-          title: "Too many attempts",
-          description: "Please wait a moment before trying to join again.",
-          variant: "destructive",
-        });
-        return Promise.resolve();
-      }
-
-      if (!validatedData.participantName.trim()) {
-        toast({
-          title: "Please enter your name",
-          description: "A name is required to join the session.",
-          variant: "destructive",
-        });
+      if (!validatedData) {
         return Promise.resolve();
       }
 
       // Check if we have persisted data for this conversation
-      const sessionData = conversationId ? getSessionByConversationId(conversationId) : null;
+      const existingParticipant = conversationId ? 
+        await handleExistingParticipant(conversationId, validatedData.participantName, validatedData.avatarSeed) : 
+        null;
       
-      if (sessionData) {
-        console.log("Using persisted participant data to rejoin session:", sessionData);
-        
-        // Validate session access
-        const hasAccess = await validateSessionAccess(conversationId!, sessionData.participantId?.toString());
-        if (!hasAccess && !sessionData.isAdmin) {
-          throw new Error("You don't have permission to access this session");
-        }
-        
-        // Update the last accessed time
-        if (conversationId) {
-          updateSessionAccessTime(conversationId);
-        }
-        
-        // Show rejoining toast
-        toast({
-          title: "Rejoining Session",
-          description: `Welcome back, ${sessionData.name || validatedData.participantName}!`,
-        });
-        
+      if (existingParticipant) {
         // Navigate directly using persisted data
         setTimeout(() => {
           navigateToSession(
             conversationId!, 
-            sessionData.name || validatedData.participantName, 
-            sessionData.participantId, 
-            sessionData.avatarSeed || validatedData.avatarSeed,
-            sessionData.isAdmin || false
+            existingParticipant.name, 
+            existingParticipant.participantId, 
+            existingParticipant.avatarSeed,
+            existingParticipant.isAdmin
           );
         }, 500);
         
@@ -132,120 +90,67 @@ export function useSessionJoiner() {
       
       // Determine effective admin status from all sources
       const effectiveIsAdmin = forceAdmin || contextIsAdmin || sessionStorage.getItem('isAdminSession') === 'true';
-      console.log("Attempting to join session with ID:", conversationId);
-      console.log("Current participant count before update:", currentParticipantCount);
-      console.log("Admin status for capacity check:", effectiveIsAdmin);
       
-      // Check capacity BEFORE we try to update participant count - fixes race condition
-      const capacityResult = await checkCapacityAndUpdate(conversationId, effectiveIsAdmin);
-      
-      // If the session is full and we're not an admin, block joining
-      if (!capacityResult.canJoin && !effectiveIsAdmin) {
-        throw new Error(capacityResult.error || "This session is full and cannot accept more participants.");
-      }
-      
-      // Use the returned participant count as the participant ID
-      const newParticipantId = capacityResult.newParticipantId;
-      console.log("New participant ID:", newParticipantId);
-      
-      // Store the participant information in the session_participants table
-      await registerParticipant({
-        conversationId, 
-        participantId: newParticipantId,
-        participantName: validatedData.participantName,
-        avatarSeed: validatedData.avatarSeed,
-        isAnonymous,
-        isAdmin: effectiveIsAdmin
-      });
-      
-      // Create a session_event to log the participant joining
       try {
-        await supabase
-          .from('session_events')
-          .insert({
-            conversation_id: conversationId,
-            event_type: 'participant_joined',
-            data: {
-              participant_id: newParticipantId,
-              participant_name: validatedData.participantName,
-              avatar_url: validatedData.avatarSeed ? `/api/avatar?name=${validatedData.avatarSeed}&variant=beam&palette=0` : null,
-              is_anonymous: isAnonymous,
-              is_admin: effectiveIsAdmin,
-              current_count: currentParticipantCount + 1
-            }
-          });
-      } catch (eventError) {
-        console.error("Error logging participant join event:", eventError);
-        // Don't block the join process if event logging fails
-      }
-      
-      // Persist participant data to localStorage
-      persistParticipantData({
-        participantId: newParticipantId,
-        conversationId,
-        name: validatedData.participantName,
-        avatarSeed: validatedData.avatarSeed,
-        isAnonymous,
-        isAdmin: effectiveIsAdmin
-      });
-      
-      // Clear any existing "session full" errors since we've successfully joined
-      setError(null);
-      
-      // Add a short delay to allow for Supabase to process the update
-      setTimeout(() => {
-        console.log("Navigating to session with admin status:", effectiveIsAdmin);
-        navigateToSession(conversationId, validatedData.participantName, newParticipantId, validatedData.avatarSeed, effectiveIsAdmin);
-      }, 500);
-      
-      return Promise.resolve();
-    } catch (error: any) {
-      console.error("Error joining session:", error);
-      
-      // Special handling for admin users - if they get an error about session being full,
-      // always allow them to join anyway
-      const isSessionFullError = error.message?.includes("full") || error.message?.includes("maximum capacity");
-      const effectiveIsAdmin = forceAdmin || contextIsAdmin || sessionStorage.getItem('isAdminSession') === 'true';
-      
-      if (isSessionFullError && effectiveIsAdmin) {
-        console.log("🔑 Admin override for session full error - forcing join success");
-        
-        // For admins, we'll still let them join with a special participant ID
-        const adminParticipantId = Math.floor(Math.random() * 900) + 9000; // Use a very high ID for admin override
-        
-        await registerParticipant({
-          conversationId: conversationId!, 
-          participantId: adminParticipantId,
-          participantName: sanitizeInput(participantName),
-          avatarSeed: sanitizeInput(avatarSeed),
+        // Try to join as new participant
+        const joinResult = await joinAsNewParticipant({
+          conversationId,
+          participantName: validatedData.participantName,
+          avatarSeed: validatedData.avatarSeed,
+          currentParticipantCount,
           isAnonymous,
-          isAdmin: true // Force admin for this registration
+          isAdmin: effectiveIsAdmin
         });
         
-        // Persist admin participant data
-        persistParticipantData({
-          participantId: adminParticipantId,
-          conversationId: conversationId!,
-          name: sanitizeInput(participantName),
-          avatarSeed: sanitizeInput(avatarSeed),
-          isAnonymous,
-          isAdmin: true
-        });
+        // Clear any existing "session full" errors since we've successfully joined
+        setError(null);
         
-        toast({
-          title: "Admin Override",
-          description: "Session is full, but you're joining as an admin.",
-          variant: "default"
-        });
-        
-        // Navigate with admin status
+        // Add a short delay to allow for Supabase to process the update
         setTimeout(() => {
-          navigateToSession(conversationId, sanitizeInput(participantName), adminParticipantId, sanitizeInput(avatarSeed), true);
+          console.log("Navigating to session with admin status:", joinResult.isAdmin);
+          navigateToSession(
+            conversationId, 
+            joinResult.name, 
+            joinResult.participantId, 
+            joinResult.avatarSeed, 
+            joinResult.isAdmin
+          );
         }, 500);
         
         return Promise.resolve();
+        
+      } catch (joinError: any) {
+        // Special handling for admin users - if they get an error about session being full,
+        // always allow them to join anyway
+        const isSessionFullError = joinError.message?.includes("full") || joinError.message?.includes("maximum capacity");
+        
+        if (isSessionFullError && effectiveIsAdmin) {
+          const adminResult = await handleAdminOverride({
+            conversationId,
+            participantName: validatedData.participantName,
+            avatarSeed: validatedData.avatarSeed,
+            isAnonymous
+          });
+          
+          // Navigate with admin status
+          setTimeout(() => {
+            navigateToSession(
+              conversationId, 
+              adminResult.name, 
+              adminResult.participantId, 
+              adminResult.avatarSeed, 
+              adminResult.isAdmin
+            );
+          }, 500);
+          
+          return Promise.resolve();
+        }
+        
+        throw joinError;
       }
       
+    } catch (error: any) {
+      console.error("Error joining session:", error);
       setError(error.message || "Failed to join the session");
       toast({
         title: "Error",
@@ -258,7 +163,7 @@ export function useSessionJoiner() {
   };
 
   return {
-    isJoining: isJoining || isCheckingCapacity,
+    isJoining,
     error,
     joinSession,
     setError,

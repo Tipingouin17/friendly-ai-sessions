@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface SessionClosureResult {
   reportId: string;
@@ -23,6 +23,7 @@ export const useSessionClosure = () => {
 
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     if (!conversationId) {
+      console.error("No conversation ID provided to closeSessionAndGenerateReport");
       toast({
         title: "Error",
         description: "No conversation ID provided",
@@ -32,18 +33,18 @@ export const useSessionClosure = () => {
     }
 
     setIsClosing(true);
+    console.log("Starting session closure process for conversation:", conversationId);
 
     try {
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
+        console.error("User authentication error:", userError);
         throw new Error('User not authenticated');
       }
 
-      console.log('Closing session and generating report for conversation:', conversationId);
+      console.log('Calling edge function to close session and generate report...');
 
-      // Call the Edge Function to close session and generate report
       const { data, error } = await supabase.functions.invoke('close-session-and-generate-report', {
         body: {
           conversationId,
@@ -51,14 +52,19 @@ export const useSessionClosure = () => {
         }
       });
 
+      console.log("Edge function response:", { data, error });
+
       if (error) {
+        console.error("Edge function error:", error);
         throw new Error(error.message || 'Failed to close session and generate report');
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to process session closure');
+      if (!data || !data.success) {
+        console.error("Edge function returned unsuccessful result:", data);
+        throw new Error(data?.error || 'Failed to process session closure');
       }
 
+      console.log("Session closed successfully:", data);
       setClosureResult(data);
 
       toast({
@@ -66,7 +72,6 @@ export const useSessionClosure = () => {
         description: `Report generated with ${data.sessionData.messageCount} messages from ${data.sessionData.participantCount} participants`,
       });
 
-      // Navigate to past workshops after a short delay
       setTimeout(() => {
         navigate('/past-workshops');
       }, 2000);

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -40,13 +41,16 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [showReportDialog, setShowReportDialog] = useState(false);
   
   const handleBack = () => {
-    // Navigate to past workshops page with auto=true to automatically navigate to the latest active session
     navigate('/past-workshops?auto=true');
   };
 
   const handleCloseSession = async () => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      console.error("No conversation ID available for closing session");
+      return;
+    }
     
+    console.log("Attempting to close session with ID:", conversation.id);
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
@@ -55,20 +59,30 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   };
 
   const handleExportClick = () => {
+    if (!conversation?.id) {
+      console.error("No conversation available for export");
+      return;
+    }
+
+    if (conversation.is_session_ended) {
+      console.log("Session already ended, cannot close again");
+      return;
+    }
+
     if (onExportData) {
-      // If there's a custom export handler, use it
       onExportData();
     } else {
-      // Otherwise, show the session closure dialog
+      console.log("Opening session closure dialog");
       setShowClosureDialog(true);
     }
   };
 
-  // Get session title
   const getSessionTitle = () => {
     if (!conversation) return "Loading...";
     return conversation.sessions?.title || "Untitled Session";
   };
+
+  const isSessionEnded = conversation?.is_session_ended || false;
 
   return (
     <>
@@ -83,9 +97,12 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               <h1 className="text-xl font-semibold">{getSessionTitle()}</h1>
               <div className="flex items-center mt-1">
                 <SessionStatusBadge
-                  isActive={!isSessionPaused}
+                  isActive={!isSessionPaused && !isSessionEnded}
                   sessionStarted={conversation?.session_started || false}
                 />
+                {isSessionEnded && (
+                  <span className="ml-2 text-sm text-gray-500">Session Ended</span>
+                )}
               </div>
             </div>
           </div>
@@ -96,26 +113,30 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               size="sm" 
               className="flex items-center gap-1"
               onClick={handleExportClick}
-              disabled={isClosing || conversation?.is_session_ended}
+              disabled={isClosing || isSessionEnded}
             >
               <FileText className="h-4 w-4" />
               <span>
-                {isClosing ? 'Closing...' : 'Close & Get Report'}
+                {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
               </span>
             </Button>
-            <SessionsDropdown 
-              currentSessionId={conversation?.id || null}
-              activeSessions={activeSessions}
-              isLoading={isLoading}
-              onRefresh={refreshSessions}
-            />
-            <AdminMessageDialog onSendMessage={handleAdminMessage} />
-            <AdminQrDialog conversationId={conversation?.id || null} />
+            
+            {!isSessionEnded && (
+              <>
+                <SessionsDropdown 
+                  currentSessionId={conversation?.id || null}
+                  activeSessions={activeSessions}
+                  isLoading={isLoading}
+                  onRefresh={refreshSessions}
+                />
+                <AdminMessageDialog onSendMessage={handleAdminMessage} />
+                <AdminQrDialog conversationId={conversation?.id || null} />
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Session Closure Confirmation Dialog */}
       <SessionClosureDialog
         isOpen={showClosureDialog}
         onClose={() => setShowClosureDialog(false)}
@@ -125,7 +146,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
         sessionTitle={getSessionTitle()}
       />
 
-      {/* Report Download Dialog */}
       <ReportDownloadDialog
         isOpen={showReportDialog}
         onClose={() => setShowReportDialog(false)}

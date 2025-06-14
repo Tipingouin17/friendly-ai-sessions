@@ -53,7 +53,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
           facilitators!conversations_facilitator_id_fkey (
             id,
             title,
-            avatar_url
+            profile_picture
           )
         `)
         .eq('id', reportConversationId)

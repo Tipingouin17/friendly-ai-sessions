@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -95,7 +94,10 @@ const SessionAdmin = () => {
     locationState,
     conversation: conversationData
   });
-  const { isAnonymous, toggleAnonymous } = useAnonymousState(currentParticipant || 1);
+  const { isAnonymous, toggleAnonymous } = useAnonymousState({
+    conversationId: currentConversationId,
+    currentParticipantId: currentParticipant
+  });
   const [hasAnswered, setHasAnswered] = useState(false);
   const [totalResponses, setTotalResponses] = useState(0);
   const [participantResponses, setParticipantResponses] = useState<{ [key: number]: boolean }>({});

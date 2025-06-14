@@ -4,6 +4,7 @@ import { Message, ParticipantInfo } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import MessageItem from './MessageItem';
 import ThinkingIndicator from './ThinkingIndicator';
+import WaitingForResponsesIndicator from './WaitingForResponsesIndicator';
 import { useScrollToBottom } from '@/hooks/useScrollToBottom';
 import { MessagesSquare } from 'lucide-react';
 
@@ -12,6 +13,9 @@ interface MessageListProps {
   participantColors?: {[key: string]: string};
   currentParticipant?: string;
   isWaitingForResponse?: boolean;
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
   participants?: ParticipantInfo[];
   isMobile?: boolean;
   conversationData?: any;
@@ -22,11 +26,14 @@ const MessageList = ({
   participantColors = {},
   currentParticipant,
   isWaitingForResponse = false,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
   participants = [],
   isMobile = false,
   conversationData
 }: MessageListProps) => {
-  const { ref, scrollToBottom } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
+  const { ref, scrollToBottom } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse, isWaitingForResponses]);
   
   // Additional effect to scroll when messages change
   useEffect(() => {
@@ -125,7 +132,18 @@ const MessageList = ({
           />
         ))}
         
-        {/* Thinking indicator */}
+        {/* Show waiting for responses indicator when collecting responses */}
+        {isWaitingForResponses && totalParticipants > 1 && (
+          <div className="py-1">
+            <WaitingForResponsesIndicator 
+              currentResponses={responseCount}
+              totalParticipants={totalParticipants}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
+        
+        {/* Show thinking indicator when AI is processing */}
         {isWaitingForResponse && (
           <div className="py-1">
             <ThinkingIndicator />

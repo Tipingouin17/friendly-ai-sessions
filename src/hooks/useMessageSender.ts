@@ -6,6 +6,7 @@ import { participantColors } from "@/utils/sessionHelpers";
 import { useMessageSaver } from "./messageSender/useMessageSaver";
 import { useFacilitatorResponse } from "./messageSender/useFacilitatorResponse";
 import { useEnhancedSessionLogger } from "./useEnhancedSessionLogger";
+import { useResponseCollection } from "./useResponseCollection";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -42,6 +43,28 @@ export const useMessageSender = ({
   const { requestFacilitatorResponse } = useFacilitatorResponse();
   const { logMessageSent, logAIResponse, logPerformanceMetric } = useEnhancedSessionLogger();
   
+  // Add response collection logic
+  const totalParticipants = conversation?.participants ?? 1;
+  const {
+    responseCount,
+    isWaitingForResponses,
+    allParticipantsResponded,
+    currentUserHasResponded,
+    startNewResponseCollection,
+    recordParticipantResponse,
+    stopWaitingForResponses
+  } = useResponseCollection({
+    totalParticipants,
+    currentUserParticipantId: sessionState.currentParticipant
+  });
+
+  // Start collecting responses when facilitator asks a question
+  const startResponseCollection = useCallback((questionId: string) => {
+    if (totalParticipants > 1) {
+      startNewResponseCollection(questionId);
+    }
+  }, [totalParticipants, startNewResponseCollection]);
+
   const handleSendMessage = useCallback(async () => {
     // Prevent duplicate sends
     if (requestInProgressRef.current || isWaitingForResponse || !currentConversationId) {
@@ -95,6 +118,7 @@ export const useMessageSender = ({
       
       // Record that this participant has responded
       sessionState.recordResponse(currentParticipant, true);
+      recordParticipantResponse(currentParticipant);
       
       // Log message processing time
       const messageProcessTime = performance.now() - messageStartTime;
@@ -105,17 +129,20 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
+      console.log("Response collection status:", {
+        totalParticipants,
+        responseCount: responseCount + 1, // +1 because we just added this response
+        allResponded: (responseCount + 1) >= totalParticipants,
+        isWaitingForResponses
+      });
+      
       // Check if we need a facilitator response
-      const totalParticipants = conversation?.participants ?? 1;
       const updatedTotalResponses = sessionState.totalResponses + 1;
       
-      console.log("Total expected participants:", totalParticipants);
-      console.log("Current total responses:", updatedTotalResponses);
-      console.log("Single participant check:", totalParticipants <= 1);
-      console.log("All participants responded check:", updatedTotalResponses >= totalParticipants);
-      
-      if (totalParticipants <= 1 || updatedTotalResponses >= totalParticipants) {
+      // Only trigger facilitator response if all participants have responded OR it's a single participant session
+      if (totalParticipants <= 1 || (responseCount + 1) >= totalParticipants) {
         setIsWaitingForResponse(true);
+        stopWaitingForResponses(); // Stop the waiting state
         const aiStartTime = performance.now();
 
         try {
@@ -133,16 +160,25 @@ export const useMessageSender = ({
           logAIResponse(
             currentConversationId,
             aiResponseTime,
-            'ai', // Assuming AI method, could be enhanced to detect actual method
-            undefined // Token count not available here
+            'ai',
+            undefined
           );
           
-          // Add AI response to UI
-          sessionState.setMessages(prev => [...prev, aiResponse]);
+          // Add AI response to UI and start new response collection
+          sessionState.setMessages(prev => {
+            const newMessages = [...prev, aiResponse];
+            // Start collecting responses for the new question
+            if (totalParticipants > 1 && !aiResponse.isReport) {
+              setTimeout(() => startResponseCollection(aiResponse.id), 100);
+            }
+            return newMessages;
+          });
         } finally {
           setIsWaitingForResponse(false);
         }
       }
+      // If not all participants have responded, we just wait (the UI will show the waiting indicator)
+      
     } catch (error) {
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
@@ -160,20 +196,28 @@ export const useMessageSender = ({
     currentConversationId, 
     participants, 
     isAnonymous, 
-    conversation?.participants,
-    conversation?.sessions?.facilitator_details?.profile_picture,
-    conversation?.sessions?.facilitator_details?.id,
+    conversation,
+    totalParticipants,
+    responseCount,
     toast,
     saveUserMessage,
     requestFacilitatorResponse,
     logMessageSent,
     logAIResponse,
-    logPerformanceMetric
+    logPerformanceMetric,
+    recordParticipantResponse,
+    stopWaitingForResponses,
+    startResponseCollection
   ]);
 
   return {
     isWaitingForResponse,
+    isWaitingForResponses,
+    responseCount,
+    totalParticipants,
+    currentUserHasResponded,
     handleSendMessage,
-    error
+    error,
+    startResponseCollection
   };
 };

@@ -13,6 +13,9 @@ interface ParticipantMessagingViewProps {
   participantColors: { [key: string]: string };
   currentParticipant: number;
   isWaitingForResponse?: boolean;
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
   participants: ParticipantInfo[];
   conversationId: number | null;
   currentParticipantCount: number;
@@ -41,6 +44,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   participantColors,
   currentParticipant,
   isWaitingForResponse = false,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
   participants,
   isMobile,
   conversationId,
@@ -108,6 +114,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             participantColors={participantColors}
             currentParticipant={`P${effectiveParticipantId}`}
             isWaitingForResponse={isWaitingForResponse}
+            isWaitingForResponses={isWaitingForResponses}
+            responseCount={responseCount}
+            totalParticipants={totalParticipants}
             participants={participants}
             isMobile={isActuallyMobile}
             conversationData={conversationData}

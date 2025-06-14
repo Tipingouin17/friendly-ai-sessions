@@ -18,6 +18,9 @@ interface SessionContainerProps {
   onGenerateReport: () => void;
   isGeneratingReport: boolean;
   isWaitingForResponse: boolean;
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
   setIsRecording: (isRecording: boolean) => void;
   isRecording: boolean;
   participantColors: { [key: string]: string };
@@ -49,6 +52,9 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   onGenerateReport,
   isGeneratingReport,
   isWaitingForResponse,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
   setIsRecording,
   isRecording,
   participantColors,
@@ -109,6 +115,9 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           participantColors={enhancedParticipantColors}
           currentParticipant={currentParticipant}
           isWaitingForResponse={isWaitingForResponse}
+          isWaitingForResponses={isWaitingForResponses}
+          responseCount={responseCount}
+          totalParticipants={totalParticipants}
           participants={participants}
           conversationId={conversationId}
           currentParticipantCount={currentParticipantCount}

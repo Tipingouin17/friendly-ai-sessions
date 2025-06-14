@@ -53,7 +53,8 @@ export const useMessageProcessor = ({
         avatar: processedAvatar,
         isAnonymous,
         displayName, // Store display name separately
-        participant: originalParticipant // Keep original participant key for filtering
+        participant: originalParticipant, // Keep original participant key for filtering
+        isQuestionMessage: message.sender === "assistant" && !message.isReport // Mark facilitator questions
       };
     });
 

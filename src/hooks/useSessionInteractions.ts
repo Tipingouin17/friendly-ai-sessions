@@ -31,8 +31,13 @@ export const useSessionInteractions = ({
   // Set up message sending functionality
   const {
     isWaitingForResponse,
+    isWaitingForResponses,
+    responseCount,
+    totalParticipants,
+    currentUserHasResponded,
     handleSendMessage,
-    error
+    error,
+    startResponseCollection
   } = useMessageSender({
     currentConversationId,
     sessionState,
@@ -50,7 +55,12 @@ export const useSessionInteractions = ({
 
   return {
     isWaitingForResponse,
+    isWaitingForResponses,
+    responseCount,
+    totalParticipants,
+    currentUserHasResponded,
     handleSendMessage,
-    error
+    error,
+    startResponseCollection
   };
 };

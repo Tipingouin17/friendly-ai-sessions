@@ -67,8 +67,8 @@ const MyFacilitators = () => {
   const isSubmitDisabled = hasReachedSessionLimit || !selectedWorkshop || !description.trim() || !agreed;
 
   return (
-    <div className="min-h-screen pt-16 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
         <PlanLimitAlert 
           hasReachedSessionLimit={hasReachedSessionLimit}
           hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
@@ -77,7 +77,7 @@ const MyFacilitators = () => {
           onUpgrade={handleUpgradePlan}
         />
         
-        <div className="bg-white rounded-3xl shadow-lg p-8">
+        <div className="bg-white rounded-3xl shadow-lg p-4 md:p-6">
           <FacilitatorStepper 
             currentStep={currentStep}
             setCurrentStep={setCurrentStep}
@@ -86,7 +86,7 @@ const MyFacilitators = () => {
             isStep3Disabled={isStep3Disabled}
           />
 
-          <div className="space-y-8">
+          <div className="space-y-6 md:space-y-8">
             {/* Step 1: Facilitator Selection */}
             <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
               <FacilitatorSelection 

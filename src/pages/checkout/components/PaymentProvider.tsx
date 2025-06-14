@@ -6,10 +6,11 @@ import { getSafeCookieParams, handleStripeCookies, isInCrossOriginContext, isInI
 
 // Use environment variable for Stripe publishable key with validation
 const getStripePublishableKey = (): string => {
-  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  // Use the provided live publishable key
+  const key = 'pk_live_51NQ84KK0lFUZlqguiHpmAcNEoAg1UT7GMfyuE45TiBR8NHY4qJXSKW9abcnILEjTCh2C5fPDP0qly5cql2j7pqG500cpdTJT3O';
   
   if (!key) {
-    console.error('VITE_STRIPE_PUBLISHABLE_KEY environment variable is not set');
+    console.error('Stripe publishable key is not set');
     throw new Error('Stripe configuration is missing');
   }
   

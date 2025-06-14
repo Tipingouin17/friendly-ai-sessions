@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, LayoutDashboard, Users, MessageSquare, Clock, BarChart2 } from "lucide-react";
+import { ArrowLeft, FileText, LayoutDashboard, Users, MessageSquare, Clock, AlertCircle } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -12,6 +12,7 @@ import { useAdminSessions } from "@/hooks/useAdminSessions";
 import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 
 interface SimplifiedAdminHeaderProps {
   conversation: ConversationWithSession | null;
@@ -35,6 +36,7 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
   totalMessages
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
   const { 
     isClosing, 
@@ -50,35 +52,47 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
 
   const handleCloseSession = async () => {
     if (!conversation?.id) {
-      console.error("No conversation ID available for closing session");
+      console.error("❌ No conversation ID available for closing session");
+      toast({
+        title: "Error",
+        description: "No conversation ID available",
+        variant: "destructive"
+      });
       return;
     }
     
+    console.log("🚀 User confirmed session closure, proceeding...");
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
+      console.log("✅ Session closed successfully, navigating to report view");
       // Navigate to the session report view
       navigate(`/session/report/${conversation.id}`);
+    } else {
+      console.error("❌ Session closure failed, keeping dialog open");
     }
   };
 
   const handleExportClick = () => {
     if (!conversation?.id) {
-      console.error("No conversation available for export");
+      console.error("❌ No conversation available for export");
+      toast({
+        title: "Error",
+        description: "No conversation available",
+        variant: "destructive"
+      });
       return;
     }
 
     if (conversation.is_session_ended) {
+      console.log("📄 Session already ended, navigating to existing report");
       // Navigate to existing report
       navigate(`/session/report/${conversation.id}`);
       return;
     }
 
-    if (onExportData) {
-      onExportData();
-    } else {
-      setShowClosureDialog(true);
-    }
+    console.log("📋 Opening session closure dialog for active session");
+    setShowClosureDialog(true);
   };
 
   const getSessionTitle = () => {
@@ -95,6 +109,16 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
   const sessionDurationMinutes = Math.round(
     (new Date().getTime() - sessionStartTime.getTime()) / (1000 * 60)
   );
+
+  // Debug logging for conversation state
+  React.useEffect(() => {
+    console.log("🔍 SimplifiedAdminHeader conversation state:", {
+      conversationId: conversation?.id,
+      isSessionEnded,
+      hasCloseFunction: !!closeSessionAndGenerateReport,
+      isClosing
+    });
+  }, [conversation?.id, isSessionEnded, isClosing]);
 
   return (
     <>
@@ -128,10 +152,19 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
               onClick={handleExportClick}
               disabled={isClosing}
             >
-              <FileText className="h-4 w-4" />
-              <span>
-                {isClosing ? 'Closing...' : isSessionEnded ? 'View Report' : 'Close & Get Report'}
-              </span>
+              {isClosing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  <span>Closing...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  <span>
+                    {isSessionEnded ? 'View Report' : 'Close & Get Report'}
+                  </span>
+                </>
+              )}
             </Button>
             
             {!isSessionEnded && (

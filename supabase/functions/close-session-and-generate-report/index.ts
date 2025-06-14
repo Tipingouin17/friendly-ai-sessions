@@ -10,23 +10,45 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log(`🚀 Edge function invoked: ${req.method} ${req.url}`);
+  
   if (req.method === 'OPTIONS') {
+    console.log("📋 Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { conversationId, userId } = await req.json()
-
-    if (!conversationId || !userId) {
-      throw new Error('Missing conversationId or userId')
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("❌ Missing Supabase environment variables");
+      throw new Error('Missing Supabase configuration');
     }
 
-    // Verify user owns this conversation
+    console.log("🔧 Initializing Supabase client...");
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("📥 Request body parsed:", { conversationId: requestBody.conversationId, userId: requestBody.userId });
+    } catch (parseError) {
+      console.error("❌ Failed to parse request body:", parseError);
+      throw new Error('Invalid request body format');
+    }
+
+    const { conversationId, userId } = requestBody;
+
+    if (!conversationId || !userId) {
+      console.error("❌ Missing required parameters:", { conversationId, userId });
+      throw new Error('Missing conversationId or userId');
+    }
+
+    // Step 1: Verify user owns this conversation
+    console.log("🔍 Step 1: Verifying conversation ownership...");
     const { data: conversation, error: convError } = await supabaseClient
       .from('conversations')
       .select(`
@@ -43,16 +65,26 @@ serve(async (req) => {
       .eq('user_id', userId)
       .single()
 
-    if (convError || !conversation) {
-      throw new Error('Conversation not found or access denied')
+    if (convError) {
+      console.error("❌ Error fetching conversation:", convError);
+      throw new Error(`Conversation query failed: ${convError.message}`);
     }
+
+    if (!conversation) {
+      console.error("❌ Conversation not found or access denied");
+      throw new Error('Conversation not found or access denied');
+    }
+
+    console.log("✅ Conversation ownership verified");
 
     // Check if session is already ended
     if (conversation.is_session_ended) {
-      throw new Error('Session is already ended')
+      console.error("❌ Session is already ended");
+      throw new Error('Session is already ended');
     }
 
-    // Fetch messages for the conversation
+    // Step 2: Fetch messages for the conversation
+    console.log("🔍 Step 2: Fetching conversation messages...");
     const { data: messages, error: msgError } = await supabaseClient
       .from('messages')
       .select('*')
@@ -60,35 +92,47 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
 
     if (msgError) {
-      throw new Error('Failed to fetch messages: ' + msgError.message)
+      console.error("❌ Error fetching messages:", msgError);
+      throw new Error(`Failed to fetch messages: ${msgError.message}`);
     }
 
-    // Fetch participants
+    console.log(`✅ Fetched ${messages?.length || 0} messages`);
+
+    // Step 3: Fetch participants
+    console.log("🔍 Step 3: Fetching session participants...");
     const { data: participants, error: partError } = await supabaseClient
       .from('session_participants')
       .select('*')
       .eq('conversation_id', conversationId)
 
     if (partError) {
-      throw new Error('Failed to fetch participants: ' + partError.message)
+      console.error("❌ Error fetching participants:", partError);
+      throw new Error(`Failed to fetch participants: ${partError.message}`);
     }
 
-    // Calculate session analytics
+    console.log(`✅ Fetched ${participants?.length || 0} participants`);
+
+    // Step 4: Calculate session analytics
+    console.log("🔍 Step 4: Calculating session analytics...");
     const { error: analyticsError } = await supabaseClient
       .rpc('calculate_session_analytics', { conv_id: conversationId })
 
     if (analyticsError) {
-      console.error('Failed to calculate analytics:', analyticsError)
+      console.error("⚠️ Warning: Failed to calculate analytics:", analyticsError);
+      // Don't throw here, continue with report generation
+    } else {
+      console.log("✅ Session analytics calculated");
     }
 
-    // Generate comprehensive report using enhanced generator
-    const participantStats = analyzeParticipation(messages, participants)
-    const userTopics = extractUserTopics(messages)
+    // Step 5: Generate comprehensive report
+    console.log("🔍 Step 5: Generating comprehensive report...");
+    const participantStats = analyzeParticipation(messages || [], participants || []);
+    const userTopics = extractUserTopics(messages || []);
     
-    const sessionTitle = conversation.sessions?.title || "Session Report"
-    const sessionObjective = conversation.sessions?.objective || "Facilitate productive discussion"
-    const participantCount = participants?.length || 0
-    const participantDescription = conversation.participant_description || ""
+    const sessionTitle = conversation.sessions?.title || "Session Report";
+    const sessionObjective = conversation.sessions?.objective || "Facilitate productive discussion";
+    const participantCount = participants?.length || 0;
+    const participantDescription = conversation.participant_description || "";
 
     const reportContent = generateEnhancedReportContent(
       sessionTitle,
@@ -98,10 +142,13 @@ serve(async (req) => {
       userTopics,
       participantStats,
       participantCount > 10 ? "large group" : participantCount > 4 ? "medium group" : "small group",
-      messages
-    )
+      messages || []
+    );
 
-    // Create session report record
+    console.log("✅ Report content generated");
+
+    // Step 6: Create session report record
+    console.log("🔍 Step 6: Creating session report record...");
     const { data: reportData, error: reportError } = await supabaseClient
       .from('session_reports')
       .insert({
@@ -111,23 +158,27 @@ serve(async (req) => {
         generated_by: userId,
         metadata: {
           participant_count: participantCount,
-          message_count: messages.length,
+          message_count: messages?.length || 0,
           session_duration: conversation.session_duration_minutes || 0,
           engagement_score: conversation.participant_engagement_score || 0,
           topics: userTopics,
           participation_stats: participantStats,
-          highlights: extractHighlights(messages),
-          key_insights: extractKeyInsights(messages, participantStats)
+          highlights: extractHighlights(messages || []),
+          key_insights: extractKeyInsights(messages || [], participantStats)
         }
       })
       .select()
       .single()
 
     if (reportError) {
-      throw new Error('Failed to create report: ' + reportError.message)
+      console.error("❌ Error creating report:", reportError);
+      throw new Error(`Failed to create report: ${reportError.message}`);
     }
 
-    // Close the session
+    console.log("✅ Session report record created:", reportData.id);
+
+    // Step 7: Close the session
+    console.log("🔍 Step 7: Closing the session...");
     const { error: closeError } = await supabaseClient
       .from('conversations')
       .update({
@@ -139,10 +190,14 @@ serve(async (req) => {
       .eq('id', conversationId)
 
     if (closeError) {
-      throw new Error('Failed to close session: ' + closeError.message)
+      console.error("❌ Error closing session:", closeError);
+      throw new Error(`Failed to close session: ${closeError.message}`);
     }
 
-    // Send session ended event to participants
+    console.log("✅ Session closed successfully");
+
+    // Step 8: Send session ended event to participants
+    console.log("🔍 Step 8: Creating session ended event...");
     const { error: eventError } = await supabaseClient
       .from('session_events')
       .insert({
@@ -156,33 +211,44 @@ serve(async (req) => {
       })
 
     if (eventError) {
-      console.error('Failed to create session ended event:', eventError)
+      console.error("⚠️ Warning: Failed to create session ended event:", eventError);
+      // Don't throw here, the main operation succeeded
+    } else {
+      console.log("✅ Session ended event created");
     }
 
-    console.log(`Session ${conversationId} closed successfully with report ${reportData.id}`)
+    console.log(`🎉 Session ${conversationId} closed successfully with report ${reportData.id}`);
 
+    const responseData = {
+      success: true,
+      reportId: reportData.id,
+      reportContent: reportContent,
+      sessionData: {
+        participantCount,
+        messageCount: messages?.length || 0,
+        duration: conversation.session_duration_minutes || 0,
+        engagementScore: conversation.participant_engagement_score || 0
+      }
+    };
+
+    console.log("📤 Sending success response");
     return new Response(
-      JSON.stringify({
-        success: true,
-        reportId: reportData.id,
-        reportContent: reportContent,
-        sessionData: {
-          participantCount,
-          messageCount: messages.length,
-          duration: conversation.session_duration_minutes || 0,
-          engagementScore: conversation.participant_engagement_score || 0
-        }
-      }),
+      JSON.stringify(responseData),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   } catch (error) {
-    console.error('Error in close-session-and-generate-report:', error)
+    console.error('💥 Error in close-session-and-generate-report:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.log("📤 Sending error response:", errorMessage);
+    
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        success: false,
+        error: errorMessage
       }),
       { 
         status: 500, 

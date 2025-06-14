@@ -23,7 +23,7 @@ export const useSessionClosure = () => {
 
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     if (!conversationId) {
-      console.error("No conversation ID provided to closeSessionAndGenerateReport");
+      console.error("❌ No conversation ID provided to closeSessionAndGenerateReport");
       toast({
         title: "Error",
         description: "No conversation ID provided",
@@ -33,18 +33,58 @@ export const useSessionClosure = () => {
     }
 
     setIsClosing(true);
-    console.log("Starting session closure process for conversation:", conversationId);
+    console.log("🚀 Starting session closure process for conversation:", conversationId);
 
     try {
+      // Step 1: Verify user authentication
+      console.log("🔍 Step 1: Checking user authentication...");
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError || !user) {
-        console.error("User authentication error:", userError);
+      if (userError) {
+        console.error("❌ User authentication error:", userError);
+        throw new Error(`Authentication failed: ${userError.message}`);
+      }
+      
+      if (!user) {
+        console.error("❌ No authenticated user found");
         throw new Error('User not authenticated');
       }
+      
+      console.log("✅ User authenticated:", user.id);
 
-      console.log('Calling edge function to close session and generate report...');
+      // Step 2: Verify conversation ownership
+      console.log("🔍 Step 2: Verifying conversation ownership...");
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('user_id, is_session_ended')
+        .eq('id', conversationId)
+        .single();
 
+      if (convError) {
+        console.error("❌ Error fetching conversation:", convError);
+        throw new Error(`Failed to fetch conversation: ${convError.message}`);
+      }
+
+      if (!conversation) {
+        console.error("❌ Conversation not found");
+        throw new Error('Conversation not found');
+      }
+
+      if (conversation.user_id !== user.id) {
+        console.error("❌ User does not own this conversation");
+        throw new Error('Access denied: You do not own this conversation');
+      }
+
+      if (conversation.is_session_ended) {
+        console.error("❌ Session is already ended");
+        throw new Error('Session is already ended');
+      }
+
+      console.log("✅ Conversation ownership verified");
+
+      // Step 3: Call the edge function
+      console.log("🔍 Step 3: Calling edge function to close session and generate report...");
+      
       const { data, error } = await supabase.functions.invoke('close-session-and-generate-report', {
         body: {
           conversationId,
@@ -52,19 +92,19 @@ export const useSessionClosure = () => {
         }
       });
 
-      console.log("Edge function response:", { data, error });
+      console.log("📡 Edge function response received:", { data, error });
 
       if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || 'Failed to close session and generate report');
+        console.error("❌ Edge function error:", error);
+        throw new Error(`Edge function failed: ${error.message || 'Unknown error'}`);
       }
 
       if (!data || !data.success) {
-        console.error("Edge function returned unsuccessful result:", data);
+        console.error("❌ Edge function returned unsuccessful result:", data);
         throw new Error(data?.error || 'Failed to process session closure');
       }
 
-      console.log("Session closed successfully:", data);
+      console.log("✅ Session closed successfully:", data);
       setClosureResult(data);
 
       toast({
@@ -74,10 +114,16 @@ export const useSessionClosure = () => {
 
       return true;
     } catch (error) {
-      console.error('Error closing session:', error);
+      console.error('💥 Error in closeSessionAndGenerateReport:', error);
+      
+      let errorMessage = "Failed to close session and generate report";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error Closing Session",
-        description: error instanceof Error ? error.message : "Failed to close session and generate report",
+        description: errorMessage,
         variant: "destructive"
       });
       return false;

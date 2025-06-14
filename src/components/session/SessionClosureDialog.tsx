@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, AlertTriangle } from "lucide-react";
+import { FileText, Download, AlertTriangle, Users, MessageSquare, Clock } from "lucide-react";
 
 interface SessionClosureDialogProps {
   isOpen: boolean;
@@ -43,15 +43,29 @@ const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
               Are you sure you want to close <strong>{sessionTitle}</strong>? This action will:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>End the session for all {participantCount} participants</li>
-              <li>Generate a comprehensive session report</li>
-              <li>Prevent further messages from being sent</li>
-              <li>Redirect participants to the home page</li>
+              <li className="flex items-center space-x-2">
+                <Users className="h-3 w-3 flex-shrink-0" />
+                <span>End the session for all {participantCount} participants</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <FileText className="h-3 w-3 flex-shrink-0" />
+                <span>Generate a comprehensive session report</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                <span>Prevent further messages from being sent</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <Clock className="h-3 w-3 flex-shrink-0" />
+                <span>Redirect participants to the home page</span>
+              </li>
             </ul>
-            <p className="text-sm text-muted-foreground">
-              <FileText className="h-4 w-4 inline mr-1" />
-              The report will include participation statistics, key discussion points, and session analytics.
-            </p>
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <FileText className="h-4 w-4 inline mr-1" />
+                The report will include participation statistics, key discussion points, and session analytics.
+              </p>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

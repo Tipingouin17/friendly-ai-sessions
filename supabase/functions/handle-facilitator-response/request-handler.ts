@@ -14,26 +14,45 @@ export function initSupabaseClient() {
 }
 
 export async function parseRequest(req: Request) {
-  const body = await req.json()
-  
-  const { 
-    messages = [], 
-    conversationId, 
-    generateReport = false,
-    wrapUpSession = false 
-  } = body
-  
-  if (!conversationId) {
-    throw new Error('Missing conversationId')
-  }
-  
-  console.log(`Processing request: conversationId=${conversationId}, generateReport=${generateReport}, wrapUpSession=${wrapUpSession}, messagesCount=${messages.length}`)
-  
-  return { 
-    messages, 
-    conversationId: Number(conversationId), 
-    generateReport: Boolean(generateReport),
-    wrapUpSession: Boolean(wrapUpSession)
+  try {
+    const body = await req.json();
+    console.log("📥 Received request body:", JSON.stringify(body, null, 2));
+    
+    const { 
+      messages = [], 
+      conversationId, 
+      generateReport = false, 
+      wrapUpSession = false,
+      sessionStart = false 
+    } = body;
+    
+    // Validate required fields
+    if (!conversationId) {
+      throw new Error("conversationId is required");
+    }
+    
+    if (!Array.isArray(messages)) {
+      throw new Error("messages must be an array");
+    }
+    
+    console.log("✅ Request validation passed:", {
+      messageCount: messages.length,
+      conversationId,
+      generateReport,
+      wrapUpSession,
+      sessionStart
+    });
+    
+    return {
+      messages,
+      conversationId: Number(conversationId),
+      generateReport: Boolean(generateReport),
+      wrapUpSession: Boolean(wrapUpSession),
+      sessionStart: Boolean(sessionStart)
+    };
+  } catch (error) {
+    console.error("❌ Request parsing failed:", error);
+    throw new Error(`Invalid request format: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

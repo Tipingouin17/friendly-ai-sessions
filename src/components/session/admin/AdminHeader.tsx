@@ -91,6 +91,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   };
 
   const isSessionEnded = conversation?.is_session_ended || false;
+  const isSessionStarted = conversation?.session_started || false;
   const facilitatorInfo = getFacilitatorInfo();
 
   return (
@@ -117,8 +118,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-semibold text-gray-900">{getSessionTitle()}</h1>
                 <SessionStatusBadge
-                  isActive={!isSessionPaused && !isSessionEnded}
-                  sessionStarted={conversation?.session_started || false}
+                  isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
+                  sessionStarted={isSessionStarted}
                 />
               </div>
               
@@ -177,8 +178,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               </Collapsible>
             )}
 
-            {/* Wrap Up Button */}
-            {!isSessionEnded && (
+            {/* Wrap Up Button - only show if session has started */}
+            {!isSessionEnded && isSessionStarted && (
               <AdminWrapUpDialog
                 onWrapUp={toggleSessionState}
                 isWrappingUp={isSessionPaused}

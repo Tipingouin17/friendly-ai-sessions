@@ -34,7 +34,8 @@ export async function processResponse(
   conversation: any,
   participants: any[],
   generateReport: boolean,
-  wrapUpSession?: boolean
+  wrapUpSession?: boolean,
+  sessionStart?: boolean
 ) {
   // Track participation metrics with enhanced participant awareness
   const participantStats = analyzeParticipation(messages, participants || []);
@@ -65,6 +66,12 @@ export async function processResponse(
   if (wrapUpSession) {
     console.log("🔄 Admin triggered wrap up - forcing session progress to 'concluding'");
     sessionProgress = "concluding";
+  }
+  
+  // Force session progress to "early" if this is session start
+  if (sessionStart) {
+    console.log("🚀 Session start detected - generating welcome message");
+    sessionProgress = "early";
   }
   
   // Get the appropriate facilitator avatar
@@ -101,7 +108,7 @@ export async function processResponse(
       // Extract user questions and topics
       const userTopics = extractUserTopics(prunedMessages);
       
-      // Prepare OpenAI prompt with language awareness and wrap up instruction
+      // Prepare OpenAI prompt with language awareness and session start instruction
       let basePrompt = prepareOpenAIPrompt(
         conversation, 
         sessionProgress, 
@@ -109,6 +116,18 @@ export async function processResponse(
         participantDescription, 
         strategies
       );
+      
+      // Add session start instruction if requested
+      if (sessionStart) {
+        basePrompt += `\n\nIMPORTANT: This is the session start. Please generate an engaging welcome message that:
+1. Introduces yourself as the facilitator and the session topic
+2. Acknowledges the participants who have joined (${participantCount} ${participantDescription})
+3. Explains the session objective: ${conversation.sessions.objective || 'facilitate meaningful discussion'}
+4. Asks engaging questions to help participants introduce themselves
+5. Creates an inclusive and welcoming atmosphere
+6. Encourages participation and sets expectations
+7. Be specific about what you want participants to share about themselves`;
+      }
       
       // Add wrap up instruction if requested
       if (wrapUpSession) {
@@ -172,7 +191,7 @@ export async function processResponse(
           participantCount,
           participantDescription,
           sessionLanguage,
-          wrapUpSession ? 'session_wrap_up' : (generateReport ? 'report_generation' : 'facilitator_response')
+          sessionStart ? 'session_start' : (wrapUpSession ? 'session_wrap_up' : (generateReport ? 'report_generation' : 'facilitator_response'))
         );
       } else {
         console.error("OpenAI API error:", openAIResult.error);

@@ -5,6 +5,7 @@ import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
 import { useMessageSaver } from "./messageSender/useMessageSaver";
 import { useFacilitatorResponse } from "./messageSender/useFacilitatorResponse";
+import { useEnhancedSessionLogger } from "./useEnhancedSessionLogger";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -39,11 +40,12 @@ export const useMessageSender = ({
   // Import our helper hooks
   const { saveUserMessage } = useMessageSaver();
   const { requestFacilitatorResponse } = useFacilitatorResponse();
+  const { logMessageSent, logAIResponse, logPerformanceMetric } = useEnhancedSessionLogger();
   
   const handleSendMessage = useCallback(async () => {
     // Prevent duplicate sends
-    if (requestInProgressRef.current || isWaitingForResponse) {
-      console.log("Request already in progress, ignoring duplicate send");
+    if (requestInProgressRef.current || isWaitingForResponse || !currentConversationId) {
+      console.log("Request already in progress or missing conversation ID, ignoring duplicate send");
       return;
     }
     
@@ -51,11 +53,12 @@ export const useMessageSender = ({
     if (sessionState.viewMode === "admin") return;
     
     // Don't send empty messages
-    if (!sessionState.inputMessage.trim() || !currentConversationId) return;
+    if (!sessionState.inputMessage.trim()) return;
 
     const currentParticipant = sessionState.currentParticipant;
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
+    const messageStartTime = performance.now();
     
     console.log("Sending message with participant info:", {
       currentParticipant,
@@ -77,6 +80,14 @@ export const useMessageSender = ({
         color: participantColors[currentParticipantKey] || "#CCCCCC"
       });
 
+      // Log message sent event
+      logMessageSent(
+        currentConversationId,
+        currentParticipant,
+        sessionState.inputMessage.length,
+        isAnonymous ? 'anonymous' : 'named'
+      );
+
       // Update UI
       sessionState.setMessages(prev => [...prev, newMessage]);
       const sentMessage = sessionState.inputMessage;
@@ -84,6 +95,15 @@ export const useMessageSender = ({
       
       // Record that this participant has responded
       sessionState.recordResponse(currentParticipant, true);
+      
+      // Log message processing time
+      const messageProcessTime = performance.now() - messageStartTime;
+      logPerformanceMetric(
+        currentConversationId,
+        'message_processing_time',
+        messageProcessTime,
+        { participant_id: currentParticipant, message_length: sentMessage.length }
+      );
       
       // Check if we need a facilitator response
       const totalParticipants = conversation?.participants ?? 1;
@@ -96,6 +116,7 @@ export const useMessageSender = ({
       
       if (totalParticipants <= 1 || updatedTotalResponses >= totalParticipants) {
         setIsWaitingForResponse(true);
+        const aiStartTime = performance.now();
 
         try {
           // Get facilitator response
@@ -103,6 +124,17 @@ export const useMessageSender = ({
             currentConversationId, 
             sessionState.messages,
             conversation
+          );
+          
+          const aiEndTime = performance.now();
+          const aiResponseTime = aiEndTime - aiStartTime;
+          
+          // Log AI response metrics
+          logAIResponse(
+            currentConversationId,
+            aiResponseTime,
+            'ai', // Assuming AI method, could be enhanced to detect actual method
+            undefined // Token count not available here
           );
           
           // Add AI response to UI
@@ -133,7 +165,10 @@ export const useMessageSender = ({
     conversation?.sessions?.facilitator_details?.id,
     toast,
     saveUserMessage,
-    requestFacilitatorResponse
+    requestFacilitatorResponse,
+    logMessageSent,
+    logAIResponse,
+    logPerformanceMetric
   ]);
 
   return {

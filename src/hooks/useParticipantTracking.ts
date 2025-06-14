@@ -18,6 +18,14 @@ export function useParticipantTracking(
     events: false
   });
   
+  // Use ref to always have access to current participants state
+  const participantsRef = useRef<ParticipantInfo[]>([]);
+  
+  // Update ref whenever participants state changes
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+  
   // Fetch initial participants data
   useEffect(() => {
     if (!currentConversationId) {
@@ -50,9 +58,10 @@ export function useParticipantTracking(
           isAnonymous: p.is_anonymous || false,
           isAdmin: p.is_admin || false,
           joinedAt: new Date(p.created_at),
-          lastActive: new Date(p.created_at), // Use created_at as fallback since updated_at might not exist
+          lastActive: new Date(p.created_at),
         }));
         
+        console.log(`Loaded ${participantInfos.length} participants:`, participantInfos);
         setParticipants(participantInfos);
         setIsLoading(false);
       } catch (error) {
@@ -74,7 +83,7 @@ export function useParticipantTracking(
     if (participantsChannelRef.current) {
       try {
         const channel = participantsChannelRef.current;
-        participantsChannelRef.current = null; // Clear ref first
+        participantsChannelRef.current = null;
         cleanupAttemptedRef.current.participants = true;
         
         console.info('Cleaning up participants channel before creating new one');
@@ -97,33 +106,43 @@ export function useParticipantTracking(
           table: 'session_participants',
           filter: `conversation_id=eq.${currentConversationId}`
         }, (payload) => {
+          console.log("Participant table change:", payload);
+          
           // Handle different event types
           if (payload.eventType === 'INSERT') {
             // New participant joined
             const newParticipant = payload.new;
+            console.log("New participant data:", newParticipant);
             
-            // Check if participant already exists to prevent duplicates
-            const exists = participants.some(p => p.id === newParticipant.participant_id);
-            if (exists) return;
-            
-            // Add new participant
-            const participantInfo: ParticipantInfo = {
-              id: newParticipant.participant_id,
-              name: newParticipant.name || `Participant ${newParticipant.participant_id}`,
-              avatar: newParticipant.avatar_seed ? `/api/avatar?name=${newParticipant.avatar_seed}&variant=beam&palette=0` : null,
-              avatarSeed: newParticipant.avatar_seed || null,
-              isAnonymous: newParticipant.is_anonymous || false,
-              isAdmin: newParticipant.is_admin || false,
-              joinedAt: new Date(newParticipant.created_at),
-              lastActive: new Date(newParticipant.created_at),
-            };
-            
-            setParticipants(prev => [...prev, participantInfo]);
+            // Use functional update to avoid stale closure issues
+            setParticipants(prevParticipants => {
+              // Check if participant already exists to prevent duplicates
+              const exists = prevParticipants.some(p => p.id === newParticipant.participant_id);
+              if (exists) {
+                console.log(`Participant ${newParticipant.participant_id} already exists, skipping`);
+                return prevParticipants;
+              }
+              
+              // Add new participant
+              const participantInfo: ParticipantInfo = {
+                id: newParticipant.participant_id,
+                name: newParticipant.name || `Participant ${newParticipant.participant_id}`,
+                avatar: newParticipant.avatar_seed ? `/api/avatar?name=${newParticipant.avatar_seed}&variant=beam&palette=0` : null,
+                avatarSeed: newParticipant.avatar_seed || null,
+                isAnonymous: newParticipant.is_anonymous || false,
+                isAdmin: newParticipant.is_admin || false,
+                joinedAt: new Date(newParticipant.created_at),
+                lastActive: new Date(newParticipant.created_at),
+              };
+              
+              console.log(`Adding new participant to list:`, participantInfo);
+              return [...prevParticipants, participantInfo];
+            });
           } else if (payload.eventType === 'UPDATE') {
             // Participant updated (e.g., name change, status change)
             const updatedParticipant = payload.new;
             
-            setParticipants(prev => prev.map(p => {
+            setParticipants(prevParticipants => prevParticipants.map(p => {
               if (p.id === updatedParticipant.participant_id) {
                 return {
                   ...p,
@@ -141,7 +160,7 @@ export function useParticipantTracking(
             // Participant removed
             const removedParticipant = payload.old;
             
-            setParticipants(prev => prev.filter(p => p.id !== removedParticipant.participant_id));
+            setParticipants(prevParticipants => prevParticipants.filter(p => p.id !== removedParticipant.participant_id));
           }
         })
         .subscribe(status => {
@@ -159,7 +178,7 @@ export function useParticipantTracking(
     if (participantEventsChannelRef.current) {
       try {
         const eventsChannel = participantEventsChannelRef.current;
-        participantEventsChannelRef.current = null; // Clear ref first
+        participantEventsChannelRef.current = null;
         cleanupAttemptedRef.current.events = true;
         
         console.info('Cleaning up participant events channel before creating new one');
@@ -181,36 +200,50 @@ export function useParticipantTracking(
           table: 'session_events',
           filter: `conversation_id=eq.${currentConversationId}`
         }, (payload) => {
+          console.log("Session event received:", payload);
+          
           // We're interested in join/leave events
           if (payload.new?.event_type === 'participant_joined') {
-            // A new participant joined - this may already be handled by the session_participants subscription
-            // but we'll update the UI quicker this way
             const eventData = payload.new.data;
+            console.log("Participant joined event data:", eventData);
             
-            if (eventData?.participant_id) {
-              // Check if we already have this participant
-              const exists = participants.some(p => p.id === eventData.participant_id);
-              if (exists) return;
-              
-              // Add new participant with available data
-              const participantInfo: ParticipantInfo = {
-                id: eventData.participant_id,
-                name: eventData.participant_name || `Participant ${eventData.participant_id}`,
-                avatarSeed: eventData.avatar_seed || null,
-                isAnonymous: eventData.is_anonymous || false,
-                isAdmin: eventData.is_admin || false,
-                joinedAt: new Date(),
-                lastActive: new Date(),
-              };
-              
-              setParticipants(prev => [...prev, participantInfo]);
+            if (eventData?.participant_id && eventData?.participant_name) {
+              // Use functional update to avoid stale closure issues
+              setParticipants(prevParticipants => {
+                // Check if we already have this participant
+                const exists = prevParticipants.some(p => p.id === eventData.participant_id);
+                if (exists) {
+                  console.log(`Participant ${eventData.participant_id} already exists from event, updating name if needed`);
+                  // Update existing participant with latest data
+                  return prevParticipants.map(p => 
+                    p.id === eventData.participant_id 
+                      ? { ...p, name: eventData.participant_name || p.name }
+                      : p
+                  );
+                }
+                
+                // Add new participant with available data
+                const participantInfo: ParticipantInfo = {
+                  id: eventData.participant_id,
+                  name: eventData.participant_name || `Participant ${eventData.participant_id}`,
+                  avatar: eventData.avatar_url || null,
+                  avatarSeed: eventData.avatar_seed || null,
+                  isAnonymous: eventData.is_anonymous || false,
+                  isAdmin: eventData.is_admin || false,
+                  joinedAt: new Date(),
+                  lastActive: new Date(),
+                };
+                
+                console.log(`Adding participant from event:`, participantInfo);
+                return [...prevParticipants, participantInfo];
+              });
             }
           } else if (payload.new?.event_type === 'participant_removed') {
             // A participant was removed
             const eventData = payload.new.data;
             
             if (eventData?.participant_id) {
-              setParticipants(prev => prev.filter(p => p.id !== eventData.participant_id));
+              setParticipants(prevParticipants => prevParticipants.filter(p => p.id !== eventData.participant_id));
             }
           }
         })
@@ -227,38 +260,30 @@ export function useParticipantTracking(
     // Clean up both channel subscriptions on unmount
     return () => {
       try {
-        console.info('Participant events channel status:', participantEventsChannelRef.current?.state);
-        
-        // Only attempt cleanup if there's a valid channel and we haven't already tried
         if (participantsChannelRef.current && !cleanupAttemptedRef.current.participants) {
           const channel = participantsChannelRef.current;
-          participantsChannelRef.current = null; // Clear ref first
+          participantsChannelRef.current = null;
           cleanupAttemptedRef.current.participants = true;
           supabase.removeChannel(channel);
         }
       } catch (err) {
         console.error('Error cleaning up participants channel:', err);
-        // Ensure ref is cleared
         participantsChannelRef.current = null;
       }
       
       try {
-        console.info('Participant events channel status:', participantEventsChannelRef.current?.state);
-        
-        // Only attempt cleanup if there's a valid channel and we haven't already tried
         if (participantEventsChannelRef.current && !cleanupAttemptedRef.current.events) {
           const eventsChannel = participantEventsChannelRef.current;
-          participantEventsChannelRef.current = null; // Clear ref first
+          participantEventsChannelRef.current = null;
           cleanupAttemptedRef.current.events = true;
           supabase.removeChannel(eventsChannel);
         }
       } catch (err) {
         console.error('Error cleaning up participant events channel:', err);
-        // Ensure ref is cleared
         participantEventsChannelRef.current = null;
       }
     };
-  }, [currentConversationId, participants]);
+  }, [currentConversationId]); // Removed participants from dependency array to prevent stale closures
   
   return { participants, setParticipants, isLoading };
 }

@@ -47,7 +47,13 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
   const [showReportDialog, setShowReportDialog] = useState(false);
   
   const handleBack = () => {
-    navigate('/past-workshops?auto=true');
+    // Navigate to the participant session view instead of past workshops
+    if (conversation?.id) {
+      navigate(`/session?id=${conversation.id}`);
+    } else {
+      // Fallback to past workshops if no conversation ID
+      navigate('/past-workshops?auto=true');
+    }
   };
 
   const handleCloseSession = async () => {
@@ -101,8 +107,8 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
         {/* Main header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" onClick={handleBack} title="Back to Sessions Dashboard">
-              <LayoutDashboard className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={handleBack} title="Return to Participant Session">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             
             <div className="flex flex-col">

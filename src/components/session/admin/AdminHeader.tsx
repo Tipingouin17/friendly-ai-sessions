@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,14 +21,12 @@ interface AdminHeaderProps {
   conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
-  onExportData?: () => void;
 }
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({
   conversation,
   isSessionPaused,
-  toggleSessionState,
-  onExportData
+  toggleSessionState
 }) => {
   const navigate = useNavigate();
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
@@ -67,9 +66,9 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
   };
 
-  const handleExportClick = () => {
+  const handleCloseAndGetReport = () => {
     if (!conversation?.id) {
-      console.error("No conversation available for export");
+      console.error("No conversation available for closure");
       return;
     }
 
@@ -78,12 +77,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       return;
     }
 
-    if (onExportData) {
-      onExportData();
-    } else {
-      console.log("Opening session closure dialog");
-      setShowClosureDialog(true);
-    }
+    console.log("Opening session closure dialog for proper report generation");
+    setShowClosureDialog(true);
   };
 
   const getSessionTitle = () => {
@@ -207,7 +202,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             variant={isSessionEnded ? "outline" : "default"}
             size="sm" 
             className="flex items-center gap-2 min-w-0"
-            onClick={handleExportClick}
+            onClick={handleCloseAndGetReport}
             disabled={isClosing}
           >
             <FileText className="h-4 w-4" />

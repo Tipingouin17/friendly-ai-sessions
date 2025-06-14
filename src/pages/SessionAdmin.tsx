@@ -57,7 +57,6 @@ const SessionAdmin = () => {
   const {
     isSessionPaused,
     toggleSessionState,
-    exportSessionData,
     handleAdminMessage,
     handleSendAdminMessage,
     responseCount,
@@ -133,7 +132,6 @@ const SessionAdmin = () => {
   return (
     <AdminSessionLayout
       conversationData={conversationData}
-      exportSessionData={exportSessionData}
       handleSendAdminMessage={handleSendAdminMessage}
       toggleSessionState={toggleSessionState}
       isSessionPaused={isSessionPaused}

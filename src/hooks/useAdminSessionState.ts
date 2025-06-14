@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { useToast } from '@/components/ui/use-toast';
@@ -19,7 +20,6 @@ export function useAdminSessionState({
   setMessages
 }: UseAdminSessionStateProps) {
   const [isSessionPaused, setIsSessionPaused] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
   // Toggle session state (active/paused)
@@ -112,80 +112,9 @@ export function useAdminSessionState({
     }
   }, [conversationId, setMessages, toast]);
 
-  // Export session data (messages, participants, etc.)
-  const exportSessionData = useCallback(async () => {
-    if (!conversationId) return;
-
-    try {
-      setIsExporting(true);
-      
-      // Prepare the data to export
-      // Filter out system messages and format for export
-      const exportableMessages = messages
-        .filter(m => !m.isReport && (m.sender === "user" || m.sender === "assistant" || m.sender === "admin" || m.isAdminMessage))
-        .map(m => {
-          // Find participant info for user messages
-          const participantInfo = m.sender === "user" && m.participant 
-            ? participants.find(p => `P${p.id}` === m.participant) 
-            : null;
-            
-          return {
-            timestamp: m.timestamp ? m.timestamp.toISOString() : new Date().toISOString(),
-            type: m.sender === "admin" ? "admin" : m.isAdminMessage ? "admin" : m.sender,
-            participant: participantInfo?.name || m.participant || "Unknown",
-            anonymous: participantInfo?.isAnonymous || false,
-            content: m.content,
-            pinned: m.isPinned || false
-          };
-        });
-      
-      // Create export object
-      const exportData = {
-        sessionId: conversationId,
-        title: "Session Export",
-        exportDate: new Date().toISOString(),
-        participants: participants.map(p => ({
-          id: p.id,
-          name: p.name,
-          anonymous: p.isAnonymous || false
-        })),
-        messages: exportableMessages
-      };
-      
-      // Convert to JSON
-      const jsonString = JSON.stringify(exportData, null, 2);
-      
-      // Create and download file
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `session-${conversationId}-export-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: "Export complete",
-        description: "Session data has been exported to a JSON file",
-      });
-    } catch (error) {
-      console.error("Error exporting session data:", error);
-      toast({
-        title: "Export failed",
-        description: "There was an error exporting the session data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  }, [conversationId, messages, participants, toast]);
-
   return {
     isSessionPaused,
-    isExporting,
     toggleSessionState,
-    sendAdminMessage,
-    exportSessionData
+    sendAdminMessage
   };
 }

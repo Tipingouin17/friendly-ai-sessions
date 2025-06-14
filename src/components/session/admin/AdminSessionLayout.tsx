@@ -7,7 +7,6 @@ import { ConversationWithSession } from "@/types/database";
 
 interface AdminSessionLayoutProps {
   conversationData: ConversationWithSession | null;
-  exportSessionData: () => void;
   handleSendAdminMessage: (message: string, isPinned?: boolean, recipientId?: string) => void;
   toggleSessionState: () => void;
   isSessionPaused: boolean;
@@ -26,7 +25,6 @@ interface AdminSessionLayoutProps {
 
 const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
   conversationData,
-  exportSessionData,
   handleSendAdminMessage,
   toggleSessionState,
   isSessionPaused,
@@ -46,7 +44,6 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         conversation={conversationData}
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
-        onExportData={exportSessionData}
       />
       
       <AdminSessionContent

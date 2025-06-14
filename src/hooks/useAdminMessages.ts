@@ -57,10 +57,8 @@ export function useAdminMessages({
   // Use the admin session state hook
   const {
     isSessionPaused,
-    isExporting,
     toggleSessionState,
-    sendAdminMessage,
-    exportSessionData
+    sendAdminMessage
   } = useAdminSessionState({
     conversationId,
     currentUserParticipantId: null,
@@ -340,9 +338,7 @@ export function useAdminMessages({
   return {
     welcomeMessage,
     isSessionPaused,
-    isExporting,
     toggleSessionState,
-    exportSessionData,
     handleAdminMessage,
     handleSendAdminMessage,
     

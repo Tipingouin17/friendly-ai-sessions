@@ -6,7 +6,6 @@ import AdminMessageLoadingState from './messaging/AdminMessageLoadingState';
 import AdminMessageEmptyState from './messaging/AdminMessageEmptyState';
 import AdminMessageInput from './AdminMessageInput';
 import { getParticipantColor } from '@/utils/sessionHelpers';
-import AdminDashboard from './admin/AdminDashboard';
 
 interface AdminSessionMessagesProps {
   messages: Message[];
@@ -46,10 +45,12 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
   // but no participant responses yet
   const hasWelcomeMessage = conversationData?.sessions?.welcome_message;
 
-  const content = messages.length === 0 && !hasWelcomeMessage ? (
-    <AdminMessageEmptyState conversationData={conversationData} />
-  ) : (
-    <>
+  if (messages.length === 0 && !hasWelcomeMessage) {
+    return <AdminMessageEmptyState conversationData={conversationData} />;
+  }
+
+  return (
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-hidden">
         <AdminMessageView
           messages={messages}
@@ -67,28 +68,7 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
         onSendMessage={onSendMessage}
         participants={participants}
       />
-    </>
-  );
-
-  // Wrap content in the dashboard UI
-  return (
-    <AdminDashboard
-      conversationData={conversationData}
-      messages={messages}
-      isSessionPaused={false} // This will be passed from parent
-      toggleSessionState={() => {}} // This will be passed from parent
-      handleAdminMessage={(message) => onSendMessage(message, false)}
-      exportSessionData={() => {}} // This will be passed from parent
-      participants={participants}
-      currentParticipantCount={participants.length}
-      maxParticipants={conversationData?.participants || 10}
-      searchTerm={searchTerm}
-      setSearchTerm={setSearchTerm}
-      showAnonymous={showAnonymous}
-      setShowAnonymous={setShowAnonymous}
-    >
-      {content}
-    </AdminDashboard>
+    </div>
   );
 };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import QRCodeView from 'qrcode.react';
 import { Button } from "@/components/ui/button";
@@ -73,10 +74,9 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
           {/* Participant Counter */}
           <div className="mb-8">
             <ParticipantCounter
-              currentCount={currentParticipantCount}
-              maxCount={maxParticipants}
+              currentParticipants={currentParticipantCount}
+              maxParticipants={maxParticipants}
               conversationId={conversationId}
-              onSessionFull={onSessionFull}
             />
           </div>
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlanInfo } from '@/components/subscription/PlanInfo';
@@ -43,7 +42,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-gray-50">
+    <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-primary/10 to-white">
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
         

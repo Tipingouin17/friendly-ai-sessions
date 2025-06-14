@@ -13,6 +13,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
+    --primary: 45 100% 50%; /* #FFC107 - Yellow */
+    --primary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
     --border: 214.3 31.8% 91.4%;
@@ -53,11 +55,11 @@
   
   /* Add new spinner utility classes */
   .spinner {
-    @apply w-8 h-8 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
+    @apply w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
   }
   
   .spinner-sm {
-    @apply w-4 h-4 border-2 border-amber-200 border-t-amber-500 rounded-full animate-spin;
+    @apply w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
   }
   
   /* Admin session page specific styles */

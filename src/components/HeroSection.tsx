@@ -27,7 +27,7 @@ export const HeroSection = () => {
         </p>
         <div className="space-y-4 flex flex-col items-center">
           <Button size="lg" className="hover-lift" onClick={handleButtonClick}>
-            {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"} <ArrowRight className="ml-2 h-4 w-4" />
+            {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
           <p className="text-sm text-muted-foreground">*no credit card required</p>
         </div>

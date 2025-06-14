@@ -1,3 +1,4 @@
+
 import { Brain, Globe, LineChart } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 import { Button } from "./ui/button";
@@ -31,7 +32,7 @@ export const Features = () => {
   }];
 
   return <>
-      <div className="py-24 px-4 bg-[#FFC107]/10">
+      <div className="py-24 px-4 bg-primary/10">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">Features and Benefits</h2>
@@ -46,7 +47,7 @@ export const Features = () => {
 
           <div className="mt-16 text-center">
             <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
-              {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"}
+              {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
             </Button>
             <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
           </div>
@@ -63,7 +64,7 @@ export const Features = () => {
             Our platform revolutionizes how sessions are conducted, empowering businesses and individuals to achieve greater outcomes.
           </p>
           <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
-            {isAuthenticated ? "Go to MyFacilitators!" : "Try it for free now!"}
+            {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
           </Button>
           <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
         </div>

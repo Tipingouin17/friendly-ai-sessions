@@ -26,8 +26,8 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#FFC107", // Yellow color from the screenshot
-          foreground: "#1A1F2C",
+          DEFAULT: "hsl(var(--primary))", // Uses CSS variable for consistency
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
           DEFAULT: "#FFD54F",

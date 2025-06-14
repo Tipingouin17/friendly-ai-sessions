@@ -1,6 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 import {
   Accordion,
   AccordionContent,
@@ -102,7 +103,7 @@ const FAQs = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-b from-primary/10 to-white pt-24 pb-16">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-4xl font-bold text-center mb-4">
           Frequently Asked Questions
@@ -124,9 +125,9 @@ const FAQs = () => {
         <div className="mt-12 text-center">
           <p className="text-muted-foreground">
             Can't find what you're looking for?{' '}
-            <a href="/contact" className="text-primary hover:underline">
+            <Link to="/contact" className="text-primary hover:underline">
               Contact our support team
-            </a>
+            </Link>
           </p>
         </div>
       </div>

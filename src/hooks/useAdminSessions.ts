@@ -1,12 +1,13 @@
 
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 
 export function useAdminSessions() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeSessions, setActiveSessions] = useState<ConversationWithSession[]>([]);
   
   // Fetch active sessions for admin
@@ -57,6 +58,49 @@ export function useAdminSessions() {
     refetchOnWindowFocus: false,
   });
   
+  // Set up real-time listener for conversations changes
+  useEffect(() => {
+    console.log("🔄 Setting up real-time listener for active sessions");
+    
+    const channel = supabase
+      .channel('admin-sessions-realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations'
+      }, (payload) => {
+        console.log("🔄 Conversations table updated:", payload);
+        
+        // Check if the change affects session status
+        if (payload.new && payload.old) {
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+          
+          // If session status changed (ended/started) or participant count changed
+          if (newRecord.is_session_ended !== oldRecord.is_session_ended ||
+              newRecord.status !== oldRecord.status ||
+              newRecord.current_participants !== oldRecord.current_participants) {
+            
+            console.log("🔄 Session status change detected, refreshing admin sessions");
+            
+            // Invalidate and refetch the admin sessions query
+            queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+            
+            // Also trigger a manual refetch for immediate update
+            refetch();
+          }
+        }
+      })
+      .subscribe((status) => {
+        console.log("🔄 Admin sessions real-time subscription status:", status);
+      });
+
+    return () => {
+      console.log("🔄 Cleaning up admin sessions real-time listener");
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, refetch]);
+  
   // Set active sessions whenever data changes
   useEffect(() => {
     if (data) {
@@ -76,6 +120,7 @@ export function useAdminSessions() {
   }, [error, toast]);
   
   const refreshSessions = () => {
+    console.log("🔄 Manual refresh triggered for admin sessions");
     refetch();
   };
   

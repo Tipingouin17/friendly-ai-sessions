@@ -2,7 +2,7 @@
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Clock, PlusCircle, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Workshop } from "@/types/database";
@@ -150,6 +150,7 @@ const EmptyState = ({ isActive = false }) => (
 const PastWorkshops = () => {
   const navigate = useNavigate();
   const { setAdminStatus } = useSessionAdminStatus();
+  const queryClient = useQueryClient();
   
   const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
     queryKey: ['past-workshops'],
@@ -160,6 +161,33 @@ const PastWorkshops = () => {
     queryKey: ['active-workshops'],
     queryFn: fetchActiveWorkshops,
   });
+  
+  // Set up real-time listener for workshop status changes
+  useEffect(() => {
+    console.log("🔄 Setting up real-time listener for workshop status changes");
+    
+    const channel = supabase
+      .channel('workshops-realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations'
+      }, (payload) => {
+        console.log("🔄 Workshop status updated:", payload);
+        
+        // Invalidate both past and active workshops queries
+        queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
+        queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
+      })
+      .subscribe((status) => {
+        console.log("🔄 Workshops real-time subscription status:", status);
+      });
+
+    return () => {
+      console.log("🔄 Cleaning up workshops real-time listener");
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
   
   // Navigate to most recent active session automatically
   useEffect(() => {

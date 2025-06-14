@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,6 +21,7 @@ export const useSessionClosure = () => {
   const [closureResult, setClosureResult] = useState<SessionClosureResult | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     if (!conversationId) {
@@ -106,6 +108,12 @@ export const useSessionClosure = () => {
 
       console.log("✅ Session closed successfully:", data);
       setClosureResult(data);
+
+      // Step 4: Invalidate relevant queries to ensure real-time sync
+      console.log("🔄 Invalidating queries for real-time sync...");
+      queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
+      queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
 
       toast({
         title: "Session Closed Successfully",

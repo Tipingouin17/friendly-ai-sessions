@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import QRCodeView from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
 import { Copy, CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -86,7 +86,7 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
             <div className="flex flex-col items-center">
               <h3 className="text-xl font-semibold mb-4 text-gray-800">Scan to Join</h3>
               <div className="bg-white p-4 rounded-lg border-2 border-gray-200 shadow-sm">
-                <QRCodeView 
+                <QRCodeSVG 
                   value={sessionLink} 
                   size={isMobile ? 200 : 250}
                   className="mx-auto"

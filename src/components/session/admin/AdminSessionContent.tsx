@@ -11,6 +11,7 @@ interface AdminSessionContentProps {
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
+  onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
 }
 
 const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
@@ -19,7 +20,8 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
   conversationData,
   participants,
   isLoadingParticipants,
-  currentConversationId
+  currentConversationId,
+  onSendMessage
 }) => {
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
@@ -41,6 +43,7 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
         isLoading={isLoadingParticipants}
         conversationData={conversationData}
         messages={sessionMessages}
+        onSendMessage={onSendMessage}
       />
     </div>
   );

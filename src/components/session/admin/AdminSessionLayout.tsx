@@ -1,13 +1,14 @@
 
 import React from "react";
-import AdminHeader from "@/components/session/admin/AdminHeader";
+import AdminHeader from "./AdminHeader";
 import AdminSessionContent from "./AdminSessionContent";
 import { Message, ParticipantInfo } from "@/types/chat";
+import { ConversationWithSession } from "@/types/database";
 
 interface AdminSessionLayoutProps {
-  conversationData: any;
+  conversationData: ConversationWithSession | null;
   exportSessionData: () => void;
-  handleSendAdminMessage: (message: string) => void;
+  handleSendAdminMessage: (message: string, isPinned?: boolean, recipientId?: string) => void;
   toggleSessionState: () => void;
   isSessionPaused: boolean;
   sessionMessages: Message[];
@@ -30,17 +31,14 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
   currentConversationId
 }) => {
   return (
-    <div className="flex flex-col h-screen">
-      {/* Enhanced admin header with all functionalities */}
+    <div className="flex flex-col h-screen bg-gray-50">
       <AdminHeader
         conversation={conversationData}
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
-        handleAdminMessage={handleSendAdminMessage}
         onExportData={exportSessionData}
       />
-
-      {/* Main content area */}
+      
       <AdminSessionContent
         sessionMessages={sessionMessages}
         participantColors={participantColors}
@@ -48,6 +46,7 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         participants={participants}
         isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
+        onSendMessage={handleSendAdminMessage}
       />
     </div>
   );

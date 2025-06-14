@@ -7,6 +7,7 @@ import { useParticipantRealtime } from "@/hooks/useParticipantRealtime";
 import ParticipantListItem from "@/components/session/participant/ParticipantListItem";
 import EmptyParticipantList from "@/components/session/participant/EmptyParticipantList";
 import ParticipantListSkeleton from "@/components/session/participant/ParticipantListSkeleton";
+import AdminMessageInput from "@/components/session/AdminMessageInput";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
@@ -17,6 +18,7 @@ interface AdminParticipantListProps {
   isLoading: boolean;
   conversationData: any;
   messages?: Message[];
+  onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
 }
 
 const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
@@ -25,7 +27,8 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   maxParticipants,
   isLoading,
   conversationData,
-  messages = []
+  messages = [],
+  onSendMessage
 }) => {
   const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(isLoading);
@@ -41,7 +44,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     setIsLoadingParticipants(isLoading);
   }, [participants, isLoading]);
   
-  // Use custom hooks for participant management
   const { 
     displayCount, 
     setDisplayCount, 
@@ -52,14 +54,12 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     setParticipantsList
   });
   
-  // Update display count whenever the participants list changes
   useEffect(() => {
     const actualCount = participantsList.length;
     console.log('AdminParticipantList: Setting display count to', actualCount);
     setDisplayCount(actualCount);
   }, [participantsList, setDisplayCount]);
   
-  // Set up realtime updates with the updated hook
   useParticipantRealtime({
     conversationId: conversationData?.id || null,
     participants: participantsList,
@@ -68,7 +68,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     maxParticipants
   });
   
-  // Calculate message counts for each participant
   const getParticipantMessageCount = (participantId: number) => {
     return messages.filter(msg => 
       msg.sender === 'user' && 
@@ -76,7 +75,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     ).length;
   };
   
-  // Get last active time for participant
   const getParticipantLastActive = (participantId: number) => {
     const participantMessages = messages.filter(msg => 
       msg.sender === 'user' && 
@@ -89,13 +87,11 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     return lastMessage.timestamp || (lastMessage.created_at ? new Date(lastMessage.created_at) : undefined);
   };
   
-  // Filter participants based on search term
   const filteredParticipants = participantsList.filter(participant => 
     participant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     `Participant ${participant.id}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Use actual participant count instead of passed count for display
   const actualParticipantCount = participantsList.length;
 
   return (
@@ -152,6 +148,16 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
           )}
         </div>
       </div>
+
+      {/* Admin Message Input */}
+      {onSendMessage && (
+        <div className="border-t border-gray-200">
+          <AdminMessageInput
+            onSendMessage={onSendMessage}
+            participants={participantsList}
+          />
+        </div>
+      )}
     </div>
   );
 };

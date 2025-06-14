@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, FileText, BarChart3 } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
-import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
 import SessionAnalyticsDashboard from "./SessionAnalyticsDashboard";
 import AdminWrapUpDialog from "./AdminWrapUpDialog";
@@ -22,7 +21,6 @@ interface AdminHeaderProps {
   conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
-  handleAdminMessage: (message: string) => void;
   onExportData?: () => void;
 }
 
@@ -30,7 +28,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   conversation,
   isSessionPaused,
   toggleSessionState,
-  handleAdminMessage,
   onExportData
 }) => {
   const navigate = useNavigate();
@@ -190,7 +187,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             {/* Communication Group */}
             {!isSessionEnded && (
               <div className="flex items-center gap-2">
-                <AdminMessageDialog onSendMessage={handleAdminMessage} />
                 <AdminQrDialog conversationId={conversation?.id || null} />
               </div>
             )}

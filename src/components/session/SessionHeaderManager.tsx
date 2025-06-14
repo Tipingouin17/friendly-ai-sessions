@@ -49,7 +49,6 @@ const SessionHeaderManager: React.FC<SessionHeaderManagerProps> = ({
         conversation={conversation}
         isSessionPaused={!isSessionActive}
         toggleSessionState={onToggleSessionState}
-        handleAdminMessage={onSendAdminMessage}
         onExportData={onExportData}
       />
     );

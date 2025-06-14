@@ -3,7 +3,6 @@ export interface AdminHeaderProps {
   conversation: any;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
-  handleAdminMessage: (message: string) => void;
   onExportData?: () => void;
 }
 

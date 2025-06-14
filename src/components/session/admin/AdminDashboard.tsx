@@ -82,7 +82,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           conversation={conversationData}
           isSessionPaused={isSessionPaused}
           toggleSessionState={toggleSessionState}
-          handleAdminMessage={handleAdminMessage}
           onExportData={exportSessionData}
         />
         

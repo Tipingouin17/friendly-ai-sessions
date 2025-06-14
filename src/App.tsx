@@ -73,7 +73,7 @@ function App() {
               <Route path="/session" element={<Session />} />
               <Route path="/session/admin" element={<SessionAdmin />} />
               <Route path="/session/report/:id" element={<SessionReport />} />
-              <Route path="/join" element={<JoinSession />} />
+              <Route path="/join-session" element={<JoinSession />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

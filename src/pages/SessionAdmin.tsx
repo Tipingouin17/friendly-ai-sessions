@@ -4,7 +4,6 @@ import { useSessionPage } from "@/hooks/useSessionPage";
 import { useAdminStatusPersistence } from "@/hooks/useAdminStatusPersistence";
 import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
 import { useAdminMessages } from "@/hooks/useAdminMessages";
-import { useSessionInteractions } from "@/hooks/useSessionInteractions";
 import { useAdminParticipantState } from "@/hooks/useAdminParticipantState";
 import { useAdminSessionInitialization } from "@/hooks/useAdminSessionInitialization";
 import AdminSessionLayout from "@/components/session/admin/AdminSessionLayout";
@@ -44,14 +43,7 @@ const SessionAdmin = () => {
   const {
     participants,
     setParticipants,
-    isLoadingParticipants,
-    currentParticipant,
-    isAnonymous,
-    toggleAnonymous,
-    hasAnswered,
-    totalResponses,
-    participantResponses,
-    recordResponse
+    isLoadingParticipants
   } = useAdminParticipantState({
     locationState,
     conversationData,
@@ -60,7 +52,6 @@ const SessionAdmin = () => {
 
   // Initialize session messages with empty array
   const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
 
   // Admin message handling
   const {
@@ -74,38 +65,6 @@ const SessionAdmin = () => {
     participants: participants || [],
     messages: sessionMessages || [],
     setMessages: setSessionMessages
-  });
-
-  // Session state for participant interactions
-  const sessionState = {
-    messages: sessionMessages,
-    setMessages: setSessionMessages,
-    inputMessage,
-    setInputMessage,
-    currentParticipant: currentParticipant || 1,
-    isRecording: false,
-    setIsRecording: () => {},
-    handleGenerateReport: async () => {},
-    isGeneratingReport: false,
-    hasAnswered,
-    totalResponses,
-    viewMode: "admin" as const,
-    setViewMode: () => {},
-    recordResponse,
-    error: null
-  };
-
-  // Set up session interactions for participant message sending
-  const {
-    isWaitingForResponse,
-    handleSendMessage,
-    error: interactionError
-  } = useSessionInteractions({
-    currentConversationId,
-    sessionState,
-    conversation: conversationData,
-    participants,
-    isAnonymous
   });
 
   // Keep a state reference to preserve UI data
@@ -177,15 +136,6 @@ const SessionAdmin = () => {
       participantColors={participantColors}
       participants={participants}
       isLoadingParticipants={isLoadingParticipants}
-      currentParticipant={currentParticipant}
-      inputMessage={inputMessage}
-      setInputMessage={setInputMessage}
-      isWaitingForResponse={isWaitingForResponse}
-      handleSendMessage={handleSendMessage}
-      isAnonymous={isAnonymous}
-      toggleAnonymous={toggleAnonymous}
-      hasAnswered={hasAnswered}
-      totalResponses={totalResponses}
       currentConversationId={currentConversationId}
     />
   );

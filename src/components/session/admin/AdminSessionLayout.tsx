@@ -1,6 +1,6 @@
 
 import React from "react";
-import SimplifiedAdminHeader from "@/components/session/admin/SimplifiedAdminHeader";
+import AdminHeader from "@/components/session/admin/AdminHeader";
 import AdminSessionContent from "./AdminSessionContent";
 import { Message, ParticipantInfo } from "@/types/chat";
 
@@ -14,15 +14,6 @@ interface AdminSessionLayoutProps {
   participantColors: { [key: string]: string };
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
-  currentParticipant: number | null;
-  inputMessage: string;
-  setInputMessage: (message: string) => void;
-  isWaitingForResponse: boolean;
-  handleSendMessage: () => void;
-  isAnonymous: boolean;
-  toggleAnonymous: () => void;
-  hasAnswered: boolean;
-  totalResponses: number;
   currentConversationId: number | null;
 }
 
@@ -36,31 +27,17 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
   participantColors,
   participants,
   isLoadingParticipants,
-  currentParticipant,
-  inputMessage,
-  setInputMessage,
-  isWaitingForResponse,
-  handleSendMessage,
-  isAnonymous,
-  toggleAnonymous,
-  hasAnswered,
-  totalResponses,
   currentConversationId
 }) => {
   return (
     <div className="flex flex-col h-screen">
-      {/* Simplified admin header */}
-      <SimplifiedAdminHeader
-        conversationData={conversationData}
-        onCloseAndReport={exportSessionData}
-        onSendMessage={handleSendAdminMessage}
-        isGeneratingReport={false}
-        participantCount={conversationData?.current_participants || 0}
-        maxParticipants={conversationData?.participants || 10}
-        onWrapUp={async () => {
-          await toggleSessionState();
-        }}
-        isWrappingUp={isSessionPaused}
+      {/* Full admin header with navigation */}
+      <AdminHeader
+        conversation={conversationData}
+        isSessionPaused={isSessionPaused}
+        toggleSessionState={toggleSessionState}
+        handleAdminMessage={handleSendAdminMessage}
+        onExportData={exportSessionData}
       />
 
       {/* Main content area */}
@@ -70,15 +47,6 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         conversationData={conversationData}
         participants={participants}
         isLoadingParticipants={isLoadingParticipants}
-        currentParticipant={currentParticipant}
-        inputMessage={inputMessage}
-        setInputMessage={setInputMessage}
-        isWaitingForResponse={isWaitingForResponse}
-        handleSendMessage={handleSendMessage}
-        isAnonymous={isAnonymous}
-        toggleAnonymous={toggleAnonymous}
-        hasAnswered={hasAnswered}
-        totalResponses={totalResponses}
         currentConversationId={currentConversationId}
       />
     </div>

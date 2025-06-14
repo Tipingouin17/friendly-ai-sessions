@@ -15,27 +15,14 @@ export const useAdminParticipantState = ({
   conversationData,
   currentConversationId
 }: UseAdminParticipantStateProps) => {
-  // Participant tracking
+  // Participant tracking for admin monitoring
   const {
     participants = [],
     setParticipants,
     isLoading: isLoadingParticipants
   } = useParticipantTracking(locationState, conversationData, currentConversationId);
 
-  // Current participant state
-  const currentParticipant = useCurrentParticipant({
-    locationState,
-    conversation: conversationData
-  });
-
-  // Anonymous state
-  const { isAnonymous, toggleAnonymous } = useAnonymousState({
-    conversationId: currentConversationId,
-    currentParticipantId: currentParticipant
-  });
-
-  // Response tracking state
-  const [hasAnswered, setHasAnswered] = useState(false);
+  // Response tracking state for admin monitoring
   const [totalResponses, setTotalResponses] = useState(0);
   const [participantResponses, setParticipantResponses] = useState<{ [key: number]: boolean }>({});
 
@@ -44,9 +31,6 @@ export const useAdminParticipantState = ({
       const updated = { ...prev, [participantId]: hasResponded };
       const newTotal = Object.values(updated).filter(Boolean).length;
       setTotalResponses(newTotal);
-      if (participantId === currentParticipant) {
-        setHasAnswered(hasResponded);
-      }
       return updated;
     });
   };
@@ -55,10 +39,6 @@ export const useAdminParticipantState = ({
     participants,
     setParticipants,
     isLoadingParticipants,
-    currentParticipant,
-    isAnonymous,
-    toggleAnonymous,
-    hasAnswered,
     totalResponses,
     participantResponses,
     recordResponse

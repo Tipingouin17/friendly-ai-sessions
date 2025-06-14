@@ -41,6 +41,7 @@ const SimplifiedAdminMessagingView: React.FC<SimplifiedAdminMessagingViewProps> 
 }) => {
   console.log('SimplifiedAdminMessagingView: Rendering with', messages.length, 'messages and', currentParticipantCount, 'participants');
   console.log('Session started:', isSessionStarted);
+  console.log('Participants prop:', participants?.length);
 
   // Show empty state if no real messages exist OR session hasn't started
   // Filter out welcome messages to check for real participant/facilitator content

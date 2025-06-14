@@ -22,6 +22,15 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
 }) => {
   const [actualParticipants, setActualParticipants] = useState(propParticipants);
 
+  // Debug logging
+  console.log('StartSessionButton Debug:', {
+    conversationId,
+    propParticipants: propParticipants?.length,
+    actualParticipants: actualParticipants?.length,
+    currentParticipantCount: conversationData?.current_participants,
+    disabled
+  });
+
   // Fetch actual participants if not provided
   useEffect(() => {
     const fetchParticipants = async () => {
@@ -36,6 +45,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
         if (error) {
           console.error('Error fetching participants:', error);
         } else {
+          console.log('Fetched participants from DB:', data?.length);
           setActualParticipants(data || []);
         }
       } catch (err) {
@@ -53,21 +63,25 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   });
 
   const handleStartSession = async () => {
+    console.log('Starting session with participants:', actualParticipants.length);
     const success = await startSession();
     if (success) {
       onSessionStarted();
     }
   };
 
-  const hasParticipants = actualParticipants.length > 0;
+  // Use fallback logic - check both participants array and current count
+  const hasParticipants = actualParticipants.length > 0 || (conversationData?.current_participants > 0);
   const isDisabled = disabled || isStarting || !hasParticipants;
+
+  console.log('Button state:', { hasParticipants, isDisabled, isStarting });
 
   return (
     <Button
       onClick={handleStartSession}
       disabled={isDisabled}
       size="lg"
-      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+      className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
     >
       {isStarting ? (
         <>

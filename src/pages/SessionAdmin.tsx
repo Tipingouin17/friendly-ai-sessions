@@ -91,7 +91,10 @@ const SessionAdmin = () => {
 
   // Participant state for message sending
   const [inputMessage, setInputMessage] = useState('');
-  const { currentParticipant } = useCurrentParticipant(locationState, conversationData);
+  const currentParticipant = useCurrentParticipant({
+    locationState,
+    conversation: conversationData
+  });
   const { isAnonymous, toggleAnonymous } = useAnonymousState();
   const [hasAnswered, setHasAnswered] = useState(false);
   const [totalResponses, setTotalResponses] = useState(0);
@@ -243,6 +246,7 @@ const SessionAdmin = () => {
                 messages={sessionMessages || []}
                 participantColors={participantColors}
                 currentParticipantCount={conversationData?.current_participants || 0}
+                conversationData={conversationData}
               />
             </div>
           </div>
@@ -251,7 +255,7 @@ const SessionAdmin = () => {
           <div className="h-64 border-t border-gray-200 bg-gray-50">
             <div className="p-2 bg-gray-100 border-b border-gray-200">
               <h3 className="text-sm font-medium text-gray-700">Participant Test Interface</h3>
-              <p className="text-xs text-gray-500">Send messages as Participant {currentParticipant}</p>
+              <p className="text-xs text-gray-500">Send messages as Participant {currentParticipant || 1}</p>
             </div>
             <div className="h-full">
               <ParticipantMessagingView
@@ -277,6 +281,7 @@ const SessionAdmin = () => {
                 participantNames={{}}
                 currentUserParticipantId={currentParticipant}
                 showResponseStats={false}
+                conversationData={conversationData}
               />
             </div>
           </div>

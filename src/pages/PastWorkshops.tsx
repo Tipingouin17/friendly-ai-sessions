@@ -1,3 +1,4 @@
+
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, PlusCircle, LayoutDashboard, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -168,7 +169,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
             
             <div className="flex gap-2">
               {isActive && (
-                <Button size="sm" onClick={handleAdminView} className="bg-green-600 hover:bg-green-700">
+                <Button size="sm" onClick={handleAdminView} className="bg-primary hover:bg-primary/90">
                   Manage Session
                 </Button>
               )}

@@ -2,6 +2,34 @@
 /**
  * Enhanced report generator that creates meaningful highlights and insights
  */
+
+// Helper function to safely extract text content from JSONB or string
+function extractTextContent(content: any): string {
+  if (!content) return '';
+  
+  // If it's already a string, return it
+  if (typeof content === 'string') return content;
+  
+  // If it's an object (JSONB), try to extract text content
+  if (typeof content === 'object') {
+    // Common patterns for content structure
+    if (content.text) return String(content.text);
+    if (content.content) return String(content.content);
+    if (content.message) return String(content.message);
+    
+    // If it's an array, join the elements
+    if (Array.isArray(content)) {
+      return content.map(item => extractTextContent(item)).join(' ');
+    }
+    
+    // Fallback: stringify the object
+    return JSON.stringify(content);
+  }
+  
+  // Fallback: convert to string
+  return String(content);
+}
+
 export function generateEnhancedReportContent(
   sessionTitle: string,
   sessionObjective: string,
@@ -93,8 +121,15 @@ function extractKeyInsights(userMessages: any[], participantStats: any) {
   }
   
   // Content depth insight
-  const longMessages = userMessages.filter(m => m.content && m.content.length > 100).length;
-  const shortMessages = userMessages.filter(m => m.content && m.content.length <= 50).length;
+  const longMessages = userMessages.filter(m => {
+    const content = extractTextContent(m.content);
+    return content && content.length > 100;
+  }).length;
+  
+  const shortMessages = userMessages.filter(m => {
+    const content = extractTextContent(m.content);
+    return content && content.length <= 50;
+  }).length;
   
   if (longMessages > shortMessages) {
     insights.push({
@@ -132,10 +167,22 @@ function extractMeaningfulHighlights(userMessages: any[]) {
   
   // Group messages by content themes (simplified)
   const themes = {
-    questions: userMessages.filter(m => m.content && m.content.includes('?')),
-    agreements: userMessages.filter(m => m.content && (m.content.toLowerCase().includes('agree') || m.content.toLowerCase().includes('yes'))),
-    challenges: userMessages.filter(m => m.content && (m.content.toLowerCase().includes('challenge') || m.content.toLowerCase().includes('difficult'))),
-    solutions: userMessages.filter(m => m.content && (m.content.toLowerCase().includes('solution') || m.content.toLowerCase().includes('suggest'))),
+    questions: userMessages.filter(m => {
+      const content = extractTextContent(m.content);
+      return content && content.includes('?');
+    }),
+    agreements: userMessages.filter(m => {
+      const content = extractTextContent(m.content).toLowerCase();
+      return content && (content.includes('agree') || content.includes('yes'));
+    }),
+    challenges: userMessages.filter(m => {
+      const content = extractTextContent(m.content).toLowerCase();
+      return content && (content.includes('challenge') || content.includes('difficult'));
+    }),
+    solutions: userMessages.filter(m => {
+      const content = extractTextContent(m.content).toLowerCase();
+      return content && (content.includes('solution') || content.includes('suggest'));
+    }),
   };
   
   // Create highlights from themes
@@ -199,7 +246,11 @@ function generateRecommendations(participantStats: any, userMessages: any[], obj
   }
   
   // Content-based recommendations
-  const hasQuestions = userMessages.some(m => m.content && m.content.includes('?'));
+  const hasQuestions = userMessages.some(m => {
+    const content = extractTextContent(m.content);
+    return content && content.includes('?');
+  });
+  
   if (hasQuestions) {
     recommendations.push("Follow up on the questions raised during the session with additional resources or a Q&A session");
   }

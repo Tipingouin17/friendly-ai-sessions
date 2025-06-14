@@ -17,7 +17,9 @@ import {
   Calendar,
   UserCheck,
   Star,
-  Quote
+  Quote,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,9 +39,12 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const reportConversationId = conversationId || parseInt(params.id || '0');
   
   // Fetch session report data
-  const { data: reportData, isLoading } = useQuery({
+  const { data: reportData, isLoading, error, refetch } = useQuery({
     queryKey: ['sessionReport', reportConversationId],
     queryFn: async () => {
+      console.log('🔍 Fetching session report for conversation:', reportConversationId);
+      
+      // Fetch conversation with sessions
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .select(`
@@ -53,48 +58,80 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
           )
         `)
         .eq('id', reportConversationId)
-        .single();
+        .maybeSingle();
 
-      if (convError) throw convError;
+      if (convError) {
+        console.error('❌ Error fetching conversation:', convError);
+        throw new Error(`Failed to fetch conversation: ${convError.message}`);
+      }
 
-      // Get facilitator details separately
+      if (!conversation) {
+        console.error('❌ Conversation not found for ID:', reportConversationId);
+        throw new Error('Conversation not found');
+      }
+
+      console.log('✅ Conversation found:', conversation.id);
+
+      // Get facilitator details separately if facilitator exists
       let facilitatorData = null;
       if (conversation.sessions?.facilitator) {
         const { data: facilitator, error: facilitatorError } = await supabase
           .from('facilitators')
           .select('id, title, profile_picture')
           .eq('id', conversation.sessions.facilitator)
-          .single();
+          .maybeSingle();
         
-        if (!facilitatorError) {
+        if (!facilitatorError && facilitator) {
           facilitatorData = facilitator;
+          console.log('✅ Facilitator data loaded:', facilitator.title);
         }
       }
 
+      // Fetch session report
       const { data: report, error: reportError } = await supabase
         .from('session_reports')
         .select('*')
         .eq('conversation_id', reportConversationId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (reportError) throw reportError;
+      if (reportError) {
+        console.error('❌ Error fetching report:', reportError);
+        throw new Error(`Failed to fetch report: ${reportError.message}`);
+      }
 
+      if (!report) {
+        console.error('❌ No report found for conversation:', reportConversationId);
+        throw new Error('Session report not found. The session may not have been closed yet.');
+      }
+
+      console.log('✅ Report found:', report.id);
+
+      // Fetch messages
       const { data: messages, error: msgError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', reportConversationId)
         .order('created_at', { ascending: true });
 
-      if (msgError) throw msgError;
+      if (msgError) {
+        console.error('❌ Error fetching messages:', msgError);
+        // Don't throw here, messages might be empty
+      }
 
+      // Fetch participants
       const { data: participants, error: partError } = await supabase
         .from('session_participants')
         .select('*')
         .eq('conversation_id', reportConversationId);
 
-      if (partError) throw partError;
+      if (partError) {
+        console.error('❌ Error fetching participants:', partError);
+        // Don't throw here, continue with empty participants
+      }
+
+      console.log(`✅ Data loaded - Messages: ${messages?.length || 0}, Participants: ${participants?.length || 0}`);
 
       return {
         conversation: {
@@ -102,14 +139,16 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
           facilitator: facilitatorData
         },
         report,
-        messages,
-        participants,
-        highlights: extractHighlights(messages),
-        keyMoments: extractKeyMoments(messages),
-        participationStats: calculateParticipationStats(messages, participants)
+        messages: messages || [],
+        participants: participants || [],
+        highlights: extractHighlights(messages || []),
+        keyMoments: extractKeyMoments(messages || []),
+        participationStats: calculateParticipationStats(messages || [], participants || [])
       };
     },
-    enabled: !!reportConversationId
+    enabled: !!reportConversationId,
+    retry: 2,
+    retryDelay: 1000
   });
 
   const canDownloadPDF = planRestrictions?.data_export;
@@ -135,6 +174,11 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     });
   };
 
+  const handleRetry = () => {
+    console.log('🔄 Retrying session report fetch...');
+    refetch();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -146,13 +190,50 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     );
   }
 
+  if (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const isNotFound = errorMessage.includes('not found');
+    
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          {isNotFound ? (
+            <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          ) : (
+            <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          )}
+          
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            {isNotFound ? 'Report Not Found' : 'Failed to Load Report'}
+          </h2>
+          
+          <p className="text-gray-500 mb-4">{errorMessage}</p>
+          
+          <div className="flex gap-2 justify-center">
+            <Button onClick={handleBack} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Sessions
+            </Button>
+            
+            {!isNotFound && (
+              <Button onClick={handleRetry} variant="default">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!reportData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Report Not Found</h2>
-          <p className="text-gray-500 mb-4">The session report could not be loaded.</p>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">No Report Data</h2>
+          <p className="text-gray-500 mb-4">Unable to load report data.</p>
           <Button onClick={handleBack} variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Sessions
@@ -262,14 +343,21 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
               <CardContent>
                 <ScrollArea className="h-64">
                   <div className="space-y-3">
-                    {highlights.map((highlight, index) => (
-                      <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-                        <div className="flex items-start space-x-2">
-                          <Quote className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-gray-700">{highlight}</p>
+                    {highlights.length > 0 ? (
+                      highlights.map((highlight, index) => (
+                        <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                          <div className="flex items-start space-x-2">
+                            <Quote className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-gray-700">{highlight}</p>
+                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Quote className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No highlights available for this session</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -285,15 +373,22 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {keyMoments.map((moment, index) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <p className="text-sm text-gray-600">{moment.time}</p>
-                        <p className="text-gray-900">{moment.description}</p>
+                  {keyMoments.length > 0 ? (
+                    keyMoments.map((moment, index) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        <div>
+                          <p className="text-sm text-gray-600">{moment.time}</p>
+                          <p className="text-gray-900">{moment.description}</p>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No key moments recorded for this session</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>

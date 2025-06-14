@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { generateReportContent } from "../_shared/report-generator.ts"
+import { generateEnhancedReportContent } from "../_shared/enhanced-report-generator.ts"
 import { analyzeParticipation, extractUserTopics } from "../_shared/message-analysis.ts"
 
 const corsHeaders = {
@@ -81,7 +81,7 @@ serve(async (req) => {
       console.error('Failed to calculate analytics:', analyticsError)
     }
 
-    // Generate comprehensive report
+    // Generate comprehensive report using enhanced generator
     const participantStats = analyzeParticipation(messages, participants)
     const userTopics = extractUserTopics(messages)
     
@@ -90,7 +90,7 @@ serve(async (req) => {
     const participantCount = participants?.length || 0
     const participantDescription = conversation.participant_description || ""
 
-    const reportContent = generateReportContent(
+    const reportContent = generateEnhancedReportContent(
       sessionTitle,
       sessionObjective,
       participantCount,
@@ -115,7 +115,9 @@ serve(async (req) => {
           session_duration: conversation.session_duration_minutes || 0,
           engagement_score: conversation.participant_engagement_score || 0,
           topics: userTopics,
-          participation_stats: participantStats
+          participation_stats: participantStats,
+          highlights: extractHighlights(messages),
+          key_insights: extractKeyInsights(messages, participantStats)
         }
       })
       .select()
@@ -189,3 +191,29 @@ serve(async (req) => {
     )
   }
 })
+
+// Helper functions for metadata
+function extractHighlights(messages: any[]): string[] {
+  const userMessages = messages.filter(m => m.role === 'user');
+  return userMessages
+    .filter(m => m.content && m.content.length > 50)
+    .slice(0, 5)
+    .map(m => m.content.substring(0, 150) + (m.content.length > 150 ? '...' : ''));
+}
+
+function extractKeyInsights(messages: any[], participantStats: any) {
+  const insights = [];
+  
+  if (participantStats.participationBalance > 0.7) {
+    insights.push("High engagement with balanced participation");
+  }
+  
+  const userMessages = messages.filter(m => m.role === 'user');
+  const longMessages = userMessages.filter(m => m.content && m.content.length > 100).length;
+  
+  if (longMessages > userMessages.length / 2) {
+    insights.push("In-depth contributions and thoughtful responses");
+  }
+  
+  return insights;
+}

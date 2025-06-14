@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import SessionsDropdown from "./SessionsDropdown";
 import { useAdminSessions } from "@/hooks/useAdminSessions";
 import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
-import ReportDownloadDialog from "../ReportDownloadDialog";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SimplifiedAdminHeaderProps {
@@ -38,13 +38,10 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
   const { 
     isClosing, 
-    closureResult, 
-    closeSessionAndGenerateReport, 
-    downloadReport 
+    closeSessionAndGenerateReport
   } = useSessionClosure();
   
   const [showClosureDialog, setShowClosureDialog] = useState(false);
-  const [showReportDialog, setShowReportDialog] = useState(false);
   
   const handleBack = () => {
     // Navigate back to the sessions dashboard
@@ -60,7 +57,8 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
-      setShowReportDialog(true);
+      // Navigate to the session report view
+      navigate(`/session/report/${conversation.id}`);
     }
   };
 
@@ -71,6 +69,8 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
     }
 
     if (conversation.is_session_ended) {
+      // Navigate to existing report
+      navigate(`/session/report/${conversation.id}`);
       return;
     }
 
@@ -126,11 +126,11 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
               size="sm" 
               className="flex items-center gap-1"
               onClick={handleExportClick}
-              disabled={isClosing || isSessionEnded}
+              disabled={isClosing}
             >
               <FileText className="h-4 w-4" />
               <span>
-                {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
+                {isClosing ? 'Closing...' : isSessionEnded ? 'View Report' : 'Close & Get Report'}
               </span>
             </Button>
             
@@ -186,23 +186,6 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
         isClosing={isClosing}
         participantCount={conversation?.current_participants || 0}
         sessionTitle={getSessionTitle()}
-      />
-
-      <ReportDownloadDialog
-        isOpen={showReportDialog}
-        onClose={() => setShowReportDialog(false)}
-        onDownload={(format) => {
-          downloadReport(format);
-          setShowReportDialog(false);
-        }}
-        sessionData={closureResult?.sessionData || {
-          participantCount: 0,
-          messageCount: 0,
-          duration: 0,
-          engagementScore: 0
-        }}
-        sessionTitle={getSessionTitle()}
-        reportContent={closureResult?.reportContent}
       />
     </>
   );

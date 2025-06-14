@@ -72,10 +72,6 @@ export const useSessionClosure = () => {
         description: `Report generated with ${data.sessionData.messageCount} messages from ${data.sessionData.participantCount} participants`,
       });
 
-      setTimeout(() => {
-        navigate('/past-workshops');
-      }, 2000);
-
       return true;
     } catch (error) {
       console.error('Error closing session:', error);

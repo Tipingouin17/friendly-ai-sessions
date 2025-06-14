@@ -36,6 +36,9 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const transitionTimeout = useRef<NodeJS.Timeout | null>(null);
   const hasResolvedTransition = useRef(false);
   const participantEventChannelRef = useRef<any>(null);
+  const processedEventIds = useRef<Set<string>>(new Set());
+  const isNavigatingRef = useRef(false);
+  const sessionTransitionRef = useRef(false);
   
   // Listen for session end events (for participants)
   useSessionEndListener(props.currentConversationId, isAdmin);
@@ -62,7 +65,21 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     };
   }, [isTransitioning]);
   
-  // Listen for participant removal events
+  // Track session state transitions to prevent navigation during auto-start
+  useEffect(() => {
+    if (sessionStarted && !sessionTransitionRef.current) {
+      console.log("Session starting, setting navigation lock");
+      sessionTransitionRef.current = true;
+      
+      // Clear the lock after a short delay to allow session to stabilize
+      setTimeout(() => {
+        sessionTransitionRef.current = false;
+        console.log("Session transition lock cleared");
+      }, 3000);
+    }
+  }, [sessionStarted]);
+  
+  // Enhanced participant removal event listener with better validation
   useEffect(() => {
     if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
 
@@ -77,10 +94,44 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           table: 'session_events',
           filter: `conversation_id=eq.${props.currentConversationId}`
         }, (payload) => {
+          // Create unique event ID to prevent duplicate processing
+          const eventId = `${payload.new.id}-${payload.new.created_at}`;
+          
+          if (processedEventIds.current.has(eventId)) {
+            console.log("Duplicate event detected, skipping:", eventId);
+            return;
+          }
+          
+          processedEventIds.current.add(eventId);
+          
+          // Don't process removal events during session transitions
+          if (sessionTransitionRef.current) {
+            console.log("Session in transition, ignoring participant removal event");
+            return;
+          }
+          
+          // Don't process events if we're already navigating
+          if (isNavigatingRef.current) {
+            console.log("Already navigating, ignoring participant removal event");
+            return;
+          }
+          
           if (payload.new && 
               payload.new.event_type === 'participant_removed' && 
               payload.new.data && 
+              typeof payload.new.data === 'object' &&
               payload.new.data.participant_id === props.currentUserParticipantId) {
+            
+            // Additional validation: ensure this is actually a removal and not a side effect
+            const eventData = payload.new.data;
+            if (!eventData.removed_by_admin && !eventData.reason) {
+              console.log("Invalid removal event data, ignoring");
+              return;
+            }
+            
+            console.log("Valid participant removal detected for:", props.currentUserParticipantId);
+            
+            isNavigatingRef.current = true;
             
             toast({
               title: "Removed from session",
@@ -117,6 +168,9 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           console.error("Error removing participant events channel:", err);
         }
       }
+      
+      // Clear processed events when component unmounts
+      processedEventIds.current.clear();
     };
   }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);
   

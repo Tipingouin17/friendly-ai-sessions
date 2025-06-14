@@ -24,13 +24,20 @@ export function useSessionStateTransition({
   const [shouldShowSession, setShouldShowSession] = useState(false);
   const lastSessionStartedRef = useRef(sessionStarted);
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionFullTriggeredRef = useRef(false);
+  const participantNavigationLockRef = useRef(false);
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Track participant removal events for this participant
+  // Enhanced participant removal check with better validation
   useEffect(() => {
     if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
+    
+    // Don't check participant status during session transitions to prevent false positives
+    if (participantNavigationLockRef.current) {
+      return;
+    }
     
     // Check if this participant is still valid
     const checkParticipantStatus = async () => {
@@ -45,39 +52,44 @@ export function useSessionStateTransition({
           .single();
           
         if (error || !data) {
-          console.log("Participant has been removed from the session");
-          
-          // Clear storage and redirect
-          try {
-            localStorage.removeItem('participant_session');
-            sessionStorage.removeItem('isAdminSession');
-          } catch (err) {
-            console.error("Error clearing session storage:", err);
+          // Only redirect if we're certain the participant was removed
+          // and we're not in the middle of a session transition
+          if (!participantNavigationLockRef.current && !sessionStarted) {
+            console.log("Participant has been removed from the session");
+            
+            // Clear storage and redirect
+            try {
+              localStorage.removeItem('participant_session');
+              sessionStorage.removeItem('isAdminSession');
+            } catch (err) {
+              console.error("Error clearing session storage:", err);
+            }
+            
+            toast({
+              title: "Session access revoked",
+              description: "You can no longer access this session",
+              variant: "destructive"
+            });
+            
+            navigate('/');
           }
-          
-          toast({
-            title: "Session access revoked",
-            description: "You can no longer access this session",
-            variant: "destructive"
-          });
-          
-          navigate('/');
         }
       } catch (err) {
         console.error("Error checking participant status:", err);
       }
     };
     
-    // Initial check
-    checkParticipantStatus();
+    // Initial check with delay to allow for session stabilization
+    const timeoutId = setTimeout(checkParticipantStatus, 2000);
     
-    // Set up periodic check
-    const intervalId = setInterval(checkParticipantStatus, 15000); // Check every 15 seconds
+    // Set up periodic check with longer intervals during active sessions
+    const intervalId = setInterval(checkParticipantStatus, sessionStarted ? 30000 : 15000);
     
     return () => {
+      clearTimeout(timeoutId);
       clearInterval(intervalId);
     };
-  }, [props.currentConversationId, props.currentUserParticipantId, isAdmin, navigate, toast]);
+  }, [props.currentConversationId, props.currentUserParticipantId, isAdmin, navigate, toast, sessionStarted]);
   
   // Calculate values from conversation and participants if available
   const currentParticipants = props.conversation?.current_participants || 
@@ -85,15 +97,28 @@ export function useSessionStateTransition({
   const maxParticipants = props.conversation?.participants || 0;
   const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
   
-  // Handle session full condition
+  // Enhanced session full handling with navigation lock
   useEffect(() => {
-    // Safety check to prevent duplicate calls
-    if (isSessionFull && onSessionFull && !lastSessionStartedRef.current) {
+    if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current) {
       console.log("Session is full, triggering onSessionFull callback");
+      sessionFullTriggeredRef.current = true;
+      
+      // Set navigation lock for participants to prevent redirects during auto-start
+      if (!isAdmin) {
+        participantNavigationLockRef.current = true;
+        console.log("Setting participant navigation lock during session auto-start");
+        
+        // Clear the lock after session has time to stabilize
+        setTimeout(() => {
+          participantNavigationLockRef.current = false;
+          console.log("Participant navigation lock cleared");
+        }, 5000);
+      }
+      
       setSessionStarted(true);
       if (onSessionFull) onSessionFull();
     }
-  }, [isSessionFull, onSessionFull, setSessionStarted]);
+  }, [isSessionFull, onSessionFull, setSessionStarted, isAdmin]);
   
   // Reset transition state after a maximum timeout
   useEffect(() => {
@@ -127,7 +152,7 @@ export function useSessionStateTransition({
     }
   }, [isOnAdminPath, shouldShowSession, setSessionStarted]);
   
-  // Main transition effect
+  // Main transition effect with improved handling
   useEffect(() => {
     // CRITICAL FIX: Always show session if it's already started in DB
     if (props.isSessionStartedInDB && !shouldShowSession) {

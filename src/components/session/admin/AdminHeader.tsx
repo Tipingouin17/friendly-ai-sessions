@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,14 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   
   const handleBack = () => {
-    navigate('/past-workshops?auto=true');
+    console.log("Dashboard button clicked - navigating to past workshops");
+    try {
+      navigate('/past-workshops', { replace: true });
+    } catch (error) {
+      console.error("Navigation error:", error);
+      // Fallback navigation
+      window.location.href = '/past-workshops';
+    }
   };
 
   const handleCloseSession = async () => {
@@ -104,10 +110,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               variant="ghost" 
               size="sm" 
               onClick={handleBack} 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               title="Back to Dashboard"
             >
               <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
             
             <Separator orientation="vertical" className="h-6" />

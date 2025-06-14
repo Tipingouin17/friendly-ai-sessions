@@ -14,7 +14,7 @@ interface SessionContainerProps {
   inputMessage: string;
   setInputMessage: (message: string) => void;
   currentParticipant: number;
-  onSendMessage: () => void;
+  handleSendMessage: () => void; // renamed from onSendMessage for clarity
   onGenerateReport: () => void;
   isGeneratingReport: boolean;
   isWaitingForResponse: boolean;
@@ -45,7 +45,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   inputMessage,
   setInputMessage,
   currentParticipant,
-  onSendMessage,
+  handleSendMessage, // use handleSendMessage instead of onSendMessage
   onGenerateReport,
   isGeneratingReport,
   isWaitingForResponse,
@@ -121,7 +121,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           // Pass input functionality props
           inputMessage={inputMessage}
           setInputMessage={setInputMessage}
-          onSendMessage={onSendMessage}
+          onSendMessage={handleSendMessage} // fixed: use correct handler
           isRecording={isRecording}
           setIsRecording={setIsRecording}
           isAnonymous={isAnonymous}

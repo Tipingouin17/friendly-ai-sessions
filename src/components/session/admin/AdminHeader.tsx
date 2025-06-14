@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -158,58 +157,48 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons Row - Below Description */}
-        <div className="flex items-center justify-between px-6 pb-4">
+        {/* Action Buttons Row - Aligned to the right in specified order */}
+        <div className="flex items-center justify-end px-6 pb-4">
           <div className="flex items-center gap-3">
-            {/* Analytics Group */}
-            {conversation?.id && (
-              <div className="flex items-center gap-2">
-                <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Analytics</span>
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              </div>
-            )}
-
-            <Separator orientation="vertical" className="h-6" />
-
-            {/* Session Controls Group */}
-            <div className="flex items-center gap-2">
-              {!isSessionEnded && (
-                <AdminWrapUpDialog
-                  onWrapUp={toggleSessionState}
-                  isWrappingUp={isSessionPaused}
-                />
-              )}
-            </div>
-
-            <Separator orientation="vertical" className="h-6" />
-
-            {/* Communication Group */}
+            {/* QR Code Button */}
             {!isSessionEnded && (
-              <div className="flex items-center gap-2">
-                <AdminQrDialog conversationId={conversation?.id || null} />
-              </div>
+              <AdminQrDialog conversationId={conversation?.id || null} />
             )}
-          </div>
 
-          {/* Primary Action */}
-          <Button 
-            variant={isSessionEnded ? "outline" : "default"}
-            size="sm" 
-            className="flex items-center gap-2 min-w-0"
-            onClick={handleCloseAndGetReport}
-            disabled={isClosing}
-          >
-            <FileText className="h-4 w-4" />
-            <span className="whitespace-nowrap">
-              {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
-            </span>
-          </Button>
+            {/* Analytics Button */}
+            {conversation?.id && (
+              <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Analytics</span>
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
+            )}
+
+            {/* Wrap Up Button */}
+            {!isSessionEnded && (
+              <AdminWrapUpDialog
+                onWrapUp={toggleSessionState}
+                isWrappingUp={isSessionPaused}
+              />
+            )}
+
+            {/* Close & Get Report Button */}
+            <Button 
+              variant={isSessionEnded ? "outline" : "default"}
+              size="sm" 
+              className="flex items-center gap-2 min-w-0"
+              onClick={handleCloseAndGetReport}
+              disabled={isClosing}
+            >
+              <FileText className="h-4 w-4" />
+              <span className="whitespace-nowrap">
+                {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
+              </span>
+            </Button>
+          </div>
         </div>
 
         {/* Analytics Dashboard */}

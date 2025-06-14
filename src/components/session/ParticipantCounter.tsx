@@ -48,22 +48,27 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
         console.log(`ParticipantCounter channel ${channelName} status:`, status);
       });
       
-    // Also listen for count_updated events
+    // Also listen for participant removal events
     const eventsChannel = supabase
       .channel(`count-events-${conversationId}-${Date.now()}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'session_events',
-        filter: `conversation_id=eq.${conversationId} AND event_type=eq.count_updated`
+        filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        console.log("Count update event:", payload);
+        console.log("Count event:", payload);
         
-        if (payload.new && 
-            payload.new.data && 
-            typeof payload.new.data.current_count === 'number') {
-          console.log(`Setting counter display count from event to ${payload.new.data.current_count}`);
-          setDisplayCount(payload.new.data.current_count);
+        if (payload.new && payload.new.data) {
+          const eventData = payload.new.data;
+          const eventType = payload.new.event_type;
+          
+          // Update count for both join and removal events
+          if ((eventType === 'participant_joined' || eventType === 'participant_removed') &&
+              typeof eventData.current_count === 'number') {
+            console.log(`Setting counter display count from ${eventType} event to ${eventData.current_count}`);
+            setDisplayCount(eventData.current_count);
+          }
         }
       })
       .subscribe();

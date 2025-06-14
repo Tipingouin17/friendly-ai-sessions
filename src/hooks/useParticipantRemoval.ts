@@ -23,95 +23,119 @@ export const useParticipantRemoval = ({
     setDisplayCount(currentParticipantCount);
   }, [currentParticipantCount]);
   
-  // Function to remove a participant
+  // Function to remove a participant with optimistic updates
   const removeParticipant = async (participantId: number) => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      toast({
+        title: "Error",
+        description: "No active session found",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Optimistic update - remove participant from UI immediately
+    let originalParticipants: ParticipantInfo[] = [];
+    setParticipantsList(prev => {
+      originalParticipants = [...prev];
+      const filteredList = prev.filter(p => p.id !== participantId);
+      setDisplayCount(filteredList.length);
+      return filteredList;
+    });
     
     try {
-      // First, remove from session_participants table
-      const { error: removeError } = await supabase
+      console.log(`Attempting to remove participant ${participantId} from conversation ${conversationId}`);
+      
+      // Remove from session_participants table
+      const { error: removeError, data } = await supabase
         .from('session_participants')
         .delete()
         .eq('conversation_id', conversationId)
-        .eq('participant_id', participantId);
+        .eq('participant_id', participantId)
+        .select();
         
       if (removeError) {
         console.error("Error removing participant:", removeError);
+        
+        // Revert optimistic update
+        setParticipantsList(originalParticipants);
+        setDisplayCount(originalParticipants.length);
+        
+        // Show specific error message
+        const errorMessage = removeError.message.includes('policy') 
+          ? "You don't have permission to remove this participant"
+          : "Could not remove participant";
+          
         toast({
           title: "Error",
-          description: "Could not remove participant",
+          description: errorMessage,
           variant: "destructive"
         });
         return;
       }
       
-      // Calculate new count based on actual remaining participants
-      setParticipantsList(prev => {
-        const filteredList = prev.filter(p => p.id !== participantId);
-        const newCount = filteredList.length;
-        
-        // Update the display count
-        setDisplayCount(newCount);
-        
-        // Update conversations table with the new count
-        supabase
-          .from('conversations')
-          .update({ current_participants: newCount })
-          .eq('id', conversationId)
-          .then(({ error: updateError }) => {
-            if (updateError) {
-              console.error("Error updating participant count:", updateError);
-              toast({
-                title: "Error", 
-                description: "Could not update participant count",
-                variant: "destructive"
-              });
-            }
-          });
-          
-        return filteredList;
-      });
+      if (!data || data.length === 0) {
+        console.warn("No participant was removed - may have already been removed");
+        toast({
+          title: "Warning",
+          description: "Participant may have already been removed",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      // Create a participant_removed event with more detailed data to completely remove access
-      await supabase
+      const newCount = originalParticipants.length - 1;
+      
+      // Update conversations table with the new count
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({ current_participants: newCount })
+        .eq('id', conversationId);
+        
+      if (updateError) {
+        console.error("Error updating participant count:", updateError);
+        toast({
+          title: "Warning", 
+          description: "Participant removed but count may be inconsistent",
+          variant: "destructive"
+        });
+      }
+      
+      // Create a participant_removed event for real-time updates
+      const { error: eventError } = await supabase
         .from('session_events')
         .insert({
           conversation_id: conversationId,
           event_type: 'participant_removed',
           data: { 
             participant_id: participantId,
-            current_count: displayCount - 1,
+            current_count: newCount,
             removed_by: 'admin',
             timestamp: new Date().toISOString(),
-            permanent_removal: true,  // Flag to indicate permanent removal
-            access_revoked: true      // Flag to indicate access revocation
+            permanent_removal: true,
+            access_revoked: true
           }
         });
+      
+      if (eventError) {
+        console.error("Error creating removal event:", eventError);
+        // Don't show error to user as the removal was successful
+      }
       
       toast({
         title: "Participant removed",
         description: `Successfully removed participant from session`,
       });
       
-      // Broadcast count update to ensure all clients get the update
-      try {
-        await supabase
-          .from('session_events')
-          .insert({
-            conversation_id: conversationId,
-            event_type: 'count_updated',
-            data: { 
-              current_count: displayCount - 1,
-              updated_by: 'admin',
-              timestamp: new Date().toISOString()
-            }
-          });
-      } catch (err) {
-        console.error("Error broadcasting count update:", err);
-      }
+      console.log(`Successfully removed participant ${participantId}, new count: ${newCount}`);
       
     } catch (err) {
       console.error("Exception removing participant:", err);
+      
+      // Revert optimistic update
+      setParticipantsList(originalParticipants);
+      setDisplayCount(originalParticipants.length);
+      
       toast({
         title: "Error",
         description: "An unexpected error occurred",

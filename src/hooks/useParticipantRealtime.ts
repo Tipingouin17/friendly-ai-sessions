@@ -4,7 +4,6 @@ import { ParticipantInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
-import { getParticipantInfo } from "@/utils/participantUtils";
 
 interface UseParticipantRealtimeProps {
   conversationId: number | null;
@@ -53,24 +52,24 @@ export function useParticipantRealtime({
     console.log("Setting up realtime participant tracking for conversation:", conversationId);
     
     try {
+      // Subscribe to direct table changes (INSERT, UPDATE, DELETE)
       const participantsChannel = supabase
         .channel(`admin-session-participants-${conversationId}`)
         .on('postgres_changes', {
-          event: 'INSERT',
+          event: '*', // Listen for all events
           schema: 'public',
           table: 'session_participants',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("New participant registered:", payload);
+          console.log("Participant table change:", payload);
           
-          if (payload.new) {
+          if (payload.eventType === 'INSERT' && payload.new) {
             const participant = payload.new;
             
             setParticipants(prev => {
               if (prev.some(p => p.id === participant.participant_id)) return prev;
               
               console.log("Adding participant from realtime event:", participant);
-              console.log("Participant name from database:", participant.name);
               
               return [...prev, {
                 id: participant.participant_id,
@@ -78,9 +77,34 @@ export function useParticipantRealtime({
                 avatar: participant.avatar_seed 
                   ? `/api/avatar?name=${participant.avatar_seed}&variant=beam&palette=0` 
                   : null,
-                isAnonymous: participant.is_anonymous || false
+                isAnonymous: participant.is_anonymous || false,
+                isAdmin: participant.is_admin || false
               }];
             });
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            // Handle direct deletion from database
+            const deletedParticipant = payload.old;
+            console.log("Participant deleted from database:", deletedParticipant);
+            
+            setParticipants(prev => prev.filter(p => p.id !== deletedParticipant.participant_id));
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            // Handle participant updates
+            const updatedParticipant = payload.new;
+            
+            setParticipants(prev => prev.map(p => {
+              if (p.id === updatedParticipant.participant_id) {
+                return {
+                  ...p,
+                  name: updatedParticipant.name || p.name,
+                  avatar: updatedParticipant.avatar_seed 
+                    ? `/api/avatar?name=${updatedParticipant.avatar_seed}&variant=beam&palette=0` 
+                    : p.avatar,
+                  isAnonymous: updatedParticipant.is_anonymous || p.isAnonymous,
+                  isAdmin: updatedParticipant.is_admin || p.isAdmin
+                };
+              }
+              return p;
+            }));
           }
         })
         .subscribe((status) => {
@@ -101,6 +125,7 @@ export function useParticipantRealtime({
     }
     
     try {
+      // Subscribe to session events for additional coordination
       const eventsChannel = supabase
         .channel(`admin-participant-events-${conversationId}`)
         .on('postgres_changes', {
@@ -120,7 +145,6 @@ export function useParticipantRealtime({
               const participantName = eventData.participant_name;
               
               console.log("Participant joined event data:", eventData);
-              console.log("Participant name from event:", participantName);
               
               if (participantId && participantName) {
                 setParticipants(prev => {
@@ -131,12 +155,22 @@ export function useParticipantRealtime({
                     id: participantId,
                     name: participantName,
                     avatar: eventData.avatar_url || null,
-                    isAnonymous: eventData.is_anonymous || false
+                    isAnonymous: eventData.is_anonymous || false,
+                    isAdmin: eventData.is_admin || false
                   }];
                 });
               }
+            } else if (eventType === 'participant_removed' && eventData) {
+              // Handle participant removal events
+              const participantId = eventData.participant_id;
+              
+              if (participantId) {
+                console.log("Participant removed via event:", participantId);
+                setParticipants(prev => prev.filter(p => p.id !== participantId));
+              }
             }
             
+            // Auto-start session when max participants reached
             if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
               console.log(`Maximum participants (${maxParticipants}) reached, updating session_started flag`);
               supabase
@@ -169,7 +203,7 @@ export function useParticipantRealtime({
     }
       
     return () => {
-      // We'll only clean up on unmount, not on every dependency change
+      // Clean up on unmount
       if (participantsChannelRef.current) {
         removeChannel(participantsChannelRef.current);
         participantsChannelRef.current = null;

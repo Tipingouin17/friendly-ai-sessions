@@ -32,6 +32,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   // Synchronize the component's local state with the incoming props
   useEffect(() => {
     if (participants && participants.length > 0) {
+      console.log('AdminParticipantList: Updating participants list', participants.length);
       setParticipantsList(participants);
     }
     
@@ -45,13 +46,15 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     removeParticipant 
   } = useParticipantRemoval({
     conversationId: conversationData?.id || null,
-    currentParticipantCount: participantsList.length, // Use actual list length instead of passed count
+    currentParticipantCount: participantsList.length,
     setParticipantsList
   });
   
   // Update display count whenever the participants list changes
   useEffect(() => {
-    setDisplayCount(participantsList.length);
+    const actualCount = participantsList.length;
+    console.log('AdminParticipantList: Setting display count to', actualCount);
+    setDisplayCount(actualCount);
   }, [participantsList, setDisplayCount]);
   
   // Set up realtime updates with the updated hook
@@ -67,16 +70,19 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   const facilitatorInfo = conversationData?.sessions?.facilitator_details || null;
   const sessionInfo = conversationData?.sessions || null;
 
+  // Use actual participant count instead of passed count for display
+  const actualParticipantCount = participantsList.length;
+
   return (
     <div className="w-80 border-l border-gray-200 p-4 overflow-y-auto bg-white hidden md:block">
       <h3 className="flex items-center gap-2 font-medium mb-4 text-gray-900">
         <Users className="h-5 w-5" /> 
-        Participants ({participantsList.length}/{maxParticipants || "∞"})
+        Participants ({actualParticipantCount}/{maxParticipants || "∞"})
       </h3>
       
       {isLoadingParticipants ? (
-        <ParticipantListSkeleton count={participantsList.length || 1} />
-      ) : participantsList.length > 0 ? (
+        <ParticipantListSkeleton count={actualParticipantCount || 1} />
+      ) : actualParticipantCount > 0 ? (
         <div className="space-y-2">
           {participantsList.map((participant) => (
             <ParticipantListItem

@@ -18,6 +18,7 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
   
   // Update from props when they change
   useEffect(() => {
+    console.log('ParticipantCounter: Updating display count to', currentParticipants);
     setDisplayCount(currentParticipants);
   }, [currentParticipants]);
   
@@ -48,22 +49,27 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
         console.log(`Admin ParticipantCounter channel ${channelName} status:`, status);
       });
       
-    // Also listen for count_updated events
-    const eventsChannel = supabase
-      .channel(`admin-count-events-${conversationId}-${Date.now()}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'session_events',
-        filter: `conversation_id=eq.${conversationId} AND event_type=eq.count_updated`
-      }, (payload) => {
-        console.log("Admin counter: Count update event:", payload);
+    // Also listen for participant table changes to update count
+    const participantsChannel = supabase
+      .channel(`admin-participants-${conversationId}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'session_participants',
+        filter: `conversation_id=eq.${conversationId}`
+      }, async (payload) => {
+        console.log("Admin counter: Participant table change:", payload);
         
-        if (payload.new && 
-            payload.new.data && 
-            typeof payload.new.data.current_count === 'number') {
-          console.log(`Admin counter: Setting display count from event to ${payload.new.data.current_count}`);
-          setDisplayCount(payload.new.data.current_count);
+        // Refetch participant count from database
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('participant_id', { count: 'exact' })
+          .eq('conversation_id', conversationId);
+          
+        if (!error && data) {
+          const actualCount = data.length;
+          console.log(`Admin counter: Setting display count from participant table to ${actualCount}`);
+          setDisplayCount(actualCount);
         }
       })
       .subscribe();
@@ -71,7 +77,7 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
     return () => {
       try {
         supabase.removeChannel(channel);
-        supabase.removeChannel(eventsChannel);
+        supabase.removeChannel(participantsChannel);
       } catch (err) {
         console.error("Error removing admin participant counter channels:", err);
       }

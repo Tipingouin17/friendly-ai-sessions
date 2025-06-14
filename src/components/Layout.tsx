@@ -20,11 +20,14 @@ export const Layout = ({ children }: LayoutProps) => {
   
   // Determine if we need the mobile session navigation
   const needsMobileSessionNav = isMobile && isSessionPage && !isAdminPage;
+  
+  // Don't render main navigation on admin pages at all
+  const shouldShowMainNav = !isAdminPage;
 
   return (
     <div className="min-h-screen flex flex-col text-left">
-      {needsMobileSessionNav ? <SessionMobileNav /> : <Navigation />}
-      <main className={`flex-grow ${isSessionPage ? 'pt-0' : 'pt-16'}`}>
+      {shouldShowMainNav && (needsMobileSessionNav ? <SessionMobileNav /> : <Navigation />)}
+      <main className={`flex-grow ${isSessionPage && !isAdminPage ? 'pt-0' : shouldShowMainNav ? 'pt-16' : 'pt-0'}`}>
         {children}
       </main>
       {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}

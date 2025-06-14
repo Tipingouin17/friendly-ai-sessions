@@ -151,8 +151,8 @@ const SessionAdmin = () => {
   const totalMessages = sessionMessages?.length || 0;
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Simplified admin header */}
+    <div className="flex flex-col h-screen">
+      {/* Simplified admin header - now the only header */}
       <SimplifiedAdminHeader
         conversation={conversationData}
         isSessionPaused={isSessionPaused}

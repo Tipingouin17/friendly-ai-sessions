@@ -54,23 +54,18 @@ const AdminMessageView: React.FC<AdminMessagingViewProps> = ({
     return Array.from(messageMap.values());
   }, [messages]);
 
-  // Create participant name mapping 
+  // Create participant name mapping from the participants prop
   const participantNameMap = useMemo(() => {
     const nameMap: { [key: string]: string } = {};
     
-    deduplicatedMessages.forEach(message => {
-      if (message.participant && typeof message.participant === 'string') {
-        if (!message.participant.startsWith('P') || message.participant.includes(' ')) {
-          const participantId = message.participant.startsWith('P') 
-            ? message.participant 
-            : `P${message.participant}`;
-          nameMap[participantId] = message.participant;
-        }
-      }
+    // Use the actual participants data to create the mapping
+    participants.forEach(participant => {
+      const participantKey = `P${participant.id}`;
+      nameMap[participantKey] = participant.name || `Participant ${participant.id}`;
     });
     
     return nameMap;
-  }, [deduplicatedMessages]);
+  }, [participants]);
 
   // Filter messages based on search and anonymity settings
   const filteredMessages = useMemo(() => {

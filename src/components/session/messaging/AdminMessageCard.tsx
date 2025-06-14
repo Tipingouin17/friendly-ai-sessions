@@ -107,7 +107,9 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
     );
   }
   
-  // Format for user/participant messages
+  // Format for user/participant messages - use participantName prop if provided
+  const displayParticipantName = participantName || `Participant ${message.participant}`;
+  
   return (
     <Card className={`mb-3 border-l-4 shadow-sm animate-fade-in`} 
       style={{ borderLeftColor: participantColor }}>
@@ -121,7 +123,7 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <p className="font-medium text-gray-800">
-                  {isAnonymous ? 'Anonymous participant' : participantName || `Participant ${message.participant}`}
+                  {isAnonymous ? 'Anonymous participant' : displayParticipantName}
                 </p>
                 
                 {isAnonymous && (
@@ -160,7 +162,7 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
           </Collapsible>
         </div>
       </CardContent>
-    </Card>
+    </div>
   );
 };
 

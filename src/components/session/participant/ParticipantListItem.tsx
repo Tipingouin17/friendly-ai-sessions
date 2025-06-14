@@ -44,16 +44,9 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
     return "bg-gray-400";
   };
   
-  // Get display name with fallback
-  const getDisplayName = () => {
-    if (participant.name && participant.name !== `Participant ${participant.id}`) {
-      return participant.name;
-    }
-    return `Guest ${participant.id}`;
-  };
-
-  const displayName = getDisplayName();
-  const isDefaultName = participant.name === `Participant ${participant.id}` || !participant.name;
+  // Use the actual participant name from the database
+  const displayName = participant.name || `Participant ${participant.id}`;
+  const isDefaultName = !participant.name || participant.name === `Participant ${participant.id}`;
 
   return (
     <div className="group flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 transition-colors">

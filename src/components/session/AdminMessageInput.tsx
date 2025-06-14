@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { SendHorizonal, Pin } from 'lucide-react';
-import { Toggle } from '@/components/ui/toggle';
+import { SendHorizonal } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -23,31 +22,19 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
   participants
 }) => {
   const [message, setMessage] = useState('');
-  const [isPinned, setIsPinned] = useState(false);
   const [recipient, setRecipient] = useState<string>('all');
 
   const handleSend = () => {
     if (!message.trim()) return;
     
     const recipientId = recipient !== 'all' ? recipient : undefined;
-    onSendMessage(message, isPinned, recipientId);
+    onSendMessage(message, false, recipientId);
     setMessage('');
   };
 
   return (
     <div className="p-4 border-t border-gray-200 bg-white">
-      <div className="flex items-center mb-2 gap-2">
-        <Toggle
-          pressed={isPinned}
-          onPressedChange={setIsPinned}
-          size="sm"
-          variant="outline"
-          className="flex items-center gap-1"
-        >
-          <Pin className="h-3.5 w-3.5" />
-          Pin message
-        </Toggle>
-        
+      <div className="flex items-center mb-2">
         <Select value={recipient} onValueChange={setRecipient}>
           <SelectTrigger className="w-[180px] h-8 text-sm">
             <SelectValue placeholder="Send to everyone" />

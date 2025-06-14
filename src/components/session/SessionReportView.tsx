@@ -48,7 +48,8 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
             id,
             title,
             objective,
-            session_type
+            session_type,
+            facilitator
           ),
           facilitators!conversations_facilitator_id_fkey (
             id,

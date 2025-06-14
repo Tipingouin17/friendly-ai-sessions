@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, LayoutDashboard, BarChart3, Users, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, BarChart3 } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -99,8 +99,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   return (
     <>
       <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b shadow-sm">
-        {/* Main Header Row */}
-        <div className="flex items-center justify-between p-6">
+        {/* Main Header Row - Navigation & Title Only */}
+        <div className="flex items-center justify-between p-6 pb-4">
           {/* Left Section - Navigation & Title */}
           <div className="flex items-center space-x-6">
             <Button 
@@ -111,7 +111,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               title="Back to Dashboard"
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
             </Button>
             
             <Separator orientation="vertical" className="h-6" />
@@ -146,8 +145,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               )}
             </div>
           </div>
-          
-          {/* Right Section - Controls */}
+        </div>
+
+        {/* Action Buttons Row - Below Description */}
+        <div className="flex items-center justify-between px-6 pb-4">
           <div className="flex items-center gap-3">
             {/* Analytics Group */}
             {conversation?.id && (
@@ -193,23 +194,21 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
                 <AdminQrDialog conversationId={conversation?.id || null} />
               </div>
             )}
-
-            <Separator orientation="vertical" className="h-6" />
-            
-            {/* Primary Action */}
-            <Button 
-              variant={isSessionEnded ? "outline" : "default"}
-              size="sm" 
-              className="flex items-center gap-2 min-w-0"
-              onClick={handleExportClick}
-              disabled={isClosing}
-            >
-              <FileText className="h-4 w-4" />
-              <span className="whitespace-nowrap">
-                {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
-              </span>
-            </Button>
           </div>
+
+          {/* Primary Action */}
+          <Button 
+            variant={isSessionEnded ? "outline" : "default"}
+            size="sm" 
+            className="flex items-center gap-2 min-w-0"
+            onClick={handleExportClick}
+            disabled={isClosing}
+          >
+            <FileText className="h-4 w-4" />
+            <span className="whitespace-nowrap">
+              {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
+            </span>
+          </Button>
         </div>
 
         {/* Analytics Dashboard */}

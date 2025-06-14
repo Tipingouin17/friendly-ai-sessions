@@ -1,15 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo, Message } from "@/types/chat";
-import { Users, UserCheck, Award, Languages, Clock, BookText, BadgeCheck, Sparkles, GraduationCap, Search } from "lucide-react";
+import { Users, Search } from "lucide-react";
 import { useParticipantRemoval } from "@/hooks/useParticipantRemoval";
 import { useParticipantRealtime } from "@/hooks/useParticipantRealtime";
 import ParticipantListItem from "@/components/session/participant/ParticipantListItem";
 import EmptyParticipantList from "@/components/session/participant/EmptyParticipantList";
 import ParticipantListSkeleton from "@/components/session/participant/ParticipantListSkeleton";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 
 interface AdminParticipantListProps {
@@ -96,10 +94,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     participant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     `Participant ${participant.id}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
-  // Get the facilitator information from the conversation data
-  const facilitatorInfo = conversationData?.sessions?.facilitator_details || null;
-  const sessionInfo = conversationData?.sessions || null;
 
   // Use actual participant count instead of passed count for display
   const actualParticipantCount = participantsList.length;
@@ -136,7 +130,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
           {isLoadingParticipants ? (
             <ParticipantListSkeleton count={actualParticipantCount || 1} />
           ) : filteredParticipants.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filteredParticipants.map((participant) => (
                 <ParticipantListItem
                   key={participant.id}
@@ -158,64 +152,6 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
           )}
         </div>
       </div>
-      
-      {/* Facilitator Info */}
-      {facilitatorInfo && (
-        <>
-          <Separator />
-          <div className="p-4 bg-gray-50">
-            <h4 className="flex items-center gap-2 font-semibold mb-3 text-gray-900">
-              <UserCheck className="h-5 w-5" />
-              Facilitator
-            </h4>
-            <div className="bg-white p-4 rounded-lg shadow-sm border">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <p className="font-semibold text-primary text-lg">{facilitatorInfo.title}</p>
-                  {facilitatorInfo.details && (
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">{facilitatorInfo.details}</p>
-                  )}
-                </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="outline" className="bg-primary/10 text-xs whitespace-nowrap">
-                        Expert
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Facilitator expertise level</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              
-              <div className="space-y-2 text-xs text-gray-500">
-                {sessionInfo?.duration_minutes && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>Duration: {sessionInfo.duration_minutes} minutes</span>
-                  </div>
-                )}
-                
-                {sessionInfo?.session_type && (
-                  <div className="flex items-center gap-2">
-                    <BookText className="h-3.5 w-3.5" />
-                    <span>Type: {sessionInfo.session_type.replace('_', ' ')}</span>
-                  </div>
-                )}
-                
-                {sessionInfo?.skill_level && (
-                  <div className="flex items-center gap-2">
-                    <BadgeCheck className="h-3.5 w-3.5" />
-                    <span>Level: {sessionInfo.skill_level}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };

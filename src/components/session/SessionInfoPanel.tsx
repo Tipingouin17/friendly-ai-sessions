@@ -49,37 +49,47 @@ const SessionInfoPanel: React.FC<SessionInfoPanelProps> = ({
           </CardContent>
         </Card>
 
-        {/* Facilitator Info */}
+        {/* Facilitator Info - Enhanced */}
         {facilitatorInfo && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <User className="h-4 w-4" />
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-600" />
                 Facilitator
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
+            <CardContent className="space-y-4">
+              {/* Facilitator Avatar and Name */}
+              <div className="flex flex-col items-center text-center space-y-3">
+                <Avatar className="h-16 w-16">
                   <AvatarImage 
                     src={facilitatorInfo.profile_picture} 
                     alt={facilitatorInfo.title}
+                    className="object-cover"
                   />
-                  <AvatarFallback className="bg-amber-100 text-amber-700">
+                  <AvatarFallback className="bg-blue-100 text-blue-700 text-lg">
                     {facilitatorInfo.title?.charAt(0) || 'F'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-lg">
                     {facilitatorInfo.title}
-                  </p>
-                  {facilitatorInfo.details && (
-                    <p className="text-xs text-gray-500 truncate">
-                      {facilitatorInfo.details}
-                    </p>
-                  )}
+                  </h3>
                 </div>
               </div>
+              
+              {/* Facilitator Details */}
+              {facilitatorInfo.details && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-2">About</h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {facilitatorInfo.details}
+                    </p>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

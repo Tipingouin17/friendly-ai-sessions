@@ -4,7 +4,6 @@ import MessagingArea from "./MessagingArea";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
 import InputFooter from "./InputFooter";
-import AdminSessionHeader from "./AdminSessionHeader";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SessionContainerProps {
@@ -96,19 +95,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      {/* Admin header in admin mode */}
-      {isAdmin && (
-        <AdminSessionHeader
-          conversationData={conversation}
-          currentParticipantCount={currentParticipantCount}
-          isSessionPaused={false}
-          onToggleSessionState={() => {}}
-          onSendAdminMessage={onSendAdminMessage || (() => {})}
-          onExportData={onGenerateReport}
-        />
-      )}
-      
-      {/* Main content area */}
+      {/* Main content area - admin header is now handled by AdminDashboard */}
       <div className={`flex-1 overflow-hidden ${!isAdmin && 'pt-2'}`}>
         <MessagingArea
           messages={messages}

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -6,7 +7,7 @@ import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
 import { useAdminMessages } from "@/hooks/useAdminMessages";
 import { useAdminParticipantState } from "@/hooks/useAdminParticipantState";
 import { useAdminSessionInitialization } from "@/hooks/useAdminSessionInitialization";
-import AdminSessionLayout from "@/components/session/admin/AdminSessionLayout";
+import AdminDashboard from "@/components/session/admin/AdminDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
 
@@ -130,16 +131,16 @@ const SessionAdmin = () => {
   }, {} as { [key: string]: string });
 
   return (
-    <AdminSessionLayout
-      conversationData={conversationData}
-      handleSendAdminMessage={handleSendAdminMessage}
-      toggleSessionState={toggleSessionState}
+    <AdminDashboard
+      conversation={conversationData}
       isSessionPaused={isSessionPaused}
+      toggleSessionState={toggleSessionState}
       sessionMessages={sessionMessages}
       participantColors={participantColors}
       participants={participants}
       isLoadingParticipants={isLoadingParticipants}
       currentConversationId={currentConversationId}
+      onSendMessage={handleSendAdminMessage}
       isWaitingForResponses={isWaitingForResponses}
       responseCount={responseCount}
       totalParticipants={totalParticipants}

@@ -26,17 +26,8 @@ export const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({ childr
       }
 
       try {
-        // Log admin route access attempt
-        await supabase.from('admin_access_log').insert({
-          user_id: user.id,
-          access_granted: false,
-          access_reason: 'Checking admin permissions',
-          ip_address: null, // Would need server-side IP detection
-          user_agent: navigator.userAgent
-        });
-
-        // Check if user has admin role using the database function
-        const { data, error } = await supabase.rpc('is_user_admin', { user_id: user.id });
+        // Check if user has admin role using the existing database function
+        const { data, error } = await supabase.rpc('is_admin');
         
         if (error) {
           console.error('Error checking admin status:', error);
@@ -48,13 +39,6 @@ export const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({ childr
           if (data) {
             // Log successful admin access
             logSensitiveAction('admin_route_access', location.pathname);
-            await supabase.from('admin_access_log').insert({
-              user_id: user.id,
-              access_granted: true,
-              access_reason: 'Valid admin user',
-              ip_address: null,
-              user_agent: navigator.userAgent
-            });
           } else {
             // Log unauthorized access attempt
             logSecurityViolation('unauthorized_admin_access', { 

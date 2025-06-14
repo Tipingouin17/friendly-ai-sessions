@@ -66,8 +66,7 @@ const JoinSession = () => {
         conversationId,
         existingSessionData.name || "Participant",
         existingSessionData.participantId,
-        existingSessionData.avatarSeed || "",
-        existingSessionData.isAdmin || false
+        existingSessionData.avatarSeed || ""
       );
     }
   }, [existingSessionData, conversationId, navigateToSession]);

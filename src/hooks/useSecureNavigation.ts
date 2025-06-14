@@ -51,8 +51,8 @@ export function useSecureNavigation() {
     }
 
     try {
-      // Verify admin status before navigation
-      const { data: isAdmin, error } = await supabase.rpc('is_user_admin', { user_id: user.id });
+      // Verify admin status before navigation using the existing function
+      const { data: isAdmin, error } = await supabase.rpc('is_admin');
       
       if (error || !isAdmin) {
         logSecurityViolation('unauthorized_admin_navigation_attempt', { 

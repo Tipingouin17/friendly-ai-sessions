@@ -66,8 +66,7 @@ export function useSessionJoiner() {
             conversationId!, 
             existingParticipant.name, 
             existingParticipant.participantId, 
-            existingParticipant.avatarSeed,
-            existingParticipant.isAdmin
+            existingParticipant.avatarSeed
           );
         }, 500);
         
@@ -112,8 +111,7 @@ export function useSessionJoiner() {
             conversationId, 
             joinResult.name, 
             joinResult.participantId, 
-            joinResult.avatarSeed, 
-            joinResult.isAdmin
+            joinResult.avatarSeed
           );
         }, 500);
         
@@ -138,8 +136,7 @@ export function useSessionJoiner() {
               conversationId, 
               adminResult.name, 
               adminResult.participantId, 
-              adminResult.avatarSeed, 
-              adminResult.isAdmin
+              adminResult.avatarSeed
             );
           }, 500);
           

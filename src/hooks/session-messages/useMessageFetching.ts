@@ -6,17 +6,20 @@ import { getParticipantColor } from '@/utils/sessionHelpers';
 import { debugLog } from '@/utils/debugLogger';
 import { useWelcomeMessage } from './useWelcomeMessage';
 import { processFacilitatorAvatar } from './utils/avatarProcessing';
+import { resolveFacilitatorAvatar } from '@/utils/avatarUtils';
 
 interface UseMessageFetchingProps {
   conversationId: number | null;
   welcomeMessage?: string | null;
   isAdmin: boolean;
+  conversation?: any; // Add conversation data
 }
 
 export const useMessageFetching = ({
   conversationId,
   welcomeMessage,
-  isAdmin
+  isAdmin,
+  conversation
 }: UseMessageFetchingProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +30,8 @@ export const useMessageFetching = ({
   } = useWelcomeMessage({
     conversationId,
     welcomeMessage,
-    isAdmin
+    isAdmin,
+    conversation
   });
 
   // Format database messages into app format
@@ -71,13 +75,12 @@ export const useMessageFetching = ({
       
       const color = participantId ? getParticipantColor(participantId) : undefined;
       
-      // Handle facilitator avatar for assistant messages
+      // Handle facilitator avatar for assistant messages using conversation data
       if (msg.role === 'assistant') {
-        if (!avatarUrl) {
-          avatarUrl = await getFacilitatorAvatarUrl({
-            title: 'Facilitator'
-          });
-          debugLog('all', `Generated facilitator avatar URL: ${avatarUrl}`);
+        if (!avatarUrl && conversation) {
+          // Use the proper avatar resolution function with conversation data
+          avatarUrl = await resolveFacilitatorAvatar(msg, conversation);
+          debugLog('all', `Resolved facilitator avatar URL: ${avatarUrl}`);
         }
         
         // Ensure avatar URL is properly formatted
@@ -103,7 +106,7 @@ export const useMessageFetching = ({
     
     // Wait for all message processing to complete
     return await Promise.all(formattedMessagesPromises);
-  }, []);
+  }, [conversation]);
   
   // Save a welcome message to the database (admin only)
   const saveWelcomeMessageToDb = useCallback(async (welcomeMsg: Message) => {
@@ -193,6 +196,7 @@ export const useMessageFetching = ({
   }, [
     conversationId,
     welcomeMessage,
+    conversation,
     getCachedWelcomeMessage,
     createWelcomeMessage,
     formatDatabaseMessages,
@@ -206,9 +210,3 @@ export const useMessageFetching = ({
     fetchMessages
   };
 };
-
-// Helper function imported from facilitatorUtils
-async function getFacilitatorAvatarUrl(params: { title: string }) {
-  // This is just a reference to the imported function
-  return `/api/avatar?name=${params.title}&variant=beam&palette=2`;
-}

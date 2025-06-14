@@ -2,13 +2,14 @@
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
 import { processFacilitatorAvatar } from './utils/avatarProcessing';
-import { getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
+import { resolveFacilitatorAvatar } from '@/utils/avatarUtils';
 import { debugLog } from '@/utils/debugLogger';
 
 interface UseWelcomeMessageProps {
   conversationId: number | null;
   welcomeMessage?: string | null;
   isAdmin: boolean;
+  conversation?: any; // Add conversation data
 }
 
 const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
@@ -16,7 +17,8 @@ const WELCOME_MESSAGE_STORAGE_KEY = 'session_welcome_message_';
 export const useWelcomeMessage = ({
   conversationId,
   welcomeMessage,
-  isAdmin
+  isAdmin,
+  conversation
 }: UseWelcomeMessageProps) => {
   // Retrieve a cached welcome message
   const getCachedWelcomeMessage = useCallback(() => {
@@ -49,12 +51,13 @@ export const useWelcomeMessage = ({
   const createWelcomeMessage = useCallback(async (): Promise<Message | null> => {
     if (!welcomeMessage || !conversationId) return null;
     
-    debugLog('all', 'Creating welcome message');
+    debugLog('all', 'Creating welcome message with conversation data');
     
-    // Get the facilitator avatar URL
-    const facilitatorAvatarUrl = await getFacilitatorAvatarUrl({
-      title: 'Facilitator'
-    });
+    // Create a mock response object for avatar resolution
+    const mockResponse = { avatar: null };
+    
+    // Get the facilitator avatar URL using the conversation data
+    const facilitatorAvatarUrl = await resolveFacilitatorAvatar(mockResponse, conversation);
     
     // Process the URL to ensure it's correctly formatted
     const processedAvatarUrl = processFacilitatorAvatar(facilitatorAvatarUrl);
@@ -69,11 +72,13 @@ export const useWelcomeMessage = ({
       isWelcomeMessage: true
     };
     
+    debugLog('all', `Welcome message created with avatar: ${processedAvatarUrl}`);
+    
     // Cache the welcome message
     cacheWelcomeMessage(welcomeMsg);
     
     return welcomeMsg;
-  }, [welcomeMessage, conversationId, cacheWelcomeMessage]);
+  }, [welcomeMessage, conversationId, conversation, cacheWelcomeMessage]);
 
   return {
     getCachedWelcomeMessage,

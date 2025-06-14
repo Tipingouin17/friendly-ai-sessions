@@ -10,13 +10,15 @@ interface UseSessionMessagesProps {
   currentUserParticipantId: number | null;
   isAdmin: boolean;
   welcomeMessage?: string | null;
+  conversation?: any; // Add conversation data
 }
 
 export const useSessionMessages = ({
   conversationId,
   currentUserParticipantId,
   isAdmin,
-  welcomeMessage
+  welcomeMessage,
+  conversation
 }: UseSessionMessagesProps) => {
   // Use our more focused hooks
   const {
@@ -27,7 +29,8 @@ export const useSessionMessages = ({
   } = useMessageFetching({
     conversationId,
     welcomeMessage,
-    isAdmin
+    isAdmin,
+    conversation
   });
   
   const {
@@ -49,7 +52,7 @@ export const useSessionMessages = ({
   // Fetch messages when the conversation ID changes
   useEffect(() => {
     fetchMessages();
-  }, [conversationId, welcomeMessage, fetchMessages]);
+  }, [conversationId, welcomeMessage, conversation, fetchMessages]);
   
   return {
     messages,

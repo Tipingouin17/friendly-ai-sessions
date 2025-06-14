@@ -65,16 +65,18 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
       const adminActions = events.filter(e => e.event_type === 'admin_action').length;
       const errorEvents = events.filter(e => e.event_type === 'error').length;
 
-      // Calculate average response time for AI responses
-      const aiResponseEvents = events.filter(e => 
-        e.event_type === 'ai_response_generated' && 
-        e.data?.performance_metrics?.responseTime
-      );
+      // Calculate average response time for AI responses with proper type casting
+      const aiResponseEvents = events.filter(e => {
+        if (e.event_type !== 'ai_response_generated') return false;
+        const eventData = e.data as Record<string, any>;
+        return eventData?.performance_metrics?.responseTime;
+      });
       
       const averageResponseTime = aiResponseEvents.length > 0
-        ? aiResponseEvents.reduce((sum, event) => 
-            sum + (event.data?.performance_metrics?.responseTime || 0), 0
-          ) / aiResponseEvents.length
+        ? aiResponseEvents.reduce((sum, event) => {
+            const eventData = event.data as Record<string, any>;
+            return sum + (eventData?.performance_metrics?.responseTime || 0);
+          }, 0) / aiResponseEvents.length
         : 0;
 
       // Calculate session duration
@@ -87,8 +89,14 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
       // Calculate engagement score (messages per participant)
       const uniqueParticipants = new Set(
         events
-          .filter(e => e.data?.participant_id)
-          .map(e => e.data.participant_id)
+          .filter(e => {
+            const eventData = e.data as Record<string, any>;
+            return eventData?.participant_id;
+          })
+          .map(e => {
+            const eventData = e.data as Record<string, any>;
+            return eventData.participant_id;
+          })
       ).size;
       
       const engagementScore = uniqueParticipants > 0 

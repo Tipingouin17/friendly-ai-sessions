@@ -154,14 +154,16 @@ const SessionAdmin = () => {
     <div className="flex flex-col h-screen">
       {/* Simplified admin header - now the only header */}
       <SimplifiedAdminHeader
-        conversation={conversationData}
-        isSessionPaused={isSessionPaused}
-        toggleSessionState={toggleSessionState}
-        handleAdminMessage={handleSendAdminMessage}
-        onExportData={exportSessionData}
-        currentParticipantCount={conversationData?.current_participants || 0}
+        conversationData={conversationData}
+        onCloseAndReport={exportSessionData}
+        onSendMessage={handleSendAdminMessage}
+        isGeneratingReport={false}
+        participantCount={conversationData?.current_participants || 0}
         maxParticipants={conversationData?.participants || 10}
-        totalMessages={totalMessages}
+        onWrapUp={async () => {
+          await toggleSessionState();
+        }}
+        isWrappingUp={isSessionPaused}
       />
       
       {/* Main content area */}

@@ -84,7 +84,7 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
           <AdminMessageDialog onSendMessage={onSendMessage} />
 
           {/* QR Code */}
-          <AdminQrDialog conversationData={conversationData} />
+          <AdminQrDialog conversationId={conversationData?.id || null} />
 
           {/* Close & Report */}
           <Button
@@ -110,10 +110,12 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
       {/* Analytics Dashboard */}
       <Collapsible open={showAnalytics} onOpenChange={setShowAnalytics}>
         <CollapsibleContent>
-          <SessionAnalyticsDashboard 
-            conversationId={conversationData?.id} 
-            className="mt-4"
-          />
+          {conversationData?.id && (
+            <SessionAnalyticsDashboard 
+              conversationId={conversationData.id} 
+              className="mt-4"
+            />
+          )}
         </CollapsibleContent>
       </Collapsible>
     </div>

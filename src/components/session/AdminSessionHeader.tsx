@@ -23,14 +23,14 @@ const AdminSessionHeader: React.FC<AdminSessionHeaderProps> = ({
 }) => {
   return (
     <SimplifiedAdminHeader 
-      conversation={conversationData}
-      isSessionPaused={isSessionPaused}
-      toggleSessionState={onToggleSessionState}
-      handleAdminMessage={onSendAdminMessage}
-      onExportData={onExportData}
-      currentParticipantCount={currentParticipantCount}
+      conversationData={conversationData}
+      onCloseAndReport={onExportData}
+      onSendMessage={onSendAdminMessage}
+      isGeneratingReport={false}
+      participantCount={currentParticipantCount}
       maxParticipants={conversationData?.participants || 10}
-      totalMessages={totalMessages}
+      onWrapUp={onToggleSessionState}
+      isWrappingUp={isSessionPaused}
     />
   );
 };

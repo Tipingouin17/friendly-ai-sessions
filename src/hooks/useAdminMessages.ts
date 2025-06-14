@@ -90,10 +90,10 @@ export function useAdminMessages({
         if (!dbMessages || dbMessages.length === 0) {
           console.info('No database messages found for admin view');
           
-          // If there are no messages but we have conversation data with welcome_message, use that
-          if (conversationData?.sessions?.welcome_message) {
+          // Only create welcome message if session has already started
+          if (conversationData?.session_started && conversationData?.sessions?.welcome_message) {
             const welcomeMsg = conversationData.sessions.welcome_message;
-            console.info(`Admin: Found welcome message: ${welcomeMsg.substring(0, 50)}...`);
+            console.info(`Admin: Session started, using welcome message: ${welcomeMsg.substring(0, 50)}...`);
             setWelcomeMessage(welcomeMsg);
             
             // Create welcome message in the expected format
@@ -107,6 +107,10 @@ export function useAdminMessages({
             
             // Set it as the first message
             setMessages([initialWelcomeMessage]);
+          } else {
+            console.info('Session not started yet, not creating welcome message');
+            // Clear any existing messages to ensure clean state
+            setMessages([]);
           }
           return;
         }
@@ -170,7 +174,7 @@ export function useAdminMessages({
     };
     
     loadInitialMessages();
-  }, [conversationId, conversationData, setMessages]);
+  }, [conversationId, conversationData?.session_started, conversationData?.sessions?.welcome_message, setMessages]);
   
   // Set up real-time subscription for new messages
   useEffect(() => {

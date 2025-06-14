@@ -42,7 +42,12 @@ const SimplifiedAdminMessagingView: React.FC<SimplifiedAdminMessagingViewProps> 
   console.log('SimplifiedAdminMessagingView: Rendering with', messages.length, 'messages and', currentParticipantCount, 'participants');
   console.log('Session started:', isSessionStarted);
 
-  if (messages.length === 0) {
+  // Show empty state if no real messages exist OR session hasn't started
+  // Filter out welcome messages to check for real participant/facilitator content
+  const realMessages = messages.filter(msg => !msg.isWelcomeMessage);
+  const shouldShowEmptyState = realMessages.length === 0;
+
+  if (shouldShowEmptyState) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
         <div className="mb-3 p-3 bg-gray-50 rounded-full">

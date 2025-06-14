@@ -1,85 +1,98 @@
 
-import { z } from 'zod';
+import DOMPurify from 'dompurify';
 
-// Common validation schemas
-export const emailSchema = z.string().email('Please enter a valid email address');
-export const nameSchema = z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters');
-export const messageSchema = z.string().min(1, 'Message is required').max(5000, 'Message must be less than 5000 characters');
-export const participantIdSchema = z.number().int().positive('Participant ID must be a positive integer');
-export const conversationIdSchema = z.number().int().positive('Conversation ID must be a positive integer');
-export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
-
-// Session-related validation
-export const sessionJoinSchema = z.object({
-  participantName: nameSchema,
-  avatarSeed: z.string().max(50, 'Avatar seed too long'),
-  conversationId: conversationIdSchema,
-  isAnonymous: z.boolean().optional().default(false)
-});
-
-// Message validation
-export const messageContentSchema = z.object({
-  content: messageSchema,
-  conversationId: conversationIdSchema,
-  role: z.enum(['user', 'assistant', 'system']).optional().default('user')
-});
-
-// Contact form validation
-export const contactFormSchema = z.object({
-  fname: nameSchema,
-  lname: nameSchema,
-  email: emailSchema,
-  message: messageSchema
-});
-
-// Facilitator creation validation
-export const facilitatorSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
-  details: z.string().max(2000, 'Details too long'),
-  description: z.string().max(1000, 'Description too long'),
-  specialties: z.array(z.string().max(50)).max(10, 'Too many specialties'),
-  languages: z.array(z.string().max(30)).max(5, 'Too many languages'),
-  expertise_level: z.enum(['beginner', 'intermediate', 'advanced', 'expert'])
-});
-
-// Signup validation schema
-export const signupSchema = z.object({
-  name: nameSchema,
-  email: emailSchema,
-  password: passwordSchema
-});
-
-// Sanitization utilities
-export const sanitizeHtml = (input: string): string => {
-  return input
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+/**
+ * Sanitizes HTML content to prevent XSS attacks
+ */
+export const sanitizeHtml = (content: string): string => {
+  return DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br'],
+    ALLOWED_ATTR: []
+  });
 };
 
-export const sanitizeInput = (input: string): string => {
-  return input.trim().slice(0, 5000); // Limit length and trim whitespace
+/**
+ * Validates message content before storage
+ */
+export const validateMessageContent = (content: string): { isValid: boolean; error?: string } => {
+  if (!content || typeof content !== 'string') {
+    return { isValid: false, error: 'Message content is required' };
+  }
+
+  if (content.length > 2000) {
+    return { isValid: false, error: 'Message content exceeds maximum length of 2000 characters' };
+  }
+
+  // Check for potential script injection
+  if (content.includes('<script') || content.includes('javascript:')) {
+    return { isValid: false, error: 'Invalid content detected' };
+  }
+
+  return { isValid: true };
 };
 
-// Rate limiting helper
-export const createRateLimiter = (maxRequests: number, windowMs: number) => {
-  const requests = new Map<string, number[]>();
-  
-  return (identifier: string): boolean => {
+/**
+ * Validates session title
+ */
+export const validateSessionTitle = (title: string): { isValid: boolean; error?: string } => {
+  if (!title || typeof title !== 'string') {
+    return { isValid: false, error: 'Session title is required' };
+  }
+
+  if (title.length < 3 || title.length > 100) {
+    return { isValid: false, error: 'Session title must be between 3 and 100 characters' };
+  }
+
+  return { isValid: true };
+};
+
+/**
+ * Validates participant name
+ */
+export const validateParticipantName = (name: string): { isValid: boolean; error?: string } => {
+  if (!name || typeof name !== 'string') {
+    return { isValid: false, error: 'Participant name is required' };
+  }
+
+  if (name.length < 2 || name.length > 50) {
+    return { isValid: false, error: 'Participant name must be between 2 and 50 characters' };
+  }
+
+  // Only allow alphanumeric characters, spaces, hyphens, and apostrophes
+  if (!/^[a-zA-Z0-9\s\-']+$/.test(name)) {
+    return { isValid: false, error: 'Participant name contains invalid characters' };
+  }
+
+  return { isValid: true };
+};
+
+/**
+ * Rate limiting helper
+ */
+class RateLimiter {
+  private requests: Map<string, number[]> = new Map();
+
+  isRateLimited(key: string, limit: number, windowMs: number): boolean {
     const now = Date.now();
-    const userRequests = requests.get(identifier) || [];
+    const requests = this.requests.get(key) || [];
     
     // Remove old requests outside the window
-    const validRequests = userRequests.filter(time => now - time < windowMs);
+    const validRequests = requests.filter(time => now - time < windowMs);
     
-    if (validRequests.length >= maxRequests) {
-      return false; // Rate limit exceeded
+    if (validRequests.length >= limit) {
+      return true;
     }
-    
+
+    // Add current request
     validRequests.push(now);
-    requests.set(identifier, validRequests);
-    return true;
-  };
-};
+    this.requests.set(key, validRequests);
+    return false;
+  }
+
+  reset(key: string): void {
+    this.requests.delete(key);
+  }
+}
+
+export const messagingRateLimiter = new RateLimiter();
+export const sessionCreationRateLimiter = new RateLimiter();

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { validateSecureSessionOperation } from '@/utils/securityEnhanced';
+import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 interface SessionClosureResult {
   reportId: string;
@@ -22,10 +24,12 @@ export const useSessionClosure = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { logSensitiveAction, logSecurityViolation } = useSecurityAudit();
 
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     if (!conversationId) {
       console.error("❌ No conversation ID provided to closeSessionAndGenerateReport");
+      logSecurityViolation('invalid_session_closure_attempt', { conversationId });
       toast({
         title: "Error",
         description: "No conversation ID provided",
@@ -49,13 +53,32 @@ export const useSessionClosure = () => {
       
       if (!user) {
         console.error("❌ No authenticated user found");
+        logSecurityViolation('unauthenticated_session_closure_attempt', { conversationId });
         throw new Error('User not authenticated');
       }
       
       console.log("✅ User authenticated:", user.id);
 
-      // Step 2: Verify conversation ownership
-      console.log("🔍 Step 2: Verifying conversation ownership...");
+      // Step 2: Enhanced security validation
+      console.log("🔍 Step 2: Performing security validation...");
+      const securityValidation = await validateSecureSessionOperation(
+        conversationId, 
+        user.id, 
+        'close_session'
+      );
+      
+      if (!securityValidation.isValid) {
+        console.error("❌ Security validation failed:", securityValidation.error);
+        logSecurityViolation('unauthorized_session_closure', { 
+          conversationId, 
+          userId: user.id,
+          error: securityValidation.error 
+        });
+        throw new Error(securityValidation.error || 'Security validation failed');
+      }
+
+      // Step 3: Verify conversation ownership
+      console.log("🔍 Step 3: Verifying conversation ownership...");
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .select('user_id, is_session_ended')
@@ -74,6 +97,11 @@ export const useSessionClosure = () => {
 
       if (conversation.user_id !== user.id) {
         console.error("❌ User does not own this conversation");
+        logSecurityViolation('unauthorized_session_access', { 
+          conversationId, 
+          userId: user.id,
+          ownerId: conversation.user_id 
+        });
         throw new Error('Access denied: You do not own this conversation');
       }
 
@@ -84,8 +112,11 @@ export const useSessionClosure = () => {
 
       console.log("✅ Conversation ownership verified");
 
-      // Step 3: Call the edge function
-      console.log("🔍 Step 3: Calling edge function to close session and generate report...");
+      // Log the sensitive action
+      logSensitiveAction('session_closure_initiated', conversationId);
+
+      // Step 4: Call the edge function
+      console.log("🔍 Step 4: Calling edge function to close session and generate report...");
       
       const { data, error } = await supabase.functions.invoke('close-session-and-generate-report', {
         body: {
@@ -98,6 +129,10 @@ export const useSessionClosure = () => {
 
       if (error) {
         console.error("❌ Edge function error:", error);
+        logSecurityViolation('edge_function_failure', { 
+          conversationId, 
+          error: error.message 
+        });
         throw new Error(`Edge function failed: ${error.message || 'Unknown error'}`);
       }
 
@@ -109,7 +144,10 @@ export const useSessionClosure = () => {
       console.log("✅ Session closed successfully:", data);
       setClosureResult(data);
 
-      // Step 4: Invalidate relevant queries to ensure real-time sync
+      // Log successful closure
+      logSensitiveAction('session_closure_completed', conversationId);
+
+      // Step 5: Invalidate relevant queries to ensure real-time sync
       console.log("🔄 Invalidating queries for real-time sync...");
       queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
@@ -128,6 +166,12 @@ export const useSessionClosure = () => {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
+      
+      // Log the failure
+      logSecurityViolation('session_closure_failed', { 
+        conversationId, 
+        error: errorMessage 
+      });
       
       toast({
         title: "Error Closing Session",

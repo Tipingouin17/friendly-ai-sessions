@@ -162,7 +162,7 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
           </Collapsible>
         </div>
       </CardContent>
-    </div>
+    </Card>
   );
 };
 

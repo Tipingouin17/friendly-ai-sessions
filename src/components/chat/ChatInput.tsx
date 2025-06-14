@@ -21,9 +21,9 @@ const ChatInput = ({
   inputMessage,
   setInputMessage,
   onSendMessage,
-  isRecording,
-  setIsRecording,
-  placeholder = "Type your message here...",
+  isRecording = false,
+  setIsRecording = () => {},
+  placeholder = "Type a message", // Updated to consistent placeholder
   disabled = false,
   isMobile = false
 }: ChatInputProps) => {
@@ -93,14 +93,14 @@ const ChatInput = ({
   };
 
   return (
-    <div className={`${isMobile ? 'p-2' : 'p-4'} border-t border-gray-100`}>
+    <div className={`${isMobile ? 'p-3' : 'p-4'} border-t border-gray-200 bg-white`}>
       <div className="relative flex items-center">
         <Textarea
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder={disabled ? "You have already answered this question" : placeholder}
-          className={`${isMobile ? 'min-h-[45px] py-2 text-sm' : 'min-h-[60px]'} pr-16 rounded-md border-gray-200`}
+          className={`${isMobile ? 'min-h-[45px] py-2 text-sm' : 'min-h-[60px]'} pr-16 rounded-md border-gray-200 resize-none`}
           disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !disabled) {

@@ -95,8 +95,8 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
         <AdminSessionHeader
           conversationData={conversation}
           currentParticipantCount={currentParticipantCount}
-          isSessionPaused={false} // This would need to be passed as a prop if needed
-          onToggleSessionState={() => {}} // This would need to be implemented if needed
+          isSessionPaused={false}
+          onToggleSessionState={() => {}}
           onSendAdminMessage={onSendAdminMessage || (() => {})}
           onExportData={onGenerateReport}
         />
@@ -116,6 +116,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           isMobile={isMobile}
           viewMode={viewMode}
           isAdmin={isAdmin}
+          conversationData={conversation}
           
           // Pass input functionality props
           inputMessage={inputMessage}

@@ -29,6 +29,9 @@ interface MessagingAreaProps {
   totalResponses?: number;
   participantNames?: { [key: number]: string };
   currentUserParticipantId?: number | null;
+  
+  // Add conversationData prop to pass session info
+  conversationData?: any;
 }
 
 const MessagingArea = ({
@@ -55,7 +58,10 @@ const MessagingArea = ({
   hasAnswered = false,
   totalResponses = 0,
   participantNames = {},
-  currentUserParticipantId = null
+  currentUserParticipantId = null,
+  
+  // Session data
+  conversationData
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);
@@ -84,9 +90,6 @@ const MessagingArea = ({
     }
   }, [messages, viewMode, isAdmin, currentParticipant]);
   
-  // For participant view, we'll handle filtering in the MessageItem component
-  // No filtering happens here, as it would be redundant with useMessageProcessor hook
-  
   // Always use admin view if isAdmin=true or viewMode is admin
   if (isAdmin || viewMode === "admin") {
     return (
@@ -105,7 +108,7 @@ const MessagingArea = ({
   // Default to participant view
   return (
     <ParticipantMessagingView
-      messages={messages} // Let ParticipantMessagingView handle filtering using the hooks
+      messages={messages}
       participantColors={participantColors}
       currentParticipant={currentParticipant}
       isWaitingForResponse={isWaitingForResponse}
@@ -114,6 +117,7 @@ const MessagingArea = ({
       currentParticipantCount={currentParticipantCount}
       maxParticipants={maxParticipants}
       isMobile={isMobile}
+      conversationData={conversationData}
       
       // Pass input props to the participant view
       inputMessage={inputMessage}
@@ -128,7 +132,7 @@ const MessagingArea = ({
       viewMode={viewMode}
       participantNames={participantNames}
       currentUserParticipantId={currentUserParticipantId}
-      showResponseStats={false} // Don't show response stats in participant view
+      showResponseStats={false}
     />
   );
 };

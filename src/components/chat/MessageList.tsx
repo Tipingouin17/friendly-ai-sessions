@@ -14,7 +14,7 @@ interface MessageListProps {
   isWaitingForResponse?: boolean;
   participants?: ParticipantInfo[];
   isMobile?: boolean;
-  conversationData?: any; // Added to pass facilitator info
+  conversationData?: any;
 }
 
 const MessageList = ({ 
@@ -54,15 +54,18 @@ const MessageList = ({
       if (message.sender === "user" && message.participant && !messageColor) {
         messageColor = participantColors[message.participant] || getParticipantColor(message.participant);
       } else if (message.sender === "assistant" && !messageColor) {
-        messageColor = "#FFFFFF"; // Default color for assistant messages
+        messageColor = "#FFFFFF";
       }
 
-      // Set facilitator avatar from conversation data if not already set
+      // Set facilitator avatar from conversation data - FIXED
       let messageAvatar = message.avatar;
-      if (message.sender === "assistant" && (!messageAvatar || messageAvatar === '/api/avatar?name=Facilitator&variant=beam&palette=2')) {
-        // Use facilitator profile picture from conversation data
+      if (message.sender === "assistant") {
+        // Always use facilitator profile picture from conversation data if available
         if (conversationData?.sessions?.facilitator_details?.profile_picture) {
           messageAvatar = conversationData.sessions.facilitator_details.profile_picture;
+        } else if (!messageAvatar || messageAvatar === '/api/avatar?name=Facilitator&variant=beam&palette=2') {
+          // Fallback to default facilitator avatar
+          messageAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
         }
       }
 
@@ -88,7 +91,7 @@ const MessageList = ({
         isLastMessageOfGroup,
         participantInfo
       };
-    }).filter(Boolean); // Filter out any null entries
+    }).filter(Boolean);
   }, [messages, participantColors, participants, conversationData]);
 
   // Empty state for no messages
@@ -108,12 +111,13 @@ const MessageList = ({
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain pb-20">
-      <div className="px-3 py-6 sm:px-4 sm:py-8 space-y-1 sm:space-y-2">
+      {/* Reduced padding for better spacing */}
+      <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
         {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
           <MessageItem
             key={`${message.id || index}-${index}`}
             message={message}
-            isFirstMessageOfGroup={true} // Always show avatar for each message for now
+            isFirstMessageOfGroup={true}
             isLastMessageOfGroup={isLastMessageOfGroup}
             currentParticipant={currentParticipant}
             participantInfo={participantInfo}

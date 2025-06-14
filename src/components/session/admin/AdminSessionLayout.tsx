@@ -31,7 +31,7 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
 }) => {
   return (
     <div className="flex flex-col h-screen">
-      {/* Full admin header with navigation */}
+      {/* Enhanced admin header with all functionalities */}
       <AdminHeader
         conversation={conversationData}
         isSessionPaused={isSessionPaused}

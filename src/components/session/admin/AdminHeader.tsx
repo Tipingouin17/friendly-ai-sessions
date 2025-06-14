@@ -2,16 +2,19 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, FileText, LayoutDashboard, BarChart3 } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
+import SessionAnalyticsDashboard from "./SessionAnalyticsDashboard";
+import AdminWrapUpDialog from "./AdminWrapUpDialog";
 import { ConversationWithSession } from "@/types/database";
 import SessionsDropdown from "./SessionsDropdown";
 import { useAdminSessions } from "@/hooks/useAdminSessions";
 import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
 import ReportDownloadDialog from "../ReportDownloadDialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface AdminHeaderProps {
   conversation: ConversationWithSession | null;
@@ -39,6 +42,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   
   const [showClosureDialog, setShowClosureDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   
   const handleBack = () => {
     navigate('/past-workshops?auto=true');
@@ -108,6 +112,26 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Analytics Toggle */}
+            {conversation?.id && (
+              <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Analytics
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
+            )}
+
+            {/* Wrap Up Button */}
+            {!isSessionEnded && (
+              <AdminWrapUpDialog
+                onWrapUp={toggleSessionState}
+                isWrappingUp={isSessionPaused}
+              />
+            )}
+            
             <Button 
               variant="outline" 
               size="sm" 
@@ -135,6 +159,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             )}
           </div>
         </div>
+
+        {/* Analytics Dashboard */}
+        {conversation?.id && (
+          <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+            <CollapsibleContent className="px-4 pb-4">
+              <SessionAnalyticsDashboard
+                conversationId={conversation.id}
+                className="border rounded-lg"
+              />
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </div>
 
       <SessionClosureDialog

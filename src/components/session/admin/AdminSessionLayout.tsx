@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import AdminSessionHeader from '../AdminSessionHeader';
+import AdminSessionHeader from './AdminSessionHeader';
 import AdminSessionMessages from '../AdminSessionMessages';
 
 interface AdminSessionLayoutProps {

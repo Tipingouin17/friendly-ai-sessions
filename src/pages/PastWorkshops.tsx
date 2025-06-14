@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import { Calendar, Users, Clock, PlusCircle, LayoutDashboard, Download } from "lucide-react";
+import { Calendar, PlusCircle, LayoutDashboard, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +13,9 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
 import { useReportDownloader } from "@/hooks/session-closure/useReportDownloader";
 import ReportDownloadDialog from "@/components/session/ReportDownloadDialog";
+import WorkshopMetrics from "@/components/session/WorkshopMetrics";
+import FacilitatorInfo from "@/components/session/FacilitatorInfo";
+import WorkshopTags from "@/components/session/WorkshopTags";
 
 const fetchPastWorkshops = async () => {
   const { data, error } = await supabase
@@ -21,7 +24,14 @@ const fetchPastWorkshops = async () => {
       *,
       sessions!conversations_sessions_id_fkey (
         title,
-        facilitator
+        facilitator,
+        objective,
+        difficulty_level,
+        tags,
+        facilitators!sessions_facilitator_fkey (
+          title,
+          profile_picture
+        )
       )
     `)
     .eq('is_session_ended', true)
@@ -38,7 +48,14 @@ const fetchActiveWorkshops = async () => {
       *,
       sessions!conversations_sessions_id_fkey (
         title,
-        facilitator
+        facilitator,
+        objective,
+        difficulty_level,
+        tags,
+        facilitators!sessions_facilitator_fkey (
+          title,
+          profile_picture
+        )
       )
     `)
     .eq('is_session_ended', false)
@@ -87,58 +104,80 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
   const participantCount = workshop.participants || 0;
   const participantText = participantCount === 1 ? 'participant' : 'participants';
   
+  const truncateText = (text: string, maxLength: number) => {
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  };
+  
   return (
     <>
-      <Card className={isActive ? "border-green-300" : ""}>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl flex justify-between">
-            <span>{workshop.sessions?.title || 'Untitled Workshop'}</span>
-            {isActive && (
-              <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                Active
-              </span>
-            )}
-          </CardTitle>
-          <div className="flex items-center text-gray-600 text-sm">
-            <Calendar className="w-4 h-4 mr-2" />
-            {format(new Date(workshop.created_at), 'PPP')}
-          </div>
-        </CardHeader>
-        <CardContent>
+      <Card className={isActive ? "border-green-300 bg-green-50/30" : "hover:shadow-md transition-shadow"}>
+        <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              {workshop.participant_description && (
-                <p className="text-gray-600 text-sm">
-                  {workshop.participant_description}
-                </p>
-              )}
-              <div className="flex items-center text-gray-600 text-sm">
-                <Clock className="w-4 h-4 mr-2" />
-                {workshop.ended_at ? (
-                  <span>Completed on {format(new Date(workshop.ended_at), 'PP')}</span>
-                ) : (
-                  <span>In progress</span>
-                )}
+            <div className="flex-1">
+              <CardTitle className="text-lg font-semibold mb-2">
+                {workshop.sessions?.title || 'Untitled Workshop'}
+              </CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center text-gray-500 text-sm">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  {format(new Date(workshop.created_at), 'PPP')}
+                </div>
+                <FacilitatorInfo 
+                  facilitatorName={workshop.sessions?.facilitators?.title}
+                  facilitatorAvatar={workshop.sessions?.facilitators?.profile_picture}
+                />
               </div>
             </div>
-            <div className="text-right">
-              <div className="flex items-center justify-end text-gray-600 text-sm mb-2">
-                <Users className="w-4 h-4 mr-2" />
-                <span>{participantCount} {participantText}</span>
-              </div>
-              <div className="flex gap-2">
-                {isActive && (
-                  <Button size="sm" onClick={handleAdminView}>
-                    Manage Session
-                  </Button>
-                )}
-                {!isActive && canGenerateReports && reportData && (
-                  <Button size="sm" variant="outline" onClick={handleDownloadReport}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Report
-                  </Button>
-                )}
-              </div>
+          </div>
+          
+          <WorkshopTags 
+            difficulty={workshop.sessions?.difficulty_level}
+            tags={workshop.sessions?.tags}
+            isActive={isActive}
+          />
+        </CardHeader>
+        
+        <CardContent className="pt-0">
+          {workshop.sessions?.objective && (
+            <p className="text-gray-600 text-sm mb-3 leading-relaxed">
+              {truncateText(workshop.sessions.objective, 120)}
+            </p>
+          )}
+          
+          {workshop.participant_description && (
+            <p className="text-gray-500 text-xs mb-3 italic">
+              "{truncateText(workshop.participant_description, 80)}"
+            </p>
+          )}
+
+          <WorkshopMetrics
+            participantCount={participantCount}
+            messageCount={workshop.total_messages || 0}
+            duration={workshop.session_duration_minutes || 0}
+            engagementScore={workshop.participant_engagement_score || 0}
+          />
+
+          <div className="flex justify-between items-center mt-4">
+            <div className="text-sm text-gray-500">
+              {workshop.ended_at ? (
+                <span>Completed {format(new Date(workshop.ended_at), 'PP')}</span>
+              ) : (
+                <span className="text-green-600 font-medium">In progress</span>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              {isActive && (
+                <Button size="sm" onClick={handleAdminView} className="bg-green-600 hover:bg-green-700">
+                  Manage Session
+                </Button>
+              )}
+              {!isActive && canGenerateReports && reportData && (
+                <Button size="sm" variant="outline" onClick={handleDownloadReport}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Report
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -298,7 +337,7 @@ const PastWorkshops = () => {
   };
 
   return (
-    <div className="min-h-screen pt-16 pb-16">
+    <div className="min-h-screen pt-12 pb-16">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <div>

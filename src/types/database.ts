@@ -30,5 +30,12 @@ export interface Workshop extends DbConversation {
   sessions: {
     title: string | null;
     facilitator: number | null;
+    objective?: string | null;
+    difficulty_level?: string | null;
+    tags?: string[] | null;
+    facilitators?: {
+      title: string | null;
+      profile_picture: string | null;
+    } | null;
   } | null;
 }

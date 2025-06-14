@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Users, Clock, Target, User } from 'lucide-react';
+import { Clock, Target, User } from 'lucide-react';
 import { ParticipantInfo } from '@/types/chat';
 
 interface SessionInfoPanelProps {
@@ -86,21 +86,6 @@ const SessionInfoPanel: React.FC<SessionInfoPanelProps> = ({
         )}
 
         <Separator />
-
-        {/* Participants Count */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Users className="h-4 w-4" />
-                <span>Participants</span>
-              </div>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                {currentParticipantCount}/{maxParticipants}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Session Status */}
         <Card>

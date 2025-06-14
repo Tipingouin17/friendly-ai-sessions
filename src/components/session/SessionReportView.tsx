@@ -52,7 +52,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
           ),
           facilitators!conversations_facilitator_id_fkey (
             id,
-            name,
+            title,
             avatar_url
           )
         `)
@@ -300,7 +300,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
                 </div>
                 <div className="flex items-center space-x-2">
                   <UserCheck className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm">{conversation.facilitators?.name || 'AI Facilitator'}</span>
+                  <span className="text-sm">{conversation.facilitators?.title || 'AI Facilitator'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge variant="outline">{conversation.sessions?.session_type || 'Discussion'}</Badge>

@@ -16,6 +16,12 @@ interface AdminSessionLayoutProps {
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
+  
+  // Response collection props
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
+  onTriggerFacilitatorResponse?: () => void;
 }
 
 const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
@@ -28,7 +34,11 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
   participantColors,
   participants,
   isLoadingParticipants,
-  currentConversationId
+  currentConversationId,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
+  onTriggerFacilitatorResponse
 }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -47,6 +57,10 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
         onSendMessage={handleSendAdminMessage}
+        isWaitingForResponses={isWaitingForResponses}
+        responseCount={responseCount}
+        totalParticipants={totalParticipants}
+        onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
       />
     </div>
   );

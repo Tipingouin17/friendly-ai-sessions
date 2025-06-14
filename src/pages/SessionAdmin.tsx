@@ -53,18 +53,23 @@ const SessionAdmin = () => {
   // Initialize session messages with empty array
   const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
 
-  // Admin message handling
+  // Admin message handling with response collection
   const {
     isSessionPaused,
     toggleSessionState,
     exportSessionData,
     handleAdminMessage,
-    handleSendAdminMessage
+    handleSendAdminMessage,
+    responseCount,
+    isWaitingForResponses,
+    totalParticipants,
+    triggerFacilitatorResponse
   } = useAdminMessages({
     conversationId: currentConversationId,
     participants: participants || [],
     messages: sessionMessages || [],
-    setMessages: setSessionMessages
+    setMessages: setSessionMessages,
+    conversationData
   });
 
   // Keep a state reference to preserve UI data
@@ -137,6 +142,10 @@ const SessionAdmin = () => {
       participants={participants}
       isLoadingParticipants={isLoadingParticipants}
       currentConversationId={currentConversationId}
+      isWaitingForResponses={isWaitingForResponses}
+      responseCount={responseCount}
+      totalParticipants={totalParticipants}
+      onTriggerFacilitatorResponse={triggerFacilitatorResponse}
     />
   );
 };

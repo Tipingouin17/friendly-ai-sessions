@@ -1,10 +1,10 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { ConversationWithSession } from '@/types/database';
 import { useToast } from '@/components/ui/use-toast';
 import { useAdminSessionState } from './useAdminSessionState';
+import { useResponseCollection } from './useResponseCollection';
 
 // Create a function to log channel information in a controlled way
 const logChannelStatus = (channelRef: any, label: string) => {
@@ -38,6 +38,21 @@ export function useAdminMessages({
   const cleanupAttemptedRef = useRef(false);
   const [hasInitializedChannel, setHasInitializedChannel] = useState(false);
   const { toast } = useToast();
+  
+  // Add response collection logic
+  const totalParticipants = participants.length || 1;
+  const {
+    responseCount,
+    isWaitingForResponses,
+    allParticipantsResponded,
+    startNewResponseCollection,
+    recordParticipantResponse,
+    stopWaitingForResponses,
+    lastQuestionId
+  } = useResponseCollection({
+    totalParticipants,
+    currentUserParticipantId: null // Admin doesn't have a participant ID
+  });
   
   // Use the admin session state hook
   const {
@@ -256,15 +271,71 @@ export function useAdminMessages({
     };
   }, [conversationId, hasInitializedChannel, messages, setMessages]);
   
-  // Handle sending a message as admin
+  // Enhanced admin message handler that can trigger response collection
   const handleAdminMessage = useCallback((message: string, isPinned: boolean = false, recipientId?: string) => {
+    // Check if this is a question that should trigger response collection
+    const isQuestion = message.includes('?') || message.toLowerCase().includes('what') || 
+                      message.toLowerCase().includes('how') || message.toLowerCase().includes('why') ||
+                      message.toLowerCase().includes('tell me') || message.toLowerCase().includes('describe');
+    
+    if (isQuestion && totalParticipants > 1) {
+      // Start response collection for this question
+      const questionId = `question-${Date.now()}`;
+      startNewResponseCollection(questionId);
+    }
+    
     return sendAdminMessage(message, isPinned, recipientId);
-  }, [sendAdminMessage]);
+  }, [sendAdminMessage, totalParticipants, startNewResponseCollection]);
   
   // Handle sending a quick admin message
   const handleSendAdminMessage = useCallback((message: string) => {
-    return sendAdminMessage(message, false);
-  }, [sendAdminMessage]);
+    return handleAdminMessage(message, false);
+  }, [handleAdminMessage]);
+
+  // Function to manually trigger facilitator response
+  const triggerFacilitatorResponse = useCallback(async () => {
+    if (!conversationId) return;
+    
+    try {
+      stopWaitingForResponses();
+      
+      // Call the facilitator response function
+      const response = await supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages,
+          conversationId
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data) {
+        const aiResponse: Message = {
+          id: response.data.id || `ai-${Date.now()}`,
+          content: response.data.content,
+          sender: "assistant",
+          timestamp: new Date(),
+          avatar: conversationData?.sessions?.facilitator_details?.profile_picture || '/api/avatar?name=Facilitator&variant=beam&palette=2'
+        };
+
+        setMessages(prev => [...prev, aiResponse]);
+        
+        toast({
+          title: "Facilitator Response",
+          description: "Response generated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error triggering facilitator response:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate facilitator response",
+        variant: "destructive",
+      });
+    }
+  }, [conversationId, messages, conversationData, setMessages, stopWaitingForResponses, toast]);
   
   return {
     welcomeMessage,
@@ -273,7 +344,16 @@ export function useAdminMessages({
     toggleSessionState,
     exportSessionData,
     handleAdminMessage,
-    handleSendAdminMessage
+    handleSendAdminMessage,
+    
+    // Response collection state
+    responseCount,
+    isWaitingForResponses,
+    allParticipantsResponded,
+    totalParticipants,
+    recordParticipantResponse,
+    triggerFacilitatorResponse,
+    lastQuestionId
   };
 }
 

@@ -12,6 +12,12 @@ interface AdminSessionContentProps {
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
+  
+  // Response collection props
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
+  onTriggerFacilitatorResponse?: () => void;
 }
 
 const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
@@ -21,7 +27,11 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
   participants,
   isLoadingParticipants,
   currentConversationId,
-  onSendMessage
+  onSendMessage,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
+  onTriggerFacilitatorResponse
 }) => {
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
@@ -32,6 +42,10 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
           participantColors={participantColors}
           currentParticipantCount={conversationData?.current_participants || 0}
           conversationData={conversationData}
+          isWaitingForResponses={isWaitingForResponses}
+          responseCount={responseCount}
+          totalParticipants={totalParticipants}
+          onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         />
       </div>
 

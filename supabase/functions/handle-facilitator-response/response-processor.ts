@@ -1,3 +1,4 @@
+
 import { 
   analyzeParticipation, 
   extractUserTopics 
@@ -32,7 +33,8 @@ export async function processResponse(
   conversationId: number,
   conversation: any,
   participants: any[],
-  generateReport: boolean
+  generateReport: boolean,
+  wrapUpSession?: boolean
 ) {
   // Track participation metrics with enhanced participant awareness
   const participantStats = analyzeParticipation(messages, participants || []);
@@ -58,8 +60,12 @@ export async function processResponse(
   let responseContent = "";
   let responseMetrics = createResponseMetrics('template', 0, participantStats.participationBalance);
   
-  // Determine session progress
-  const sessionProgress = determineSessionProgress(messages, conversation?.sessions?.duration_minutes);
+  // Determine session progress - force to "concluding" if wrap up is requested
+  let sessionProgress = determineSessionProgress(messages, conversation?.sessions?.duration_minutes);
+  if (wrapUpSession) {
+    console.log("🔄 Admin triggered wrap up - forcing session progress to 'concluding'");
+    sessionProgress = "concluding";
+  }
   
   // Get the appropriate facilitator avatar
   let facilitatorAvatar = getFacilitatorAvatar(conversation);
@@ -95,7 +101,7 @@ export async function processResponse(
       // Extract user questions and topics
       const userTopics = extractUserTopics(prunedMessages);
       
-      // Prepare OpenAI prompt with language awareness
+      // Prepare OpenAI prompt with language awareness and wrap up instruction
       let basePrompt = prepareOpenAIPrompt(
         conversation, 
         sessionProgress, 
@@ -103,6 +109,16 @@ export async function processResponse(
         participantDescription, 
         strategies
       );
+      
+      // Add wrap up instruction if requested
+      if (wrapUpSession) {
+        basePrompt += `\n\nIMPORTANT: The session admin has requested you to wrap up this session. Please:
+1. Acknowledge that the session is coming to a close
+2. Summarize the key points discussed so far
+3. Ask participants for any final thoughts or questions
+4. Guide the conversation toward natural conclusion
+5. Keep your response concise but comprehensive`;
+      }
       
       // Add language instruction to the prompt if not already present
       if (sessionLanguage && sessionLanguage !== "en" && !basePrompt.includes(`respond in ${sessionLanguage}`)) {
@@ -156,7 +172,7 @@ export async function processResponse(
           participantCount,
           participantDescription,
           sessionLanguage,
-          generateReport ? 'report_generation' : 'facilitator_response'
+          wrapUpSession ? 'session_wrap_up' : (generateReport ? 'report_generation' : 'facilitator_response')
         );
       } else {
         console.error("OpenAI API error:", openAIResult.error);

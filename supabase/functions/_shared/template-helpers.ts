@@ -1,9 +1,8 @@
 
 import { FACILITATION_STRATEGIES } from "./facilitation-strategies.ts";
-import { REPORT_TEMPLATES } from "./report-templates.ts";
 
 /**
- * Generate a welcome message based on session context and language
+ * Generate a welcome message for the session
  */
 export function generateWelcomeMessage(
   sessionType: string,
@@ -13,62 +12,48 @@ export function generateWelcomeMessage(
   participantCount: number,
   participantDescription: string
 ) {
-  // Basic welcome message
-  let welcome = "";
+  const strategies = FACILITATION_STRATEGIES[sessionType as keyof typeof FACILITATION_STRATEGIES] || FACILITATION_STRATEGIES.workshop;
   
-  // Use basic translations for common welcome phrases based on language
-  if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
-    welcome = `Bienvenido a nuestra sesión de ${sessionType} sobre ${sessionTitle}. ${sessionObjective ? `Nuestro objetivo hoy es ${sessionObjective}.` : ''} Estoy aquí para facilitar nuestra discusión.`;
-  } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
-    welcome = `Bienvenue à notre session de ${sessionType} sur ${sessionTitle}. ${sessionObjective ? `Notre objectif aujourd'hui est de ${sessionObjective}.` : ''} Je suis là pour faciliter notre discussion.`;
-  } else if (sessionLanguage === "de" || sessionLanguage === "German") {
-    welcome = `Willkommen zu unserer ${sessionType}-Sitzung zum Thema ${sessionTitle}. ${sessionObjective ? `Unser Ziel heute ist es, ${sessionObjective}.` : ''} Ich bin hier, um unsere Diskussion zu moderieren.`;
-  } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
-    welcome = `欢迎参加我们关于${sessionTitle}的${sessionType}会议。${sessionObjective ? `今天我们的目标是${sessionObjective}。` : ''} 我在这里是为了促进我们的讨论。`;
-  } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
-    welcome = `مرحبًا بك في جلسة ${sessionType} حول ${sessionTitle}. ${sessionObjective ? `هدفنا اليوم هو ${sessionObjective}.` : ''} أنا هنا لتسهيل مناقشتنا.`;
-  } else {
-    // Default to English
-    welcome = `Welcome to our ${sessionType} session on ${sessionTitle}. ${sessionObjective ? `Our objective today is to ${sessionObjective}.` : ''} I'm here to facilitate our discussion.`;
+  let welcomeMessage = `Welcome to "${sessionTitle}"!\n\n`;
+  
+  if (sessionObjective) {
+    welcomeMessage += `Our objective today is: ${sessionObjective}\n\n`;
   }
   
-  // Adapt based on participant count and description (keep in selected language)
   if (participantCount > 1) {
-    if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
-      welcome += ` Veo que tenemos ${participantCount} participantes hoy${participantDescription ? ` descritos como ${participantDescription}` : ""}.`;
-    } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
-      welcome += ` Je vois que nous avons ${participantCount} participants aujourd'hui${participantDescription ? ` décrits comme ${participantDescription}` : ""}.`;
-    } else if (sessionLanguage === "de" || sessionLanguage === "German") {
-      welcome += ` Ich sehe, dass wir heute ${participantCount} Teilnehmer haben${participantDescription ? `, die als ${participantDescription} beschrieben werden` : ""}.`;
-    } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
-      welcome += ` 我看到我们今天有${participantCount}名参与者${participantDescription ? `，被描述为${participantDescription}` : ""}。`;
-    } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
-      welcome += ` أرى أن لدينا ${participantCount} مشاركين اليوم${participantDescription ? ` وصفهم بأنهم ${participantDescription}` : ""}.`;
-    } else {
-      welcome += ` I see we have ${participantCount} participants today${participantDescription ? ` described as ${participantDescription}` : ""}.`;
-    }
-  }
-  
-  // Add final prompt in the selected language
-  if (sessionLanguage === "es" || sessionLanguage === "Spanish") {
-    welcome += " Por favor, comparta sus pensamientos iniciales sobre el tema.";
-  } else if (sessionLanguage === "fr" || sessionLanguage === "French") {
-    welcome += " Veuillez partager vos réflexions initiales sur le sujet.";
-  } else if (sessionLanguage === "de" || sessionLanguage === "German") {
-    welcome += " Bitte teilen Sie Ihre ersten Gedanken zum Thema mit.";
-  } else if (sessionLanguage === "zh" || sessionLanguage === "Chinese") {
-    welcome += " 请分享您对该主题的初步想法。";
-  } else if (sessionLanguage === "ar" || sessionLanguage === "Arabic") {
-    welcome += " يرجى مشاركة أفكارك الأولية حول الموضوع.";
+    welcomeMessage += `I see we have ${participantCount} ${participantDescription || "participants"} joining us today. `;
   } else {
-    welcome += " Please share your initial thoughts on the topic.";
+    welcomeMessage += `Welcome! `;
   }
   
-  return welcome;
+  welcomeMessage += `I'm here to facilitate our discussion and ensure everyone has the opportunity to contribute.\n\n`;
+  
+  // Add session-type specific opening
+  switch (sessionType) {
+    case "workshop":
+      welcomeMessage += `Let's begin by sharing your initial thoughts or questions about our topic. What brings you here today, and what would you like to explore or achieve?`;
+      break;
+    case "training":
+      welcomeMessage += `Before we dive into the content, I'd like to understand your current experience with this topic. What's your background, and what specific areas would you like to focus on?`;
+      break;
+    case "consultation":
+      welcomeMessage += `Please share the specific challenges or questions you'd like to address today. The more context you can provide, the better I can tailor our discussion.`;
+      break;
+    case "coaching":
+      welcomeMessage += `What specific goals or challenges would you like to work on today? What would make this session valuable for you?`;
+      break;
+    case "team_building":
+      welcomeMessage += `Let's start by getting to know each other better. Share something about yourself and what you hope to gain from our time together.`;
+      break;
+    default:
+      welcomeMessage += `Please share your thoughts, questions, or what you'd like to explore in our discussion today.`;
+  }
+  
+  return welcomeMessage;
 }
 
 /**
- * Generate a template-based facilitator response
+ * Generate a facilitator response based on session context and participant input
  */
 export function generateFacilitatorResponse(
   sessionProgress: string,
@@ -79,77 +64,111 @@ export function generateFacilitatorResponse(
   languageStyle: string,
   strategies: any
 ) {
-  let response = '';
+  let response = "";
   
-  // Add appropriate greeting based on language style
-  if (languageStyle === "accessible") {
-    response = `Thanks for sharing your thoughts! `;
-  } else if (languageStyle === "technical") {
-    response = `Thank you for your detailed contributions. `;
-  } else if (languageStyle === "executive") {
-    response = `Thank you for those insights. `;
+  // Handle wrap up mode specifically
+  if (sessionProgress === "concluding") {
+    response = generateWrapUpResponse(participantStats, userTopics, recentUserMessages, groupSizeApproach);
   } else {
-    response = `Thank you for sharing your perspectives. `;
+    // Generate regular facilitator response
+    response = generateRegularResponse(sessionProgress, participantStats, userTopics, recentUserMessages, groupSizeApproach, strategies);
   }
   
-  // Add topic acknowledgment
-  response += `I notice we're discussing ${userTopics.length > 0 ? userTopics.join(", ") : "several interesting points"}.\n\n`;
+  return response;
+}
+
+function generateWrapUpResponse(
+  participantStats: any,
+  userTopics: string[],
+  recentUserMessages: string[],
+  groupSizeApproach: string
+) {
+  let response = "Thank you all for your valuable contributions to our discussion today. ";
   
-  // Add stage-appropriate facilitation
+  // Summarize key themes if we have them
+  if (userTopics.length > 0) {
+    response += `We've covered some important ground together, including ${userTopics.slice(0, 3).join(", ")}.`;
+    if (userTopics.length > 3) {
+      response += ` And several other valuable topics.`;
+    }
+    response += "\n\n";
+  }
+  
+  // Acknowledge participation
+  if (participantStats.activeParticipants > 1) {
+    response += `I've appreciated hearing from ${participantStats.activeParticipants} participants, and the diverse perspectives you've shared have enriched our conversation.\n\n`;
+  } else {
+    response += `Thank you for your engaged participation and thoughtful contributions.\n\n`;
+  }
+  
+  // Ask for final thoughts
+  response += `As we wrap up, I'd like to invite any final thoughts, questions, or reflections you'd like to share. `;
+  
+  if (groupSizeApproach === "large group") {
+    response += `Is there anything important we haven't covered, or any key insights you'd like to highlight?`;
+  } else {
+    response += `What's one key takeaway or next step you're taking away from our discussion?`;
+  }
+  
+  response += `\n\nThank you for making this such a productive session!`;
+  
+  return response;
+}
+
+function generateRegularResponse(
+  sessionProgress: string,
+  participantStats: any,
+  userTopics: string[],
+  recentUserMessages: string[],
+  groupSizeApproach: string,
+  strategies: any
+) {
+  let response = "";
+  
+  // Analyze recent content for response direction
+  const hasQuestions = recentUserMessages.some(msg => msg.includes('?'));
+  const hasChallenges = recentUserMessages.some(msg => 
+    msg.toLowerCase().includes('challenge') || 
+    msg.toLowerCase().includes('difficult') ||
+    msg.toLowerCase().includes('problem')
+  );
+  
+  // Session progress based responses
   if (sessionProgress === "early") {
-    // Early stage facilitation focuses on exploration
-    if (participantStats.participationBalance < 0.5) {
-      // Low participation balance - encourage quieter participants
-      if (groupSizeApproach === "large group") {
-        response += `I'd like to hear from more participants. What are your thoughts on what's been shared so far?\n\n`;
-      } else {
-        response += `I'd love to hear your perspective on this topic.\n\n`;
-      }
-    } else {
-      // Good participation - keep momentum
-      response += `You've raised some interesting points. Let's explore them further:\n\n`;
+    response += "Great start to our discussion! ";
+    if (participantStats.activeParticipants > 1) {
+      response += "I'm hearing some interesting perspectives emerging. ";
     }
     
-    // Add a thought-provoking question using the appropriate facilitation technique
-    response += `${strategies.redirections[0]} ${strategies.techniques.includes("questioning") ? "What specific examples come to mind?" : "How might this impact your work or situation?"}\n\n`;
-  } 
-  else if (sessionProgress === "middle") {
-    // Middle stage facilitation focuses on deepening
-    response = `We're making good progress in our discussion. ${userTopics.length > 0 ? `The topics of ${userTopics.join(", ")} are particularly interesting.` : "Several valuable insights have emerged."}\n\n`;
+    if (hasQuestions) {
+      response += "I notice some important questions being raised. ";
+    }
     
-    // Add a summarization to consolidate learning
-    response += `So far, I'm hearing that: \n`;
-    recentUserMessages.slice(0, 3).forEach(msg => {
-      response += `- ${msg.substring(0, 100)}${msg.length > 100 ? '...' : ''}\n`;
-    });
+    response += "Let's build on these ideas. ";
     
-    // Adapt question based on group size and language style
-    if (groupSizeApproach === "small group") {
-      response += `\nTo deepen our exploration: ${strategies.redirections[1]} What personal examples can you share related to this topic?\n\n`;
-    } else if (groupSizeApproach === "large group") {
-      response += `\nTo build on these ideas: How do these concepts apply in your specific contexts? Feel free to share brief examples.\n\n`;
-    } else {
-      response += `\nTo deepen our exploration: ${strategies.redirections[1]} What connections do you see between these different perspectives?\n\n`;
+  } else if (sessionProgress === "middle") {
+    response += "We're making good progress in our discussion. ";
+    
+    if (userTopics.length > 2) {
+      response += `You've touched on several key areas: ${userTopics.slice(-2).join(" and ")}. `;
+    }
+    
+    if (hasChallenges) {
+      response += "I'm noting some challenges being highlighted - let's explore these further. ";
     }
   }
-  else {
-    // Concluding stage facilitation focuses on consolidation and next steps
-    response = `As we move toward wrapping up our session, let's consolidate what we've covered.\n\n`;
-    
-    // Summarize key points
-    response += `The discussion has touched on ${userTopics.length > 0 ? userTopics.join(", ") : "several important aspects"}. Some key insights include:\n\n`;
-    
-    // Extract a few points from recent messages
-    recentUserMessages.slice(0, 2).forEach(msg => {
-      response += `- ${msg.substring(0, 80)}${msg.length > 80 ? '...' : ''}\n`;
-    });
-    
-    // Add reflection prompt based on group size
-    if (groupSizeApproach === "large group") {
-      response += `\nAs we conclude, take a moment to reflect: What is your main takeaway from today's discussion? What specific actions might you consider based on our conversation?`;
+  
+  // Add facilitating questions based on strategies
+  if (strategies.techniques.includes("questioning")) {
+    if (hasQuestions) {
+      response += "What additional aspects of this should we consider? ";
     } else {
-      response += `\nAs we conclude, what do you see as the most valuable takeaway from our discussion? What specific actions might you consider based on today's conversation?`;
+      response += "What questions does this raise for you? ";
     }
+  } else if (strategies.techniques.includes("collaborative")) {
+    response += "How do others see this? What's your experience been? ";
+  } else if (strategies.techniques.includes("action-oriented")) {
+    response += "What practical steps could address this? ";
   }
   
   return response;

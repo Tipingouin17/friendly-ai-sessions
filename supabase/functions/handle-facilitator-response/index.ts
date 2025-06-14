@@ -23,7 +23,7 @@ serve(async (req) => {
     const supabase = initSupabaseClient();
     
     // Parse and validate the request
-    const { messages, conversationId, generateReport } = await parseRequest(req);
+    const { messages, conversationId, generateReport, wrapUpSession } = await parseRequest(req);
 
     // ENHANCED CONTEXT MANAGEMENT: Fetch conversation and participants data
     const conversation = await fetchConversationData(supabase, conversationId);
@@ -36,14 +36,16 @@ serve(async (req) => {
       conversationId,
       conversation,
       participants,
-      generateReport
+      generateReport,
+      wrapUpSession
     );
 
     console.log("Sending facilitator response:", {
       id: responseObject.id,
       isReport: responseObject.is_report,
       contentLength: responseObject.content.length,
-      metrics: responseObject.metrics
+      metrics: responseObject.metrics,
+      wrapUpTriggered: wrapUpSession
     });
     
     return new Response(

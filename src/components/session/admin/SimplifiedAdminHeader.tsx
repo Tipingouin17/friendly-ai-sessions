@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, LayoutDashboard, Users, MessageSquare, Clock, AlertCircle } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
+import AdminWrapUpDialog from "./AdminWrapUpDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
 import { ConversationWithSession } from "@/types/database";
 import SessionsDropdown from "./SessionsDropdown";
@@ -13,6 +14,7 @@ import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SimplifiedAdminHeaderProps {
   conversation: ConversationWithSession | null;
@@ -42,6 +44,7 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
     isClosing, 
     closeSessionAndGenerateReport
   } = useSessionClosure();
+  const [isWrappingUp, setIsWrappingUp] = useState(false);
   
   const [showClosureDialog, setShowClosureDialog] = useState(false);
   
@@ -70,6 +73,57 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
       navigate(`/session/report/${conversation.id}`);
     } else {
       console.error("❌ Session closure failed, keeping dialog open");
+    }
+  };
+
+  const handleWrapUp = async () => {
+    if (!conversation?.id) {
+      console.error("❌ No conversation ID available for wrap up");
+      toast({
+        title: "Error",
+        description: "No conversation available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log("📝 Admin triggered session wrap up");
+    setIsWrappingUp(true);
+
+    try {
+      // Send a special wrap up message to trigger AI facilitator response
+      const { error } = await supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId: conversation.id,
+          generateReport: false,
+          wrapUpSession: true
+        }
+      });
+
+      if (error) {
+        console.error("❌ Error triggering wrap up:", error);
+        toast({
+          title: "Error",
+          description: "Failed to trigger session wrap up",
+          variant: "destructive"
+        });
+      } else {
+        console.log("✅ Wrap up request sent successfully");
+        toast({
+          title: "Session Wrap Up",
+          description: "The AI facilitator will now begin wrapping up the session",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error in wrap up request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to trigger session wrap up",
+        variant: "destructive"
+      });
+    } finally {
+      setIsWrappingUp(false);
     }
   };
 
@@ -169,6 +223,10 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
             
             {!isSessionEnded && (
               <>
+                <AdminWrapUpDialog 
+                  onWrapUp={handleWrapUp}
+                  isWrappingUp={isWrappingUp}
+                />
                 <SessionsDropdown 
                   currentSessionId={conversation?.id || null}
                   activeSessions={activeSessions}

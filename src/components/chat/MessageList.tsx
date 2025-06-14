@@ -14,6 +14,7 @@ interface MessageListProps {
   isWaitingForResponse?: boolean;
   participants?: ParticipantInfo[];
   isMobile?: boolean;
+  conversationData?: any; // Added to pass facilitator info
 }
 
 const MessageList = ({ 
@@ -22,7 +23,8 @@ const MessageList = ({
   currentParticipant,
   isWaitingForResponse = false,
   participants = [],
-  isMobile = false
+  isMobile = false,
+  conversationData
 }: MessageListProps) => {
   const { ref, scrollToBottom } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse]);
   
@@ -55,9 +57,13 @@ const MessageList = ({
         messageColor = "#FFFFFF"; // Default color for assistant messages
       }
 
-      // Default avatar for assistant
-      if (message.sender === "assistant" && !message.avatar) {
-        message.avatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
+      // Set facilitator avatar from conversation data if not already set
+      let messageAvatar = message.avatar;
+      if (message.sender === "assistant" && (!messageAvatar || messageAvatar === '/api/avatar?name=Facilitator&variant=beam&palette=2')) {
+        // Use facilitator profile picture from conversation data
+        if (conversationData?.sessions?.facilitator_details?.profile_picture) {
+          messageAvatar = conversationData.sessions.facilitator_details.profile_picture;
+        }
       }
 
       // Get participant info if this is a user message
@@ -77,13 +83,13 @@ const MessageList = ({
       }
 
       return {
-        message: {...message, color: messageColor},
+        message: {...message, color: messageColor, avatar: messageAvatar},
         isFirstMessageOfGroup,
         isLastMessageOfGroup,
         participantInfo
       };
     }).filter(Boolean); // Filter out any null entries
-  }, [messages, participantColors, participants]);
+  }, [messages, participantColors, participants, conversationData]);
 
   // Empty state for no messages
   if (processedMessages.length === 0) {

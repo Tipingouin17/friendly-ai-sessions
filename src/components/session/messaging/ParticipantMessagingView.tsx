@@ -16,6 +16,7 @@ interface ParticipantMessagingViewProps {
   currentParticipantCount: number;
   maxParticipants: number;
   isMobile: boolean;
+  conversationData?: any; // Added to pass to MessageList
   
   // Add additional props needed for InputFooter
   inputMessage?: string;
@@ -43,6 +44,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   conversationId,
   currentParticipantCount = 0,
   maxParticipants = 1,
+  conversationData,
   
   // InputFooter props with defaults
   inputMessage = '',
@@ -73,9 +75,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   });
   
   return (
-    <div className="message-area-container">
+    <div className="message-area-container h-full flex flex-col">
       {/* Message list with flex-1 to take all available space */}
-      <div className="message-container">
+      <div className="message-container flex-1 overflow-hidden">
         <MessageList 
           messages={filteredMessages} 
           participantColors={participantColors}
@@ -83,11 +85,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           isWaitingForResponse={isWaitingForResponse}
           participants={participants}
           isMobile={isMobile || isMobileDevice}
+          conversationData={conversationData}
         />
       </div>
       
       {/* Fixed footer with input */}
-      <div className="fixed-input-footer">
+      <div className="fixed-input-footer shrink-0">
         <InputFooter
           participantCount={maxParticipants}
           currentParticipant={currentParticipant}

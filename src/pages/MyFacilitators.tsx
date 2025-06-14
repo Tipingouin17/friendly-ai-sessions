@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";
@@ -86,7 +85,7 @@ const MyFacilitators = () => {
             isStep3Disabled={isStep3Disabled}
           />
 
-          <div className="space-y-6 md:space-y-8">
+          <div className="space-y-4 md:space-y-6">
             {/* Step 1: Facilitator Selection */}
             <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
               <FacilitatorSelection 

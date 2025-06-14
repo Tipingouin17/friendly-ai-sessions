@@ -22,7 +22,7 @@ export const FacilitatorStepper = ({
     <Stepper 
       value={currentStep.toString()} 
       onValueChange={value => setCurrentStep(parseInt(value) as Step)} 
-      className="mb-8"
+      className="mb-4"
     >
       <div className="flex items-center gap-2 w-full">
         <StepperItem value="1" disabled={isStep1Disabled}>

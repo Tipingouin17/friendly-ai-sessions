@@ -41,11 +41,6 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
     // You might want to refresh data or trigger other actions here
   };
 
-  // Wrapper function to match AdminSessionHeader's expected signature
-  const handleHeaderSendMessage = (message: string) => {
-    handleSendAdminMessage(message, false); // Default isPinned to false, no recipientId
-  };
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <AdminSessionHeader
@@ -53,7 +48,7 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         currentParticipantCount={participants.length}
         isSessionPaused={isSessionPaused}
         onToggleSessionState={toggleSessionState}
-        onSendAdminMessage={handleHeaderSendMessage}
+        onSendAdminMessage={handleSendAdminMessage}
         onExportData={onTriggerFacilitatorResponse}
       />
       

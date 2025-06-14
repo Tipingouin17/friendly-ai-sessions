@@ -20,14 +20,16 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
   onSessionFull
 }) => {
   return (
-    <QRCodeView
-      conversationId={conversationId}
-      currentParticipantCount={currentParticipantCount}
-      maxParticipants={maxParticipants}
-      facilitatorTitle={facilitatorTitle}
-      onStartSession={onStartSession}
-      onSessionFull={onSessionFull}
-    />
+    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white">
+      <QRCodeView
+        conversationId={conversationId}
+        currentParticipantCount={currentParticipantCount}
+        maxParticipants={maxParticipants}
+        facilitatorTitle={facilitatorTitle}
+        onStartSession={onStartSession}
+        onSessionFull={onSessionFull}
+      />
+    </div>
   );
 };
 

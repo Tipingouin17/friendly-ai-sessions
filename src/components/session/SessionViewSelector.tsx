@@ -150,17 +150,25 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
 
-  // Force showing the session view if we're on an admin route or session has started
+  // Check if we should force the main session view for admin paths
   const isOnAdminPath = window.location.pathname.includes('/admin');
-  const forceShowSession = isOnAdminPath || props.isSessionStartedInDB || sessionStarted || hasResolvedTransition.current;
   
-  if (forceShowSession) {
-    /* console.log("Force showing session view due to admin route, session started, or timeout"); */
-    return <SessionView props={props} isAdmin={isAdmin || isOnAdminPath} />;
+  // For admin paths, always show the main session view (admin dashboard)
+  if (isOnAdminPath) {
+    /* console.log("Admin path detected - showing session view"); */
+    return <SessionView props={props} isAdmin={true} />;
   }
 
-  // Admin view gets QR code view for sharing until session is started
-  if (isAdmin && !shouldShowSession && props.showQrCodeView) {
+  // For regular session pages, check if we should show QR code or session
+  const forceShowSession = props.isSessionStartedInDB || sessionStarted || hasResolvedTransition.current;
+  
+  if (forceShowSession && !props.showQrCodeView) {
+    /* console.log("Force showing session view due to session started or timeout"); */
+    return <SessionView props={props} isAdmin={isAdmin} />;
+  }
+
+  // Admin view gets QR code view for sharing (even if session is started)
+  if (isAdmin && props.showQrCodeView) {
     /* console.log("Rendering AdminQrView"); */
     return (
       <AdminQrView

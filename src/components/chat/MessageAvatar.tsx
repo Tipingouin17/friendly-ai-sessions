@@ -3,6 +3,7 @@ import React from 'react';
 import AnonymousAvatar from './avatars/AnonymousAvatar';
 import FacilitatorAvatar from './avatars/FacilitatorAvatar';
 import ParticipantAvatar from './avatars/ParticipantAvatar';
+import AdminAvatar from './avatars/AdminAvatar';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
@@ -10,6 +11,7 @@ interface MessageAvatarProps {
   size?: 'sm' | 'md' | 'lg';
   anonymized?: boolean;
   isAssistant?: boolean;
+  isAdmin?: boolean;
 }
 
 const MessageAvatar = ({ 
@@ -17,11 +19,17 @@ const MessageAvatar = ({
   name, 
   size = 'md',
   anonymized = false,
-  isAssistant = false
+  isAssistant = false,
+  isAdmin = false
 }: MessageAvatarProps) => {
   // Handle anonymized avatars
   if (anonymized) {
     return <AnonymousAvatar size={size} />;
+  }
+
+  // Handle admin avatars
+  if (isAdmin) {
+    return <AdminAvatar size={size} name={name} />;
   }
 
   // Handle facilitator/assistant avatars

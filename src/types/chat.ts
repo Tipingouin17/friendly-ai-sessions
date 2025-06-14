@@ -1,8 +1,7 @@
-
 export interface Message {
   id: string;
   content: string;
-  sender: "user" | "assistant";
+  sender: "user" | "assistant" | "admin"; // Added "admin" as distinct sender type
   timestamp?: Date;
   created_at?: string; // Added to support both timestamp and created_at
   participant?: string;

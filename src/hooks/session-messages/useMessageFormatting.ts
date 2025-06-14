@@ -52,8 +52,18 @@ export const useMessageFormatting = ({ conversation }: UseMessageFormattingProps
       
       const color = participantId ? getParticipantColor(participantId) : undefined;
       
+      // Determine sender type based on role
+      let sender: "user" | "assistant" | "admin";
+      if (msg.role === 'admin') {
+        sender = 'admin';
+      } else if (msg.role === 'assistant') {
+        sender = 'assistant';
+      } else {
+        sender = 'user';
+      }
+      
       // Handle facilitator avatar for assistant messages using conversation data
-      if (msg.role === 'assistant') {
+      if (sender === 'assistant') {
         if (!avatarUrl && conversation) {
           // Use the proper avatar resolution function with conversation data
           avatarUrl = await resolveFacilitatorAvatar(msg, conversation);
@@ -69,7 +79,7 @@ export const useMessageFormatting = ({ conversation }: UseMessageFormattingProps
       return {
         id: String(msg.id),
         content: messageContent,
-        sender: msg.role === 'assistant' ? 'assistant' : 'user',
+        sender,
         participant: participantId,
         color,
         timestamp: new Date(msg.created_at),

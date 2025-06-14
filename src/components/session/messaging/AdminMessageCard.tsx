@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Message } from '@/types/chat';
-import { MessageCircle, User, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { MessageCircle, User, ChevronDown, ChevronUp, Clock, UserCog } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,8 +27,47 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
   index
 }) => {
   const isFacilitator = message.sender === 'assistant';
+  const isAdmin = message.sender === 'admin';
   const isAnonymous = Boolean(message.isAnonymous);
   const messageTime = message.timestamp ? formatDistanceToNow(message.timestamp, { addSuffix: true }) : 'just now';
+  
+  // Format for admin messages
+  if (isAdmin) {
+    return (
+      <Card className={`mb-3 border-l-4 shadow-sm animate-fade-in`} 
+        style={{ borderLeftColor: '#3B82F6' }}>
+        <CardContent className="p-0">
+          <div className="p-3 bg-blue-50 rounded-tr-lg flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <UserCog className="w-4 h-4 text-blue-700" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-800">Admin</p>
+                <p className="text-xs text-blue-700/70 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {messageTime}
+                </p>
+              </div>
+            </div>
+            
+            <Collapsible defaultOpen={isExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={toggleExpand}
+                  className="h-7 w-7 p-0 rounded-full text-blue-700">
+                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="p-3">
+                <p className="text-gray-800 whitespace-pre-wrap">{message.content}</p>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   // Format for facilitator messages
   if (isFacilitator) {

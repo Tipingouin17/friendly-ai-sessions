@@ -56,20 +56,21 @@ const MessageItem = ({
     <div
       className={cn(
         "flex group",
-        message.sender === "assistant" ? "justify-start" : "justify-end",
+        (message.sender === "assistant" || message.sender === "admin") ? "justify-start" : "justify-end",
         !isFirstMessageOfGroup && spacing,
         isFirstMessageOfGroup && groupSpacing
       )}
     >
       <div className="flex items-end gap-1.5 max-w-full">
-        {/* Show avatar for facilitator messages */}
-        {message.sender === "assistant" && (
+        {/* Show avatar for facilitator and admin messages */}
+        {(message.sender === "assistant" || message.sender === "admin") && (
           <div className="mb-1">
             <MessageAvatar 
               avatarUrl={message.avatar} 
-              name="Facilitator" 
+              name={message.sender === "admin" ? "Admin" : "Facilitator"} 
               size={isMobile ? "sm" : "md"}
-              isAssistant={true}
+              isAssistant={message.sender === "assistant"}
+              isAdmin={message.sender === "admin"}
             />
           </div>
         )}

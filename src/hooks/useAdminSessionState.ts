@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { useToast } from '@/components/ui/use-toast';
@@ -59,7 +58,7 @@ export function useAdminSessionState({
       const newMessage: Message = {
         id: `admin-${Date.now()}`,
         content: message,
-        sender: "assistant",
+        sender: "admin", // Changed from "assistant" to "admin"
         timestamp: new Date(),
         isPinned,
         recipientId,
@@ -75,11 +74,11 @@ export function useAdminSessionState({
         const messageData = {
           conversation_id: conversationId,
           content: {
-            message, // The actual message text
+            text: message, // The actual message text
             isPinned, // Whether the message should be pinned
             recipientId // Who the message is for (if anyone specific)
           },
-          role: 'admin'
+          role: 'admin' // Set role as 'admin' instead of 'assistant'
         };
         
         // Send to database
@@ -123,7 +122,7 @@ export function useAdminSessionState({
       // Prepare the data to export
       // Filter out system messages and format for export
       const exportableMessages = messages
-        .filter(m => !m.isReport && (m.sender === "user" || m.sender === "assistant" || m.isAdminMessage))
+        .filter(m => !m.isReport && (m.sender === "user" || m.sender === "assistant" || m.sender === "admin" || m.isAdminMessage))
         .map(m => {
           // Find participant info for user messages
           const participantInfo = m.sender === "user" && m.participant 
@@ -132,7 +131,7 @@ export function useAdminSessionState({
             
           return {
             timestamp: m.timestamp ? m.timestamp.toISOString() : new Date().toISOString(),
-            type: m.isAdminMessage ? "admin" : m.sender,
+            type: m.sender === "admin" ? "admin" : m.isAdminMessage ? "admin" : m.sender,
             participant: participantInfo?.name || m.participant || "Unknown",
             anonymous: participantInfo?.isAnonymous || false,
             content: m.content,

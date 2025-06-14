@@ -1,11 +1,11 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, UserCog } from 'lucide-react';
 
 interface MessageBubbleProps {
   content: string;
-  sender: "user" | "assistant";
+  sender: "user" | "assistant" | "admin";
   isReport?: boolean;
   participantName?: string;
   backgroundColor?: string;
@@ -36,6 +36,8 @@ const MessageBubble = ({
         maxWidth, padding, "rounded-lg shadow-sm message-width-control",
         sender === "assistant"
           ? "bg-white text-gray-800 rounded-tl-sm border border-gray-100"
+          : sender === "admin"
+          ? "bg-blue-50 text-blue-900 rounded-tl-sm border border-blue-200"
           : "text-gray-800 rounded-tr-sm",
         isReport && "bg-green-50 border border-green-200 w-full max-w-full rounded-tl-lg",
         isFirstMessageOfGroup && "mt-1"
@@ -47,6 +49,14 @@ const MessageBubble = ({
         textAlign: "left"
       }}
     >
+      {/* Admin badge for admin messages */}
+      {sender === "admin" && isFirstMessageOfGroup && (
+        <div className={cn(nameSize, "font-medium mb-1 flex items-center gap-1 text-blue-700")}>
+          <UserCog className="h-3 w-3" />
+          Admin
+        </div>
+      )}
+
       {/* Participant name for user messages */}
       {(sender === "user" && participantName && isFirstMessageOfGroup) && (
         <div 

@@ -2,9 +2,8 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Target, User } from 'lucide-react';
+import { Target, User } from 'lucide-react';
 import { ParticipantInfo } from '@/types/chat';
 
 interface SessionInfoPanelProps {
@@ -84,23 +83,6 @@ const SessionInfoPanel: React.FC<SessionInfoPanelProps> = ({
             </CardContent>
           </Card>
         )}
-
-        <Separator />
-
-        {/* Session Status */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Clock className="h-4 w-4" />
-                <span>Status</span>
-              </div>
-              <Badge className="bg-green-100 text-green-700">
-                Active
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

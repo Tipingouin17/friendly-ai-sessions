@@ -1,13 +1,12 @@
 
-import React from "react";
-import AdminHeader from "./AdminHeader";
-import AdminSessionContent from "./AdminSessionContent";
+import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import { ConversationWithSession } from "@/types/database";
+import AdminSessionHeader from './AdminSessionHeader';
+import AdminSessionMessages from '../AdminSessionMessages';
 
 interface AdminSessionLayoutProps {
-  conversationData: ConversationWithSession | null;
-  handleSendAdminMessage: (message: string, isPinned?: boolean, recipientId?: string) => void;
+  conversationData: any;
+  handleSendAdminMessage: (message: string, isPinned: boolean, recipientId?: string) => void;
   toggleSessionState: () => void;
   isSessionPaused: boolean;
   sessionMessages: Message[];
@@ -15,12 +14,10 @@ interface AdminSessionLayoutProps {
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
-  
-  // Response collection props
-  isWaitingForResponses?: boolean;
-  responseCount?: number;
-  totalParticipants?: number;
-  onTriggerFacilitatorResponse?: () => void;
+  isWaitingForResponses: boolean;
+  responseCount: number;
+  totalParticipants: number;
+  onTriggerFacilitatorResponse: () => void;
 }
 
 const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
@@ -33,32 +30,39 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
   participants,
   isLoadingParticipants,
   currentConversationId,
-  isWaitingForResponses = false,
-  responseCount = 0,
-  totalParticipants = 1,
+  isWaitingForResponses,
+  responseCount,
+  totalParticipants,
   onTriggerFacilitatorResponse
 }) => {
+  const handleSessionStarted = () => {
+    // Trigger any necessary updates when session starts
+    console.log("Session started callback in AdminSessionLayout");
+    // You might want to refresh data or trigger other actions here
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <AdminHeader
-        conversation={conversationData}
+    <div className="h-screen flex flex-col bg-gray-50">
+      <AdminSessionHeader
+        conversationData={conversationData}
+        currentParticipantCount={participants.length}
         isSessionPaused={isSessionPaused}
-        toggleSessionState={toggleSessionState}
+        onToggleSessionState={toggleSessionState}
+        onSendAdminMessage={handleSendAdminMessage}
+        onExportData={onTriggerFacilitatorResponse}
       />
       
-      <AdminSessionContent
-        sessionMessages={sessionMessages}
-        participantColors={participantColors}
-        conversationData={conversationData}
-        participants={participants}
-        isLoadingParticipants={isLoadingParticipants}
-        currentConversationId={currentConversationId}
-        onSendMessage={handleSendAdminMessage}
-        isWaitingForResponses={isWaitingForResponses}
-        responseCount={responseCount}
-        totalParticipants={totalParticipants}
-        onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
-      />
+      <div className="flex-1 overflow-hidden">
+        <AdminSessionMessages
+          messages={sessionMessages}
+          isLoading={isLoadingParticipants}
+          participants={participants}
+          conversationData={conversationData}
+          onSendMessage={handleSendAdminMessage}
+          conversationId={currentConversationId}
+          onSessionStarted={handleSessionStarted}
+        />
+      </div>
     </div>
   );
 };

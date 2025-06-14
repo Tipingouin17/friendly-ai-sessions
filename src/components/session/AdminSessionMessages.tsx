@@ -13,6 +13,8 @@ interface AdminSessionMessagesProps {
   participants: ParticipantInfo[];
   conversationData: any;
   onSendMessage: (message: string, isPinned: boolean, recipientId?: string) => void;
+  conversationId?: number | null;
+  onSessionStarted?: () => void;
 }
 
 const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
@@ -20,7 +22,9 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
   isLoading,
   participants,
   conversationData,
-  onSendMessage
+  onSendMessage,
+  conversationId,
+  onSessionStarted
 }) => {
   // State for search and filtering
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,12 +45,19 @@ const AdminSessionMessages: React.FC<AdminSessionMessagesProps> = ({
     return <AdminMessageLoadingState />;
   }
 
-  // Special case: Show messages even if length is 0, in case there's a welcome message
-  // but no participant responses yet
+  // Check if session has started and if there are messages
+  const sessionStarted = conversationData?.session_started;
   const hasWelcomeMessage = conversationData?.sessions?.welcome_message;
 
-  if (messages.length === 0 && !hasWelcomeMessage) {
-    return <AdminMessageEmptyState conversationData={conversationData} />;
+  if (messages.length === 0) {
+    return (
+      <AdminMessageEmptyState 
+        conversationData={conversationData}
+        conversationId={conversationId}
+        participants={participants}
+        onSessionStarted={onSessionStarted}
+      />
+    );
   }
 
   return (

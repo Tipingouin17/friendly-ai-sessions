@@ -2,12 +2,11 @@
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
-import JoinForm from "@/components/session/JoinForm";
-import SessionFullAlert from "@/components/session/SessionFullAlert";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
+import JoinSessionErrorState from "@/components/session/JoinSessionErrorState";
+import JoinSessionRejoinPrompt from "@/components/session/JoinSessionRejoinPrompt";
+import JoinSessionMain from "@/components/session/JoinSessionMain";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RefreshCw, UserCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 
@@ -110,116 +109,40 @@ const JoinSession = () => {
     console.error("Session not found or error:", error, "Conversation ID:", conversationId);
     
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md text-center">
-          <div className="mb-4 flex justify-center">
-            <AlertCircle className="h-12 w-12 text-red-500" />
-          </div>
-          <SessionFullAlert 
-            type="not-found" 
-            message={error ? `Error: ${error}` : invalidRequest ? 
-              "Invalid session link. Please make sure you have the correct URL." : 
-              "The session you're trying to join doesn't exist or has been closed."} 
-          />
-          <div className="mt-4">
-            <Button
-              onClick={handleRetry}
-              className="bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </div>
+      <JoinSessionErrorState 
+        error={error}
+        invalidRequest={invalidRequest}
+        onRetry={handleRetry}
+      />
     );
   }
 
   // Show rejoin prompt if we have existing session data
   if (showRejoinPrompt && existingSessionData) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="flex justify-center mb-4">
-              <UserCheck className="h-12 w-12 text-green-500" />
-            </div>
-            <h1 className="text-2xl font-bold mb-2">Welcome Back!</h1>
-            <p className="text-gray-600">
-              You've previously joined this session as <span className="font-medium">{existingSessionData.name}</span>.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <Button 
-              onClick={handleRejoin} 
-              className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
-            >
-              Rejoin as {existingSessionData.name}
-            </Button>
-            
-            <div className="text-center">
-              <Button 
-                onClick={handleJoinAsNew}
-                variant="ghost" 
-                className="text-gray-500 hover:text-gray-800"
-              >
-                Join as a different participant
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <JoinSessionRejoinPrompt
+        existingSessionData={existingSessionData}
+        onRejoin={handleRejoin}
+        onJoinAsNew={handleJoinAsNew}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">Join Session</h1>
-          {conversation && conversation.sessions && conversation.sessions.facilitator_details && (
-            <p className="text-gray-600">
-              You're joining a session with {conversation.sessions.facilitator_details.title || "Facilitator"}
-            </p>
-          )}
-        </div>
-
-        {error ? (
-          <div className="p-4 mb-4 border border-red-100 bg-red-50 rounded-md text-red-700">
-            <div className="flex items-start">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
-              <div>
-                <p>{error}</p>
-                <Button 
-                  onClick={handleRetry}
-                  className="mt-2 bg-red-100 hover:bg-red-200 text-red-800 text-sm py-1 px-2"
-                  variant="ghost"
-                  size="sm"
-                >
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {isFull ? (
-          <SessionFullAlert type="full" />
-        ) : (
-          <JoinForm
-            participantName={participantName}
-            onNameChange={(e) => setParticipantName(e.target.value)}
-            avatarSeed={avatarSeed}
-            onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-            onJoinSession={handleJoinSession}
-            isJoining={isJoining}
-            currentParticipantCount={currentParticipantCount}
-            effectiveMaxParticipants={effectiveMaxParticipants}
-          />
-        )}
-      </div>
-    </div>
+    <JoinSessionMain
+      conversation={conversation}
+      error={error}
+      isFull={isFull}
+      participantName={participantName}
+      onNameChange={(e) => setParticipantName(e.target.value)}
+      avatarSeed={avatarSeed}
+      onAvatarChange={() => setAvatarSeed(Math.random().toString())}
+      onJoinSession={handleJoinSession}
+      isJoining={isJoining}
+      currentParticipantCount={currentParticipantCount}
+      effectiveMaxParticipants={effectiveMaxParticipants}
+      onRetry={handleRetry}
+    />
   );
 };
 

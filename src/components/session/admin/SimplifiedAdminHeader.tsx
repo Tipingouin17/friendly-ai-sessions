@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -202,6 +201,7 @@ const SimplifiedAdminHeader: React.FC<SimplifiedAdminHeaderProps> = ({
           engagementScore: 0
         }}
         sessionTitle={getSessionTitle()}
+        reportContent={closureResult?.reportContent}
       />
     </>
   );

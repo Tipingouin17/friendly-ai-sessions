@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Download, Users, MessageSquare, Clock, TrendingUp } from "lucide-react";
 
 interface ReportDownloadDialogProps {
@@ -22,6 +23,7 @@ interface ReportDownloadDialogProps {
     engagementScore: number;
   };
   sessionTitle?: string;
+  reportContent?: string;
 }
 
 const ReportDownloadDialog: React.FC<ReportDownloadDialogProps> = ({
@@ -29,22 +31,24 @@ const ReportDownloadDialog: React.FC<ReportDownloadDialogProps> = ({
   onClose,
   onDownload,
   sessionData,
-  sessionTitle = "Session"
+  sessionTitle = "Session",
+  reportContent
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <FileText className="h-5 w-5 text-green-600" />
-            <span>Session Report Generated</span>
+            <span>Session Report - {sessionTitle}</span>
           </DialogTitle>
           <DialogDescription>
             Your session has been successfully closed and a comprehensive report has been generated.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="flex-1 space-y-4 overflow-hidden">
+          {/* Session Summary */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-medium text-sm text-gray-900 mb-3">Session Summary</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -67,9 +71,24 @@ const ReportDownloadDialog: React.FC<ReportDownloadDialogProps> = ({
             </div>
           </div>
           
+          {/* Report Content */}
+          {reportContent && (
+            <div className="flex-1 min-h-0">
+              <h3 className="font-medium text-sm text-gray-900 mb-2">Full Report</h3>
+              <ScrollArea className="h-[400px] w-full border rounded-lg">
+                <div className="p-4">
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700">
+                    {reportContent}
+                  </pre>
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          
+          {/* Download Options */}
           <div className="space-y-2">
             <p className="text-sm text-gray-600">
-              Choose your preferred download format:
+              Download the report in your preferred format:
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Button

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +26,7 @@ export function useSessionInterface(conversationId: number | null) {
           console.log("Checking if session is already started for conversation:", conversationId);
           const { data, error } = await supabase
             .from('conversations')
-            .select('*')
+            .select('session_started')
             .eq('id', conversationId)
             .maybeSingle();
             
@@ -39,6 +38,9 @@ export function useSessionInterface(conversationId: number | null) {
             setShowQrCodeView(false);
           } else {
             console.log("Session not yet started in DB:", data);
+            // Keep QR code view visible for new sessions
+            setShowQrCodeView(true);
+            setIsSessionStarted(false);
           }
         } catch (err) {
           console.error("Exception checking session_started:", err);

@@ -96,7 +96,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   return (
     <>
       <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b shadow-sm">
-        {/* Main Header Row - Navigation & Title Only */}
+        {/* Main Header Row - Navigation, Title & Session Switcher */}
         <div className="flex items-center justify-between p-6 pb-4">
           {/* Left Section - Navigation & Title */}
           <div className="flex items-center space-x-6">
@@ -142,6 +142,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               )}
             </div>
           </div>
+
+          {/* Right Section - Session Switcher (only if multiple sessions) */}
+          <div className="flex items-center gap-3">
+            {activeSessions.length > 1 && (
+              <SessionsDropdown 
+                currentSessionId={conversation?.id || null}
+                activeSessions={activeSessions}
+                isLoading={isLoading}
+                onRefresh={refreshSessions}
+              />
+            )}
+          </div>
         </div>
 
         {/* Action Buttons Row - Below Description */}
@@ -166,19 +178,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             {/* Session Controls Group */}
             <div className="flex items-center gap-2">
               {!isSessionEnded && (
-                <>
-                  <AdminWrapUpDialog
-                    onWrapUp={toggleSessionState}
-                    isWrappingUp={isSessionPaused}
-                  />
-                  
-                  <SessionsDropdown 
-                    currentSessionId={conversation?.id || null}
-                    activeSessions={activeSessions}
-                    isLoading={isLoading}
-                    onRefresh={refreshSessions}
-                  />
-                </>
+                <AdminWrapUpDialog
+                  onWrapUp={toggleSessionState}
+                  isWrappingUp={isSessionPaused}
+                />
               )}
             </div>
 

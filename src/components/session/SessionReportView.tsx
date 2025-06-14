@@ -50,17 +50,26 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
             objective,
             session_type,
             facilitator
-          ),
-          facilitators!conversations_facilitator_id_fkey (
-            id,
-            title,
-            profile_picture
           )
         `)
         .eq('id', reportConversationId)
         .single();
 
       if (convError) throw convError;
+
+      // Get facilitator details separately
+      let facilitatorData = null;
+      if (conversation.sessions?.facilitator) {
+        const { data: facilitator, error: facilitatorError } = await supabase
+          .from('facilitators')
+          .select('id, title, profile_picture')
+          .eq('id', conversation.sessions.facilitator)
+          .single();
+        
+        if (!facilitatorError) {
+          facilitatorData = facilitator;
+        }
+      }
 
       const { data: report, error: reportError } = await supabase
         .from('session_reports')
@@ -88,7 +97,10 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       if (partError) throw partError;
 
       return {
-        conversation,
+        conversation: {
+          ...conversation,
+          facilitator: facilitatorData
+        },
         report,
         messages,
         participants,
@@ -301,7 +313,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
                 </div>
                 <div className="flex items-center space-x-2">
                   <UserCheck className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm">{conversation.facilitators?.title || 'AI Facilitator'}</span>
+                  <span className="text-sm">{conversation.facilitator?.title || 'AI Facilitator'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge variant="outline">{conversation.sessions?.session_type || 'Discussion'}</Badge>

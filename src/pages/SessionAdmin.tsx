@@ -4,21 +4,17 @@ import { useSessionPage } from "@/hooks/useSessionPage";
 import { useAdminStatusPersistence } from "@/hooks/useAdminStatusPersistence";
 import { useAdminSessionLoader } from "@/hooks/useAdminSessionLoader";
 import { useAdminMessages } from "@/hooks/useAdminMessages";
-import AdminSessionHeader from "@/components/session/AdminSessionHeader";
-import AdminSessionMessages from "@/components/session/AdminSessionMessages";
+import SimplifiedAdminHeader from "@/components/session/admin/SimplifiedAdminHeader";
+import SimplifiedAdminMessagingView from "@/components/session/messaging/SimplifiedAdminMessagingView";
 import AdminParticipantList from "@/components/session/AdminParticipantList";
 import { useParticipantTracking } from "@/hooks/useParticipantTracking";
 import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
-import { Timer, ChevronRight, User2, CalendarClock, BookOpen } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 const SessionAdmin = () => {
   // Enforce admin status
   const { forceAdmin } = useAdminStatusPersistence();
   const initialRenderRef = useRef(true);
-  const adminViewMountedRef = useRef(true);
   const { toast } = useToast();
   const location = useLocation();
 
@@ -49,14 +45,9 @@ const SessionAdmin = () => {
   
   // Track URL params for session switching
   useEffect(() => {
-    // When location changes (new session ID in URL), reset state
     console.log("Location or conversation ID changed in SessionAdmin");
-    
-    // Reset initialized provider when switching sessions
     setHasInitializedProvider(false);
     setIsLoading(true);
-    
-    // Force admin status
     sessionStorage.setItem('isAdminSession', 'true');
   }, [location.search, location.pathname, setHasInitializedProvider, setIsLoading]);
   
@@ -66,7 +57,7 @@ const SessionAdmin = () => {
     console.log("Admin session confirmed on mount");
   }, []);
   
-  // Participant tracking - pass nullish conversationId properly with fallback empty array for participants
+  // Participant tracking
   const {
     participants = [],
     setParticipants,
@@ -85,8 +76,8 @@ const SessionAdmin = () => {
     handleSendAdminMessage
   } = useAdminMessages({
     conversationId: currentConversationId,
-    participants: participants || [], // Provide empty array as fallback
-    messages: sessionMessages || [], // Provide empty array as fallback
+    participants: participants || [],
+    messages: sessionMessages || [],
     setMessages: setSessionMessages
   });
   
@@ -102,7 +93,6 @@ const SessionAdmin = () => {
       setAdminViewReady(true);
     }
     
-    // Safety timeout to force admin view ready in case other conditions don't trigger
     const readyTimeout = setTimeout(() => {
       if (!adminViewReady) {
         console.log("Forcing admin view ready after timeout");
@@ -128,10 +118,8 @@ const SessionAdmin = () => {
         participantsCount: participants?.length || 0
       });
       
-      // Make sure admin status is set
       sessionStorage.setItem('isAdminSession', 'true');
       
-      // Show admin notification
       toast({
         title: "Admin Session Interface",
         description: "You are viewing the admin interface. You can monitor and manage the session."
@@ -146,16 +134,12 @@ const SessionAdmin = () => {
     }
   }, [currentConversationId]);
   
-  // Redirect if no conversation ID and not in loading state
-  // Only redirect if BOTH: not loading AND no conversation ID AND no new conversation id AND not admin view ready
-  // This prevents unnecessary redirects for admin sessions
+  // Redirect logic
   if (!adminViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
     console.log("No conversation ID found, checking if we should show admin interface anyway");
     
-    // For admin sessions, we'll show the admin interface anyway even without a conversation ID
     if (sessionStorage.getItem('isAdminSession') === 'true' || window.location.pathname.includes('/admin')) {
       console.log("Admin session detected - showing admin interface despite missing conversation ID");
-      // Force admin view ready to prevent redirect
       setAdminViewReady(true);
     } else {
       console.error("No conversation ID found on admin page, redirecting home");
@@ -163,26 +147,37 @@ const SessionAdmin = () => {
     }
   }
 
-  // Extract session details from conversation data
-  const sessionDetails = conversationData?.sessions || {};
-  const facilitatorDetails = sessionDetails?.facilitator_details || {};
+  // Calculate total messages count
+  const totalMessages = sessionMessages?.length || 0;
 
-  // Show the enhanced admin panel UI with redesigned layout
   return (
-    <div className="flex flex-col min-h-screen pt-16">
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <AdminSessionMessages
-            messages={sessionMessages || []} // Ensure messages is always an array
-            isLoading={isLoading || isConversationLoading}
-            participants={participants || []} // Ensure participants is always an array
-            conversationData={conversationData}
-            onSendMessage={handleAdminMessage}
+    <div className="flex flex-col min-h-screen">
+      {/* Simplified admin header */}
+      <SimplifiedAdminHeader
+        conversation={conversationData}
+        isSessionPaused={isSessionPaused}
+        toggleSessionState={toggleSessionState}
+        handleAdminMessage={handleSendAdminMessage}
+        onExportData={exportSessionData}
+        currentParticipantCount={conversationData?.current_participants || 0}
+        maxParticipants={conversationData?.participants || 10}
+        totalMessages={totalMessages}
+      />
+      
+      {/* Main content area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Messages area */}
+        <div className="flex-1 overflow-hidden">
+          <SimplifiedAdminMessagingView
+            messages={sessionMessages || []}
+            participantColors={{}}
+            currentParticipantCount={conversationData?.current_participants || 0}
           />
         </div>
         
+        {/* Participant sidebar */}
         <AdminParticipantList
-          participants={participants || []} // Ensure participants is always an array
+          participants={participants || []}
           currentParticipantCount={conversationData?.current_participants || 0}
           maxParticipants={conversationData?.participants || 10}
           isLoading={isLoadingParticipants}

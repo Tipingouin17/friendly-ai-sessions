@@ -1,6 +1,6 @@
 
 import React from 'react';
-import AdminHeader from './admin/AdminHeader';
+import SimplifiedAdminHeader from './admin/SimplifiedAdminHeader';
 
 interface AdminSessionHeaderProps {
   conversationData: any;
@@ -9,25 +9,29 @@ interface AdminSessionHeaderProps {
   onToggleSessionState: () => void;
   onSendAdminMessage: (message: string) => void;
   onExportData: () => void;
+  totalMessages?: number;
 }
 
 const AdminSessionHeader: React.FC<AdminSessionHeaderProps> = ({
   conversationData,
+  currentParticipantCount,
   isSessionPaused,
   onToggleSessionState,
   onSendAdminMessage,
-  onExportData
+  onExportData,
+  totalMessages = 0
 }) => {
   return (
-    <div className="pt-2">
-      <AdminHeader 
-        conversation={conversationData}
-        isSessionPaused={isSessionPaused}
-        toggleSessionState={onToggleSessionState}
-        handleAdminMessage={onSendAdminMessage}
-        onExportData={onExportData}
-      />
-    </div>
+    <SimplifiedAdminHeader 
+      conversation={conversationData}
+      isSessionPaused={isSessionPaused}
+      toggleSessionState={onToggleSessionState}
+      handleAdminMessage={onSendAdminMessage}
+      onExportData={onExportData}
+      currentParticipantCount={currentParticipantCount}
+      maxParticipants={conversationData?.participants || 10}
+      totalMessages={totalMessages}
+    />
   );
 };
 

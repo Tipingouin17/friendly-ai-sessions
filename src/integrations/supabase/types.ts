@@ -839,7 +839,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      is_participant_or_owner: {
+        Args: { conversation_id: number }
+        Returns: boolean
+      }
     }
     Enums: {
       session_status: "draft" | "active" | "completed" | "archived"

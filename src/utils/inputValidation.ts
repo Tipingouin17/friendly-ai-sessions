@@ -1,5 +1,6 @@
 
 import DOMPurify from 'dompurify';
+import { z } from 'zod';
 
 /**
  * Sanitizes HTML content to prevent XSS attacks
@@ -9,6 +10,13 @@ export const sanitizeHtml = (content: string): string => {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br'],
     ALLOWED_ATTR: []
   });
+};
+
+/**
+ * Sanitizes input by trimming and removing potentially dangerous characters
+ */
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, '');
 };
 
 /**
@@ -67,6 +75,25 @@ export const validateParticipantName = (name: string): { isValid: boolean; error
 };
 
 /**
+ * Zod schema for session joining validation
+ */
+export const sessionJoinSchema = z.object({
+  participantName: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters"),
+  avatarSeed: z.string(),
+  conversationId: z.number().positive("Invalid conversation ID"),
+  isAnonymous: z.boolean().optional().default(false)
+});
+
+/**
+ * Zod schema for signup validation
+ */
+export const signupSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters")
+});
+
+/**
  * Rate limiting helper
  */
 class RateLimiter {
@@ -93,6 +120,14 @@ class RateLimiter {
     this.requests.delete(key);
   }
 }
+
+/**
+ * Creates a rate limiter function
+ */
+export const createRateLimiter = (limit: number, windowMs: number) => {
+  const rateLimiter = new RateLimiter();
+  return (key: string) => !rateLimiter.isRateLimited(key, limit, windowMs);
+};
 
 export const messagingRateLimiter = new RateLimiter();
 export const sessionCreationRateLimiter = new RateLimiter();

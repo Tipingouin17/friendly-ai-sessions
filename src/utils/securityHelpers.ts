@@ -198,9 +198,12 @@ export const logSecurityEvent = (
   };
   
   // Remove sensitive data before logging
-  delete sanitizedDetails.password;
-  delete sanitizedDetails.token;
-  delete sanitizedDetails.secret;
+  const keysToRemove = ['password', 'token', 'secret'];
+  keysToRemove.forEach(key => {
+    if (key in sanitizedDetails) {
+      delete sanitizedDetails[key];
+    }
+  });
   
   console.log(`🔒 Security Event: ${eventType}`, sanitizedDetails);
   

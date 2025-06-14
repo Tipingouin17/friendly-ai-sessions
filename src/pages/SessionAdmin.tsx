@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -124,6 +125,16 @@ const SessionAdmin = () => {
     }
   }
 
+  // Check if session is started
+  const isSessionStarted = Boolean(conversationData?.session_started);
+
+  // Handle session start
+  const handleSessionStarted = () => {
+    console.log("Session started successfully");
+    // The session start will be reflected in conversationData on next refresh
+    // or we could trigger a refetch here if needed
+  };
+
   // Generate participant colors mapping
   const participantColors = participants.reduce((colors, participant) => {
     colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
@@ -145,6 +156,8 @@ const SessionAdmin = () => {
       responseCount={responseCount}
       totalParticipants={totalParticipants}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
+      isSessionStarted={isSessionStarted}
+      onSessionStarted={handleSessionStarted}
     />
   );
 };

@@ -1,3 +1,4 @@
+
 import React from "react";
 import AdminHeader from "./AdminHeader";
 import AdminSessionContent from "./AdminSessionContent";
@@ -20,6 +21,10 @@ interface AdminDashboardProps {
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: () => void;
+  
+  // Session start props
+  isSessionStarted?: boolean;
+  onSessionStarted?: () => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -35,7 +40,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
-  onTriggerFacilitatorResponse
+  onTriggerFacilitatorResponse,
+  isSessionStarted = false,
+  onSessionStarted
 }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -57,6 +64,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         responseCount={responseCount}
         totalParticipants={totalParticipants}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+        isSessionStarted={isSessionStarted}
+        onSessionStarted={onSessionStarted}
       />
     </div>
   );

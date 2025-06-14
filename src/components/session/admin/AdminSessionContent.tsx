@@ -18,6 +18,10 @@ interface AdminSessionContentProps {
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: () => void;
+  
+  // Session start props
+  isSessionStarted?: boolean;
+  onSessionStarted?: () => void;
 }
 
 const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
@@ -31,7 +35,9 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
-  onTriggerFacilitatorResponse
+  onTriggerFacilitatorResponse,
+  isSessionStarted = false,
+  onSessionStarted
 }) => {
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
@@ -46,6 +52,10 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
           responseCount={responseCount}
           totalParticipants={totalParticipants}
           onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+          isSessionStarted={isSessionStarted}
+          onSessionStarted={onSessionStarted}
+          participants={participants}
+          conversationId={currentConversationId}
         />
       </div>
 

@@ -2,7 +2,7 @@
 import { FACILITATION_STRATEGIES } from "./facilitation-strategies.ts";
 
 /**
- * Generate a welcome message for the session
+ * Generate an engaging welcome message that prompts participants to describe themselves
  */
 export function generateWelcomeMessage(
   sessionType: string,
@@ -14,39 +14,77 @@ export function generateWelcomeMessage(
 ) {
   const strategies = FACILITATION_STRATEGIES[sessionType as keyof typeof FACILITATION_STRATEGIES] || FACILITATION_STRATEGIES.workshop;
   
-  let welcomeMessage = `Welcome to "${sessionTitle}"!\n\n`;
+  // Start with a warm, engaging greeting
+  let welcomeMessage = `Welcome to "${sessionTitle}"! I'm excited to have you join us today.\n\n`;
   
+  // Add session objective if provided
   if (sessionObjective) {
-    welcomeMessage += `Our objective today is: ${sessionObjective}\n\n`;
+    welcomeMessage += `Our objective is: ${sessionObjective}\n\n`;
   }
   
+  // Acknowledge participant count with enthusiasm
   if (participantCount > 1) {
-    welcomeMessage += `I see we have ${participantCount} ${participantDescription || "participants"} joining us today. `;
+    welcomeMessage += `I see we have ${participantCount} ${participantDescription || "participants"} here today - wonderful! `;
   } else {
-    welcomeMessage += `Welcome! `;
+    welcomeMessage += `Great to have you here! `;
   }
   
-  welcomeMessage += `I'm here to facilitate our discussion and ensure everyone has the opportunity to contribute.\n\n`;
+  welcomeMessage += `I'm here to facilitate our discussion and ensure everyone gets the chance to contribute meaningfully.\n\n`;
   
-  // Add session-type specific opening
+  // Add session-type specific engagement prompts that ask for self-description
   switch (sessionType) {
     case "workshop":
-      welcomeMessage += `Let's begin by sharing your initial thoughts or questions about our topic. What brings you here today, and what would you like to explore or achieve?`;
+      welcomeMessage += `To get us started, I'd love to learn about each of you! Please share:\n\n`;
+      welcomeMessage += `• Your name (or how you'd like to be addressed)\n`;
+      welcomeMessage += `• Your background or connection to today's topic\n`;
+      welcomeMessage += `• What specific aspect of this workshop interests you most\n`;
+      welcomeMessage += `• One thing you hope to take away from our time together\n\n`;
+      welcomeMessage += `Feel free to jump in and introduce yourself!`;
       break;
+      
     case "training":
-      welcomeMessage += `Before we dive into the content, I'd like to understand your current experience with this topic. What's your background, and what specific areas would you like to focus on?`;
+      welcomeMessage += `Before we dive into the training content, let's get to know each other! Please tell us:\n\n`;
+      welcomeMessage += `• Your name and current role\n`;
+      welcomeMessage += `• Your experience level with today's topic\n`;
+      welcomeMessage += `• What challenges you're hoping this training will help you solve\n`;
+      welcomeMessage += `• Any specific skills you want to develop\n\n`;
+      welcomeMessage += `Who would like to start us off?`;
       break;
+      
     case "consultation":
-      welcomeMessage += `Please share the specific challenges or questions you'd like to address today. The more context you can provide, the better I can tailor our discussion.`;
+      welcomeMessage += `I'm here to help address your specific needs today. To provide the best guidance, please share:\n\n`;
+      welcomeMessage += `• Your name and background relevant to today's discussion\n`;
+      welcomeMessage += `• The specific challenges or questions you're facing\n`;
+      welcomeMessage += `• What context or situation led you here\n`;
+      welcomeMessage += `• What kind of outcome would make this session valuable for you\n\n`;
+      welcomeMessage += `The more context you can provide, the better I can tailor our discussion to help you!`;
       break;
+      
     case "coaching":
-      welcomeMessage += `What specific goals or challenges would you like to work on today? What would make this session valuable for you?`;
+      welcomeMessage += `This is your space to explore and grow. To make our session most effective, please share:\n\n`;
+      welcomeMessage += `• Your name and a bit about yourself\n`;
+      welcomeMessage += `• What area of your life or work you'd like to focus on\n`;
+      welcomeMessage += `• Any specific goals or challenges you're working through\n`;
+      welcomeMessage += `• What success would look like for you today\n\n`;
+      welcomeMessage += `Remember, this is a safe space for exploration and growth. Who's ready to dive in?`;
       break;
+      
     case "team_building":
-      welcomeMessage += `Let's start by getting to know each other better. Share something about yourself and what you hope to gain from our time together.`;
+      welcomeMessage += `Let's start building connections! I'd love for everyone to introduce themselves by sharing:\n\n`;
+      welcomeMessage += `• Your name and role in the team\n`;
+      welcomeMessage += `• One interesting thing about yourself (work or personal)\n`;
+      welcomeMessage += `• What you enjoy most about working with this team\n`;
+      welcomeMessage += `• One thing you hope we'll accomplish together today\n\n`;
+      welcomeMessage += `Let's go around and get to know each other better!`;
       break;
+      
     default:
-      welcomeMessage += `Please share your thoughts, questions, or what you'd like to explore in our discussion today.`;
+      welcomeMessage += `To create the best experience for everyone, please take a moment to introduce yourself:\n\n`;
+      welcomeMessage += `• Your name and background\n`;
+      welcomeMessage += `• How this topic relates to your interests or work\n`;
+      welcomeMessage += `• What questions or ideas you're bringing to our discussion\n`;
+      welcomeMessage += `• What you're hoping to gain from our time together\n\n`;
+      welcomeMessage += `I'm looking forward to hearing from each of you and learning about your perspectives!`;
   }
   
   return welcomeMessage;

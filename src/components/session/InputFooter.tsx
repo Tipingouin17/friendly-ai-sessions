@@ -87,7 +87,7 @@ const InputFooter = ({
             onSendMessage={onSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
-            placeholder={isMobile ? "Type message..." : `Type as ${participantName}...`}
+            placeholder="Type a message..."
             disabled={false}
             isMobile={isMobile}
           />

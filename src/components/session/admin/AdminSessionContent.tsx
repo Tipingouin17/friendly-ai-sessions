@@ -22,9 +22,9 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
   currentConversationId
 }) => {
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden bg-gray-50">
       {/* Admin monitoring view - full height */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-white m-4 mr-0 rounded-l-lg border border-r-0">
         <SimplifiedAdminMessagingView
           messages={sessionMessages || []}
           participantColors={participantColors}
@@ -40,6 +40,7 @@ const AdminSessionContent: React.FC<AdminSessionContentProps> = ({
         maxParticipants={conversationData?.participants || 10}
         isLoading={isLoadingParticipants}
         conversationData={conversationData}
+        messages={sessionMessages}
       />
     </div>
   );

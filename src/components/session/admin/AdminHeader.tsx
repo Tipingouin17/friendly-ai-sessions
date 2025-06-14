@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, LayoutDashboard, BarChart3 } from "lucide-react";
+import { ArrowLeft, FileText, LayoutDashboard, BarChart3, Users, Settings } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import AdminMessageDialog from "./AdminMessageDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -15,6 +15,8 @@ import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
 import ReportDownloadDialog from "../ReportDownloadDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface AdminHeaderProps {
   conversation: ConversationWithSession | null;
@@ -86,88 +88,140 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     return conversation.sessions?.title || "Untitled Session";
   };
 
+  const getFacilitatorInfo = () => {
+    if (!conversation?.sessions?.facilitator_details) return null;
+    return conversation.sessions.facilitator_details;
+  };
+
   const isSessionEnded = conversation?.is_session_ended || false;
+  const facilitatorInfo = getFacilitatorInfo();
 
   return (
     <>
-      <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b pb-2">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" onClick={handleBack} title="Back to Sessions Dashboard">
-              <LayoutDashboard className="h-5 w-5" />
+      <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b shadow-sm">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between p-6">
+          {/* Left Section - Navigation & Title */}
+          <div className="flex items-center space-x-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleBack} 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              title="Back to Dashboard"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
             
-            <div className="flex flex-col">
-              <h1 className="text-xl font-semibold">{getSessionTitle()}</h1>
-              <div className="flex items-center mt-1">
+            <Separator orientation="vertical" className="h-6" />
+            
+            <div className="flex flex-col space-y-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-semibold text-gray-900">{getSessionTitle()}</h1>
                 <SessionStatusBadge
                   isActive={!isSessionPaused && !isSessionEnded}
                   sessionStarted={conversation?.session_started || false}
                 />
-                {isSessionEnded && (
-                  <span className="ml-2 text-sm text-gray-500">Session Ended</span>
-                )}
               </div>
+              
+              {facilitatorInfo && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Facilitated by</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                    {facilitatorInfo.title}
+                  </Badge>
+                  {facilitatorInfo.details && (
+                    <span className="text-xs text-gray-500 max-w-xs truncate">
+                      {facilitatorInfo.details}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {isSessionEnded && (
+                <Badge variant="destructive" className="w-fit">
+                  Session Ended
+                </Badge>
+              )}
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            {/* Analytics Toggle */}
+          {/* Right Section - Controls */}
+          <div className="flex items-center gap-3">
+            {/* Analytics Group */}
             {conversation?.id && (
-              <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Analytics
-                  </Button>
-                </CollapsibleTrigger>
-              </Collapsible>
+              <div className="flex items-center gap-2">
+                <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Analytics</span>
+                    </Button>
+                  </CollapsibleTrigger>
+                </Collapsible>
+              </div>
             )}
 
-            {/* Wrap Up Button */}
+            <Separator orientation="vertical" className="h-6" />
+
+            {/* Session Controls Group */}
+            <div className="flex items-center gap-2">
+              {!isSessionEnded && (
+                <>
+                  <AdminWrapUpDialog
+                    onWrapUp={toggleSessionState}
+                    isWrappingUp={isSessionPaused}
+                  />
+                  
+                  <SessionsDropdown 
+                    currentSessionId={conversation?.id || null}
+                    activeSessions={activeSessions}
+                    isLoading={isLoading}
+                    onRefresh={refreshSessions}
+                  />
+                </>
+              )}
+            </div>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            {/* Communication Group */}
             {!isSessionEnded && (
-              <AdminWrapUpDialog
-                onWrapUp={toggleSessionState}
-                isWrappingUp={isSessionPaused}
-              />
+              <div className="flex items-center gap-2">
+                <AdminMessageDialog onSendMessage={handleAdminMessage} />
+                <AdminQrDialog conversationId={conversation?.id || null} />
+              </div>
             )}
+
+            <Separator orientation="vertical" className="h-6" />
             
+            {/* Primary Action */}
             <Button 
-              variant="outline" 
+              variant={isSessionEnded ? "outline" : "default"}
               size="sm" 
-              className="flex items-center gap-1"
+              className="flex items-center gap-2 min-w-0"
               onClick={handleExportClick}
-              disabled={isClosing || isSessionEnded}
+              disabled={isClosing}
             >
               <FileText className="h-4 w-4" />
-              <span>
+              <span className="whitespace-nowrap">
                 {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
               </span>
             </Button>
-            
-            {!isSessionEnded && (
-              <>
-                <SessionsDropdown 
-                  currentSessionId={conversation?.id || null}
-                  activeSessions={activeSessions}
-                  isLoading={isLoading}
-                  onRefresh={refreshSessions}
-                />
-                <AdminMessageDialog onSendMessage={handleAdminMessage} />
-                <AdminQrDialog conversationId={conversation?.id || null} />
-              </>
-            )}
           </div>
         </div>
 
         {/* Analytics Dashboard */}
         {conversation?.id && (
           <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-            <CollapsibleContent className="px-4 pb-4">
-              <SessionAnalyticsDashboard
-                conversationId={conversation.id}
-                className="border rounded-lg"
-              />
+            <CollapsibleContent className="px-6 pb-4">
+              <div className="bg-gray-50 rounded-lg p-4 border">
+                <SessionAnalyticsDashboard
+                  conversationId={conversation.id}
+                  className="bg-white rounded-md"
+                />
+              </div>
             </CollapsibleContent>
           </Collapsible>
         )}

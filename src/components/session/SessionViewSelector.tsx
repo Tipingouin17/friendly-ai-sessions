@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from "react";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
@@ -10,6 +11,7 @@ import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
+import { useSecurityAudit } from "@/hooks/useSecurityAudit";
 
 interface SessionViewSelectorProps {
   props: SessionContextProps;
@@ -32,6 +34,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { logSecurityViolation } = useSecurityAudit();
   const transitionTimeout = useRef<NodeJS.Timeout | null>(null);
   const hasResolvedTransition = useRef(false);
   const participantEventChannelRef = useRef<any>(null);
@@ -41,6 +44,26 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   
   // Listen for session end events (for participants)
   useSessionEndListener(props.currentConversationId, isAdmin);
+  
+  // Security check: Ensure participants can't access admin view
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/admin') && !isAdmin) {
+      logSecurityViolation('unauthorized_admin_route_access', {
+        path: currentPath,
+        conversationId: props.currentConversationId
+      });
+      
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access the admin interface.",
+        variant: "destructive",
+      });
+      
+      // Redirect participants away from admin routes
+      navigate('/session');
+    }
+  }, [isAdmin, navigate, toast, logSecurityViolation, props.currentConversationId]);
   
   // Force show session if stuck in transition
   useEffect(() => {
@@ -220,7 +243,9 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         maxParticipants={props.conversation?.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onSessionStarted={() => {
-          console.log("Session started callback from ParticipantWaitingScreen");
+          console.log("Session started callback from ParticipantWaitingScreen - participants should NOT navigate");
+          // IMPORTANT: Participants should NOT navigate when session starts
+          // They should stay on their current route and just see UI update
           onStartSession();
         }}
       />

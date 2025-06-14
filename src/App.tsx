@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -71,7 +72,12 @@ function App() {
               
               {/* Routes outside the main layout */}
               <Route path="/session" element={<Session />} />
-              <Route path="/session/admin" element={<SessionAdmin />} />
+              {/* Secure admin route with proper authentication check */}
+              <Route path="/session/admin" element={
+                <ProtectedAdminRoute>
+                  <SessionAdmin />
+                </ProtectedAdminRoute>
+              } />
               <Route path="/session/report/:id" element={<SessionReport />} />
               <Route path="/join-session" element={<JoinSession />} />
               <Route path="*" element={<NotFound />} />

@@ -29,7 +29,7 @@ export const useMessageProcessor = ({
       return [];
     }
     
-    debugLog('all', `Processing ${messages.length} messages in ${viewMode} mode`);
+    debugLog('all', `Processing ${messages.length} messages in ${viewMode} mode for participant ${currentParticipant}`);
     
     // Map participants to their IDs for quicker lookup
     const participantMap = participants.reduce((map, p) => {
@@ -39,6 +39,9 @@ export const useMessageProcessor = ({
 
     // Process each message to ensure correct avatar and participant info
     const processedMessages = messages.map(message => {
+      // Store original participant key for filtering
+      const originalParticipant = message.participant;
+      
       const { processedAvatar, isAnonymous, displayName } = processMessageAvatar(
         message,
         message.participant ? participantMap[parseInt(message.participant.slice(1))] : null,
@@ -49,24 +52,32 @@ export const useMessageProcessor = ({
         ...message,
         avatar: processedAvatar,
         isAnonymous,
-        participant: displayName
+        displayName, // Store display name separately
+        participant: originalParticipant // Keep original participant key for filtering
       };
     });
 
-    // For participant mode, filter messages
+    // For participant mode, filter messages using the original participant key
     if (viewMode === "participant") {
       const participantKey = `P${currentParticipant}`;
-      return processedMessages.filter(message => 
-        message.sender === "assistant" || 
-        (message.sender === "user" && message.participant === participantKey)
-      );
+      debugLog('all', `Filtering messages for participant key: ${participantKey}`);
+      
+      const filteredMessages = processedMessages.filter(message => {
+        const isAssistantMessage = message.sender === "assistant";
+        const isCurrentParticipantMessage = message.sender === "user" && message.participant === participantKey;
+        const isAdminMessage = message.sender === "admin";
+        
+        debugLog('all', `Message ${message.id}: sender=${message.sender}, participant=${message.participant}, include=${isAssistantMessage || isCurrentParticipantMessage || isAdminMessage}`);
+        
+        return isAssistantMessage || isCurrentParticipantMessage || isAdminMessage;
+      });
+      
+      debugLog('all', `Filtered ${filteredMessages.length} messages from ${processedMessages.length} total for participant view`);
+      return filteredMessages;
     }
 
-    // For admin mode, we need to flatten the grouped messages
-    // instead of returning the groups directly
-    const groupedMessages = groupMessages(processedMessages, "", true);
-    
-    // Return processed messages directly instead of groups
+    // For admin mode, return all processed messages
+    debugLog('all', `Returning all ${processedMessages.length} messages for admin view`);
     return processedMessages;
   }, [messages, viewMode, participants, participantNames, currentParticipant, processMessageAvatar, groupMessages]);
 };

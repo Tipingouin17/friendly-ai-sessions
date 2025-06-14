@@ -7,7 +7,7 @@ import MessageBubble from './MessageBubble';
 import { debugLog } from '@/utils/debugLogger';
 
 interface MessageItemProps {
-  message: Message;
+  message: Message & { displayName?: string }; // Add displayName to message type
   isFirstMessageOfGroup: boolean;
   isLastMessageOfGroup: boolean;
   currentParticipant?: string;
@@ -33,10 +33,11 @@ const MessageItem = ({
   // Handle anonymous messages
   const isAnonymous = message.isAnonymous && message.sender === "user";
   
-  // Determine display name - prioritize participantInfo, then message.participant
-  let displayParticipantName = isAnonymous ? "Anonymous participant" : 
+  // Use displayName from processed message if available, otherwise fall back to previous logic
+  let displayParticipantName = message.displayName || 
+                              (isAnonymous ? "Anonymous participant" : 
                               participantInfo?.name || 
-                              (typeof message.participant === 'string' ? message.participant : "Participant");
+                              (typeof message.participant === 'string' ? message.participant : "Participant"));
   
   // Ensure we don't display "Participant X" if we have a real name
   if (displayParticipantName.startsWith("Participant") && participantInfo?.name) {

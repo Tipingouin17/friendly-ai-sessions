@@ -67,14 +67,23 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const isMobileDevice = useIsMobile();
   const isActuallyMobile = isMobile || isMobileDevice;
   
+  // Use the correct participant ID for filtering - prioritize currentUserParticipantId
+  const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
+  
   // Filter messages for this participant using the messageProcessor hook
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant",
     participants,
     participantNames,
-    currentParticipant: currentUserParticipantId || currentParticipant
+    currentParticipant: effectiveParticipantId
   });
+  
+  // Debug logging
+  useEffect(() => {
+    console.log(`ParticipantMessagingView: currentParticipant=${currentParticipant}, currentUserParticipantId=${currentUserParticipantId}, effectiveParticipantId=${effectiveParticipantId}`);
+    console.log(`Filtered ${filteredMessages.length} messages from ${messages.length} total`);
+  }, [currentParticipant, currentUserParticipantId, effectiveParticipantId, filteredMessages.length, messages.length]);
   
   return (
     <div className="h-full flex">
@@ -97,7 +106,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           <MessageList 
             messages={filteredMessages} 
             participantColors={participantColors}
-            currentParticipant={`P${currentParticipant}`}
+            currentParticipant={`P${effectiveParticipantId}`}
             isWaitingForResponse={isWaitingForResponse}
             participants={participants}
             isMobile={isActuallyMobile}
@@ -109,7 +118,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <div className="fixed-input-footer shrink-0">
           <InputFooter
             participantCount={maxParticipants}
-            currentParticipant={currentParticipant}
+            currentParticipant={effectiveParticipantId}
             participantNames={participantNames}
             participants={participants}
             inputMessage={inputMessage}
@@ -117,7 +126,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             onSendMessage={onSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
-            currentUserParticipantId={currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant}
+            currentUserParticipantId={effectiveParticipantId}
             isAnonymous={isAnonymous}
             toggleAnonymous={toggleAnonymous}
             hasAnswered={hasAnswered}

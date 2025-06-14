@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
-import AdminSessionHeader from './AdminSessionHeader';
+import AdminSessionHeader from '../AdminSessionHeader';
 import AdminSessionMessages from '../AdminSessionMessages';
 
 interface AdminSessionLayoutProps {
@@ -41,6 +41,11 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
     // You might want to refresh data or trigger other actions here
   };
 
+  // Wrapper function to adapt the signature for AdminSessionHeader
+  const handleHeaderSendMessage = (message: string) => {
+    handleSendAdminMessage(message, false); // Default isPinned to false
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <AdminSessionHeader
@@ -48,7 +53,7 @@ const AdminSessionLayout: React.FC<AdminSessionLayoutProps> = ({
         currentParticipantCount={participants.length}
         isSessionPaused={isSessionPaused}
         onToggleSessionState={toggleSessionState}
-        onSendAdminMessage={handleSendAdminMessage}
+        onSendAdminMessage={handleHeaderSendMessage}
         onExportData={onTriggerFacilitatorResponse}
       />
       

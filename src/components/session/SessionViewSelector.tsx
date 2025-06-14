@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useSessionEndListener } from "@/hooks/useSessionEndListener";
 
 interface SessionViewSelectorProps {
   props: SessionContextProps;
@@ -36,6 +37,9 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const hasResolvedTransition = useRef(false);
   const participantEventChannelRef = useRef<any>(null);
   
+  // Listen for session end events (for participants)
+  useSessionEndListener(props.currentConversationId, isAdmin);
+  
   // Force show session if stuck in transition
   useEffect(() => {
     // Clear any existing timeout
@@ -61,7 +65,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   
   // Listen for participant removal events
   useEffect(() => {
-    if (!props.currentConversationId || !props.currentUserParticipantId) return;
+    if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
 
     // Using a more unique channel name with current timestamp
     // to avoid conflicts and ensure unique channels
@@ -130,7 +134,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         }
       }
     };
-  }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast]);
+  }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);
   
   // Safety check for null values
   if (!props.conversation) {

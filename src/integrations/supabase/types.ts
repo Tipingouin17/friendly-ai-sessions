@@ -134,15 +134,19 @@ export type Database = {
           created_at: string | null
           current_participants: number | null
           ended_at: string | null
+          final_report_id: string | null
           id: number
           is_saved: boolean
           is_session_ended: boolean | null
           language: string | null
           participant_description: string | null
+          participant_engagement_score: number | null
           participants: number | null
+          session_duration_minutes: number | null
           session_started: boolean | null
           sessions_id: number | null
           status: Database["public"]["Enums"]["session_status"] | null
+          total_messages: number | null
           updated_at: string | null
           user_id: string
         }
@@ -151,15 +155,19 @@ export type Database = {
           created_at?: string | null
           current_participants?: number | null
           ended_at?: string | null
+          final_report_id?: string | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null
           language?: string | null
           participant_description?: string | null
+          participant_engagement_score?: number | null
           participants?: number | null
+          session_duration_minutes?: number | null
           session_started?: boolean | null
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
+          total_messages?: number | null
           updated_at?: string | null
           user_id: string
         }
@@ -168,19 +176,30 @@ export type Database = {
           created_at?: string | null
           current_participants?: number | null
           ended_at?: string | null
+          final_report_id?: string | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null
           language?: string | null
           participant_description?: string | null
+          participant_engagement_score?: number | null
           participants?: number | null
+          session_duration_minutes?: number | null
           session_started?: boolean | null
           sessions_id?: number | null
           status?: Database["public"]["Enums"]["session_status"] | null
+          total_messages?: number | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_final_report_id_fkey"
+            columns: ["final_report_id"]
+            isOneToOne: false
+            referencedRelation: "session_reports"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_sessions_id_fkey"
             columns: ["sessions_id"]
@@ -657,6 +676,50 @@ export type Database = {
           },
         ]
       }
+      session_reports: {
+        Row: {
+          conversation_id: number
+          file_size: number | null
+          file_url: string | null
+          generated_at: string
+          generated_by: string | null
+          id: string
+          metadata: Json | null
+          report_content: string
+          report_type: string
+        }
+        Insert: {
+          conversation_id: number
+          file_size?: number | null
+          file_url?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          report_content: string
+          report_type?: string
+        }
+        Update: {
+          conversation_id?: number
+          file_size?: number | null
+          file_url?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          report_content?: string
+          report_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_reports_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           category_id: number | null
@@ -839,6 +902,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_session_analytics: {
+        Args: { conv_id: number }
+        Returns: undefined
+      }
       is_participant_or_owner: {
         Args: { conversation_id: number }
         Returns: boolean

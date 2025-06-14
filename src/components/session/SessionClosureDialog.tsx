@@ -1,0 +1,84 @@
+
+import React from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { FileText, Download, AlertTriangle } from "lucide-react";
+
+interface SessionClosureDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isClosing: boolean;
+  participantCount: number;
+  sessionTitle?: string;
+}
+
+const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  isClosing,
+  participantCount,
+  sessionTitle = "this session"
+}) => {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <AlertDialogTitle>Close Session & Generate Report</AlertDialogTitle>
+          </div>
+          <AlertDialogDescription className="space-y-3">
+            <p>
+              Are you sure you want to close <strong>{sessionTitle}</strong>? This action will:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li>End the session for all {participantCount} participants</li>
+              <li>Generate a comprehensive session report</li>
+              <li>Prevent further messages from being sent</li>
+              <li>Redirect participants to the home page</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              <FileText className="h-4 w-4 inline mr-1" />
+              The report will include participation statistics, key discussion points, and session analytics.
+            </p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isClosing}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={isClosing}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            {isClosing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Closing Session...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-2" />
+                Close & Generate Report
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+export default SessionClosureDialog;

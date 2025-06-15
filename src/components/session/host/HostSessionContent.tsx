@@ -39,6 +39,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isSessionStarted = false,
   onSessionStarted
 }) => {
+  // Use actual participant count from real-time data
+  const actualParticipantCount = participants.length;
+
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
       {/* Host monitoring view - full height */}
@@ -46,7 +49,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         <SimplifiedHostMessagingView
           messages={sessionMessages || []}
           participantColors={participantColors}
-          currentParticipantCount={conversationData?.current_participants || 0}
+          currentParticipantCount={actualParticipantCount}
           conversationData={conversationData}
           isWaitingForResponses={isWaitingForResponses}
           responseCount={responseCount}
@@ -62,7 +65,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       {/* Participant sidebar */}
       <HostParticipantList
         participants={participants || []}
-        currentParticipantCount={conversationData?.current_participants || 0}
+        currentParticipantCount={actualParticipantCount}
         maxParticipants={conversationData?.participants || 10}
         isLoading={isLoadingParticipants}
         conversationData={conversationData}

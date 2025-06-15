@@ -53,29 +53,29 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-4 md:mb-8">
+        <div className="text-center mb-4 md:mb-6">
           
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
           {/* QR Code and Link Section */}
           <Card className="bg-white shadow-lg">
-            <CardHeader className="pb-3 md:pb-6">
+            <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                 <Users className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                 Participant Access
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 md:space-y-6 pt-0">
+            <CardContent className="space-y-4 md:space-y-5 pt-0">
               {/* QR Code */}
               <div className="flex flex-col items-center">
-                <div className="bg-white p-3 md:p-4 lg:p-6 rounded-lg border-2 border-gray-200 shadow-sm">
+                <div className="bg-white p-2 md:p-3 lg:p-4 rounded-lg border-2 border-gray-200 shadow-sm">
                   <QRCodeSVG 
                     value={sessionLink} 
-                    size={window.innerWidth < 640 ? 140 : window.innerWidth < 768 ? 160 : 200} 
+                    size={window.innerWidth < 640 ? 120 : window.innerWidth < 768 ? 140 : 160} 
                   />
                 </div>
-                <p className="text-xs md:text-sm text-gray-600 mt-2 md:mt-3 text-center">
+                <p className="text-xs md:text-sm text-gray-600 mt-2 text-center">
                   Participants can scan this QR code to join
                 </p>
               </div>
@@ -84,7 +84,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="space-y-2">
                 <label className="text-xs md:text-sm font-medium text-gray-700">Session Link</label>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                  <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded-lg border text-xs md:text-sm font-mono truncate">
+                  <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded-lg border text-xs md:text-sm font-mono break-all">
                     {sessionLink}
                   </div>
                   <Button 
@@ -126,13 +126,13 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 
           {/* Session Information */}
           <Card className="bg-white shadow-lg">
-            <CardHeader className="pb-3 md:pb-6">
+            <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                 <Target className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
                 Session Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 md:space-y-6 pt-0">
+            <CardContent className="space-y-4 md:space-y-5 pt-0">
               {/* Session Title */}
               <div>
                 <label className="text-xs md:text-sm font-medium text-gray-700">Session Title</label>
@@ -176,7 +176,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
         </div>
 
         {/* Instructions and Start Button */}
-        <Card className="bg-white shadow-lg mt-4 md:mt-6 lg:mt-8">
+        <Card className="bg-white shadow-lg mt-4 md:mt-6">
           <CardContent className="p-4 md:p-6">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 md:gap-6">
               <div className="text-center lg:text-left">

@@ -5,34 +5,66 @@
 
 /**
  * Validates that a user can access a specific session
+ * Updated to allow anonymous access for active sessions while maintaining host security
  */
 export const validateSessionAccess = async (
   conversationId: number,
   userId?: string
 ): Promise<boolean> => {
-  if (!userId) return false;
-  
   try {
     const { supabase } = await import('@/integrations/supabase/client');
     
-    // Check if user is the session owner or a participant
-    const { data: conversation } = await supabase
+    // First, check if the session exists and is active
+    const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
-      .select('user_id')
+      .select('id, user_id, is_session_ended, session_started, status')
       .eq('id', conversationId)
-      .eq('user_id', userId)
       .single();
       
-    if (conversation) return true;
+    if (conversationError || !conversation) {
+      console.log('Session not found or error fetching session:', conversationError);
+      return false;
+    }
     
-    // Check if user is a participant (more secure query)
-    const { data: participant } = await supabase
+    // Check if session is ended
+    if (conversation.is_session_ended) {
+      console.log('Session has ended');
+      return false;
+    }
+    
+    // Check if session status is inactive
+    if (conversation.status && conversation.status !== 'active') {
+      console.log('Session is not active');
+      return false;
+    }
+    
+    // If no userId provided, allow access to active sessions (for anonymous participants)
+    if (!userId) {
+      console.log('Anonymous access to active session allowed');
+      return true;
+    }
+    
+    // If userId is provided, check if user is the session owner
+    if (conversation.user_id === userId) {
+      console.log('User is session owner');
+      return true;
+    }
+    
+    // Check if user is a participant (for authenticated participants)
+    const { data: participant, error: participantError } = await supabase
       .from('session_participants')
       .select('id')
       .eq('conversation_id', conversationId)
-      .limit(1);
+      .limit(1)
+      .single();
       
-    return !!participant;
+    if (participant && !participantError) {
+      console.log('User is a session participant');
+      return true;
+    }
+    
+    console.log('User does not have access to this session');
+    return false;
   } catch (error) {
     console.error('Error validating session access:', error);
     return false;

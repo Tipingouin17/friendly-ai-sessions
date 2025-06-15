@@ -4,7 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionCapacityCheck } from "./useSessionCapacityCheck";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
-import { validateSessionAccess } from "@/utils/securityHelpers";
+import { validateSessionAccess } from "@/utils/security/sessionValidation";
 
 interface JoinParticipantParams {
   conversationId: number;
@@ -34,10 +34,11 @@ export function useParticipantJoining() {
     if (sessionData) {
       console.log("Using persisted participant data to rejoin session:", sessionData);
       
-      // Validate session access
-      const hasAccess = await validateSessionAccess(conversationId, sessionData.participantId?.toString());
-      if (!hasAccess && !sessionData.isAdmin) {
-        throw new Error("You don't have permission to access this session");
+      // For existing participants, validate session access (anonymous access allowed)
+      const hasAccess = await validateSessionAccess(conversationId);
+      if (!hasAccess) {
+        console.log("Session is no longer accessible (may be ended or inactive)");
+        throw new Error("This session is no longer available");
       }
       
       // Update the last accessed time
@@ -72,6 +73,13 @@ export function useParticipantJoining() {
     console.log("Attempting to join session with ID:", conversationId);
     console.log("Current participant count before update:", currentParticipantCount);
     console.log("Admin status for capacity check:", isAdmin);
+    
+    // Validate session access first (anonymous access allowed for active sessions)
+    const hasAccess = await validateSessionAccess(conversationId);
+    if (!hasAccess) {
+      console.log("Session access validation failed");
+      throw new Error("This session is not available or has ended");
+    }
     
     // Check capacity BEFORE we try to update participant count - fixes race condition
     const capacityResult = await checkCapacityAndUpdate(conversationId, isAdmin);

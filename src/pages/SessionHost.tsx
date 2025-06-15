@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -7,6 +6,7 @@ import { useHostSessionLoader } from "@/hooks/useHostSessionLoader";
 import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostParticipantState } from "@/hooks/useHostParticipantState";
 import { useHostSessionInitialization } from "@/hooks/useHostSessionInitialization";
+import { useSessionInterface } from "@/hooks/useSessionInterface";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
@@ -84,6 +84,12 @@ const SessionHost = () => {
     conversationData
   });
 
+  // Session interface for proper session start handling
+  const {
+    isSessionStarted,
+    handleStartSession
+  } = useSessionInterface(currentConversationId);
+
   // Keep a state reference to preserve UI data
   const [hostViewReady, setHostViewReady] = useState(false);
 
@@ -136,14 +142,18 @@ const SessionHost = () => {
     }
   }
 
-  // Check if session is started
-  const isSessionStarted = Boolean(conversationData?.session_started);
+  // Check if session is started - use from useSessionInterface
+  const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Handle session start
-  const handleSessionStarted = () => {
-    console.log("Session started successfully");
-    // The session start will be reflected in conversationData on next refresh
-    // or we could trigger a refetch here if needed
+  // Handle session start - use the proper function from useSessionInterface
+  const handleSessionStarted = async () => {
+    console.log("🔥 SessionHost - Starting session through useSessionInterface");
+    try {
+      await handleStartSession();
+      console.log("🔥 SessionHost - Session started successfully");
+    } catch (error) {
+      console.error("🔥 SessionHost - Error starting session:", error);
+    }
   };
 
   // Generate participant colors mapping
@@ -176,7 +186,7 @@ const SessionHost = () => {
       responseCount={responseCount}
       totalParticipants={totalParticipants}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
-      isSessionStarted={isSessionStarted}
+      isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
     />
   );

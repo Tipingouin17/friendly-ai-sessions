@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Message, ParticipantInfo } from '@/types/chat';
-import StartSessionButton from '@/components/session/host/StartSessionButton';
+import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import { MessageSquare, Users, Play, Clock } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -39,14 +39,20 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
 
+  // Show pre-session view if session hasn't started
+  if (!isSessionStarted) {
+    return (
+      <PreSessionHostView
+        conversationData={conversationData}
+        conversationId={conversationId}
+        participantCount={currentParticipantCount}
+        onSessionStarted={onSessionStarted || (() => {})}
+      />
+    );
+  }
+
   const facilitatorMessages = messages.filter(m => m.sender === 'assistant');
   const participantMessages = messages.filter(m => m.sender === 'user');
-
-  const handleStartSession = () => {
-    if (onSessionStarted) {
-      onSessionStarted();
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -91,13 +97,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
             </div>
           </div>
           
-          {!isSessionStarted && (
-            <StartSessionButton
-              onStartSession={handleStartSession}
-              participantCount={currentParticipantCount}
-              isSessionStarted={isSessionStarted}
-            />
-          )}
+          <Badge variant="default" className="bg-green-100 text-green-800">
+            Session Active
+          </Badge>
         </div>
       </div>
 
@@ -128,9 +130,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <div className="text-sm text-gray-600">Responses</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {isSessionStarted ? 'Active' : 'Waiting'}
-                    </div>
+                    <div className="text-2xl font-bold text-orange-600">Active</div>
                     <div className="text-sm text-gray-600">Status</div>
                   </div>
                 </div>
@@ -208,7 +208,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 <div className="text-center text-gray-500 py-12">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <h3 className="text-lg font-medium mb-2">No messages yet</h3>
-                  <p>Messages will appear here once the session starts and participants begin responding.</p>
+                  <p>Messages will appear here once participants begin responding.</p>
                 </div>
               ) : (
                 messages.map((message, index) => (

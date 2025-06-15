@@ -46,7 +46,7 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       inputMessage={props.sessionState.inputMessage}
       setInputMessage={props.sessionState.setInputMessage}
       currentParticipant={props.sessionState.currentParticipant}
-      handleSendMessage={props.handleSendMessage} // fixed: match prop name with SessionContainerProps
+      handleSendMessage={props.handleSendMessage}
       isWaitingForResponse={props.isWaitingForResponse}
       onGenerateReport={props.sessionState.handleGenerateReport}
       isGeneratingReport={props.sessionState.isGeneratingReport}
@@ -65,7 +65,7 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       viewMode={props.sessionState.viewMode}
       setViewMode={props.sessionState.setViewMode}
       isAdmin={isAdmin}
-      onSendAdminMessage={props.onSendAdminMessage}
+      onSendAdminMessage={() => props.onSendAdminMessage()}
       isAnonymous={props.anonymousState.isAnonymous}
       toggleAnonymous={props.anonymousState.toggleAnonymous}
     />

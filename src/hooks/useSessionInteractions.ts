@@ -19,7 +19,6 @@ type UseSessionInteractionsProps = {
   conversation: any;
   participants: any[];
   isAnonymous: boolean;
-  forceRefreshMessages?: () => void;
 };
 
 export const useSessionInteractions = ({
@@ -27,8 +26,7 @@ export const useSessionInteractions = ({
   sessionState,
   conversation,
   participants,
-  isAnonymous,
-  forceRefreshMessages
+  isAnonymous
 }: UseSessionInteractionsProps) => {
   // Set up message sending functionality
   const {
@@ -48,12 +46,11 @@ export const useSessionInteractions = ({
     conversation
   });
 
-  // Set up real-time message subscription with callback
-  const { reconnect } = useMessageRealtime({
+  // Set up real-time message subscription
+  useMessageRealtime({
     currentConversationId,
     viewMode: sessionState.viewMode,
-    setMessages: sessionState.setMessages,
-    onNewMessage: forceRefreshMessages // Use the force refresh function as callback
+    setMessages: sessionState.setMessages
   });
 
   return {
@@ -64,7 +61,6 @@ export const useSessionInteractions = ({
     currentUserHasResponded,
     handleSendMessage,
     error,
-    startResponseCollection,
-    reconnectRealtime: reconnect
+    startResponseCollection
   };
 };

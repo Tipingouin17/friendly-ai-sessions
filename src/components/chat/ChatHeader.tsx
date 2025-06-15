@@ -97,8 +97,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </Tooltip>
         </TooltipProvider>
         
-        {/* Report generation button - only show when canGenerateReport is true */}
-        {onGenerateReport && canGenerateReport && (
+        {/* Report generation button - only show for participant view */}
+        {viewMode === "participant" && onGenerateReport && canGenerateReport && (
           <Button 
             variant="outline" 
             size="sm"

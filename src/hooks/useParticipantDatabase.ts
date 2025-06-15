@@ -25,7 +25,7 @@ export function useParticipantDatabase(conversationId: number | null) {
             name,
             avatar_seed,
             is_anonymous,
-            is_admin,
+            is_host,
             created_at
           `)
           .eq('conversation_id', conversationId);
@@ -72,7 +72,7 @@ export function useParticipantDatabase(conversationId: number | null) {
           name: `Participant ${id}`,
           avatar_seed: null,
           is_anonymous: false,
-          is_admin: false,
+          is_host: false,
           created_at: new Date().toISOString()
         }));
 
@@ -86,7 +86,7 @@ export function useParticipantDatabase(conversationId: number | null) {
             avatar: p.avatar_seed ? `/api/avatar?name=${p.avatar_seed}&variant=beam&palette=0` : null,
             avatarSeed: p.avatar_seed || null,
             isAnonymous: p.is_anonymous || false,
-            isAdmin: p.is_admin || false,
+            isHost: p.is_host || false,
             joinedAt: new Date(p.created_at),
             lastActive: new Date(p.created_at),
           }));
@@ -106,7 +106,7 @@ export function useParticipantDatabase(conversationId: number | null) {
                   name: p.name,
                   avatar_seed: p.avatar_seed,
                   is_anonymous: p.is_anonymous,
-                  is_admin: p.is_admin
+                  is_host: p.is_host
                 }))
               );
 

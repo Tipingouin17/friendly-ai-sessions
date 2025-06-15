@@ -1,52 +1,71 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-interface RegisterParticipantParams {
+export interface RegisterParticipantParams {
   conversationId: number;
   participantId: number;
   participantName: string;
   avatarSeed: string;
   isAnonymous?: boolean;
-  isAdmin?: boolean;
+  isAdmin?: boolean; // Keep for backward compatibility
+  isHost?: boolean; // New host property
 }
 
-export async function registerParticipant({
+export interface ParticipantSessionData {
+  participantId: number;
+  conversationId: number;
+  name: string;
+  avatarSeed: string;
+  isAnonymous: boolean;
+  isAdmin?: boolean; // Keep for backward compatibility
+  isHost?: boolean; // New host property
+  timestamp: string;
+  lastAccessedAt: string;
+}
+
+export const registerParticipant = async ({
   conversationId,
   participantId,
   participantName,
   avatarSeed,
   isAnonymous = false,
-  isAdmin = false
-}: RegisterParticipantParams): Promise<void> {
+  isAdmin = false,
+  isHost = false
+}: RegisterParticipantParams) => {
   try {
-    console.log("Registering participant:", {
-      conversationId,
-      participantId,
-      participantName,
-      avatarSeed,
-      isAnonymous,
-      isAdmin
-    });
+    console.log(`Registering participant ${participantId} for conversation ${conversationId}`);
     
-    const { error: participantError } = await supabase
+    // Insert into session_participants table
+    const { error: insertError } = await supabase
       .from('session_participants')
       .insert({
         conversation_id: conversationId,
         participant_id: participantId,
         name: participantName,
         avatar_seed: avatarSeed,
-        is_anonymous: isAnonymous || false,
-        is_admin: isAdmin || false
+        is_anonymous: isAnonymous,
+        is_host: isHost || isAdmin // Map isAdmin to isHost for compatibility
       });
-      
-    if (participantError) {
-      console.error("Error storing participant info:", participantError);
-      // Continue anyway - this is not critical for joining
-    } else {
-      console.log("Successfully registered participant:", participantName);
+
+    if (insertError) {
+      console.error('Error inserting participant:', insertError);
+      throw insertError;
     }
-  } catch (err) {
-    // Catch any error from the insert operation but continue
-    console.error("Exception storing participant info:", err);
+
+    // Update conversation participant count
+    const { error: updateError } = await supabase.rpc('validate_participant_capacity', {
+      conv_id: conversationId
+    });
+
+    if (updateError) {
+      console.error('Error validating participant capacity:', updateError);
+      throw updateError;
+    }
+
+    console.log(`Successfully registered participant ${participantId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to register participant:', error);
+    throw error;
   }
-}
+};

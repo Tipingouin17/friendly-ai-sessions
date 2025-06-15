@@ -1,27 +1,25 @@
 
-import React from 'react';
-import { Message } from '@/types/chat';
-import MessageList from '@/components/chat/MessageList';
-import { MessagesSquare, Users, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Message, ParticipantInfo } from '@/types/chat';
 import StartSessionButton from '@/components/session/host/StartSessionButton';
+import { MessageSquare, Users, Play, Clock } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
   messages: Message[];
   participantColors: { [key: string]: string };
   currentParticipantCount: number;
-  conversationData?: any;
-  
-  // Response collection props
+  conversationData: any;
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: () => void;
-  
-  // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
-  participants?: any[];
+  participants?: ParticipantInfo[];
   conversationId?: number | null;
 }
 
@@ -32,120 +30,218 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   conversationData,
   isWaitingForResponses = false,
   responseCount = 0,
-  totalParticipants = 1,
+  totalParticipants = 0,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
   participants = [],
   conversationId
 }) => {
-  console.log('SimplifiedHostMessagingView: Rendering with', messages.length, 'messages and', currentParticipantCount, 'participants');
-  console.log('Session started:', isSessionStarted);
-  console.log('Participants prop:', participants?.length);
+  const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
 
-  // Show empty state if no real messages exist OR session hasn't started
-  // Filter out welcome messages to check for real participant/facilitator content
-  const realMessages = messages.filter(msg => !msg.isWelcomeMessage);
-  const shouldShowEmptyState = realMessages.length === 0;
+  const facilitatorMessages = messages.filter(m => m.sender === 'assistant');
+  const participantMessages = messages.filter(m => m.sender === 'user');
 
-  if (shouldShowEmptyState) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
-        <div className="mb-3 p-3 bg-gray-50 rounded-full">
-          <MessagesSquare className="w-6 h-6 text-gray-400" />
-        </div>
-        
-        {!isSessionStarted ? (
-          <>
-            <p className="text-base font-medium mb-1">Ready to Start Session</p>
-            <p className="text-sm mb-4">
-              Click the button below to begin the session and send the welcome message to participants.
-            </p>
-            <div className="mt-4 mb-6">
-              <StartSessionButton
-                conversationId={conversationId}
-                participants={participants}
-                conversationData={conversationData}
-                onSessionStarted={onSessionStarted || (() => {})}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-base font-medium mb-1">Session Active - Monitoring</p>
-            <p className="text-sm">
-              All participant messages will appear here as they are sent.
-            </p>
-          </>
-        )}
-        
-        <div className="mt-2 text-xs text-gray-400">
-          Current participants: {currentParticipantCount}
-        </div>
-        
-        {conversationData?.sessions?.welcome_message && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-700 mb-1 font-medium">Session Welcome Message:</p>
-            <p className="text-xs text-blue-600">{conversationData.sessions.welcome_message}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const handleStartSession = () => {
+    if (onSessionStarted) {
+      onSessionStarted();
+    }
+  };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Response Collection Status Banner */}
-      {isWaitingForResponses && totalParticipants > 1 && (
-        <div className="bg-orange-50 border-b border-orange-200 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-orange-600" />
-              <span className="text-sm font-medium text-orange-800">
-                Waiting for participant responses
+    <div className="flex flex-col h-full">
+      {/* Header with tabs */}
+      <div className="border-b bg-white p-4">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant={activeTab === 'overview' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('overview')}
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Overview
+          </Button>
+          <Button
+            variant={activeTab === 'messages' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('messages')}
+            className="flex items-center gap-2"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Messages
+            <Badge variant="secondary">{messages.length}</Badge>
+          </Button>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-gray-500" />
+              <span className="text-sm text-gray-600">
+                {currentParticipantCount} participants
               </span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-xs text-orange-600">
-                <Users className="w-3 h-3" />
-                <span>{responseCount} of {totalParticipants} responded</span>
-              </div>
-              {onTriggerFacilitatorResponse && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onTriggerFacilitatorResponse}
-                  className="text-xs h-7"
-                >
-                  Continue Anyway
-                </Button>
-              )}
+            
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-gray-500" />
+              <span className="text-sm text-gray-600">
+                {participantMessages.length} responses
+              </span>
             </div>
           </div>
-          {totalParticipants > 1 && (
-            <div className="mt-2 w-full bg-orange-200 rounded-full h-1">
-              <div 
-                className="bg-orange-500 h-1 rounded-full transition-all duration-300"
-                style={{ width: `${(responseCount / totalParticipants) * 100}%` }}
-              />
-            </div>
+          
+          {!isSessionStarted && (
+            <StartSessionButton
+              onStartSession={handleStartSession}
+              participantCount={currentParticipantCount}
+              isSessionStarted={isSessionStarted}
+            />
           )}
         </div>
-      )}
+      </div>
 
-      {/* Message List */}
+      {/* Content area */}
       <div className="flex-1 overflow-hidden">
-        <MessageList 
-          messages={messages}
-          participantColors={participantColors}
-          isWaitingForResponse={false}
-          isWaitingForResponses={isWaitingForResponses}
-          responseCount={responseCount}
-          totalParticipants={totalParticipants}
-          participants={[]}
-          isMobile={false}
-          conversationData={conversationData}
-        />
+        {activeTab === 'overview' ? (
+          <div className="p-6 space-y-6">
+            {/* Session Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Play className="h-5 w-5" />
+                  Session Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{currentParticipantCount}</div>
+                    <div className="text-sm text-gray-600">Participants</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{facilitatorMessages.length}</div>
+                    <div className="text-sm text-gray-600">Questions</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">{participantMessages.length}</div>
+                    <div className="text-sm text-gray-600">Responses</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {isSessionStarted ? 'Active' : 'Waiting'}
+                    </div>
+                    <div className="text-sm text-gray-600">Status</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Response Collection Status */}
+            {isWaitingForResponses && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Collecting Responses
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        {responseCount} of {totalParticipants} participants have responded
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: totalParticipants > 0 
+                              ? `${(responseCount / totalParticipants) * 100}%` 
+                              : '0%' 
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {onTriggerFacilitatorResponse && (
+                      <Button 
+                        onClick={onTriggerFacilitatorResponse}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Continue
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Session Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Session Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div>
+                    <span className="font-medium">Title:</span>{' '}
+                    {conversationData?.sessions?.title || 'Untitled Session'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Facilitator:</span>{' '}
+                    {conversationData?.sessions?.facilitator_details?.title || 'Unknown'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Objective:</span>{' '}
+                    {conversationData?.sessions?.objective || 'Not specified'}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <ScrollArea className="h-full p-4">
+            <div className="space-y-4">
+              {messages.length === 0 ? (
+                <div className="text-center text-gray-500 py-12">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-medium mb-2">No messages yet</h3>
+                  <p>Messages will appear here once the session starts and participants begin responding.</p>
+                </div>
+              ) : (
+                messages.map((message, index) => (
+                  <div key={message.id || index} className="border rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
+                        message.sender === 'assistant' ? 'bg-blue-500' : 'bg-gray-500'
+                      }`}>
+                        {message.sender === 'assistant' ? 'F' : 'P'}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">
+                            {message.sender === 'assistant' 
+                              ? (conversationData?.sessions?.facilitator_details?.title || 'Facilitator')
+                              : (message.participant || 'Participant')
+                            }
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {message.timestamp?.toLocaleTimeString() || 'Now'}
+                          </span>
+                        </div>
+                        
+                        <p className="text-gray-700">{message.content}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        )}
       </div>
     </div>
   );

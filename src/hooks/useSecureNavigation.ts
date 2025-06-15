@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,8 +51,8 @@ export function useSecureNavigation() {
     }
 
     try {
-      // Verify admin status before navigation using the existing function
-      const { data: isAdmin, error } = await supabase.rpc('is_admin');
+      // Verify admin status before navigation using the updated function
+      const { data: isAdmin, error } = await supabase.rpc('is_system_admin');
       
       if (error || !isAdmin) {
         logSecurityViolation('unauthorized_admin_navigation_attempt', { 
@@ -81,5 +82,51 @@ export function useSecureNavigation() {
     }
   };
 
-  return { navigateToParticipantSession, navigateToAdminSession };
+  const navigateToHostSession = async (conversationId: number | null) => {
+    if (!conversationId) {
+      console.error("Cannot navigate to host session without conversation ID");
+      return;
+    }
+    
+    if (!user) {
+      console.error("Cannot access host session without authentication");
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // Verify host status before navigation
+      const { data: isHost, error } = await supabase.rpc('is_session_host', {
+        conversation_id: conversationId
+      });
+      
+      if (error || !isHost) {
+        logSecurityViolation('unauthorized_host_navigation_attempt', { 
+          userId: user.id,
+          conversationId 
+        });
+        console.error("Unauthorized host access attempt");
+        navigate('/session');
+        return;
+      }
+
+      logSensitiveAction('host_session_navigation', String(conversationId));
+      console.log(`Secure navigation to host session for conversation: ${conversationId}`);
+      
+      // Navigate to host session path
+      navigate(`/session/host?id=${conversationId}`, {
+        state: {
+          isHost: true,
+          showMessaging: true,
+          conversationId: conversationId
+        }
+      });
+    } catch (error) {
+      console.error('Error during host navigation:', error);
+      logSecurityViolation('host_navigation_error', { error: String(error) });
+      navigate('/session');
+    }
+  };
+
+  return { navigateToParticipantSession, navigateToAdminSession, navigateToHostSession };
 }

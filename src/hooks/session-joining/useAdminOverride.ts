@@ -30,7 +30,7 @@ export function useAdminOverride() {
     }
 
     try {
-      const { data: isAdmin, error } = await supabase.rpc('is_admin');
+      const { data: isAdmin, error } = await supabase.rpc('is_system_admin');
       
       if (error || !isAdmin) {
         throw new Error("Unauthorized: Admin privileges required");

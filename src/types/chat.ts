@@ -18,12 +18,13 @@ export interface Message {
 export interface ParticipantInfo {
   id: number;
   name: string;
-  avatar?: string; // Changed from required to optional
-  avatarSeed?: string | null; // Added to match the data structure in useParticipantTracking
+  avatar?: string | null;
+  avatarSeed?: string | null;
   isAnonymous?: boolean;
-  isAdmin?: boolean; // Added to match usage in useParticipantTracking
-  joinedAt?: Date; // Added for tracking when participants joined
-  lastActive?: Date; // Added for tracking participant activity
+  isAdmin?: boolean; // Keep for backward compatibility
+  isHost?: boolean; // New host property
+  joinedAt?: Date;
+  lastActive?: Date;
 }
 
 export interface SpeechRecognition extends EventTarget {

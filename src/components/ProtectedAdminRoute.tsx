@@ -26,8 +26,8 @@ export const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({ childr
       }
 
       try {
-        // Check if user has admin role using the existing database function
-        const { data, error } = await supabase.rpc('is_admin');
+        // Check if user has admin role using the updated system admin function
+        const { data, error } = await supabase.rpc('is_system_admin');
         
         if (error) {
           console.error('Error checking admin status:', error);

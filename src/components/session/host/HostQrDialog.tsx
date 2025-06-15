@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { QrCode, Copy, Check } from "lucide-react";
-import QRCode from "qrcode.react";
+import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface HostQrDialogProps {
@@ -60,7 +61,7 @@ const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
           {sessionLink && (
             <>
               <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-                <QRCode value={sessionLink} size={200} />
+                <QRCodeSVG value={sessionLink} size={200} />
               </div>
               
               <div className="flex items-center space-x-2 w-full">

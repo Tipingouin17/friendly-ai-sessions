@@ -84,8 +84,9 @@ export async function checkSessionCapacity(
   
   const maxAllowed = latestConversation.participants || 0;
   
+  // FIXED: Use actual count for capacity check, not the stored current_participants
   if (maxAllowed > 0 && actualCount >= maxAllowed) {
-    console.log("Session is full based on actual count, starting automatically:", {
+    console.log("Session is full based on actual count:", {
       actualCount,
       maxAllowed
     });
@@ -101,14 +102,12 @@ export async function checkSessionCapacity(
       console.log("Session auto-started successfully");
     }
     
-    if (!effectiveIsAdmin) {
-      return {
-        canJoin: false,
-        latestConversation,
-        newParticipantId: 0,
-        error: "This session is full and cannot accept more participants."
-      };
-    }
+    return {
+      canJoin: false,
+      latestConversation,
+      newParticipantId: 0,
+      error: "This session is full and cannot accept more participants."
+    };
   }
   
   console.log("Session has space, new participant ID will be:", nextParticipantId);
@@ -140,58 +139,32 @@ export function useSessionCapacityCheck() {
       // If on admin route, always allow joining regardless of capacity
       const finalCanJoin = isOnAdminPath ? true : (effectiveIsAdmin ? true : capacityResult.canJoin);
       
+      // FIXED: Only update count if participant can actually join
       if (finalCanJoin) {
-        // Update the conversation with the corrected participant count
-        const { data: updateData, error: updateError } = await supabase
-          .from('conversations')
-          .update({ current_participants: capacityResult.newParticipantId })
-          .eq('id', conversationId)
-          .select('current_participants')
-          .single();
-          
-        if (updateError) {
-          console.error("Error updating participant count:", updateError);
-          
-          // For admin route, continue even if update fails
-          if (isOnAdminPath) {
-            console.log("🔑 On admin route - bypassing update error");
-            setIsCheckingCapacity(false);
-            return {
-              canJoin: true,
-              latestConversation: capacityResult.latestConversation,
-              newParticipantId: capacityResult.newParticipantId
-            };
-          }
-          
-          throw new Error(`Failed to join: ${updateError.message}`);
-        }
-
-        if (!updateData && !isOnAdminPath) {
-          throw new Error("Failed to update participant count");
-        }
-
-        console.log("Updated participant count to:", capacityResult.newParticipantId);
+        console.log("Participant can join, will update count after successful registration");
+        
+        // Don't update the count here - it will be updated after successful participant registration
+        // This prevents count inflation when join attempts fail
         
         try {
           const { error: broadcastError } = await supabase
             .from('session_events')
             .insert({
               conversation_id: conversationId,
-              event_type: 'participant_joined',
+              event_type: 'participant_joining',
               data: { 
                 participant_id: capacityResult.newParticipantId,
-                current_count: capacityResult.newParticipantId,
                 timestamp: new Date().toISOString()
               }
             });
             
           if (broadcastError) {
-            console.error("Error broadcasting participant join event:", broadcastError);
+            console.error("Error broadcasting participant joining event:", broadcastError);
           } else {
-            console.log("Successfully broadcast participant join event");
+            console.log("Successfully broadcast participant joining event");
           }
         } catch (broadcastErr) {
-          console.error("Exception broadcasting join event:", broadcastErr);
+          console.error("Exception broadcasting joining event:", broadcastErr);
         }
       }
       
@@ -206,7 +179,10 @@ export function useSessionCapacityCheck() {
         };
       }
       
-      return capacityResult;
+      return {
+        ...capacityResult,
+        canJoin: finalCanJoin
+      };
     } catch (error) {
       setIsCheckingCapacity(false);
       

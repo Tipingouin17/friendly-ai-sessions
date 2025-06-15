@@ -52,14 +52,29 @@ export const registerParticipant = async ({
       throw insertError;
     }
 
-    // Update conversation participant count
-    const { error: updateError } = await supabase.rpc('validate_participant_capacity', {
-      conv_id: conversationId
-    });
+    // FIXED: Update the conversation participant count to match actual participants
+    // This ensures data consistency after successful participant registration
+    const { data: participantCount, error: countError } = await supabase
+      .from('session_participants')
+      .select('participant_id', { count: 'exact' })
+      .eq('conversation_id', conversationId);
 
-    if (updateError) {
-      console.error('Error validating participant capacity:', updateError);
-      throw updateError;
+    if (countError) {
+      console.error('Error getting participant count:', countError);
+    } else {
+      const actualCount = participantCount?.length || 0;
+      console.log(`Updating conversation ${conversationId} participant count to ${actualCount}`);
+      
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({ current_participants: actualCount })
+        .eq('id', conversationId);
+
+      if (updateError) {
+        console.error('Error updating participant count:', updateError);
+      } else {
+        console.log(`Successfully updated participant count to ${actualCount}`);
+      }
     }
 
     console.log(`Successfully registered participant ${participantId}`);

@@ -71,7 +71,7 @@ export function useParticipantJoining() {
     isAdmin = false
   }: JoinParticipantParams) => {
     console.log("Attempting to join session with ID:", conversationId);
-    console.log("Current participant count before update:", currentParticipantCount);
+    console.log("Current participant count before join:", currentParticipantCount);
     console.log("Admin status for capacity check:", isAdmin);
     
     // Validate session access first (anonymous access allowed for active sessions)
@@ -81,11 +81,12 @@ export function useParticipantJoining() {
       throw new Error("This session is not available or has ended");
     }
     
-    // Check capacity BEFORE we try to update participant count - fixes race condition
+    // FIXED: Check capacity without updating count - count will be updated after successful registration
     const capacityResult = await checkCapacityAndUpdate(conversationId, isAdmin);
     
     // If the session is full and we're not an admin, block joining
     if (!capacityResult.canJoin && !isAdmin) {
+      console.log("Join blocked - session at capacity:", capacityResult.error);
       throw new Error(capacityResult.error || "This session is full and cannot accept more participants.");
     }
     
@@ -93,7 +94,7 @@ export function useParticipantJoining() {
     const newParticipantId = capacityResult.newParticipantId;
     console.log("New participant ID:", newParticipantId);
     
-    // Store the participant information in the session_participants table
+    // FIXED: Register participant first, which will handle count updates correctly
     await registerParticipant({
       conversationId, 
       participantId: newParticipantId,
@@ -103,7 +104,7 @@ export function useParticipantJoining() {
       isAdmin
     });
     
-    // Create a session_event to log the participant joining
+    // Create a session_event to log the participant successfully joining
     try {
       await supabase
         .from('session_events')
@@ -116,9 +117,10 @@ export function useParticipantJoining() {
             avatar_url: avatarSeed ? `/api/avatar?name=${avatarSeed}&variant=beam&palette=0` : null,
             is_anonymous: isAnonymous,
             is_admin: isAdmin,
-            current_count: currentParticipantCount + 1
+            timestamp: new Date().toISOString()
           }
         });
+      console.log("Successfully logged participant join event");
     } catch (eventError) {
       console.error("Error logging participant join event:", eventError);
       // Don't block the join process if event logging fails

@@ -85,20 +85,22 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 {/* Session Link */}
                 <div className="flex-1 w-full space-y-2">
                   <label className="text-xs md:text-sm font-medium text-gray-700">Session Link</label>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                    <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded-lg border text-xs md:text-sm font-mono break-all">
+                  <div 
+                    className="relative group cursor-pointer"
+                    onClick={handleCopyLink}
+                  >
+                    <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded-lg border text-xs md:text-sm font-mono break-all hover:bg-gray-100 transition-colors">
                       {sessionLink}
                     </div>
-                    <Button 
-                      onClick={handleCopyLink} 
-                      size="sm" 
-                      variant="outline" 
-                      className="flex items-center gap-1 px-3 md:px-4 w-full sm:w-auto"
-                    >
-                      {copied ? <Check className="h-3 w-3 md:h-4 md:w-4" /> : <Copy className="h-3 w-3 md:h-4 md:w-4" />}
-                      {copied ? "Copied" : "Copy"}
-                    </Button>
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
                   </div>
+                  <p className="text-xs text-gray-500">Click to copy link</p>
                 </div>
               </div>
 

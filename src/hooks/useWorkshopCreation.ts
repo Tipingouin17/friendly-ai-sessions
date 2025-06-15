@@ -1,10 +1,9 @@
-
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
+import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 
 export const useWorkshopCreation = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -14,8 +13,10 @@ export const useWorkshopCreation = () => {
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Secure navigation for admin session page
+  const { navigateToAdminSession } = useNavigateToSession();
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -73,18 +74,11 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-        console.log("New conversation created with ID:", data.id, "redirecting to admin");
-        
-        // Use navigate with replace:true to prevent back button from returning to creation form
-        navigate('/session/admin', {
-          state: {
-            newConversationId: data.id,
-            isAdmin: true,
-            replace: true
-          },
-          replace: true // Add this to ensure proper replacement in history
-        });
-        
+        console.log("New conversation created with ID:", data.id, "redirecting admin with secure navigation");
+
+        // Use secure navigation for admin sessions instead of direct navigate
+        await navigateToAdminSession(data.id);
+
         toast({
           title: "Session Created",
           description: "Your admin session has been created successfully.",
@@ -101,7 +95,7 @@ export const useWorkshopCreation = () => {
   };
 
   const handleUpgradePlan = () => {
-    navigate('/pricing');
+    window.location.assign('/pricing');
   };
 
   return {

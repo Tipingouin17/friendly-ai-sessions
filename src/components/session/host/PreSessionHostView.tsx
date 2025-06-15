@@ -24,6 +24,12 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  console.log("🔍 PreSessionHostView - Received props:", {
+    conversationId,
+    participantCount,
+    conversationData: conversationData?.id
+  });
+
   const sessionLink = conversationId ? `${window.location.origin}/join-session?id=${conversationId}` : '';
 
   const handleCopyLink = async () => {
@@ -112,6 +118,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                     <p className="text-xs md:text-sm text-blue-700">
                       {participantCount} of {conversationData?.participants || 10} joined
                     </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Debug: participantCount = {participantCount}, type = {typeof participantCount}
+                    </p>
                   </div>
                   <Badge variant="secondary" className="text-sm md:text-lg px-2 md:px-3 py-1">
                     {participantCount}
@@ -189,6 +198,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 <p className="text-sm md:text-base text-gray-600">
                   Once participants have joined, click "Start Session" to begin the facilitated discussion.
                   {participantCount === 0 && " You need at least one participant to start."}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Debug: Button will be {participantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {participantCount})
                 </p>
               </div>
               <div className="flex-shrink-0 w-full lg:w-auto">

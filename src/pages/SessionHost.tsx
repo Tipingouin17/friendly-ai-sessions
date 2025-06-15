@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -39,6 +40,12 @@ const SessionHost = () => {
     hostViewMounted
   } = useHostSessionLoader();
 
+  console.log("🔍 SessionHost - Current state:", {
+    currentConversationId,
+    conversationDataId: conversationData?.id,
+    isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading
+  });
+
   // Participant state management
   const {
     participants,
@@ -48,6 +55,12 @@ const SessionHost = () => {
     locationState,
     conversationData,
     currentConversationId
+  });
+
+  console.log("🔍 SessionHost - Participants from hook:", {
+    participantsCount: participants.length,
+    participants: participants.map(p => ({ id: p.id, name: p.name })),
+    isLoadingParticipants
   });
 
   // Initialize session messages with empty array
@@ -138,6 +151,15 @@ const SessionHost = () => {
     colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
     return colors;
   }, {} as { [key: string]: string });
+
+  // Calculate participant count for passing to components
+  const participantCount = participants.length;
+  
+  console.log("🔍 SessionHost - Passing to HostDashboard:", {
+    participantCount,
+    participantsLength: participants.length,
+    conversationId: currentConversationId
+  });
 
   return (
     <HostDashboard

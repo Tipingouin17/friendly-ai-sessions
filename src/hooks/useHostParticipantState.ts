@@ -17,10 +17,17 @@ export function useHostParticipantState({
 }: UseHostParticipantStateProps) {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
 
+  console.log("🔍 useHostParticipantState - Starting with conversationId:", currentConversationId);
+
   const { data: participantsData, isLoading: isLoadingParticipants } = useQuery({
     queryKey: ['session-participants', currentConversationId],
     queryFn: async () => {
-      if (!currentConversationId) return [];
+      if (!currentConversationId) {
+        console.log("🔍 useHostParticipantState - No conversationId, returning empty array");
+        return [];
+      }
+      
+      console.log("🔍 useHostParticipantState - Fetching participants for conversation:", currentConversationId);
       
       const { data, error } = await supabase
         .from('session_participants')
@@ -29,10 +36,11 @@ export function useHostParticipantState({
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error("Error fetching participants:", error);
+        console.error("🔍 useHostParticipantState - Error fetching participants:", error);
         return [];
       }
 
+      console.log("🔍 useHostParticipantState - Raw data from database:", data);
       return data || [];
     },
     enabled: !!currentConversationId,
@@ -41,6 +49,8 @@ export function useHostParticipantState({
 
   useEffect(() => {
     if (participantsData) {
+      console.log("🔍 useHostParticipantState - Processing participants data:", participantsData);
+      
       const formattedParticipants: ParticipantInfo[] = participantsData.map(p => ({
         id: p.participant_id,
         name: p.name,
@@ -49,10 +59,18 @@ export function useHostParticipantState({
         isHost: p.is_host || false
       }));
 
+      console.log("🔍 useHostParticipantState - Formatted participants:", formattedParticipants);
+      console.log("🔍 useHostParticipantState - Setting participants count to:", formattedParticipants.length);
+      
       setParticipants(formattedParticipants);
-      console.log("Host: Updated participants list:", formattedParticipants.length);
     }
   }, [participantsData]);
+
+  console.log("🔍 useHostParticipantState - Current state:", {
+    participantsCount: participants.length,
+    isLoadingParticipants,
+    conversationId: currentConversationId
+  });
 
   return {
     participants,

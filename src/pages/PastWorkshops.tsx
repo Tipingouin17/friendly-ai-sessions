@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
-import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
+import { useSessionHostStatus } from "@/hooks/useSessionHostStatus";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
 import { useReportDownloader } from "@/hooks/session-closure/useReportDownloader";
@@ -73,14 +73,14 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
   canGenerateReports: boolean,
   reportData?: any 
 }) => {
-  const { navigateToAdminSession } = useNavigateToSession();
+  const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
   
-  const handleAdminView = async () => {
+  const handleHostView = async () => {
     if (isActive) {
-      console.log("Navigating to admin session for conversation:", workshop.id);
-      await navigateToAdminSession(workshop.id);
+      console.log("Navigating to host session for conversation:", workshop.id);
+      await navigateToHostSession(workshop.id);
     }
   };
   
@@ -170,7 +170,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
             
             <div className="flex gap-2">
               {isActive && (
-                <Button size="sm" onClick={handleAdminView} className="bg-primary hover:bg-primary/90">
+                <Button size="sm" onClick={handleHostView} className="bg-primary hover:bg-primary/90">
                   Manage Session
                 </Button>
               )}
@@ -264,8 +264,8 @@ const EmptyState = ({ isActive = false }) => (
 
 const PastWorkshops = () => {
   const navigate = useNavigate();
-  const { navigateToAdminSession } = useNavigateToSession();
-  const { setAdminStatus } = useSessionAdminStatus();
+  const { navigateToHostSession } = useNavigateToSession();
+  const { setHostStatus } = useSessionHostStatus();
   const queryClient = useQueryClient();
   const { planRestrictions } = useUserPlan();
   
@@ -321,12 +321,12 @@ const PastWorkshops = () => {
         console.log("Auto-navigating to most recent session with secure navigation:", mostRecentSession.id);
         
         // Use secure navigation instead of client-side flags
-        await navigateToAdminSession(mostRecentSession.id);
+        await navigateToHostSession(mostRecentSession.id);
       }
     };
     
     handleAutoNavigation();
-  }, [activeWorkshops, navigateToAdminSession]);
+  }, [activeWorkshops, navigateToHostSession]);
   
   const handleCreateNew = () => {
     navigate('/my-facilitators');

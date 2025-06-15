@@ -671,8 +671,8 @@ export type Database = {
           conversation_id: number
           created_at: string | null
           id: number
-          is_admin: boolean
           is_anonymous: boolean | null
+          is_host: boolean
           name: string
           participant_id: number
         }
@@ -681,8 +681,8 @@ export type Database = {
           conversation_id: number
           created_at?: string | null
           id?: number
-          is_admin?: boolean
           is_anonymous?: boolean | null
+          is_host?: boolean
           name: string
           participant_id: number
         }
@@ -691,8 +691,8 @@ export type Database = {
           conversation_id?: number
           created_at?: string | null
           id?: number
-          is_admin?: boolean
           is_anonymous?: boolean | null
+          is_host?: boolean
           name?: string
           participant_id?: number
         }
@@ -936,12 +936,16 @@ export type Database = {
         Args: { conv_id: number }
         Returns: undefined
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       is_participant_or_owner: {
         Args: { conversation_id: number }
+        Returns: boolean
+      }
+      is_session_host: {
+        Args: { conversation_id: number }
+        Returns: boolean
+      }
+      is_system_admin: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       validate_participant_capacity: {

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +16,8 @@ export const useWorkshopCreation = () => {
   const [agreed, setAgreed] = useState(false);
   const { toast } = useToast();
 
-  // Secure navigation for admin session page
-  const { navigateToAdminSession } = useNavigateToSession();
+  // Secure navigation for host session page
+  const { navigateToHostSession } = useNavigateToSession();
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -74,14 +75,14 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-        console.log("New conversation created with ID:", data.id, "redirecting admin with secure navigation");
+        console.log("New conversation created with ID:", data.id, "redirecting host with secure navigation");
 
-        // Use secure navigation for admin sessions instead of direct navigate
-        await navigateToAdminSession(data.id);
+        // Use secure navigation for host sessions instead of direct navigate
+        await navigateToHostSession(data.id);
 
         toast({
           title: "Session Created",
-          description: "Your admin session has been created successfully.",
+          description: "Your host session has been created successfully.",
         });
       }
     } catch (error) {

@@ -16,10 +16,9 @@ export function useAdminSessionLoader() {
   const wasInitializedRef = useRef<boolean>(false);
   const adminViewMountedRef = useRef<boolean>(false);
   
-  // Always store admin status in session storage
+  // Set admin view as mounted to prevent unmounting
   useEffect(() => {
-    sessionStorage.setItem('isAdminSession', 'true');
-    console.log("Admin session loader enforcing admin status");
+    console.log("Admin session loader - admin view mounted");
     
     // Set admin view as mounted to prevent unmounting
     adminViewMountedRef.current = true;

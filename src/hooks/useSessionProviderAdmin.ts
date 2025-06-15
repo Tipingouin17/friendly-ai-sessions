@@ -10,13 +10,10 @@ export function useSessionProviderAdmin({ forceAdmin = false }: UseSessionProvid
   const location = useLocation();
   const isOnAdminPath = location.pathname.includes('/admin');
   
-  useEffect(() => {
-    if (forceAdmin || isOnAdminPath) {
-      sessionStorage.setItem('isAdminSession', 'true');
-    }
-  }, [forceAdmin, isOnAdminPath]);
-
+  // Remove automatic session storage manipulation
+  // Admin status should be determined server-side only
+  
   return {
-    isAdmin: forceAdmin || isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true'
+    isAdmin: forceAdmin || isOnAdminPath
   };
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
+import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
 export function useSessionInterface(conversationId: number | null) {
   const [sessionLink, setSessionLink] = useState('');
@@ -10,7 +11,7 @@ export function useSessionInterface(conversationId: number | null) {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const { toast } = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
+  const { navigateToAdminSession } = useSecureNavigation();
   const isMobile = window.innerWidth < 768;
   
   // Generate session link when conversationId changes
@@ -120,30 +121,9 @@ export function useSessionInterface(conversationId: number | null) {
         setShowQrCodeView(false);
         setIsSessionStarted(true);
         
-        // Always force admin state when redirecting
-        const adminState = { 
-          isAdmin: true,
-          showMessaging: true,
-          conversationId: conversationId
-        };
-        
-        // Mark as admin in sessionStorage to persist across page reloads
-        sessionStorage.setItem('isAdminSession', 'true');
-        
-        // Check if we're already on the admin path
-        if (location.pathname.includes('/admin')) {
-          // If already on admin path, just update state
-          navigate(`/session/admin?id=${conversationId}`, { 
-            state: adminState,
-            replace: true
-          });
-        } else {
-          // Redirect to admin page for session creators
-          navigate(`/session/admin?id=${conversationId}`, { 
-            state: adminState,
-            replace: true
-          });
-        }
+        // Use secure navigation for admin redirect
+        console.log("Using secure navigation to redirect to admin session");
+        await navigateToAdminSession(conversationId);
       }
     } catch (err) {
       console.error("Exception updating session_started:", err);

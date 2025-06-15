@@ -29,14 +29,7 @@ export const useAdminSessionInitialization = ({
     console.log("Location or conversation ID changed in SessionAdmin");
     setHasInitializedProvider(false);
     setIsLoading(true);
-    sessionStorage.setItem('isAdminSession', 'true');
   }, [location.search, location.pathname, setHasInitializedProvider, setIsLoading]);
-
-  // Set admin status in session storage immediately
-  useEffect(() => {
-    sessionStorage.setItem('isAdminSession', 'true');
-    console.log("Admin session confirmed on mount");
-  }, []);
 
   // Log status on mount
   useEffect(() => {
@@ -51,8 +44,6 @@ export const useAdminSessionInitialization = ({
         path: window.location.pathname,
         participantsCount: participants?.length || 0
       });
-
-      sessionStorage.setItem('isAdminSession', 'true');
 
       toast({
         title: "Admin Session Interface",

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -196,6 +196,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Session QR Code</DialogTitle>
+              <DialogDescription>
+                Scan this QR code with your device to join the session instantly.
+              </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col items-center space-y-4">
               <div className="bg-white p-6 rounded-lg border-2 border-gray-200">

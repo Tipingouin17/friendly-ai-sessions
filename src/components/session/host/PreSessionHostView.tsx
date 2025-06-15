@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,13 +32,24 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     conversationData: conversationData?.id
   });
 
-  console.log("🔍 PreSessionHostView - participantCount value:", participantCount);
-  console.log("🔍 PreSessionHostView - typeof participantCount:", typeof participantCount);
-  console.log("🔍 PreSessionHostView - participantCount === 0:", participantCount === 0);
+  // Stabilize participant count to prevent rapid state changes
+  const stableParticipantCount = useMemo(() => {
+    const count = Number(participantCount) || 0;
+    console.log("🔥 PreSessionHostView - Stabilized participant count:", {
+      original: participantCount,
+      stabilized: count,
+      type: typeof participantCount
+    });
+    return count;
+  }, [participantCount]);
 
-  const sessionLink = conversationId ? `${window.location.origin}/join-session?id=${conversationId}` : '';
+  // Memoize session link to prevent unnecessary recalculations
+  const sessionLink = useMemo(() => {
+    return conversationId ? `${window.location.origin}/join-session?id=${conversationId}` : '';
+  }, [conversationId]);
 
-  const handleCopyLink = async () => {
+  // Stable copy handler
+  const handleCopyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(sessionLink);
       setCopied(true);
@@ -54,20 +66,39 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
         variant: "destructive"
       });
     }
-  };
+  }, [sessionLink, toast]);
 
-  const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator';
-  const sessionTitle = conversationData?.sessions?.title || 'Untitled Session';
-  const objective = conversationData?.sessions?.objective || 'No objective specified';
+  // Stable session start handler with logging
+  const handleSessionStart = useCallback(() => {
+    console.log("🔥 PreSessionHostView - Session start requested", {
+      participantCount: stableParticipantCount,
+      conversationId
+    });
+    onSessionStarted();
+  }, [onSessionStarted, stableParticipantCount, conversationId]);
+
+  // Memoize facilitator and session data
+  const sessionInfo = useMemo(() => ({
+    facilitatorTitle: conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator',
+    sessionTitle: conversationData?.sessions?.title || 'Untitled Session',
+    objective: conversationData?.sessions?.objective || 'No objective specified'
+  }), [conversationData]);
+
+  // Memoize participant progress calculation
+  const participantProgress = useMemo(() => {
+    const maxParticipants = conversationData?.participants || 10;
+    const progressPercentage = Math.min(100, stableParticipantCount / maxParticipants * 100);
+    
+    return {
+      current: stableParticipantCount,
+      max: maxParticipants,
+      percentage: progressPercentage
+    };
+  }, [stableParticipantCount, conversationData?.participants]);
 
   return (
     <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-4 md:mb-6">
-          
-        </div>
-
         {/* Ready to Begin Section */}
         <Card className="bg-white shadow-lg mb-4 md:mb-6">
           <CardContent className="p-4 md:p-6">
@@ -76,14 +107,18 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
                   Once participants have joined, click "Start Session" to begin the facilitated discussion.
-                  {participantCount === 0 && " You need at least one participant to start."}
+                  {stableParticipantCount === 0 && " You need at least one participant to start."}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Debug: Button will be {participantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {participantCount})
+                  Debug: Button will be {stableParticipantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {stableParticipantCount})
                 </p>
               </div>
-              <div className="flex-shrink-0 w-full lg:w-auto">
-                <StartSessionButton onStartSession={onSessionStarted} participantCount={participantCount} isSessionStarted={false} />
+              <div className="flex-shrink-0 w-full lg:w-auto" style={{ pointerEvents: 'auto' }}>
+                <StartSessionButton 
+                  onStartSession={handleSessionStart} 
+                  participantCount={stableParticipantCount} 
+                  isSessionStarted={false} 
+                />
               </div>
             </div>
           </CardContent>
@@ -132,17 +167,18 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   <div>
                     <h4 className="font-medium text-blue-900 text-sm md:text-base">Participants Waiting</h4>
                     <p className="text-xs md:text-sm text-blue-700">
-                      {participantCount} of {conversationData?.participants || 10} joined
+                      {participantProgress.current} of {participantProgress.max} joined
                     </p>
                   </div>
                   <Badge variant="secondary" className="text-sm md:text-lg px-2 md:px-3 py-1">
-                    {participantCount}
+                    {participantProgress.current}
                   </Badge>
                 </div>
                 <div className="w-full bg-blue-200 rounded-full h-2 mt-2 md:mt-3">
-                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{
-                    width: `${Math.min(100, participantCount / (conversationData?.participants || 10) * 100)}%`
-                  }} />
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${participantProgress.percentage}%` }}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -160,7 +196,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               {/* Session Title and Duration */}
               <div>
                 <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-900">{sessionTitle}</h3>
+                  <h3 className="text-lg md:text-xl font-semibold text-gray-900">{sessionInfo.sessionTitle}</h3>
                   <div className="flex items-center gap-1 text-gray-600 flex-shrink-0">
                     <Clock className="h-4 w-4" />
                     <span className="text-sm font-medium">~30-60 min</span>
@@ -175,7 +211,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs md:text-sm text-gray-600">Facilitated by</p>
-                  <p className="font-medium text-gray-900 text-sm md:text-base truncate">{facilitatorTitle}</p>
+                  <p className="font-medium text-gray-900 text-sm md:text-base truncate">{sessionInfo.facilitatorTitle}</p>
                 </div>
               </div>
 
@@ -183,7 +219,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div>
                 <label className="text-xs md:text-sm font-medium text-gray-700">Session Objective</label>
                 <p className="text-gray-900 mt-1 p-2 md:p-3 bg-gray-50 rounded-lg text-xs md:text-sm leading-relaxed">
-                  {objective}
+                  {sessionInfo.objective}
                 </p>
               </div>
             </CardContent>

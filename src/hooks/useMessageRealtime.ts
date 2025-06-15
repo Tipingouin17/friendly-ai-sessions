@@ -20,6 +20,7 @@ export const useMessageRealtime = ({
   const channelRef = useRef<any>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
+  const processedMessageIds = useRef(new Set<string>());
 
   const setupRealtimeSubscription = () => {
     if (!currentConversationId) return;
@@ -42,13 +43,20 @@ export const useMessageRealtime = ({
         debugLog('all', 'New message received via realtime:', payload);
         
         if (payload.new) {
-          // Trigger callback for new message
+          // Check if we've already processed this message to prevent duplicates
+          const messageId = payload.new.id;
+          if (processedMessageIds.current.has(messageId)) {
+            debugLog('all', `Message ${messageId} already processed, skipping`);
+            return;
+          }
+          
+          processedMessageIds.current.add(messageId);
+          
+          // Trigger callback for new message to refresh the full message list
+          // This ensures we get properly formatted messages with all necessary data
           if (onNewMessage) {
             onNewMessage();
           }
-          
-          // Note: We don't add the message directly here because it needs formatting
-          // The callback should trigger a fetchMessages() call instead
         }
       })
       .on('postgres_changes', {
@@ -68,6 +76,8 @@ export const useMessageRealtime = ({
         
         if (status === 'SUBSCRIBED') {
           reconnectAttempts.current = 0;
+          // Clear processed messages set when we successfully reconnect
+          processedMessageIds.current.clear();
         } else if (status === 'CHANNEL_ERROR' && reconnectAttempts.current < maxReconnectAttempts) {
           console.error('Realtime subscription error:', err);
           reconnectAttempts.current++;
@@ -91,6 +101,8 @@ export const useMessageRealtime = ({
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      // Clear processed messages when component unmounts
+      processedMessageIds.current.clear();
     };
   }, [currentConversationId, viewMode]);
 

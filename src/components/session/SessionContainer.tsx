@@ -125,7 +125,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
         participantCount={participantCount}
         onGenerateReport={onGenerateReport}
         isGeneratingReport={isGeneratingReport}
-        canGenerateReports={messages.length > 0}
+        canGenerateReports={isAdmin && messages.length > 0}
         messagesCount={messages.length}
         viewMode={viewMode}
       />

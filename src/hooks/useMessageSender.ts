@@ -93,6 +93,9 @@ export const useMessageSender = ({
     try {
       requestInProgressRef.current = true;
       
+      // Save current messages to prevent losing them
+      const currentMessages = [...sessionState.messages];
+      
       // Save user message
       const newMessage = await saveUserMessage({
         message: sessionState.inputMessage,
@@ -111,8 +114,27 @@ export const useMessageSender = ({
         isAnonymous ? 'anonymous' : 'named'
       );
 
-      // Update UI
-      sessionState.setMessages(prev => [...prev, newMessage]);
+      // Update UI with proper message deduplication
+      sessionState.setMessages(prev => {
+        // Check if this message already exists to prevent duplicates
+        const messageExists = prev.some(msg => 
+          msg.id === newMessage.id || 
+          (msg.content === newMessage.content && 
+           msg.sender === newMessage.sender && 
+           Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000)
+        );
+        
+        if (messageExists) {
+          console.log("Message already exists, not adding duplicate");
+          return prev;
+        }
+        
+        // Add new message while preserving all existing messages
+        const updatedMessages = [...prev, newMessage];
+        console.log("Updated messages count:", updatedMessages.length, "Previous count:", prev.length);
+        return updatedMessages;
+      });
+      
       const sentMessage = sessionState.inputMessage;
       sessionState.setInputMessage("");
       
@@ -164,13 +186,29 @@ export const useMessageSender = ({
             undefined
           );
           
-          // Add AI response to UI and start new response collection
+          // Add AI response to UI with proper deduplication
           sessionState.setMessages(prev => {
+            // Check if this AI response already exists
+            const aiResponseExists = prev.some(msg => 
+              msg.id === aiResponse.id ||
+              (msg.content === aiResponse.content && 
+               msg.sender === aiResponse.sender && 
+               Math.abs(new Date(msg.timestamp).getTime() - new Date(aiResponse.timestamp).getTime()) < 1000)
+            );
+            
+            if (aiResponseExists) {
+              console.log("AI response already exists, not adding duplicate");
+              return prev;
+            }
+            
             const newMessages = [...prev, aiResponse];
+            console.log("Added AI response, total messages:", newMessages.length);
+            
             // Start collecting responses for the new question
             if (totalParticipants > 1 && !aiResponse.isReport) {
               setTimeout(() => startResponseCollection(aiResponse.id), 100);
             }
+            
             return newMessages;
           });
         } finally {

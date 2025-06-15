@@ -8,7 +8,7 @@ interface AdminControlsProps {
   isGeneratingReport: boolean;
   onViewModeToggle: () => void;
   viewMode: "participant" | "admin";
-  onSendAdminMessage: () => void;
+  onSendAdminMessage: (message: string) => void;
   responseCount: number;
   totalParticipants: number;
   isWaitingForResponses: boolean;
@@ -26,6 +26,12 @@ const AdminControls: React.FC<AdminControlsProps> = ({
   isWaitingForResponses,
   isMobile
 }) => {
+  const handleSendMessage = () => {
+    // For now, we'll send an empty message or could open a dialog
+    // This maintains the existing behavior while fixing the type error
+    onSendAdminMessage("");
+  };
+
   return (
     <div className="border-b bg-white px-3 py-2 sm:px-4">
       <div className="flex items-center justify-between max-w-4xl mx-auto">
@@ -43,7 +49,7 @@ const AdminControls: React.FC<AdminControlsProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={onSendAdminMessage}
+            onClick={handleSendMessage}
             className={isMobile ? 'px-2' : 'px-3'}
           >
             <MessageSquare className="w-4 h-4" />

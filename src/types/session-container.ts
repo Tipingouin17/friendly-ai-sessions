@@ -27,7 +27,7 @@ export interface SessionContainerProps {
   viewMode: "participant" | "admin";
   setViewMode: (mode: "participant" | "admin") => void;
   isAdmin: boolean;
-  onSendAdminMessage: () => void;
+  onSendAdminMessage: (message: string) => void;
   isAnonymous: boolean;
   toggleAnonymous: () => void;
 }

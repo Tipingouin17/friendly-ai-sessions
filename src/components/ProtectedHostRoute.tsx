@@ -11,7 +11,7 @@ interface ProtectedHostRouteProps {
 }
 
 export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const location = useLocation();
   const { logSecurityViolation, logSensitiveAction } = useSecurityAudit();
   const [isHost, setIsHost] = useState<boolean | null>(null);
@@ -19,6 +19,12 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
 
   useEffect(() => {
     const checkHostStatus = async () => {
+      // Wait for auth to finish loading first
+      if (authLoading) {
+        return;
+      }
+
+      // If not authenticated after auth loading is complete, set loading to false
       if (!user || !isAuthenticated) {
         setIsHost(false);
         setIsLoading(false);
@@ -71,22 +77,25 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
     };
 
     checkHostStatus();
-  }, [user, isAuthenticated, location.pathname, location.search, logSecurityViolation, logSensitiveAction]);
+  }, [user, isAuthenticated, authLoading, location.pathname, location.search, logSecurityViolation, logSensitiveAction]);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  }
-
-  if (isLoading) {
+  // Show loading while auth is loading or while we're checking host status
+  if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="w-8 h-8 animate-spin" />
-        <span className="ml-2">Verifying host permissions...</span>
+        <span className="ml-2">Verifying access...</span>
       </div>
     );
   }
 
-  if (!isHost) {
+  // Only redirect to login if auth has finished loading and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  // Only redirect away from host routes if we've confirmed user is not a host
+  if (!isLoading && !isHost) {
     // Redirect unauthorized users away from host routes
     return <Navigate to="/session" replace />;
   }

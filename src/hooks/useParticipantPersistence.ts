@@ -62,6 +62,27 @@ export function useParticipantPersistence() {
     }
   };
 
+  const getSessionByConversationId = (conversationId: number): ParticipantSessionData | null => {
+    return loadParticipantData(conversationId);
+  };
+
+  const updateSessionAccessTime = (conversationId: number) => {
+    const sessionData = getSessionByConversationId(conversationId);
+    if (sessionData) {
+      const updatedData = {
+        ...sessionData,
+        lastAccessedAt: new Date().toISOString()
+      };
+      
+      try {
+        localStorage.setItem(PARTICIPANT_STORAGE_KEY, JSON.stringify(updatedData));
+        setParticipantData(updatedData);
+      } catch (error) {
+        console.error('Failed to update session access time:', error);
+      }
+    }
+  };
+
   const clearParticipantData = () => {
     try {
       localStorage.removeItem(PARTICIPANT_STORAGE_KEY);
@@ -95,8 +116,11 @@ export function useParticipantPersistence() {
 
   return {
     participantData,
+    persistedParticipantData: participantData, // Alias for compatibility
     persistParticipantData,
     loadParticipantData,
+    getSessionByConversationId,
+    updateSessionAccessTime,
     clearParticipantData,
     updateLastAccessed
   };

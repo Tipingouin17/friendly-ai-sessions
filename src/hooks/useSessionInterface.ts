@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ export function useSessionInterface(conversationId: number | null) {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const { toast } = useToast();
   const location = useLocation();
-  const { navigateToAdminSession } = useSecureNavigation();
+  const { navigateToHostSession } = useSecureNavigation();
   const isMobile = window.innerWidth < 768;
   
   // Generate session link when conversationId changes
@@ -78,8 +79,8 @@ export function useSessionInterface(conversationId: number | null) {
       return;
     }
     
-    // Always ensure admin status is preserved
-    sessionStorage.setItem('isAdminSession', 'true');
+    // Always ensure host status is preserved
+    sessionStorage.setItem('isHostSession', 'true');
     
     try {
       // Update the session_started flag in the database
@@ -121,9 +122,9 @@ export function useSessionInterface(conversationId: number | null) {
         setShowQrCodeView(false);
         setIsSessionStarted(true);
         
-        // Use secure navigation for admin redirect
-        console.log("Using secure navigation to redirect to admin session");
-        await navigateToAdminSession(conversationId);
+        // Use secure navigation for host redirect
+        console.log("Using secure navigation to redirect to host session");
+        await navigateToHostSession(conversationId);
       }
     } catch (err) {
       console.error("Exception updating session_started:", err);

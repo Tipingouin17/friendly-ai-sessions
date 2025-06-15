@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { QrCode, Copy, Check } from "lucide-react";
-import QRCode from "qrcode.react";
+import { QRCode } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface HostQrDialogProps {

@@ -9,6 +9,7 @@ import { useSessionStateTransition } from "@/hooks/useSessionStateTransition";
 import SessionViewSelector from "./SessionViewSelector";
 import SessionStateDebugger from "./SessionStateDebugger";
 import { useSessionInitialization } from "@/hooks/useSessionInitialization";
+import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
 
 interface SessionStateHandlerProps {
   props: SessionContextProps;
@@ -57,9 +58,9 @@ const SessionContent: React.FC<{
   
   // When admin loads the page, check if they need to be notified of anything
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && props.conversation) {
       // Check if session is ready to start
-      if (transitionState.currentParticipants > 0 && !sessionStarted) {
+      if (transitionState.currentParticipants > 0 && !sessionStarted && !props.isSessionStartedInDB) {
         toast({
           title: "Participants waiting",
           description: `You have ${transitionState.currentParticipants} participant(s) waiting to start.`,
@@ -67,12 +68,14 @@ const SessionContent: React.FC<{
       }
       
       // Show admin controls hint
-      toast({
-        title: "Admin Controls Available",
-        description: "You're viewing the session as an admin. You can start the session and invite participants.",
-      });
+      if (!sessionStarted && !props.isSessionStartedInDB) {
+        toast({
+          title: "Admin Controls Available",
+          description: "You're viewing the session as an admin. You can start the session and invite participants.",
+        });
+      }
     }
-  }, [isAdmin, sessionStarted, transitionState.currentParticipants, toast]);
+  }, [isAdmin, sessionStarted, transitionState.currentParticipants, toast, props.conversation, props.isSessionStartedInDB]);
 
   // Error and loading states are handled first with early returns
   if (props.isLoading || initializing) {
@@ -93,6 +96,35 @@ const SessionContent: React.FC<{
   if (!props.currentConversationId) {
     console.log("No conversation ID, showing empty state");
     return <EmptyState />;
+  }
+
+  // Check if this is a participant (not admin) and session hasn't started
+  const isParticipant = !isAdmin && !isOnAdminPath;
+  const sessionHasStarted = props.isSessionStartedInDB || sessionStarted;
+  
+  console.log("Session state check:", {
+    isParticipant,
+    sessionHasStarted,
+    isSessionStartedInDB: props.isSessionStartedInDB,
+    sessionStarted,
+    currentParticipants: transitionState.currentParticipants
+  });
+
+  // If participant and session hasn't started, show waiting screen
+  if (isParticipant && !sessionHasStarted) {
+    console.log("Showing participant waiting screen");
+    return (
+      <ParticipantWaitingScreen
+        conversationId={props.currentConversationId}
+        currentParticipantCount={transitionState.currentParticipants}
+        maxParticipants={transitionState.maxParticipants}
+        facilitatorTitle={props.conversation?.sessions?.facilitator_details?.title}
+        onSessionStarted={() => {
+          console.log("Session started callback triggered");
+          setSessionStarted(true);
+        }}
+      />
+    );
   }
 
   // Always show session for admin route

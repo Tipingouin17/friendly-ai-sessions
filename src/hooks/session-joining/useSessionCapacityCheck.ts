@@ -56,21 +56,37 @@ export async function checkSessionCapacity(
     throw new Error("Could not fetch the latest session data");
   }
   
+  // Get actual participant count from session_participants table
+  const { data: actualParticipants, error: participantsError } = await supabase
+    .from('session_participants')
+    .select('participant_id')
+    .eq('conversation_id', conversationId);
+    
+  if (participantsError) {
+    console.error("Error fetching actual participants:", participantsError);
+  }
+  
+  const actualCount = actualParticipants?.length || 0;
+  console.log("Actual participant count from database:", actualCount);
+  console.log("Stored current_participants count:", latestConversation.current_participants);
+  
+  // Calculate the next participant ID
+  const nextParticipantId = actualCount + 1;
+  
   if (effectiveIsAdmin) {
     console.log("🔑 Admin user detected - bypassing ALL session full checks");
     return {
       canJoin: true,
       latestConversation,
-      newParticipantId: (latestConversation.current_participants || 0) + 1
+      newParticipantId: nextParticipantId
     };
   }
   
-  const currentCount = latestConversation.current_participants || 0;
   const maxAllowed = latestConversation.participants || 0;
   
-  if (maxAllowed > 0 && currentCount >= maxAllowed) {
-    console.log("Session is full, starting automatically:", {
-      currentCount,
+  if (maxAllowed > 0 && actualCount >= maxAllowed) {
+    console.log("Session is full based on actual count, starting automatically:", {
+      actualCount,
       maxAllowed
     });
     
@@ -95,13 +111,12 @@ export async function checkSessionCapacity(
     }
   }
   
-  const newCount = currentCount + 1;
-  console.log("Latest count from database:", currentCount, "New count will be:", newCount);
+  console.log("Session has space, new participant ID will be:", nextParticipantId);
   
   return {
     canJoin: true,
     latestConversation,
-    newParticipantId: newCount
+    newParticipantId: nextParticipantId
   };
 }
 
@@ -126,6 +141,7 @@ export function useSessionCapacityCheck() {
       const finalCanJoin = isOnAdminPath ? true : (effectiveIsAdmin ? true : capacityResult.canJoin);
       
       if (finalCanJoin) {
+        // Update the conversation with the corrected participant count
         const { data: updateData, error: updateError } = await supabase
           .from('conversations')
           .update({ current_participants: capacityResult.newParticipantId })
@@ -154,7 +170,7 @@ export function useSessionCapacityCheck() {
           throw new Error("Failed to update participant count");
         }
 
-        console.log("Update response:", updateData);
+        console.log("Updated participant count to:", capacityResult.newParticipantId);
         
         try {
           const { error: broadcastError } = await supabase

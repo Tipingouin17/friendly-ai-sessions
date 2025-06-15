@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,6 +23,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   onSessionStarted
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   const { toast } = useToast();
   
   console.log("🔍 PreSessionHostView - Received props:", {
@@ -102,9 +104,14 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6">
                 {/* QR Code */}
                 <div className="flex flex-col items-center flex-shrink-0">
-                  <div className="bg-white p-2 md:p-3 rounded-lg border-2 border-gray-200 shadow-sm">
+                  <div 
+                    className="bg-white p-2 md:p-3 rounded-lg border-2 border-gray-200 shadow-sm cursor-pointer hover:border-blue-300 transition-colors"
+                    onClick={() => setIsQrDialogOpen(true)}
+                    title="Click to view larger QR code"
+                  >
                     <QRCodeSVG value={sessionLink} size={window.innerWidth < 640 ? 120 : 140} />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Click to enlarge</p>
                 </div>
 
                 {/* Session Link */}
@@ -183,6 +190,37 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
             </CardContent>
           </Card>
         </div>
+
+        {/* QR Code Dialog */}
+        <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Session QR Code</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
+                <QRCodeSVG value={sessionLink} size={280} />
+              </div>
+              <div className="flex items-center space-x-2 w-full">
+                <div className="flex-1 p-2 bg-gray-50 rounded border text-sm font-mono truncate">
+                  {sessionLink}
+                </div>
+                <Button 
+                  onClick={handleCopyLink}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-1"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600 text-center">
+                Participants can scan this QR code or use the link to join your session.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

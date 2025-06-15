@@ -18,10 +18,11 @@ const Session = () => {
     retryConnection,
     handleProviderInitialized,
     stateRef,
-    isOnAdminPath
+    isOnAdminPath,
+    isClient
   } = useSessionPageState();
   
-  // Check if we're on mobile
+  // Check if we're on mobile (will be undefined during hydration)
   const isMobile = useIsMobile();
   
   // Set up session page effects
@@ -34,12 +35,17 @@ const Session = () => {
     isOnAdminPath
   });
 
+  // Show mobile nav only when we know we're on mobile and not admin
+  const showMobileNav = isClient && isMobile && !isOnAdminPath;
+
   return (
     <div className="flex flex-col h-screen">
-      {/* Only show our custom navigation on mobile for participant view */}
-      {isMobile && !isOnAdminPath && <SessionMobileNav />}
+      {/* Mobile navigation container - always present for consistent DOM structure */}
+      <div className={`${showMobileNav ? 'block' : 'hidden'}`}>
+        <SessionMobileNav />
+      </div>
       
-      <div className={`flex-1 overflow-hidden ${isMobile && !isOnAdminPath ? 'pt-16' : ''}`}>
+      <div className={`flex-1 overflow-hidden ${showMobileNav ? 'pt-16' : ''}`}>
         <SessionContent
           isLoading={isLoading}
           hasInitializedProvider={hasInitializedProvider}

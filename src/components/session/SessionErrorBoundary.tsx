@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -32,9 +32,38 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [isClient, setIsClient] = useState(false);
+  const [pathInfo, setPathInfo] = useState({
+    isOnAdminPath: false,
+    isParticipantPath: false,
+    hasSessionId: false,
+    hasAdminQueryParam: false
+  });
   
-  // Debug logging
+  // Initialize client-only state after hydration
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    setIsClient(true);
+    
+    const isOnAdminPath = window.location.pathname.includes('/admin');
+    const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSessionId = urlParams.has('id') && urlParams.get('id');
+    const hasAdminQueryParam = window.location.search.includes('admin=true');
+    
+    setPathInfo({
+      isOnAdminPath,
+      isParticipantPath,
+      hasSessionId: !!hasSessionId,
+      hasAdminQueryParam
+    });
+  }, []);
+  
+  // Debug logging - only on client
+  useEffect(() => {
+    if (!isClient) return;
+    
     console.log("SessionErrorBoundary state:", {
       error,
       noSessionFound,
@@ -44,37 +73,29 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
       hasInitializedProvider,
       propIsAdmin,
       storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
-      isOnAdminPath: window.location.pathname.includes('/admin'),
-      hasAdminQueryParam: window.location.search.includes('admin=true'),
+      pathInfo,
       currentPath: window.location.pathname
     });
   }, [error, noSessionFound, connectionAttempts, lastAttemptTime, isLoading, 
-      hasInitializedProvider, propIsAdmin]);
-  
-  // Check if we're on the dedicated admin route
-  const isOnAdminPath = window.location.pathname.includes('/admin');
-  const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminPath;
-  
-  // Enhanced admin detection - check all possible sources
-  const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
-  const hasAdminQueryParam = window.location.search.includes('admin=true');
-  
-  // Combined admin detection from all possible sources
-  const effectiveIsAdmin = propIsAdmin || 
-                         storedIsAdmin || 
-                         isOnAdminPath || 
-                         hasAdminQueryParam;
+      hasInitializedProvider, propIsAdmin, pathInfo, isClient]);
   
   // If on dedicated admin route, always bypass errors
-  if (isOnAdminPath) {
+  if (pathInfo.isOnAdminPath) {
     console.log("🔑 On dedicated admin route - always bypassing error boundary");
     return <>{children}</>;
   }
   
+  // Enhanced admin detection - check all possible sources (only on client)
+  const storedIsAdmin = isClient ? sessionStorage.getItem('isAdminSession') === 'true' : false;
+  
+  // Combined admin detection from all possible sources
+  const effectiveIsAdmin = propIsAdmin || 
+                         storedIsAdmin || 
+                         pathInfo.isOnAdminPath || 
+                         pathInfo.hasAdminQueryParam;
+  
   // CRITICAL FIX: Make participant route see the session even when there are initial connection issues
-  // Previously, isParticipantPath was restricting bypass access to just admins - but participants should see the session too
   if (effectiveIsAdmin || connectionAttempts < 2) {
-    // Allow bypassing errors for admins and also for initial participant connection attempts
     console.log(`${effectiveIsAdmin ? "Admin user" : "Participant"} session - bypassing initial error boundary`);
     return <>{children}</>;
   }
@@ -85,10 +106,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   
   if (hasError || waitedTooLong) {
     // If there's an active session (based on URL parameter), bypass this error for participants too
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasSessionId = urlParams.has('id') && urlParams.get('id');
-    
-    if (hasSessionId && connectionAttempts < 3) {
+    if (pathInfo.hasSessionId && connectionAttempts < 3) {
       console.log("Session ID found in URL, bypassing error for participant");
       return <>{children}</>;
     }

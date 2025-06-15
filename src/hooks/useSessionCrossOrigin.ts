@@ -8,9 +8,14 @@ export function useSessionCrossOrigin() {
   const location = useLocation();
   const { toast } = useToast();
   const [isCrossOrigin, setIsCrossOrigin] = useState<boolean>(false);
+  const [isClient, setIsClient] = useState(false);
   
-  // Check for cross-origin context
+  // Check for cross-origin context only on client
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    setIsClient(true);
+    
     const crossOriginContext = isInCrossOriginContext();
     const inIframe = isInIframe();
     setIsCrossOrigin(crossOriginContext);
@@ -29,5 +34,5 @@ export function useSessionCrossOrigin() {
     }
   }, [location.search, toast]);
 
-  return { isCrossOrigin };
+  return { isCrossOrigin, isClient };
 }

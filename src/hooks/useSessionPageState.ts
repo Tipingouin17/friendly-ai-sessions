@@ -1,33 +1,46 @@
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 
 export function useSessionPageState() {
   const location = useLocation();
   const { toast } = useToast();
-  const isOnAdminPath = location.pathname.includes('/admin');
   
-  // Use refs for state that doesn't need to trigger re-renders
+  // Use refs for state that doesn't need to trigger re-renders and browser-only detection
   const stateRef = useRef({
-    isOnAdminPath,
-    isAdmin: isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true',
+    isOnAdminPath: false,
+    isAdmin: false,
     connectionAttempts: 0,
     error: null as string | null,
     noSessionFound: false,
     hasShownToast: false,
-    pageLoadTime: Date.now()
+    pageLoadTime: 0 // Will be set in useEffect
   });
   
   // Mutable state that requires re-renders
   const [isLoading, setIsLoading] = useState(true);
   const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  
+  // Initialize client-only state after hydration
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    setIsClient(true);
+    stateRef.current.pageLoadTime = Date.now();
+    
+    const isOnAdminPath = location.pathname.includes('/admin');
+    const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
+    
+    stateRef.current.isOnAdminPath = isOnAdminPath;
+    stateRef.current.isAdmin = isOnAdminPath || storedIsAdmin;
+  }, [location.pathname]);
   
   // Handle error function that doesn't cause re-renders
   const handleError = useCallback((errorMessage: string) => {
     stateRef.current.error = errorMessage;
-    //console.error("Session error:", errorMessage);
     
     if (!stateRef.current.hasShownToast) {
       stateRef.current.hasShownToast = true;
@@ -63,8 +76,6 @@ export function useSessionPageState() {
 
   // Handler for provider initialization
   const handleProviderInitialized = useCallback(() => {
-    //console.log(`Provider initialized after ${Date.now() - stateRef.current.pageLoadTime}ms`);
-    
     // Update provider initialization state
     setHasInitializedProvider(true);
     
@@ -87,6 +98,7 @@ export function useSessionPageState() {
     retryConnection,
     handleProviderInitialized,
     stateRef,
-    isOnAdminPath
+    isOnAdminPath: stateRef.current.isOnAdminPath,
+    isClient
   };
 }

@@ -36,17 +36,17 @@ export const useMessageFetching = ({
   const { formatDatabaseMessages } = useMessageFormatting({ conversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
-  // Main fetch function - FIXED to not show welcome message until session starts
-  const fetchMessages = useCallback(async () => {
+  // Enhanced fetch function with forced refresh capability
+  const fetchMessages = useCallback(async (forceRefresh = false) => {
     if (!conversationId) {
       debugLog('all', 'No conversation ID provided, skipping message fetch');
       return;
     }
     
     try {
-      debugLog('all', `Fetching messages for conversation: ${conversationId}`);
+      debugLog('all', `Fetching messages for conversation: ${conversationId} (force: ${forceRefresh})`);
       
-      // Check if session has started
+      // Always check current session status
       const { data: conversationData, error: convError } = await supabase
         .from('conversations')
         .select('session_started')
@@ -58,6 +58,7 @@ export const useMessageFetching = ({
       }
       
       const sessionStarted = conversationData?.session_started || false;
+      debugLog('all', `Session started status: ${sessionStarted}`);
       
       const { data, error } = await supabase
         .from('messages')
@@ -71,13 +72,11 @@ export const useMessageFetching = ({
         return;
       }
       
-      // FIXED: Only show messages if session has started or if there are actual database messages
-      if (!data || data.length === 0) {
-        if (!sessionStarted) {
-          debugLog('all', 'Session not started yet - showing no messages');
-          setMessages([]);
-          return;
-        }
+      debugLog('all', `Fetched ${data?.length || 0} messages from database`);
+      
+      // If session started but no messages, try to get/create welcome message
+      if (sessionStarted && (!data || data.length === 0) && welcomeMessage) {
+        debugLog('all', 'Session started with no messages - checking for welcome message');
         
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         if (cachedWelcomeMsg) {
@@ -86,35 +85,30 @@ export const useMessageFetching = ({
           return;
         }
         
-        if (welcomeMessage) {
-          debugLog('all', 'Session started - adding welcome message to messages list');
-          
-          const welcomeMsg = await createWelcomeMessage();
-          if (welcomeMsg) {
-            setMessages([welcomeMsg]);
-            saveWelcomeMessageToDb(welcomeMsg);
-          }
+        // Create and save welcome message
+        const welcomeMsg = await createWelcomeMessage();
+        if (welcomeMsg) {
+          debugLog('all', 'Created new welcome message');
+          setMessages([welcomeMsg]);
+          saveWelcomeMessageToDb(welcomeMsg);
         }
         return;
       }
       
-      // Format the database messages
-      const formattedMessages = await formatDatabaseMessages(data);
-      
-      debugLog('all', `Successfully fetched messages: ${formattedMessages.length}`);
-      
-      // Determine if we need to include the cached welcome message
-      const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
-      if (sessionStarted && !hasAssistantMessage && welcomeMessage) {
-        const cachedWelcomeMsg = getCachedWelcomeMessage();
-        if (cachedWelcomeMsg) {
-          setMessages([cachedWelcomeMsg, ...formattedMessages]);
-        } else {
-          setMessages(formattedMessages);
-        }
-      } else {
+      // If we have database messages, format and display them
+      if (data && data.length > 0) {
+        const formattedMessages = await formatDatabaseMessages(data);
+        debugLog('all', `Successfully formatted ${formattedMessages.length} messages`);
         setMessages(formattedMessages);
+        return;
       }
+      
+      // If session not started and no messages, show empty state
+      if (!sessionStarted) {
+        debugLog('all', 'Session not started - showing empty state');
+        setMessages([]);
+      }
+      
     } catch (err) {
       console.error('Exception fetching messages:', err);
       setError('Failed to load session messages');
@@ -129,10 +123,17 @@ export const useMessageFetching = ({
     saveWelcomeMessageToDb
   ]);
 
+  // Force refresh function for when session starts
+  const forceRefreshMessages = useCallback(() => {
+    debugLog('all', 'Force refreshing messages due to session start');
+    return fetchMessages(true);
+  }, [fetchMessages]);
+
   return {
     messages,
     setMessages,
     error,
-    fetchMessages
+    fetchMessages,
+    forceRefreshMessages
   };
 };

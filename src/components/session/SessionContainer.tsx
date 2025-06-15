@@ -1,44 +1,18 @@
 
-import React, { useEffect } from "react";
-import MessagingArea from "./MessagingArea";
+import React, { useEffect, useRef } from "react";
+import { Send, Mic, MicOff, FileText, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { Badge } from "@/components/ui/badge";
+import MessageList from "@/components/chat/MessageList";
 import { Message, ParticipantInfo } from "@/types/chat";
-import { getParticipantColor } from "@/utils/sessionHelpers";
-import InputFooter from "./InputFooter";
+import SessionHeader from "./SessionHeader";
+import AdminControls from "./AdminControls";
+import { SessionContainerProps } from "@/types/session-container";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-interface SessionContainerProps {
-  participantCount: number;
-  conversation: any | null;
-  messages: Message[];
-  inputMessage: string;
-  setInputMessage: (message: string) => void;
-  currentParticipant: number;
-  handleSendMessage: () => void; // renamed from onSendMessage for clarity
-  onGenerateReport: () => void;
-  isGeneratingReport: boolean;
-  isWaitingForResponse: boolean;
-  isWaitingForResponses?: boolean;
-  responseCount?: number;
-  totalParticipants?: number;
-  setIsRecording: (isRecording: boolean) => void;
-  isRecording: boolean;
-  participantColors: { [key: string]: string };
-  participantNames: { [key: number]: string };
-  participants: ParticipantInfo[];
-  conversationId: number | null;
-  facilitator: any;
-  objective: string;
-  currentParticipantCount: number;
-  currentUserParticipantId: number | null;
-  hasAnswered: boolean;
-  totalResponses: number;
-  viewMode: "participant" | "admin";
-  setViewMode: (mode: "participant" | "admin") => void;
-  isAdmin: boolean;
-  onSendAdminMessage?: (message: string) => void;
-  isAnonymous?: boolean;
-  toggleAnonymous?: () => void;
-}
+import { useSessionInteractions } from "@/hooks/useSessionInteractions";
+import { debugLog } from "@/utils/debugLogger";
 
 const SessionContainer: React.FC<SessionContainerProps> = ({
   participantCount,
@@ -47,13 +21,10 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   inputMessage,
   setInputMessage,
   currentParticipant,
-  handleSendMessage, // use handleSendMessage instead of onSendMessage
+  handleSendMessage,
+  isWaitingForResponse,
   onGenerateReport,
   isGeneratingReport,
-  isWaitingForResponse,
-  isWaitingForResponses = false,
-  responseCount = 0,
-  totalParticipants = 1,
   setIsRecording,
   isRecording,
   participantColors,
@@ -70,63 +41,189 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   setViewMode,
   isAdmin,
   onSendAdminMessage,
-  isAnonymous = false,
-  toggleAnonymous = () => {}
+  isAnonymous,
+  toggleAnonymous
 }) => {
-  const mobileState = useIsMobile();
-  const isMobile = mobileState === true;
-  
-  // Combined participant names from props
-  const allParticipantNames = { ...participantNames };
-  
-  // Calculate participant colors if needed
-  const enhancedParticipantColors = { ...participantColors };
-  participants.forEach(p => {
-    const key = `P${p.id}`;
-    if (!enhancedParticipantColors[key]) {
-      enhancedParticipantColors[key] = getParticipantColor(key);
-    }
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Set up session interactions with force refresh capability
+  const {
+    isWaitingForResponses,
+    responseCount,
+    totalParticipants,
+    reconnectRealtime
+  } = useSessionInteractions({
+    currentConversationId: conversationId,
+    sessionState: {
+      messages,
+      setMessages: () => {}, // Not used in this context
+      inputMessage,
+      setInputMessage,
+      currentParticipant,
+      recordResponse: () => {}, // Not used in this context
+      totalResponses,
+      hasAnswered,
+      viewMode
+    },
+    conversation,
+    participants,
+    isAnonymous,
+    forceRefreshMessages: undefined // Will be handled by parent component
   });
-  
-  // Debug logging for messages
+
+  // Debug logging for message updates
   useEffect(() => {
-    console.log(`SessionContainer - Rendering with ${messages.length} messages, participant: ${currentParticipant}, hasAnswered: ${hasAnswered}`);
-  }, [messages.length, currentParticipant, hasAnswered]);
+    debugLog('all', `SessionContainer - Messages updated: ${messages.length} messages`);
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      debugLog('all', `Last message: ${lastMessage.sender} - ${lastMessage.content?.substring(0, 50)}...`);
+    }
+  }, [messages]);
+
+  // Auto-focus input on desktop
+  useEffect(() => {
+    if (!isMobile && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isMobile]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleToggleRecording = () => {
+    setIsRecording(!isRecording);
+    toast({
+      title: isRecording ? "Recording stopped" : "Recording started",
+      description: isRecording ? 
+        "Voice recording has been stopped." : 
+        "Voice recording has been started.",
+    });
+  };
+
+  const handleViewModeToggle = () => {
+    const newMode = viewMode === "participant" ? "admin" : "participant";
+    setViewMode(newMode);
+    toast({
+      title: `Switched to ${newMode} view`,
+      description: newMode === "admin" ? 
+        "You can now see admin features and controls." : 
+        "You're now viewing as a participant.",
+    });
+  };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Main content area - admin header is now handled by AdminDashboard */}
-      <div className={`flex-1 overflow-hidden ${!isAdmin && 'pt-2'}`}>
-        <MessagingArea
+    <div className="flex flex-col h-screen bg-gray-50">
+      <SessionHeader
+        conversation={conversation}
+        facilitator={facilitator}
+        objective={objective}
+        currentParticipantCount={currentParticipantCount}
+        participantCount={participantCount}
+        isMobile={isMobile}
+        isAdmin={isAdmin}
+        viewMode={viewMode}
+      />
+
+      {/* Admin Controls */}
+      {isAdmin && (
+        <AdminControls
+          onGenerateReport={onGenerateReport}
+          isGeneratingReport={isGeneratingReport}
+          onViewModeToggle={handleViewModeToggle}
+          viewMode={viewMode}
+          onSendAdminMessage={onSendAdminMessage}
+          responseCount={responseCount}
+          totalParticipants={totalParticipants}
+          isWaitingForResponses={isWaitingForResponses}
+          isMobile={isMobile}
+        />
+      )}
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden">
+        <MessageList
           messages={messages}
-          participantColors={enhancedParticipantColors}
-          currentParticipant={currentParticipant}
+          participantColors={participantColors}
+          currentParticipant={`P${currentUserParticipantId}`}
           isWaitingForResponse={isWaitingForResponse}
           isWaitingForResponses={isWaitingForResponses}
           responseCount={responseCount}
           totalParticipants={totalParticipants}
           participants={participants}
-          conversationId={conversationId}
-          currentParticipantCount={currentParticipantCount}
-          maxParticipants={participantCount}
           isMobile={isMobile}
-          viewMode={viewMode}
-          isAdmin={isAdmin}
           conversationData={conversation}
-          
-          // Pass input functionality props
-          inputMessage={inputMessage}
-          setInputMessage={setInputMessage}
-          onSendMessage={handleSendMessage} // fixed: use correct handler
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
-          isAnonymous={isAnonymous}
-          toggleAnonymous={toggleAnonymous}
-          hasAnswered={hasAnswered}
-          totalResponses={totalResponses}
-          participantNames={allParticipantNames}
-          currentUserParticipantId={currentUserParticipantId}
         />
+      </div>
+
+      {/* Input Area */}
+      <div className="border-t bg-white p-3 sm:p-4">
+        <div className="flex items-center gap-2 max-w-4xl mx-auto">
+          {/* Anonymous toggle for participants */}
+          {!isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleAnonymous}
+              className={`${isMobile ? 'px-2' : 'px-3'} ${isAnonymous ? 'bg-gray-100' : ''}`}
+            >
+              {isAnonymous ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {!isMobile && (isAnonymous ? 'Anonymous' : 'Named')}
+            </Button>
+          )}
+          
+          <div className="flex-1 relative">
+            <Input
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={isAdmin ? "Send a message or question to participants..." : 
+                         isAnonymous ? "Send an anonymous message..." : "Type your message..."}
+              disabled={isWaitingForResponse}
+              className="pr-20"
+            />
+            
+            {/* Status badges */}
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+              {hasAnswered && !isAdmin && (
+                <Badge variant="secondary" className="text-xs">
+                  Responded
+                </Badge>
+              )}
+              {isWaitingForResponse && (
+                <Badge variant="outline" className="text-xs">
+                  AI thinking...
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim() || isWaitingForResponse}
+            size={isMobile ? "sm" : "default"}
+          >
+            <Send className="w-4 h-4" />
+            {!isMobile && "Send"}
+          </Button>
+
+          {/* Voice recording toggle */}
+          <Button
+            variant="outline"
+            onClick={handleToggleRecording}
+            size={isMobile ? "sm" : "default"}
+            className={isRecording ? "bg-red-50 border-red-200" : ""}
+          >
+            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {!isMobile && (isRecording ? "Stop" : "Record")}
+          </Button>
+        </div>
       </div>
     </div>
   );

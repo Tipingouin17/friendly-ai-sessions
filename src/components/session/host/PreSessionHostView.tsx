@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -193,19 +192,22 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 
         {/* QR Code Dialog */}
         <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-w-full sm:max-w-xl px-2 py-6 md:px-8 md:py-10">
             <DialogHeader>
               <DialogTitle>Session QR Code</DialogTitle>
               <DialogDescription>
                 Scan this QR code with your device to join the session instantly.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col items-center space-y-4">
-              <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-                <QRCodeSVG value={sessionLink} size={280} />
+            <div className="flex flex-col items-center gap-6 w-full">
+              {/* QR Code */}
+              <div className="bg-white p-4 md:p-6 rounded-lg border-2 border-gray-200">
+                <QRCodeSVG value={sessionLink} size={window.innerWidth < 640 ? 180 : 280} />
               </div>
-              <div className="flex items-center space-x-2 w-full">
-                <div className="flex-1 p-2 bg-gray-50 rounded border text-sm font-mono truncate">
+
+              {/* Session Link and Copy Button - fixed layout */}
+              <div className="flex w-full flex-col md:flex-row items-stretch gap-3">
+                <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded border text-xs md:text-base font-mono break-all text-gray-800 text-center md:text-left">
                   {sessionLink}
                 </div>
                 <Button 
@@ -218,7 +220,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   {copied ? "Copied" : "Copy"}
                 </Button>
               </div>
-              <p className="text-sm text-gray-600 text-center">
+              <p className="text-sm text-gray-600 text-center max-w-xs">
                 Participants can scan this QR code or use the link to join your session.
               </p>
             </div>

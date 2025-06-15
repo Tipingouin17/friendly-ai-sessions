@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
+import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -17,7 +17,7 @@ import Settings from "./pages/Settings";
 import MyFacilitators from "./pages/MyFacilitators";
 import PastWorkshops from "./pages/PastWorkshops";
 import Session from "./pages/Session";
-import SessionAdmin from "./pages/SessionAdmin";
+import SessionHost from "./pages/SessionHost";
 import SessionReport from "./pages/SessionReport";
 import JoinSession from "./pages/JoinSession";
 import Pricing from "./pages/Pricing";
@@ -72,11 +72,11 @@ function App() {
               
               {/* Routes outside the main layout */}
               <Route path="/session" element={<Session />} />
-              {/* Secure admin route with proper authentication check */}
-              <Route path="/session/admin" element={
-                <ProtectedAdminRoute>
-                  <SessionAdmin />
-                </ProtectedAdminRoute>
+              {/* Protected host route for session hosts */}
+              <Route path="/session/host" element={
+                <ProtectedHostRoute>
+                  <SessionHost />
+                </ProtectedHostRoute>
               } />
               <Route path="/session/report/:id" element={<SessionReport />} />
               <Route path="/join-session" element={<JoinSession />} />

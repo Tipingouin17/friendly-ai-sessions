@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,14 +6,12 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import StartSessionButton from './StartSessionButton';
-
 interface PreSessionHostViewProps {
   conversationData: any;
   conversationId: number | null;
   participantCount: number;
   onSessionStarted: () => void;
 }
-
 const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   conversationData,
   conversationId,
@@ -22,43 +19,37 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   onSessionStarted
 }) => {
   const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
-
-  const sessionLink = conversationId 
-    ? `${window.location.origin}/join-session?id=${conversationId}`
-    : '';
-
+  const {
+    toast
+  } = useToast();
+  const sessionLink = conversationId ? `${window.location.origin}/join-session?id=${conversationId}` : '';
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(sessionLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      
       toast({
         title: "Link copied!",
-        description: "Session link has been copied to clipboard.",
+        description: "Session link has been copied to clipboard."
       });
     } catch (error) {
       console.error('Failed to copy link:', error);
       toast({
         title: "Copy failed",
         description: "Failed to copy link to clipboard.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator';
   const sessionTitle = conversationData?.sessions?.title || 'Untitled Session';
   const objective = conversationData?.sessions?.objective || 'No objective specified';
-
-  return (
-    <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+  return <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Session Setup</h1>
-          <p className="text-lg text-gray-600">Welcome participants to join your session</p>
+          
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -88,12 +79,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   <div className="flex-1 p-3 bg-gray-50 rounded-lg border text-sm font-mono truncate">
                     {sessionLink}
                   </div>
-                  <Button 
-                    onClick={handleCopyLink}
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-1 px-4"
-                  >
+                  <Button onClick={handleCopyLink} size="sm" variant="outline" className="flex items-center gap-1 px-4">
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     {copied ? "Copied" : "Copy"}
                   </Button>
@@ -114,12 +100,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   </Badge>
                 </div>
                 <div className="w-full bg-blue-200 rounded-full h-2 mt-3">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${Math.min(100, (participantCount / (conversationData?.participants || 10)) * 100)}%` 
-                    }}
-                  />
+                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{
+                  width: `${Math.min(100, participantCount / (conversationData?.participants || 10) * 100)}%`
+                }} />
                 </div>
               </div>
             </CardContent>
@@ -186,18 +169,12 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 </p>
               </div>
               <div className="flex-shrink-0">
-                <StartSessionButton
-                  onStartSession={onSessionStarted}
-                  participantCount={participantCount}
-                  isSessionStarted={false}
-                />
+                <StartSessionButton onStartSession={onSessionStarted} participantCount={participantCount} isSessionStarted={false} />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default PreSessionHostView;

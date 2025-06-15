@@ -120,13 +120,13 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <SessionHeader
-        conversation={conversation}
         facilitator={facilitator}
         objective={objective}
-        currentParticipantCount={currentParticipantCount}
         participantCount={participantCount}
-        isMobile={isMobile}
-        isAdmin={isAdmin}
+        onGenerateReport={onGenerateReport}
+        isGeneratingReport={isGeneratingReport}
+        canGenerateReports={messages.length > 0}
+        messagesCount={messages.length}
         viewMode={viewMode}
       />
 

@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";
@@ -9,8 +10,16 @@ import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { PlanLimitAlert } from "@/components/facilitator/PlanLimitAlert";
 import { StepNavigation } from "@/components/facilitator/StepNavigation";
+import { useState, useEffect } from "react";
 
 const MyFacilitators = () => {
+  const [isClient, setIsClient] = useState(false);
+  
+  // Hydration-safe client detection
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
   const {
     currentStep,
     setCurrentStep,
@@ -54,10 +63,11 @@ const MyFacilitators = () => {
   } = useQuery({
     queryKey: ['workshops', selectedFacilitator],
     queryFn: () => fetchWorkshops(selectedFacilitator),
-    enabled: currentStep === 2
+    enabled: currentStep === 2 && isClient
   });
 
   // Determine if steps should be disabled based on limits
+  // Use hydration-safe defaults
   const isStep1Disabled = false; // Never disable selection of facilitators
   const isStep2Disabled = !selectedFacilitator; // Only disable if no facilitator selected
   const isStep3Disabled = !selectedWorkshop; // Only disable if no workshop selected

@@ -1,7 +1,24 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
-import { isInCrossOriginContext } from "@/utils/crossOriginUtils";
+
+/**
+ * Checks if we're in a browser environment (client-side)
+ */
+const isBrowser = () => typeof window !== 'undefined';
+
+/**
+ * Checks if we're in a cross-origin context safely
+ */
+const isInCrossOriginContext = () => {
+  if (!isBrowser()) return false;
+  
+  try {
+    return window.location !== window.parent.location;
+  } catch {
+    return true; // If we can't access parent.location, we're likely in cross-origin
+  }
+};
 
 /**
  * Gets a facilitator's avatar URL with robust normalization and cross-browser compatibility
@@ -10,6 +27,12 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
   // If no facilitator data provided, return placeholder
   if (!facilitator) {
     debugLog('all', 'No facilitator data provided, using placeholder avatar');
+    return '/placeholder.svg';
+  }
+  
+  // Server-side rendering safety check
+  if (!isBrowser()) {
+    debugLog('all', 'Server-side rendering detected, using placeholder avatar');
     return '/placeholder.svg';
   }
   

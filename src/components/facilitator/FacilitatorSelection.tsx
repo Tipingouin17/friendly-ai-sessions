@@ -10,6 +10,7 @@ import { FacilitatorDetailsPanel } from "./FacilitatorDetailsPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { debugLog } from "@/utils/debugLogger";
+import { useNavigate } from "react-router-dom";
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
@@ -27,7 +28,9 @@ export const FacilitatorSelection = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({});
   const [loadingImages, setLoadingImages] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const { planRestrictions } = useUserPlan();
   const { 
@@ -37,12 +40,22 @@ export const FacilitatorSelection = ({
     canCreateCustomFacilitators 
   } = usePlanLimits();
   
+  // Hydration-safe client detection
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
   // Filter facilitators based on your ability to USE them, not CREATE them
   // All existing facilitators should be accessible for selection
   const accessibleFacilitators = facilitators;
   
-  // Load all facilitator images
+  // Load all facilitator images only on client-side
   useEffect(() => {
+    if (!isClient) {
+      setLoadingImages(false);
+      return;
+    }
+
     const loadFacilitatorImages = async () => {
       if (!facilitators || facilitators.length === 0) {
         setLoadingImages(false);
@@ -101,11 +114,13 @@ export const FacilitatorSelection = ({
         console.log('Finished loading facilitator images:', imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
-        toast({
-          title: "Warning",
-          description: "Some facilitator images could not be loaded",
-          variant: "destructive",
-        });
+        if (isClient) {
+          toast({
+            title: "Warning",
+            description: "Some facilitator images could not be loaded",
+            variant: "destructive",
+          });
+        }
       } finally {
         setLoadingImages(false);
       }
@@ -116,11 +131,11 @@ export const FacilitatorSelection = ({
     } else {
       setLoadingImages(false);
     }
-  }, [facilitators, toast]);
+  }, [facilitators, toast, isClient]);
 
   useEffect(() => {
     // Debug log all facilitators and their profile_picture values
-    if (facilitators && facilitators.length > 0) {
+    if (facilitators && facilitators.length > 0 && isClient) {
       console.log('Facilitator data with profile pictures:', 
         facilitators.map(f => ({
           id: f.id,
@@ -129,7 +144,12 @@ export const FacilitatorSelection = ({
         }))
       );
     }
-  }, [facilitators]);
+  }, [facilitators, isClient]);
+
+  const handleCreateSuccess = () => {
+    // Use React Router navigation instead of window.location.reload()
+    navigate(0); // This refreshes the current route
+  };
 
   if (isLoading) {
     return (
@@ -157,7 +177,7 @@ export const FacilitatorSelection = ({
         hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
         maxFacilitators={maxFacilitators}
         canCreateCustomFacilitators={canCreateCustomFacilitators}
-        isLoading={loadingImages}
+        isLoading={loadingImages || !isClient}
       />
       
       <FacilitatorDetailsPanel
@@ -168,9 +188,7 @@ export const FacilitatorSelection = ({
       <CreateFacilitatorModal
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
-        onSuccess={() => {
-          window.location.reload();
-        }}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   );

@@ -131,10 +131,13 @@ export type Database = {
       conversations: {
         Row: {
           accept_terms_and_conditions: boolean | null
+          conversation_memory: Json | null
           created_at: string | null
           current_participants: number | null
           ended_at: string | null
+          engagement_metrics: Json | null
           final_report_id: string | null
+          flow_config: Json | null
           id: number
           is_saved: boolean
           is_session_ended: boolean | null
@@ -152,10 +155,13 @@ export type Database = {
         }
         Insert: {
           accept_terms_and_conditions?: boolean | null
+          conversation_memory?: Json | null
           created_at?: string | null
           current_participants?: number | null
           ended_at?: string | null
+          engagement_metrics?: Json | null
           final_report_id?: string | null
+          flow_config?: Json | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null
@@ -173,10 +179,13 @@ export type Database = {
         }
         Update: {
           accept_terms_and_conditions?: boolean | null
+          conversation_memory?: Json | null
           created_at?: string | null
           current_participants?: number | null
           ended_at?: string | null
+          engagement_metrics?: Json | null
           final_report_id?: string | null
+          flow_config?: Json | null
           id?: number
           is_saved?: boolean
           is_session_ended?: boolean | null

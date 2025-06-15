@@ -22,14 +22,22 @@ export const FacilitatorCard = ({
   isLoading = false
 }: FacilitatorCardProps) => {
   const [imageLoading, setImageLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   
-  // Display a placeholder if the URL is empty
-  const displayUrl = avatarUrl || '/placeholder.svg';
-  
-  // Add debugging to see what URLs we're getting
+  // Hydration-safe client detection
   useEffect(() => {
-    debugLog('all', `FacilitatorCard - Displaying avatar for ${facilitator.title}: ${displayUrl}`);
-  }, [displayUrl, facilitator.title]);
+    setIsClient(true);
+  }, []);
+  
+  // Display a placeholder if the URL is empty or we're on server
+  const displayUrl = (isClient && avatarUrl) ? avatarUrl : '/placeholder.svg';
+  
+  // Add debugging to see what URLs we're getting (only on client)
+  useEffect(() => {
+    if (isClient) {
+      debugLog('all', `FacilitatorCard - Displaying avatar for ${facilitator.title}: ${displayUrl}`);
+    }
+  }, [displayUrl, facilitator.title, isClient]);
   
   return (
     <div
@@ -39,23 +47,32 @@ export const FacilitatorCard = ({
       onClick={onClick}
     >
       <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full">
-        {(isLoading || imageLoading) ? (
+        {(isLoading || imageLoading || !isClient) ? (
           <Skeleton className="absolute inset-0 h-full w-full rounded-full" />
         ) : null}
         
-        <Avatar className="h-full w-full">
-          <AvatarImage 
-            src={displayUrl} 
-            alt={facilitator.title || 'Facilitator'} 
-            onError={handleAvatarError}
-            onLoad={() => setImageLoading(false)}
-            className="h-full w-full object-cover"
-            crossOrigin="anonymous"
-          />
-          <AvatarFallback delayMs={600}>
+        {isClient && (
+          <Avatar className="h-full w-full">
+            <AvatarImage 
+              src={displayUrl} 
+              alt={facilitator.title || 'Facilitator'} 
+              onError={handleAvatarError}
+              onLoad={() => setImageLoading(false)}
+              className="h-full w-full object-cover"
+              crossOrigin="anonymous"
+            />
+            <AvatarFallback delayMs={600}>
+              {facilitator.title?.charAt(0) || 'F'}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        
+        {/* Server-side rendering fallback */}
+        {!isClient && (
+          <div className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-600 text-xl font-medium">
             {facilitator.title?.charAt(0) || 'F'}
-          </AvatarFallback>
-        </Avatar>
+          </div>
+        )}
       </div>
       <h3 className="text-center text-sm font-medium">{facilitator.title}</h3>
     </div>

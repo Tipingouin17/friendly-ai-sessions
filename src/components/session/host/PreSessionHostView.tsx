@@ -67,6 +67,27 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
           
         </div>
 
+        {/* Ready to Begin Section */}
+        <Card className="bg-white shadow-lg mb-4 md:mb-6">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 md:gap-6">
+              <div className="text-center lg:text-left">
+                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
+                <p className="text-sm md:text-base text-gray-600">
+                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
+                  {participantCount === 0 && " You need at least one participant to start."}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Debug: Button will be {participantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {participantCount})
+                </p>
+              </div>
+              <div className="flex-shrink-0 w-full lg:w-auto">
+                <StartSessionButton onStartSession={onSessionStarted} participantCount={participantCount} isSessionStarted={false} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
           {/* QR Code and Link Section */}
           <Card className="bg-white shadow-lg">
@@ -162,27 +183,6 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
             </CardContent>
           </Card>
         </div>
-
-        {/* Instructions and Start Button */}
-        <Card className="bg-white shadow-lg mt-4 md:mt-6">
-          <CardContent className="p-4 md:p-6">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 md:gap-6">
-              <div className="text-center lg:text-left">
-                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
-                <p className="text-sm md:text-base text-gray-600">
-                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
-                  {participantCount === 0 && " You need at least one participant to start."}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Debug: Button will be {participantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {participantCount})
-                </p>
-              </div>
-              <div className="flex-shrink-0 w-full lg:w-auto">
-                <StartSessionButton onStartSession={onSessionStarted} participantCount={participantCount} isSessionStarted={false} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

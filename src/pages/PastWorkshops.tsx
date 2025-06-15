@@ -1,4 +1,3 @@
-
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, PlusCircle, LayoutDashboard, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +8,7 @@ import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
@@ -73,13 +73,14 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
   canGenerateReports: boolean,
   reportData?: any 
 }) => {
-  const navigate = useNavigate();
+  const { navigateToAdminSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
   
-  const handleAdminView = () => {
+  const handleAdminView = async () => {
     if (isActive) {
-      navigate(`/session/admin?id=${workshop.id}`);
+      console.log("Navigating to admin session for conversation:", workshop.id);
+      await navigateToAdminSession(workshop.id);
     }
   };
   
@@ -263,6 +264,7 @@ const EmptyState = ({ isActive = false }) => (
 
 const PastWorkshops = () => {
   const navigate = useNavigate();
+  const { navigateToAdminSession } = useNavigateToSession();
   const { setAdminStatus } = useSessionAdminStatus();
   const queryClient = useQueryClient();
   const { planRestrictions } = useUserPlan();
@@ -311,27 +313,20 @@ const PastWorkshops = () => {
     };
   }, [queryClient]);
   
-  // Navigate to most recent active session automatically
+  // Handle auto-navigation to most recent active session with secure navigation
   useEffect(() => {
-    // Only navigate if there's at least one active workshop and we're coming from admin header
-    if (activeWorkshops && activeWorkshops.length > 0 && window.location.search.includes('auto=true')) {
-      const mostRecentSession = activeWorkshops[0];
-      console.log("Auto-navigating to most recent session:", mostRecentSession.id);
-      
-      // Set admin status
-      sessionStorage.setItem('isAdminSession', 'true');
-      setAdminStatus(true);
-      
-      // Navigate to the session admin page
-      navigate(`/session/admin?id=${mostRecentSession.id}`, {
-        state: {
-          isAdmin: true,
-          showMessaging: true,
-          conversationId: mostRecentSession.id
-        }
-      });
-    }
-  }, [activeWorkshops, navigate, setAdminStatus]);
+    const handleAutoNavigation = async () => {
+      if (activeWorkshops && activeWorkshops.length > 0 && window.location.search.includes('auto=true')) {
+        const mostRecentSession = activeWorkshops[0];
+        console.log("Auto-navigating to most recent session with secure navigation:", mostRecentSession.id);
+        
+        // Use secure navigation instead of client-side flags
+        await navigateToAdminSession(mostRecentSession.id);
+      }
+    };
+    
+    handleAutoNavigation();
+  }, [activeWorkshops, navigateToAdminSession]);
   
   const handleCreateNew = () => {
     navigate('/my-facilitators');

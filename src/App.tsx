@@ -2,9 +2,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
@@ -25,67 +23,61 @@ import Checkout from "./pages/checkout/index";
 import NotFound from "./pages/NotFound";
 import FAQs from "./pages/FAQs";
 
-const queryClient = new QueryClient();
-
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Layout><Outlet /></Layout>}>
-                <Route index element={<Index />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/faqs" element={<FAQs />} />
-                <Route path="/checkout" element={
-                  <ProtectedRoute>
-                    <Checkout />
-                  </ProtectedRoute>
-                } />
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-                <Route path="/my-facilitators" element={
-                  <ProtectedRoute>
-                    <MyFacilitators />
-                  </ProtectedRoute>
-                } />
-                <Route path="/past-workshops" element={
-                  <ProtectedRoute>
-                    <PastWorkshops />
-                  </ProtectedRoute>
-                } />
-              </Route>
-              
-              {/* Routes outside the main layout */}
-              <Route path="/session" element={<Session />} />
-              {/* Protected host route for session hosts */}
-              <Route path="/session/host" element={
-                <ProtectedHostRoute>
-                  <SessionHost />
-                </ProtectedHostRoute>
-              } />
-              <Route path="/session/report/:id" element={<SessionReport />} />
-              <Route path="/join-session" element={<JoinSession />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout><Outlet /></Layout>}>
+            <Route index element={<Index />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/faqs" element={<FAQs />} />
+            <Route path="/checkout" element={
+              <ProtectedRoute>
+                <Checkout />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/my-facilitators" element={
+              <ProtectedRoute>
+                <MyFacilitators />
+              </ProtectedRoute>
+            } />
+            <Route path="/past-workshops" element={
+              <ProtectedRoute>
+                <PastWorkshops />
+              </ProtectedRoute>
+            } />
+          </Route>
+          
+          {/* Routes outside the main layout */}
+          <Route path="/session" element={<Session />} />
+          {/* Protected host route for session hosts */}
+          <Route path="/session/host" element={
+            <ProtectedHostRoute>
+              <SessionHost />
+            </ProtectedHostRoute>
+          } />
+          <Route path="/session/report/:id" element={<SessionReport />} />
+          <Route path="/join-session" element={<JoinSession />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   );
 }
 

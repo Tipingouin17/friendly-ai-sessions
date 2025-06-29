@@ -91,6 +91,11 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
     }
   };
 
+  // Create an alias for backward compatibility
+  const closeSessionAndGenerateReport = async (conversationId: number) => {
+    return closeSession();
+  };
+
   const downloadReport = (format: 'json' | 'text' = 'text') => {
     setIsDownloading(true);
     try {
@@ -105,6 +110,7 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
     isDownloading,
     closureResult,
     closeSession,
+    closeSessionAndGenerateReport,
     downloadReport
   };
 };

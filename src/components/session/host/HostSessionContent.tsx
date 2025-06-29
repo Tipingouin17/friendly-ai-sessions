@@ -13,6 +13,10 @@ interface HostSessionContentProps {
   currentConversationId: number | null;
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
   
+  // Session state props
+  isSessionPaused?: boolean;
+  toggleSessionState?: () => void;
+  
   // Response collection props
   isWaitingForResponses?: boolean;
   responseCount?: number;
@@ -23,6 +27,11 @@ interface HostSessionContentProps {
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
   triggerSessionStart?: () => Promise<boolean>;
+  responseProgress?: {
+    collected: number;
+    total: number;
+    isComplete: boolean;
+  } | null;
 }
 
 const HostSessionContent: React.FC<HostSessionContentProps> = ({
@@ -33,13 +42,16 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isLoadingParticipants,
   currentConversationId,
   onSendMessage,
+  isSessionPaused = false,
+  toggleSessionState,
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
-  triggerSessionStart
+  triggerSessionStart,
+  responseProgress
 }) => {
   // Use actual participant count from real-time data
   const actualParticipantCount = participants.length;

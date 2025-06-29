@@ -7,14 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { useSessionStateTransition } from '@/hooks/useSessionStateTransition';
-import { useSessionStart } from '@/hooks/useSessionStart';
+import StartSessionButton from './StartSessionButton';
 
 interface PreSessionHostViewProps {
   conversationData: any;
   conversationId: number | null;
   participantCount: number;
-  participants: any[];
   onSessionStarted: () => void;
 }
 
@@ -22,51 +20,16 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   conversationData,
   conversationId,
   participantCount,
-  participants,
   onSessionStarted
 }) => {
   const [copied, setCopied] = useState(false);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
-  const [sessionStarted, setSessionStarted] = useState(false);
   const { toast } = useToast();
   
   console.log("🔍 PreSessionHostView - Received props:", {
     conversationId,
     participantCount,
-    conversationDataId: conversationData?.id,
-    participantsLength: participants?.length
-  });
-
-  // Session start hook for AI message generation
-  const { startSession, isStarting } = useSessionStart({
-    conversationId,
-    participants: participants || [],
-    conversationData
-  });
-
-  // Auto-start detection using session state transition
-  const {
-    isTransitioning,
-    shouldShowSession,
-    currentParticipants,
-    maxParticipants,
-    isSessionFull,
-    handleStartSession: handleAutoStart
-  } = useSessionStateTransition({
-    props: {
-      conversation: conversationData,
-      participants: participants || [],
-      currentConversationId: conversationId,
-      isSessionStartedInDB: conversationData?.session_started || false,
-      handleStartSession: onSessionStarted
-    },
-    isAdmin: true,
-    sessionStarted,
-    setSessionStarted,
-    onSessionFull: async () => {
-      console.log("🔥 Auto-starting session - participant limit reached");
-      await handleSessionStart();
-    }
+    conversationData: conversationData?.id
   });
 
   // Stabilize participant count to prevent rapid state changes
@@ -75,12 +38,10 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     console.log("🔥 PreSessionHostView - Stabilized participant count:", {
       original: participantCount,
       stabilized: count,
-      currentParticipants,
-      maxParticipants,
-      isSessionFull
+      type: typeof participantCount
     });
     return count;
-  }, [participantCount, currentParticipants, maxParticipants, isSessionFull]);
+  }, [participantCount]);
 
   // Memoize session link to prevent unnecessary recalculations
   const sessionLink = useMemo(() => {
@@ -107,43 +68,14 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     }
   }, [sessionLink, toast]);
 
-  // Enhanced session start handler with AI generation
-  const handleSessionStart = useCallback(async () => {
+  // Stable session start handler with logging
+  const handleSessionStart = useCallback(() => {
     console.log("🔥 PreSessionHostView - Session start requested", {
       participantCount: stableParticipantCount,
-      conversationId,
-      isStarting
+      conversationId
     });
-    
-    if (isStarting) {
-      console.log("Session start already in progress, skipping");
-      return;
-    }
-    
-    try {
-      // Start the session and generate AI welcome message
-      const success = await startSession();
-      if (success) {
-        console.log("✅ Session started successfully with AI welcome message");
-        setSessionStarted(true);
-        onSessionStarted();
-      } else {
-        console.error("❌ Failed to start session");
-        toast({
-          title: "Failed to start session",
-          description: "There was an error starting the session. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("💥 Error in session start:", error);
-      toast({
-        title: "Session start error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [stableParticipantCount, conversationId, isStarting, startSession, onSessionStarted, toast]);
+    onSessionStarted();
+  }, [onSessionStarted, stableParticipantCount, conversationId]);
 
   // Memoize facilitator and session data
   const sessionInfo = useMemo(() => ({
@@ -154,75 +86,39 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 
   // Memoize participant progress calculation
   const participantProgress = useMemo(() => {
-    const maxCount = conversationData?.participants || 10;
-    const currentCount = Math.max(stableParticipantCount, currentParticipants);
-    const progressPercentage = Math.min(100, currentCount / maxCount * 100);
+    const maxParticipants = conversationData?.participants || 10;
+    const progressPercentage = Math.min(100, stableParticipantCount / maxParticipants * 100);
     
     return {
-      current: currentCount,
-      max: maxCount,
-      percentage: progressPercentage,
-      isFull: currentCount >= maxCount
+      current: stableParticipantCount,
+      max: maxParticipants,
+      percentage: progressPercentage
     };
-  }, [stableParticipantCount, currentParticipants, conversationData?.participants]);
-
-  // Show auto-start notification when session is full
-  const showAutoStartNotification = participantProgress.isFull && !sessionStarted && !isStarting;
+  }, [stableParticipantCount, conversationData?.participants]);
 
   return (
     <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Auto-start notification */}
-        {showAutoStartNotification && (
-          <Card className="bg-yellow-50 border-yellow-200 mb-4 md:mb-6">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="animate-pulse w-3 h-3 bg-yellow-500 rounded-full" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-yellow-800">Session Auto-Starting</h4>
-                  <p className="text-sm text-yellow-700">
-                    Maximum participants reached. Session will start automatically with AI welcome message.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Ready to Begin Section */}
         <Card className="bg-white shadow-lg mb-4 md:mb-6">
           <CardContent className="p-4 md:p-6">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 md:gap-6">
               <div className="text-center lg:text-left">
-                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
-                  {participantProgress.isFull ? "Auto-Starting Session..." : "Ready to Begin?"}
-                </h3>
+                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  {participantProgress.isFull 
-                    ? "Maximum participants reached. Session is starting automatically with AI welcome message."
-                    : "Once participants have joined, click 'Start Session' to begin the facilitated discussion."
-                  }
-                  {participantProgress.current === 0 && " You need at least one participant to start."}
+                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
+                  {stableParticipantCount === 0 && " You need at least one participant to start."}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Debug: Button will be {stableParticipantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {stableParticipantCount})
                 </p>
               </div>
-              <div className="flex-shrink-0 w-full lg:w-auto">
-                <Button
-                  onClick={handleSessionStart}
-                  disabled={isStarting || participantProgress.current === 0}
-                  size="lg"
-                  className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300 w-full lg:w-auto"
-                >
-                  {isStarting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Starting Session & Generating AI Welcome...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Start Session</span>
-                    </>
-                  )}
-                </Button>
+              <div className="flex-shrink-0 w-full lg:w-auto" style={{ pointerEvents: 'auto' }}>
+                <StartSessionButton 
+                  onStartSession={handleSessionStart} 
+                  participantCount={stableParticipantCount} 
+                  isSessionStarted={false} 
+                />
               </div>
             </div>
           </CardContent>
@@ -266,13 +162,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               </div>
 
               {/* Participant Status */}
-              <div className={`p-3 md:p-4 rounded-lg ${participantProgress.isFull ? 'bg-green-50' : 'bg-blue-50'}`}>
+              <div className="bg-blue-50 p-3 md:p-4 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className={`font-medium text-sm md:text-base ${participantProgress.isFull ? 'text-green-900' : 'text-blue-900'}`}>
-                      {participantProgress.isFull ? 'Session Full - Auto-Starting' : 'Participants Waiting'}
-                    </h4>
-                    <p className={`text-xs md:text-sm ${participantProgress.isFull ? 'text-green-700' : 'text-blue-700'}`}>
+                    <h4 className="font-medium text-blue-900 text-sm md:text-base">Participants Waiting</h4>
+                    <p className="text-xs md:text-sm text-blue-700">
                       {participantProgress.current} of {participantProgress.max} joined
                     </p>
                   </div>
@@ -280,9 +174,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                     {participantProgress.current}
                   </Badge>
                 </div>
-                <div className={`w-full rounded-full h-2 mt-2 md:mt-3 ${participantProgress.isFull ? 'bg-green-200' : 'bg-blue-200'}`}>
+                <div className="w-full bg-blue-200 rounded-full h-2 mt-2 md:mt-3">
                   <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${participantProgress.isFull ? 'bg-green-600' : 'bg-blue-600'}`}
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
                     style={{ width: `${participantProgress.percentage}%` }}
                   />
                 </div>

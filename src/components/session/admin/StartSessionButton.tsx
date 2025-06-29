@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play } from 'lucide-react';
 import { useSessionStart } from '@/hooks/useSessionStart';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StartSessionButtonProps {
   conversationId: number | null;
@@ -14,14 +15,41 @@ interface StartSessionButtonProps {
 
 const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   conversationId,
-  participants,
+  participants: propParticipants,
   conversationData,
   onSessionStarted,
   disabled = false
 }) => {
+  const [actualParticipants, setActualParticipants] = useState(propParticipants);
+
+  // Fetch actual participants if not provided
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      if (!conversationId || propParticipants.length > 0) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('conversation_id', conversationId);
+          
+        if (error) {
+          console.error('Error fetching participants:', error);
+        } else {
+          console.log('Fetched participants from DB:', data?.length);
+          setActualParticipants(data || []);
+        }
+      } catch (err) {
+        console.error('Exception fetching participants:', err);
+      }
+    };
+
+    fetchParticipants();
+  }, [conversationId, propParticipants]);
+
   const { startSession, isStarting } = useSessionStart({
     conversationId,
-    participants,
+    participants: actualParticipants,
     conversationData
   });
 
@@ -29,7 +57,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     console.log('🚀 Starting session with AI welcome message generation');
     console.log('Session context:', {
       conversationId,
-      participantCount: participants.length,
+      participantCount: actualParticipants.length,
       facilitatorName: conversationData?.sessions?.facilitator_details?.title,
       participantDescription: conversationData?.participant_description
     });
@@ -41,8 +69,8 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     }
   };
 
-  // Use participants array length for enable/disable logic
-  const hasParticipants = participants.length > 0;
+  // Use fallback logic - check both participants array and current count
+  const hasParticipants = actualParticipants.length > 0 || (conversationData?.current_participants > 0);
   const isDisabled = disabled || isStarting || !hasParticipants;
 
   return (

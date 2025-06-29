@@ -59,13 +59,10 @@ export const useSessionMessages = ({
     isAdmin
   });
   
-  // Fetch messages when the conversation ID changes or session starts
+  // Fetch messages when the conversation ID changes
   useEffect(() => {
-    if (conversationId) {
-      console.log("🔍 useSessionMessages - Fetching messages for conversation:", conversationId);
-      fetchMessages();
-    }
-  }, [conversationId, welcomeMessage, conversation?.session_started, fetchMessages]);
+    fetchMessages();
+  }, [conversationId, welcomeMessage, conversation, fetchMessages]);
   
   // Clear cache when conversation changes (ensures fresh AI generation for new sessions)
   useEffect(() => {
@@ -76,13 +73,6 @@ export const useSessionMessages = ({
   
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {
-    console.log("🔍 useSessionMessages - Processing new message:", {
-      id: message.id,
-      sender: message.sender,
-      participant: message.participant,
-      contentPreview: message.content.substring(0, 50) + "..."
-    });
-    
     processNewMessage(message);
     
     // Record response for tracking
@@ -91,21 +81,6 @@ export const useSessionMessages = ({
       recordResponse(participantId, true);
     }
   };
-  
-  // Auto-generate aggregated response when all participants respond
-  useEffect(() => {
-    if (isWaitingForResponses && responseCount >= totalParticipants && responseCount > 0) {
-      console.log("🤖 All participants responded, generating aggregated AI response");
-      generateAggregatedResponse().then((aggregatedMessage) => {
-        if (aggregatedMessage) {
-          console.log("✅ Generated aggregated response:", aggregatedMessage.content.substring(0, 100) + "...");
-          handleNewMessage(aggregatedMessage);
-        }
-      }).catch((error) => {
-        console.error("❌ Failed to generate aggregated response:", error);
-      });
-    }
-  }, [isWaitingForResponses, responseCount, totalParticipants, generateAggregatedResponse]);
   
   return {
     messages,

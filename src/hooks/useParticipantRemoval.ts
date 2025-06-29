@@ -16,6 +16,7 @@ export const useParticipantRemoval = ({
   setParticipantsList
 }: UseParticipantRemovalProps) => {
   const [displayCount, setDisplayCount] = useState(currentParticipantCount);
+  const [isRemoving, setIsRemoving] = useState<number | null>(null);
   const { toast } = useToast();
   
   // Update display count when props change
@@ -34,6 +35,13 @@ export const useParticipantRemoval = ({
       return;
     }
     
+    // Prevent multiple simultaneous removals
+    if (isRemoving === participantId) {
+      return;
+    }
+    
+    setIsRemoving(participantId);
+    
     // Optimistic update - remove participant from UI immediately
     let originalParticipants: ParticipantInfo[] = [];
     setParticipantsList(prev => {
@@ -44,7 +52,7 @@ export const useParticipantRemoval = ({
     });
     
     try {
-      console.log(`Attempting to remove participant ${participantId} from conversation ${conversationId}`);
+      console.log(`🗑️ Admin removing participant ${participantId} from conversation ${conversationId}`);
       
       // Remove from session_participants table
       const { error: removeError, data } = await supabase
@@ -55,7 +63,7 @@ export const useParticipantRemoval = ({
         .select();
         
       if (removeError) {
-        console.error("Error removing participant:", removeError);
+        console.error("❌ Error removing participant:", removeError);
         
         // Revert optimistic update
         setParticipantsList(originalParticipants);
@@ -64,7 +72,7 @@ export const useParticipantRemoval = ({
         // Show specific error message
         const errorMessage = removeError.message.includes('policy') 
           ? "You don't have permission to remove this participant"
-          : "Could not remove participant";
+          : "Could not remove participant. Please try again.";
           
         toast({
           title: "Error",
@@ -75,7 +83,7 @@ export const useParticipantRemoval = ({
       }
       
       if (!data || data.length === 0) {
-        console.warn("No participant was removed - may have already been removed");
+        console.warn("⚠️ No participant was removed - may have already been removed");
         toast({
           title: "Warning",
           description: "Participant may have already been removed",
@@ -93,7 +101,7 @@ export const useParticipantRemoval = ({
         .eq('id', conversationId);
         
       if (updateError) {
-        console.error("Error updating participant count:", updateError);
+        console.error("⚠️ Error updating participant count:", updateError);
         toast({
           title: "Warning", 
           description: "Participant removed but count may be inconsistent",
@@ -101,7 +109,7 @@ export const useParticipantRemoval = ({
         });
       }
       
-      // Create a participant_removed event for real-time updates
+      // Create a participant_removed event for real-time updates to other clients
       const { error: eventError } = await supabase
         .from('session_events')
         .insert({
@@ -113,12 +121,13 @@ export const useParticipantRemoval = ({
             removed_by: 'admin',
             timestamp: new Date().toISOString(),
             permanent_removal: true,
-            access_revoked: true
+            access_revoked: true,
+            reason: 'admin_removal'
           }
         });
       
       if (eventError) {
-        console.error("Error creating removal event:", eventError);
+        console.error("⚠️ Error creating removal event:", eventError);
         // Don't show error to user as the removal was successful
       }
       
@@ -127,10 +136,10 @@ export const useParticipantRemoval = ({
         description: `Successfully removed participant from session`,
       });
       
-      console.log(`Successfully removed participant ${participantId}, new count: ${newCount}`);
+      console.log(`✅ Successfully removed participant ${participantId}, new count: ${newCount}`);
       
     } catch (err) {
-      console.error("Exception removing participant:", err);
+      console.error("💥 Exception removing participant:", err);
       
       // Revert optimistic update
       setParticipantsList(originalParticipants);
@@ -138,15 +147,18 @@ export const useParticipantRemoval = ({
       
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred while removing participant",
         variant: "destructive"
       });
+    } finally {
+      setIsRemoving(null);
     }
   };
   
   return {
     displayCount,
     setDisplayCount,
-    removeParticipant
+    removeParticipant,
+    isRemoving
   };
 };

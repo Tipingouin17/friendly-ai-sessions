@@ -2,7 +2,7 @@
 import React from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import { X, Crown } from "lucide-react";
+import { X, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,13 +12,15 @@ interface ParticipantListItemProps {
   onRemove: (participantId: number) => void;
   messageCount?: number;
   lastActiveTime?: Date;
+  isRemoving?: boolean;
 }
 
 const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   participant,
   onRemove,
   messageCount = 0,
-  lastActiveTime
+  lastActiveTime,
+  isRemoving = false
 }) => {
   const participantColor = getParticipantColor(`P${participant.id}`);
   
@@ -45,8 +47,13 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   };
   
   // Always display the participant's actual name from the database
-  // If no name is set, show a default format but still show the name field
   const displayName = participant.name || `Participant ${participant.id}`;
+
+  const handleRemove = () => {
+    if (!isRemoving) {
+      onRemove(participant.id);
+    }
+  };
 
   return (
     <div className="group flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 transition-colors">
@@ -59,7 +66,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
               className="text-white font-medium text-sm"
               style={{ backgroundColor: participantColor }}
             >
-              {participant.isAdmin ? (
+              {participant.isHost ? (
                 <Crown className="h-4 w-4" />
               ) : (
                 displayName.charAt(0).toUpperCase()
@@ -89,6 +96,9 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
               <TooltipTrigger asChild>
                 <span className="text-sm font-medium text-gray-900 truncate">
                   {displayName}
+                  {participant.isHost && (
+                    <span className="ml-1 text-xs text-amber-600">(Host)</span>
+                  )}
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top">
@@ -111,24 +121,31 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
         </div>
       </div>
       
-      {/* Remove button */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="h-7 w-7 p-0 rounded-full hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onRemove(participant.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            <p>Remove participant</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {/* Remove button - only show for non-host participants */}
+      {!participant.isHost && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-7 w-7 p-0 rounded-full hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleRemove}
+                disabled={isRemoving}
+              >
+                {isRemoving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <X className="h-3 w-3" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>{isRemoving ? 'Removing...' : 'Remove participant'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 };

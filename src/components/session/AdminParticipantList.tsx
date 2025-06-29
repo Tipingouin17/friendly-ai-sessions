@@ -47,7 +47,8 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
   const { 
     displayCount, 
     setDisplayCount, 
-    removeParticipant 
+    removeParticipant,
+    isRemoving
   } = useParticipantRemoval({
     conversationId: conversationData?.id || null,
     currentParticipantCount: participantsList.length,
@@ -87,7 +88,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
     return lastMessage.timestamp || (lastMessage.created_at ? new Date(lastMessage.created_at) : undefined);
   };
   
-  // Filter participants based on their actual name, always showing the name
+  // Filter participants based on their actual name
   const filteredParticipants = participantsList.filter(participant => {
     const displayName = participant.name || `Participant ${participant.id}`;
     return displayName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -135,6 +136,7 @@ const AdminParticipantList: React.FC<AdminParticipantListProps> = ({
                   onRemove={removeParticipant}
                   messageCount={getParticipantMessageCount(participant.id)}
                   lastActiveTime={getParticipantLastActive(participant.id)}
+                  isRemoving={isRemoving === participant.id}
                 />
               ))}
             </div>

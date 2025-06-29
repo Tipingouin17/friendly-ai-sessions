@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { QrCode, Copy, X } from "lucide-react";
 import { 
@@ -60,7 +59,7 @@ const JoinSessionDialog = ({
   useEffect(() => {
     // Generate QR code URL when the join URL is available
     if (internalJoinUrl) {
-      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(internalJoinUrl)}`);
+      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(internalJoinUrl)}`);
       console.log("Generated QR code for URL:", internalJoinUrl);
     }
   }, [internalJoinUrl]);
@@ -73,6 +72,13 @@ const JoinSessionDialog = ({
         description: "Session join link copied to clipboard",
       });
     }
+  };
+
+  const truncateUrl = (url: string, maxLength: number = 40) => {
+    if (url.length <= maxLength) return url;
+    const start = url.substring(0, Math.floor(maxLength / 2) - 2);
+    const end = url.substring(url.length - Math.floor(maxLength / 2) + 2);
+    return `${start}...${end}`;
   };
 
   // Don't render the dialog trigger or dialog if session is full
@@ -92,38 +98,38 @@ const JoinSessionDialog = ({
           <QrCode className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-md mx-auto p-4 max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="text-center">
           <DialogTitle>Join Session</DialogTitle>
           <DialogDescription>
             Share this link or QR code to invite others
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col items-center justify-center p-4 space-y-6">
+        <div className="flex flex-col items-center space-y-4">
           {internalJoinUrl ? (
             <>
-              <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm">
+              <div className="w-full flex justify-center bg-white p-3 rounded-lg border">
                 <img 
                   src={qrCodeUrl} 
                   alt="Session QR Code" 
-                  className="w-[250px] h-[250px] object-contain"
+                  className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
                 />
               </div>
-              <div className="flex w-full items-center bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
-                <input 
-                  type="text" 
-                  value={internalJoinUrl} 
-                  readOnly 
-                  className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none"
-                />
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-full rounded-l-none border-l" 
-                  onClick={copyJoinLink}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+              
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg border p-2 min-h-[40px]">
+                  <span className="text-xs font-mono text-gray-700 flex-1 break-all leading-tight px-1">
+                    {truncateUrl(internalJoinUrl, 50)}
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="ml-2 h-8 w-8 p-0 flex-shrink-0" 
+                    onClick={copyJoinLink}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </>
           ) : (

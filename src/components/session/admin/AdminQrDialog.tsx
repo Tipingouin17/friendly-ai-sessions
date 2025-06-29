@@ -25,7 +25,6 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
   useEffect(() => {
     if (conversationId) {
       const baseUrl = window.location.origin;
-      // Update to use the proper join-session path
       setJoinUrl(`${baseUrl}/join-session?id=${conversationId}`);
     }
   }, [conversationId]);
@@ -38,6 +37,13 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
         description: "Session join link copied to clipboard",
       });
     }
+  };
+
+  const truncateUrl = (url: string, maxLength: number = 40) => {
+    if (url.length <= maxLength) return url;
+    const start = url.substring(0, Math.floor(maxLength / 2) - 2);
+    const end = url.substring(url.length - Math.floor(maxLength / 2) + 2);
+    return `${start}...${end}`;
   };
 
   // Don't render the dialog at all if no conversation ID
@@ -53,35 +59,35 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
           <span>QR Code</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-md mx-auto p-4 max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="text-center">
           <DialogTitle>Session QR Code</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col items-center justify-center p-6 space-y-6">
+        <div className="flex flex-col items-center space-y-4">
           {joinUrl && (
             <>
-              <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm">
+              <div className="w-full flex justify-center bg-white p-3 rounded-lg border">
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(joinUrl)}`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`} 
                   alt="Session QR Code" 
-                  className="w-[250px] h-[250px] object-contain"
+                  className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
                 />
               </div>
-              <div className="flex w-full items-center bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
-                <input 
-                  type="text" 
-                  value={joinUrl} 
-                  readOnly 
-                  className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none"
-                />
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-full rounded-l-none border-l" 
-                  onClick={onCopyLink}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+              
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg border p-2 min-h-[40px]">
+                  <span className="text-xs font-mono text-gray-700 flex-1 break-all leading-tight px-1">
+                    {truncateUrl(joinUrl, 50)}
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="ml-2 h-8 w-8 p-0 flex-shrink-0" 
+                    onClick={onCopyLink}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </>
           )}

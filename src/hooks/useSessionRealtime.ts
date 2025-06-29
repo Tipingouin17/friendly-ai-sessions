@@ -19,7 +19,7 @@ export const useSessionRealtime = ({
 }: UseSessionRealtimeProps) => {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const channelRef = useRef<any>(null);
-  const logger = createLogger('SessionRealtime', 'realtime');
+  const logger = createLogger('SessionRealtime', 'connection');
 
   useEffect(() => {
     if (!conversationId) return;
@@ -35,7 +35,7 @@ export const useSessionRealtime = ({
         filter: `id=eq.${conversationId}`
       }, (payload) => {
         if (payload.new.session_started && !payload.old.session_started) {
-          logger.category('realtime', 'Session started event received');
+          logger.category('connection', 'Session started event received');
           onSessionStart();
         }
       })
@@ -56,12 +56,12 @@ export const useSessionRealtime = ({
           participant: payload.new.participant_id ? `P${payload.new.participant_id}` : undefined
         };
         
-        logger.category('realtime', 'New message received via realtime');
+        logger.category('connection', 'New message received via realtime');
         onNewMessage(message);
       })
       .subscribe((status) => {
         setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'connecting');
-        logger.category('realtime', `Realtime connection status: ${status}`);
+        logger.category('connection', `Realtime connection status: ${status}`);
       });
 
     channelRef.current = channel;

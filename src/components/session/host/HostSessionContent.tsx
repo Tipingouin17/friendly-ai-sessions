@@ -22,6 +22,7 @@ interface HostSessionContentProps {
   // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
+  triggerSessionStart?: () => Promise<boolean>;
 }
 
 const HostSessionContent: React.FC<HostSessionContentProps> = ({
@@ -37,7 +38,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
-  onSessionStarted
+  onSessionStarted,
+  triggerSessionStart
 }) => {
   // Use actual participant count from real-time data
   const actualParticipantCount = participants.length;

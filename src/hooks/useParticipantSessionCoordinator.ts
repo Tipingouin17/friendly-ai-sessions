@@ -16,7 +16,7 @@ export const useParticipantSessionCoordinator = ({
 }: UseParticipantSessionCoordinatorProps) => {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const logger = createLogger('ParticipantCoordinator', 'participant');
+  const logger = createLogger('ParticipantCoordinator', 'participants');
 
   // Get coordinated session data
   const {
@@ -33,7 +33,7 @@ export const useParticipantSessionCoordinator = ({
 
   // Handle session start
   const handleSessionStart = useCallback(() => {
-    logger.category('participant', 'Session started - participant view updating');
+    logger.category('participants', 'Session started - participant view updating');
     setSessionStarted(true);
     // Refresh data to get welcome message
     refetch();
@@ -41,7 +41,7 @@ export const useParticipantSessionCoordinator = ({
 
   // Handle new messages
   const handleNewMessage = useCallback((message: Message) => {
-    logger.category('participant', 'New message received via realtime');
+    logger.category('participants', 'New message received via realtime');
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) return prev;

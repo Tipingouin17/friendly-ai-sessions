@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { Message } from '@/types/chat';
 import { useResponseTracking } from './session-messages/useResponseTracking';
-import { useMessageFetching } from './session-messages/useMessageFetching';
 import { useViewMode } from './session-messages/useViewMode';
+import { useCoordinatedSessionData } from './useCoordinatedSessionData';
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
@@ -22,25 +22,18 @@ export const useSessionMessages = ({
   conversation,
   totalParticipants = 1
 }: UseSessionMessagesProps) => {
-  // Use enhanced message fetching with database-first approach
+  // Use coordinated session data to prevent duplicate requests
   const {
     messages,
-    setMessages,
+    participants,
+    conversation: sessionConversation,
+    isLoading,
     error,
-    fetchMessages,
-    isGeneratingWelcome,
-    processNewMessage,
-    isWaitingForResponses,
-    responseCount,
-    generateAggregatedResponse,
-    isGeneratingResponse,
-    clearWelcomeMessageCache
-  } = useMessageFetching({
+    refetch,
+    connectionHealthy
+  } = useCoordinatedSessionData({
     conversationId,
-    welcomeMessage,
-    isAdmin,
-    conversation,
-    totalParticipants
+    isAdmin
   });
   
   const {
@@ -59,32 +52,23 @@ export const useSessionMessages = ({
     isAdmin
   });
   
-  // Fetch messages when the conversation ID changes
-  useEffect(() => {
-    fetchMessages();
-  }, [conversationId, welcomeMessage, conversation, fetchMessages]);
-  
-  // Clear cache when conversation changes (ensures fresh AI generation for new sessions)
-  useEffect(() => {
-    if (conversationId && !isAdmin) {
-      clearWelcomeMessageCache();
-    }
-  }, [conversationId, isAdmin, clearWelcomeMessageCache]);
-  
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {
-    processNewMessage(message);
-    
     // Record response for tracking
     if (message.sender === 'user' && message.participant) {
       const participantId = parseInt(message.participant.replace('P', ''));
       recordResponse(participantId, true);
     }
+    
+    // Trigger refetch to get updated data
+    refetch();
   };
   
   return {
     messages,
-    setMessages,
+    setMessages: () => {
+      console.warn('setMessages is deprecated - use refetch() to update messages');
+    },
     error,
     currentParticipant,
     recordResponse,
@@ -92,11 +76,13 @@ export const useSessionMessages = ({
     hasAnswered,
     viewMode,
     setViewMode,
-    isGeneratingWelcome,
+    isGeneratingWelcome: isLoading,
     handleNewMessage,
-    isWaitingForResponses,
-    responseCount,
-    generateAggregatedResponse,
-    isGeneratingResponse
+    isWaitingForResponses: false,
+    responseCount: 0,
+    generateAggregatedResponse: () => Promise.resolve(),
+    isGeneratingResponse: false,
+    refetch,
+    connectionHealthy
   };
 };

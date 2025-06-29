@@ -1,12 +1,11 @@
 
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
-import { supabase } from '@/integrations/supabase/client';
 import { debugLog } from '@/utils/debugLogger';
 import { useWelcomeMessageWithFallback } from './useWelcomeMessageWithFallback';
-import { useMessageFormatting } from './useMessageFormatting';
 import { useWelcomeMessageSaver } from './useWelcomeMessageSaver';
 import { useResponseAggregation } from './useResponseAggregation';
+import { useCoordinatedSessionData } from '../useCoordinatedSessionData';
 
 interface UseMessageFetchingProps {
   conversationId: number | null;
@@ -23,8 +22,19 @@ export const useMessageFetching = ({
   conversation,
   totalParticipants = 1
 }: UseMessageFetchingProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use coordinated session data instead of direct database calls
+  const {
+    messages: coordinatedMessages,
+    isLoading,
+    error: coordinatedError,
+    refetch,
+    connectionHealthy
+  } = useCoordinatedSessionData({
+    conversationId,
+    isAdmin
+  });
   
   const { 
     getCachedWelcomeMessage, 
@@ -39,7 +49,6 @@ export const useMessageFetching = ({
     conversation
   });
 
-  const { formatDatabaseMessages } = useMessageFormatting({ conversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
   // Response aggregation system
@@ -63,13 +72,9 @@ export const useMessageFetching = ({
       recordParticipantResponse(message);
     }
 
-    // Add message to the list
-    setMessages(prev => {
-      const exists = prev.some(m => m.id === message.id);
-      if (exists) return prev;
-      return [...prev, message];
-    });
-  }, [isWaitingForResponses, recordParticipantResponse]);
+    // Trigger coordinated data refetch to get updated messages
+    refetch();
+  }, [isWaitingForResponses, recordParticipantResponse, refetch]);
 
   // Trigger response collection for facilitator questions
   const handleFacilitatorQuestion = useCallback((message: Message) => {
@@ -81,125 +86,43 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
-  // Main fetch function - DATABASE FIRST approach
+  // Main fetch function - uses coordinated data
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
-      debugLog('all', 'No conversation ID provided, skipping message fetch');
+      debugLog('all', 'No conversation ID provided, using coordinated fetch');
       return;
     }
     
-    try {
-      debugLog('all', `🔍 Fetching messages for conversation: ${conversationId} (Database First)`);
-      
-      // ALWAYS check database first - this is the primary source of truth
-      const { data, error: dbError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-        
-      if (dbError) {
-        console.error('Error fetching messages from database:', dbError);
-        setError(`Failed to fetch messages: ${dbError.message}`);
-        
-        // If database fails and we're a participant, show emergency fallback
-        if (!isAdmin) {
-          const cachedWelcomeMsg = getCachedWelcomeMessage();
-          if (cachedWelcomeMsg) {
-            debugLog('all', 'Database failed, using cached welcome message');
-            setMessages([cachedWelcomeMsg]);
-          } else {
-            const emergencyWelcome = await createWelcomeMessageWithFallback();
-            if (emergencyWelcome) {
-              setMessages([emergencyWelcome]);
-            }
-          }
-        }
-        return;
-      }
-      
-      // If we have database messages, use them (this is the expected path)
-      if (data && data.length > 0) {
-        const formattedMessages = await formatDatabaseMessages(data);
-        debugLog('all', `✅ Successfully loaded ${formattedMessages.length} database messages`);
-        setMessages(formattedMessages);
-        
-        // Check if the last message was a facilitator question
-        const lastMessage = formattedMessages[formattedMessages.length - 1];
-        if (lastMessage) {
-          handleFacilitatorQuestion(lastMessage);
-        }
-        return;
-      }
-      
-      // No database messages found
-      debugLog('all', `📭 No messages found in database for session ${conversationId}`);
-      
-      // For admin, just show empty state - they'll see messages when session starts
-      if (isAdmin) {
-        debugLog('all', 'Admin view - showing empty state until session generates messages');
-        setMessages([]);
-        return;
-      }
-      
-      // For participants, check if we should have a welcome message
-      debugLog('all', 'Participant view - checking for welcome message availability');
-      
-      // If session has started, there should be a database message
-      // If not found, it means AI generation may have failed - show emergency fallback
-      const cachedWelcomeMsg = getCachedWelcomeMessage();
-      if (cachedWelcomeMsg && !cachedWelcomeMsg.isFallback) {
-        debugLog('all', 'Using valid cached AI-generated welcome message');
-        setMessages([cachedWelcomeMsg]);
-      } else {
-        debugLog('all', '⚠️ No AI-generated welcome message found, creating emergency fallback');
-        const emergencyWelcome = await createWelcomeMessageWithFallback();
-        if (emergencyWelcome) {
-          setMessages([emergencyWelcome]);
-        }
-      }
-      
-    } catch (err) {
-      console.error('Exception fetching messages:', err);
-      setError('Failed to load session messages');
-      
-      // Emergency fallback for participants
-      if (!isAdmin) {
-        try {
-          const cachedWelcomeMsg = getCachedWelcomeMessage();
-          if (cachedWelcomeMsg) {
-            setMessages([cachedWelcomeMsg]);
-          } else {
-            const emergencyWelcome = await createWelcomeMessageWithFallback();
-            if (emergencyWelcome) {
-              setMessages([emergencyWelcome]);
-            }
-          }
-        } catch (fallbackError) {
-          console.error('Failed to show emergency fallback welcome message:', fallbackError);
-        }
-      }
-    }
-  }, [
-    conversationId,
-    isAdmin,
-    getCachedWelcomeMessage,
-    createWelcomeMessageWithFallback,
-    formatDatabaseMessages,
-    handleFacilitatorQuestion
-  ]);
+    debugLog('all', `🔍 Using coordinated fetch for conversation: ${conversationId}`);
+    
+    // The coordinated system handles all the fetching logic
+    // We just need to trigger a refetch if needed
+    refetch();
+  }, [conversationId, refetch]);
+
+  // Determine final messages based on coordinated data and fallbacks
+  const messages = coordinatedMessages.length > 0 
+    ? coordinatedMessages 
+    : (getCachedWelcomeMessage() ? [getCachedWelcomeMessage()] : []);
+
+  // Combine errors from different sources
+  const finalError = error || coordinatedError || welcomeError;
 
   return {
     messages,
-    setMessages,
-    error: error || welcomeError,
+    setMessages: () => {
+      console.warn('setMessages is deprecated in coordinated system - use refetch()');
+    },
+    error: finalError,
     fetchMessages,
-    isGeneratingWelcome,
+    isGeneratingWelcome: isGeneratingWelcome || isLoading,
     processNewMessage,
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,
     isGeneratingResponse,
-    clearWelcomeMessageCache
+    clearWelcomeMessageCache,
+    refetch,
+    connectionHealthy
   };
 };

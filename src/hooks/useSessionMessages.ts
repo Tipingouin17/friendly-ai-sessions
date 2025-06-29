@@ -10,7 +10,7 @@ interface UseSessionMessagesProps {
   currentUserParticipantId: number | null;
   isAdmin: boolean;
   welcomeMessage?: string | null;
-  conversation?: any; // Add conversation data
+  conversation?: any;
 }
 
 export const useSessionMessages = ({
@@ -25,7 +25,8 @@ export const useSessionMessages = ({
     messages,
     setMessages,
     error,
-    fetchMessages
+    fetchMessages,
+    isGeneratingWelcome
   } = useMessageFetching({
     conversationId,
     welcomeMessage,
@@ -63,6 +64,7 @@ export const useSessionMessages = ({
     totalResponses,
     hasAnswered,
     viewMode,
-    setViewMode
+    setViewMode,
+    isGeneratingWelcome
   };
 };

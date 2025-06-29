@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
 import { debugLog } from '@/utils/debugLogger';
-import { useWelcomeMessage } from './useWelcomeMessage';
+import { useWelcomeMessageWithFallback } from './useWelcomeMessageWithFallback';
 import { useMessageFormatting } from './useMessageFormatting';
 import { useWelcomeMessageSaver } from './useWelcomeMessageSaver';
 
@@ -25,8 +25,10 @@ export const useMessageFetching = ({
   
   const { 
     getCachedWelcomeMessage, 
-    createWelcomeMessage 
-  } = useWelcomeMessage({
+    createWelcomeMessageWithFallback,
+    isGenerating: isGeneratingWelcome,
+    lastError: welcomeError
+  } = useWelcomeMessageWithFallback({
     conversationId,
     welcomeMessage,
     isAdmin,
@@ -36,7 +38,7 @@ export const useMessageFetching = ({
   const { formatDatabaseMessages } = useMessageFormatting({ conversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
-  // Main fetch function - FIXED to not show welcome message until session starts
+  // Main fetch function - updated to generate welcome messages immediately for participants
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       debugLog('all', 'No conversation ID provided, skipping message fetch');
@@ -46,19 +48,7 @@ export const useMessageFetching = ({
     try {
       debugLog('all', `Fetching messages for conversation: ${conversationId}`);
       
-      // Check if session has started
-      const { data: conversationData, error: convError } = await supabase
-        .from('conversations')
-        .select('session_started')
-        .eq('id', conversationId)
-        .single();
-        
-      if (convError) {
-        console.error('Error checking session status:', convError);
-      }
-      
-      const sessionStarted = conversationData?.session_started || false;
-      
+      // Always check for database messages first
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -71,14 +61,20 @@ export const useMessageFetching = ({
         return;
       }
       
-      // FIXED: Only show messages if session has started or if there are actual database messages
-      if (!data || data.length === 0) {
-        if (!sessionStarted) {
-          debugLog('all', 'Session not started yet - showing no messages');
-          setMessages([]);
-          return;
-        }
+      // If we have database messages, format and display them
+      if (data && data.length > 0) {
+        const formattedMessages = await formatDatabaseMessages(data);
+        debugLog('all', `Successfully fetched ${formattedMessages.length} database messages`);
+        setMessages(formattedMessages);
+        return;
+      }
+      
+      // No database messages - generate welcome message for participants
+      // For participants, always generate a welcome message immediately
+      if (!isAdmin) {
+        debugLog('all', 'No database messages found, generating welcome message for participant');
         
+        // Check cache first
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         if (cachedWelcomeMsg) {
           debugLog('all', 'Using cached welcome message');
@@ -86,45 +82,42 @@ export const useMessageFetching = ({
           return;
         }
         
-        if (welcomeMessage) {
-          debugLog('all', 'Session started - adding welcome message to messages list');
-          
-          const welcomeMsg = await createWelcomeMessage();
-          if (welcomeMsg) {
-            setMessages([welcomeMsg]);
-            saveWelcomeMessageToDb(welcomeMsg);
-          }
-        }
-        return;
-      }
-      
-      // Format the database messages
-      const formattedMessages = await formatDatabaseMessages(data);
-      
-      debugLog('all', `Successfully fetched messages: ${formattedMessages.length}`);
-      
-      // Determine if we need to include the cached welcome message
-      const hasAssistantMessage = formattedMessages.some(m => m.sender === 'assistant');
-      if (sessionStarted && !hasAssistantMessage && welcomeMessage) {
-        const cachedWelcomeMsg = getCachedWelcomeMessage();
-        if (cachedWelcomeMsg) {
-          setMessages([cachedWelcomeMsg, ...formattedMessages]);
-        } else {
-          setMessages(formattedMessages);
+        // Generate new welcome message with AI/fallback
+        const welcomeMsg = await createWelcomeMessageWithFallback();
+        if (welcomeMsg) {
+          setMessages([welcomeMsg]);
+          // Save to database for other participants to see
+          saveWelcomeMessageToDb(welcomeMsg);
         }
       } else {
-        setMessages(formattedMessages);
+        // For admin, just show empty state until session starts
+        debugLog('all', 'Admin view - showing empty state until session starts');
+        setMessages([]);
       }
+      
     } catch (err) {
       console.error('Exception fetching messages:', err);
       setError('Failed to load session messages');
+      
+      // Even on error, try to show a fallback welcome message for participants
+      if (!isAdmin) {
+        try {
+          const cachedWelcomeMsg = getCachedWelcomeMessage();
+          if (cachedWelcomeMsg) {
+            setMessages([cachedWelcomeMsg]);
+          }
+        } catch (fallbackError) {
+          console.error('Failed to show fallback welcome message:', fallbackError);
+        }
+      }
     }
   }, [
     conversationId,
     welcomeMessage,
     conversation,
+    isAdmin,
     getCachedWelcomeMessage,
-    createWelcomeMessage,
+    createWelcomeMessageWithFallback,
     formatDatabaseMessages,
     saveWelcomeMessageToDb
   ]);
@@ -132,7 +125,8 @@ export const useMessageFetching = ({
   return {
     messages,
     setMessages,
-    error,
-    fetchMessages
+    error: error || welcomeError,
+    fetchMessages,
+    isGeneratingWelcome
   };
 };

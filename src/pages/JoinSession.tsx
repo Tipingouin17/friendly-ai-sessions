@@ -1,6 +1,6 @@
 
 import { useSearchParams, Navigate } from "react-router-dom";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import JoinSessionErrorState from "@/components/session/JoinSessionErrorState";
@@ -20,6 +20,9 @@ const JoinSession = () => {
     name: string;
     avatarSeed: string;
   } | null>(null);
+  
+  // Use ref to prevent multiple navigation attempts during same render cycle
+  const hasNavigated = useRef(false);
   
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
@@ -44,7 +47,8 @@ const JoinSession = () => {
   const defaultAvatarSeed = existingSessionData?.avatarSeed || Math.random().toString();
 
   // Navigate to participant session if join was successful - MOVED TO TOP
-  if (joinSuccess) {
+  if (joinSuccess && !hasNavigated.current) {
+    hasNavigated.current = true;
     const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
     console.log("🚀 Navigating to participant session:", navigationPath);
     return <Navigate to={navigationPath} replace />;
@@ -64,7 +68,7 @@ const JoinSession = () => {
   
   // Force refresh conversation data when joining a session
   useEffect(() => {
-    if (conversationId) {
+    if (conversationId && !hasNavigated.current) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true });
@@ -84,7 +88,7 @@ const JoinSession = () => {
     isLoading,
     error,
     handleJoinSession,
-    joinResult
+    existingSessionData: hookExistingSessionData
   } = useJoinSessionData(conversationId, {
     defaultParticipantName,
     defaultAvatarSeed
@@ -92,14 +96,14 @@ const JoinSession = () => {
 
   // Handle successful join - set success state for navigation (GUARDED)
   const handleJoin = async () => {
-    // Don't allow join if user has already joined before
-    if (hasJoinedBefore) {
-      console.log("User has already joined before, skipping join attempt");
+    // Don't allow join if user has already joined before or already navigating
+    if (hasJoinedBefore || hasNavigated.current) {
+      console.log("User has already joined before or is navigating, skipping join attempt");
       return;
     }
     
     const result = await handleJoinSession();
-    if (result && conversationId) {
+    if (result && conversationId && !hasNavigated.current) {
       console.log("Successfully joined session, preparing for navigation:", result);
       setJoinSuccess({
         conversationId,
@@ -111,10 +115,11 @@ const JoinSession = () => {
   };
 
   const handleRetry = useCallback(() => {
-    if (conversationId) {
+    if (conversationId && !hasNavigated.current) {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
       setJoinSuccess(null);
+      hasNavigated.current = false;
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
@@ -122,7 +127,7 @@ const JoinSession = () => {
   
   // Handle rejoining the session with existing data
   const handleRejoin = useCallback(() => {
-    if (existingSessionData && conversationId) {
+    if (existingSessionData && conversationId && !hasNavigated.current) {
       console.log("Rejoining session with existing data:", existingSessionData);
       setJoinSuccess({
         conversationId,
@@ -135,8 +140,11 @@ const JoinSession = () => {
   
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
-    setShowRejoinPrompt(false);
-    setJoinSuccess(null);
+    if (!hasNavigated.current) {
+      setShowRejoinPrompt(false);
+      setJoinSuccess(null);
+      hasNavigated.current = false;
+    }
   }, []);
 
   // Show loading state when data is being fetched
@@ -177,7 +185,7 @@ const JoinSession = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={!hasJoinedBefore ? handleJoin : undefined}
+      onJoinSession={!hasJoinedBefore && !hasNavigated.current ? handleJoin : undefined}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

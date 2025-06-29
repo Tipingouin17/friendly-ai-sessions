@@ -38,7 +38,6 @@ export function useJoinSessionData(
   // Initialize participant state with provided defaults (pure, no side effects)
   const [participantName, setParticipantName] = useState(() => options?.defaultParticipantName || "");
   const [avatarSeed, setAvatarSeed] = useState(() => options?.defaultAvatarSeed || Math.random().toString());
-  const [joinResult, setJoinResult] = useState<JoinResult | null>(null);
   
   // Debug logging
   useEffect(() => {
@@ -140,9 +139,8 @@ export function useJoinSessionData(
     });
 
     if (result) {
-      console.log("Join session successful, storing result:", result);
-      setJoinResult(result);
-      // Note: We no longer navigate here - let the component handle navigation
+      console.log("Join session successful, returning result:", result);
+      // Just return the result - don't store it in state
     }
 
     return result;
@@ -172,7 +170,6 @@ export function useJoinSessionData(
     isLoading: !conversation && !error,
     error,
     handleJoinSession,
-    existingSessionData,
-    joinResult
+    existingSessionData
   };
 }

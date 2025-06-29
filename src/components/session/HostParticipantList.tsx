@@ -1,12 +1,15 @@
 
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Users, MessageSquare, Crown } from "lucide-react";
+import React, { useEffect, useState } from 'react';
 import { ParticipantInfo, Message } from "@/types/chat";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Users, Search } from "lucide-react";
+import { useParticipantRemoval } from "@/hooks/useParticipantRemoval";
+import { useParticipantRealtime } from "@/hooks/useParticipantRealtime";
+import ParticipantListItem from "@/components/session/participant/ParticipantListItem";
+import EmptyParticipantList from "@/components/session/participant/EmptyParticipantList";
+import ParticipantListSkeleton from "@/components/session/participant/ParticipantListSkeleton";
+import AdminMessageInput from "@/components/session/AdminMessageInput";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 interface HostParticipantListProps {
   participants: ParticipantInfo[];
@@ -14,7 +17,7 @@ interface HostParticipantListProps {
   maxParticipants: number;
   isLoading: boolean;
   conversationData: any;
-  messages: Message[];
+  messages?: Message[];
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
 }
 
@@ -24,94 +27,141 @@ const HostParticipantList: React.FC<HostParticipantListProps> = ({
   maxParticipants,
   isLoading,
   conversationData,
-  messages,
+  messages = [],
   onSendMessage
 }) => {
+  const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(isLoading);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Synchronize the component's local state with the incoming props
+  useEffect(() => {
+    if (participants && participants.length > 0) {
+      console.log('HostParticipantList: Updating participants list', participants.length);
+      setParticipantsList(participants);
+    }
+    
+    setIsLoadingParticipants(isLoading);
+  }, [participants, isLoading]);
+  
+  const { 
+    displayCount, 
+    setDisplayCount, 
+    removeParticipant,
+    isRemoving
+  } = useParticipantRemoval({
+    conversationId: conversationData?.id || null,
+    currentParticipantCount: participantsList.length,
+    setParticipantsList
+  });
+  
+  useEffect(() => {
+    const actualCount = participantsList.length;
+    console.log('HostParticipantList: Setting display count to', actualCount);
+    setDisplayCount(actualCount);
+  }, [participantsList, setDisplayCount]);
+  
+  useParticipantRealtime({
+    conversationId: conversationData?.id || null,
+    participants: participantsList,
+    setParticipants: setParticipantsList,
+    setIsLoading: setIsLoadingParticipants,
+    maxParticipants
+  });
+  
   const getParticipantMessageCount = (participantId: number) => {
-    return messages.filter(m => 
-      m.sender === 'user' && 
-      m.participant === `P${participantId}`
+    return messages.filter(msg => 
+      msg.sender === 'user' && 
+      msg.participant === `P${participantId}`
     ).length;
   };
-
-  const handleMessageParticipant = (participantId: number) => {
-    if (onSendMessage) {
-      const message = `Private message to participant ${participantId}`;
-      onSendMessage(message, false, String(participantId));
-    }
+  
+  const getParticipantLastActive = (participantId: number) => {
+    const participantMessages = messages.filter(msg => 
+      msg.sender === 'user' && 
+      msg.participant === `P${participantId}`
+    );
+    
+    if (participantMessages.length === 0) return undefined;
+    
+    const lastMessage = participantMessages[participantMessages.length - 1];
+    return lastMessage.timestamp || (lastMessage.created_at ? new Date(lastMessage.created_at) : undefined);
   };
+  
+  // Filter participants based on their actual name
+  const filteredParticipants = participantsList.filter(participant => {
+    const displayName = participant.name || `Participant ${participant.id}`;
+    return displayName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const actualParticipantCount = participantsList.length;
 
   return (
-    <Card className="w-80 bg-white border-l rounded-l-none rounded-r-lg m-4 ml-0">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Users className="h-5 w-5" />
-          Participants
-          <Badge variant="secondary" className="ml-auto">
-            {currentParticipantCount}/{maxParticipants}
+    <div className="w-80 border-l border-gray-200 bg-white flex flex-col h-full hidden md:flex">
+      {/* Header */}
+      <div className="p-4 border-b bg-gray-50">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900">
+            <Users className="h-5 w-5" /> 
+            Participants
+          </h3>
+          <Badge variant="outline" className="bg-white">
+            {actualParticipantCount}/{maxParticipants || "∞"}
           </Badge>
-        </CardTitle>
-      </CardHeader>
+        </div>
+        
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search participants..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+      </div>
       
-      <CardContent className="p-0">
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          <div className="space-y-2 p-4 pt-0">
-            {isLoading ? (
-              <div className="text-center text-gray-500 py-8">
-                Loading participants...
-              </div>
-            ) : participants.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                No participants yet
-              </div>
-            ) : (
-              participants.map((participant) => (
-                <div key={participant.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={participant.avatar || undefined} />
-                    <AvatarFallback>
-                      {participant.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {participant.name}
-                      </p>
-                      {participant.isHost && (
-                        <Crown className="h-4 w-4 text-yellow-500" />
-                      )}
-                      {participant.isAnonymous && (
-                        <Badge variant="outline" className="text-xs">
-                          Anonymous
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mt-1">
-                      <MessageSquare className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">
-                        {getParticipantMessageCount(participant.id)} messages
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleMessageParticipant(participant.id)}
-                    className="text-xs"
-                  >
-                    Message
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+      {/* Participants List */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-4">
+          {isLoadingParticipants ? (
+            <ParticipantListSkeleton count={actualParticipantCount || 1} />
+          ) : filteredParticipants.length > 0 ? (
+            <div className="space-y-2">
+              {filteredParticipants.map((participant) => (
+                <ParticipantListItem
+                  key={participant.id}
+                  participant={participant}
+                  onRemove={removeParticipant}
+                  messageCount={getParticipantMessageCount(participant.id)}
+                  lastActiveTime={getParticipantLastActive(participant.id)}
+                  isRemoving={isRemoving === participant.id}
+                />
+              ))}
+            </div>
+          ) : searchTerm ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm">No participants found</p>
+              <p className="text-xs text-gray-400">Try adjusting your search</p>
+            </div>
+          ) : (
+            <EmptyParticipantList />
+          )}
+        </div>
+      </div>
+
+      {/* Host Message Input */}
+      {onSendMessage && (
+        <div className="border-t border-gray-200">
+          <AdminMessageInput
+            onSendMessage={onSendMessage}
+            participants={participantsList}
+          />
+        </div>
+      )}
+    </div>
   );
 };
 

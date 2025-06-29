@@ -129,6 +129,14 @@ const SessionHost = () => {
     }
   }, [currentConversationId]);
 
+  // Force host status when on host page
+  useEffect(() => {
+    if (currentConversationId) {
+      console.log("🔧 SessionHost - Forcing host status for conversation:", currentConversationId);
+      forceHost();
+    }
+  }, [currentConversationId, forceHost]);
+
   // Redirect logic
   if (!hostViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
     console.log("No conversation ID found, checking if we should show host interface anyway");

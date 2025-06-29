@@ -11,7 +11,7 @@ const fetchConversation = async (id: number | null) => {
   try {
     console.log('🔍 Fetching conversation with enhanced facilitator context for ID:', id);
     
-    // Enhanced query with proper facilitator joins for both paths
+    // Enhanced query with proper facilitator joins through sessions table
     const { data, error } = await supabase
       .from('conversations')
       .select(`
@@ -36,16 +36,6 @@ const fetchConversation = async (id: number | null) => {
             specialties,
             languages
           )
-        ),
-        facilitator:facilitator_id (
-          id,
-          title,
-          profile_picture,
-          details,
-          description,
-          expertise_level,
-          specialties,
-          languages
         )
       `)
       .eq('id', id)
@@ -65,8 +55,7 @@ const fetchConversation = async (id: number | null) => {
       id: data.id,
       hasSession: !!data.sessions,
       hasFacilitatorDetails: !!data.sessions?.facilitator_details,
-      hasDirectFacilitator: !!data.facilitator,
-      facilitatorName: data.sessions?.facilitator_details?.title || data.facilitator?.title,
+      facilitatorName: data.sessions?.facilitator_details?.title,
       participantDescription: data.participant_description,
       objective: data.sessions?.objective
     });

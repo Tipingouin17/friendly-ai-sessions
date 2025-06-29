@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Clock, Users } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Clock, Users, CheckCircle } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { removeChannel } from "@/utils/realtimeHelpers";
@@ -12,6 +11,7 @@ interface ParticipantWaitingScreenProps {
   maxParticipants?: number;
   facilitatorTitle?: string;
   onSessionStarted?: () => void;
+  sessionStarted?: boolean;
 }
 
 const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
@@ -19,17 +19,19 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   currentParticipantCount,
   maxParticipants,
   facilitatorTitle,
-  onSessionStarted
+  onSessionStarted,
+  sessionStarted = false
 }) => {
   const { toast } = useToast();
   const [participantCount, setParticipantCount] = React.useState(currentParticipantCount || 0);
+  const [sessionStarting, setSessionStarting] = React.useState(false);
   
-  // Debug log to verify props
-  console.log("ParticipantWaitingScreen mounted with props:", {
+  console.log("ParticipantWaitingScreen props:", {
     conversationId,
     currentParticipantCount,
     maxParticipants,
-    facilitatorTitle
+    facilitatorTitle,
+    sessionStarted
   });
   
   // Set up real-time listener for conversation updates
@@ -40,7 +42,6 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     }
     
     console.log("Setting up realtime subscription for participant waiting screen:", conversationId);
-    console.log("Initial participant count:", currentParticipantCount);
     
     // Update initial count from props
     setParticipantCount(currentParticipantCount || 0);
@@ -66,16 +67,19 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             
             // Check if session was started
             if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-              console.log("Session was started, triggering callback");
+              console.log("Session was started, showing transition state");
+              setSessionStarting(true);
+              
               toast({
-                title: "Session Started",
-                description: "The session has been started by the admin."
+                title: "Session Starting",
+                description: "The session is starting! Please wait while we load your conversation..."
               });
               
               if (onSessionStarted) {
+                // Small delay to show the transition state
                 setTimeout(() => {
                   onSessionStarted();
-                }, 1000); // Short delay to ensure toast is shown
+                }, 1500);
               }
             }
           }
@@ -120,6 +124,32 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
 
   // Ensure we always have a valid display value
   const displayCount = participantCount || 0;
+
+  // Show session starting state
+  if (sessionStarting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
+        <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+          <div className="w-16 h-16 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
+            <CheckCircle className="h-8 w-8 text-green-500" />
+          </div>
+          
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">Session Starting!</h2>
+          
+          <p className="text-gray-600 mb-6">
+            Your session is now beginning. Please wait a moment while we prepare your conversation...
+          </p>
+          
+          <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-6">
+            <p className="text-green-800 font-medium">Loading your conversation...</p>
+            <div className="mt-2 h-2 bg-green-200 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '70%' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">

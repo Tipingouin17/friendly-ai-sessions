@@ -34,6 +34,7 @@ export const useSessionFlow = ({
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [sessionStartNotification, setSessionStartNotification] = useState<string | null>(null);
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [startProgress, setStartProgress] = useState<string>('');
   
   const { toast } = useToast();
   const logger = createLogger('SessionFlow', 'session');
@@ -187,14 +188,15 @@ export const useSessionFlow = ({
     if (!conversationId || !isAdmin || isStartingSession) return false;
 
     setIsStartingSession(true);
+    setStartProgress('Initializing session...');
     
     try {
-      logger.category('session', 'Starting session with AI welcome generation');
+      logger.category('session', 'Starting session with enhanced flow');
       
-      // Show immediate feedback
-      setSessionStartNotification('Starting session and generating welcome message...');
+      // Step 1: Mark session as started immediately for UI feedback
+      setStartProgress('Starting session...');
+      setSessionStartNotification('Starting session...');
 
-      // Mark session as started first
       const { error: updateError } = await supabase
         .from('conversations')
         .update({ session_started: true })
@@ -202,37 +204,62 @@ export const useSessionFlow = ({
 
       if (updateError) throw updateError;
 
-      // Generate and save welcome message
-      const { data: welcomeResponse, error: welcomeError } = await supabase.functions.invoke(
-        'handle-facilitator-response',
-        {
-          body: {
-            messages: [],
-            conversationId,
-            generateReport: false,
-            sessionStart: true,
-            conversation: conversationData
-          }
+      // Step 2: Generate welcome message with timeout handling
+      setStartProgress('Generating AI welcome message...');
+      setSessionStartNotification('Generating AI welcome message...');
+
+      const welcomePromise = supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          generateReport: false,
+          sessionStart: true,
+          conversation: conversationData
         }
+      });
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI generation timeout')), 15000)
       );
 
-      if (welcomeError) throw welcomeError;
+      let welcomeResponse;
+      try {
+        welcomeResponse = await Promise.race([welcomePromise, timeoutPromise]);
+      } catch (timeoutError) {
+        logger.error('AI generation timeout, using fallback message');
+        welcomeResponse = {
+          data: {
+            content: "Welcome to the session! I'm your facilitator and I'm excited to guide you through our discussion. Let's begin!",
+            avatar: conversationData?.sessions?.facilitator_details?.profile_picture
+          }
+        };
+      }
 
-      // Save welcome message to database with proper content structure
+      // Step 3: Save welcome message to database
+      setStartProgress('Saving welcome message...');
+
       const { error: messageError } = await supabase.from('messages').insert({
         conversation_id: conversationId,
         content: {
-          text: welcomeResponse.content,
-          avatar: welcomeResponse.avatar
+          text: welcomeResponse.data.content,
+          avatar: welcomeResponse.data.avatar
         },
         role: 'assistant'
       });
 
       if (messageError) throw messageError;
 
+      // Step 4: Finalize session start
       setIsSessionActive(true);
+      setStartProgress('Session started successfully!');
       setSessionStartNotification('Session started successfully with AI welcome message');
-      setTimeout(() => setSessionStartNotification(null), 8000);
+      
+      // Clear progress after a moment
+      setTimeout(() => {
+        setStartProgress('');
+        setSessionStartNotification(null);
+      }, 8000);
 
       // Start collecting responses for the welcome message
       startResponseCollection(`welcome-${Date.now()}`);
@@ -248,8 +275,13 @@ export const useSessionFlow = ({
 
     } catch (error) {
       logger.error('Error starting session:', error);
+      setStartProgress('Error starting session');
       setSessionStartNotification('Error starting session. Please try again.');
-      setTimeout(() => setSessionStartNotification(null), 5000);
+      
+      setTimeout(() => {
+        setStartProgress('');
+        setSessionStartNotification(null);
+      }, 5000);
       
       toast({
         title: "Error Starting Session",
@@ -270,6 +302,7 @@ export const useSessionFlow = ({
     triggerSessionStart,
     startResponseCollection,
     isStartingSession,
+    startProgress,
     responseProgress: currentResponseCollection ? {
       collected: currentResponseCollection.responses.length,
       total: currentResponseCollection.totalExpected,

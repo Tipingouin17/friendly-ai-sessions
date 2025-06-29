@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Users, CheckCircle } from 'lucide-react';
+import { Play, Users, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface StartSessionButtonProps {
@@ -12,6 +12,8 @@ interface StartSessionButtonProps {
   disabled?: boolean;
   triggerSessionStart?: () => Promise<boolean>;
   sessionStartNotification?: string | null;
+  isStartingSession?: boolean;
+  startProgress?: string;
 }
 
 const StartSessionButton: React.FC<StartSessionButtonProps> = ({
@@ -21,9 +23,10 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   onSessionStarted,
   disabled = false,
   triggerSessionStart,
-  sessionStartNotification
+  sessionStartNotification,
+  isStartingSession = false,
+  startProgress = ''
 }) => {
-  const [isStarting, setIsStarting] = useState(false);
   const [actualParticipants, setActualParticipants] = useState(propParticipants);
 
   // Fetch actual participants if not provided
@@ -53,8 +56,6 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   const handleStartSession = async () => {
     if (!triggerSessionStart) return;
     
-    setIsStarting(true);
-    
     try {
       const success = await triggerSessionStart();
       if (success) {
@@ -62,17 +63,15 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       }
     } catch (error) {
       console.error('Error in handleStartSession:', error);
-    } finally {
-      setIsStarting(false);
     }
   };
 
   const hasParticipants = actualParticipants.length > 0 || (conversationData?.current_participants > 0);
-  const isDisabled = disabled || isStarting || !hasParticipants;
+  const isDisabled = disabled || !hasParticipants;
   const isSessionStarted = conversationData?.session_started;
 
   // Show session started state
-  if (isSessionStarted) {
+  if (isSessionStarted && !isStartingSession) {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
@@ -90,6 +89,32 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     );
   }
 
+  // Show starting state with progress
+  if (isStartingSession) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Button
+          disabled
+          size="lg"
+          className="flex items-center gap-2 bg-yellow-500 text-white"
+        >
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Starting Session...</span>
+        </Button>
+        
+        {startProgress && (
+          <div className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded border border-yellow-200">
+            {startProgress}
+          </div>
+        )}
+        
+        <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
+          This may take a few moments while we generate your AI welcome message...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <Button
@@ -98,18 +123,15 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
         size="lg"
         className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
       >
-        {isStarting ? (
-          <>
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            <span>Starting Session & Generating AI Welcome...</span>
-          </>
-        ) : (
-          <>
-            <Play className="h-5 w-5" />
-            <span>Start Session</span>
-          </>
-        )}
+        <Play className="h-5 w-5" />
+        <span>Start Session</span>
       </Button>
+      
+      {!hasParticipants && (
+        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
+          Waiting for participants to join...
+        </div>
+      )}
       
       {sessionStartNotification && !isSessionStarted && (
         <div className="text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded border border-blue-200">

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { networkManager } from '@/utils/networkManager';
@@ -34,11 +35,15 @@ export const useCoordinatedSessionData = ({
 
   const mountedRef = useRef(true);
   const lastSuccessfulFetch = useRef<number>(0);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -152,7 +157,7 @@ export const useCoordinatedSessionData = ({
       const resultData = (result as any).data;
       if (!resultData) return [];
 
-      // Convert database messages to Message format with proper content extraction
+      // Enhanced message processing with consistent content extraction
       const messages: Message[] = resultData.map((msg: any) => {
         let messageContent = '';
         let avatarUrl = undefined;
@@ -161,9 +166,11 @@ export const useCoordinatedSessionData = ({
         if (typeof msg.content === 'string') {
           messageContent = msg.content;
         } else if (msg.content && typeof msg.content === 'object') {
+          // Extract text content from object
           if (msg.content.text) {
             messageContent = msg.content.text;
-          } else {
+          } else if (typeof msg.content === 'object' && Object.keys(msg.content).length > 0) {
+            // Fallback: stringify if it's a non-empty object without text property
             messageContent = JSON.stringify(msg.content);
           }
           
@@ -173,15 +180,20 @@ export const useCoordinatedSessionData = ({
           }
         }
 
+        // Skip messages without content
+        if (!messageContent || messageContent.trim() === '') {
+          return null;
+        }
+
         return {
           id: msg.id.toString(),
-          content: messageContent, // Always extract text content
+          content: messageContent,
           sender: msg.role === 'assistant' ? 'assistant' : msg.role === 'admin' ? 'admin' : 'user',
           timestamp: new Date(msg.created_at),
           participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
           avatar: avatarUrl
         } as Message;
-      });
+      }).filter(Boolean); // Remove null messages
 
       return messages;
     } catch (error) {
@@ -190,13 +202,18 @@ export const useCoordinatedSessionData = ({
     }
   }, [conversationId]);
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (forceRefresh = false) => {
     if (!conversationId || !mountedRef.current) return;
 
     updateState({ isLoading: true, error: null });
 
     try {
-      console.log(`🔄 Loading coordinated data for conversation ${conversationId}`);
+      console.log(`🔄 Loading coordinated data for conversation ${conversationId}${forceRefresh ? ' (forced refresh)' : ''}`);
+      
+      // Clear cache if force refresh
+      if (forceRefresh) {
+        networkManager.clearCache(`_${conversationId}`);
+      }
       
       // Fetch all data in parallel with coordinated caching
       const [conversationData, participantsData, messagesData] = await Promise.all([
@@ -210,7 +227,8 @@ export const useCoordinatedSessionData = ({
       console.log(`✅ Successfully loaded data:`, {
         conversation: !!conversationData,
         participants: participantsData.length,
-        messages: messagesData.length
+        messages: messagesData.length,
+        forceRefresh
       });
 
       updateState({
@@ -251,16 +269,32 @@ export const useCoordinatedSessionData = ({
   }, [conversationId]);
 
   const refetch = useCallback(() => {
-    console.log('🔄 Refetching session data...');
+    console.log('🔄 Refetching session data with force refresh...');
+    loadAllData(true);
+  }, [loadAllData]);
+
+  const refetchMessages = useCallback(() => {
+    console.log('🔄 Quick refetch of messages only...');
+    
+    // Clear message cache and refetch immediately
     if (conversationId) {
-      networkManager.clearCache(`_${conversationId}`);
+      networkManager.clearCache(`messages_${conversationId}`);
+      
+      // Set a short timeout to avoid overwhelming the database
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      
+      fetchTimeoutRef.current = setTimeout(() => {
+        loadAllData(false);
+      }, 100);
     }
-    loadAllData();
   }, [conversationId, loadAllData]);
 
   return {
     ...state,
     refetch,
+    refetchMessages,
     lastSuccessfulFetch: lastSuccessfulFetch.current
   };
 };

@@ -25,21 +25,23 @@ export const useParticipantSessionCoordinator = ({
     isLoading,
     error,
     refetch,
+    refetchMessages,
     connectionHealthy
   } = useCoordinatedSessionData({
     conversationId,
     isAdmin: false
   });
 
-  // Handle session start
+  // Handle session start - just update state, don't navigate
   const handleSessionStart = useCallback(() => {
-    logger.category('participants', 'Session started - participant view updating');
+    logger.category('participants', 'Session started - updating participant view state');
     setSessionStarted(true);
-    // Refresh data to get welcome message
-    setTimeout(() => refetch(), 500); // Small delay to ensure message is saved
-  }, [refetch, logger]);
+    
+    // Immediately refetch messages to get the welcome message
+    refetchMessages();
+  }, [refetchMessages, logger]);
 
-  // Handle new messages with immediate update
+  // Handle new messages with immediate update and coordination  
   const handleNewMessage = useCallback((message: Message) => {
     logger.category('participants', `New message received via realtime: ${message.content?.substring(0, 50)}...`);
     
@@ -47,15 +49,18 @@ export const useParticipantSessionCoordinator = ({
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) return prev;
+      
       const newMessages = [...prev, message].sort((a, b) => 
         new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
       );
+      
+      logger.category('participants', `Updated messages count: ${newMessages.length}`);
       return newMessages;
     });
     
-    // Also refresh coordinated data to ensure consistency
-    setTimeout(() => refetch(), 100);
-  }, [logger, refetch]);
+    // Also trigger a quick refetch to ensure consistency
+    setTimeout(() => refetchMessages(), 200);
+  }, [logger, refetchMessages]);
 
   // Set up real-time coordination
   const { connectionStatus, isConnected } = useSessionRealtime({
@@ -65,34 +70,50 @@ export const useParticipantSessionCoordinator = ({
     isAdmin: false
   });
 
-  // Sync with coordinated messages (but don't replace real-time updates)
+  // Sync with coordinated messages and merge real-time updates
   useEffect(() => {
     if (coordinatedMessages.length > 0) {
       setMessages(prevMessages => {
-        // Merge coordinated messages with any real-time messages
-        const allMessages = [...coordinatedMessages];
+        // Create a map of existing real-time messages
+        const realtimeMessageIds = new Set(prevMessages.map(m => m.id));
         
-        // Add any real-time messages that might not be in coordinated data yet
+        // Start with coordinated messages as base
+        const mergedMessages = [...coordinatedMessages];
+        
+        // Add any real-time messages that aren't in coordinated data yet
         prevMessages.forEach(rtMessage => {
-          if (!allMessages.some(m => m.id === rtMessage.id)) {
-            allMessages.push(rtMessage);
+          if (!mergedMessages.some(m => m.id === rtMessage.id)) {
+            mergedMessages.push(rtMessage);
           }
         });
         
         // Sort by timestamp
-        return allMessages.sort((a, b) => 
+        const sortedMessages = mergedMessages.sort((a, b) => 
           new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
         );
+        
+        logger.category('participants', `Merged messages: ${sortedMessages.length} total (${coordinatedMessages.length} coordinated, ${prevMessages.length} realtime)`);
+        return sortedMessages;
       });
     }
-  }, [coordinatedMessages]);
+  }, [coordinatedMessages, logger]);
 
   // Check if session is already started
   useEffect(() => {
     if (conversation?.session_started && !sessionStarted) {
+      logger.category('participants', 'Session already started - updating state');
       setSessionStarted(true);
     }
-  }, [conversation?.session_started, sessionStarted]);
+  }, [conversation?.session_started, sessionStarted, logger]);
+
+  // Auto-refresh messages when session starts
+  useEffect(() => {
+    if (sessionStarted && conversationId) {
+      logger.category('participants', 'Session started - triggering message refresh');
+      // Wait a moment for the welcome message to be saved, then refetch
+      setTimeout(() => refetchMessages(), 500);
+    }
+  }, [sessionStarted, conversationId, refetchMessages, logger]);
 
   return {
     sessionStarted,
@@ -103,6 +124,7 @@ export const useParticipantSessionCoordinator = ({
     connectionHealthy,
     isConnected,
     connectionStatus,
-    refetch
+    refetch,
+    refetchMessages
   };
 };

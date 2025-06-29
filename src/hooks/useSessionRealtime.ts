@@ -24,7 +24,9 @@ export const useSessionRealtime = ({
   useEffect(() => {
     if (!conversationId) return;
 
-    const channelName = `session-realtime-${conversationId}`;
+    const channelName = `session-realtime-${conversationId}-${Date.now()}`;
+    
+    logger.category('connection', `Setting up real-time subscriptions for conversation ${conversationId}`);
     
     const channel = supabase
       .channel(channelName)
@@ -34,8 +36,9 @@ export const useSessionRealtime = ({
         table: 'conversations',
         filter: `id=eq.${conversationId}`
       }, (payload) => {
+        logger.category('connection', 'Conversation update received:', payload);
         if (payload.new.session_started && !payload.old.session_started) {
-          logger.category('connection', 'Session started event received');
+          logger.category('connection', 'Session started event detected');
           onSessionStart();
         }
       })
@@ -45,7 +48,9 @@ export const useSessionRealtime = ({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        // Ensure consistent message content extraction
+        logger.category('connection', 'New message received via realtime:', payload);
+        
+        // Enhanced message content extraction with fallback
         let messageContent = '';
         let avatarUrl = undefined;
         
@@ -58,33 +63,45 @@ export const useSessionRealtime = ({
             messageContent = JSON.stringify(payload.new.content);
           }
           
-          // Extract avatar if present
           if (payload.new.content.avatar) {
             avatarUrl = payload.new.content.avatar;
           }
         }
 
+        // Don't process empty messages
+        if (!messageContent || messageContent.trim() === '') {
+          logger.category('connection', 'Skipping empty message');
+          return;
+        }
+
         const message: Message = {
           id: payload.new.id.toString(),
-          content: messageContent, // Always extract text content
+          content: messageContent,
           sender: payload.new.role === 'assistant' ? 'assistant' : payload.new.role === 'admin' ? 'admin' : 'user',
           timestamp: new Date(payload.new.created_at),
           avatar: avatarUrl,
           participant: payload.new.participant_id ? `P${payload.new.participant_id}` : undefined
         };
         
-        logger.category('connection', 'New message received via realtime with extracted content');
+        logger.category('connection', `Processing new message: ${messageContent.substring(0, 50)}...`);
         onNewMessage(message);
       })
       .subscribe((status) => {
-        setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'connecting');
-        logger.category('connection', `Realtime connection status: ${status}`);
+        const connectionState = status === 'SUBSCRIBED' ? 'connected' : 'connecting';
+        setConnectionStatus(connectionState);
+        logger.category('connection', `Real-time connection status: ${status} -> ${connectionState}`);
+        
+        // Immediately try to fetch any existing messages when connected
+        if (status === 'SUBSCRIBED') {
+          logger.category('connection', 'Real-time connected - ready to receive updates');
+        }
       });
 
     channelRef.current = channel;
 
     return () => {
       if (channelRef.current) {
+        logger.category('connection', 'Cleaning up real-time subscriptions');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }

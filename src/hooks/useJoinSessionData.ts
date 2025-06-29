@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
@@ -8,7 +7,15 @@ import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
-export function useJoinSessionData(conversationId: number | null) {
+interface UseJoinSessionDataOptions {
+  defaultParticipantName?: string;
+  defaultAvatarSeed?: string;
+}
+
+export function useJoinSessionData(
+  conversationId: number | null, 
+  options?: UseJoinSessionDataOptions
+) {
   const { toast } = useToast();
   const { isAdmin } = useSessionAdminStatus();
   
@@ -20,9 +27,9 @@ export function useJoinSessionData(conversationId: number | null) {
   const { getSessionByConversationId } = useParticipantPersistence();
   const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
   
-  // Initialize participant state with existing data as default
-  const [participantName, setParticipantName] = useState(() => existingSessionData?.name || "");
-  const [avatarSeed, setAvatarSeed] = useState(() => existingSessionData?.avatarSeed || Math.random().toString());
+  // Initialize participant state with provided defaults (pure, no side effects)
+  const [participantName, setParticipantName] = useState(() => options?.defaultParticipantName || "");
+  const [avatarSeed, setAvatarSeed] = useState(() => options?.defaultAvatarSeed || Math.random().toString());
   
   // Debug logging
   useEffect(() => {

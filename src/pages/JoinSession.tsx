@@ -1,4 +1,3 @@
-
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -31,6 +30,10 @@ const JoinSession = () => {
   
   // Use function initialization to avoid re-renders
   const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => !!existingSessionData);
+  
+  // Prepare default values for the hook
+  const defaultParticipantName = existingSessionData?.name || "";
+  const defaultAvatarSeed = existingSessionData?.avatarSeed || Math.random().toString();
   
   // Validate that we have a valid conversation ID
   useEffect(() => {
@@ -93,7 +96,10 @@ const JoinSession = () => {
     isLoading,
     error,
     handleJoinSession
-  } = useJoinSessionData(conversationId);
+  } = useJoinSessionData(conversationId, {
+    defaultParticipantName,
+    defaultAvatarSeed
+  });
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {

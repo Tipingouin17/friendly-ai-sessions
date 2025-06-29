@@ -1,5 +1,5 @@
 
-import { useSearchParams, Navigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
@@ -11,6 +11,7 @@ import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -21,8 +22,9 @@ const JoinSession = () => {
     avatarSeed: string;
   } | null>(null);
   
-  // Use ref to prevent multiple navigation attempts during same render cycle
+  // Use ref to prevent multiple navigation attempts and processing
   const hasNavigated = useRef(false);
+  const hasProcessedJoin = useRef(false);
   
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
@@ -33,6 +35,7 @@ const JoinSession = () => {
   
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
+    if (hasNavigated.current) return null;
     return conversationId ? getSessionByConversationId(conversationId) : null;
   }, [conversationId, getSessionByConversationId]);
   
@@ -46,34 +49,39 @@ const JoinSession = () => {
   const defaultParticipantName = existingSessionData?.name || "";
   const defaultAvatarSeed = existingSessionData?.avatarSeed || Math.random().toString();
 
-  // Navigate to participant session if join was successful - MOVED TO TOP
-  if (joinSuccess && !hasNavigated.current) {
-    hasNavigated.current = true;
-    const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
-    console.log("🚀 Navigating to participant session:", navigationPath);
-    return <Navigate to={navigationPath} replace />;
-  }
+  // Navigate immediately when join is successful
+  useEffect(() => {
+    if (joinSuccess && !hasNavigated.current) {
+      hasNavigated.current = true;
+      const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
+      console.log("🚀 Navigating to participant session:", navigationPath);
+      navigate(navigationPath, { replace: true });
+    }
+  }, [joinSuccess, navigate]);
   
   // Validate that we have a valid conversation ID
   useEffect(() => {
+    if (hasNavigated.current) return;
+    
     if (!conversationId) {
       console.error("No valid conversation ID found in URL parameters:", idParam);
       setInvalidRequest(true);
     } else {
       console.log("JoinSession: Using conversation ID:", conversationId);
-      // Force invalidate any existing queries for this conversation
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
     }
-  }, [conversationId, idParam, queryClient]);
+  }, [conversationId, idParam]);
   
-  // Force refresh conversation data when joining a session
+  // Force refresh conversation data when joining a session (only once)
   useEffect(() => {
-    if (conversationId && !hasNavigated.current) {
+    if (hasNavigated.current || hasProcessedJoin.current) return;
+    
+    if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true });
+      hasProcessedJoin.current = true;
     }
-  }, [conversationId, queryClient, retryCount]);
+  }, [conversationId, queryClient]);
   
   const {
     participantName,
@@ -97,7 +105,7 @@ const JoinSession = () => {
   // Handle successful join - set success state for navigation (GUARDED)
   const handleJoin = async () => {
     // Don't allow join if user has already joined before or already navigating
-    if (hasJoinedBefore || hasNavigated.current) {
+    if (hasJoinedBefore || hasNavigated.current || isJoining) {
       console.log("User has already joined before or is navigating, skipping join attempt");
       return;
     }
@@ -120,6 +128,7 @@ const JoinSession = () => {
       setRetryCount(prev => prev + 1);
       setJoinSuccess(null);
       hasNavigated.current = false;
+      hasProcessedJoin.current = false;
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
@@ -143,9 +152,13 @@ const JoinSession = () => {
     if (!hasNavigated.current) {
       setShowRejoinPrompt(false);
       setJoinSuccess(null);
-      hasNavigated.current = false;
     }
   }, []);
+
+  // Early return if navigation has been triggered
+  if (hasNavigated.current) {
+    return null;
+  }
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {

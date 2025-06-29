@@ -36,20 +36,26 @@ export const useParticipantSessionCoordinator = ({
     logger.category('participants', 'Session started - participant view updating');
     setSessionStarted(true);
     // Refresh data to get welcome message
-    refetch();
+    setTimeout(() => refetch(), 500); // Small delay to ensure message is saved
   }, [refetch, logger]);
 
-  // Handle new messages
+  // Handle new messages with immediate update
   const handleNewMessage = useCallback((message: Message) => {
-    logger.category('participants', 'New message received via realtime');
+    logger.category('participants', `New message received via realtime: ${message.content?.substring(0, 50)}...`);
+    
+    // Add message immediately for real-time feel
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) return prev;
-      return [...prev, message].sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      const newMessages = [...prev, message].sort((a, b) => 
+        new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
       );
+      return newMessages;
     });
-  }, [logger]);
+    
+    // Also refresh coordinated data to ensure consistency
+    setTimeout(() => refetch(), 100);
+  }, [logger, refetch]);
 
   // Set up real-time coordination
   const { connectionStatus, isConnected } = useSessionRealtime({
@@ -59,10 +65,25 @@ export const useParticipantSessionCoordinator = ({
     isAdmin: false
   });
 
-  // Sync with coordinated messages
+  // Sync with coordinated messages (but don't replace real-time updates)
   useEffect(() => {
     if (coordinatedMessages.length > 0) {
-      setMessages(coordinatedMessages);
+      setMessages(prevMessages => {
+        // Merge coordinated messages with any real-time messages
+        const allMessages = [...coordinatedMessages];
+        
+        // Add any real-time messages that might not be in coordinated data yet
+        prevMessages.forEach(rtMessage => {
+          if (!allMessages.some(m => m.id === rtMessage.id)) {
+            allMessages.push(rtMessage);
+          }
+        });
+        
+        // Sort by timestamp
+        return allMessages.sort((a, b) => 
+          new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+        );
+      });
     }
   }, [coordinatedMessages]);
 

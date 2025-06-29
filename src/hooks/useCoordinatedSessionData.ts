@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { networkManager } from '@/utils/networkManager';
@@ -153,14 +152,36 @@ export const useCoordinatedSessionData = ({
       const resultData = (result as any).data;
       if (!resultData) return [];
 
-      // Convert database messages to Message format
-      const messages: Message[] = resultData.map((msg: any) => ({
-        id: msg.id.toString(),
-        content: msg.content,
-        sender: msg.role === 'assistant' ? 'assistant' : 'user',
-        timestamp: new Date(msg.created_at),
-        participant: msg.participant_id ? `P${msg.participant_id}` : undefined
-      }));
+      // Convert database messages to Message format with proper content extraction
+      const messages: Message[] = resultData.map((msg: any) => {
+        let messageContent = '';
+        let avatarUrl = undefined;
+        
+        // Handle different content formats consistently
+        if (typeof msg.content === 'string') {
+          messageContent = msg.content;
+        } else if (msg.content && typeof msg.content === 'object') {
+          if (msg.content.text) {
+            messageContent = msg.content.text;
+          } else {
+            messageContent = JSON.stringify(msg.content);
+          }
+          
+          // Extract avatar if present
+          if (msg.content.avatar) {
+            avatarUrl = msg.content.avatar;
+          }
+        }
+
+        return {
+          id: msg.id.toString(),
+          content: messageContent, // Always extract text content
+          sender: msg.role === 'assistant' ? 'assistant' : msg.role === 'admin' ? 'admin' : 'user',
+          timestamp: new Date(msg.created_at),
+          participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
+          avatar: avatarUrl
+        } as Message;
+      });
 
       return messages;
     } catch (error) {

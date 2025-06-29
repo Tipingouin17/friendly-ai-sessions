@@ -45,18 +45,35 @@ export const useSessionRealtime = ({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
+        // Ensure consistent message content extraction
+        let messageContent = '';
+        let avatarUrl = undefined;
+        
+        if (typeof payload.new.content === 'string') {
+          messageContent = payload.new.content;
+        } else if (payload.new.content && typeof payload.new.content === 'object') {
+          if (payload.new.content.text) {
+            messageContent = payload.new.content.text;
+          } else {
+            messageContent = JSON.stringify(payload.new.content);
+          }
+          
+          // Extract avatar if present
+          if (payload.new.content.avatar) {
+            avatarUrl = payload.new.content.avatar;
+          }
+        }
+
         const message: Message = {
           id: payload.new.id.toString(),
-          content: typeof payload.new.content === 'string' 
-            ? payload.new.content 
-            : payload.new.content.text,
-          sender: payload.new.role === 'assistant' ? 'assistant' : 'user',
+          content: messageContent, // Always extract text content
+          sender: payload.new.role === 'assistant' ? 'assistant' : payload.new.role === 'admin' ? 'admin' : 'user',
           timestamp: new Date(payload.new.created_at),
-          avatar: payload.new.content?.avatar,
+          avatar: avatarUrl,
           participant: payload.new.participant_id ? `P${payload.new.participant_id}` : undefined
         };
         
-        logger.category('connection', 'New message received via realtime');
+        logger.category('connection', 'New message received via realtime with extracted content');
         onNewMessage(message);
       })
       .subscribe((status) => {

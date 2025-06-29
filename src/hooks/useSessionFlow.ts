@@ -33,6 +33,7 @@ export const useSessionFlow = ({
   const [currentResponseCollection, setCurrentResponseCollection] = useState<ResponseCollection | null>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [sessionStartNotification, setSessionStartNotification] = useState<string | null>(null);
+  const [isStartingSession, setIsStartingSession] = useState(false);
   
   const { toast } = useToast();
   const logger = createLogger('SessionFlow', 'session');
@@ -43,8 +44,8 @@ export const useSessionFlow = ({
     if (conversationData?.session_started && !isSessionActive) {
       setIsSessionActive(true);
       if (isAdmin) {
-        setSessionStartNotification('Session started successfully');
-        setTimeout(() => setSessionStartNotification(null), 5000);
+        setSessionStartNotification('Session started successfully with AI welcome message');
+        setTimeout(() => setSessionStartNotification(null), 8000);
       }
     }
   }, [conversationData?.session_started, isSessionActive, isAdmin]);
@@ -183,12 +184,17 @@ export const useSessionFlow = ({
   }, [participants.length, isAdmin, logger]);
 
   const triggerSessionStart = useCallback(async () => {
-    if (!conversationId || !isAdmin) return false;
+    if (!conversationId || !isAdmin || isStartingSession) return false;
 
+    setIsStartingSession(true);
+    
     try {
-      logger.category('session', 'Triggering session start with AI welcome generation');
+      logger.category('session', 'Starting session with AI welcome generation');
+      
+      // Show immediate feedback
+      setSessionStartNotification('Starting session and generating welcome message...');
 
-      // Mark session as started
+      // Mark session as started first
       const { error: updateError } = await supabase
         .from('conversations')
         .update({ session_started: true })
@@ -212,8 +218,8 @@ export const useSessionFlow = ({
 
       if (welcomeError) throw welcomeError;
 
-      // Save welcome message to database
-      await supabase.from('messages').insert({
+      // Save welcome message to database with proper content structure
+      const { error: messageError } = await supabase.from('messages').insert({
         conversation_id: conversationId,
         content: {
           text: welcomeResponse.content,
@@ -222,26 +228,39 @@ export const useSessionFlow = ({
         role: 'assistant'
       });
 
+      if (messageError) throw messageError;
+
       setIsSessionActive(true);
       setSessionStartNotification('Session started successfully with AI welcome message');
-      setTimeout(() => setSessionStartNotification(null), 5000);
+      setTimeout(() => setSessionStartNotification(null), 8000);
 
       // Start collecting responses for the welcome message
       startResponseCollection(`welcome-${Date.now()}`);
 
       logger.category('session', 'Session started successfully with welcome message');
+      
+      toast({
+        title: "Session Started",
+        description: "Welcome message generated and sent to all participants.",
+      });
+
       return true;
 
     } catch (error) {
       logger.error('Error starting session:', error);
+      setSessionStartNotification('Error starting session. Please try again.');
+      setTimeout(() => setSessionStartNotification(null), 5000);
+      
       toast({
         title: "Error Starting Session",
         description: "Failed to start session. Please try again.",
         variant: "destructive",
       });
       return false;
+    } finally {
+      setIsStartingSession(false);
     }
-  }, [conversationId, conversationData, isAdmin, startResponseCollection, toast, logger]);
+  }, [conversationId, conversationData, isAdmin, startResponseCollection, toast, logger, isStartingSession]);
 
   return {
     isSessionActive,
@@ -250,6 +269,7 @@ export const useSessionFlow = ({
     sessionStartNotification,
     triggerSessionStart,
     startResponseCollection,
+    isStartingSession,
     responseProgress: currentResponseCollection ? {
       collected: currentResponseCollection.responses.length,
       total: currentResponseCollection.totalExpected,

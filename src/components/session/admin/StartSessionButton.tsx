@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Users, CheckCircle } from 'lucide-react';
@@ -53,11 +54,16 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     if (!triggerSessionStart) return;
     
     setIsStarting(true);
-    const success = await triggerSessionStart();
-    setIsStarting(false);
     
-    if (success) {
-      onSessionStarted();
+    try {
+      const success = await triggerSessionStart();
+      if (success) {
+        onSessionStarted();
+      }
+    } catch (error) {
+      console.error('Error in handleStartSession:', error);
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -85,24 +91,32 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   }
 
   return (
-    <Button
-      onClick={handleStartSession}
-      disabled={isDisabled}
-      size="lg"
-      className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
-    >
-      {isStarting ? (
-        <>
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          <span>Starting Session & Generating AI Welcome...</span>
-        </>
-      ) : (
-        <>
-          <Play className="h-5 w-5" />
-          <span>Start Session</span>
-        </>
+    <div className="flex flex-col gap-2">
+      <Button
+        onClick={handleStartSession}
+        disabled={isDisabled}
+        size="lg"
+        className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
+      >
+        {isStarting ? (
+          <>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <span>Starting Session & Generating AI Welcome...</span>
+          </>
+        ) : (
+          <>
+            <Play className="h-5 w-5" />
+            <span>Start Session</span>
+          </>
+        )}
+      </Button>
+      
+      {sessionStartNotification && !isSessionStarted && (
+        <div className="text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded border border-blue-200">
+          {sessionStartNotification}
+        </div>
       )}
-    </Button>
+    </div>
   );
 };
 

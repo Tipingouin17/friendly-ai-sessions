@@ -83,7 +83,7 @@ export const useSessionRealtime = ({
           participant: payload.new.participant_id ? `P${payload.new.participant_id}` : undefined
         };
         
-        logger.category('connection', `Processing new message: ${messageContent.substring(0, 50)}...`);
+        logger.category('connection', `Processing new message from ${message.sender}: ${messageContent.substring(0, 50)}...`);
         onNewMessage(message);
       })
       .subscribe((status) => {

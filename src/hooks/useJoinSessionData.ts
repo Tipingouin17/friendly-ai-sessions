@@ -9,9 +9,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
 export function useJoinSessionData(conversationId: number | null) {
-  // Participant state
-  const [participantName, setParticipantName] = useState("");
-  const [avatarSeed, setAvatarSeed] = useState(Math.random().toString());
   const { toast } = useToast();
   const { isAdmin } = useSessionAdminStatus();
   
@@ -23,18 +20,9 @@ export function useJoinSessionData(conversationId: number | null) {
   const { getSessionByConversationId } = useParticipantPersistence();
   const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
   
-  // Pre-fill participant name if we have existing session data
-  useEffect(() => {
-    if (existingSessionData?.name && !participantName) {
-      console.log("Pre-filling participant name from stored session data:", existingSessionData.name);
-      setParticipantName(existingSessionData.name);
-      
-      // Also use the persisted avatar seed if available
-      if (existingSessionData.avatarSeed) {
-        setAvatarSeed(existingSessionData.avatarSeed);
-      }
-    }
-  }, [existingSessionData, participantName]);
+  // Initialize participant state with existing data as default
+  const [participantName, setParticipantName] = useState(() => existingSessionData?.name || "");
+  const [avatarSeed, setAvatarSeed] = useState(() => existingSessionData?.avatarSeed || Math.random().toString());
   
   // Debug logging
   useEffect(() => {

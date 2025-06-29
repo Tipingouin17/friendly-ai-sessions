@@ -95,13 +95,6 @@ const JoinSession = () => {
     handleJoinSession
   } = useJoinSessionData(conversationId);
 
-  // Pre-fill participant name from existing session data
-  useEffect(() => {
-    if (existingSessionData?.name && !participantName) {
-      setParticipantName(existingSessionData.name);
-    }
-  }, [existingSessionData, participantName, setParticipantName]);
-
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
     return <JoinSessionLoadingState onRetry={handleRetry} error={error} />;

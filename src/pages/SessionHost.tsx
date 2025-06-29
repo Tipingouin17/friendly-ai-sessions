@@ -173,7 +173,7 @@ const SessionHost = () => {
   });
 
   // Enhanced session start handler
-  const handleSessionStarted = async () => {
+  const handleSessionStarted = async (): Promise<void> => {
     console.log("🔥 SessionHost - Starting session through session flow");
     try {
       const success = await triggerSessionStart();

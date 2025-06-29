@@ -17,18 +17,17 @@ export const useJoinSessionState = (checkNavigationState: () => boolean) => {
   
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
-    // Only calculate if navigation is not in progress
     if (checkNavigationState()) return null;
     return conversationId ? getSessionByConversationId(conversationId) : null;
-  }, [conversationId, getSessionByConversationId, retryCount]); // Remove checkNavigationState from deps
+  }, [conversationId, getSessionByConversationId, checkNavigationState]);
   
   // Guard variable to detect if user has already joined
   const hasJoinedBefore = !!existingSessionData?.participantId;
   
   // Use function initialization to avoid re-renders
   const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => {
-    // Only show rejoin prompt if we have existing data and navigation is not in progress
-    return !!existingSessionData && !checkNavigationState();
+    if (checkNavigationState()) return false;
+    return !!existingSessionData;
   });
   
   // Prepare default values for the hook
@@ -37,7 +36,6 @@ export const useJoinSessionState = (checkNavigationState: () => boolean) => {
 
   // Validate that we have a valid conversation ID
   useEffect(() => {
-    // Skip validation if navigation is in progress
     if (checkNavigationState()) return;
     
     if (!conversationId) {
@@ -45,9 +43,8 @@ export const useJoinSessionState = (checkNavigationState: () => boolean) => {
       setInvalidRequest(true);
     } else {
       console.log("JoinSession: Using conversation ID:", conversationId);
-      setInvalidRequest(false);
     }
-  }, [conversationId, idParam, retryCount]); // Remove checkNavigationState from deps
+  }, [conversationId, idParam, checkNavigationState]);
   
   return {
     conversationId,

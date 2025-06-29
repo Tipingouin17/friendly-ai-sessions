@@ -7,25 +7,25 @@
 // Configuration for which log categories are enabled
 const DEBUG_CONFIG = {
   // Core logs
-  session: false,          // Session setup and management
-  provider: false,         // Session provider internals
-  initialization: false,   // Initialization processes
-  connection: false,       // Connection and realtime events
+  session: true,          // Session setup and management - ENABLED for debugging
+  provider: false,        // Session provider internals
+  initialization: false,  // Initialization processes
+  connection: false,      // Connection and realtime events
   
   // Data logs
-  participants: true,      // Participant joining/leaving
-  messages: false,         // Message sending/receiving
-  conversation: false,     // Conversation data
+  participants: true,     // Participant joining/leaving
+  messages: true,         // Message sending/receiving - ENABLED for AI debugging
+  conversation: false,    // Conversation data
   
   // UI logs
-  rendering: false,        // Component renders
-  state: false,            // State changes
+  rendering: false,       // Component renders
+  state: false,           // State changes
   
   // Special cases
-  errors: true,            // Always log errors
-  warnings: true,          // Always log warnings
-  admin: true,             // Admin-specific logs
-  all: false,              // Generic logs that don't fit in other categories - DISABLED by default
+  errors: true,           // Always log errors
+  warnings: true,         // Always log warnings
+  admin: true,            // Admin-specific logs
+  all: false,             // Generic logs that don't fit in other categories - DISABLED by default
 };
 
 // Enable all logs with this flag (overrides individual settings)
@@ -50,7 +50,7 @@ export function debugLog(
   
   // Log everything if all logs are enabled
   if (ENABLE_ALL_LOGS) {
-    console.log(`[${category}] ${message}`, ...data);
+    console.log(`[${category.toUpperCase()}] ${message}`, ...data);
     return;
   }
   
@@ -64,7 +64,7 @@ export function debugLog(
   
   // Check if this category is enabled in config
   if (DEBUG_CONFIG[category]) {
-    console.log(`[${category}] ${message}`, ...data);
+    console.log(`[${category.toUpperCase()}] ${message}`, ...data);
   }
 }
 
@@ -94,19 +94,21 @@ export function warnLog(message: string, ...data: any[]) {
  * Helper to create a namespaced logger for a specific component
  */
 export function createLogger(component: string, defaultCategory: keyof typeof DEBUG_CONFIG = 'all') {
+  const timestamp = () => new Date().toISOString().split('T')[1].split('.')[0];
+  
   return {
     log: (message: string, ...data: any[]) => 
-      debugLog(defaultCategory, `${component}: ${message}`, ...data),
+      debugLog(defaultCategory, `[${timestamp()}] ${component}: ${message}`, ...data),
     
     error: (message: string, ...data: any[]) => 
-      errorLog(`${component}: ${message}`, ...data),
+      errorLog(`[${timestamp()}] ${component}: ${message}`, ...data),
     
     warn: (message: string, ...data: any[]) => 
-      warnLog(`${component}: ${message}`, ...data),
+      warnLog(`[${timestamp()}] ${component}: ${message}`, ...data),
     
     // Allow specifying a different category
     category: (category: keyof typeof DEBUG_CONFIG, message: string, ...data: any[]) => 
-      debugLog(category, `${component}: ${message}`, ...data)
+      debugLog(category, `[${timestamp()}] ${component}: ${message}`, ...data)
   };
 }
 

@@ -17,9 +17,11 @@ const JoinSession = () => {
   // Use ref to prevent multiple navigation attempts and processing
   const hasNavigated = useRef(false);
   const hasProcessedJoin = useRef(false);
+  const isNavigatingRef = useRef(false);
   
-  // Early exit if already navigated
-  if (hasNavigated.current) {
+  // CRITICAL: Check navigation state first before any other processing
+  if (hasNavigated.current || isNavigatingRef.current) {
+    console.log("Navigation already initiated, stopping component processing");
     return null;
   }
   
@@ -35,7 +37,7 @@ const JoinSession = () => {
   
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
-    if (hasNavigated.current) return null;
+    if (hasNavigated.current || isNavigatingRef.current) return null;
     return conversationId ? getSessionByConversationId(conversationId) : null;
   }, [conversationId, getSessionByConversationId]);
   
@@ -43,7 +45,10 @@ const JoinSession = () => {
   const hasJoinedBefore = !!existingSessionData?.participantId;
   
   // Use function initialization to avoid re-renders
-  const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => !!existingSessionData);
+  const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => {
+    if (hasNavigated.current || isNavigatingRef.current) return false;
+    return !!existingSessionData;
+  });
   
   // Prepare default values for the hook
   const defaultParticipantName = existingSessionData?.name || "";
@@ -51,7 +56,7 @@ const JoinSession = () => {
 
   // Validate that we have a valid conversation ID
   useEffect(() => {
-    if (hasNavigated.current) return;
+    if (hasNavigated.current || isNavigatingRef.current) return;
     
     if (!conversationId) {
       console.error("No valid conversation ID found in URL parameters:", idParam);
@@ -63,7 +68,7 @@ const JoinSession = () => {
   
   // Force refresh conversation data when joining a session (only once)
   useEffect(() => {
-    if (hasNavigated.current || hasProcessedJoin.current) return;
+    if (hasNavigated.current || isNavigatingRef.current || hasProcessedJoin.current) return;
     
     if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
@@ -93,15 +98,18 @@ const JoinSession = () => {
   });
 
   // Handle successful join - navigate immediately and synchronously
-  const handleJoin = async () => {
-    // Prevent multiple join attempts
-    if (hasJoinedBefore || hasNavigated.current || isJoining) {
-      console.log("User has already joined before or is navigating, skipping join attempt");
+  const handleJoin = useCallback(async () => {
+    // CRITICAL: Check navigation state first
+    if (hasNavigated.current || isNavigatingRef.current || hasJoinedBefore || isJoining) {
+      console.log("Navigation already initiated or join in progress, skipping");
       return;
     }
     
-    // Set navigation flag immediately to prevent further processing
+    // Set navigation flags immediately to prevent any further processing
+    isNavigatingRef.current = true;
     hasNavigated.current = true;
+    
+    console.log("Starting join process...");
     
     try {
       const result = await handleJoinSession();
@@ -111,23 +119,27 @@ const JoinSession = () => {
         // Navigate immediately and synchronously
         const navigationPath = `/session?id=${conversationId}&name=${encodeURIComponent(result.name)}&participantId=${result.participantId}&avatarSeed=${encodeURIComponent(result.avatarSeed)}`;
         console.log("🚀 Navigating to participant session:", navigationPath);
+        
+        // Use replace to prevent back navigation issues
         navigate(navigationPath, { replace: true });
         
-        // Return immediately to prevent any further processing
+        // Immediately return to prevent any further processing
         return;
       }
     } catch (error) {
       console.error("Error during join:", error);
-      // Reset navigation flag on error so user can retry
+      // Reset navigation flags on error so user can retry
       hasNavigated.current = false;
+      isNavigatingRef.current = false;
     }
-  };
+  }, [handleJoinSession, conversationId, navigate, hasJoinedBefore, isJoining]);
 
   const handleRetry = useCallback(() => {
-    if (conversationId && !hasNavigated.current) {
+    if (conversationId && !hasNavigated.current && !isNavigatingRef.current) {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
       hasNavigated.current = false;
+      isNavigatingRef.current = false;
       hasProcessedJoin.current = false;
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
@@ -136,10 +148,11 @@ const JoinSession = () => {
   
   // Handle rejoining the session with existing data
   const handleRejoin = useCallback(() => {
-    if (existingSessionData && conversationId && !hasNavigated.current) {
+    if (existingSessionData && conversationId && !hasNavigated.current && !isNavigatingRef.current) {
       console.log("Rejoining session with existing data:", existingSessionData);
       
-      // Set navigation flag immediately
+      // Set navigation flags immediately
+      isNavigatingRef.current = true;
       hasNavigated.current = true;
       
       // Navigate immediately
@@ -151,13 +164,14 @@ const JoinSession = () => {
   
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
-    if (!hasNavigated.current) {
+    if (!hasNavigated.current && !isNavigatingRef.current) {
       setShowRejoinPrompt(false);
     }
   }, []);
 
-  // Early return if navigation has been triggered
-  if (hasNavigated.current) {
+  // CRITICAL: Check navigation state again before any rendering
+  if (hasNavigated.current || isNavigatingRef.current) {
+    console.log("Navigation flags set, returning null to stop rendering");
     return null;
   }
 
@@ -199,7 +213,7 @@ const JoinSession = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={!hasJoinedBefore && !hasNavigated.current ? handleJoin : undefined}
+      onJoinSession={!hasJoinedBefore && !hasNavigated.current && !isNavigatingRef.current ? handleJoin : undefined}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

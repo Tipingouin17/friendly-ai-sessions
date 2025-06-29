@@ -1,5 +1,5 @@
 
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Navigate } from "react-router-dom";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
@@ -8,14 +8,13 @@ import JoinSessionRejoinPrompt from "@/components/session/JoinSessionRejoinPromp
 import JoinSessionMain from "@/components/session/JoinSessionMain";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
-import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [hasNavigated, setHasNavigated] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
   
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
@@ -23,7 +22,6 @@ const JoinSession = () => {
   
   // Participant persistence hooks
   const { getSessionByConversationId } = useParticipantPersistence();
-  const { navigateToSession } = useNavigateToSession();
   
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
@@ -77,31 +75,20 @@ const JoinSession = () => {
     defaultAvatarSeed
   });
 
-  // Controlled navigation after successful join
-  useEffect(() => {
-    if (!isJoining && joinResult && conversationId && !hasNavigated) {
-      console.log("Navigating to participant session after successful join:", {
-        conversationId,
-        participantName: joinResult.name,
-        participantId: joinResult.participantId,
-        avatarSeed: joinResult.avatarSeed
-      });
-      
-      setHasNavigated(true);
-      navigateToSession(
-        conversationId,
-        joinResult.name,
-        joinResult.participantId,
-        joinResult.avatarSeed
-      );
+  // Handle successful join - set hasJoined flag instead of navigating
+  const handleJoin = async () => {
+    const result = await handleJoinSession();
+    if (result) {
+      console.log("Successfully joined session, preparing to navigate:", result);
+      setHasJoined(true);
     }
-  }, [isJoining, joinResult, conversationId, navigateToSession, hasNavigated]);
+  };
 
   const handleRetry = useCallback(() => {
     if (conversationId) {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
-      setHasNavigated(false);
+      setHasJoined(false);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
@@ -109,23 +96,37 @@ const JoinSession = () => {
   
   // Handle rejoining the session with existing data
   const handleRejoin = useCallback(() => {
-    if (existingSessionData && conversationId && !hasNavigated) {
+    if (existingSessionData && conversationId) {
       console.log("Rejoining session with existing data:", existingSessionData);
-      setHasNavigated(true);
-      navigateToSession(
-        conversationId,
-        existingSessionData.name || "Participant",
-        existingSessionData.participantId,
-        existingSessionData.avatarSeed || ""
-      );
+      setHasJoined(true);
     }
-  }, [existingSessionData, conversationId, navigateToSession, hasNavigated]);
+  }, [existingSessionData, conversationId]);
   
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
     setShowRejoinPrompt(false);
-    setHasNavigated(false);
+    setHasJoined(false);
   }, []);
+
+  // Navigation logic - redirect to participant session after successful join
+  if (hasJoined && conversationId) {
+    const participantData = joinResult || existingSessionData;
+    if (participantData) {
+      console.log("Navigating to participant session:", {
+        conversationId,
+        participantId: participantData.participantId,
+        name: participantData.name,
+        avatarSeed: participantData.avatarSeed
+      });
+      
+      return (
+        <Navigate
+          to={`/session?id=${conversationId}&participantId=${participantData.participantId}&name=${encodeURIComponent(participantData.name)}&avatarSeed=${encodeURIComponent(participantData.avatarSeed)}&isGuest=true`}
+          replace
+        />
+      );
+    }
+  }
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
@@ -165,7 +166,7 @@ const JoinSession = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={handleJoinSession}
+      onJoinSession={handleJoin}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

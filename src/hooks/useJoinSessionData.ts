@@ -140,7 +140,9 @@ export function useJoinSessionData(
     });
 
     if (result) {
+      console.log("Join session successful, storing result:", result);
       setJoinResult(result);
+      // Note: We no longer navigate here - let the component handle navigation
     }
 
     return result;

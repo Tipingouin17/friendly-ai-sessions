@@ -41,7 +41,7 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-64 bg-white z-50">
         <DropdownMenuLabel className="flex items-center justify-between">
           Active Sessions
           <Button

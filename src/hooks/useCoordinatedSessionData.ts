@@ -87,7 +87,7 @@ export const useCoordinatedSessionData = ({
         cacheKey
       );
 
-      return result.data;
+      return (result as any).data;
     } catch (error) {
       console.error('Error fetching conversation:', error);
       throw error;
@@ -110,11 +110,12 @@ export const useCoordinatedSessionData = ({
         cacheKey
       );
 
-      if (!result.data || result.data.length === 0) {
+      const resultData = (result as any).data;
+      if (!resultData || resultData.length === 0) {
         return [];
       }
 
-      const participantPromises = result.data.map(async (participant) => {
+      const participantPromises = resultData.map(async (participant: any) => {
         try {
           return await getParticipantInfo(participant);
         } catch (err) {
@@ -149,10 +150,11 @@ export const useCoordinatedSessionData = ({
         cacheKey
       );
 
-      if (!result.data) return [];
+      const resultData = (result as any).data;
+      if (!resultData) return [];
 
       // Convert database messages to Message format
-      const messages: Message[] = result.data.map(msg => ({
+      const messages: Message[] = resultData.map((msg: any) => ({
         id: msg.id.toString(),
         content: msg.content,
         sender: msg.role === 'assistant' ? 'assistant' : 'user',

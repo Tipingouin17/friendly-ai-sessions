@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,39 +26,42 @@ export const useWelcomeMessageWithFallback = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  // ENHANCED: Create static fallback template with complete facilitator context
+  // Enhanced: Create static fallback template with complete facilitator context
   const createStaticFallbackMessage = useCallback(async (): Promise<Message | null> => {
     if (!conversationId) return null;
 
+    console.log('🎯 Creating enhanced static fallback with complete facilitator context for session:', conversationId);
+
+    // Enhanced facilitator context extraction
+    const facilitatorFromSession = conversation?.sessions?.facilitator_details;
+    const facilitatorDirect = conversation?.facilitator;
+    const facilitator = facilitatorFromSession || facilitatorDirect;
+
+    const facilitatorName = facilitator?.title || 'your facilitator';
+    const facilitatorDetails = facilitator?.details || facilitator?.description || '';
+    const facilitatorExpertise = facilitator?.expertise_level || '';
+    const facilitatorSpecialties = Array.isArray(facilitator?.specialties) ? facilitator.specialties : [];
+
+    // Session context
     const sessionTitle = conversation?.sessions?.title || 'this session';
-    
-    // FIXED: Enhanced facilitator context extraction
-    const facilitatorName = conversation?.sessions?.facilitator_details?.title || 
-                           conversation?.facilitator?.title || 
-                           'your facilitator';
-    const facilitatorDetails = conversation?.sessions?.facilitator_details?.details || 
-                              conversation?.facilitator?.details ||
-                              conversation?.sessions?.facilitator_details?.description ||
-                              conversation?.facilitator?.description || '';
-    const facilitatorExpertise = conversation?.sessions?.facilitator_details?.expertise_level || 
-                                conversation?.facilitator?.expertise_level || '';
-    const facilitatorSpecialties = conversation?.sessions?.facilitator_details?.specialties || 
-                                  conversation?.facilitator?.specialties || [];
-    
     const objective = conversation?.sessions?.objective || 'facilitate meaningful discussion';
     const participantCount = conversation?.participants || 1;
     const participantDescription = conversation?.participant_description || 'participants';
+    const sessionType = conversation?.sessions?.session_type || 'workshop';
 
-    console.log('ENHANCED: Creating fallback message with complete facilitator context:', {
+    console.log('📋 Enhanced fallback context:', {
       facilitatorName,
       facilitatorDetails,
       facilitatorExpertise,
       facilitatorSpecialties,
+      sessionTitle,
+      objective,
+      participantCount,
       participantDescription,
-      objective
+      sessionType
     });
 
-    // ENHANCED: Create contextual static message with complete facilitator personality
+    // Create contextual static message with complete facilitator personality
     let staticContent = `Welcome to ${sessionTitle}! I'm ${facilitatorName}, and I'm excited to have you join us today.\n\n`;
     
     if (facilitatorDetails) {
@@ -72,15 +76,13 @@ export const useWelcomeMessageWithFallback = ({
       staticContent += `, I'm here to guide our discussion.\n\n`;
     }
     
-    if (objective) {
-      staticContent += `Our objective for today is: ${objective}\n\n`;
-    }
+    staticContent += `Our objective for today is: ${objective}\n\n`;
     
     if (participantCount > 1) {
       staticContent += `I see we have ${participantCount} ${participantDescription} here today. `;
     }
     
-    // ENHANCED: Tailor the message to the specific participant type
+    // Enhanced: Tailor the message to the specific participant type
     if (participantDescription.toLowerCase().includes('squad') || participantDescription.toLowerCase().includes('team')) {
       staticContent += `To get us started, please introduce yourself and share your role in the team. What are you hoping to learn or contribute to improve our team dynamics?\n\n`;
     } else if (participantDescription.toLowerCase().includes('student') || participantDescription.toLowerCase().includes('learner')) {
@@ -89,7 +91,7 @@ export const useWelcomeMessageWithFallback = ({
       staticContent += `To get us started, please introduce yourself and share what brings you to this session. What are you hoping to learn or contribute?\n\n`;
     }
     
-    // ENHANCED: Close with facilitator-specific context
+    // Enhanced: Close with facilitator-specific context
     if (facilitatorDetails || facilitatorExpertise) {
       staticContent += `I'm looking forward to using my experience to help facilitate our discussion and learning from each of your unique perspectives!`;
     } else {
@@ -112,41 +114,39 @@ export const useWelcomeMessageWithFallback = ({
       isFallback: true
     };
 
-    debugLog('all', 'ENHANCED: Created static fallback welcome message with complete facilitator context');
+    console.log('✅ Created enhanced static fallback welcome message with complete facilitator context');
     return fallbackMessage;
   }, [conversationId, conversation, welcomeMessage]);
 
-  // ENHANCED: AI generation with complete facilitator and session context
+  // Enhanced: AI generation with complete facilitator and session context
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {
     if (!conversationId || !conversation) return null;
 
     try {
-      debugLog('all', `ENHANCED: Attempting AI welcome message generation with COMPLETE context (attempt ${attempt}/${MAX_RETRY_ATTEMPTS})`);
+      console.log(`🤖 Attempting AI welcome message generation with COMPLETE context (attempt ${attempt}/${MAX_RETRY_ATTEMPTS})`);
 
-      // ENHANCED: Prepare comprehensive context for AI generation with complete facilitator details
+      // Enhanced: Prepare comprehensive context for AI generation with complete facilitator details
+      const facilitatorFromSession = conversation?.sessions?.facilitator_details;
+      const facilitatorDirect = conversation?.facilitator;
+      const facilitator = facilitatorFromSession || facilitatorDirect;
+
       const sessionContext = {
         sessionTitle: conversation?.sessions?.title,
         sessionObjective: conversation?.sessions?.objective,
         sessionType: conversation?.sessions?.session_type || 'workshop',
         
-        // ENHANCED: Complete facilitator context
-        facilitatorName: conversation?.sessions?.facilitator_details?.title || 
-                        conversation?.facilitator?.title || 'Facilitator',
-        facilitatorDetails: conversation?.sessions?.facilitator_details?.details || 
-                           conversation?.facilitator?.details ||
-                           conversation?.sessions?.facilitator_details?.description ||
-                           conversation?.facilitator?.description || '',
-        facilitatorExpertise: conversation?.sessions?.facilitator_details?.expertise_level || 
-                             conversation?.facilitator?.expertise_level || '',
-        facilitatorSpecialties: conversation?.sessions?.facilitator_details?.specialties || 
-                               conversation?.facilitator?.specialties || [],
+        // Enhanced: Complete facilitator context
+        facilitatorName: facilitator?.title || 'Facilitator',
+        facilitatorDetails: facilitator?.details || facilitator?.description || '',
+        facilitatorExpertise: facilitator?.expertise_level || '',
+        facilitatorSpecialties: Array.isArray(facilitator?.specialties) ? facilitator.specialties : [],
         
         participantCount: conversation?.participants || 1,
         participantDescription: conversation?.participant_description,
         language: conversation?.language || 'en'
       };
 
-      console.log('ENHANCED: AI generation with complete session context:', sessionContext);
+      console.log('🎯 AI generation with complete session context:', sessionContext);
 
       const { data: aiResponse, error } = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
@@ -155,7 +155,7 @@ export const useWelcomeMessageWithFallback = ({
           sessionStart: true,
           generateReport: false,
           sessionContext,
-          // ENHANCED: Pass complete conversation data for facilitator context
+          // Enhanced: Pass complete conversation data for facilitator context
           conversation: conversation
         }
       });
@@ -180,19 +180,19 @@ export const useWelcomeMessageWithFallback = ({
         isAIGenerated: true
       };
 
-      debugLog('all', 'ENHANCED: Successfully generated AI welcome message with complete facilitator context');
+      console.log('✅ Successfully generated AI welcome message with complete facilitator context');
       setLastError(null);
       return aiMessage;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      debugLog('all', `ENHANCED: AI generation attempt ${attempt} failed: ${errorMessage}`);
+      console.error(`❌ AI generation attempt ${attempt} failed:`, errorMessage);
       setLastError(errorMessage);
 
       // Retry with exponential backoff
       if (attempt < MAX_RETRY_ATTEMPTS) {
         const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
-        debugLog('all', `Retrying AI generation in ${delay}ms...`);
+        console.log(`🔄 Retrying AI generation in ${delay}ms...`);
         
         await new Promise(resolve => setTimeout(resolve, delay));
         return attemptAIGeneration(attempt + 1);
@@ -246,7 +246,7 @@ export const useWelcomeMessageWithFallback = ({
       }
 
       // If AI fails, use enhanced static fallback with complete facilitator context
-      debugLog('all', 'AI generation failed, using enhanced static fallback with complete facilitator context');
+      console.log('🔄 AI generation failed, using enhanced static fallback with complete facilitator context');
       const fallbackMessage = await createStaticFallbackMessage();
       
       if (fallbackMessage) {

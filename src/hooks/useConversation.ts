@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { ConversationWithSession } from "@/types/database";
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
-// Define the fetch conversation function first
+// Define the fetch conversation function with enhanced facilitator joins
 const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
   try {
-    // Ensure we also fetch language and participant_description fields
+    console.log('🔍 Fetching conversation with enhanced facilitator context for ID:', id);
+    
+    // Enhanced query with proper facilitator joins for both paths
     const { data, error } = await supabase
       .from('conversations')
       .select(`
@@ -22,28 +24,56 @@ const fetchConversation = async (id: number | null) => {
           title,
           objective,
           welcome_message,
+          session_type,
           facilitator,
-          facilitator_details:facilitators (
+          facilitator_details:facilitators!sessions_facilitator_fkey (
             id,
             title,
             profile_picture,
-            details
+            details,
+            description,
+            expertise_level,
+            specialties,
+            languages
           )
+        ),
+        facilitator:facilitator_id (
+          id,
+          title,
+          profile_picture,
+          details,
+          description,
+          expertise_level,
+          specialties,
+          languages
         )
       `)
       .eq('id', id)
       .maybeSingle();
 
     if (error) {
+      console.error('❌ Error fetching conversation:', error);
       throw new Error(error.message || "Could not load session data");
     }
     
     if (!data) {
+      console.warn('⚠️ No conversation data found for ID:', id);
       return null;
     }
+
+    console.log('📋 Fetched conversation data:', {
+      id: data.id,
+      hasSession: !!data.sessions,
+      hasFacilitatorDetails: !!data.sessions?.facilitator_details,
+      hasDirectFacilitator: !!data.facilitator,
+      facilitatorName: data.sessions?.facilitator_details?.title || data.facilitator?.title,
+      participantDescription: data.participant_description,
+      objective: data.sessions?.objective
+    });
     
     return data as ConversationWithSession;
   } catch (error) {
+    console.error('💥 Exception in fetchConversation:', error);
     throw error;
   }
 };
@@ -84,7 +114,7 @@ export const useConversation = (conversationId: number | null) => {
             if (cachedAvatar && (now - cachedAvatar.timestamp) < AVATAR_CACHE_TTL) {
               // Use cached avatar URL
               facilitator.profile_picture = cachedAvatar.url;
-              console.log('Using cached facilitator profile picture:', cachedAvatar.url);
+              console.log('✅ Using cached facilitator profile picture:', cachedAvatar.url);
             } else {
               // Process and cache the new avatar URL
               try {
@@ -97,9 +127,9 @@ export const useConversation = (conversationId: number | null) => {
                   timestamp: now
                 });
                 
-                console.log('Processed and cached facilitator profile picture:', avatarUrl);
+                console.log('✅ Processed and cached facilitator profile picture:', avatarUrl);
               } catch (error) {
-                console.error('Error processing facilitator avatar:', error);
+                console.error('❌ Error processing facilitator avatar:', error);
                 facilitator.profile_picture = '/placeholder.svg';
               }
             }
@@ -114,8 +144,8 @@ export const useConversation = (conversationId: number | null) => {
     enabled: !!conversationId,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 30000, // Increase from 3000ms to 30000ms (30 seconds) to reduce refresh frequency
-    gcTime: 300000, // Increase from 60000ms to 300000ms (5 minutes)
+    staleTime: 30000, // 30 seconds
+    gcTime: 300000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: true,
@@ -123,7 +153,6 @@ export const useConversation = (conversationId: number | null) => {
       // Only poll every 30 seconds for active admin sessions
       const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
       
-      // Fix: In @tanstack/react-query v5, access the data through queryData directly
       if (queryData && queryData.state && queryData.state.data) {
         const conversationData = queryData.state.data;
         

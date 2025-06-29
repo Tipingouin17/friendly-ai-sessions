@@ -23,6 +23,13 @@ import {
   MAX_TOKEN_ESTIMATE
 } from "../_shared/context-management.ts";
 import { createResponseMetrics, trackSessionMetrics } from "./metrics-handler.ts";
+import { 
+  extractFacilitatorContext, 
+  extractSessionContext, 
+  createContextualSystemPrompt,
+  FacilitatorContext,
+  SessionContext
+} from "./enhanced-context-extractor.ts";
 
 /**
  * Process the request and generate a facilitator response with enhanced context awareness
@@ -40,42 +47,31 @@ export async function processResponse(
   responseContext?: any,
   sessionContext?: any
 ) {
+  console.log('🚀 Starting enhanced response processing for conversation:', conversationId, {
+    sessionStart,
+    wrapUpSession,
+    aggregateResponses,
+    generateReport,
+    conversationData: !!conversation,
+    participantCount: participants?.length || 0
+  });
+
+  // Extract enhanced context using new utilities
+  const facilitatorContext = extractFacilitatorContext(conversation);
+  const sessionContextData = extractSessionContext(conversation, participants);
+
+  console.log('📋 Enhanced context extracted:', {
+    facilitatorName: facilitatorContext.name,
+    facilitatorDetails: facilitatorContext.details,
+    sessionTitle: sessionContextData.title,
+    sessionObjective: sessionContextData.objective,
+    participantDescription: sessionContextData.participantDescription,
+    participantCount: sessionContextData.participantCount
+  });
+
   // Track participation metrics with enhanced participant awareness
   const participantStats = analyzeParticipation(messages, participants || []);
   
-  // Extract participant description and count information
-  const participantCount = conversation?.participants || participants?.length || 0;
-  const participantDescription = conversation?.participant_description || "";
-  
-  // Extract and process language setting
-  let sessionLanguage = conversation?.language || "en";
-  if (sessionLanguage !== "en" && sessionLanguage !== "es" && sessionLanguage !== "fr" && 
-      sessionLanguage !== "de" && sessionLanguage !== "zh" && sessionLanguage !== "ar") {
-    sessionLanguage = getLanguageCode(sessionLanguage);
-  }
-  
-  console.log(`Enhanced context - Participants: ${participantCount}, Description: ${participantDescription}, Language: ${sessionLanguage}`);
-  
-  // FIXED: Enhanced facilitator context with correct data access paths
-  const facilitatorContext = {
-    name: conversation?.sessions?.facilitator_details?.title || 
-          conversation?.facilitator?.title || 
-          'Facilitator',
-    details: conversation?.sessions?.facilitator_details?.details || 
-             conversation?.facilitator?.details || 
-             conversation?.sessions?.facilitator_details?.description ||
-             conversation?.facilitator?.description || '',
-    expertise: conversation?.sessions?.facilitator_details?.expertise_level || 
-               conversation?.facilitator?.expertise_level || 
-               'Professional facilitator',
-    specialties: conversation?.sessions?.facilitator_details?.specialties || 
-                 conversation?.facilitator?.specialties || [],
-    profilePicture: conversation?.sessions?.facilitator_details?.profile_picture || 
-                    conversation?.facilitator?.profile_picture || null
-  };
-
-  console.log('FIXED: Enhanced facilitator context with proper data paths:', facilitatorContext);
-
   // Get OpenAI API key
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY') || '';
   
@@ -115,19 +111,11 @@ export async function processResponse(
   // Use OpenAI with enhanced context if available
   if (openaiApiKey && conversation?.sessions) {
     try {
-      console.log("Using enhanced OpenAI integration with COMPLETE session and facilitator context");
+      console.log("🤖 Using enhanced OpenAI integration with COMPLETE session and facilitator context");
       const startTime = performance.now();
       
-      // FIXED: Construct enhanced session context with proper objective access
-      const sessionType = conversation.sessions.session_type || "workshop";
-      const sessionObjective = conversation.sessions.objective || "facilitate meaningful discussion";
-      const sessionTitle = conversation.sessions.title || "Discussion Session";
-      
-      console.log(`FIXED: Session context - Type: ${sessionType}, Objective: ${sessionObjective}, Title: ${sessionTitle}`);
-      console.log(`FIXED: Participant context - Count: ${participantCount}, Description: ${participantDescription}`);
-      
       // Get relevant facilitation strategies
-      const strategies = FACILITATION_STRATEGIES[sessionType as keyof typeof FACILITATION_STRATEGIES] || FACILITATION_STRATEGIES.workshop;
+      const strategies = FACILITATION_STRATEGIES[sessionContextData.sessionType as keyof typeof FACILITATION_STRATEGIES] || FACILITATION_STRATEGIES.workshop;
       
       // Prune messages to fit context window
       const prunedMessages = pruneMessagesToFitContext(messages, MAX_TOKEN_ESTIMATE);
@@ -135,69 +123,40 @@ export async function processResponse(
       // Extract user questions and topics
       const userTopics = extractUserTopics(prunedMessages);
       
-      // FIXED: Prepare enhanced OpenAI prompt with complete facilitator and session context
-      let basePrompt = prepareEnhancedOpenAIPrompt(
-        conversation, 
-        sessionProgress, 
-        participantCount, 
-        participantDescription, 
-        strategies,
+      // Create enhanced system prompt with complete context
+      let systemPrompt = createContextualSystemPrompt(
         facilitatorContext,
-        sessionContext
+        sessionContextData,
+        sessionProgress,
+        sessionStart
       );
-      
-      // ENHANCED: Add session start instruction with complete context
-      if (sessionStart) {
-        basePrompt += `\n\nCRITICAL SESSION START CONTEXT: Generate an engaging welcome message that:
-1. Introduces yourself as ${facilitatorContext.name} with your specific expertise: ${facilitatorContext.details}
-2. Acknowledges the ${participantCount} ${participantDescription} who have joined this session
-3. Clearly explains the session objective: "${sessionObjective}"
-4. References your specialties: ${facilitatorContext.specialties.join(', ') || 'facilitation and guidance'}
-5. Uses language and examples specifically appropriate for ${participantDescription}
-6. Creates an inclusive atmosphere that matches the participant background and expertise level
-7. Sets clear expectations for participation based on the session type: ${sessionType}
-8. Shows enthusiasm for working with this specific group: ${participantDescription}
-9. Mentions how your background (${facilitatorContext.details}) will help achieve: ${sessionObjective}`;
-      }
       
       // Add response aggregation instruction
       if (aggregateResponses && responseContext) {
-        basePrompt += `\n\nIMPORTANT RESPONSE AGGREGATION: You are ${facilitatorContext.name} synthesizing responses from ${responseContext.totalResponses} ${participantDescription}. Please:
-1. Acknowledge the diverse perspectives shared by the ${participantDescription}
+        systemPrompt += `\n\nIMPORTANT RESPONSE AGGREGATION: You are ${facilitatorContext.name} synthesizing responses from ${responseContext.totalResponses} ${sessionContextData.participantDescription}. Please:
+1. Acknowledge the diverse perspectives shared by the ${sessionContextData.participantDescription}
 2. Identify common themes and interesting contrasts in their responses
-3. Build upon their contributions with follow-up questions appropriate for ${participantDescription}
-4. Encourage deeper exploration of topics relevant to: ${sessionObjective}
+3. Build upon their contributions with follow-up questions appropriate for ${sessionContextData.participantDescription}
+4. Encourage deeper exploration of topics relevant to: ${sessionContextData.objective}
 5. Guide the discussion toward the session objectives using your expertise: ${facilitatorContext.details}
 6. Maintain your facilitator persona as ${facilitatorContext.name} throughout`;
       }
       
       // Add wrap up instruction if requested
       if (wrapUpSession) {
-        basePrompt += `\n\nSESSION WRAP-UP: As ${facilitatorContext.name}, please wrap up this session for the ${participantCount} ${participantDescription}:
+        systemPrompt += `\n\nSESSION WRAP-UP: As ${facilitatorContext.name}, please wrap up this session for the ${sessionContextData.participantCount} ${sessionContextData.participantDescription}:
 1. Acknowledge that the session is coming to a close
-2. Summarize key insights relevant to the objective: ${sessionObjective}
-3. Highlight the most valuable contributions made by the ${participantDescription}
-4. Ask for final thoughts specifically related to: ${sessionObjective}
+2. Summarize key insights relevant to the objective: ${sessionContextData.objective}
+3. Highlight the most valuable contributions made by the ${sessionContextData.participantDescription}
+4. Ask for final thoughts specifically related to: ${sessionContextData.objective}
 5. Provide a meaningful conclusion that ties back to the original goals and your expertise`;
       }
       
-      // Add language instruction
-      if (sessionLanguage && sessionLanguage !== "en") {
-        const languageName = 
-          sessionLanguage === "es" ? "Spanish" : 
-          sessionLanguage === "fr" ? "French" : 
-          sessionLanguage === "de" ? "German" :
-          sessionLanguage === "zh" ? "Chinese" :
-          sessionLanguage === "ar" ? "Arabic" : sessionLanguage;
-        
-        basePrompt += `\n\nIMPORTANT: Please respond in ${languageName} language only.`;
-      }
-      
-      // FIXED: Prepare enhanced content for OpenAI with complete context
+      // Prepare enhanced content for OpenAI with complete context
       const promptContent = prepareEnhancedOpenAIContent(
         prunedMessages.slice(-15), 
-        participantCount, 
-        participantDescription,
+        sessionContextData.participantCount, 
+        sessionContextData.participantDescription,
         userTopics,
         participantStats,
         participants,
@@ -205,14 +164,14 @@ export async function processResponse(
         aggregateResponses,
         responseContext,
         facilitatorContext,
-        sessionObjective,
-        sessionType
+        sessionContextData.objective,
+        sessionContextData.sessionType
       );
       
       // Call OpenAI with enhanced context
       const openAIResult = await generateOpenAIResponse(
         openaiApiKey,
-        basePrompt,
+        systemPrompt,
         promptContent,
         generateReport
       );
@@ -221,7 +180,7 @@ export async function processResponse(
       
       if (openAIResult.success) {
         responseContent = openAIResult.content;
-        console.log("FIXED: Enhanced OpenAI response generated with complete facilitator context:", responseContent.substring(0, 100) + "...");
+        console.log("✅ Enhanced OpenAI response generated with complete facilitator context:", responseContent.substring(0, 100) + "...");
         
         responseMetrics = createResponseMetrics('ai', Math.round(endTime - startTime), participantStats.participationBalance);
         
@@ -233,18 +192,18 @@ export async function processResponse(
           responseContent,
           userTopics,
           participantStats,
-          participantCount,
-          participantDescription,
-          sessionLanguage,
+          sessionContextData.participantCount,
+          sessionContextData.participantDescription,
+          sessionContextData.language,
           sessionStart ? 'session_start' : 
           (aggregateResponses ? 'response_aggregation' : 
           (wrapUpSession ? 'session_wrap_up' : 
           (generateReport ? 'report_generation' : 'facilitator_response'))),
           facilitatorContext,
-          sessionObjective
+          sessionContextData.objective
         );
       } else {
-        console.error("Enhanced OpenAI API error:", openAIResult.error);
+        console.error("❌ Enhanced OpenAI API error:", openAIResult.error);
         // Fall back to enhanced template response with complete context
         responseContent = generateEnhancedTemplateResponse(
           prunedMessages, 
@@ -253,14 +212,14 @@ export async function processResponse(
           sessionProgress, 
           participantStats, 
           userTopics,
-          participantCount,
-          participantDescription,
+          sessionContextData.participantCount,
+          sessionContextData.participantDescription,
           facilitatorContext,
-          sessionObjective
+          sessionContextData.objective
         );
       }
     } catch (error) {
-      console.error("Error in enhanced OpenAI processing:", error instanceof Error ? error.message : "Unknown error");
+      console.error("💥 Error in enhanced OpenAI processing:", error instanceof Error ? error.message : "Unknown error");
       
       // Fall back to enhanced template response with complete context
       responseContent = generateEnhancedTemplateResponse(
@@ -270,14 +229,14 @@ export async function processResponse(
         sessionProgress, 
         participantStats, 
         extractUserTopics(messages),
-        participantCount,
-        participantDescription,
+        sessionContextData.participantCount,
+        sessionContextData.participantDescription,
         facilitatorContext,
-        sessionObjective
+        sessionContextData.objective
       );
     }
   } else {
-    console.log("Using enhanced template-based response generation with complete context");
+    console.log("📝 Using enhanced template-based response generation with complete context");
     
     responseContent = generateEnhancedTemplateResponse(
       messages, 
@@ -286,104 +245,36 @@ export async function processResponse(
       sessionProgress, 
       participantStats, 
       extractUserTopics(messages),
-      participantCount,
-      participantDescription,
+      sessionContextData.participantCount,
+      sessionContextData.participantDescription,
       facilitatorContext,
-      sessionObjective
+      sessionContextData.objective
     );
   }
 
   // Create response object with enhanced metrics and complete context
-  return {
+  const result = {
     id: `resp-${Date.now()}`,
     content: responseContent,
     is_report: generateReport,
     metrics: responseMetrics,
     avatar: facilitatorAvatar || '/api/avatar?name=Facilitator&variant=beam&palette=2',
-    facilitator_context: facilitatorContext
+    facilitator_context: facilitatorContext,
+    session_context: sessionContextData
   };
+
+  console.log('✅ Response processing complete:', {
+    contentLength: responseContent.length,
+    facilitatorName: facilitatorContext.name,
+    sessionObjective: sessionContextData.objective,
+    participantDescription: sessionContextData.participantDescription
+  });
+
+  return result;
 }
 
 /**
- * FIXED: Prepare enhanced OpenAI prompt with complete facilitator and session context
- */
-function prepareEnhancedOpenAIPrompt(
-  conversation: any,
-  sessionProgress: string,
-  participantCount: number,
-  participantDescription: string,
-  strategies: any,
-  facilitatorContext: any,
-  sessionContext?: any
-) {
-  const sessionType = conversation?.sessions?.session_type || "workshop";
-  const sessionObjective = conversation?.sessions?.objective || "facilitate a productive discussion";
-  const sessionTitle = conversation?.sessions?.title || "Discussion Session";
-  const languageCode = conversation?.language || "en";
-  
-  let languageInstruction = "";
-  if (languageCode && languageCode !== "en") {
-    const displayLanguage = 
-      languageCode === "es" ? "Spanish" : 
-      languageCode === "fr" ? "French" : 
-      languageCode === "de" ? "German" : 
-      languageCode === "zh" ? "Chinese" : 
-      languageCode === "ar" ? "Arabic" : languageCode;
-    
-    languageInstruction = `\n\nIMPORTANT: Please respond in ${displayLanguage} language only.`;
-  }
-  
-  return `You are ${facilitatorContext.name}, an expert facilitator leading a ${sessionType} session titled "${sessionTitle}".
-
-FACILITATOR PROFILE (CRITICAL - USE THIS CONTEXT):
-- Name: ${facilitatorContext.name}
-- Background & Expertise: ${facilitatorContext.details || 'Professional session facilitator'}
-- Expertise Level: ${facilitatorContext.expertise}
-- Specialties: ${facilitatorContext.specialties.join(', ') || 'facilitation and guidance'}
-- Your unique value: ${facilitatorContext.details}
-
-SESSION CONTEXT (CRITICAL - REFERENCE THESE DETAILS):
-- Objective: ${sessionObjective}
-- Current progress: ${sessionProgress} stage
-- Session type: ${sessionType}
-- Title: ${sessionTitle}
-
-PARTICIPANT INFORMATION (CRITICAL - TAILOR TO THIS GROUP):
-- Number of participants: ${participantCount}
-- Participant type: ${participantDescription || "General participants"}
-- Your approach: Adapt your facilitation style specifically for ${participantDescription}
-- Use language, examples, and references appropriate for ${participantDescription}
-
-FACILITATION APPROACH AS ${facilitatorContext.name}:
-- Leverage your background: ${facilitatorContext.details}
-- Use these techniques: ${strategies.techniques.join(", ")}
-- For redirection, use: ${strategies.redirections.join(" Or, ")}
-- Always maintain your identity as ${facilitatorContext.name}
-- Reference your specialties when relevant: ${facilitatorContext.specialties.join(', ')}
-
-ADAPTIVE STRATEGIES FOR ${participantDescription}:
-- Small groups (1-3): Direct, personal engagement with questions suited to ${participantDescription}
-- Medium groups (4-8): Balance individual contributions with group synthesis for ${participantDescription}
-- Large groups (9+): Structured sharing with clear facilitation guidance for ${participantDescription}
-
-PARTICIPANT-CENTERED APPROACH (ESSENTIAL):
-- Always remember you're working with ${participantDescription}
-- Tailor all language and examples to match their context and expertise
-- Reference the session objective: ${sessionObjective} in relation to their needs
-- Build on their contributions meaningfully as ${facilitatorContext.name}
-- Create psychological safety appropriate for ${participantDescription}
-- Balance participation across all ${participantCount} ${participantDescription}
-
-AUTHENTIC FACILITATION AS ${facilitatorContext.name}:
-- Respond authentically as ${facilitatorContext.name}, not as a generic AI
-- Reference your specific background: ${facilitatorContext.details}
-- Show genuine interest in ${participantDescription} contributions
-- Guide toward the objective: ${sessionObjective} using your expertise
-- Demonstrate how your background helps achieve: ${sessionObjective}${languageInstruction}`;
-}
-
-/**
- * FIXED: Prepare enhanced OpenAI content with complete context awareness
+ * Prepare enhanced OpenAI content with complete context awareness
  */
 function prepareEnhancedOpenAIContent(
   recentMessages: any[],
@@ -395,7 +286,7 @@ function prepareEnhancedOpenAIContent(
   generateReport: boolean,
   aggregateResponses?: boolean,
   responseContext?: any,
-  facilitatorContext?: any,
+  facilitatorContext?: FacilitatorContext,
   sessionObjective?: string,
   sessionType?: string
 ) {
@@ -404,7 +295,7 @@ function prepareEnhancedOpenAIContent(
   // Add enhanced participant context
   promptContent += `PARTICIPANT CONTEXT (CRITICAL):\n`;
   promptContent += `- Total participants: ${participantCount}\n`;
-  promptContent += `- Participant profile: ${participantDescription || "General participants"}\n`;
+  promptContent += `- Participant profile: ${participantDescription}\n`;
   promptContent += `- Participation patterns: ${participantStats.summary}\n`;
   promptContent += `- Session type: ${sessionType}\n`;
   promptContent += `- Session objective: ${sessionObjective}\n\n`;

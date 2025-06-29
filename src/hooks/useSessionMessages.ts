@@ -22,7 +22,7 @@ export const useSessionMessages = ({
   conversation,
   totalParticipants = 1
 }: UseSessionMessagesProps) => {
-  // Use enhanced message fetching with response aggregation
+  // Use enhanced message fetching with database-first approach
   const {
     messages,
     setMessages,
@@ -33,7 +33,8 @@ export const useSessionMessages = ({
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,
-    isGeneratingResponse
+    isGeneratingResponse,
+    clearWelcomeMessageCache
   } = useMessageFetching({
     conversationId,
     welcomeMessage,
@@ -62,6 +63,13 @@ export const useSessionMessages = ({
   useEffect(() => {
     fetchMessages();
   }, [conversationId, welcomeMessage, conversation, fetchMessages]);
+  
+  // Clear cache when conversation changes (ensures fresh AI generation for new sessions)
+  useEffect(() => {
+    if (conversationId && !isAdmin) {
+      clearWelcomeMessageCache();
+    }
+  }, [conversationId, isAdmin, clearWelcomeMessageCache]);
   
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {

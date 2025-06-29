@@ -29,6 +29,7 @@ export const useMessageFetching = ({
   const { 
     getCachedWelcomeMessage, 
     createWelcomeMessageWithFallback,
+    clearWelcomeMessageCache,
     isGenerating: isGeneratingWelcome,
     lastError: welcomeError
   } = useWelcomeMessageWithFallback({
@@ -80,7 +81,7 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
-  // Main fetch function with enhanced context awareness
+  // Main fetch function - DATABASE FIRST approach
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       debugLog('all', 'No conversation ID provided, skipping message fetch');
@@ -88,25 +89,39 @@ export const useMessageFetching = ({
     }
     
     try {
-      debugLog('all', `Fetching messages for conversation: ${conversationId}`);
+      debugLog('all', `🔍 Fetching messages for conversation: ${conversationId} (Database First)`);
       
-      // Always check for database messages first
-      const { data, error } = await supabase
+      // ALWAYS check database first - this is the primary source of truth
+      const { data, error: dbError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
         
-      if (error) {
-        console.error('Error fetching messages:', error);
-        setError(`Failed to fetch messages: ${error.message}`);
+      if (dbError) {
+        console.error('Error fetching messages from database:', dbError);
+        setError(`Failed to fetch messages: ${dbError.message}`);
+        
+        // If database fails and we're a participant, show emergency fallback
+        if (!isAdmin) {
+          const cachedWelcomeMsg = getCachedWelcomeMessage();
+          if (cachedWelcomeMsg) {
+            debugLog('all', 'Database failed, using cached welcome message');
+            setMessages([cachedWelcomeMsg]);
+          } else {
+            const emergencyWelcome = await createWelcomeMessageWithFallback();
+            if (emergencyWelcome) {
+              setMessages([emergencyWelcome]);
+            }
+          }
+        }
         return;
       }
       
-      // If we have database messages, format and display them
+      // If we have database messages, use them (this is the expected path)
       if (data && data.length > 0) {
         const formattedMessages = await formatDatabaseMessages(data);
-        debugLog('all', `Successfully fetched ${formattedMessages.length} database messages`);
+        debugLog('all', `✅ Successfully loaded ${formattedMessages.length} database messages`);
         setMessages(formattedMessages);
         
         // Check if the last message was a facilitator question
@@ -117,56 +132,60 @@ export const useMessageFetching = ({
         return;
       }
       
-      // No database messages - generate welcome message for participants
-      if (!isAdmin) {
-        debugLog('all', 'No database messages found, generating contextual welcome message for participant');
-        
-        // Check cache first
-        const cachedWelcomeMsg = getCachedWelcomeMessage();
-        if (cachedWelcomeMsg) {
-          debugLog('all', 'Using cached welcome message');
-          setMessages([cachedWelcomeMsg]);
-          return;
-        }
-        
-        // Generate new welcome message with enhanced context
-        const welcomeMsg = await createWelcomeMessageWithFallback();
-        if (welcomeMsg) {
-          setMessages([welcomeMsg]);
-          // Save to database for other participants to see
-          saveWelcomeMessageToDb(welcomeMsg);
-        }
-      } else {
-        // For admin, just show empty state until session starts
-        debugLog('all', 'Admin view - showing empty state until session starts');
+      // No database messages found
+      debugLog('all', `📭 No messages found in database for session ${conversationId}`);
+      
+      // For admin, just show empty state - they'll see messages when session starts
+      if (isAdmin) {
+        debugLog('all', 'Admin view - showing empty state until session generates messages');
         setMessages([]);
+        return;
+      }
+      
+      // For participants, check if we should have a welcome message
+      debugLog('all', 'Participant view - checking for welcome message availability');
+      
+      // If session has started, there should be a database message
+      // If not found, it means AI generation may have failed - show emergency fallback
+      const cachedWelcomeMsg = getCachedWelcomeMessage();
+      if (cachedWelcomeMsg && !cachedWelcomeMsg.isFallback) {
+        debugLog('all', 'Using valid cached AI-generated welcome message');
+        setMessages([cachedWelcomeMsg]);
+      } else {
+        debugLog('all', '⚠️ No AI-generated welcome message found, creating emergency fallback');
+        const emergencyWelcome = await createWelcomeMessageWithFallback();
+        if (emergencyWelcome) {
+          setMessages([emergencyWelcome]);
+        }
       }
       
     } catch (err) {
       console.error('Exception fetching messages:', err);
       setError('Failed to load session messages');
       
-      // Even on error, try to show a fallback welcome message for participants
+      // Emergency fallback for participants
       if (!isAdmin) {
         try {
           const cachedWelcomeMsg = getCachedWelcomeMessage();
           if (cachedWelcomeMsg) {
             setMessages([cachedWelcomeMsg]);
+          } else {
+            const emergencyWelcome = await createWelcomeMessageWithFallback();
+            if (emergencyWelcome) {
+              setMessages([emergencyWelcome]);
+            }
           }
         } catch (fallbackError) {
-          console.error('Failed to show fallback welcome message:', fallbackError);
+          console.error('Failed to show emergency fallback welcome message:', fallbackError);
         }
       }
     }
   }, [
     conversationId,
-    welcomeMessage,
-    conversation,
     isAdmin,
     getCachedWelcomeMessage,
     createWelcomeMessageWithFallback,
     formatDatabaseMessages,
-    saveWelcomeMessageToDb,
     handleFacilitatorQuestion
   ]);
 
@@ -180,6 +199,7 @@ export const useMessageFetching = ({
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,
-    isGeneratingResponse
+    isGeneratingResponse,
+    clearWelcomeMessageCache
   };
 };

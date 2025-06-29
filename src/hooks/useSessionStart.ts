@@ -19,6 +19,74 @@ export const useSessionStart = ({
   const { toast } = useToast();
   const logger = createLogger('SessionStart', 'session');
 
+  const clearWelcomeMessageCache = (convId: number) => {
+    try {
+      const cacheKey = `session_welcome_message_${convId}`;
+      localStorage.removeItem(cacheKey);
+      logger.category('session', `🗑️ Cleared welcome message cache for session ${convId}`);
+    } catch (error) {
+      logger.error('Error clearing welcome message cache:', error);
+    }
+  };
+
+  const generateAndSaveWelcomeMessage = async (convId: number) => {
+    logger.category('session', `🤖 Generating AI welcome message for session ${convId}`);
+    
+    try {
+      const { data: responseData, error: responseError } = await supabase.functions.invoke(
+        'handle-facilitator-response',
+        {
+          body: {
+            messages: [],
+            conversationId: convId,
+            generateReport: false,
+            sessionStart: true,
+            conversation: conversationData
+          }
+        }
+      );
+
+      if (responseError) {
+        logger.error('❌ Error generating welcome message:', responseError);
+        throw responseError;
+      }
+
+      if (!responseData?.content) {
+        logger.error('⚠️ Empty response from AI generation');
+        throw new Error('Empty AI response');
+      }
+
+      // Save the generated message to database
+      const { error: dbError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: convId,
+          content: { 
+            text: responseData.content,
+            avatar: responseData.avatar
+          },
+          role: 'assistant',
+          created_at: new Date().toISOString()
+        });
+
+      if (dbError) {
+        logger.error('❌ Error saving welcome message to database:', dbError);
+        throw dbError;
+      }
+
+      logger.category('session', '✅ Welcome message generated and saved to database:', {
+        contentLength: responseData.content.length,
+        generationMethod: responseData.metrics?.generationMethod,
+        hasAvatar: !!responseData.avatar
+      });
+
+      return responseData;
+    } catch (error) {
+      logger.error('💥 Welcome message generation failed:', error);
+      throw error;
+    }
+  };
+
   const startSession = async () => {
     if (!conversationId || !conversationData) {
       logger.error('Cannot start session: Missing conversation data', {
@@ -34,17 +102,10 @@ export const useSessionStart = ({
     try {
       logger.category('session', `🚀 Starting session for conversation: ${conversationId} with ${participants.length} participants`);
       
-      // Log session context
-      logger.category('session', '📋 Session context:', {
-        conversationId,
-        participantCount: participants.length,
-        facilitatorName: conversationData?.sessions?.facilitator_details?.title,
-        sessionObjective: conversationData?.sessions?.objective,
-        participantDescription: conversationData?.participant_description,
-        language: conversationData?.language
-      });
+      // Clear any existing cached welcome messages to ensure fresh AI generation
+      clearWelcomeMessageCache(conversationId);
       
-      // First, mark the session as started in the database
+      // Mark the session as started in the database first
       const dbUpdateStart = performance.now();
       const { error: updateError } = await supabase
         .from('conversations')
@@ -63,53 +124,19 @@ export const useSessionStart = ({
 
       logger.category('session', '✅ Session marked as started in database');
 
-      // Generate the initial facilitator welcome message
-      logger.category('session', '🤖 Generating initial facilitator welcome message');
+      // Generate AI welcome message with full context
+      const welcomeMessageStart = performance.now();
+      await generateAndSaveWelcomeMessage(conversationId);
+      const welcomeMessageDuration = performance.now() - welcomeMessageStart;
       
-      const aiRequestStart = performance.now();
-      const requestPayload = {
-        messages: [], // Empty for initial welcome message
-        conversationId: conversationId,
-        generateReport: false,
-        sessionStart: true // Flag to indicate this is the session start
-      };
-      
-      logger.category('session', '📤 Edge function request payload:', requestPayload);
-
-      const { data: responseData, error: responseError } = await supabase.functions.invoke(
-        'handle-facilitator-response',
-        {
-          body: requestPayload
-        }
-      );
-
-      const aiRequestDuration = performance.now() - aiRequestStart;
-      logger.category('session', `⚡ Edge function call completed in ${aiRequestDuration.toFixed(2)}ms`);
-
-      if (responseError) {
-        logger.error('❌ Error generating welcome message:', {
-          error: responseError,
-          duration: aiRequestDuration,
-          requestPayload
-        });
-        throw responseError;
-      }
-
-      logger.category('session', '✅ Welcome message generated successfully:', {
-        responseData,
-        contentLength: responseData?.content?.length,
-        generationMethod: responseData?.metrics?.generationMethod,
-        hasAvatar: !!responseData?.avatar,
-        facilitatorContext: responseData?.facilitator_context,
-        sessionContext: responseData?.session_context
-      });
+      logger.category('session', `🎯 Welcome message generation completed in ${welcomeMessageDuration.toFixed(2)}ms`);
       
       const totalDuration = performance.now() - startTime;
-      logger.category('session', `🎯 Session start completed in ${totalDuration.toFixed(2)}ms total`);
+      logger.category('session', `🎉 Session start completed in ${totalDuration.toFixed(2)}ms total`);
       
       toast({
         title: "Session started",
-        description: "The session has been started and participants will receive the welcome message.",
+        description: "The session has been started and participants will receive an AI-generated welcome message.",
       });
       
       return true;

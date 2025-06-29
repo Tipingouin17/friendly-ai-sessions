@@ -14,7 +14,7 @@ interface JoinSessionMainProps {
   onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   avatarSeed: string;
   onAvatarChange: () => void;
-  onJoinSession: () => void;
+  onJoinSession: () => Promise<any>;
   isJoining: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
@@ -35,6 +35,10 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   effectiveMaxParticipants,
   onRetry
 }) => {
+  const handleJoinClick = async () => {
+    await onJoinSession();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
@@ -74,7 +78,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
             onNameChange={onNameChange}
             avatarSeed={avatarSeed}
             onAvatarChange={onAvatarChange}
-            onJoinSession={onJoinSession}
+            onJoinSession={handleJoinClick}
             isJoining={isJoining}
             currentParticipantCount={currentParticipantCount}
             effectiveMaxParticipants={effectiveMaxParticipants}

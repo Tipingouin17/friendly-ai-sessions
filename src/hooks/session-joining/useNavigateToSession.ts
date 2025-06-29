@@ -4,7 +4,6 @@ import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 export function useNavigateToSession() {
   const { navigateToParticipantSession, navigateToHostSession } = useSecureNavigation();
 
-  // Remove the dangerous forceAdmin parameter entirely
   const navigateToSession = (
     conversationId: number | null, 
     name: string, 

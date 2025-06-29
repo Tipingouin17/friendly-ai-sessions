@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
@@ -10,6 +11,13 @@ import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 interface UseJoinSessionDataOptions {
   defaultParticipantName?: string;
   defaultAvatarSeed?: string;
+}
+
+interface JoinResult {
+  participantId: number;
+  name: string;
+  avatarSeed: string;
+  isAdmin: boolean;
 }
 
 export function useJoinSessionData(
@@ -30,6 +38,7 @@ export function useJoinSessionData(
   // Initialize participant state with provided defaults (pure, no side effects)
   const [participantName, setParticipantName] = useState(() => options?.defaultParticipantName || "");
   const [avatarSeed, setAvatarSeed] = useState(() => options?.defaultAvatarSeed || Math.random().toString());
+  const [joinResult, setJoinResult] = useState<JoinResult | null>(null);
   
   // Debug logging
   useEffect(() => {
@@ -73,7 +82,7 @@ export function useJoinSessionData(
     }
   }, [effectiveIsAdmin, conversationId]);
 
-  const handleJoinSession = async () => {
+  const handleJoinSession = async (): Promise<JoinResult | null> => {
     // Enhanced admin detection - check all sources
     const effectiveIsAdmin = isAdmin || 
                            isOnAdminPath ||
@@ -103,45 +112,38 @@ export function useJoinSessionData(
         description: "A name is required to join the session.",
         variant: "destructive",
       });
-      return Promise.resolve();
+      return null;
     }
 
     // Skip check if on admin route or admin user - they should always be able to join
-    if (isOnAdminPath || effectiveIsAdmin) {
-      console.log("Admin user detected, bypassing session full check");
-      // Continue with join process for admin users
-      return joinSession({
-        conversationId,
-        participantName,
-        avatarSeed,
-        conversation: conversation as ConversationWithSession,
-        currentParticipantCount,
-        refetch,
-        isAdmin: true  // Pass the admin status to joinSession
-      });
+    if (!isOnAdminPath && !effectiveIsAdmin) {
+      // Only check if session is full if effectiveMaxParticipants is greater than 0
+      if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
+        toast({
+          title: "Session Full",
+          description: "This session has reached its maximum capacity of participants.",
+          variant: "destructive",
+        });
+        setError("This session has reached its maximum capacity of participants.");
+        return null;
+      }
     }
 
-    // Only check if session is full if effectiveMaxParticipants is greater than 0
-    // and we're not an admin
-    if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
-      toast({
-        title: "Session Full",
-        description: "This session has reached its maximum capacity of participants.",
-        variant: "destructive",
-      });
-      setError("This session has reached its maximum capacity of participants.");
-      return Promise.resolve(); // Return a resolved promise for async compatibility
-    }
-
-    return joinSession({
+    const result = await joinSession({
       conversationId,
       participantName,
       avatarSeed,
       conversation: conversation as ConversationWithSession,
       currentParticipantCount,
       refetch,
-      isAdmin: false
+      isAdmin: effectiveIsAdmin
     });
+
+    if (result) {
+      setJoinResult(result);
+    }
+
+    return result;
   };
   
   // Calculate effective max participants
@@ -168,6 +170,7 @@ export function useJoinSessionData(
     isLoading: !conversation && !error,
     error,
     handleJoinSession,
-    existingSessionData
+    existingSessionData,
+    joinResult
   };
 }

@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
-import { useNavigateToSession } from "./useNavigateToSession";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { useSessionValidation } from "./useSessionValidation";
@@ -20,10 +19,16 @@ interface SessionJoinParams {
   isAdmin?: boolean;
 }
 
+interface JoinResult {
+  participantId: number;
+  name: string;
+  avatarSeed: string;
+  isAdmin: boolean;
+}
+
 export function useSessionJoiner() {
   const { toast } = useToast();
   const [isJoining, setIsJoining] = useState(false);
-  const { navigateToSession } = useNavigateToSession();
   const { isAdmin: contextIsAdmin } = useSessionAdminStatus();
   const { persistedParticipantData } = useParticipantPersistence();
   
@@ -40,7 +45,7 @@ export function useSessionJoiner() {
     refetch,
     isAnonymous = false,
     isAdmin: forceAdmin = false
-  }: SessionJoinParams) => {
+  }: SessionJoinParams): Promise<JoinResult | null> => {
     try {
       // Validate input parameters
       const validatedData = await validateSessionJoin({
@@ -51,7 +56,7 @@ export function useSessionJoiner() {
       });
 
       if (!validatedData) {
-        return Promise.resolve();
+        return null;
       }
 
       // Check if we have persisted data for this conversation
@@ -60,17 +65,13 @@ export function useSessionJoiner() {
         null;
       
       if (existingParticipant) {
-        // Navigate directly using persisted data
-        setTimeout(() => {
-          navigateToSession(
-            conversationId!, 
-            existingParticipant.name, 
-            existingParticipant.participantId, 
-            existingParticipant.avatarSeed
-          );
-        }, 500);
-        
-        return Promise.resolve();
+        // Return existing participant data without navigation
+        return {
+          participantId: existingParticipant.participantId,
+          name: existingParticipant.name,
+          avatarSeed: existingParticipant.avatarSeed,
+          isAdmin: false
+        };
       }
 
       setIsJoining(true);
@@ -104,18 +105,12 @@ export function useSessionJoiner() {
         // Clear any existing "session full" errors since we've successfully joined
         setError(null);
         
-        // Add a short delay to allow for Supabase to process the update
-        setTimeout(() => {
-          console.log("Navigating to session with admin status:", joinResult.isAdmin);
-          navigateToSession(
-            conversationId, 
-            joinResult.name, 
-            joinResult.participantId, 
-            joinResult.avatarSeed
-          );
-        }, 500);
-        
-        return Promise.resolve();
+        return {
+          participantId: joinResult.participantId,
+          name: joinResult.name,
+          avatarSeed: joinResult.avatarSeed,
+          isAdmin: joinResult.isAdmin
+        };
         
       } catch (joinError: any) {
         // Special handling for admin users - if they get an error about session being full,
@@ -130,17 +125,12 @@ export function useSessionJoiner() {
             isAnonymous
           });
           
-          // Navigate with admin status
-          setTimeout(() => {
-            navigateToSession(
-              conversationId, 
-              adminResult.name, 
-              adminResult.participantId, 
-              adminResult.avatarSeed
-            );
-          }, 500);
-          
-          return Promise.resolve();
+          return {
+            participantId: adminResult.participantId,
+            name: adminResult.name,
+            avatarSeed: adminResult.avatarSeed,
+            isAdmin: true
+          };
         }
         
         throw joinError;
@@ -154,8 +144,9 @@ export function useSessionJoiner() {
         description: error.message || "Failed to join the session. Please try again.",
         variant: "destructive",
       });
+      return null;
+    } finally {
       setIsJoining(false);
-      return Promise.resolve();
     }
   };
 

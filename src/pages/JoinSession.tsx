@@ -1,3 +1,4 @@
+
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
@@ -14,6 +15,7 @@ const JoinSession = () => {
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasNavigated, setHasNavigated] = useState(false);
   
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
@@ -56,33 +58,6 @@ const JoinSession = () => {
     }
   }, [conversationId, queryClient, retryCount]);
   
-  const handleRetry = useCallback(() => {
-    if (conversationId) {
-      console.log("Retrying connection to session:", conversationId);
-      setRetryCount(prev => prev + 1);
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
-      queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
-    }
-  }, [conversationId, queryClient]);
-  
-  // Handle rejoining the session with existing data
-  const handleRejoin = useCallback(() => {
-    if (existingSessionData && conversationId) {
-      console.log("Rejoining session with existing data:", existingSessionData);
-      navigateToSession(
-        conversationId,
-        existingSessionData.name || "Participant",
-        existingSessionData.participantId,
-        existingSessionData.avatarSeed || ""
-      );
-    }
-  }, [existingSessionData, conversationId, navigateToSession]);
-  
-  // Handle joining as a new participant
-  const handleJoinAsNew = useCallback(() => {
-    setShowRejoinPrompt(false);
-  }, []);
-  
   const {
     participantName,
     setParticipantName,
@@ -95,11 +70,62 @@ const JoinSession = () => {
     conversation,
     isLoading,
     error,
-    handleJoinSession
+    handleJoinSession,
+    joinResult
   } = useJoinSessionData(conversationId, {
     defaultParticipantName,
     defaultAvatarSeed
   });
+
+  // Controlled navigation after successful join
+  useEffect(() => {
+    if (!isJoining && joinResult && conversationId && !hasNavigated) {
+      console.log("Navigating to participant session after successful join:", {
+        conversationId,
+        participantName: joinResult.name,
+        participantId: joinResult.participantId,
+        avatarSeed: joinResult.avatarSeed
+      });
+      
+      setHasNavigated(true);
+      navigateToSession(
+        conversationId,
+        joinResult.name,
+        joinResult.participantId,
+        joinResult.avatarSeed
+      );
+    }
+  }, [isJoining, joinResult, conversationId, navigateToSession, hasNavigated]);
+
+  const handleRetry = useCallback(() => {
+    if (conversationId) {
+      console.log("Retrying connection to session:", conversationId);
+      setRetryCount(prev => prev + 1);
+      setHasNavigated(false);
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+      queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
+    }
+  }, [conversationId, queryClient]);
+  
+  // Handle rejoining the session with existing data
+  const handleRejoin = useCallback(() => {
+    if (existingSessionData && conversationId && !hasNavigated) {
+      console.log("Rejoining session with existing data:", existingSessionData);
+      setHasNavigated(true);
+      navigateToSession(
+        conversationId,
+        existingSessionData.name || "Participant",
+        existingSessionData.participantId,
+        existingSessionData.avatarSeed || ""
+      );
+    }
+  }, [existingSessionData, conversationId, navigateToSession, hasNavigated]);
+  
+  // Handle joining as a new participant
+  const handleJoinAsNew = useCallback(() => {
+    setShowRejoinPrompt(false);
+    setHasNavigated(false);
+  }, []);
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {

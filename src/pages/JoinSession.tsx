@@ -1,6 +1,6 @@
 
 import { useSearchParams } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 import JoinSessionErrorState from "@/components/session/JoinSessionErrorState";
@@ -24,9 +24,13 @@ const JoinSession = () => {
   const { getSessionByConversationId } = useParticipantPersistence();
   const { navigateToSession } = useNavigateToSession();
   
-  // Check for existing session data
-  const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
-  const [showRejoinPrompt, setShowRejoinPrompt] = useState(!!existingSessionData);
+  // Memoize existingSessionData to prevent infinite re-renders
+  const existingSessionData = useMemo(() => {
+    return conversationId ? getSessionByConversationId(conversationId) : null;
+  }, [conversationId, getSessionByConversationId]);
+  
+  // Use function initialization to avoid re-renders
+  const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => !!existingSessionData);
   
   // Validate that we have a valid conversation ID
   useEffect(() => {

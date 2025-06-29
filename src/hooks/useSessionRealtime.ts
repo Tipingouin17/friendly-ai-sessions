@@ -1,190 +1,81 @@
 
-import { useState, useEffect, useRef } from "react";
-import { ParticipantInfo } from "@/types/chat";
-import { ConversationWithSession } from "@/types/database";
-import { 
-  createConversationChannel, 
-  createParticipantsChannel, 
-  createMessagesChannel
-} from "@/utils/realtimeConnectionManager";
-import { removeChannel } from "@/utils/realtimeHelpers";
-import { getParticipantInfo } from "@/utils/participantUtils";
+import { useEffect, useRef, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Message } from '@/types/chat';
+import { createLogger } from '@/utils/debugLogger';
 
-type UseSessionRealtimeProps = {
-  currentConversationId: number | null;
-  participants: ParticipantInfo[];
-  setParticipants: React.Dispatch<React.SetStateAction<ParticipantInfo[]>>;
-  conversation: ConversationWithSession | null;
-  refetch: () => void;
-  handleSessionFull?: () => void;
-  onSessionStarted?: () => void;
-};
+interface UseSessionRealtimeProps {
+  conversationId: number | null;
+  onSessionStart: () => void;
+  onNewMessage: (message: Message) => void;
+  isAdmin?: boolean;
+}
 
 export const useSessionRealtime = ({
-  currentConversationId,
-  participants,
-  setParticipants,
-  conversation,
-  refetch,
-  handleSessionFull,
-  onSessionStarted
+  conversationId,
+  onSessionStart,
+  onNewMessage,
+  isAdmin = false
 }: UseSessionRealtimeProps) => {
-  const [error, setError] = useState<string | null>(null);
-  const [sessionStartedCalled, setSessionStartedCalled] = useState(false);
-  const [sessionFullCalled, setSessionFullCalled] = useState(false);
-  
-  // Use refs to track active channels and prevent duplicate subscriptions
-  const conversationChannelRef = useRef<any>(null);
-  const participantsChannelRef = useRef<any>(null);
-  const messagesChannelRef = useRef<any>(null);
-  const setupCompletedRef = useRef(false);
-  
-  // Set up realtime channels
-  useEffect(() => {
-    if (!currentConversationId || setupCompletedRef.current) {
-      return;
-    }
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const channelRef = useRef<any>(null);
+  const logger = createLogger('SessionRealtime', 'realtime');
 
-    // Mark setup as completed
-    setupCompletedRef.current = true;
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const channelName = `session-realtime-${conversationId}`;
     
-    // Check initial state
-    if (conversation) {
-      // Check if session is already started
-      if (conversation.session_started && !sessionStartedCalled) {
-        console.log("Session already started, triggering callback");
-        setSessionStartedCalled(true);
-        if (onSessionStarted) onSessionStarted();
-      }
-      
-      // Check if session is already full
-      if (conversation.current_participants >= (conversation.participants || 0) && 
-          (conversation.participants || 0) > 0 && 
-          !sessionFullCalled) {
-        console.log("Session is already full, triggering callback");
-        setSessionFullCalled(true);
-        if (handleSessionFull) handleSessionFull();
-      }
-    }
-    
-    // Create conversation channel
-    try {
-      conversationChannelRef.current = createConversationChannel(
-        currentConversationId,
-        (payload) => {
-          console.log("Conversation update:", payload);
-          
-          if (payload.new) {
-            // Handle session started
-            if (payload.new.session_started && !sessionStartedCalled) {
-              console.log("Session started detected");
-              setSessionStartedCalled(true);
-              if (onSessionStarted) onSessionStarted();
-            }
-            
-            // Handle session full
-            if (payload.new.current_participants >= (payload.new.participants || 0) && 
-                (payload.new.participants || 0) > 0 && 
-                !sessionFullCalled) {
-              console.log("Session full detected");
-              setSessionFullCalled(true);
-              if (handleSessionFull) handleSessionFull();
-            }
-            
-            // Refresh data
-            refetch();
-          }
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, (payload) => {
+        if (payload.new.session_started && !payload.old.session_started) {
+          logger.category('realtime', 'Session started event received');
+          onSessionStart();
         }
-      );
-      
-      // Create participants channel
-      participantsChannelRef.current = createParticipantsChannel(
-        currentConversationId,
-        async (payload) => {
-          console.log("Participant update:", payload);
-          
-          if (payload.new) {
-            // Add new participant if not already in list
-            if (!participants.some(p => p.id === payload.new.participant_id)) {
-              try {
-                const participantInfo = await getParticipantInfo(payload.new);
-                
-                setParticipants(current => {
-                  if (current.some(p => p.id === participantInfo.id)) {
-                    return current;
-                  }
-                  return [...current, participantInfo];
-                });
-              } catch (error) {
-                console.error("Error getting participant info:", error);
-                setError("Error retrieving participant information");
-              }
-            }
-          }
-        }
-      );
-      
-      // Create messages channel
-      messagesChannelRef.current = createMessagesChannel(
-        currentConversationId,
-        (payload) => {
-          console.log("Message update:", payload);
-          refetch();
-        }
-      );
-    } catch (err) {
-      console.error("Error setting up realtime channels:", err);
-      setError("Failed to establish realtime connection");
-    }
-    
-    // Cleanup function
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        const message: Message = {
+          id: payload.new.id.toString(),
+          content: typeof payload.new.content === 'string' 
+            ? payload.new.content 
+            : payload.new.content.text,
+          sender: payload.new.role === 'assistant' ? 'assistant' : 'user',
+          timestamp: new Date(payload.new.created_at),
+          avatar: payload.new.content?.avatar,
+          participant: payload.new.participant_id ? `P${payload.new.participant_id}` : undefined
+        };
+        
+        logger.category('realtime', 'New message received via realtime');
+        onNewMessage(message);
+      })
+      .subscribe((status) => {
+        setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'connecting');
+        logger.category('realtime', `Realtime connection status: ${status}`);
+      });
+
+    channelRef.current = channel;
+
     return () => {
-      setupCompletedRef.current = false;
-      try {
-        if (conversationChannelRef.current) {
-          removeChannel(conversationChannelRef.current);
-          conversationChannelRef.current = null;
-        }
-        
-        if (participantsChannelRef.current) {
-          removeChannel(participantsChannelRef.current);
-          participantsChannelRef.current = null;
-        }
-        
-        if (messagesChannelRef.current) {
-          removeChannel(messagesChannelRef.current);
-          messagesChannelRef.current = null;
-        }
-      } catch (err) {
-        console.error("Error removing channels:", err);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
     };
-  }, [currentConversationId]);
-  
-  // Secondary effect to check conversation state from props
-  useEffect(() => {
-    if (conversation && currentConversationId) {
-      // Check for session status
-      if (conversation.session_started && !sessionStartedCalled) {
-        console.log("Session already started from props, triggering onSessionStarted");
-        setSessionStartedCalled(true);
-        if (onSessionStarted && typeof onSessionStarted === 'function') {
-          onSessionStarted();
-        }
-      }
-      
-      // Check if session is full
-      if (conversation.current_participants >= (conversation.participants || 0) && 
-          (conversation.participants || 0) > 0 && 
-          !sessionFullCalled) {
-        console.log("Session is full from props, triggering handleSessionFull");
-        setSessionFullCalled(true);
-        if (handleSessionFull && typeof handleSessionFull === 'function') {
-          handleSessionFull();
-        }
-      }
-    }
-  }, [conversation, currentConversationId, onSessionStarted, handleSessionFull]);
+  }, [conversationId, onSessionStart, onNewMessage, logger]);
 
-  return { error };
+  return {
+    connectionStatus,
+    isConnected: connectionStatus === 'connected'
+  };
 };

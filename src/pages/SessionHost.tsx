@@ -10,6 +10,7 @@ import { useSessionInterface } from "@/hooks/useSessionInterface";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
+import { useSessionFlow } from "@/hooks/useSessionFlow";
 
 const SessionHost = () => {
   // Enforce host status
@@ -153,12 +154,30 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Handle session start - use the proper function from useSessionInterface
+  // Add the new session flow hook
+  const {
+    isSessionActive,
+    currentResponseCollection,
+    isGeneratingResponse,
+    sessionStartNotification,
+    triggerSessionStart,
+    startResponseCollection,
+    responseProgress
+  } = useSessionFlow({
+    conversationId: currentConversationId,
+    participants: participants || [],
+    conversationData,
+    isAdmin: true
+  });
+
+  // Enhanced session start handler
   const handleSessionStarted = async () => {
-    console.log("🔥 SessionHost - Starting session through useSessionInterface");
+    console.log("🔥 SessionHost - Starting session through session flow");
     try {
-      await handleStartSession();
-      console.log("🔥 SessionHost - Session started successfully");
+      const success = await triggerSessionStart();
+      if (success) {
+        console.log("🔥 SessionHost - Session started successfully with welcome message");
+      }
     } catch (error) {
       console.error("🔥 SessionHost - Error starting session:", error);
     }
@@ -196,6 +215,9 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
+      triggerSessionStart={triggerSessionStart}
+      sessionStartNotification={sessionStartNotification}
+      responseProgress={responseProgress}
     />
   );
 };

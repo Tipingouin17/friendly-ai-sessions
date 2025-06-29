@@ -33,12 +33,22 @@ const JoinSession = () => {
     return conversationId ? getSessionByConversationId(conversationId) : null;
   }, [conversationId, getSessionByConversationId]);
   
+  // Guard variable to detect if user has already joined
+  const hasJoinedBefore = !!existingSessionData?.participantId;
+  
   // Use function initialization to avoid re-renders
   const [showRejoinPrompt, setShowRejoinPrompt] = useState(() => !!existingSessionData);
   
   // Prepare default values for the hook
   const defaultParticipantName = existingSessionData?.name || "";
   const defaultAvatarSeed = existingSessionData?.avatarSeed || Math.random().toString();
+
+  // Navigate to participant session if join was successful - MOVED TO TOP
+  if (joinSuccess) {
+    const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
+    console.log("🚀 Navigating to participant session:", navigationPath);
+    return <Navigate to={navigationPath} replace />;
+  }
   
   // Validate that we have a valid conversation ID
   useEffect(() => {
@@ -80,8 +90,14 @@ const JoinSession = () => {
     defaultAvatarSeed
   });
 
-  // Handle successful join - set success state for navigation
+  // Handle successful join - set success state for navigation (GUARDED)
   const handleJoin = async () => {
+    // Don't allow join if user has already joined before
+    if (hasJoinedBefore) {
+      console.log("User has already joined before, skipping join attempt");
+      return;
+    }
+    
     const result = await handleJoinSession();
     if (result && conversationId) {
       console.log("Successfully joined session, preparing for navigation:", result);
@@ -123,13 +139,6 @@ const JoinSession = () => {
     setJoinSuccess(null);
   }, []);
 
-  // Navigate to participant session if join was successful
-  if (joinSuccess) {
-    const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
-    console.log("🚀 Navigating to participant session:", navigationPath);
-    return <Navigate to={navigationPath} replace />;
-  }
-
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {
     return <JoinSessionLoadingState onRetry={handleRetry} error={error} />;
@@ -168,7 +177,7 @@ const JoinSession = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={handleJoin}
+      onJoinSession={!hasJoinedBefore ? handleJoin : undefined}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

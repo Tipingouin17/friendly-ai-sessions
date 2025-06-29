@@ -60,7 +60,7 @@ const JoinSessionDialog = ({
   useEffect(() => {
     // Generate QR code URL when the join URL is available
     if (internalJoinUrl) {
-      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(internalJoinUrl)}`);
+      setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(internalJoinUrl)}`);
       console.log("Generated QR code for URL:", internalJoinUrl);
     }
   }, [internalJoinUrl]);
@@ -92,24 +92,24 @@ const JoinSessionDialog = ({
           <QrCode className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Join Session</DialogTitle>
           <DialogDescription>
             Share this link or QR code to invite others
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center justify-center p-4 space-y-6">
           {internalJoinUrl ? (
             <>
-              <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-4">
+              <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm">
                 <img 
                   src={qrCodeUrl} 
                   alt="Session QR Code" 
-                  className="w-48 h-48"
+                  className="w-[250px] h-[250px] object-contain"
                 />
               </div>
-              <div className="flex w-full items-center mt-2 bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
+              <div className="flex w-full items-center bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
                 <input 
                   type="text" 
                   value={internalJoinUrl} 
@@ -118,6 +118,7 @@ const JoinSessionDialog = ({
                 />
                 <Button 
                   variant="ghost" 
+                  size="sm"
                   className="h-full rounded-l-none border-l" 
                   onClick={copyJoinLink}
                 >
@@ -130,7 +131,7 @@ const JoinSessionDialog = ({
               No session URL available
             </div>
           )}
-          <p className="mt-4 text-sm text-gray-600 text-center">
+          <p className="text-sm text-gray-600 text-center">
             {currentParticipantCount} 
             {maxParticipants > 0 ? ` of ${maxParticipants}` : ''} participants
           </p>

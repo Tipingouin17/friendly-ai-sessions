@@ -52,27 +52,27 @@ const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
           <span className="hidden sm:inline">QR Code</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Session QR Code</DialogTitle>
         </DialogHeader>
         
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center space-y-6 p-4">
           {sessionLink && (
             <>
-              <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-                <QRCodeSVG value={sessionLink} size={200} />
+              <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm">
+                <QRCodeSVG value={sessionLink} size={250} />
               </div>
               
-              <div className="flex items-center space-x-2 w-full">
-                <div className="flex-1 p-2 bg-gray-50 rounded border text-sm font-mono truncate">
+              <div className="flex items-center space-x-2 w-full bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
+                <div className="flex-1 p-3 text-sm font-mono truncate">
                   {sessionLink}
                 </div>
                 <Button 
                   onClick={handleCopyLink}
                   size="sm"
-                  variant="outline"
-                  className="flex items-center gap-1"
+                  variant="ghost"
+                  className="h-full rounded-l-none border-l flex items-center gap-1"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? "Copied" : "Copy"}

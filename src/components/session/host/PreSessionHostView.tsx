@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useSessionStateTransition } from '@/hooks/useSessionStateTransition';
 import { useSessionStart } from '@/hooks/useSessionStart';
 
 interface PreSessionHostViewProps {
@@ -42,29 +44,43 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     conversationData
   });
 
+  // Auto-start detection using session state transition
+  const {
+    isTransitioning,
+    shouldShowSession,
+    currentParticipants,
+    maxParticipants,
+    isSessionFull,
+    handleStartSession: handleAutoStart
+  } = useSessionStateTransition({
+    props: {
+      conversation: conversationData,
+      participants: participants || [],
+      currentConversationId: conversationId,
+      isSessionStartedInDB: conversationData?.session_started || false,
+      handleStartSession: onSessionStarted
+    },
+    isAdmin: true,
+    sessionStarted,
+    setSessionStarted,
+    onSessionFull: async () => {
+      console.log("🔥 Auto-starting session - participant limit reached");
+      await handleSessionStart();
+    }
+  });
+
   // Stabilize participant count to prevent rapid state changes
   const stableParticipantCount = useMemo(() => {
     const count = Number(participantCount) || 0;
     console.log("🔥 PreSessionHostView - Stabilized participant count:", {
       original: participantCount,
       stabilized: count,
-      participantsLength: participants?.length
+      currentParticipants,
+      maxParticipants,
+      isSessionFull
     });
     return count;
-  }, [participantCount, participants?.length]);
-
-  // Auto-start logic based on participant count
-  const maxParticipants = conversationData?.participants || 10;
-  const isSessionFull = stableParticipantCount >= maxParticipants;
-  const shouldAutoStart = isSessionFull && !sessionStarted && !isStarting;
-
-  // Auto-start effect when session is full
-  React.useEffect(() => {
-    if (shouldAutoStart) {
-      console.log("🔥 PreSessionHostView - Auto-starting session due to participant limit");
-      handleSessionStart();
-    }
-  }, [shouldAutoStart]);
+  }, [participantCount, currentParticipants, maxParticipants, isSessionFull]);
 
   // Memoize session link to prevent unnecessary recalculations
   const sessionLink = useMemo(() => {
@@ -139,7 +155,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   // Memoize participant progress calculation
   const participantProgress = useMemo(() => {
     const maxCount = conversationData?.participants || 10;
-    const currentCount = Math.max(stableParticipantCount, participants?.length || 0);
+    const currentCount = Math.max(stableParticipantCount, currentParticipants);
     const progressPercentage = Math.min(100, currentCount / maxCount * 100);
     
     return {
@@ -148,7 +164,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
       percentage: progressPercentage,
       isFull: currentCount >= maxCount
     };
-  }, [stableParticipantCount, participants?.length, conversationData?.participants]);
+  }, [stableParticipantCount, currentParticipants, conversationData?.participants]);
 
   // Show auto-start notification when session is full
   const showAutoStartNotification = participantProgress.isFull && !sessionStarted && !isStarting;

@@ -13,6 +13,8 @@ export interface Message {
   recipientId?: string; // For directed messages
   isAdminMessage?: boolean; // Flag for admin messages
   isWelcomeMessage?: boolean; // Flag for welcome messages
+  isFallback?: boolean; // Flag for fallback messages
+  isAIGenerated?: boolean; // Flag for AI-generated messages
 }
 
 export interface ParticipantInfo {

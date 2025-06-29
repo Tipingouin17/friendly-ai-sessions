@@ -6,10 +6,10 @@ export const MAX_CONTEXT_MESSAGES = 15;
 export const MAX_TOKEN_ESTIMATE = 4000;
 
 /**
- * Fetches conversation data with detailed session information
+ * ENHANCED: Fetches conversation data with complete facilitator and session information
  */
 export async function fetchConversationData(supabase: any, conversationId: number) {
-  console.log('Fetching conversation with ID:', conversationId);
+  console.log('ENHANCED: Fetching conversation with complete facilitator context for ID:', conversationId);
   
   const { data: conversation, error: conversationError } = await supabase
     .from('conversations')
@@ -30,13 +30,27 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
         learning_outcomes,
         prerequisites,
         welcome_message,
-        facilitator_id
+        facilitator_id,
+        facilitator_details:facilitator (
+          id,
+          title,
+          details,
+          description,
+          profile_picture,
+          expertise_level,
+          specialties,
+          languages
+        )
       ),
       facilitator:facilitator_id (
         id,
         title,
+        details,
+        description,
         profile_picture,
         expertise_level,
+        specialties,
+        languages,
         language_preference
       )
     `)
@@ -44,7 +58,14 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
     .single();
 
   if (conversationError) {
-    console.error("Error fetching conversation:", conversationError.message);
+    console.error("ENHANCED: Error fetching conversation with facilitator context:", conversationError.message);
+  } else {
+    console.log('ENHANCED: Successfully fetched conversation with complete facilitator context:', {
+      facilitatorFromSessions: conversation?.sessions?.facilitator_details,
+      facilitatorDirect: conversation?.facilitator,
+      participantDescription: conversation?.participant_description,
+      objective: conversation?.sessions?.objective
+    });
   }
   
   return conversation;

@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,7 +25,7 @@ export const useWelcomeMessageWithFallback = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  // Create static fallback template
+  // Create static fallback template with enhanced context
   const createStaticFallbackMessage = useCallback(async (): Promise<Message | null> => {
     if (!conversationId) return null;
 
@@ -35,20 +34,25 @@ export const useWelcomeMessageWithFallback = ({
     const objective = conversation?.sessions?.objective || 'facilitate meaningful discussion';
     const participantCount = conversation?.participants || 1;
     const participantDescription = conversation?.participant_description || 'participants';
+    const facilitatorDetails = conversation?.sessions?.facilitator_details?.details || '';
 
-    // Create contextual static message
+    // Create contextual static message with facilitator personality
     let staticContent = `Welcome to ${sessionTitle}! I'm ${facilitatorName}, and I'm excited to have you join us today.\n\n`;
     
+    if (facilitatorDetails) {
+      staticContent += `A bit about me: ${facilitatorDetails}\n\n`;
+    }
+    
     if (objective) {
-      staticContent += `Our objective is: ${objective}\n\n`;
+      staticContent += `Our objective for today is: ${objective}\n\n`;
     }
     
     if (participantCount > 1) {
       staticContent += `I see we have ${participantCount} ${participantDescription} here today. `;
     }
     
-    staticContent += `To get us started, please introduce yourself and share what brings you to this session today. What are you hoping to learn or contribute?\n\n`;
-    staticContent += `Feel free to share your thoughts and questions as we go along!`;
+    staticContent += `To get us started, please introduce yourself and share what brings you to this session. What are you hoping to learn or contribute?\n\n`;
+    staticContent += `I'm looking forward to our discussion and learning from each of your unique perspectives!`;
 
     // Get facilitator avatar
     const mockResponse = { avatar: null };
@@ -66,23 +70,36 @@ export const useWelcomeMessageWithFallback = ({
       isFallback: true
     };
 
-    debugLog('all', 'Created static fallback welcome message');
+    debugLog('all', 'Created enhanced static fallback welcome message');
     return fallbackMessage;
   }, [conversationId, conversation, welcomeMessage]);
 
-  // Attempt AI generation with retry
+  // Enhanced AI generation with full context
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {
     if (!conversationId || !conversation) return null;
 
     try {
-      debugLog('all', `Attempting AI welcome message generation (attempt ${attempt}/${MAX_RETRY_ATTEMPTS})`);
+      debugLog('all', `Attempting AI welcome message generation with full context (attempt ${attempt}/${MAX_RETRY_ATTEMPTS})`);
+
+      // Prepare comprehensive context for AI generation
+      const sessionContext = {
+        sessionTitle: conversation?.sessions?.title,
+        sessionObjective: conversation?.sessions?.objective,
+        facilitatorName: conversation?.sessions?.facilitator_details?.title,
+        facilitatorDetails: conversation?.sessions?.facilitator_details?.details,
+        participantCount: conversation?.participants || 1,
+        participantDescription: conversation?.participant_description,
+        language: conversation?.language || 'en',
+        sessionType: conversation?.sessions?.session_type || 'workshop'
+      };
 
       const { data: aiResponse, error } = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],
           conversationId,
           sessionStart: true,
-          generateReport: false
+          generateReport: false,
+          sessionContext
         }
       });
 
@@ -94,7 +111,7 @@ export const useWelcomeMessageWithFallback = ({
         throw new Error('AI response is empty');
       }
 
-      // Create AI-generated message
+      // Create AI-generated message with enhanced context
       const aiMessage: Message = {
         id: 'welcome-ai',
         content: aiResponse.content,
@@ -106,7 +123,7 @@ export const useWelcomeMessageWithFallback = ({
         isAIGenerated: true
       };
 
-      debugLog('all', 'Successfully generated AI welcome message');
+      debugLog('all', 'Successfully generated AI welcome message with full context');
       setLastError(null);
       return aiMessage;
 
@@ -163,7 +180,7 @@ export const useWelcomeMessageWithFallback = ({
     setLastError(null);
 
     try {
-      // First, try AI generation
+      // First, try AI generation with full context
       const aiMessage = await attemptAIGeneration();
       
       if (aiMessage) {
@@ -171,8 +188,8 @@ export const useWelcomeMessageWithFallback = ({
         return aiMessage;
       }
 
-      // If AI fails, use static fallback
-      debugLog('all', 'AI generation failed, using static fallback');
+      // If AI fails, use enhanced static fallback
+      debugLog('all', 'AI generation failed, using enhanced static fallback');
       const fallbackMessage = await createStaticFallbackMessage();
       
       if (fallbackMessage) {

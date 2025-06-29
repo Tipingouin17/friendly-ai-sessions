@@ -11,6 +11,7 @@ interface UseSessionMessagesProps {
   isAdmin: boolean;
   welcomeMessage?: string | null;
   conversation?: any;
+  totalParticipants?: number;
 }
 
 export const useSessionMessages = ({
@@ -18,20 +19,27 @@ export const useSessionMessages = ({
   currentUserParticipantId,
   isAdmin,
   welcomeMessage,
-  conversation
+  conversation,
+  totalParticipants = 1
 }: UseSessionMessagesProps) => {
-  // Use our more focused hooks
+  // Use enhanced message fetching with response aggregation
   const {
     messages,
     setMessages,
     error,
     fetchMessages,
-    isGeneratingWelcome
+    isGeneratingWelcome,
+    processNewMessage,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
   } = useMessageFetching({
     conversationId,
     welcomeMessage,
     isAdmin,
-    conversation
+    conversation,
+    totalParticipants
   });
   
   const {
@@ -55,6 +63,17 @@ export const useSessionMessages = ({
     fetchMessages();
   }, [conversationId, welcomeMessage, conversation, fetchMessages]);
   
+  // Enhanced message handler that includes response processing
+  const handleNewMessage = (message: Message) => {
+    processNewMessage(message);
+    
+    // Record response for tracking
+    if (message.sender === 'user' && message.participant) {
+      const participantId = parseInt(message.participant.replace('P', ''));
+      recordResponse(participantId, true);
+    }
+  };
+  
   return {
     messages,
     setMessages,
@@ -65,6 +84,11 @@ export const useSessionMessages = ({
     hasAnswered,
     viewMode,
     setViewMode,
-    isGeneratingWelcome
+    isGeneratingWelcome,
+    handleNewMessage,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
   };
 };

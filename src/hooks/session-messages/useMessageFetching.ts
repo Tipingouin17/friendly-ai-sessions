@@ -6,19 +6,22 @@ import { debugLog } from '@/utils/debugLogger';
 import { useWelcomeMessageWithFallback } from './useWelcomeMessageWithFallback';
 import { useMessageFormatting } from './useMessageFormatting';
 import { useWelcomeMessageSaver } from './useWelcomeMessageSaver';
+import { useResponseAggregation } from './useResponseAggregation';
 
 interface UseMessageFetchingProps {
   conversationId: number | null;
   welcomeMessage?: string | null;
   isAdmin: boolean;
   conversation?: any;
+  totalParticipants?: number;
 }
 
 export const useMessageFetching = ({
   conversationId,
   welcomeMessage,
   isAdmin,
-  conversation
+  conversation,
+  totalParticipants = 1
 }: UseMessageFetchingProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,46 @@ export const useMessageFetching = ({
   const { formatDatabaseMessages } = useMessageFormatting({ conversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
-  // Main fetch function - updated to generate welcome messages immediately for participants
+  // Response aggregation system
+  const {
+    isWaitingForResponses,
+    responseCount,
+    recordParticipantResponse,
+    generateAggregatedResponse,
+    startResponseCollection,
+    isGeneratingResponse
+  } = useResponseAggregation({
+    conversationId,
+    totalParticipants,
+    conversation
+  });
+
+  // Enhanced message processing with response tracking
+  const processNewMessage = useCallback((message: Message) => {
+    // Record participant responses for aggregation
+    if (message.sender === 'user' && isWaitingForResponses) {
+      recordParticipantResponse(message);
+    }
+
+    // Add message to the list
+    setMessages(prev => {
+      const exists = prev.some(m => m.id === message.id);
+      if (exists) return prev;
+      return [...prev, message];
+    });
+  }, [isWaitingForResponses, recordParticipantResponse]);
+
+  // Trigger response collection for facilitator questions
+  const handleFacilitatorQuestion = useCallback((message: Message) => {
+    if (message.sender === 'assistant' && !isAdmin) {
+      // Start collecting responses for this question
+      const questionId = `question-${message.id}`;
+      startResponseCollection(questionId);
+      debugLog('all', `Started response collection for facilitator question: ${questionId}`);
+    }
+  }, [isAdmin, startResponseCollection]);
+
+  // Main fetch function with enhanced context awareness
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       debugLog('all', 'No conversation ID provided, skipping message fetch');
@@ -66,13 +108,18 @@ export const useMessageFetching = ({
         const formattedMessages = await formatDatabaseMessages(data);
         debugLog('all', `Successfully fetched ${formattedMessages.length} database messages`);
         setMessages(formattedMessages);
+        
+        // Check if the last message was a facilitator question
+        const lastMessage = formattedMessages[formattedMessages.length - 1];
+        if (lastMessage) {
+          handleFacilitatorQuestion(lastMessage);
+        }
         return;
       }
       
       // No database messages - generate welcome message for participants
-      // For participants, always generate a welcome message immediately
       if (!isAdmin) {
-        debugLog('all', 'No database messages found, generating welcome message for participant');
+        debugLog('all', 'No database messages found, generating contextual welcome message for participant');
         
         // Check cache first
         const cachedWelcomeMsg = getCachedWelcomeMessage();
@@ -82,7 +129,7 @@ export const useMessageFetching = ({
           return;
         }
         
-        // Generate new welcome message with AI/fallback
+        // Generate new welcome message with enhanced context
         const welcomeMsg = await createWelcomeMessageWithFallback();
         if (welcomeMsg) {
           setMessages([welcomeMsg]);
@@ -119,7 +166,8 @@ export const useMessageFetching = ({
     getCachedWelcomeMessage,
     createWelcomeMessageWithFallback,
     formatDatabaseMessages,
-    saveWelcomeMessageToDb
+    saveWelcomeMessageToDb,
+    handleFacilitatorQuestion
   ]);
 
   return {
@@ -127,6 +175,11 @@ export const useMessageFetching = ({
     setMessages,
     error: error || welcomeError,
     fetchMessages,
-    isGeneratingWelcome
+    isGeneratingWelcome,
+    processNewMessage,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
   };
 };

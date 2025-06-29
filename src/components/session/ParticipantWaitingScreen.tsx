@@ -10,7 +10,7 @@ interface ParticipantWaitingScreenProps {
   currentParticipantCount: number;
   maxParticipants?: number;
   facilitatorTitle?: string;
-  onSessionStarted?: () => void;
+  onSessionStarted?: () => void; // Now means "participant is ready to proceed"
   sessionStarted?: boolean;
 }
 
@@ -19,7 +19,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   currentParticipantCount,
   maxParticipants,
   facilitatorTitle,
-  onSessionStarted,
+  onSessionStarted, // This is now the "participant ready" callback
   sessionStarted = false
 }) => {
   const { toast } = useToast();
@@ -36,33 +36,35 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     sessionStarted
   });
 
-  // Handle final redirect when both conditions are met
-  const handleFinalRedirect = React.useCallback(() => {
+  // PARTICIPANT SELF-DETERMINATION: Only proceed when BOTH conditions are met
+  const handleParticipantReadyToProceed = React.useCallback(() => {
     if (sessionStartDetected && welcomeMessageReceived && !isTransitioning) {
-      console.log('Both conditions met - redirecting participant to session');
+      console.log('🎯 PARTICIPANT READY: Both session started AND welcome message received');
       setIsTransitioning(true);
       
       toast({
-        title: "Session Ready",
-        description: "Welcome message loaded! Joining the conversation..."
+        title: "Ready to Join",
+        description: "Welcome message loaded! You're ready to join the conversation.",
       });
       
+      // Signal to parent that THIS PARTICIPANT is ready to proceed
       if (onSessionStarted) {
         setTimeout(() => {
-          onSessionStarted();
+          console.log('🚀 Calling participant ready callback');
+          onSessionStarted(); // This tells SessionViewSelector that participant is ready
         }, 1500);
       }
     }
   }, [sessionStartDetected, welcomeMessageReceived, isTransitioning, onSessionStarted, toast]);
 
-  // Set up real-time listeners
+  // Set up real-time listeners for participant self-determination
   useEffect(() => {
     if (!conversationId) {
       console.log("No conversation ID provided to ParticipantWaitingScreen");
       return;
     }
     
-    console.log("Setting up event-driven session detection for conversation:", conversationId);
+    console.log("🔄 Setting up participant self-determination listeners for conversation:", conversationId);
     
     // Update initial count from props
     setParticipantCount(currentParticipantCount || 0);
@@ -88,7 +90,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             
             // Check if session was started
             if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-              console.log("Session start detected via conversation update");
+              console.log("🚦 Session start detected - but participant waits for welcome message");
               setSessionStartDetected(true);
             }
           }
@@ -97,7 +99,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           console.log(`Conversation updates channel status:`, status);
         });
       
-      // Listen for welcome message INSERT events
+      // Listen for welcome message INSERT events - THIS IS THE KEY
       const messagesChannel = supabase
         .channel(`messages-insert-${conversationId}`)
         .on('postgres_changes', {
@@ -109,8 +111,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           console.log("Received message INSERT event:", payload);
           
           if (payload.new && payload.new.role === 'assistant') {
-            // This is likely the welcome message from the facilitator
-            console.log("Welcome message received via real-time INSERT");
+            console.log("✅ Welcome message confirmed received via real-time INSERT");
             setWelcomeMessageReceived(true);
             
             toast({
@@ -158,19 +159,19 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     }
   }, [conversationId, currentParticipantCount]);
 
-  // Trigger redirect when both conditions are met
+  // Trigger participant ready check when conditions change
   useEffect(() => {
-    handleFinalRedirect();
-  }, [handleFinalRedirect]);
+    handleParticipantReadyToProceed();
+  }, [handleParticipantReadyToProceed]);
 
   // Add timeout protection (30 seconds max wait after session start detected)
   useEffect(() => {
     if (sessionStartDetected && !welcomeMessageReceived && !isTransitioning) {
-      console.log("Session started but no welcome message yet - setting timeout");
+      console.log("Session started but no welcome message yet - setting safety timeout");
       
       const timeoutId = setTimeout(() => {
         if (!welcomeMessageReceived && !isTransitioning) {
-          console.log("Timeout reached - proceeding without welcome message");
+          console.log("⏰ Safety timeout reached - proceeding without welcome message confirmation");
           
           toast({
             title: "Session Starting",
@@ -178,23 +179,18 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             variant: "default"
           });
           
-          setIsTransitioning(true);
-          if (onSessionStarted) {
-            setTimeout(() => {
-              onSessionStarted();
-            }, 1000);
-          }
+          setWelcomeMessageReceived(true); // Force trigger the ready state
         }
-      }, 30000); // 30 second timeout
+      }, 30000); // 30 second safety timeout
       
       return () => clearTimeout(timeoutId);
     }
-  }, [sessionStartDetected, welcomeMessageReceived, isTransitioning, onSessionStarted, toast]);
+  }, [sessionStartDetected, welcomeMessageReceived, isTransitioning, toast]);
 
   // Ensure we always have a valid display value
   const displayCount = participantCount || 0;
 
-  // Show transitioning state when both conditions are met
+  // Show final transition state when participant is ready to proceed
   if (isTransitioning) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
@@ -203,19 +199,19 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
           
-          <h2 className="text-xl sm:text-2xl font-bold mb-2">Session Ready!</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">Ready to Join!</h2>
           
           <p className="text-gray-600 mb-6">
             {welcomeMessageReceived 
-              ? "Your facilitator's welcome message is ready. Joining the conversation now..."
-              : "Joining the session now..."
+              ? "Your facilitator's welcome message is ready. Entering the conversation now..."
+              : "Session resources confirmed. Joining now..."
             }
           </p>
           
           <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-6">
-            <p className="text-green-800 font-medium">Joining conversation...</p>
+            <p className="text-green-800 font-medium">Entering conversation...</p>
             <div className="mt-2 h-2 bg-green-200 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '90%' }}></div>
+              <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '95%' }}></div>
             </div>
           </div>
         </div>
@@ -223,7 +219,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     );
   }
 
-  // Show message preparation state when session started but no message yet
+  // Show message preparation state when session started but waiting for welcome message
   if (sessionStartDetected && !welcomeMessageReceived) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
@@ -232,16 +228,16 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             <MessageCircle className="h-8 w-8 text-blue-500 animate-pulse" />
           </div>
           
-          <h2 className="text-xl sm:text-2xl font-bold mb-2">Preparing Your Session</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">Session Started!</h2>
           
           <p className="text-gray-600 mb-6">
-            The facilitator is generating a personalized welcome message. This will just take a moment...
+            The facilitator is preparing your personalized welcome message. This will just take a moment...
           </p>
           
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6">
-            <p className="text-blue-800 font-medium">Generating welcome message...</p>
+            <p className="text-blue-800 font-medium">Preparing your welcome message...</p>
             <div className="mt-2 h-2 bg-blue-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '70%' }}></div>
             </div>
           </div>
           
@@ -253,7 +249,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     );
   }
 
-  // Default waiting state - waiting for session to start
+  // Default waiting state - waiting for host to start session
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-md w-full text-center">
@@ -261,7 +257,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           <Clock className="h-8 w-8 text-amber-500" />
         </div>
         
-        <h2 className="text-xl sm:text-2xl font-bold mb-2">Waiting for Session to Begin</h2>
+        <h2 className="text-xl sm:text-2xl font-bold mb-2">Waiting for Host</h2>
         
         <p className="text-gray-600 mb-6">
           {facilitatorTitle 

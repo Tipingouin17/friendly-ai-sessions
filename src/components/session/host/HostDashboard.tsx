@@ -1,12 +1,11 @@
 
-import React from "react";
-import HostHeader from "./HostHeader";
-import HostSessionContent from "./HostSessionContent";
-import { Message, ParticipantInfo } from "@/types/chat";
-import { ConversationWithSession } from "@/types/database";
+import React from 'react';
+import { ParticipantInfo, Message } from "@/types/chat";
+import PreSessionHostView from './PreSessionHostView';
+import SimplifiedHostMessagingView from '../messaging/SimplifiedHostMessagingView';
 
 interface HostDashboardProps {
-  conversation: ConversationWithSession | null;
+  conversation: any;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
   sessionMessages: Message[];
@@ -14,15 +13,11 @@ interface HostDashboardProps {
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
-  onSendMessage: (message: string, isPinned?: boolean, recipientId?: string) => void;
-  
-  // Response collection props
+  onSendMessage: (message: string, isPinned: boolean, recipientId?: string) => void;
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: () => void;
-  
-  // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
 }
@@ -39,35 +34,47 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   onSendMessage,
   isWaitingForResponses = false,
   responseCount = 0,
-  totalParticipants = 1,
+  totalParticipants = 0,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted
 }) => {
-  return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <HostHeader
-        conversation={conversation}
-        isSessionPaused={isSessionPaused}
-        toggleSessionState={toggleSessionState}
-      />
-      
-      <HostSessionContent
-        sessionMessages={sessionMessages}
-        participantColors={participantColors}
+  console.log("🔍 HostDashboard - Props:", {
+    conversationId: currentConversationId,
+    participantCount: participants?.length || 0,
+    isSessionStarted,
+    sessionStarted: conversation?.session_started
+  });
+
+  // Show pre-session view if session hasn't started
+  if (!isSessionStarted && !conversation?.session_started) {
+    return (
+      <PreSessionHostView
         conversationData={conversation}
-        participants={participants}
-        isLoadingParticipants={isLoadingParticipants}
-        currentConversationId={currentConversationId}
-        onSendMessage={onSendMessage}
-        isWaitingForResponses={isWaitingForResponses}
-        responseCount={responseCount}
-        totalParticipants={totalParticipants}
-        onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
-        isSessionStarted={isSessionStarted}
-        onSessionStarted={onSessionStarted}
+        conversationId={currentConversationId}
+        participantCount={participants?.length || 0}
+        participants={participants || []}
+        onSessionStarted={onSessionStarted || (() => {})}
       />
-    </div>
+    );
+  }
+
+  // Show session messaging view when session is active
+  return (
+    <SimplifiedHostMessagingView
+      messages={sessionMessages}
+      participantColors={participantColors}
+      currentParticipantCount={participants?.length || 0}
+      conversationData={conversation}
+      isWaitingForResponses={isWaitingForResponses}
+      responseCount={responseCount}
+      totalParticipants={totalParticipants}
+      onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+      isSessionStarted={true}
+      onSessionStarted={onSessionStarted}
+      participants={participants}
+      conversationId={currentConversationId}
+    />
   );
 };
 

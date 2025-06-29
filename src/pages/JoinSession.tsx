@@ -8,15 +8,18 @@ import JoinSessionRejoinPrompt from "@/components/session/JoinSessionRejoinPromp
 import JoinSessionMain from "@/components/session/JoinSessionMain";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
-import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 
 const JoinSession = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [invalidRequest, setInvalidRequest] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [hasJoined, setHasJoined] = useState(false);
-  const [hasNavigated, setHasNavigated] = useState(false);
+  const [joinSuccess, setJoinSuccess] = useState<{
+    conversationId: number;
+    participantId: number;
+    name: string;
+    avatarSeed: string;
+  } | null>(null);
   
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
@@ -24,7 +27,6 @@ const JoinSession = () => {
   
   // Participant persistence hooks
   const { getSessionByConversationId } = useParticipantPersistence();
-  const { navigateToSession } = useNavigateToSession();
   
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
@@ -78,47 +80,17 @@ const JoinSession = () => {
     defaultAvatarSeed
   });
 
-  // BULLETPROOF NAVIGATION: One-time navigation effect with guard
-  useEffect(() => {
-    if (
-      !hasNavigated &&
-      hasJoined &&
-      conversationId &&
-      (joinResult || existingSessionData)
-    ) {
-      const participantData = joinResult || existingSessionData;
-      if (participantData) {
-        console.log("🚀 Navigating to participant session once:", {
-          conversationId,
-          participantId: participantData.participantId,
-          name: participantData.name,
-          avatarSeed: participantData.avatarSeed
-        });
-        
-        navigateToSession(
-          conversationId,
-          participantData.name,
-          participantData.participantId,
-          participantData.avatarSeed
-        );
-        setHasNavigated(true);
-      }
-    }
-  }, [
-    hasNavigated,
-    hasJoined,
-    conversationId,
-    joinResult,
-    existingSessionData,
-    navigateToSession
-  ]);
-
-  // Handle successful join - set hasJoined flag instead of navigating directly
+  // Handle successful join - set success state for navigation
   const handleJoin = async () => {
     const result = await handleJoinSession();
-    if (result) {
-      console.log("Successfully joined session, preparing to navigate:", result);
-      setHasJoined(true);
+    if (result && conversationId) {
+      console.log("Successfully joined session, preparing for navigation:", result);
+      setJoinSuccess({
+        conversationId,
+        participantId: result.participantId,
+        name: result.name,
+        avatarSeed: result.avatarSeed
+      });
     }
   };
 
@@ -126,8 +98,7 @@ const JoinSession = () => {
     if (conversationId) {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
-      setHasJoined(false);
-      setHasNavigated(false);
+      setJoinSuccess(null);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
@@ -137,16 +108,27 @@ const JoinSession = () => {
   const handleRejoin = useCallback(() => {
     if (existingSessionData && conversationId) {
       console.log("Rejoining session with existing data:", existingSessionData);
-      setHasJoined(true);
+      setJoinSuccess({
+        conversationId,
+        participantId: existingSessionData.participantId,
+        name: existingSessionData.name,
+        avatarSeed: existingSessionData.avatarSeed
+      });
     }
   }, [existingSessionData, conversationId]);
   
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
     setShowRejoinPrompt(false);
-    setHasJoined(false);
-    setHasNavigated(false);
+    setJoinSuccess(null);
   }, []);
+
+  // Navigate to participant session if join was successful
+  if (joinSuccess) {
+    const navigationPath = `/session?id=${joinSuccess.conversationId}&name=${encodeURIComponent(joinSuccess.name)}&participantId=${joinSuccess.participantId}&avatarSeed=${encodeURIComponent(joinSuccess.avatarSeed)}`;
+    console.log("🚀 Navigating to participant session:", navigationPath);
+    return <Navigate to={navigationPath} replace />;
+  }
 
   // Show loading state when data is being fetched
   if (isLoading && !invalidRequest) {

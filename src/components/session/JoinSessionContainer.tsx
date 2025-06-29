@@ -1,5 +1,5 @@
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import { useJoinSessionNavigation } from "@/hooks/useJoinSessionNavigation";
@@ -12,23 +12,25 @@ import JoinSessionMain from "./JoinSessionMain";
 const JoinSessionContainer = () => {
   const queryClient = useQueryClient();
   
-  // Navigation management
+  // State for navigation management
+  const [shouldBlockRendering, setShouldBlockRendering] = useState(false);
+  const [hasProcessedJoin, setHasProcessedJoin] = useState(false);
+  
+  // Navigation management with stable function references
   const {
     hasNavigated,
-    hasProcessedJoin,
     isNavigatingRef,
     navigateToSession,
     resetNavigationFlags,
     checkNavigationState
   } = useJoinSessionNavigation();
   
-  // CRITICAL: Check navigation state first before any other processing
-  if (checkNavigationState()) {
-    console.log("Navigation already initiated, stopping component processing");
-    return null;
-  }
+  // Stable checkNavigationState with useCallback
+  const stableCheckNavigationState = useCallback(() => {
+    return checkNavigationState();
+  }, [checkNavigationState]);
   
-  // State management
+  // State management with stable navigation check
   const {
     conversationId,
     invalidRequest,
@@ -40,19 +42,30 @@ const JoinSessionContainer = () => {
     setShowRejoinPrompt,
     defaultParticipantName,
     defaultAvatarSeed
-  } = useJoinSessionState(checkNavigationState);
+  } = useJoinSessionState(stableCheckNavigationState);
+  
+  // Check navigation state and block rendering if needed
+  useEffect(() => {
+    const isNavigating = stableCheckNavigationState();
+    if (isNavigating) {
+      console.log("Navigation already initiated, blocking component rendering");
+      setShouldBlockRendering(true);
+      return;
+    }
+    setShouldBlockRendering(false);
+  }, [stableCheckNavigationState]);
   
   // Force refresh conversation data when joining a session (only once)
   useEffect(() => {
-    if (checkNavigationState() || hasProcessedJoin.current) return;
+    if (shouldBlockRendering || hasProcessedJoin) return;
     
     if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true });
-      hasProcessedJoin.current = true;
+      setHasProcessedJoin(true);
     }
-  }, [conversationId, queryClient, checkNavigationState]);
+  }, [conversationId, queryClient, shouldBlockRendering, hasProcessedJoin]);
   
   const {
     participantName,
@@ -74,8 +87,8 @@ const JoinSessionContainer = () => {
 
   // Handle successful join - navigate immediately and synchronously
   const handleJoin = useCallback(async () => {
-    // CRITICAL: Check navigation state first
-    if (checkNavigationState() || hasJoinedBefore || isJoining) {
+    // Check navigation state first
+    if (stableCheckNavigationState() || hasJoinedBefore || isJoining) {
       console.log("Navigation already initiated or join in progress, skipping");
       return;
     }
@@ -94,21 +107,22 @@ const JoinSessionContainer = () => {
       // Reset navigation flags on error so user can retry
       resetNavigationFlags();
     }
-  }, [handleJoinSession, conversationId, navigateToSession, hasJoinedBefore, isJoining, checkNavigationState, resetNavigationFlags]);
+  }, [handleJoinSession, conversationId, navigateToSession, hasJoinedBefore, isJoining, stableCheckNavigationState, resetNavigationFlags]);
 
   const handleRetry = useCallback(() => {
-    if (conversationId && !checkNavigationState()) {
+    if (conversationId && !stableCheckNavigationState()) {
       console.log("Retrying connection to session:", conversationId);
       setRetryCount(prev => prev + 1);
       resetNavigationFlags();
+      setHasProcessedJoin(false);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
-  }, [conversationId, queryClient, checkNavigationState, resetNavigationFlags, setRetryCount]);
+  }, [conversationId, queryClient, stableCheckNavigationState, resetNavigationFlags, setRetryCount]);
   
   // Handle rejoining the session with existing data
   const handleRejoin = useCallback(() => {
-    if (existingSessionData && conversationId && !checkNavigationState()) {
+    if (existingSessionData && conversationId && !stableCheckNavigationState()) {
       console.log("Rejoining session with existing data:", existingSessionData);
       navigateToSession(
         conversationId, 
@@ -117,17 +131,17 @@ const JoinSessionContainer = () => {
         existingSessionData.avatarSeed
       );
     }
-  }, [existingSessionData, conversationId, navigateToSession, checkNavigationState]);
+  }, [existingSessionData, conversationId, navigateToSession, stableCheckNavigationState]);
   
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
-    if (!checkNavigationState()) {
+    if (!stableCheckNavigationState()) {
       setShowRejoinPrompt(false);
     }
-  }, [checkNavigationState, setShowRejoinPrompt]);
+  }, [stableCheckNavigationState, setShowRejoinPrompt]);
 
-  // CRITICAL: Check navigation state again before any rendering
-  if (checkNavigationState()) {
+  // Early return if navigation is in progress - but only after all hooks are called
+  if (shouldBlockRendering) {
     console.log("Navigation flags set, returning null to stop rendering");
     return null;
   }
@@ -170,7 +184,7 @@ const JoinSessionContainer = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={!hasJoinedBefore && !checkNavigationState() ? handleJoin : undefined}
+      onJoinSession={!hasJoinedBefore && !stableCheckNavigationState() ? handleJoin : undefined}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

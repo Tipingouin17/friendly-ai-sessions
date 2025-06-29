@@ -91,7 +91,6 @@ export const useSessionRealtime = ({
         setConnectionStatus(connectionState);
         logger.category('connection', `Real-time connection status: ${status} -> ${connectionState}`);
         
-        // Immediately try to fetch any existing messages when connected
         if (status === 'SUBSCRIBED') {
           logger.category('connection', 'Real-time connected - ready to receive updates');
         }

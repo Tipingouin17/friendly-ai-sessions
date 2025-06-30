@@ -7,7 +7,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import StartSessionButton from './StartSessionButton';
-
 interface PreSessionHostViewProps {
   conversationData: any;
   conversationId: number | null;
@@ -17,7 +16,6 @@ interface PreSessionHostViewProps {
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
 }
-
 const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   conversationData,
   conversationId,
@@ -29,8 +27,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
-  const { toast } = useToast();
-  
+  const {
+    toast
+  } = useToast();
   console.log("🔍 PreSessionHostView - Received props:", {
     conversationId,
     participantCount,
@@ -93,16 +92,13 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   const participantProgress = useMemo(() => {
     const maxParticipants = conversationData?.participants || 10;
     const progressPercentage = Math.min(100, stableParticipantCount / maxParticipants * 100);
-    
     return {
       current: stableParticipantCount,
       max: maxParticipants,
       percentage: progressPercentage
     };
   }, [stableParticipantCount, conversationData?.participants]);
-
-  return (
-    <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
+  return <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Ready to Begin Section */}
         <Card className="bg-white shadow-lg mb-4 md:mb-6">
@@ -114,19 +110,12 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   Once participants have joined, click "Start Session" to begin the facilitated discussion.
                   {stableParticipantCount === 0 && " You need at least one participant to start."}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Debug: Button will be {stableParticipantCount === 0 ? 'DISABLED' : 'ENABLED'} (count: {stableParticipantCount})
-                </p>
+                
               </div>
-              <div className="flex-shrink-0 w-full lg:w-auto" style={{ pointerEvents: 'auto' }}>
-                <StartSessionButton 
-                  onStartSession={handleSessionStart} 
-                  participantCount={stableParticipantCount} 
-                  isSessionStarted={false}
-                  isAutoStarting={isAutoStarting}
-                  autoStartCountdown={autoStartCountdown}
-                  onCancelAutoStart={onCancelAutoStart}
-                />
+              <div className="flex-shrink-0 w-full lg:w-auto" style={{
+              pointerEvents: 'auto'
+            }}>
+                <StartSessionButton onStartSession={handleSessionStart} participantCount={stableParticipantCount} isSessionStarted={false} isAutoStarting={isAutoStarting} autoStartCountdown={autoStartCountdown} onCancelAutoStart={onCancelAutoStart} />
               </div>
             </div>
           </CardContent>
@@ -146,11 +135,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6">
                 {/* QR Code */}
                 <div className="flex flex-col items-center flex-shrink-0">
-                  <div 
-                    className="bg-white p-2 md:p-3 rounded-lg border-2 border-gray-200 shadow-sm cursor-pointer hover:border-blue-300 transition-colors"
-                    onClick={() => setIsQrDialogOpen(true)}
-                    title="Click to view larger QR code"
-                  >
+                  <div className="bg-white p-2 md:p-3 rounded-lg border-2 border-gray-200 shadow-sm cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setIsQrDialogOpen(true)} title="Click to view larger QR code">
                     <QRCodeSVG value={sessionLink} size={window.innerWidth < 640 ? 120 : 140} />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Click to enlarge</p>
@@ -183,10 +168,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   </Badge>
                 </div>
                 <div className="w-full bg-blue-200 rounded-full h-2 mt-2 md:mt-3">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${participantProgress.percentage}%` }}
-                  />
+                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{
+                  width: `${participantProgress.percentage}%`
+                }} />
                 </div>
               </div>
             </CardContent>
@@ -254,12 +238,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 <div className="flex-1 p-2 md:p-3 bg-gray-50 rounded border text-xs md:text-base font-mono break-all text-gray-800 text-center md:text-left">
                   {sessionLink}
                 </div>
-                <Button 
-                  onClick={handleCopyLink}
-                  size="sm"
-                  variant="outline"
-                  className="flex items-center gap-1"
-                >
+                <Button onClick={handleCopyLink} size="sm" variant="outline" className="flex items-center gap-1">
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? "Copied" : "Copy"}
                 </Button>
@@ -271,8 +250,6 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
           </DialogContent>
         </Dialog>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default PreSessionHostView;

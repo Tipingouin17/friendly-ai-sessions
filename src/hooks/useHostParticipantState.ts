@@ -4,6 +4,7 @@ import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManager";
 import { createLogger } from "@/utils/debugLogger";
+import { isNetworkError } from "@/utils/networkUtils";
 
 interface UseHostParticipantStateProps {
   locationState?: any;
@@ -20,6 +21,7 @@ export function useHostParticipantState({
 }: UseHostParticipantStateProps) {
   const logger = createLogger('HostParticipantState', 'admin');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   // Mock refetch function for participant manager
   const mockRefetch = useCallback(async () => {
@@ -27,7 +29,17 @@ export function useHostParticipantState({
     return Promise.resolve();
   }, [logger]);
 
-  // Use session participant manager with session full callback
+  // Enhanced error handler that filters network errors
+  const handleError = useCallback((error: string) => {
+    if (isNetworkError({ message: error })) {
+      setNetworkError(error);
+      logger.category('admin', 'Network error detected:', error);
+    } else {
+      logger.category('admin', 'Non-network error:', error);
+    }
+  }, [logger]);
+
+  // Use session participant manager with enhanced error handling
   const {
     participants: managerParticipants,
     isConnected,
@@ -37,7 +49,8 @@ export function useHostParticipantState({
     currentUserParticipantId,
     isSessionFull,
     error,
-    forceRefreshParticipants
+    forceRefreshParticipants,
+    retryCount
   } = useSessionParticipantManager({
     conversationId: currentConversationId,
     conversation: conversationData,
@@ -51,6 +64,8 @@ export function useHostParticipantState({
     if (managerParticipants && managerParticipants.length > 0) {
       logger.category('admin', `Updating participants from manager: ${managerParticipants.length} participants`);
       setParticipants(managerParticipants);
+      // Clear network error if we successfully got participants
+      setNetworkError(null);
     }
   }, [managerParticipants, logger]);
 
@@ -63,9 +78,11 @@ export function useHostParticipantState({
       isSessionFull,
       isConnected,
       connectionAttempts,
-      error: error || null
+      error: error || null,
+      networkError,
+      retryCount
     });
-  }, [participants.length, currentParticipantCount, maxParticipantsForSession, isSessionFull, isConnected, connectionAttempts, error, logger]);
+  }, [participants.length, currentParticipantCount, maxParticipantsForSession, isSessionFull, isConnected, connectionAttempts, error, logger, networkError, retryCount]);
 
   return {
     participants,
@@ -74,7 +91,8 @@ export function useHostParticipantState({
     currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    error,
-    forceRefreshParticipants
+    error: networkError || error, // Prioritize network errors for UI handling
+    forceRefreshParticipants,
+    retryCount
   };
 }

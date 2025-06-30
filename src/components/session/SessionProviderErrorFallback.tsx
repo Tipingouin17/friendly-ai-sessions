@@ -1,27 +1,51 @@
-import React, { useEffect } from "react";
+
+import React, { useEffect, useState, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { isNetworkError } from "@/utils/networkUtils";
 
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
   children: React.ReactNode;
   isAdmin?: boolean;
   onRetry?: () => void;
+  retryCount?: number;
 }
 
 export const SessionProviderErrorFallback = ({ 
   errorMessage, 
   children,
   isAdmin = false,
-  onRetry 
+  onRetry,
+  retryCount = 0
 }: SessionProviderErrorFallbackProps) => {
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [autoRetryCount, setAutoRetryCount] = useState(0);
+  
   console.log("Rendering SessionProviderErrorFallback with error:", errorMessage, "isAdmin:", isAdmin);
   
-  // For admin users, explicitly handle session full error
   const originalError = errorMessage;
   const isSessionFullError = errorMessage.includes("session is full") || 
                             errorMessage.includes("maximum capacity");
+  const isNetworkErr = isNetworkError({ message: errorMessage });
   
-  // Keep a reference to the original error message while determining what to display
+  // Handle auto-retry for network errors
+  useEffect(() => {
+    if (isNetworkErr && onRetry && autoRetryCount < 3) {
+      const retryDelay = Math.min(1000 * Math.pow(2, autoRetryCount), 10000);
+      console.log(`Auto-retrying network error in ${retryDelay}ms (attempt ${autoRetryCount + 1})`);
+      
+      const timeoutId = setTimeout(() => {
+        setAutoRetryCount(prev => prev + 1);
+        onRetry();
+      }, retryDelay);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isNetworkErr, onRetry, autoRetryCount]);
+  
+  // Determine display error
   const displayError = isAdmin && isSessionFullError
     ? "You are an admin - overriding session full restriction" 
     : errorMessage;
@@ -41,6 +65,17 @@ export const SessionProviderErrorFallback = ({
       }
     }
   }, [isAdmin, isSessionFullError, onRetry]);
+  
+  const handleManualRetry = useCallback(async () => {
+    if (onRetry && !isRetrying) {
+      setIsRetrying(true);
+      try {
+        await onRetry();
+      } finally {
+        setTimeout(() => setIsRetrying(false), 1000);
+      }
+    }
+  }, [onRetry, isRetrying]);
   
   // Create safe default props for fallback context
   const fallbackSessionContext: SessionContextProps = {
@@ -65,7 +100,10 @@ export const SessionProviderErrorFallback = ({
       error: null
     },
     participants: [],
-    participantColors,
+    participantColors: {
+      P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
+      P5: "#6EE7B7", P6: "#5EEAD4", P7: "#67E8F9", P8: "#7DD3FC",
+    },
     isWaitingForResponse: false,
     handleStartSession: () => {},
     handleSendMessage: async () => { return Promise.resolve(); },
@@ -77,46 +115,86 @@ export const SessionProviderErrorFallback = ({
       toggleAnonymous: () => {}
     },
     isSessionStartedInDB: false,
-    error: displayError, // Use the potentially modified error message
-    
-    // Add missing properties required by SessionContextProps
+    error: displayError,
     isConnected: false,
     connectionAttempts: 0,
     refetch: () => Promise.resolve({}),
-    
-    // Include isAdmin in the fallback context
     isAdmin: isAdmin
   };
 
-  // Return error state with a retry button if onRetry is provided
+  // For network errors, show a different UI
+  if (isNetworkErr) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="flex justify-center">
+            {autoRetryCount < 3 ? (
+              <RefreshCw className="h-12 w-12 text-blue-500 animate-spin" />
+            ) : (
+              <WifiOff className="h-12 w-12 text-red-500" />
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {autoRetryCount < 3 ? "Connecting..." : "Connection Problem"}
+            </h3>
+            <p className="text-gray-600">
+              {autoRetryCount < 3 
+                ? `Attempting to connect to the session... (${autoRetryCount + 1}/3)`
+                : "Unable to connect to the session. Please check your internet connection."
+              }
+            </p>
+          </div>
+          
+          {autoRetryCount >= 3 && onRetry && (
+            <Button 
+              onClick={handleManualRetry}
+              disabled={isRetrying}
+              className="flex items-center gap-2"
+            >
+              {isRetrying ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wifi className="h-4 w-4" />
+              )}
+              {isRetrying ? "Retrying..." : "Try Again"}
+            </Button>
+          )}
+          
+          {retryCount > 0 && (
+            <p className="text-sm text-gray-500">
+              Retry attempts: {retryCount}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Return error state with fallback context for other errors
   return (
     <div className="flex-1 flex flex-col">
       {React.isValidElement(children)
         ? React.cloneElement(children as React.ReactElement, fallbackSessionContext)
         : children}
       
-      {onRetry && (
+      {onRetry && !isNetworkErr && (
         <div className="fixed bottom-4 right-4">
-          <button 
-            onClick={onRetry}
-            className="bg-primary text-white px-4 py-2 rounded shadow-md hover:bg-primary/90"
+          <Button 
+            onClick={handleManualRetry}
+            disabled={isRetrying}
+            className="bg-primary text-white px-4 py-2 rounded shadow-md hover:bg-primary/90 flex items-center gap-2"
           >
-            Retry Connection
-          </button>
+            {isRetrying ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {isRetrying ? "Retrying..." : "Retry Connection"}
+          </Button>
         </div>
       )}
     </div>
   );
-};
-
-// Import this from sessionHelpers to avoid circular dependencies
-const participantColors: { [key: string]: string } = {
-  P1: "#FCA5A5",
-  P2: "#FDBA74",
-  P3: "#BEF264",
-  P4: "#86EFAC",
-  P5: "#6EE7B7",
-  P6: "#5EEAD4",
-  P7: "#67E8F9",
-  P8: "#7DD3FC",
 };

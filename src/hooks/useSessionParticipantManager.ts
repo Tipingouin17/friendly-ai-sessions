@@ -6,11 +6,13 @@ import { useParticipantCounts } from "@/hooks/useParticipantCounts";
 import { useParticipantChannel } from "@/hooks/useParticipantChannel";
 import { useRealtimeConnectionHandler } from "@/hooks/useRealtimeConnectionHandler";
 import { supabase } from "@/integrations/supabase/client";
+import { retryWithBackoff, isNetworkError } from "@/utils/networkUtils";
+import { requestDeduplicator } from "@/utils/requestDeduplication";
 
 interface UseSessionParticipantManagerProps {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
-  refetch: () => Promise<any>; // Updated to return Promise<any> instead of void
+  refetch: () => Promise<any>;
   onSessionFull?: () => void;
   locationState?: { 
     participantId?: number; 
@@ -26,14 +28,13 @@ export function useSessionParticipantManager({
   onSessionFull,
   locationState
 }: UseSessionParticipantManagerProps) {
-  // Participant state
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
-  // Determine current participant ID
   const currentUserParticipantId = locationState?.participantId || null;
   
-  // Realtime connection management
+  // Realtime connection management with enhanced error handling
   const {
     isConnected,
     setIsConnected,
@@ -43,7 +44,11 @@ export function useSessionParticipantManager({
   } = useRealtimeConnectionHandler({
     conversationId,
     refetch,
-    onConnectionError: (err) => setError(err)
+    onConnectionError: (err) => {
+      if (!isNetworkError({ message: err })) {
+        setError(err);
+      }
+    }
   });
 
   // Participant counts management
@@ -54,7 +59,7 @@ export function useSessionParticipantManager({
     setMaxParticipantsForSession
   } = useParticipantCounts(conversation);
 
-  // Set up participant channel
+  // Set up participant channel with error resilience
   const { error: channelError } = useParticipantChannel({
     conversationId,
     setIsConnected,
@@ -64,7 +69,7 @@ export function useSessionParticipantManager({
     refetch
   });
 
-  // Function to force refresh participant data
+  // Function to force refresh participant data with retry logic
   const forceRefreshParticipants = useCallback(async (): Promise<void> => {
     if (!conversationId) {
       return Promise.resolve();
@@ -73,15 +78,27 @@ export function useSessionParticipantManager({
     try {
       console.log("Forcibly refreshing participant data for conversation:", conversationId);
       
-      const { data, error } = await supabase
-        .from('session_participants')
-        .select('*')
-        .eq('conversation_id', conversationId);
-        
-      if (error) {
-        console.error("Error fetching participant data:", error);
-        return Promise.resolve();
-      }
+      const requestKey = `refresh-participants-${conversationId}`;
+      
+      const data = await requestDeduplicator.deduplicate(requestKey, async () => {
+        return await retryWithBackoff(async () => {
+          const { data, error } = await supabase
+            .from('session_participants')
+            .select('*')
+            .eq('conversation_id', conversationId);
+            
+          if (error) {
+            console.error("Error fetching participant data:", error);
+            throw error;
+          }
+          
+          return data;
+        }, {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          maxDelay: 5000
+        });
+      });
       
       if (data && data.length > 0) {
         console.log("Retrieved updated participant data:", data.length, "participants");
@@ -90,10 +107,16 @@ export function useSessionParticipantManager({
           id: p.participant_id,
           name: p.name || `Participant ${p.participant_id}`,
           avatar: p.avatar_seed ? `/api/avatar?name=${p.avatar_seed}&variant=beam&palette=0` : null,
-          isAnonymous: p.is_anonymous || false
+          avatarSeed: p.avatar_seed || null,
+          isAnonymous: p.is_anonymous || false,
+          isHost: p.is_host || false,
+          joinedAt: new Date(p.created_at),
+          lastActive: new Date(p.created_at),
         }));
         
         setParticipants(updatedParticipants);
+        setError(null);
+        setRetryCount(0);
       } else if (conversation?.current_participants) {
         const count = conversation.current_participants;
         console.log("No participant data found, creating placeholders for", count, "participants");
@@ -102,27 +125,40 @@ export function useSessionParticipantManager({
           id: i + 1,
           name: `Participant ${i + 1}`,
           avatar: null,
-          isAnonymous: false
+          avatarSeed: null,
+          isAnonymous: false,
+          isHost: false,
+          joinedAt: new Date(),
+          lastActive: new Date(),
         }));
         
         setParticipants(placeholders);
       }
       
       return Promise.resolve();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error in forceRefreshParticipants:", err);
+      setRetryCount(prev => prev + 1);
+      
+      // Only set error for non-network errors
+      if (!isNetworkError(err)) {
+        setError(`Failed to refresh participants: ${err.message}`);
+      }
+      
       return Promise.resolve();
     }
   }, [conversationId, conversation?.current_participants]);
 
   // Initial load of participants
   useEffect(() => {
-    forceRefreshParticipants();
-  }, [forceRefreshParticipants]);
+    if (conversationId) {
+      forceRefreshParticipants();
+    }
+  }, [conversationId, forceRefreshParticipants]);
 
-  // Handle channel errors
+  // Handle channel errors (only non-network errors)
   useEffect(() => {
-    if (channelError) {
+    if (channelError && !isNetworkError({ message: channelError })) {
       console.error("Participant channel error:", channelError);
       setError(channelError);
     }
@@ -158,19 +194,6 @@ export function useSessionParticipantManager({
     }
   }, [conversation, participants.length, forceRefreshParticipants]);
 
-  // Force periodic refresh of participant data to ensure UI stays updated
-  useEffect(() => {
-    if (conversationId) {
-      const intervalId = setInterval(() => {
-        forceRefreshParticipants();
-      }, 10000); // Refresh every 10 seconds
-      
-      return () => {
-        clearInterval(intervalId);
-      };
-    }
-  }, [conversationId, forceRefreshParticipants]);
-
   return {
     participants,
     setParticipants,
@@ -181,6 +204,7 @@ export function useSessionParticipantManager({
     currentUserParticipantId,
     isSessionFull: isSessionFull(),
     error: connectionError || error,
-    forceRefreshParticipants
+    forceRefreshParticipants,
+    retryCount
   };
 }

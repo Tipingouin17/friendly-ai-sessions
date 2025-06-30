@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -24,7 +25,6 @@ const SessionHost = () => {
     connectionAttempts,
     lastAttemptTime,
     handleError,
-    handleSessionFull: sessionPageHandleSessionFull,
     retryConnection
   } = useSessionPage();
 
@@ -76,7 +76,7 @@ const SessionHost = () => {
     conversationData,
     currentConversationId,
     onSessionFull: useCallback(async () => {
-      const currentCount = participants.length;
+      const currentCount = participants?.length || 0;
       const maxCount = conversationData?.participants || 10;
       
       console.log('🎯 Session full detected:', { currentCount, maxCount });
@@ -84,12 +84,12 @@ const SessionHost = () => {
       if (currentCount >= maxCount && !isSessionStarted && !conversationData?.session_started) {
         await triggerAutoStart(currentCount);
       }
-    }, [participants.length, conversationData?.participants, isSessionStarted, conversationData?.session_started, triggerAutoStart])
+    }, [participants?.length, conversationData?.participants, isSessionStarted, conversationData?.session_started, triggerAutoStart])
   });
 
   console.log("🔍 SessionHost - Participants from hook:", {
-    participantsCount: participants.length,
-    participants: participants.map(p => ({ id: p.id, name: p.name })),
+    participantsCount: participants?.length || 0,
+    participants: participants?.map(p => ({ id: p.id, name: p.name })) || [],
     isLoadingParticipants
   });
 
@@ -196,17 +196,17 @@ const SessionHost = () => {
   };
 
   // Generate participant colors mapping
-  const participantColors = participants.reduce((colors, participant) => {
+  const participantColors = (participants || []).reduce((colors, participant) => {
     colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
     return colors;
   }, {} as { [key: string]: string });
 
   // Calculate participant count for passing to components
-  const participantCount = participants.length;
+  const participantCount = participants?.length || 0;
   
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
-    participantsLength: participants.length,
+    participantsLength: participants?.length || 0,
     conversationId: currentConversationId
   });
 
@@ -217,7 +217,7 @@ const SessionHost = () => {
       toggleSessionState={toggleSessionState}
       sessionMessages={sessionMessages}
       participantColors={participantColors}
-      participants={participants}
+      participants={participants || []}
       isLoadingParticipants={isLoadingParticipants}
       currentConversationId={currentConversationId}
       onSendMessage={handleSendHostMessage}

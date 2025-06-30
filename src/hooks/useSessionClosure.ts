@@ -36,8 +36,15 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
   const { downloadReport: downloadReportFile } = useReportDownloader();
 
   const closeSession = async () => {
-    if (!conversationId) return false;
-    
+    if (!conversationId) {
+      toast({
+        title: "Error",
+        description: "No conversation ID provided",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     setIsClosing(true);
 
     try {
@@ -84,6 +91,11 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
     }
   };
 
+  // Create an alias for backward compatibility
+  const closeSessionAndGenerateReport = async (conversationId: number) => {
+    return closeSession();
+  };
+
   const downloadReport = (format: 'json' | 'text' = 'text') => {
     setIsDownloading(true);
     try {
@@ -98,6 +110,7 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
     isDownloading,
     closureResult,
     closeSession,
+    closeSessionAndGenerateReport,
     downloadReport
   };
 };

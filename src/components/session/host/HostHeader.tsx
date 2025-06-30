@@ -9,13 +9,13 @@ import StartSessionButton from "./StartSessionButton";
 interface HostHeaderProps {
   currentConversationId: number | null;
   conversation: any;
-  sessions: any[];
+  activeSessions: any[];
   participants: any[];
   isLoadingParticipants: boolean;
   onShowQrCode: () => void;
   onWrapUpSession: () => void;
   isSessionStarted: boolean;
-  onSessionStarted: () => void;
+  onSessionStarted: () => Promise<void>;
   triggerSessionStart?: () => Promise<boolean>;
   sessionStartNotification?: string | null;
   isStartingSession?: boolean;
@@ -25,7 +25,7 @@ interface HostHeaderProps {
 const HostHeader: React.FC<HostHeaderProps> = ({
   currentConversationId,
   conversation,
-  sessions,
+  activeSessions,
   participants,
   isLoadingParticipants,
   onShowQrCode,
@@ -69,8 +69,10 @@ const HostHeader: React.FC<HostHeaderProps> = ({
               </div>
 
               <SessionsDropdown 
-                sessions={sessions}
-                currentConversationId={currentConversationId}
+                currentSessionId={currentConversationId}
+                activeSessions={activeSessions}
+                isLoading={false}
+                onRefresh={() => {}}
               />
             </div>
           </div>

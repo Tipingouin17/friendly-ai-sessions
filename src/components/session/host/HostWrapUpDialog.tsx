@@ -7,96 +7,93 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Square, Download, Loader2 } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 
 interface HostWrapUpDialogProps {
-  conversationId: number | null;
+  onWrapUp: () => Promise<boolean>;
+  isWrappingUp: boolean;
   onClose: () => void;
-  onCloseSession: () => Promise<boolean>;
   onDownloadReport: (format?: 'json' | 'text') => void;
-  isClosing: boolean;
+  conversationId: number | null;
   isDownloading: boolean;
 }
 
 const HostWrapUpDialog: React.FC<HostWrapUpDialogProps> = ({ 
-  conversationId,
+  onWrapUp, 
+  isWrappingUp,
   onClose,
-  onCloseSession,
   onDownloadReport,
-  isClosing,
+  conversationId,
   isDownloading
 }) => {
-  const handleCloseSession = async () => {
-    const success = await onCloseSession();
+  const handleWrapUp = async () => {
+    const success = await onWrapUp();
     if (success) {
       onClose();
     }
   };
 
+  const handleDownload = (format: 'json' | 'text' = 'text') => {
+    onDownloadReport(format);
+  };
+
   return (
-    <Dialog open onOpenChange={() => onClose()}>
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Square className="h-5 w-5 text-red-600" />
-            End Session
-          </DialogTitle>
+          <DialogTitle>End Session & Generate Report</DialogTitle>
           <DialogDescription>
-            This will close the session and generate a final report. Participants will no longer be able to respond.
+            This will close the session for all participants and generate a comprehensive session report.
           </DialogDescription>
         </DialogHeader>
         
         <div className="flex flex-col space-y-4 pt-4">
-          <div className="flex justify-between space-x-3">
+          <div className="flex justify-end space-x-2">
             <Button 
-              variant="outline" 
+              variant="outline"
               onClick={onClose}
-              disabled={isClosing}
-              className="flex-1"
+              disabled={isWrappingUp}
             >
               Cancel
             </Button>
+            
             <Button 
-              onClick={handleCloseSession}
-              disabled={isClosing}
-              className="flex-1 bg-red-600 hover:bg-red-700"
+              onClick={handleWrapUp}
+              disabled={isWrappingUp || !conversationId}
+              className="flex items-center gap-2"
             >
-              {isClosing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Closing...
-                </>
-              ) : (
-                <>
-                  <Square className="h-4 w-4 mr-2" />
-                  End Session
-                </>
-              )}
+              <FileText className="h-4 w-4" />
+              {isWrappingUp ? 'Ending Session...' : 'End Session & Get Report'}
             </Button>
           </div>
-          
-          {/* Download options will be shown after session is closed */}
+
+          {/* Download options after session ends */}
           <div className="border-t pt-4">
-            <Button
-              variant="outline"
-              onClick={() => onDownloadReport('text')}
-              disabled={isDownloading || isClosing}
-              className="w-full"
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Report
-                </>
-              )}
-            </Button>
+            <p className="text-sm text-gray-600 mb-3">Download report in different formats:</p>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload('text')}
+                disabled={isDownloading}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Text Report
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload('json')}
+                disabled={isDownloading}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                JSON Data
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -24,7 +24,7 @@ interface HostDashboardProps {
   totalParticipants: number;
   onTriggerFacilitatorResponse: () => Promise<void>;
   isSessionStarted: boolean;
-  onSessionStarted: () => void;
+  onSessionStarted: () => Promise<void>;
   triggerSessionStart?: () => Promise<boolean>;
   sessionStartNotification?: string | null;
   isStartingSession?: boolean;
@@ -90,7 +90,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
     }
   });
 
-  // Session closure hook with proper interface
+  // Session closure hook
   const { 
     closeSession, 
     isClosing, 
@@ -135,7 +135,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       <HostHeader
         currentConversationId={currentConversationId}
         conversation={conversation}
-        sessions={sessions}
+        activeSessions={sessions}
         participants={participants}
         isLoadingParticipants={isLoadingParticipants}
         onShowQrCode={handleShowQrCode}
@@ -149,9 +149,11 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       />
 
       <HostSessionContent
+        conversationData={conversation}
+        isSessionPaused={isSessionPaused}
+        toggleSessionState={toggleSessionState}
         sessionMessages={sessionMessages}
         participantColors={participantColors}
-        conversationData={conversation}
         participants={participants}
         isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
@@ -161,8 +163,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         totalParticipants={totalParticipants}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         isSessionStarted={isSessionStarted}
-        onSessionStarted={onSessionStarted}
-        triggerSessionStart={triggerSessionStart}
+        responseProgress={responseProgress}
       />
 
       {showQrDialog && (
@@ -174,11 +175,11 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
 
       {showWrapUpDialog && (
         <HostWrapUpDialog
-          conversationId={currentConversationId}
+          onWrapUp={closeSession}
+          isWrappingUp={isClosing}
           onClose={handleCloseWrapUpDialog}
-          onCloseSession={closeSession}
           onDownloadReport={downloadReport}
-          isClosing={isClosing}
+          conversationId={currentConversationId}
           isDownloading={isDownloading}
         />
       )}

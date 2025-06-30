@@ -6,6 +6,7 @@ import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManag
 import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
 import { createLogger } from "@/utils/debugLogger";
 import { isNetworkError } from "@/utils/networkUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseHostParticipantStateProps {
   locationState?: any;
@@ -24,11 +25,46 @@ export function useHostParticipantState({
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [networkError, setNetworkError] = useState<string | null>(null);
 
-  // Mock refetch function for participant manager
-  const mockRefetch = useCallback(async () => {
-    logger.category('admin', 'Mock refetch called for host participant state');
-    return Promise.resolve();
-  }, [logger]);
+  // Real refetch function that fetches conversation data
+  const realRefetch = useCallback(async () => {
+    if (!currentConversationId) {
+      logger.category('admin', 'No conversation ID for refetch');
+      return Promise.resolve();
+    }
+
+    try {
+      logger.category('admin', `Refetching conversation data for ${currentConversationId}`);
+      
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          id,
+          current_participants,
+          participants,
+          session_started,
+          participant_description,
+          language,
+          sessions_id
+        `)
+        .eq('id', currentConversationId)
+        .single();
+
+      if (error) {
+        logger.category('admin', 'Refetch error:', error);
+        throw error;
+      }
+
+      logger.category('admin', 'Refetch successful:', {
+        currentParticipants: data?.current_participants,
+        maxParticipants: data?.participants
+      });
+
+      return data;
+    } catch (error) {
+      logger.category('admin', 'Exception during refetch:', error);
+      throw error;
+    }
+  }, [currentConversationId, logger]);
 
   // Enhanced error handler that filters network errors
   const handleError = useCallback((error: string) => {
@@ -75,7 +111,7 @@ export function useHostParticipantState({
     isHost: true
   });
 
-  // Use session participant manager with enhanced error handling
+  // Use session participant manager with enhanced error handling and real refetch
   const {
     participants: managerParticipants,
     isConnected,
@@ -90,7 +126,7 @@ export function useHostParticipantState({
   } = useSessionParticipantManager({
     conversationId: currentConversationId,
     conversation: conversationData,
-    refetch: mockRefetch,
+    refetch: realRefetch, // Use real refetch instead of mock
     onSessionFull,
     locationState
   });

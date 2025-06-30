@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -155,7 +154,7 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Add the new session flow hook
+  // Add the session flow hook with enhanced state management
   const {
     isSessionActive,
     currentResponseCollection,
@@ -163,9 +162,9 @@ const SessionHost = () => {
     sessionStartNotification,
     triggerSessionStart,
     startResponseCollection,
-    responseProgress,
     isStartingSession,
-    startProgress
+    startProgress,
+    responseProgress
   } = useSessionFlow({
     conversationId: currentConversationId,
     participants: participants || [],
@@ -174,7 +173,7 @@ const SessionHost = () => {
   });
 
   // Enhanced session start handler
-  const handleSessionStarted = async () => {
+  const handleSessionStarted = async (): Promise<void> => {
     console.log("🔥 SessionHost - Starting session through session flow");
     try {
       const success = await triggerSessionStart();
@@ -198,7 +197,9 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
     participantsLength: participants.length,
-    conversationId: currentConversationId
+    conversationId: currentConversationId,
+    isStartingSession,
+    startProgress
   });
 
   return (
@@ -220,9 +221,9 @@ const SessionHost = () => {
       onSessionStarted={handleSessionStarted}
       triggerSessionStart={triggerSessionStart}
       sessionStartNotification={sessionStartNotification}
-      responseProgress={responseProgress}
       isStartingSession={isStartingSession}
       startProgress={startProgress}
+      responseProgress={responseProgress}
     />
   );
 };

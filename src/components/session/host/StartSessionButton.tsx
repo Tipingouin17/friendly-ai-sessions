@@ -1,7 +1,7 @@
 
 import React, { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Users, Loader } from "lucide-react";
+import { Play, Users, Loader2 } from "lucide-react";
 
 interface StartSessionButtonProps {
   onStartSession: () => void;
@@ -18,7 +18,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   isSessionStarted,
   disabled = false,
   isStartingSession = false,
-  startProgress = ""
+  startProgress = ''
 }) => {
   const lastClickTime = useRef<number>(0);
   
@@ -65,10 +65,9 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       isSessionStarted,
       disabled,
       isStartingSession,
-      startProgress,
       shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isStartingSession
     });
-  }, [participantCount, isSessionStarted, disabled, isStartingSession, startProgress]);
+  }, [participantCount, isSessionStarted, disabled, isStartingSession]);
 
   if (isSessionStarted) {
     return (
@@ -80,15 +79,27 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     );
   }
 
+  // Show loading state when starting session
   if (isStartingSession) {
     return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg min-w-[140px]">
-        <Loader className="h-4 w-4 text-blue-600 animate-spin" />
-        <div className="flex flex-col">
-          <span className="text-blue-800 font-medium text-sm">Starting Session</span>
-          {startProgress && (
-            <span className="text-blue-600 text-xs">{startProgress}</span>
-          )}
+      <div className="flex flex-col gap-2">
+        <Button
+          disabled
+          className="flex items-center gap-2 min-w-[140px] bg-yellow-500 text-white"
+          size="lg"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Starting...
+        </Button>
+        
+        {startProgress && (
+          <div className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded border border-yellow-200">
+            {startProgress}
+          </div>
+        )}
+        
+        <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
+          This may take 15-20 seconds while we generate your AI welcome message...
         </div>
       </div>
     );
@@ -102,7 +113,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       disabled={isButtonDisabled}
       className="flex items-center gap-2 min-w-[140px]"
       size="lg"
-      style={{ pointerEvents: 'auto' }}
+      style={{ pointerEvents: 'auto' }} // Ensure pointer events work
     >
       <Play className="h-4 w-4" />
       Start Session

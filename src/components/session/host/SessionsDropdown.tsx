@@ -13,22 +13,18 @@ import { ChevronDown, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface SessionsDropdownProps {
-  currentSessionId: number | null;
-  activeSessions: any[];
-  isLoading: boolean;
-  onRefresh: () => void;
+  sessions: any[];
+  currentConversationId: number | null;
 }
 
 const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
-  currentSessionId,
-  activeSessions,
-  isLoading,
-  onRefresh
+  sessions,
+  currentConversationId
 }) => {
   const navigate = useNavigate();
 
   const handleSessionSwitch = (sessionId: number) => {
-    if (sessionId !== currentSessionId) {
+    if (sessionId !== currentConversationId) {
       navigate(`/session/host?id=${sessionId}`);
     }
   };
@@ -44,25 +40,16 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
       <DropdownMenuContent align="end" className="w-64 bg-white z-50">
         <DropdownMenuLabel className="flex items-center justify-between">
           Active Sessions
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="h-6 w-6 p-0"
-          >
-            <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
-        {activeSessions.length === 0 ? (
+        {sessions.length === 0 ? (
           <DropdownMenuItem disabled>
             No other active sessions
           </DropdownMenuItem>
         ) : (
-          activeSessions
-            .filter(session => session.id !== currentSessionId)
+          sessions
+            .filter(session => session.id !== currentConversationId)
             .map((session) => (
               <DropdownMenuItem
                 key={session.id}

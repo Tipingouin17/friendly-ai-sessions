@@ -14,9 +14,10 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface HostQrDialogProps {
   conversationId: number | null;
+  onClose?: () => void;
 }
 
-const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
+const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId, onClose }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -50,6 +51,51 @@ const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
     const end = url.substring(url.length - Math.floor(maxLength / 2) + 2);
     return `${start}...${end}`;
   };
+
+  const DialogComponent = onClose ? Dialog : React.Fragment;
+  const dialogProps = onClose ? { open: true, onOpenChange: () => onClose() } : {};
+
+  if (onClose) {
+    return (
+      <Dialog open onOpenChange={() => onClose()}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto p-4 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-center">
+            <DialogTitle>Session QR Code</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex flex-col items-center space-y-4">
+            {sessionLink && (
+              <>
+                <div className="w-full flex justify-center bg-white p-3 rounded-lg border">
+                  <QRCodeSVG value={sessionLink} size={200} className="w-48 h-48 sm:w-52 sm:h-52" />
+                </div>
+                
+                <div className="w-full space-y-2">
+                  <div className="flex items-center justify-between bg-gray-50 rounded-lg border p-2 min-h-[40px]">
+                    <span className="text-xs font-mono text-gray-700 flex-1 break-all leading-tight px-1">
+                      {truncateUrl(sessionLink, 50)}
+                    </span>
+                    <Button 
+                      onClick={handleCopyLink}
+                      size="sm"
+                      variant="ghost"
+                      className="ml-2 h-8 w-8 p-0 flex-shrink-0 flex items-center justify-center"
+                    >
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 text-center">
+                  Participants can scan this QR code or use the link to join your session.
+                </p>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog>

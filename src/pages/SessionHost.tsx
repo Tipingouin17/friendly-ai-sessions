@@ -172,7 +172,7 @@ const SessionHost = () => {
     isAdmin: true
   });
 
-  // Enhanced session start handler
+  // Enhanced session start handler - make it async and return Promise<void>
   const handleSessionStarted = async (): Promise<void> => {
     console.log("🔥 SessionHost - Starting session through session flow");
     try {

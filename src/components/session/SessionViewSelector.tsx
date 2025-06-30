@@ -42,9 +42,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const isNavigatingRef = useRef(false);
   const sessionTransitionRef = useRef(false);
   
-  // NEW: Participant readiness state - tracks when participant is ready to see main session
-  const [participantReady, setParticipantReady] = React.useState(false);
-  
   // Listen for session end events (for participants)
   useSessionEndListener(props.currentConversationId, isAdmin);
   
@@ -198,12 +195,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
       processedEventIds.current.clear();
     };
   }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);
-
-  // NEW: Participant readiness callback - called when participant confirms they're ready
-  const handleParticipantReady = React.useCallback(() => {
-    console.log("🎯 Participant confirmed ready - enabling main session view");
-    setParticipantReady(true);
-  }, []);
   
   // Safety check for null values
   if (!props.conversation) {
@@ -224,7 +215,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   // Check session state to determine what view to show
   const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
   
-  // ADMIN FLOW: Admins get immediate access when session hasn't started
+  // FIXED LOGIC: Admin should see QR view when session hasn't started yet
   if (isAdmin && !sessionStartedInDB) {
     console.log("Rendering AdminQrView - session not started yet");
     return (
@@ -234,7 +225,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         maxParticipants={props.conversation?.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onStartSession={() => {
-          console.log("Admin clicked start session in AdminQrView");
+          console.log("Start session button clicked in AdminQrView");
           onStartSession();
         }}
         onSessionFull={onSessionFull}
@@ -242,24 +233,23 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
   
-  // PARTICIPANT FLOW: Self-determination logic
-  if (!isAdmin) {
-    // If session hasn't started OR participant isn't ready yet, show waiting screen
-    if (!sessionStartedInDB || !participantReady) {
-      console.log("Rendering ParticipantWaitingScreen", { 
-        sessionStartedInDB, 
-        participantReady 
-      });
-      return (
-        <ParticipantWaitingScreen
-          conversationId={props.currentConversationId as number}
-          currentParticipantCount={props.conversation?.current_participants || 0}
-          maxParticipants={props.conversation?.participants || 0}
-          facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
-          onSessionStarted={handleParticipantReady} // This is now "participant ready" callback
-        />
-      );
-    }
+  // For non-admins, show waiting screen until admin starts the session
+  if (!isAdmin && !sessionStartedInDB) {
+    console.log("Rendering ParticipantWaitingScreen");
+    return (
+      <ParticipantWaitingScreen
+        conversationId={props.currentConversationId as number}
+        currentParticipantCount={props.conversation?.current_participants || 0}
+        maxParticipants={props.conversation?.participants || 0}
+        facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        onSessionStarted={() => {
+          console.log("Session started callback from ParticipantWaitingScreen - participants should NOT navigate");
+          // IMPORTANT: Participants should NOT navigate when session starts
+          // They should stay on their current route and just see UI update
+          onStartSession();
+        }}
+      />
+    );
   }
 
   // Show loading if transitioning between states (but with a time limit now)
@@ -269,7 +259,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   }
 
   // Show the main session view (admin dashboard or participant messaging)
-  console.log("Rendering main SessionView", { isAdmin, sessionStartedInDB, participantReady });
+  console.log("Rendering main SessionView", { isAdmin, sessionStartedInDB });
   return <SessionView props={props} isAdmin={isAdmin} />;
 };
 

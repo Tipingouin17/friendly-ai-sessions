@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { Message } from '@/types/chat';
 import { useResponseTracking } from './session-messages/useResponseTracking';
+import { useMessageFetching } from './session-messages/useMessageFetching';
 import { useViewMode } from './session-messages/useViewMode';
-import { useCoordinatedSessionData } from './useCoordinatedSessionData';
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
@@ -22,18 +22,24 @@ export const useSessionMessages = ({
   conversation,
   totalParticipants = 1
 }: UseSessionMessagesProps) => {
-  // Use coordinated session data to prevent duplicate requests
+  // Use enhanced message fetching with response aggregation
   const {
     messages,
-    participants,
-    conversation: sessionConversation,
-    isLoading,
+    setMessages,
     error,
-    refetch,
-    connectionHealthy
-  } = useCoordinatedSessionData({
+    fetchMessages,
+    isGeneratingWelcome,
+    processNewMessage,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
+  } = useMessageFetching({
     conversationId,
-    isAdmin
+    welcomeMessage,
+    isAdmin,
+    conversation,
+    totalParticipants
   });
   
   const {
@@ -52,23 +58,25 @@ export const useSessionMessages = ({
     isAdmin
   });
   
+  // Fetch messages when the conversation ID changes
+  useEffect(() => {
+    fetchMessages();
+  }, [conversationId, welcomeMessage, conversation, fetchMessages]);
+  
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {
+    processNewMessage(message);
+    
     // Record response for tracking
     if (message.sender === 'user' && message.participant) {
       const participantId = parseInt(message.participant.replace('P', ''));
       recordResponse(participantId, true);
     }
-    
-    // Trigger refetch to get updated data
-    refetch();
   };
   
   return {
     messages,
-    setMessages: () => {
-      console.warn('setMessages is deprecated - use refetch() to update messages');
-    },
+    setMessages,
     error,
     currentParticipant,
     recordResponse,
@@ -76,13 +84,11 @@ export const useSessionMessages = ({
     hasAnswered,
     viewMode,
     setViewMode,
-    isGeneratingWelcome: isLoading,
+    isGeneratingWelcome,
     handleNewMessage,
-    isWaitingForResponses: false,
-    responseCount: 0,
-    generateAggregatedResponse: () => Promise.resolve(),
-    isGeneratingResponse: false,
-    refetch,
-    connectionHealthy
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
   };
 };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -11,7 +10,6 @@ import { useSessionInterface } from "@/hooks/useSessionInterface";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import { useSessionFlow } from "@/hooks/useSessionFlow";
 
 const SessionHost = () => {
   // Enforce host status
@@ -155,32 +153,12 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Add the new session flow hook
-  const {
-    isSessionActive,
-    currentResponseCollection,
-    isGeneratingResponse,
-    sessionStartNotification,
-    triggerSessionStart,
-    startResponseCollection,
-    responseProgress,
-    isStartingSession,
-    startProgress
-  } = useSessionFlow({
-    conversationId: currentConversationId,
-    participants: participants || [],
-    conversationData,
-    isAdmin: true
-  });
-
-  // Enhanced session start handler
+  // Handle session start - use the proper function from useSessionInterface
   const handleSessionStarted = async () => {
-    console.log("🔥 SessionHost - Starting session through session flow");
+    console.log("🔥 SessionHost - Starting session through useSessionInterface");
     try {
-      const success = await triggerSessionStart();
-      if (success) {
-        console.log("🔥 SessionHost - Session started successfully with welcome message");
-      }
+      await handleStartSession();
+      console.log("🔥 SessionHost - Session started successfully");
     } catch (error) {
       console.error("🔥 SessionHost - Error starting session:", error);
     }
@@ -218,11 +196,6 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
-      triggerSessionStart={triggerSessionStart}
-      sessionStartNotification={sessionStartNotification}
-      responseProgress={responseProgress}
-      isStartingSession={isStartingSession}
-      startProgress={startProgress}
     />
   );
 };

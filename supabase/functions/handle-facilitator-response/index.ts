@@ -16,7 +16,7 @@ serve(async (req) => {
   const requestStart = performance.now();
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   
-  console.log(`🚀 [${requestId}] Enhanced edge function started:`, {
+  console.log(`🚀 [${requestId}] Edge function started:`, {
     method: req.method,
     url: req.url,
     timestamp: new Date().toISOString(),
@@ -27,44 +27,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     console.log(`✅ [${requestId}] CORS preflight handled`);
     return new Response(null, { headers: corsHeaders })
-  }
-
-  // Handle health check endpoint
-  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-    console.log(`🏥 [${requestId}] Health check requested`);
-    
-    try {
-      const { checkAIPipelineHealth } = await import("./ai-pipeline-handler.ts");
-      const healthStatus = await checkAIPipelineHealth();
-      
-      console.log(`🏥 [${requestId}] Health check result:`, healthStatus);
-      
-      return new Response(
-        JSON.stringify({
-          healthy: healthStatus.healthy,
-          timestamp: new Date().toISOString(),
-          checks: healthStatus.checks,
-          errors: healthStatus.errors
-        }),
-        { 
-          status: healthStatus.healthy ? 200 : 503,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    } catch (error) {
-      console.error(`💥 [${requestId}] Health check error:`, error);
-      return new Response(
-        JSON.stringify({
-          healthy: false,
-          error: 'Health check failed',
-          timestamp: new Date().toISOString()
-        }),
-        { 
-          status: 503,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
   }
 
   try {
@@ -83,10 +45,12 @@ serve(async (req) => {
       flags: { generateReport, wrapUpSession, sessionStart }
     });
 
-    // Validate OpenAI configuration
-    const { validateOpenAIConfig } = await import("./ai-pipeline-handler.ts");
-    const configValidation = validateOpenAIConfig();
-    console.log(`🔑 [${requestId}] OpenAI configuration validation:`, configValidation);
+    // Check OpenAI API key availability
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log(`🔑 [${requestId}] OpenAI API key status:`, {
+      hasKey: !!openaiApiKey,
+      keyPrefix: openaiApiKey ? openaiApiKey.substring(0, 10) + '...' : 'undefined'
+    });
 
     // ENHANCED CONTEXT MANAGEMENT: Fetch conversation and participants data
     console.log(`📋 [${requestId}] Fetching conversation data for ID: ${conversationId}...`);
@@ -104,8 +68,8 @@ serve(async (req) => {
       participantDescription: conversation?.participant_description
     });
 
-    // Process the request with enhanced pipeline
-    console.log(`🤖 [${requestId}] Starting enhanced response processing...`);
+    // Process the request and generate a response
+    console.log(`🤖 [${requestId}] Starting response processing...`);
     const processingStart = performance.now();
     
     const responseObject = await processResponse(
@@ -122,26 +86,27 @@ serve(async (req) => {
     const processingDuration = performance.now() - processingStart;
     const totalDuration = performance.now() - requestStart;
 
-    console.log(`🎉 [${requestId}] Enhanced response processing complete:`, {
+    console.log(`🎉 [${requestId}] Response processing complete:`, {
       processingDuration: `${processingDuration.toFixed(2)}ms`,
       totalDuration: `${totalDuration.toFixed(2)}ms`,
       responseData: {
         id: responseObject.id,
         isReport: responseObject.is_report,
         contentLength: responseObject.content.length,
-        generationMethod: responseObject.metrics?.ai_generation_success ? 'ai' : 'enhanced_fallback',
+        generationMethod: responseObject.metrics?.generationMethod,
         hasAvatar: !!responseObject.avatar,
         hasFacilitatorContext: !!responseObject.facilitator_context,
-        hasSessionContext: !!responseObject.session_context,
-        qualityValidationPassed: responseObject.metrics?.quality_validation_passed
+        hasSessionContext: !!responseObject.session_context
       }
     });
 
-    console.log(`📤 [${requestId}] Sending enhanced facilitator response:`, {
+    console.log(`📤 [${requestId}] Sending facilitator response:`, {
       id: responseObject.id,
       isReport: responseObject.is_report,
       contentLength: responseObject.content.length,
       metrics: responseObject.metrics,
+      wrapUpTriggered: wrapUpSession,
+      sessionStartTriggered: sessionStart,
       facilitatorName: responseObject.facilitator_context?.name,
       sessionObjective: responseObject.session_context?.objective?.substring(0, 50) + '...'
     });
@@ -155,7 +120,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const totalDuration = performance.now() - requestStart;
-    console.error(`💥 [${requestId}] Enhanced edge function error:`, {
+    console.error(`💥 [${requestId}] Edge function error:`, {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       duration: `${totalDuration.toFixed(2)}ms`,

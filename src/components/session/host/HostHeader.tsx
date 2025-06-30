@@ -21,20 +21,12 @@ interface HostHeaderProps {
   conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
-  sessionStartNotification?: string | null;
-  responseProgress?: {
-    collected: number;
-    total: number;
-    isComplete: boolean;
-  } | null;
 }
 
 const HostHeader: React.FC<HostHeaderProps> = ({
   conversation,
   isSessionPaused,
-  toggleSessionState,
-  sessionStartNotification,
-  responseProgress
+  toggleSessionState
 }) => {
   const navigate = useNavigate();
   const { activeSessions, isLoading, refreshSessions } = useHostSessions();

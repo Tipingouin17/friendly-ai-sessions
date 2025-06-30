@@ -34,9 +34,11 @@ export const useWelcomeMessageWithFallback = ({
       id: conversation.id,
       sessions: conversation.sessions,
       participant_description: conversation.participant_description,
-      language: conversation.language
+      language: conversation.language,
+      participants: conversation.participants,
+      facilitator: conversation.facilitator
     };
-  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language]);
+  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language, conversation?.participants, conversation?.facilitator]);
 
   // Clear cached welcome message for new sessions or updated context
   const clearCachedWelcomeMessage = useCallback(() => {

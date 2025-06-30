@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,13 +13,19 @@ interface PreSessionHostViewProps {
   conversationId: number | null;
   participantCount: number;
   onSessionStarted: () => void;
+  isAutoStarting?: boolean;
+  autoStartCountdown?: number;
+  onCancelAutoStart?: () => void;
 }
 
 const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   conversationData,
   conversationId,
   participantCount,
-  onSessionStarted
+  onSessionStarted,
+  isAutoStarting = false,
+  autoStartCountdown = 0,
+  onCancelAutoStart
 }) => {
   const [copied, setCopied] = useState(false);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
@@ -117,7 +122,10 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 <StartSessionButton 
                   onStartSession={handleSessionStart} 
                   participantCount={stableParticipantCount} 
-                  isSessionStarted={false} 
+                  isSessionStarted={false}
+                  isAutoStarting={isAutoStarting}
+                  autoStartCountdown={autoStartCountdown}
+                  onCancelAutoStart={onCancelAutoStart}
                 />
               </div>
             </div>

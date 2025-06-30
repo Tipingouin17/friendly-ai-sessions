@@ -24,7 +24,7 @@ const SessionHost = () => {
     connectionAttempts,
     lastAttemptTime,
     handleError,
-    handleSessionFull,
+    handleSessionFull: sessionPageHandleSessionFull,
     retryConnection
   } = useSessionPage();
 
@@ -66,18 +66,6 @@ const SessionHost = () => {
     maxParticipants: conversationData?.participants || 10
   });
 
-  // Handle session full callback for auto-start
-  const handleSessionFull = useCallback(async () => {
-    const currentCount = participants.length;
-    const maxCount = conversationData?.participants || 10;
-    
-    console.log('🎯 Session full detected:', { currentCount, maxCount });
-    
-    if (currentCount >= maxCount && !isSessionStarted && !conversationData?.session_started) {
-      await triggerAutoStart(currentCount);
-    }
-  }, [participants.length, conversationData?.participants, isSessionStarted, conversationData?.session_started, triggerAutoStart]);
-
   // Participant state management with auto-start callback
   const {
     participants,
@@ -87,7 +75,16 @@ const SessionHost = () => {
     locationState,
     conversationData,
     currentConversationId,
-    onSessionFull: handleSessionFull
+    onSessionFull: useCallback(async () => {
+      const currentCount = participants.length;
+      const maxCount = conversationData?.participants || 10;
+      
+      console.log('🎯 Session full detected:', { currentCount, maxCount });
+      
+      if (currentCount >= maxCount && !isSessionStarted && !conversationData?.session_started) {
+        await triggerAutoStart(currentCount);
+      }
+    }, [participants.length, conversationData?.participants, isSessionStarted, conversationData?.session_started, triggerAutoStart])
   });
 
   console.log("🔍 SessionHost - Participants from hook:", {

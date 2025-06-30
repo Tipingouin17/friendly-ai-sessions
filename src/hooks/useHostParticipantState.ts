@@ -18,12 +18,12 @@ export function useHostParticipantState({
   currentConversationId,
   onSessionFull
 }: UseHostParticipantStateProps) {
-  const logger = createLogger('HostParticipantState', 'host');
+  const logger = createLogger('HostParticipantState', 'admin');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
 
   // Mock refetch function for participant manager
   const mockRefetch = useCallback(async () => {
-    logger.category('host', 'Mock refetch called for host participant state');
+    logger.category('admin', 'Mock refetch called for host participant state');
     return Promise.resolve();
   }, [logger]);
 
@@ -49,14 +49,14 @@ export function useHostParticipantState({
   // Update local participants state when manager participants change
   useEffect(() => {
     if (managerParticipants && managerParticipants.length > 0) {
-      logger.category('host', `Updating participants from manager: ${managerParticipants.length} participants`);
+      logger.category('admin', `Updating participants from manager: ${managerParticipants.length} participants`);
       setParticipants(managerParticipants);
     }
   }, [managerParticipants, logger]);
 
   // Log state changes
   useEffect(() => {
-    logger.category('host', 'Host participant state updated:', {
+    logger.category('admin', 'Host participant state updated:', {
       participantCount: participants.length,
       currentParticipantCount,
       maxParticipantsForSession,

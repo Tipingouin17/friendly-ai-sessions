@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
 import { debugLog } from '@/utils/debugLogger';
@@ -25,6 +25,11 @@ export const useMessageFetching = ({
 }: UseMessageFetchingProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialFetch, setIsInitialFetch] = useState(true);
+  
+  // Refs to prevent infinite loops
+  const lastFetchRef = useRef<string>('');
+  const fetchInProgressRef = useRef(false);
   
   // Enhanced logging for conversation context
   console.log('🔍 useMessageFetching - Session Context Analysis:', {
@@ -36,8 +41,21 @@ export const useMessageFetching = ({
     sessionObjective: conversation?.sessions?.objective,
     participantDescription: conversation?.participant_description,
     isAdmin,
-    totalParticipants
+    totalParticipants,
+    isInitialFetch,
+    fetchInProgress: fetchInProgressRef.current
   });
+  
+  // Memoize conversation data to prevent unnecessary re-renders
+  const memoizedConversation = useMemo(() => {
+    if (!conversation) return null;
+    return {
+      id: conversation.id,
+      sessions: conversation.sessions,
+      participant_description: conversation.participant_description,
+      language: conversation.language
+    };
+  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language]);
   
   const { 
     getCachedWelcomeMessage, 
@@ -49,10 +67,10 @@ export const useMessageFetching = ({
     conversationId,
     welcomeMessage,
     isAdmin,
-    conversation
+    conversation: memoizedConversation
   });
 
-  const { formatDatabaseMessages } = useMessageFormatting({ conversation });
+  const { formatDatabaseMessages } = useMessageFormatting({ conversation: memoizedConversation });
   const { saveWelcomeMessageToDb } = useWelcomeMessageSaver({ conversationId, isAdmin });
 
   // Response aggregation system
@@ -66,7 +84,7 @@ export const useMessageFetching = ({
   } = useResponseAggregation({
     conversationId,
     totalParticipants,
-    conversation
+    conversation: memoizedConversation
   });
 
   // Enhanced message processing with response tracking
@@ -107,20 +125,35 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
+  // Generate unique fetch key to prevent unnecessary re-fetches
+  const generateFetchKey = useCallback(() => {
+    return `${conversationId}-${!!memoizedConversation}-${isAdmin}-${messages.length}`;
+  }, [conversationId, memoizedConversation, isAdmin, messages.length]);
+
   // Main fetch function with enhanced context awareness and improved AI generation
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       console.log('⚠️ fetchMessages: No conversation ID provided, skipping message fetch');
       return;
     }
+
+    const fetchKey = generateFetchKey();
+    if (lastFetchRef.current === fetchKey || fetchInProgressRef.current) {
+      console.log('⚠️ fetchMessages: Skipping duplicate fetch or fetch in progress');
+      return;
+    }
+
+    lastFetchRef.current = fetchKey;
+    fetchInProgressRef.current = true;
     
     console.log('🚀 fetchMessages started for conversation:', conversationId);
     console.log('📋 fetchMessages - Full conversation context:', {
-      conversation,
+      conversation: memoizedConversation,
       conversationId,
       isAdmin,
       totalParticipants,
-      welcomeMessage
+      welcomeMessage,
+      hasConversationData: !!memoizedConversation
     });
     
     try {
@@ -175,21 +208,28 @@ export const useMessageFetching = ({
         console.log('🎯 No database messages found, generating welcome message for participant');
         console.log('🎯 Welcome message generation context:', {
           conversationId,
-          hasConversation: !!conversation,
-          facilitatorDetails: conversation?.sessions?.facilitator_details,
-          sessionObjective: conversation?.sessions?.objective,
-          participantDescription: conversation?.participant_description
+          hasConversation: !!memoizedConversation,
+          facilitatorDetails: memoizedConversation?.sessions?.facilitator_details,
+          sessionObjective: memoizedConversation?.sessions?.objective,
+          participantDescription: memoizedConversation?.participant_description,
+          conversationDataAvailable: !!memoizedConversation
         });
         
-        // Clear outdated cache for sessions like 1558 to force fresh generation
+        // Only proceed if we have conversation data or if this is the initial fetch
+        if (!memoizedConversation && !isInitialFetch) {
+          console.log('⚠️ Waiting for conversation data before generating welcome message');
+          return;
+        }
+        
+        // Clear outdated cache for sessions to force fresh generation when we have data
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         if (cachedWelcomeMsg && cachedWelcomeMsg.id === 'welcome-static' && !cachedWelcomeMsg.isEnhanced) {
           console.log('🗑️ Clearing outdated cached welcome message to force fresh generation');
           clearCachedWelcomeMessage();
         }
         
-        // Force fresh generation for sessions with rich context
-        console.log('🤖 Forcing fresh welcome message generation with full context...');
+        // Generate welcome message with available data
+        console.log('🤖 Generating welcome message with available context...');
         const welcomeMsg = await createWelcomeMessageWithFallback();
         console.log('✅ Welcome message generation completed:', {
           hasMessage: !!welcomeMsg,
@@ -232,19 +272,30 @@ export const useMessageFetching = ({
           console.error('💥 Failed to show fallback welcome message:', fallbackError);
         }
       }
+    } finally {
+      fetchInProgressRef.current = false;
+      setIsInitialFetch(false);
     }
   }, [
     conversationId,
     welcomeMessage,
-    conversation,
+    memoizedConversation,
     isAdmin,
     getCachedWelcomeMessage,
     createWelcomeMessageWithFallback,
     clearCachedWelcomeMessage,
     formatDatabaseMessages,
     saveWelcomeMessageToDb,
-    handleFacilitatorQuestion
+    handleFacilitatorQuestion,
+    generateFetchKey,
+    isInitialFetch
   ]);
+
+  // Reset initial fetch flag when conversation ID changes
+  useEffect(() => {
+    setIsInitialFetch(true);
+    lastFetchRef.current = '';
+  }, [conversationId]);
 
   return {
     messages,

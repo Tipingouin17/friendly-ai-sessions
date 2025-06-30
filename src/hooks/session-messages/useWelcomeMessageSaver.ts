@@ -20,11 +20,19 @@ export const useWelcomeMessageSaver = ({
       conversationId,
       messageId: welcomeMsg.id,
       contentLength: welcomeMsg.content?.length,
-      hasAvatar: !!welcomeMsg.avatar
+      hasAvatar: !!welcomeMsg.avatar,
+      conversationIdType: typeof conversationId,
+      conversationIdValid: conversationId !== null && conversationId !== undefined && !isNaN(conversationId)
     });
 
-    if (!isAdmin || !conversationId) {
-      console.log('⚠️ Skipping database save - not admin or no conversation ID');
+    // Enhanced validation - check for valid conversation ID
+    if (!conversationId || isNaN(conversationId)) {
+      console.log('⚠️ Skipping database save - invalid conversation ID:', conversationId);
+      return;
+    }
+
+    if (!isAdmin) {
+      console.log('⚠️ Skipping database save - not admin');
       return;
     }
     

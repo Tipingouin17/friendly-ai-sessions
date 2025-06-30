@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
 import { processFacilitatorAvatar } from './utils/avatarProcessing';
@@ -27,6 +27,17 @@ export const useWelcomeMessageWithFallback = ({
   const [lastError, setLastError] = useState<string | null>(null);
   const logger = createLogger('WelcomeMessage', 'messages');
 
+  // Memoize conversation data to prevent unnecessary re-computations
+  const memoizedConversationData = useMemo(() => {
+    if (!conversation) return null;
+    return {
+      id: conversation.id,
+      sessions: conversation.sessions,
+      participant_description: conversation.participant_description,
+      language: conversation.language
+    };
+  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language]);
+
   // Clear cached welcome message for new sessions or updated context
   const clearCachedWelcomeMessage = useCallback(() => {
     if (!conversationId) return;
@@ -48,11 +59,11 @@ export const useWelcomeMessageWithFallback = ({
 
     const fallbackStart = performance.now();
     console.log('🎯 Creating enhanced static fallback for session:', conversationId);
-    console.log('📋 Fallback generation - Full conversation context:', conversation);
+    console.log('📋 Fallback generation - Full conversation context:', memoizedConversationData);
 
     // Enhanced facilitator context extraction with detailed debugging
-    const facilitatorFromSession = conversation?.sessions?.facilitator_details;
-    const facilitatorDirect = conversation?.facilitator;
+    const facilitatorFromSession = memoizedConversationData?.sessions?.facilitator_details;
+    const facilitatorDirect = memoizedConversationData?.facilitator;
     const facilitator = facilitatorFromSession || facilitatorDirect;
 
     console.log('👨‍🏫 Detailed facilitator context extraction:', {
@@ -60,8 +71,8 @@ export const useWelcomeMessageWithFallback = ({
       facilitatorDirect,
       finalFacilitator: facilitator,
       facilitatorKeys: facilitator ? Object.keys(facilitator) : [],
-      sessionKeys: conversation?.sessions ? Object.keys(conversation.sessions) : [],
-      conversationKeys: conversation ? Object.keys(conversation) : []
+      sessionKeys: memoizedConversationData?.sessions ? Object.keys(memoizedConversationData.sessions) : [],
+      conversationKeys: memoizedConversationData ? Object.keys(memoizedConversationData) : []
     });
 
     const facilitatorName = facilitator?.title || 'your facilitator';
@@ -70,11 +81,11 @@ export const useWelcomeMessageWithFallback = ({
     const facilitatorSpecialties = Array.isArray(facilitator?.specialties) ? facilitator.specialties : [];
 
     // Session context with enhanced debugging
-    const sessionTitle = conversation?.sessions?.title || 'this session';
-    const objective = conversation?.sessions?.objective || 'facilitate meaningful discussion';
-    const participantCount = conversation?.participants || 1;
-    const participantDescription = conversation?.participant_description || 'participants';
-    const sessionType = conversation?.sessions?.session_type || 'workshop';
+    const sessionTitle = memoizedConversationData?.sessions?.title || 'this session';
+    const objective = memoizedConversationData?.sessions?.objective || 'facilitate meaningful discussion';
+    const participantCount = memoizedConversationData?.participants || 1;
+    const participantDescription = memoizedConversationData?.participant_description || 'participants';
+    const sessionType = memoizedConversationData?.sessions?.session_type || 'workshop';
 
     console.log('📋 Enhanced fallback context extracted:', {
       facilitatorName,
@@ -137,7 +148,7 @@ export const useWelcomeMessageWithFallback = ({
     // Get facilitator avatar
     const avatarStart = performance.now();
     const mockResponse = { avatar: null };
-    const facilitatorAvatarUrl = await resolveFacilitatorAvatar(mockResponse, conversation);
+    const facilitatorAvatarUrl = await resolveFacilitatorAvatar(mockResponse, memoizedConversationData);
     const processedAvatarUrl = processFacilitatorAvatar(facilitatorAvatarUrl);
     const avatarDuration = performance.now() - avatarStart;
 
@@ -171,12 +182,18 @@ export const useWelcomeMessageWithFallback = ({
     });
 
     return fallbackMessage;
-  }, [conversationId, conversation, welcomeMessage, logger]);
+  }, [conversationId, memoizedConversationData, welcomeMessage, logger]);
 
   // Enhanced: AI generation with complete facilitator and session context
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {
-    if (!conversationId || !conversation) {
-      console.log('⚠️ attemptAIGeneration: Missing conversation ID or conversation data');
+    // Enhanced validation - ensure we have both conversation ID and conversation data
+    if (!conversationId) {
+      console.log('⚠️ attemptAIGeneration: Missing conversation ID');
+      return null;
+    }
+
+    if (!memoizedConversationData) {
+      console.log('⚠️ attemptAIGeneration: Missing conversation data - will use fallback');
       return null;
     }
 
@@ -186,23 +203,23 @@ export const useWelcomeMessageWithFallback = ({
       console.log('🤖 AI generation attempt', attempt, 'of', MAX_RETRY_ATTEMPTS, 'for session', conversationId);
       console.log('🤖 AI generation - Full conversation context being sent:', {
         conversationStructure: {
-          id: conversation?.id,
-          hasSession: !!conversation?.sessions,
-          sessionKeys: conversation?.sessions ? Object.keys(conversation.sessions) : [],
-          hasFacilitatorDetails: !!conversation?.sessions?.facilitator_details,
-          facilitatorDetailsKeys: conversation?.sessions?.facilitator_details ? Object.keys(conversation.sessions.facilitator_details) : []
+          id: memoizedConversationData?.id,
+          hasSession: !!memoizedConversationData?.sessions,
+          sessionKeys: memoizedConversationData?.sessions ? Object.keys(memoizedConversationData.sessions) : [],
+          hasFacilitatorDetails: !!memoizedConversationData?.sessions?.facilitator_details,
+          facilitatorDetailsKeys: memoizedConversationData?.sessions?.facilitator_details ? Object.keys(memoizedConversationData.sessions.facilitator_details) : []
         }
       });
 
       // Enhanced: Prepare comprehensive context for AI generation with complete facilitator details
-      const facilitatorFromSession = conversation?.sessions?.facilitator_details;
-      const facilitatorDirect = conversation?.facilitator;
+      const facilitatorFromSession = memoizedConversationData?.sessions?.facilitator_details;
+      const facilitatorDirect = memoizedConversationData?.facilitator;
       const facilitator = facilitatorFromSession || facilitatorDirect;
 
       const sessionContext = {
-        sessionTitle: conversation?.sessions?.title,
-        sessionObjective: conversation?.sessions?.objective,
-        sessionType: conversation?.sessions?.session_type || 'workshop',
+        sessionTitle: memoizedConversationData?.sessions?.title,
+        sessionObjective: memoizedConversationData?.sessions?.objective,
+        sessionType: memoizedConversationData?.sessions?.session_type || 'workshop',
         
         // Enhanced: Complete facilitator context
         facilitatorName: facilitator?.title || 'Facilitator',
@@ -210,9 +227,9 @@ export const useWelcomeMessageWithFallback = ({
         facilitatorExpertise: facilitator?.expertise_level || '',
         facilitatorSpecialties: Array.isArray(facilitator?.specialties) ? facilitator.specialties : [],
         
-        participantCount: conversation?.participants || 1,
-        participantDescription: conversation?.participant_description,
-        language: conversation?.language || 'en'
+        participantCount: memoizedConversationData?.participants || 1,
+        participantDescription: memoizedConversationData?.participant_description,
+        language: memoizedConversationData?.language || 'en'
       };
 
       console.log('🎯 AI generation with complete session context:', sessionContext);
@@ -224,7 +241,7 @@ export const useWelcomeMessageWithFallback = ({
         generateReport: false,
         sessionContext,
         // Enhanced: Pass complete conversation data for facilitator context
-        conversation: conversation
+        conversation: memoizedConversationData
       };
 
       console.log('📡 Calling edge function with enhanced params for session:', conversationId);
@@ -303,7 +320,7 @@ export const useWelcomeMessageWithFallback = ({
       console.error('🚫 All AI generation attempts exhausted for session', conversationId);
       return null;
     }
-  }, [conversationId, conversation, logger]);
+  }, [conversationId, memoizedConversationData, logger]);
 
   // Retrieve cached welcome message with version checking
   const getCachedWelcomeMessage = useCallback(() => {
@@ -377,9 +394,9 @@ export const useWelcomeMessageWithFallback = ({
     console.log('🚀 Starting welcome message creation for session', conversationId);
     console.log('📋 Welcome message creation - Full context:', {
       conversationId,
-      hasConversation: !!conversation,
-      conversationKeys: conversation ? Object.keys(conversation) : [],
-      facilitatorPath: conversation?.sessions?.facilitator_details ? 'sessions.facilitator_details' : 'direct',
+      hasConversation: !!memoizedConversationData,
+      conversationKeys: memoizedConversationData ? Object.keys(memoizedConversationData) : [],
+      facilitatorPath: memoizedConversationData?.sessions?.facilitator_details ? 'sessions.facilitator_details' : 'direct',
       welcomeMessage,
       isAdmin
     });
@@ -392,22 +409,26 @@ export const useWelcomeMessageWithFallback = ({
         clearCachedWelcomeMessage();
       }
 
-      // Force AI generation attempt for session 1558 and similar sessions with rich context
-      console.log('🤖 Attempting AI generation for session', conversationId, '...');
-      const aiMessage = await attemptAIGeneration();
-      
-      if (aiMessage) {
-        cacheWelcomeMessage(aiMessage);
-        const totalDuration = performance.now() - totalStart;
-        console.log('🎉 Welcome message created via AI for session', conversationId, ':', {
-          totalDuration: totalDuration.toFixed(2) + 'ms',
-          contentLength: aiMessage.content.length
-        });
-        return aiMessage;
+      // Try AI generation first if we have conversation data
+      if (memoizedConversationData) {
+        console.log('🤖 Attempting AI generation for session', conversationId, '...');
+        const aiMessage = await attemptAIGeneration();
+        
+        if (aiMessage) {
+          cacheWelcomeMessage(aiMessage);
+          const totalDuration = performance.now() - totalStart;
+          console.log('🎉 Welcome message created via AI for session', conversationId, ':', {
+            totalDuration: totalDuration.toFixed(2) + 'ms',
+            contentLength: aiMessage.content.length
+          });
+          return aiMessage;
+        }
+      } else {
+        console.log('⚠️ No conversation data available for AI generation, using fallback');
       }
 
-      // If AI fails, use enhanced static fallback with complete facilitator context
-      console.log('🔄 AI generation failed for session', conversationId, ', using enhanced static fallback');
+      // If AI fails or no conversation data, use enhanced static fallback
+      console.log('🔄 AI generation failed or unavailable for session', conversationId, ', using enhanced static fallback');
       const fallbackMessage = await createStaticFallbackMessage();
       
       if (fallbackMessage) {
@@ -429,7 +450,7 @@ export const useWelcomeMessageWithFallback = ({
       });
       setIsGenerating(false);
     }
-  }, [conversationId, attemptAIGeneration, createStaticFallbackMessage, cacheWelcomeMessage, getCachedWelcomeMessage, clearCachedWelcomeMessage, logger]);
+  }, [conversationId, attemptAIGeneration, createStaticFallbackMessage, cacheWelcomeMessage, getCachedWelcomeMessage, clearCachedWelcomeMessage, logger, memoizedConversationData]);
 
   return {
     getCachedWelcomeMessage,

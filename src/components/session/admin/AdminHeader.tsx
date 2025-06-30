@@ -34,7 +34,13 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     closureResult, 
     closeSessionAndGenerateReport, 
     downloadReport 
-  } = useSessionClosure();
+  } = useSessionClosure({
+    conversationId: conversation?.id || null,
+    onSuccess: () => {
+      setShowClosureDialog(false);
+      setShowReportDialog(true);
+    }
+  });
   
   const [showClosureDialog, setShowClosureDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);

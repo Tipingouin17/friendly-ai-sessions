@@ -155,6 +155,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         sessionMessages={sessionMessages}
         participantColors={participantColors}
         participants={participants}
+        isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
         onSendMessage={onSendMessage}
         isWaitingForResponses={isWaitingForResponses}
@@ -168,6 +169,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       {showQrDialog && (
         <HostQrDialog
           conversationId={currentConversationId}
+          onClose={handleCloseQrDialog}
         />
       )}
 
@@ -175,6 +177,10 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         <HostWrapUpDialog
           onWrapUp={closeSession}
           isWrappingUp={isClosing}
+          onClose={handleCloseWrapUpDialog}
+          onDownloadReport={downloadReport}
+          conversationId={currentConversationId}
+          isDownloading={isDownloading}
         />
       )}
     </div>

@@ -15,6 +15,7 @@ export interface Message {
   isWelcomeMessage?: boolean; // Flag for welcome messages
   isFallback?: boolean; // Flag for fallback messages
   isAIGenerated?: boolean; // Flag for AI-generated messages
+  isEnhanced?: boolean; // Flag for enhanced fallback messages
 }
 
 export interface ParticipantInfo {

@@ -30,6 +30,7 @@ export const useMessageFetching = ({
   // Refs to prevent infinite loops
   const lastFetchRef = useRef<string>('');
   const fetchInProgressRef = useRef(false);
+  const autoStartProcessedRef = useRef<boolean>(false);
   
   // Enhanced logging for conversation context
   console.log('🔍 useMessageFetching - Session Context Analysis:', {
@@ -43,7 +44,9 @@ export const useMessageFetching = ({
     isAdmin,
     totalParticipants,
     isInitialFetch,
-    fetchInProgress: fetchInProgressRef.current
+    fetchInProgress: fetchInProgressRef.current,
+    sessionStarted: conversation?.session_started,
+    autoStartProcessed: autoStartProcessedRef.current
   });
   
   // Memoize conversation data to prevent unnecessary re-renders
@@ -53,9 +56,12 @@ export const useMessageFetching = ({
       id: conversation.id,
       sessions: conversation.sessions,
       participant_description: conversation.participant_description,
-      language: conversation.language
+      language: conversation.language,
+      session_started: conversation.session_started,
+      current_participants: conversation.current_participants,
+      participants: conversation.participants
     };
-  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language]);
+  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language, conversation?.session_started, conversation?.current_participants, conversation?.participants]);
   
   const { 
     getCachedWelcomeMessage, 
@@ -86,6 +92,36 @@ export const useMessageFetching = ({
     totalParticipants,
     conversation: memoizedConversation
   });
+
+  // Check if session was auto-started
+  const checkIfAutoStarted = useCallback(async (convId: number): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('session_events')
+        .select('*')
+        .eq('conversation_id', convId)
+        .eq('event_type', 'session_auto_started')
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (error) {
+        console.error('❌ Error checking auto-start status:', error);
+        return false;
+      }
+      
+      const isAutoStarted = data && data.length > 0;
+      console.log('🔍 Auto-start check result:', {
+        conversationId: convId,
+        isAutoStarted,
+        eventData: data?.[0]
+      });
+      
+      return isAutoStarted;
+    } catch (err) {
+      console.error('💥 Exception checking auto-start status:', err);
+      return false;
+    }
+  }, []);
 
   // Enhanced message processing with response tracking
   const processNewMessage = useCallback((message: Message) => {
@@ -124,6 +160,57 @@ export const useMessageFetching = ({
       debugLog('all', `Started response collection for facilitator question: ${questionId}`);
     }
   }, [isAdmin, startResponseCollection]);
+
+  // Generate welcome message for auto-started sessions
+  const generateWelcomeForAutoStart = useCallback(async () => {
+    if (!conversationId || !memoizedConversation || autoStartProcessedRef.current) {
+      return;
+    }
+
+    console.log('🚀 generateWelcomeForAutoStart - Checking conditions:', {
+      conversationId,
+      sessionStarted: memoizedConversation.session_started,
+      isAdmin,
+      autoStartProcessed: autoStartProcessedRef.current
+    });
+
+    // Check if this is an auto-started session
+    const isAutoStarted = await checkIfAutoStarted(conversationId);
+    
+    if (!isAutoStarted) {
+      console.log('⏭️ Session was not auto-started, skipping welcome message generation');
+      return;
+    }
+
+    console.log('🎯 Auto-started session detected, generating welcome message...');
+    autoStartProcessedRef.current = true;
+
+    try {
+      const welcomeMsg = await createWelcomeMessageWithFallback();
+      console.log('✅ Auto-start welcome message generated:', {
+        hasMessage: !!welcomeMsg,
+        messageId: welcomeMsg?.id,
+        contentLength: welcomeMsg?.content?.length,
+        isAIGenerated: welcomeMsg?.isAIGenerated
+      });
+
+      if (welcomeMsg) {
+        setMessages([welcomeMsg]);
+        // Save to database for participants to see
+        await saveWelcomeMessageToDb(welcomeMsg);
+      }
+    } catch (error) {
+      console.error('❌ Error generating auto-start welcome message:', error);
+    }
+  }, [conversationId, memoizedConversation, checkIfAutoStarted, createWelcomeMessageWithFallback, saveWelcomeMessageToDb]);
+
+  // Monitor for session start and trigger welcome message generation
+  useEffect(() => {
+    if (memoizedConversation?.session_started && isAdmin && !autoStartProcessedRef.current) {
+      console.log('🔄 Session started detected for admin, checking for auto-start welcome generation...');
+      generateWelcomeForAutoStart();
+    }
+  }, [memoizedConversation?.session_started, isAdmin, generateWelcomeForAutoStart]);
 
   // Generate unique fetch key to prevent unnecessary re-fetches
   const generateFetchKey = useCallback(() => {
@@ -203,7 +290,17 @@ export const useMessageFetching = ({
         return;
       }
       
-      // No database messages - generate welcome message for participants
+      // No database messages found
+      console.log('📭 No database messages found');
+      
+      // For auto-started sessions with admins, generate welcome message
+      if (isAdmin && memoizedConversation?.session_started) {
+        console.log('🎯 Admin view with started session, checking for auto-start welcome generation...');
+        await generateWelcomeForAutoStart();
+        return;
+      }
+      
+      // For participants, generate welcome message
       if (!isAdmin) {
         console.log('🎯 No database messages found, generating welcome message for participant');
         console.log('🎯 Welcome message generation context:', {
@@ -288,13 +385,15 @@ export const useMessageFetching = ({
     saveWelcomeMessageToDb,
     handleFacilitatorQuestion,
     generateFetchKey,
-    isInitialFetch
+    isInitialFetch,
+    generateWelcomeForAutoStart
   ]);
 
-  // Reset initial fetch flag when conversation ID changes
+  // Reset initial fetch flag and auto-start processed flag when conversation ID changes
   useEffect(() => {
     setIsInitialFetch(true);
     lastFetchRef.current = '';
+    autoStartProcessedRef.current = false;
   }, [conversationId]);
 
   return {

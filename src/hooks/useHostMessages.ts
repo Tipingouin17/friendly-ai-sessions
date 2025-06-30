@@ -24,6 +24,7 @@ export const useHostMessages = ({
   const [isSessionPaused, setIsSessionPaused] = useState(false);
   const [conversationState, setConversationState] = useState(conversationData);
   const sessionStateRef = useRef(conversationData);
+  const welcomeGeneratedRef = useRef<boolean>(false);
 
   // Update refs when props change
   useEffect(() => {
@@ -66,11 +67,16 @@ export const useHostMessages = ({
       setConversationState(updatedConversation);
       sessionStateRef.current = updatedConversation;
       
-      // Check for session start
+      // Check for session start and trigger immediate welcome message generation
       if (payload.new.session_started && !payload.old?.session_started) {
-        console.log('🎉 [HOST] Session started - triggering welcome message generation');
-        // Refetch messages to get the welcome message
-        setTimeout(() => fetchMessages(), 100);
+        console.log('🎉 [HOST] Session started - triggering immediate welcome message generation');
+        welcomeGeneratedRef.current = false; // Reset flag to allow generation
+        
+        // Trigger immediate message fetch to generate welcome message
+        setTimeout(() => {
+          console.log('🚀 [HOST] Fetching messages for auto-started session...');
+          fetchMessages();
+        }, 100);
       }
     }
   }, [fetchMessages]);
@@ -81,14 +87,19 @@ export const useHostMessages = ({
     // Participant updates are handled by the parent component
   }, []);
 
-  // Handle session events
+  // Handle session events with enhanced auto-start detection
   const handleSessionEvent = useCallback((payload: any) => {
     console.log('📋 [HOST] Session event:', payload);
     
     if (payload.new?.event_type === 'session_auto_started') {
-      console.log('🚀 [HOST] Auto-start event detected');
-      // Trigger message refetch to get welcome message
-      setTimeout(() => fetchMessages(), 200);
+      console.log('🚀 [HOST] Auto-start event detected - triggering welcome message generation');
+      welcomeGeneratedRef.current = false; // Reset flag
+      
+      // Trigger immediate welcome message generation
+      setTimeout(() => {
+        console.log('🎯 [HOST] Generating welcome message for auto-started session...');
+        fetchMessages();
+      }, 200);
     }
   }, [fetchMessages]);
 
@@ -101,17 +112,37 @@ export const useHostMessages = ({
     isHost: true
   });
 
-  // Monitor for auto-start conditions
+  // Monitor for auto-start conditions with immediate welcome generation
   const { isProcessingAutoStart } = useSessionAutoStartMonitoring({
     conversationId,
     conversation: conversationState,
     participants,
     onSessionStarted: () => {
-      console.log('🎯 [HOST] Session auto-started, fetching messages...');
-      setTimeout(() => fetchMessages(), 300);
+      console.log('🎯 [HOST] Session auto-started, triggering immediate welcome generation...');
+      welcomeGeneratedRef.current = false; // Reset flag
+      
+      // Immediate fetch to generate welcome message
+      setTimeout(() => {
+        console.log('⚡ [HOST] Auto-start welcome message generation triggered');
+        fetchMessages();
+      }, 100);
     },
     isHost: true
   });
+
+  // Monitor session start state for immediate welcome generation
+  useEffect(() => {
+    if (conversationState?.session_started && !welcomeGeneratedRef.current) {
+      console.log('🔍 [HOST] Session started detected, checking for welcome message generation...');
+      welcomeGeneratedRef.current = true;
+      
+      // Check if we need to generate welcome message
+      if (messages.length === 0) {
+        console.log('📝 [HOST] No messages found, triggering welcome generation...');
+        setTimeout(() => fetchMessages(), 50);
+      }
+    }
+  }, [conversationState?.session_started, messages.length, fetchMessages]);
 
   const toggleSessionState = useCallback(() => {
     setIsSessionPaused(prev => !prev);

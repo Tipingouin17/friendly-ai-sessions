@@ -64,7 +64,7 @@ export const useWelcomeMessageWithFallback = ({
     });
 
     // Create contextual static message with complete facilitator personality
-    let staticContent = `Welcome to ${sessionTitle}! I'm ${facilitatorName}, and I'm excited to have you join us today.\n\n`;
+    let staticContent = `Welcome to "${sessionTitle}"! I'm ${facilitatorName}, and I'm excited to have you join us today.\n\n`;
     
     if (facilitatorDetails) {
       staticContent += `A bit about me: ${facilitatorDetails}\n\n`;
@@ -133,7 +133,7 @@ export const useWelcomeMessageWithFallback = ({
     });
 
     return fallbackMessage;
-  }, [conversationId, conversation, welcomeMessage, logger]);
+  }, [conversationId, conversation, logger]);
 
   // Enhanced: AI generation with complete facilitator and session context
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {

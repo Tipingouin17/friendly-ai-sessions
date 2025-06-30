@@ -18,8 +18,14 @@ interface SessionClosureResult {
   };
 }
 
-export const useSessionClosure = () => {
+interface UseSessionClosureProps {
+  conversationId: number | null;
+  onSuccess?: () => void;
+}
+
+export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosureProps) => {
   const [isClosing, setIsClosing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [closureResult, setClosureResult] = useState<SessionClosureResult | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -29,7 +35,9 @@ export const useSessionClosure = () => {
   const { executeSessionClosure } = useSessionClosureExecution();
   const { downloadReport: downloadReportFile } = useReportDownloader();
 
-  const closeSessionAndGenerateReport = async (conversationId: number) => {
+  const closeSession = async () => {
+    if (!conversationId) return false;
+    
     setIsClosing(true);
 
     try {
@@ -52,9 +60,13 @@ export const useSessionClosure = () => {
         description: `Report generated with ${data.sessionData.messageCount} messages from ${data.sessionData.participantCount} participants`,
       });
 
+      if (onSuccess) {
+        onSuccess();
+      }
+
       return true;
     } catch (error) {
-      console.error('💥 Error in closeSessionAndGenerateReport:', error);
+      console.error('💥 Error in closeSession:', error);
       
       let errorMessage = "Failed to close session and generate report";
       if (error instanceof Error) {
@@ -73,13 +85,19 @@ export const useSessionClosure = () => {
   };
 
   const downloadReport = (format: 'json' | 'text' = 'text') => {
-    downloadReportFile(closureResult, format);
+    setIsDownloading(true);
+    try {
+      downloadReportFile(closureResult, format);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return {
     isClosing,
+    isDownloading,
     closureResult,
-    closeSessionAndGenerateReport,
+    closeSession,
     downloadReport
   };
 };

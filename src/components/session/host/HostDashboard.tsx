@@ -90,7 +90,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
     }
   });
 
-  // Session closure hook
+  // Session closure hook with proper interface
   const { 
     closeSession, 
     isClosing, 
@@ -149,12 +149,11 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       />
 
       <HostSessionContent
-        conversation={conversation}
-        isSessionPaused={isSessionPaused}
-        toggleSessionState={toggleSessionState}
         sessionMessages={sessionMessages}
         participantColors={participantColors}
+        conversationData={conversation}
         participants={participants}
+        isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
         onSendMessage={onSendMessage}
         isWaitingForResponses={isWaitingForResponses}
@@ -162,7 +161,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         totalParticipants={totalParticipants}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         isSessionStarted={isSessionStarted}
-        responseProgress={responseProgress}
+        onSessionStarted={onSessionStarted}
+        triggerSessionStart={triggerSessionStart}
       />
 
       {showQrDialog && (

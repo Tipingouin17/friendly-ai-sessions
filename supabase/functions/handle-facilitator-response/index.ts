@@ -36,7 +36,7 @@ serve(async (req) => {
     const clientDuration = performance.now() - clientStart;
     console.log(`🔧 [${requestId}] Supabase client initialized in ${clientDuration.toFixed(2)}ms`);
     
-    // Parse and validate the request
+    // Parse and validate the request with enhanced debugging
     console.log(`📥 [${requestId}] Parsing request...`);
     const { messages, conversationId, generateReport, wrapUpSession, sessionStart } = await parseRequest(req);
     console.log(`✅ [${requestId}] Request parsed successfully:`, {
@@ -52,6 +52,11 @@ serve(async (req) => {
       keyPrefix: openaiApiKey ? openaiApiKey.substring(0, 10) + '...' : 'undefined'
     });
 
+    if (!openaiApiKey) {
+      console.error(`❌ [${requestId}] OpenAI API key not found in environment`);
+      return createErrorResponse(new Error('OpenAI API key not configured'));
+    }
+
     // ENHANCED CONTEXT MANAGEMENT: Fetch conversation and participants data
     console.log(`📋 [${requestId}] Fetching conversation data for ID: ${conversationId}...`);
     const contextStart = performance.now();
@@ -65,8 +70,28 @@ serve(async (req) => {
       participantCount: participants?.length || 0,
       facilitatorName: conversation?.sessions?.facilitator_details?.title,
       sessionObjective: conversation?.sessions?.objective?.substring(0, 50) + '...',
-      participantDescription: conversation?.participant_description
+      participantDescription: conversation?.participant_description,
+      conversationStructure: {
+        hasSession: !!conversation?.sessions,
+        sessionKeys: conversation?.sessions ? Object.keys(conversation.sessions) : [],
+        hasFacilitatorDetails: !!conversation?.sessions?.facilitator_details,
+        facilitatorDetailsKeys: conversation?.sessions?.facilitator_details ? Object.keys(conversation.sessions.facilitator_details) : []
+      }
     });
+
+    // Enhanced debugging for session 1558 and similar cases
+    if (sessionStart && conversation) {
+      console.log(`🎯 [${requestId}] Session start request - Enhanced context analysis:`, {
+        conversationId,
+        sessionTitle: conversation?.sessions?.title,
+        facilitatorTitle: conversation?.sessions?.facilitator_details?.title,
+        facilitatorDetails: conversation?.sessions?.facilitator_details?.details?.substring(0, 100) + '...',
+        facilitatorExpertise: conversation?.sessions?.facilitator_details?.expertise_level,
+        sessionObjective: conversation?.sessions?.objective?.substring(0, 100) + '...',
+        participantDescription: conversation?.participant_description,
+        hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
+      });
+    }
 
     // Process the request and generate a response
     console.log(`🤖 [${requestId}] Starting response processing...`);

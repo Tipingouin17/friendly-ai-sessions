@@ -42,6 +42,7 @@ export const useMessageFetching = ({
   const { 
     getCachedWelcomeMessage, 
     createWelcomeMessageWithFallback,
+    clearCachedWelcomeMessage,
     isGenerating: isGeneratingWelcome,
     lastError: welcomeError
   } = useWelcomeMessageWithFallback({
@@ -106,7 +107,7 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
-  // Main fetch function with enhanced context awareness
+  // Main fetch function with enhanced context awareness and improved AI generation
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       console.log('⚠️ fetchMessages: No conversation ID provided, skipping message fetch');
@@ -180,21 +181,15 @@ export const useMessageFetching = ({
           participantDescription: conversation?.participant_description
         });
         
-        // Check cache first
+        // Clear outdated cache for sessions like 1558 to force fresh generation
         const cachedWelcomeMsg = getCachedWelcomeMessage();
-        if (cachedWelcomeMsg) {
-          console.log('💾 Using cached welcome message:', {
-            messageId: cachedWelcomeMsg.id,
-            contentLength: cachedWelcomeMsg.content?.length,
-            isAIGenerated: cachedWelcomeMsg.isAIGenerated,
-            isFallback: cachedWelcomeMsg.isFallback
-          });
-          setMessages([cachedWelcomeMsg]);
-          return;
+        if (cachedWelcomeMsg && cachedWelcomeMsg.id === 'welcome-static' && !cachedWelcomeMsg.isEnhanced) {
+          console.log('🗑️ Clearing outdated cached welcome message to force fresh generation');
+          clearCachedWelcomeMessage();
         }
         
-        // Generate new welcome message with enhanced context
-        console.log('🤖 Generating new welcome message with full context...');
+        // Force fresh generation for sessions with rich context
+        console.log('🤖 Forcing fresh welcome message generation with full context...');
         const welcomeMsg = await createWelcomeMessageWithFallback();
         console.log('✅ Welcome message generation completed:', {
           hasMessage: !!welcomeMsg,
@@ -202,6 +197,7 @@ export const useMessageFetching = ({
           contentLength: welcomeMsg?.content?.length,
           isAIGenerated: welcomeMsg?.isAIGenerated,
           isFallback: welcomeMsg?.isFallback,
+          isEnhanced: welcomeMsg?.isEnhanced,
           hasAvatar: !!welcomeMsg?.avatar
         });
 
@@ -244,6 +240,7 @@ export const useMessageFetching = ({
     isAdmin,
     getCachedWelcomeMessage,
     createWelcomeMessageWithFallback,
+    clearCachedWelcomeMessage,
     formatDatabaseMessages,
     saveWelcomeMessageToDb,
     handleFacilitatorQuestion

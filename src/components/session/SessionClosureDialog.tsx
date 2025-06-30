@@ -38,33 +38,35 @@ const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
             <AlertTriangle className="h-5 w-5 text-orange-500" />
             <AlertDialogTitle>Close Session & Generate Report</AlertDialogTitle>
           </div>
-          <AlertDialogDescription className="space-y-3">
-            <p>
-              Are you sure you want to close <strong>{sessionTitle}</strong>? This action will:
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li className="flex items-center space-x-2">
-                <Users className="h-3 w-3 flex-shrink-0" />
-                <span>End the session for all {participantCount} participants</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <FileText className="h-3 w-3 flex-shrink-0" />
-                <span>Generate a comprehensive session report</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                <span>Prevent further messages from being sent</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <Clock className="h-3 w-3 flex-shrink-0" />
-                <span>Redirect participants to the home page</span>
-              </li>
-            </ul>
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800">
-                <FileText className="h-4 w-4 inline mr-1" />
-                The report will include participation statistics, key discussion points, and session analytics.
-              </p>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3">
+              <span>
+                Are you sure you want to close <strong>{sessionTitle}</strong>? This action will:
+              </span>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li className="flex items-center space-x-2">
+                  <Users className="h-3 w-3 flex-shrink-0" />
+                  <span>End the session for all {participantCount} participants</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <FileText className="h-3 w-3 flex-shrink-0" />
+                  <span>Generate a comprehensive session report</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                  <span>Prevent further messages from being sent</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Clock className="h-3 w-3 flex-shrink-0" />
+                  <span>Redirect participants to the home page</span>
+                </li>
+              </ul>
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <span className="text-sm text-blue-800">
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  The report will include participation statistics, key discussion points, and session analytics.
+                </span>
+              </div>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>

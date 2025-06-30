@@ -6,17 +6,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { QrCode, Copy, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface HostQrDialogProps {
   conversationId: number | null;
+  onClose: () => void;
 }
 
-const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
+const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId, onClose }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -52,13 +52,7 @@ const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <QrCode className="h-4 w-4" />
-          <span className="hidden sm:inline">QR Code</span>
-        </Button>
-      </DialogTrigger>
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-[95vw] max-w-md mx-auto p-4 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-center">
           <DialogTitle>Session QR Code</DialogTitle>

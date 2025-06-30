@@ -29,15 +29,26 @@ export const useWelcomeMessageWithFallback = ({
 
   // Enhanced: Create static fallback template with complete facilitator context
   const createStaticFallbackMessage = useCallback(async (): Promise<Message | null> => {
-    if (!conversationId) return null;
+    if (!conversationId) {
+      console.log('⚠️ createStaticFallbackMessage: No conversation ID');
+      return null;
+    }
 
     const fallbackStart = performance.now();
-    logger.category('messages', `🎯 Creating enhanced static fallback for session: ${conversationId}`);
+    console.log('🎯 Creating enhanced static fallback for session:', conversationId);
+    console.log('📋 Fallback generation - Full conversation context:', conversation);
 
     // Enhanced facilitator context extraction
     const facilitatorFromSession = conversation?.sessions?.facilitator_details;
     const facilitatorDirect = conversation?.facilitator;
     const facilitator = facilitatorFromSession || facilitatorDirect;
+
+    console.log('👨‍🏫 Extracted facilitator context:', {
+      facilitatorFromSession,
+      facilitatorDirect,
+      finalFacilitator: facilitator,
+      facilitatorKeys: facilitator ? Object.keys(facilitator) : []
+    });
 
     const facilitatorName = facilitator?.title || 'your facilitator';
     const facilitatorDetails = facilitator?.details || facilitator?.description || '';
@@ -51,7 +62,7 @@ export const useWelcomeMessageWithFallback = ({
     const participantDescription = conversation?.participant_description || 'participants';
     const sessionType = conversation?.sessions?.session_type || 'workshop';
 
-    logger.category('messages', '📋 Enhanced fallback context extracted:', {
+    console.log('📋 Enhanced fallback context extracted:', {
       facilitatorName,
       facilitatorDetails: facilitatorDetails.substring(0, 100) + '...',
       facilitatorExpertise,
@@ -100,6 +111,14 @@ export const useWelcomeMessageWithFallback = ({
       staticContent += `I'm looking forward to our discussion and learning from each of your unique perspectives!`;
     }
 
+    console.log('📝 Generated static fallback content:', {
+      contentLength: staticContent.length,
+      wordCount: staticContent.split(' ').length,
+      includesFacilitatorName: staticContent.includes(facilitatorName),
+      includesSessionTitle: staticContent.includes(sessionTitle),
+      includesObjective: staticContent.includes(objective)
+    });
+
     // Get facilitator avatar
     const avatarStart = performance.now();
     const mockResponse = { avatar: null };
@@ -107,7 +126,8 @@ export const useWelcomeMessageWithFallback = ({
     const processedAvatarUrl = processFacilitatorAvatar(facilitatorAvatarUrl);
     const avatarDuration = performance.now() - avatarStart;
 
-    logger.category('messages', `🖼️ Avatar processing completed in ${avatarDuration.toFixed(2)}ms:`, {
+    console.log('🖼️ Avatar processing completed:', {
+      duration: avatarDuration.toFixed(2) + 'ms',
       originalUrl: facilitatorAvatarUrl,
       processedUrl: processedAvatarUrl
     });
@@ -124,7 +144,8 @@ export const useWelcomeMessageWithFallback = ({
     };
 
     const fallbackDuration = performance.now() - fallbackStart;
-    logger.category('messages', `✅ Enhanced static fallback created in ${fallbackDuration.toFixed(2)}ms:`, {
+    console.log('✅ Enhanced static fallback created:', {
+      duration: fallbackDuration.toFixed(2) + 'ms',
       contentLength: staticContent.length,
       wordCount: staticContent.split(' ').length,
       hasAvatar: !!processedAvatarUrl,
@@ -137,12 +158,16 @@ export const useWelcomeMessageWithFallback = ({
 
   // Enhanced: AI generation with complete facilitator and session context
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {
-    if (!conversationId || !conversation) return null;
+    if (!conversationId || !conversation) {
+      console.log('⚠️ attemptAIGeneration: Missing conversation ID or conversation data');
+      return null;
+    }
 
     const aiStart = performance.now();
     
     try {
-      logger.category('messages', `🤖 AI generation attempt ${attempt}/${MAX_RETRY_ATTEMPTS} for session ${conversationId}`);
+      console.log('🤖 AI generation attempt', attempt, 'of', MAX_RETRY_ATTEMPTS, 'for session', conversationId);
+      console.log('🤖 AI generation - Full conversation context being sent:', conversation);
 
       // Enhanced: Prepare comprehensive context for AI generation with complete facilitator details
       const facilitatorFromSession = conversation?.sessions?.facilitator_details;
@@ -165,40 +190,41 @@ export const useWelcomeMessageWithFallback = ({
         language: conversation?.language || 'en'
       };
 
-      logger.category('messages', '🎯 AI generation with complete session context:', {
-        ...sessionContext,
-        facilitatorDetails: sessionContext.facilitatorDetails.substring(0, 100) + '...',
-        sessionObjective: sessionContext.sessionObjective?.substring(0, 100) + '...'
-      });
+      console.log('🎯 AI generation with complete session context:', sessionContext);
+
+      const edgeFunctionParams = {
+        messages: [],
+        conversationId,
+        sessionStart: true,
+        generateReport: false,
+        sessionContext,
+        // Enhanced: Pass complete conversation data for facilitator context
+        conversation: conversation
+      };
+
+      console.log('📡 Calling edge function with params:', edgeFunctionParams);
 
       const { data: aiResponse, error } = await supabase.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false,
-          sessionContext,
-          // Enhanced: Pass complete conversation data for facilitator context
-          conversation: conversation
-        }
+        body: edgeFunctionParams
       });
 
       const aiDuration = performance.now() - aiStart;
 
+      console.log('📡 Edge function response:', {
+        duration: aiDuration.toFixed(2) + 'ms',
+        hasError: !!error,
+        error: error?.message,
+        hasResponse: !!aiResponse,
+        responseContent: aiResponse?.content ? aiResponse.content.substring(0, 100) + '...' : null
+      });
+
       if (error) {
-        logger.error(`❌ AI generation attempt ${attempt} failed:`, {
-          error,
-          duration: aiDuration,
-          sessionContext: sessionContext.facilitatorName
-        });
+        console.error('❌ AI generation attempt', attempt, 'failed with error:', error);
         throw new Error(`AI generation failed: ${error.message}`);
       }
 
       if (!aiResponse?.content) {
-        logger.error(`⚠️ AI response empty on attempt ${attempt}:`, {
-          response: aiResponse,
-          duration: aiDuration
-        });
+        console.error('⚠️ AI response empty on attempt', attempt, '- response:', aiResponse);
         throw new Error('AI response is empty');
       }
 
@@ -214,7 +240,8 @@ export const useWelcomeMessageWithFallback = ({
         isAIGenerated: true
       };
 
-      logger.category('messages', `✅ AI welcome message generated in ${aiDuration.toFixed(2)}ms:`, {
+      console.log('✅ AI welcome message generated successfully:', {
+        duration: aiDuration.toFixed(2) + 'ms',
         contentLength: aiResponse.content.length,
         generationMethod: aiResponse.metrics?.generationMethod,
         hasAvatar: !!aiResponse.avatar,
@@ -229,8 +256,9 @@ export const useWelcomeMessageWithFallback = ({
       const aiDuration = performance.now() - aiStart;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      logger.error(`💥 AI generation attempt ${attempt} failed in ${aiDuration.toFixed(2)}ms:`, {
+      console.error('💥 AI generation attempt', attempt, 'failed:', {
         error: errorMessage,
+        duration: aiDuration.toFixed(2) + 'ms',
         attempt,
         maxAttempts: MAX_RETRY_ATTEMPTS,
         conversationId
@@ -241,13 +269,13 @@ export const useWelcomeMessageWithFallback = ({
       // Retry with exponential backoff
       if (attempt < MAX_RETRY_ATTEMPTS) {
         const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
-        logger.category('messages', `🔄 Retrying AI generation in ${delay}ms...`);
+        console.log('🔄 Retrying AI generation in', delay + 'ms...');
         
         await new Promise(resolve => setTimeout(resolve, delay));
         return attemptAIGeneration(attempt + 1);
       }
 
-      logger.error(`🚫 All AI generation attempts exhausted for session ${conversationId}`);
+      console.error('🚫 All AI generation attempts exhausted for session', conversationId);
       return null;
     }
   }, [conversationId, conversation, logger]);
@@ -260,7 +288,8 @@ export const useWelcomeMessageWithFallback = ({
       const cachedMessageData = localStorage.getItem(storageKey);
       if (cachedMessageData) {
         const cached = JSON.parse(cachedMessageData) as Message;
-        logger.category('messages', `💾 Retrieved cached welcome message for session ${conversationId}:`, {
+        console.log('💾 Retrieved cached welcome message:', {
+          conversationId,
           messageId: cached.id,
           contentLength: cached.content.length,
           isAIGenerated: cached.isAIGenerated,
@@ -268,10 +297,10 @@ export const useWelcomeMessageWithFallback = ({
         });
         return cached;
       }
-      logger.category('messages', `📭 No cached welcome message found for session ${conversationId}`);
+      console.log('📭 No cached welcome message found for session', conversationId);
       return null;
     } catch (e) {
-      logger.error('💥 Error retrieving cached welcome message:', e);
+      console.error('💥 Error retrieving cached welcome message:', e);
       return null;
     }
   }, [conversationId, logger]);
@@ -282,52 +311,72 @@ export const useWelcomeMessageWithFallback = ({
     try {
       const storageKey = `${WELCOME_MESSAGE_STORAGE_KEY}${conversationId}`;
       localStorage.setItem(storageKey, JSON.stringify(welcomeMsg));
-      logger.category('messages', `💾 Cached welcome message for session ${conversationId}:`, {
+      console.log('💾 Cached welcome message:', {
+        conversationId,
         messageId: welcomeMsg.id,
         isAIGenerated: welcomeMsg.isAIGenerated,
         isFallback: welcomeMsg.isFallback
       });
     } catch (e) {
-      logger.error('💥 Error caching welcome message:', e);
+      console.error('💥 Error caching welcome message:', e);
     }
   }, [conversationId, logger]);
 
   // Main creation function with fallback
   const createWelcomeMessageWithFallback = useCallback(async (): Promise<Message | null> => {
-    if (!conversationId) return null;
+    if (!conversationId) {
+      console.log('⚠️ createWelcomeMessageWithFallback: No conversation ID');
+      return null;
+    }
 
     const totalStart = performance.now();
     setIsGenerating(true);
     setLastError(null);
 
-    logger.category('messages', `🚀 Starting welcome message creation for session ${conversationId}`);
+    console.log('🚀 Starting welcome message creation for session', conversationId);
+    console.log('📋 Welcome message creation - Full context:', {
+      conversationId,
+      conversation,
+      welcomeMessage,
+      isAdmin
+    });
 
     try {
       // First, try AI generation with complete context
+      console.log('🤖 Attempting AI generation...');
       const aiMessage = await attemptAIGeneration();
       
       if (aiMessage) {
         cacheWelcomeMessage(aiMessage);
         const totalDuration = performance.now() - totalStart;
-        logger.category('messages', `🎉 Welcome message created via AI in ${totalDuration.toFixed(2)}ms total`);
+        console.log('🎉 Welcome message created via AI:', {
+          totalDuration: totalDuration.toFixed(2) + 'ms',
+          contentLength: aiMessage.content.length
+        });
         return aiMessage;
       }
 
       // If AI fails, use enhanced static fallback with complete facilitator context
-      logger.category('messages', '🔄 AI generation failed, using enhanced static fallback');
+      console.log('🔄 AI generation failed, using enhanced static fallback');
       const fallbackMessage = await createStaticFallbackMessage();
       
       if (fallbackMessage) {
         cacheWelcomeMessage(fallbackMessage);
         const totalDuration = performance.now() - totalStart;
-        logger.category('messages', `🎯 Welcome message created via fallback in ${totalDuration.toFixed(2)}ms total`);
+        console.log('🎯 Welcome message created via fallback:', {
+          totalDuration: totalDuration.toFixed(2) + 'ms',
+          contentLength: fallbackMessage.content.length
+        });
       }
       
       return fallbackMessage;
 
     } finally {
       const totalDuration = performance.now() - totalStart;
-      logger.category('messages', `⏱️ Welcome message creation completed in ${totalDuration.toFixed(2)}ms`);
+      console.log('⏱️ Welcome message creation completed:', {
+        duration: totalDuration.toFixed(2) + 'ms',
+        conversationId
+      });
       setIsGenerating(false);
     }
   }, [conversationId, attemptAIGeneration, createStaticFallbackMessage, cacheWelcomeMessage, logger]);

@@ -15,27 +15,56 @@ export const useWelcomeMessageSaver = ({
 }: UseWelcomeMessageSaverProps) => {
   // Save a welcome message to the database (admin only)
   const saveWelcomeMessageToDb = useCallback(async (welcomeMsg: Message) => {
-    if (!isAdmin || !conversationId) return;
+    console.log('💾 saveWelcomeMessageToDb called:', {
+      isAdmin,
+      conversationId,
+      messageId: welcomeMsg.id,
+      contentLength: welcomeMsg.content?.length,
+      hasAvatar: !!welcomeMsg.avatar
+    });
+
+    if (!isAdmin || !conversationId) {
+      console.log('⚠️ Skipping database save - not admin or no conversation ID');
+      return;
+    }
     
     debugLog('all', 'Admin: Adding welcome message to database for other clients');
+    
+    const messageContent = {
+      text: welcomeMsg.content,
+      avatar: welcomeMsg.avatar
+    };
+
+    console.log('📝 Preparing message for database:', {
+      conversationId,
+      messageContent,
+      role: 'assistant'
+    });
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
-          content: { 
-            text: welcomeMsg.content,
-            avatar: welcomeMsg.avatar
-          },
+          content: messageContent,
           role: 'assistant',
           created_at: new Date().toISOString()
-        });
+        })
+        .select();
+        
+      console.log('💾 Database insert result:', {
+        success: !error,
+        error: error?.message,
+        insertedData: data
+      });
         
       if (error) {
-        console.error('Error saving welcome message to database:', error);
+        console.error('❌ Error saving welcome message to database:', error);
+      } else {
+        console.log('✅ Welcome message saved to database successfully');
       }
     } catch (err) {
-      console.error('Exception saving welcome message:', err);
+      console.error('💥 Exception saving welcome message:', err);
     }
   }, [conversationId, isAdmin]);
 

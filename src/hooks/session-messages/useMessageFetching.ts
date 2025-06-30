@@ -26,6 +26,19 @@ export const useMessageFetching = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   
+  // Enhanced logging for conversation context
+  console.log('🔍 useMessageFetching - Session Context Analysis:', {
+    conversationId,
+    hasConversation: !!conversation,
+    conversationKeys: conversation ? Object.keys(conversation) : [],
+    facilitatorDetails: conversation?.sessions?.facilitator_details,
+    sessionTitle: conversation?.sessions?.title,
+    sessionObjective: conversation?.sessions?.objective,
+    participantDescription: conversation?.participant_description,
+    isAdmin,
+    totalParticipants
+  });
+  
   const { 
     getCachedWelcomeMessage, 
     createWelcomeMessageWithFallback,
@@ -57,6 +70,13 @@ export const useMessageFetching = ({
 
   // Enhanced message processing with response tracking
   const processNewMessage = useCallback((message: Message) => {
+    console.log('📨 processNewMessage called:', {
+      messageId: message.id,
+      sender: message.sender,
+      contentLength: message.content?.length,
+      isWaitingForResponses
+    });
+
     // Record participant responses for aggregation
     if (message.sender === 'user' && isWaitingForResponses) {
       recordParticipantResponse(message);
@@ -72,6 +92,12 @@ export const useMessageFetching = ({
 
   // Trigger response collection for facilitator questions
   const handleFacilitatorQuestion = useCallback((message: Message) => {
+    console.log('❓ handleFacilitatorQuestion called:', {
+      messageId: message.id,
+      sender: message.sender,
+      isAdmin
+    });
+
     if (message.sender === 'assistant' && !isAdmin) {
       // Start collecting responses for this question
       const questionId = `question-${message.id}`;
@@ -83,9 +109,18 @@ export const useMessageFetching = ({
   // Main fetch function with enhanced context awareness
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
-      debugLog('all', 'No conversation ID provided, skipping message fetch');
+      console.log('⚠️ fetchMessages: No conversation ID provided, skipping message fetch');
       return;
     }
+    
+    console.log('🚀 fetchMessages started for conversation:', conversationId);
+    console.log('📋 fetchMessages - Full conversation context:', {
+      conversation,
+      conversationId,
+      isAdmin,
+      totalParticipants,
+      welcomeMessage
+    });
     
     try {
       debugLog('all', `Fetching messages for conversation: ${conversationId}`);
@@ -97,14 +132,31 @@ export const useMessageFetching = ({
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
         
+      console.log('💾 Database message fetch result:', {
+        conversationId,
+        messageCount: data?.length || 0,
+        hasError: !!error,
+        error: error?.message
+      });
+        
       if (error) {
-        console.error('Error fetching messages:', error);
+        console.error('❌ Error fetching messages:', error);
         setError(`Failed to fetch messages: ${error.message}`);
         return;
       }
       
       // If we have database messages, format and display them
       if (data && data.length > 0) {
+        console.log('📨 Found existing database messages:', {
+          messageCount: data.length,
+          messages: data.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            contentType: typeof msg.content,
+            contentKeys: msg.content && typeof msg.content === 'object' ? Object.keys(msg.content) : []
+          }))
+        });
+
         const formattedMessages = await formatDatabaseMessages(data);
         debugLog('all', `Successfully fetched ${formattedMessages.length} database messages`);
         setMessages(formattedMessages);
@@ -119,42 +171,69 @@ export const useMessageFetching = ({
       
       // No database messages - generate welcome message for participants
       if (!isAdmin) {
-        debugLog('all', 'No database messages found, generating contextual welcome message for participant');
+        console.log('🎯 No database messages found, generating welcome message for participant');
+        console.log('🎯 Welcome message generation context:', {
+          conversationId,
+          hasConversation: !!conversation,
+          facilitatorDetails: conversation?.sessions?.facilitator_details,
+          sessionObjective: conversation?.sessions?.objective,
+          participantDescription: conversation?.participant_description
+        });
         
         // Check cache first
         const cachedWelcomeMsg = getCachedWelcomeMessage();
         if (cachedWelcomeMsg) {
-          debugLog('all', 'Using cached welcome message');
+          console.log('💾 Using cached welcome message:', {
+            messageId: cachedWelcomeMsg.id,
+            contentLength: cachedWelcomeMsg.content?.length,
+            isAIGenerated: cachedWelcomeMsg.isAIGenerated,
+            isFallback: cachedWelcomeMsg.isFallback
+          });
           setMessages([cachedWelcomeMsg]);
           return;
         }
         
         // Generate new welcome message with enhanced context
+        console.log('🤖 Generating new welcome message with full context...');
         const welcomeMsg = await createWelcomeMessageWithFallback();
+        console.log('✅ Welcome message generation completed:', {
+          hasMessage: !!welcomeMsg,
+          messageId: welcomeMsg?.id,
+          contentLength: welcomeMsg?.content?.length,
+          isAIGenerated: welcomeMsg?.isAIGenerated,
+          isFallback: welcomeMsg?.isFallback,
+          hasAvatar: !!welcomeMsg?.avatar
+        });
+
         if (welcomeMsg) {
           setMessages([welcomeMsg]);
           // Save to database for other participants to see
-          saveWelcomeMessageToDb(welcomeMsg);
+          console.log('💾 Attempting to save welcome message to database...');
+          await saveWelcomeMessageToDb(welcomeMsg);
+        } else {
+          console.error('❌ Failed to generate welcome message');
         }
       } else {
         // For admin, just show empty state until session starts
-        debugLog('all', 'Admin view - showing empty state until session starts');
+        console.log('👨‍💼 Admin view - showing empty state until session starts');
         setMessages([]);
       }
       
     } catch (err) {
-      console.error('Exception fetching messages:', err);
+      console.error('💥 Exception in fetchMessages:', err);
       setError('Failed to load session messages');
       
       // Even on error, try to show a fallback welcome message for participants
       if (!isAdmin) {
+        console.log('🔄 Attempting fallback welcome message after error...');
         try {
           const cachedWelcomeMsg = getCachedWelcomeMessage();
           if (cachedWelcomeMsg) {
+            console.log('💾 Using cached fallback welcome message');
             setMessages([cachedWelcomeMsg]);
           }
         } catch (fallbackError) {
-          console.error('Failed to show fallback welcome message:', fallbackError);
+          console.error('💥 Failed to show fallback welcome message:', fallbackError);
         }
       }
     }

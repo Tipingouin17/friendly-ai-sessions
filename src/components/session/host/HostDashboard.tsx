@@ -25,6 +25,8 @@ interface HostDashboardProps {
   // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
+  isStartingSession?: boolean;
+  startProgress?: string;
 }
 
 const HostDashboard: React.FC<HostDashboardProps> = ({
@@ -42,7 +44,9 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
-  onSessionStarted
+  onSessionStarted,
+  isStartingSession = false,
+  startProgress
 }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -66,6 +70,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         isSessionStarted={isSessionStarted}
         onSessionStarted={onSessionStarted}
+        isStartingSession={isStartingSession}
+        startProgress={startProgress}
       />
     </div>
   );

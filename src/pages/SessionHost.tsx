@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -7,6 +8,7 @@ import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostParticipantState } from "@/hooks/useHostParticipantState";
 import { useHostSessionInitialization } from "@/hooks/useHostSessionInitialization";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
+import { useSessionStartState } from "@/hooks/useSessionStartState";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
@@ -14,6 +16,15 @@ import { getParticipantColor } from "@/utils/sessionHelpers";
 const SessionHost = () => {
   // Enforce host status
   const { forceHost } = useHostStatusPersistence();
+
+  // Session starting state management
+  const {
+    isStartingSession,
+    startProgress,
+    startSessionProcess,
+    updateProgress,
+    completeSessionStart
+  } = useSessionStartState();
 
   // Session page state
   const {
@@ -43,7 +54,8 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Current state:", {
     currentConversationId,
     conversationDataId: conversationData?.id,
-    isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading
+    isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading,
+    isStartingSession
   });
 
   // Participant state management
@@ -153,14 +165,29 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Handle session start - use the proper function from useSessionInterface
+  // Handle session start with progress tracking
   const handleSessionStarted = async () => {
-    console.log("🔥 SessionHost - Starting session through useSessionInterface");
+    console.log("🔥 SessionHost - Starting session with progress tracking");
+    
     try {
+      // Start the session process
+      startSessionProcess();
+      
+      // Update progress for AI generation
+      updateProgress("Generating AI welcome message...");
+      
+      // Execute the actual session start
       await handleStartSession();
+      
       console.log("🔥 SessionHost - Session started successfully");
+      
+      // Complete the session start process
+      completeSessionStart();
+      
     } catch (error) {
       console.error("🔥 SessionHost - Error starting session:", error);
+      // Complete the process even on error to reset the UI
+      completeSessionStart();
     }
   };
 
@@ -176,7 +203,9 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
     participantsLength: participants.length,
-    conversationId: currentConversationId
+    conversationId: currentConversationId,
+    isStartingSession,
+    startProgress
   });
 
   return (
@@ -196,6 +225,8 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
+      isStartingSession={isStartingSession}
+      startProgress={startProgress}
     />
   );
 };

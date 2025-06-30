@@ -22,6 +22,9 @@ interface HostSessionContentProps {
   // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
+  triggerSessionStart?: () => Promise<boolean>;
+  
+  // Session starting state props
   isStartingSession?: boolean;
   startProgress?: string;
 }
@@ -40,8 +43,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
+  triggerSessionStart,
   isStartingSession = false,
-  startProgress
+  startProgress = ""
 }) => {
   // Use actual participant count from real-time data
   const actualParticipantCount = participants.length;

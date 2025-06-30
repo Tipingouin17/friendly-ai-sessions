@@ -38,7 +38,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   participants = [],
   conversationId,
   isStartingSession = false,
-  startProgress
+  startProgress = ""
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
 

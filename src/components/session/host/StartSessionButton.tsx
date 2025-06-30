@@ -18,7 +18,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   isSessionStarted,
   disabled = false,
   isStartingSession = false,
-  startProgress = "Starting session..."
+  startProgress = ""
 }) => {
   const lastClickTime = useRef<number>(0);
   
@@ -65,9 +65,10 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       isSessionStarted,
       disabled,
       isStartingSession,
+      startProgress,
       shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isStartingSession
     });
-  }, [participantCount, isSessionStarted, disabled, isStartingSession]);
+  }, [participantCount, isSessionStarted, disabled, isStartingSession, startProgress]);
 
   if (isSessionStarted) {
     return (
@@ -81,14 +82,15 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
 
   if (isStartingSession) {
     return (
-      <Button
-        disabled={true}
-        className="flex items-center gap-2 min-w-[140px]"
-        size="lg"
-      >
-        <Loader className="h-4 w-4 animate-spin" />
-        {startProgress}
-      </Button>
+      <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg min-w-[140px]">
+        <Loader className="h-4 w-4 text-blue-600 animate-spin" />
+        <div className="flex flex-col">
+          <span className="text-blue-800 font-medium text-sm">Starting Session</span>
+          {startProgress && (
+            <span className="text-blue-600 text-xs">{startProgress}</span>
+          )}
+        </div>
+      </div>
     );
   }
 

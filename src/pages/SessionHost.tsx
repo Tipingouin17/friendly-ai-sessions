@@ -8,6 +8,7 @@ import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostParticipantState } from "@/hooks/useHostParticipantState";
 import { useHostSessionInitialization } from "@/hooks/useHostSessionInitialization";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
+import { useOptimizedSessionState } from "@/hooks/useOptimizedSessionState";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
@@ -49,9 +50,22 @@ const SessionHost = () => {
 
   // Session interface for proper session start handling
   const {
-    isSessionStarted,
+    isSessionStarted: interfaceSessionStarted,
     handleStartSession
   } = useSessionInterface(currentConversationId);
+
+  // Optimized session state management
+  const {
+    isSessionStarted,
+    isTransitioning,
+    setIsSessionStarted
+  } = useOptimizedSessionState({
+    conversationId: currentConversationId,
+    initialSessionStarted: interfaceSessionStarted || Boolean(conversationData?.session_started),
+    onSessionStarted: () => {
+      console.log("🎉 [SessionHost] Optimized session started callback");
+    }
+  });
 
   // Auto-start functionality
   const {
@@ -68,7 +82,6 @@ const SessionHost = () => {
 
   // Create the session full handler that will be passed to useHostParticipantState
   const handleSessionFull = useCallback(async () => {
-    // We'll get the current count from the conversation data since we can't access participants here
     const currentCount = conversationData?.current_participants || 0;
     const maxCount = conversationData?.participants || 10;
     
@@ -185,7 +198,7 @@ const SessionHost = () => {
     }
   }
 
-  // Check if session is started - use from useSessionInterface
+  // Check if session is started - use optimized state
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
   // Handle session start - use the proper function from useSessionInterface
@@ -193,6 +206,7 @@ const SessionHost = () => {
     console.log("🔥 SessionHost - Starting session through useSessionInterface");
     try {
       await handleStartSession();
+      setIsSessionStarted(true);
       console.log("🔥 SessionHost - Session started successfully");
     } catch (error) {
       console.error("🔥 SessionHost - Error starting session:", error);
@@ -211,7 +225,9 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
     participantsLength: participants?.length || 0,
-    conversationId: currentConversationId
+    conversationId: currentConversationId,
+    sessionStarted: sessionStartedStatus,
+    isTransitioning
   });
 
   return (
@@ -231,7 +247,7 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
-      isAutoStarting={isAutoStarting}
+      isAutoStarting={isAutoStarting || isTransitioning}
       autoStartCountdown={autoStartCountdown}
       onCancelAutoStart={cancelAutoStart}
     />

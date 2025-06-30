@@ -18,14 +18,8 @@ interface SessionClosureResult {
   };
 }
 
-interface UseSessionClosureProps {
-  conversationId: number | null;
-  onSuccess?: () => void;
-}
-
-export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosureProps) => {
+export const useSessionClosure = () => {
   const [isClosing, setIsClosing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [closureResult, setClosureResult] = useState<SessionClosureResult | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -35,16 +29,7 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
   const { executeSessionClosure } = useSessionClosureExecution();
   const { downloadReport: downloadReportFile } = useReportDownloader();
 
-  const closeSession = async () => {
-    if (!conversationId) {
-      toast({
-        title: "Error",
-        description: "No conversation ID provided",
-        variant: "destructive"
-      });
-      return false;
-    }
-
+  const closeSessionAndGenerateReport = async (conversationId: number) => {
     setIsClosing(true);
 
     try {
@@ -67,13 +52,9 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
         description: `Report generated with ${data.sessionData.messageCount} messages from ${data.sessionData.participantCount} participants`,
       });
 
-      if (onSuccess) {
-        onSuccess();
-      }
-
       return true;
     } catch (error) {
-      console.error('💥 Error in closeSession:', error);
+      console.error('💥 Error in closeSessionAndGenerateReport:', error);
       
       let errorMessage = "Failed to close session and generate report";
       if (error instanceof Error) {
@@ -91,25 +72,13 @@ export const useSessionClosure = ({ conversationId, onSuccess }: UseSessionClosu
     }
   };
 
-  // Create an alias for backward compatibility
-  const closeSessionAndGenerateReport = async (conversationId: number) => {
-    return closeSession();
-  };
-
   const downloadReport = (format: 'json' | 'text' = 'text') => {
-    setIsDownloading(true);
-    try {
-      downloadReportFile(closureResult, format);
-    } finally {
-      setIsDownloading(false);
-    }
+    downloadReportFile(closureResult, format);
   };
 
   return {
     isClosing,
-    isDownloading,
     closureResult,
-    closeSession,
     closeSessionAndGenerateReport,
     downloadReport
   };

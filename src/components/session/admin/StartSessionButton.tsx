@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Users, CheckCircle, Loader2 } from 'lucide-react';
+import { Play } from 'lucide-react';
+import { useSessionStart } from '@/hooks/useSessionStart';
 import { supabase } from '@/integrations/supabase/client';
 
 interface StartSessionButtonProps {
@@ -10,10 +11,6 @@ interface StartSessionButtonProps {
   conversationData: any;
   onSessionStarted: () => void;
   disabled?: boolean;
-  triggerSessionStart?: () => Promise<boolean>;
-  sessionStartNotification?: string | null;
-  isStartingSession?: boolean;
-  startProgress?: string;
 }
 
 const StartSessionButton: React.FC<StartSessionButtonProps> = ({
@@ -21,11 +18,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   participants: propParticipants,
   conversationData,
   onSessionStarted,
-  disabled = false,
-  triggerSessionStart,
-  sessionStartNotification,
-  isStartingSession = false,
-  startProgress = ''
+  disabled = false
 }) => {
   const [actualParticipants, setActualParticipants] = useState(propParticipants);
 
@@ -43,6 +36,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
         if (error) {
           console.error('Error fetching participants:', error);
         } else {
+          console.log('Fetched participants from DB:', data?.length);
           setActualParticipants(data || []);
         }
       } catch (err) {
@@ -53,92 +47,51 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     fetchParticipants();
   }, [conversationId, propParticipants]);
 
+  const { startSession, isStarting } = useSessionStart({
+    conversationId,
+    participants: actualParticipants,
+    conversationData
+  });
+
   const handleStartSession = async () => {
-    if (!triggerSessionStart) return;
+    console.log('🚀 Starting session with AI welcome message generation');
+    console.log('Session context:', {
+      conversationId,
+      participantCount: actualParticipants.length,
+      facilitatorName: conversationData?.sessions?.facilitator_details?.title,
+      participantDescription: conversationData?.participant_description
+    });
     
-    try {
-      const success = await triggerSessionStart();
-      if (success) {
-        onSessionStarted();
-      }
-    } catch (error) {
-      console.error('Error in handleStartSession:', error);
+    const success = await startSession();
+    if (success) {
+      console.log('✅ Session started successfully with AI welcome message');
+      onSessionStarted();
     }
   };
 
+  // Use fallback logic - check both participants array and current count
   const hasParticipants = actualParticipants.length > 0 || (conversationData?.current_participants > 0);
-  const isDisabled = disabled || !hasParticipants;
-  const isSessionStarted = conversationData?.session_started;
-
-  // Show session started state
-  if (isSessionStarted && !isStartingSession) {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <span className="text-green-800 font-medium">Session Active</span>
-          <span className="text-green-600 text-sm">({actualParticipants.length} participants)</span>
-        </div>
-        
-        {sessionStartNotification && (
-          <div className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border border-green-200">
-            {sessionStartNotification}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Show starting state with progress
-  if (isStartingSession) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Button
-          disabled
-          size="lg"
-          className="flex items-center gap-2 bg-yellow-500 text-white"
-        >
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Starting Session...</span>
-        </Button>
-        
-        {startProgress && (
-          <div className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded border border-yellow-200">
-            {startProgress}
-          </div>
-        )}
-        
-        <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
-          This may take a few moments while we generate your AI welcome message...
-        </div>
-      </div>
-    );
-  }
+  const isDisabled = disabled || isStarting || !hasParticipants;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Button
-        onClick={handleStartSession}
-        disabled={isDisabled}
-        size="lg"
-        className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
-      >
-        <Play className="h-5 w-5" />
-        <span>Start Session</span>
-      </Button>
-      
-      {!hasParticipants && (
-        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
-          Waiting for participants to join...
-        </div>
+    <Button
+      onClick={handleStartSession}
+      disabled={isDisabled}
+      size="lg"
+      className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white disabled:bg-gray-300"
+    >
+      {isStarting ? (
+        <>
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+          <span>Starting Session & Generating AI Welcome...</span>
+        </>
+      ) : (
+        <>
+          <Play className="h-5 w-5" />
+          <span>Start Session</span>
+        </>
       )}
-      
-      {sessionStartNotification && !isSessionStarted && (
-        <div className="text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded border border-blue-200">
-          {sessionStartNotification}
-        </div>
-      )}
-    </div>
+    </Button>
   );
 };
 

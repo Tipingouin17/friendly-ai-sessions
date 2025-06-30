@@ -10,7 +10,6 @@ import { useSessionInterface } from "@/hooks/useSessionInterface";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import { useSessionFlow } from "@/hooks/useSessionFlow";
 
 const SessionHost = () => {
   // Enforce host status
@@ -154,32 +153,12 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Add the session flow hook with enhanced state management
-  const {
-    isSessionActive,
-    currentResponseCollection,
-    isGeneratingResponse,
-    sessionStartNotification,
-    triggerSessionStart,
-    startResponseCollection,
-    isStartingSession,
-    startProgress,
-    responseProgress
-  } = useSessionFlow({
-    conversationId: currentConversationId,
-    participants: participants || [],
-    conversationData,
-    isAdmin: true
-  });
-
-  // Enhanced session start handler - ensure it returns Promise<void>
-  const handleSessionStarted = async (): Promise<void> => {
-    console.log("🔥 SessionHost - Starting session through session flow");
+  // Handle session start - use the proper function from useSessionInterface
+  const handleSessionStarted = async () => {
+    console.log("🔥 SessionHost - Starting session through useSessionInterface");
     try {
-      const success = await triggerSessionStart();
-      if (success) {
-        console.log("🔥 SessionHost - Session started successfully with welcome message");
-      }
+      await handleStartSession();
+      console.log("🔥 SessionHost - Session started successfully");
     } catch (error) {
       console.error("🔥 SessionHost - Error starting session:", error);
     }
@@ -197,9 +176,7 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
     participantsLength: participants.length,
-    conversationId: currentConversationId,
-    isStartingSession,
-    startProgress
+    conversationId: currentConversationId
   });
 
   return (
@@ -219,11 +196,6 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
-      triggerSessionStart={triggerSessionStart}
-      sessionStartNotification={sessionStartNotification}
-      isStartingSession={isStartingSession}
-      startProgress={startProgress}
-      responseProgress={responseProgress}
     />
   );
 };

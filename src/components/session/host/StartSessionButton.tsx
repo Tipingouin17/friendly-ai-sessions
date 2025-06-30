@@ -1,24 +1,20 @@
 
 import React, { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Users, Loader2 } from "lucide-react";
+import { Play, Users } from "lucide-react";
 
 interface StartSessionButtonProps {
   onStartSession: () => void;
   participantCount: number;
   isSessionStarted: boolean;
   disabled?: boolean;
-  isStartingSession?: boolean;
-  startProgress?: string;
 }
 
 const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   onStartSession,
   participantCount,
   isSessionStarted,
-  disabled = false,
-  isStartingSession = false,
-  startProgress = ''
+  disabled = false
 }) => {
   const lastClickTime = useRef<number>(0);
   
@@ -31,9 +27,8 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       participantCount,
       isSessionStarted,
       disabled,
-      isStartingSession,
       timeSinceLastClick,
-      isEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isStartingSession
+      isEnabled: !disabled && participantCount > 0 && !isSessionStarted
     });
     
     // Prevent rapid clicks (debounce)
@@ -43,12 +38,11 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     }
     
     // Check if button should be enabled
-    if (disabled || participantCount === 0 || isSessionStarted || isStartingSession) {
+    if (disabled || participantCount === 0 || isSessionStarted) {
       console.log("🔥 StartSessionButton - Click ignored (button disabled)", {
         disabled,
         participantCount,
-        isSessionStarted,
-        isStartingSession
+        isSessionStarted
       });
       return;
     }
@@ -56,7 +50,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     lastClickTime.current = now;
     console.log("🔥 StartSessionButton - Executing onStartSession");
     onStartSession();
-  }, [onStartSession, participantCount, isSessionStarted, disabled, isStartingSession]);
+  }, [onStartSession, participantCount, isSessionStarted, disabled]);
 
   // Log state changes for debugging
   React.useEffect(() => {
@@ -64,10 +58,9 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       participantCount,
       isSessionStarted,
       disabled,
-      isStartingSession,
-      shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isStartingSession
+      shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted
     });
-  }, [participantCount, isSessionStarted, disabled, isStartingSession]);
+  }, [participantCount, isSessionStarted, disabled]);
 
   if (isSessionStarted) {
     return (
@@ -75,32 +68,6 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
         <Users className="h-4 w-4 text-green-600" />
         <span className="text-green-800 font-medium">Session Active</span>
         <span className="text-green-600 text-sm">({participantCount} participants)</span>
-      </div>
-    );
-  }
-
-  // Show loading state when starting session
-  if (isStartingSession) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Button
-          disabled
-          className="flex items-center gap-2 min-w-[140px] bg-yellow-500 text-white"
-          size="lg"
-        >
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Starting...
-        </Button>
-        
-        {startProgress && (
-          <div className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded border border-yellow-200">
-            {startProgress}
-          </div>
-        )}
-        
-        <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200">
-          This may take 15-20 seconds while we generate your AI welcome message...
-        </div>
       </div>
     );
   }

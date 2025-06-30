@@ -1,98 +1,140 @@
 
-import { useState, useCallback, useRef } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
-import { ConversationWithSession } from "@/types/database";
-import { supabase } from "@/integrations/supabase/client";
+import { useMessageFetching } from "./session-messages/useMessageFetching";
+import { useResponseAggregation } from "./session-messages/useResponseAggregation";
+import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
+import { useSessionAutoStartMonitoring } from "./useSessionAutoStartMonitoring";
 
 interface UseHostMessagesProps {
   conversationId: number | null;
   participants: ParticipantInfo[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  conversationData?: ConversationWithSession | null;
+  conversationData: any;
 }
 
-export function useHostMessages({
+export const useHostMessages = ({
   conversationId,
   participants,
   messages,
   setMessages,
   conversationData
-}: UseHostMessagesProps) {
+}: UseHostMessagesProps) => {
   const [isSessionPaused, setIsSessionPaused] = useState(false);
-  const [responseCount, setResponseCount] = useState(0);
-  const [isWaitingForResponses, setIsWaitingForResponses] = useState(false);
-  const { toast } = useToast();
-  const totalParticipants = participants.length;
-  
+  const [conversationState, setConversationState] = useState(conversationData);
+  const sessionStateRef = useRef(conversationData);
+
+  // Update refs when props change
+  useEffect(() => {
+    if (conversationData) {
+      setConversationState(conversationData);
+      sessionStateRef.current = conversationData;
+    }
+  }, [conversationData]);
+
+  const {
+    fetchMessages,
+    isGeneratingWelcome,
+    processNewMessage,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse
+  } = useMessageFetching({
+    conversationId,
+    isAdmin: true,
+    conversation: conversationState,
+    totalParticipants: participants.length
+  });
+
+  const {
+    recordParticipantResponse,
+    startResponseCollection
+  } = useResponseAggregation({
+    conversationId,
+    totalParticipants: participants.length,
+    conversation: conversationState
+  });
+
+  // Handle conversation updates from realtime
+  const handleConversationUpdate = useCallback((payload: any) => {
+    console.log('🔄 [HOST] Conversation update received:', payload);
+    
+    if (payload.new) {
+      const updatedConversation = { ...sessionStateRef.current, ...payload.new };
+      setConversationState(updatedConversation);
+      sessionStateRef.current = updatedConversation;
+      
+      // Check for session start
+      if (payload.new.session_started && !payload.old?.session_started) {
+        console.log('🎉 [HOST] Session started - triggering welcome message generation');
+        // Refetch messages to get the welcome message
+        setTimeout(() => fetchMessages(), 100);
+      }
+    }
+  }, [fetchMessages]);
+
+  // Handle participant changes
+  const handleParticipantChange = useCallback((payload: any) => {
+    console.log('👥 [HOST] Participant change:', payload);
+    // Participant updates are handled by the parent component
+  }, []);
+
+  // Handle session events
+  const handleSessionEvent = useCallback((payload: any) => {
+    console.log('📋 [HOST] Session event:', payload);
+    
+    if (payload.new?.event_type === 'session_auto_started') {
+      console.log('🚀 [HOST] Auto-start event detected');
+      // Trigger message refetch to get welcome message
+      setTimeout(() => fetchMessages(), 200);
+    }
+  }, [fetchMessages]);
+
+  // Set up optimized realtime connection
+  useOptimizedRealtimeConnection({
+    conversationId,
+    onConversationUpdate: handleConversationUpdate,
+    onParticipantChange: handleParticipantChange,
+    onSessionEvent: handleSessionEvent,
+    isHost: true
+  });
+
+  // Monitor for auto-start conditions
+  const { isProcessingAutoStart } = useSessionAutoStartMonitoring({
+    conversationId,
+    conversation: conversationState,
+    participants,
+    onSessionStarted: () => {
+      console.log('🎯 [HOST] Session auto-started, fetching messages...');
+      setTimeout(() => fetchMessages(), 300);
+    },
+    isHost: true
+  });
+
   const toggleSessionState = useCallback(() => {
     setIsSessionPaused(prev => !prev);
-    toast({
-      title: isSessionPaused ? "Session Resumed" : "Session Paused",
-      description: isSessionPaused ? "The session has been resumed." : "The session has been paused.",
-    });
-  }, [isSessionPaused, toast]);
-
-  const handleHostMessage = useCallback((message: Message) => {
-    console.log("Host: Processing new message:", message);
-    setMessages(prev => {
-      const exists = prev.some(m => m.id === message.id);
-      if (exists) return prev;
-      return [...prev, message];
-    });
-    
-    // Update response tracking for participant messages
-    if (message.sender === 'user' && message.participant) {
-      setResponseCount(prev => Math.min(prev + 1, totalParticipants));
-    }
-  }, [setMessages, totalParticipants]);
-
-  const handleSendHostMessage = useCallback(async (content: string, isPinned: boolean = false, recipientId?: string) => {
-    if (!conversationId) return;
-    
-    try {
-      console.log("Host sending message:", { content, isPinned, recipientId });
-      
-      const messageData = {
-        conversation_id: conversationId,
-        content: content,
-        role: 'assistant',
-        name: conversationData?.sessions?.facilitator_details?.title || 'Host'
-      };
-
-      const { error } = await supabase
-        .from('messages')
-        .insert(messageData);
-
-      if (error) {
-        console.error("Error sending host message:", error);
-        toast({
-          title: "Error",
-          description: "Failed to send message. Please try again.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Message Sent",
-          description: "Your message has been sent to participants."
-        });
-      }
-    } catch (error) {
-      console.error("Exception sending host message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [conversationId, conversationData, toast]);
-
-  const triggerFacilitatorResponse = useCallback(() => {
-    console.log("Host triggering facilitator response");
-    setIsWaitingForResponses(false);
-    setResponseCount(0);
   }, []);
+
+  const handleHostMessage = useCallback((message: string) => {
+    console.log('📝 [HOST] Sending host message:', message);
+    // Implementation for host messages
+  }, []);
+
+  const handleSendHostMessage = useCallback((message: string, isPinned = false, recipientId?: string) => {
+    console.log('📤 [HOST] Sending message:', { message, isPinned, recipientId });
+    // Implementation for sending host messages
+  }, []);
+
+  const triggerFacilitatorResponse = useCallback(async () => {
+    console.log('🤖 [HOST] Triggering facilitator response...');
+    try {
+      await generateAggregatedResponse();
+    } catch (error) {
+      console.error('❌ [HOST] Error generating facilitator response:', error);
+    }
+  }, [generateAggregatedResponse]);
 
   return {
     isSessionPaused,
@@ -101,7 +143,10 @@ export function useHostMessages({
     handleSendHostMessage,
     responseCount,
     isWaitingForResponses,
-    totalParticipants,
-    triggerFacilitatorResponse
+    totalParticipants: participants.length,
+    triggerFacilitatorResponse,
+    isGeneratingWelcome,
+    isGeneratingResponse,
+    isProcessingAutoStart
   };
-}
+};

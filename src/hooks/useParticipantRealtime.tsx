@@ -1,8 +1,7 @@
 
 import { useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
 import { ParticipantInfo } from "@/types/chat";
-import { removeChannel } from "@/utils/realtimeHelpers";
+import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
 
 interface UseParticipantRealtimeProps {
   conversationId: number | null;
@@ -20,118 +19,77 @@ export const useParticipantRealtime = ({
   setParticipantsList
 }: UseParticipantRealtimeProps) => {
   
-  // Set up realtime subscription for participant updates
-  useEffect(() => {
-    if (!conversationId) return;
-    
-    // Set up channel subscriptions
-    const conversationChannel = supabase
-      .channel(`admin-conversation-updates-${conversationId}`)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'conversations',
-        filter: `id=eq.${conversationId}`
-      }, (payload) => {
-        if (payload.new && payload.new.current_participants !== undefined) {
-          setDisplayCount(payload.new.current_participants);
+  // Handle conversation updates (participant count changes)
+  const handleConversationUpdate = (payload: any) => {
+    if (payload.new && payload.new.current_participants !== undefined) {
+      console.log(`📊 Participant count updated: ${payload.new.current_participants}`);
+      setDisplayCount(payload.new.current_participants);
+    }
+  };
+
+  // Handle participant changes
+  const handleParticipantChange = (payload: any) => {
+    if (payload.eventType === 'INSERT' && payload.new) {
+      const newParticipant: ParticipantInfo = {
+        id: payload.new.participant_id,
+        name: payload.new.name,
+        avatar: payload.new.avatar_seed 
+          ? `/api/avatar?name=${payload.new.avatar_seed}&variant=beam&palette=0` 
+          : null,
+        isAnonymous: payload.new.is_anonymous || false
+      };
+      
+      setParticipantsList(prev => {
+        const exists = prev.some(p => p.id === newParticipant.id);
+        if (exists) return prev;
+        return [...prev, newParticipant];
+      });
+    } else if (payload.eventType === 'DELETE' && payload.old) {
+      setParticipantsList(prev => prev.filter(p => p.id !== payload.old.participant_id));
+    }
+  };
+
+  // Handle session events
+  const handleSessionEvent = (payload: any) => {
+    if (payload.new) {
+      const eventData = payload.new.data;
+      const eventType = payload.new.event_type;
+      
+      // Update count for participant events
+      if ((eventType === 'participant_joined' || eventType === 'participant_removed') &&
+          typeof eventData.current_count === 'number') {
+        console.log(`📊 Setting counter from ${eventType} event: ${eventData.current_count}`);
+        setDisplayCount(eventData.current_count);
+      }
+      
+      // Handle participant joined events
+      if (eventType === 'participant_joined' && eventData.participant_id && eventData.participant_name) {
+        setParticipantsList(prev => {
+          const exists = prev.some(p => p.id === eventData.participant_id);
+          if (exists) return prev;
           
-          // If max participants is reached, update session_started flag
-          if (payload.new.current_participants >= maxParticipants && maxParticipants > 0 && !payload.new.session_started) {
-            // Update session_started flag
-            supabase
-              .from('conversations')
-              .update({ session_started: true })
-              .eq('id', conversationId)
-              .then(({ error }) => {
-                if (error) {
-                  console.error("Error starting session automatically:", error);
-                }
-              });
-          }
-        }
-      })
-      .subscribe();
-    
-    // Listen for session events
-    const eventsChannel = supabase
-      .channel(`admin-session-events-${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'session_events',
-        filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-        if (payload.new && payload.new.event_type === 'participant_joined') {
-          const eventData = payload.new.data;
-          if (eventData) {
-            if (eventData.current_count !== undefined) {
-              setDisplayCount(eventData.current_count);
-            }
-            
-            // Update participant information from the event data
-            if (eventData.participant_id && eventData.participant_name) {
-              setParticipantsList(prev => {
-                // Check if participant already exists
-                const exists = prev.some(p => p.id === eventData.participant_id);
-                if (exists) return prev;
-                
-                return [...prev, {
-                  id: eventData.participant_id,
-                  name: eventData.participant_name,
-                  avatar: eventData.avatar_url || null,
-                  isAnonymous: eventData.is_anonymous || false
-                }];
-              });
-            }
-          }
-        } else if (payload.new && payload.new.event_type === 'participant_removed') {
-          const eventData = payload.new.data;
-          if (eventData && eventData.participant_id && eventData.current_count !== undefined) {
-            setDisplayCount(eventData.current_count);
-            
-            // Remove participant from list if we didn't remove them ourselves
-            if (eventData.removed_by !== 'admin') {
-              setParticipantsList(prev => prev.filter(p => p.id !== eventData.participant_id));
-            }
-          }
-        }
-      })
-      .subscribe();
+          return [...prev, {
+            id: eventData.participant_id,
+            name: eventData.participant_name,
+            avatar: eventData.avatar_url || null,
+            isAnonymous: eventData.is_anonymous || false
+          }];
+        });
+      }
       
-    // Set up a direct subscription to session_participants table
-    const participantsDirectChannel = supabase
-      .channel(`admin-participants-direct-${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'session_participants',
-        filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-        if (payload.new) {
-          const participantData = payload.new;
-          setParticipantsList(prev => {
-            // Check if participant already exists
-            const exists = prev.some(p => p.id === participantData.participant_id);
-            if (exists) return prev;
-            
-            return [...prev, {
-              id: participantData.participant_id,
-              name: participantData.name,
-              avatar: participantData.avatar_seed 
-                ? `/api/avatar?name=${participantData.avatar_seed}&variant=beam&palette=0` 
-                : null,
-              isAnonymous: participantData.is_anonymous || false
-            }];
-          });
-        }
-      })
-      .subscribe();
-      
-    return () => {
-      removeChannel(conversationChannel);
-      removeChannel(eventsChannel);
-      removeChannel(participantsDirectChannel);
-    };
-  }, [conversationId, participants, maxParticipants, setDisplayCount, setParticipantsList]);
+      // Handle participant removed events
+      if (eventType === 'participant_removed' && eventData.participant_id) {
+        setParticipantsList(prev => prev.filter(p => p.id !== eventData.participant_id));
+      }
+    }
+  };
+
+  // Set up optimized realtime connection
+  useOptimizedRealtimeConnection({
+    conversationId,
+    onConversationUpdate: handleConversationUpdate,
+    onParticipantChange: handleParticipantChange,
+    onSessionEvent: handleSessionEvent,
+    isHost: true // Assuming this is used by admin/host components
+  });
 };

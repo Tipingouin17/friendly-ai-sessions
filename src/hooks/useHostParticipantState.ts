@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManager";
+import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
 import { createLogger } from "@/utils/debugLogger";
 import { isNetworkError } from "@/utils/networkUtils";
 
@@ -39,6 +40,41 @@ export function useHostParticipantState({
     }
   }, [logger]);
 
+  // Handle participant changes from realtime
+  const handleParticipantChange = useCallback((payload: any) => {
+    console.log('👥 [HOST] Real-time participant change:', payload);
+    
+    if (payload.eventType === 'INSERT' && payload.new) {
+      const newParticipant: ParticipantInfo = {
+        id: payload.new.participant_id,
+        name: payload.new.name,
+        avatar: payload.new.avatar_seed 
+          ? `/api/avatar?name=${payload.new.avatar_seed}&variant=beam&palette=0` 
+          : null,
+        isAnonymous: payload.new.is_anonymous || false,
+        isHost: payload.new.is_host || false
+      };
+      
+      setParticipants(prev => {
+        const exists = prev.some(p => p.id === newParticipant.id);
+        if (exists) return prev;
+        
+        console.log(`👤 [HOST] Adding new participant: ${newParticipant.name} (${newParticipant.id})`);
+        return [...prev, newParticipant];
+      });
+    } else if (payload.eventType === 'DELETE' && payload.old) {
+      console.log(`👤 [HOST] Removing participant: ${payload.old.participant_id}`);
+      setParticipants(prev => prev.filter(p => p.id !== payload.old.participant_id));
+    }
+  }, []);
+
+  // Set up optimized realtime connection for participant updates
+  useOptimizedRealtimeConnection({
+    conversationId: currentConversationId,
+    onParticipantChange: handleParticipantChange,
+    isHost: true
+  });
+
   // Use session participant manager with enhanced error handling
   const {
     participants: managerParticipants,
@@ -68,6 +104,17 @@ export function useHostParticipantState({
       setNetworkError(null);
     }
   }, [managerParticipants, logger]);
+
+  // Check for session full condition
+  useEffect(() => {
+    const currentCount = participants.length;
+    const maxCount = conversationData?.participants || 0;
+    
+    if (currentCount >= maxCount && maxCount > 0 && onSessionFull) {
+      console.log(`🎯 [HOST] Session full detected: ${currentCount}/${maxCount} participants`);
+      onSessionFull();
+    }
+  }, [participants.length, conversationData?.participants, onSessionFull]);
 
   // Log state changes
   useEffect(() => {

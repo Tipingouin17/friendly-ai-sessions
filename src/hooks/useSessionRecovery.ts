@@ -27,7 +27,11 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   
   // Set up component lifecycle
   useEffect(() => {
-    console.log("Session recovery hook mounted, isAdmin:", isAdminSession);
+    console.log("🔄 Session recovery hook mounted:", {
+      isAdmin: isAdminSession,
+      shouldSkipRecovery,
+      currentConversationId
+    });
     sessionMountedRef.current = true;
     
     // Only store status for actual admin paths to prevent conflicts
@@ -39,94 +43,106 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       sessionMountedRef.current = false;
       if (recoveryTimerRef.current) {
         clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
       }
       if (recoveryTimeoutRef.current) {
         clearTimeout(recoveryTimeoutRef.current);
+        recoveryTimeoutRef.current = null;
       }
     };
-  }, [isAdminSession, isOnAdminPath]);
-
-  const retryConnection = useCallback(() => {
-    // Skip all recovery for admin sessions
-    if (!sessionMountedRef.current || isRecovering || shouldSkipRecovery) {
-      if (shouldSkipRecovery) {
-        console.log("Admin session: Skipping recovery entirely");
-        return;
+  }, [isAdminSession, isOnAdminPath, currentConversationId]);
+  
+  // Reset connection state when conversation ID changes
+  useEffect(() => {
+    if (currentConversationId) {
+      console.log(`🔄 Connection recovery setup for conversation ID: ${currentConversationId}`);
+      // Reset state for new conversation
+      if (lastAttemptTime === 0) {
+        setLastAttemptTime(Date.now());
       }
+      // Reset connection attempts for new session
+      setConnectionAttempts(0);
     }
-    
-    // For participant sessions with IDs, don't increment the connection attempt counter too high
-    // as we want to ensure they can still see content
-    const urlParams = new URLSearchParams(location.search);
-    const hasSessionId = urlParams.has('id') && urlParams.get('id');
-    if (hasSessionId && connectionAttempts >= 2) {
-      console.log("Participant with session ID: limiting connection attempts to allow UI rendering");
-      setLastAttemptTime(Date.now());
+  }, [currentConversationId, lastAttemptTime]);
+  
+  // Enhanced retry function with better backoff and admin handling
+  const retryConnection = useCallback(() => {
+    if (!sessionMountedRef.current) return;
+
+    // Skip recovery for admin sessions
+    if (shouldSkipRecovery) {
+      console.log("🔑 Admin session - skipping connection recovery");
       return;
     }
-    
-    // Only proceed with recovery for non-admin sessions
-    setIsRecovering(true);
-    console.log(`Retrying connection (attempt ${connectionAttempts + 1})...`);
-    setConnectionAttempts(prev => prev + 1);
-    setLastAttemptTime(Date.now());
-    
-    // Use shorter delay for first few attempts
-    const retryDelay = connectionAttempts < 2 ? 1000 : Math.min(1000 * (connectionAttempts + 1), 3000);
-    
-    recoveryTimeoutRef.current = setTimeout(() => {
-      try {
-        if (!sessionMountedRef.current) return;
-        
-        // Skip recovery for admin sessions even if they somehow get here
-        if (shouldSkipRecovery) {
-          console.log("Admin session detected during recovery, aborting");
-          setIsRecovering(false);
-          return;
-        }
-        
-        // CRITICAL FIX: For participants with valid session ID, just refresh the page after first attempt
-        if (hasSessionId && connectionAttempts === 0) {
-          navigate(`${location.pathname}${location.search}`, { replace: true });
-          
-          toast({
-            title: "Reconnecting",
-            description: "Attempting to reconnect to the session...",
-          });
-        } else if (connectionAttempts < 3) {
-          const searchParams = new URLSearchParams(location.search);
-          const sessionId = searchParams.get('id') || currentConversationId?.toString();
-          
-          if (sessionId) {
-            navigate(`/session?id=${sessionId}`, { replace: true });
-            
-            toast({
-              title: "Reconnecting",
-              description: "Attempting to reconnect to the session...",
-            });
-          }
-        } else {
-          toast({
-            title: "Connection Status",
-            description: "Reconnecting...",
-          });
-        }
-      } catch (err) {
-        console.error("Error during connection retry:", err);
-      } finally {
-        setIsRecovering(false);
-      }
-    }, retryDelay);
-    
-  }, [connectionAttempts, isCrossOrigin, location.search, toast, currentConversationId, isRecovering, shouldSkipRecovery, navigate, location.pathname]);
 
-  return { 
-    connectionAttempts, 
-    lastAttemptTime, 
+    if (connectionAttempts < 5 && currentConversationId) {
+      const newAttemptCount = connectionAttempts + 1;
+      console.log(`🔄 Attempting connection recovery (attempt ${newAttemptCount}/5) for ID:`, currentConversationId);
+      
+      setConnectionAttempts(newAttemptCount);
+      setLastAttemptTime(Date.now());
+      setIsRecovering(true);
+      
+      // Clear any existing timers
+      if (recoveryTimerRef.current !== null) {
+        clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+      
+      // Use progressive backoff with longer delays
+      const backoffTime = Math.min(3000 * Math.pow(1.5, newAttemptCount - 1), 15000);
+      console.log(`🔄 Using backoff time of ${backoffTime}ms for attempt ${newAttemptCount}`);
+      
+      recoveryTimerRef.current = setTimeout(() => {
+        if (sessionMountedRef.current) {
+          console.log(`🔄 Executing connection recovery attempt ${newAttemptCount}`);
+          setIsRecovering(false);
+          
+          // Force a page refresh for connection recovery on later attempts
+          if (newAttemptCount > 2) {
+            console.log("🔄 Using page refresh for deep recovery");
+            window.location.reload();
+          }
+        }
+      }, backoffTime);
+    } else if (connectionAttempts >= 5) {
+      console.log("🚫 Maximum recovery attempts reached");
+      setIsRecovering(false);
+      
+      if (sessionMountedRef.current && !shouldSkipRecovery) {
+        toast({
+          title: "Connection Issues",
+          description: "Unable to establish a stable connection. Please check your internet and try refreshing the page.",
+          variant: "destructive"
+        });
+      }
+    }
+  }, [connectionAttempts, currentConversationId, shouldSkipRecovery, toast]);
+
+  // Handle successful connection
+  const handleConnectionEstablished = useCallback(() => {
+    if (!sessionMountedRef.current) return;
+    
+    console.log("✅ Connection established successfully");
+    setConnectionAttempts(0);
+    setLastAttemptTime(Date.now());
+    setIsRecovering(false);
+    
+    // Clear any pending recovery timers
+    if (recoveryTimerRef.current !== null) {
+      clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  }, []);
+
+  return {
+    connectionAttempts,
+    setConnectionAttempts,
+    lastAttemptTime,
     retryConnection,
     sessionMountedRef,
     recoveryTimerRef,
     isRecovering,
-    isAdminSession // Export this for other hooks to use
+    handleConnectionEstablished
   };
 }

@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { createPingChannel, performDatabasePing } from "@/utils/connectionPingUtils";
 
 interface UseConnectionCheckerProps {
@@ -16,7 +16,9 @@ export function useConnectionChecker({
   setError
 }: UseConnectionCheckerProps) {
   const [isPerformingConnectionCheck, setIsPerformingConnectionCheck] = useState(false);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const mountedRef = useRef(true);
+  const lastSuccessfulCheckRef = useRef(Date.now());
   
   // Set up lifecycle
   useEffect(() => {
@@ -26,14 +28,18 @@ export function useConnectionChecker({
     };
   }, []);
 
-  // Function to perform a connection check
+  // Enhanced connection check with resilience
   const performConnectionCheck = useCallback(async () => {
     if (!conversationId || isPerformingConnectionCheck || !mountedRef.current) return false;
     
     setIsPerformingConnectionCheck(true);
     
     try {
-      //console.log("Performing connection check...");
+      console.log("🔍 Performing resilient connection check...", {
+        conversationId,
+        consecutiveFailures,
+        timeSinceLastSuccess: Date.now() - lastSuccessfulCheckRef.current
+      });
       
       // Try channel-based ping first
       const pingResult = await createPingChannel(conversationId);
@@ -41,10 +47,12 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
       
       if (pingResult) {
-        //console.log("Connection check successful (channel subscription worked)");
+        console.log("✅ Connection check successful (channel subscription worked)");
         setIsConnected();
+        setConsecutiveFailures(0);
+        lastSuccessfulCheckRef.current = Date.now();
         
-        // If we got a successful ping, might as well refresh our state
+        // If we got a successful ping, refresh our state
         refetch();
         setIsPerformingConnectionCheck(false);
         return true;
@@ -56,35 +64,62 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
       
       if (databasePingResult) {
-        //console.log("Connection check successful (query worked)");
+        console.log("✅ Connection check successful (database query worked)");
         setIsConnected();
+        setConsecutiveFailures(0);
+        lastSuccessfulCheckRef.current = Date.now();
         
-        // If we got data, might as well refresh our state
+        // If we got data, refresh our state
         refetch();
         setIsPerformingConnectionCheck(false);
         return true;
       }
       
-      // If we get here, all connection checks failed
-      //console.log("All connection checks failed");
-      setError("Connection to server lost");
+      // Handle failure with resilience
+      const newFailureCount = consecutiveFailures + 1;
+      setConsecutiveFailures(newFailureCount);
+      
+      console.log("⚠️ Connection check failed", {
+        consecutiveFailures: newFailureCount,
+        timeSinceLastSuccess: Date.now() - lastSuccessfulCheckRef.current
+      });
+      
+      // Only mark as "lost" after multiple consecutive failures AND significant time passed
+      const timeSinceLastSuccess = Date.now() - lastSuccessfulCheckRef.current;
+      const shouldMarkAsLost = newFailureCount >= 3 && timeSinceLastSuccess > 30000; // 30 seconds
+      
+      if (shouldMarkAsLost) {
+        console.error("❌ Connection marked as lost after multiple failures");
+        setError("Connection to server lost");
+      } else {
+        console.log("📡 Temporary connection issue, not marking as lost yet");
+      }
+      
       setIsPerformingConnectionCheck(false);
       return false;
     } catch (err) {
       if (!mountedRef.current) return false;
       
-      //console.error("Error in performConnectionCheck:", err);
-      setError("Unable to check connection status");
+      const newFailureCount = consecutiveFailures + 1;
+      setConsecutiveFailures(newFailureCount);
+      
+      console.error("💥 Error in performConnectionCheck:", err, {
+        consecutiveFailures: newFailureCount
+      });
+      
+      // Only set error after multiple failures
+      if (newFailureCount >= 3) {
+        setError("Unable to check connection status");
+      }
+      
       setIsPerformingConnectionCheck(false);
       return false;
     }
-  }, [conversationId, setIsConnected, setError, refetch, isPerformingConnectionCheck]);
+  }, [conversationId, setIsConnected, setError, refetch, isPerformingConnectionCheck, consecutiveFailures]);
 
   return {
     performConnectionCheck,
-    isPerformingConnectionCheck
+    isPerformingConnectionCheck,
+    consecutiveFailures
   };
 }
-
-// Add missing imports
-import { useEffect } from "react";

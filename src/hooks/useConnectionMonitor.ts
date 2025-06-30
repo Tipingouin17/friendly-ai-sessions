@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -13,10 +14,12 @@ export function useConnectionMonitor({
   performConnectionCheck
 }: UseConnectionMonitorProps) {
   const [lastPingSuccess, setLastPingSuccess] = useState<number>(Date.now());
+  const [connectionQuality, setConnectionQuality] = useState<'good' | 'poor' | 'offline'>('good');
   const { toast } = useToast();
   const mountedRef = useRef(true);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const connectionCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastShownRef = useRef(false);
 
   // Set up lifecycle
   useEffect(() => {
@@ -37,46 +40,63 @@ export function useConnectionMonitor({
     };
   }, []);
 
-  // Setup ping system to keep connection alive and verify connectivity
+  // Setup enhanced ping system with quality monitoring
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
     
-    // Initial connection check with slight delay to allow other systems to initialize
+    // Initial connection check with delay to allow initialization
     connectionCheckTimeoutRef.current = setTimeout(() => {
       if (mountedRef.current) {
         performConnectionCheck().then(success => {
-          if (success) setLastPingSuccess(Date.now());
+          if (success) {
+            setLastPingSuccess(Date.now());
+            setConnectionQuality('good');
+          }
         });
       }
-    }, 1500);
+    }, 3000); // Increased initial delay
     
-    // Set up regular ping interval (30s)
+    // Set up regular ping interval (45s instead of 30s)
     pingIntervalRef.current = setInterval(() => {
       if (!mountedRef.current) return;
       
-      // Check if it's been too long since last successful ping
       const timeSinceLastSuccess = Date.now() - lastPingSuccess;
-      if (timeSinceLastSuccess > 60000) { // 60 seconds
-        console.log("Long time since last successful ping:", timeSinceLastSuccess / 1000, "seconds");
-        
-        // Show toast for extended connection issues
-        if (timeSinceLastSuccess > 90000 && isConnected && mountedRef.current) {
-          toast({
-            title: "Connection issues detected",
-            description: "Trying to reconnect to the session...",
-            variant: "destructive",
-          });
-        }
+      
+      console.log("🔍 Connection monitor check:", {
+        timeSinceLastSuccess: timeSinceLastSuccess / 1000,
+        isConnected,
+        connectionQuality
+      });
+      
+      // Update connection quality based on time since last success
+      if (timeSinceLastSuccess > 120000) { // 2 minutes
+        setConnectionQuality('offline');
+      } else if (timeSinceLastSuccess > 60000) { // 1 minute
+        setConnectionQuality('poor');
+      } else {
+        setConnectionQuality('good');
       }
       
-      // If we think we're disconnected or it's been a while, do a check
-      if ((!isConnected || timeSinceLastSuccess > 60000) && mountedRef.current) {
-        console.log("Connection appears to be down or stale, attempting ping...");
+      // Only perform active check if connection appears poor
+      if (connectionQuality === 'poor' || timeSinceLastSuccess > 90000) {
+        console.log("🔍 Performing active connection check due to poor quality");
         performConnectionCheck().then(success => {
-          if (success) setLastPingSuccess(Date.now());
+          if (success) {
+            setLastPingSuccess(Date.now());
+            setConnectionQuality('good');
+            toastShownRef.current = false; // Reset toast flag on success
+          } else if (timeSinceLastSuccess > 120000 && !toastShownRef.current) {
+            // Only show toast for extended issues, not temporary hiccups
+            toastShownRef.current = true;
+            toast({
+              title: "Connection quality poor",
+              description: "Session may be experiencing connectivity issues.",
+              variant: "destructive",
+            });
+          }
         });
       }
-    }, 30000); // Check every 30 seconds
+    }, 45000); // Check every 45 seconds
     
     return () => {
       if (connectionCheckTimeoutRef.current !== null) {
@@ -89,10 +109,11 @@ export function useConnectionMonitor({
         pingIntervalRef.current = null;
       }
     };
-  }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck, toast]);
+  }, [conversationId, isConnected, lastPingSuccess, performConnectionCheck, toast, connectionQuality]);
 
   return {
     lastPingSuccess,
-    setLastPingSuccess
+    setLastPingSuccess,
+    connectionQuality
   };
 }

@@ -20,6 +20,7 @@ interface SessionClosureResult {
 
 export const useSessionClosure = () => {
   const [isClosing, setIsClosing] = useState(false);
+  const [closureProgress, setClosureProgress] = useState<string>('');
   const [closureResult, setClosureResult] = useState<SessionClosureResult | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -31,18 +32,26 @@ export const useSessionClosure = () => {
 
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     setIsClosing(true);
+    setClosureProgress('Initializing session closure...');
 
     try {
       // Step 1-3: Validation
+      setClosureProgress('Validating session permissions...');
       const { user } = await validateSessionClosure(conversationId);
 
       // Step 4: Execute closure
+      setClosureProgress('Closing session and generating report...');
       const data = await executeSessionClosure(conversationId, user.id);
       
       setClosureResult(data);
+      setClosureProgress('Session closed successfully!');
 
-      // Step 5: Invalidate relevant queries to ensure real-time sync
-      console.log("🔄 Invalidating queries for real-time sync...");
+      // Step 5: Final cleanup and navigation
+      setClosureProgress('Updating dashboard...');
+      
+      // Additional query invalidation for safety
+      console.log("🔄 Final query invalidation for UI consistency...");
+      queryClient.invalidateQueries({ queryKey: ['conversation'] });
       queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
       queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
@@ -51,6 +60,11 @@ export const useSessionClosure = () => {
         title: "Session Closed Successfully",
         description: `Report generated with ${data.sessionData.messageCount} messages from ${data.sessionData.participantCount} participants`,
       });
+
+      // Ensure navigation happens
+      setTimeout(() => {
+        navigate('/past-workshops', { replace: true });
+      }, 1000);
 
       return true;
     } catch (error) {
@@ -61,6 +75,8 @@ export const useSessionClosure = () => {
         errorMessage = error.message;
       }
       
+      setClosureProgress('');
+      
       toast({
         title: "Error Closing Session",
         description: errorMessage,
@@ -69,6 +85,7 @@ export const useSessionClosure = () => {
       return false;
     } finally {
       setIsClosing(false);
+      setTimeout(() => setClosureProgress(''), 3000);
     }
   };
 
@@ -78,6 +95,7 @@ export const useSessionClosure = () => {
 
   return {
     isClosing,
+    closureProgress,
     closureResult,
     closeSessionAndGenerateReport,
     downloadReport

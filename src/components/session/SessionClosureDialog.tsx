@@ -20,6 +20,7 @@ interface SessionClosureDialogProps {
   isClosing: boolean;
   participantCount: number;
   sessionTitle?: string;
+  closureProgress?: string;
 }
 
 const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
@@ -28,7 +29,8 @@ const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
   onConfirm,
   isClosing,
   participantCount,
-  sessionTitle = "this session"
+  sessionTitle = "this session",
+  closureProgress = ""
 }) => {
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
@@ -67,6 +69,13 @@ const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
                   The report will include participation statistics, key discussion points, and session analytics.
                 </span>
               </div>
+              {closureProgress && (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <span className="text-sm text-green-800">
+                    {closureProgress}
+                  </span>
+                </div>
+              )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -82,7 +91,7 @@ const SessionClosureDialog: React.FC<SessionClosureDialogProps> = ({
             {isClosing ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Closing Session...
+                {closureProgress || "Closing Session..."}
               </>
             ) : (
               <>

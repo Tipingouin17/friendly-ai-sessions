@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SessionClosureResult {
   reportId: string;
@@ -15,6 +17,8 @@ interface SessionClosureResult {
 
 export const useSessionClosureExecution = () => {
   const { logSensitiveAction, logSecurityViolation } = useSecurityAudit();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const executeSessionClosure = async (
     conversationId: number,
@@ -54,6 +58,20 @@ export const useSessionClosureExecution = () => {
     
     // Log successful closure
     logSensitiveAction('session_closure_completed', conversationId);
+
+    // Immediately invalidate all relevant queries
+    console.log("🔄 Invalidating queries after session closure...");
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-sessions'] }),
+      queryClient.invalidateQueries({ queryKey: ['active-workshops'] }),
+      queryClient.invalidateQueries({ queryKey: ['past-workshops'] }),
+      queryClient.invalidateQueries({ queryKey: ['session-participants', conversationId] })
+    ]);
+
+    // Navigate away immediately to prevent UI confusion
+    console.log("🔄 Navigating to past workshops after successful closure...");
+    navigate('/past-workshops', { replace: true });
 
     return data;
   };

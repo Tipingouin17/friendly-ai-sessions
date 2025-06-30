@@ -9,6 +9,7 @@ import { useHostParticipantState } from "@/hooks/useHostParticipantState";
 import { useHostSessionInitialization } from "@/hooks/useHostSessionInitialization";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
 import { useOptimizedSessionState } from "@/hooks/useOptimizedSessionState";
+import { useSessionValidation } from "@/hooks/useSessionValidation";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
@@ -42,10 +43,18 @@ const SessionHost = () => {
     hostViewMounted
   } = useHostSessionLoader();
 
+  // Session validation - check if session is still active
+  const { isValidating, isValid } = useSessionValidation({
+    conversationId: currentConversationId,
+    isAdmin: true
+  });
+
   console.log("🔍 SessionHost - Current state:", {
     currentConversationId,
     conversationDataId: conversationData?.id,
-    isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading
+    isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading,
+    isValidating,
+    isValid
   });
 
   // Session interface for proper session start handling
@@ -135,7 +144,7 @@ const SessionHost = () => {
   const [hostViewReady, setHostViewReady] = useState(false);
 
   // Calculate effective loading state
-  const isLoading = (sessionPageLoading || loaderIsLoading || isConversationLoading) && !hostViewReady;
+  const isLoading = (sessionPageLoading || loaderIsLoading || isConversationLoading || isValidating) && !hostViewReady;
 
   // Initialize session and handle host view readiness
   useHostSessionInitialization({
@@ -149,19 +158,19 @@ const SessionHost = () => {
 
   // Force host view to stay ready once it's been loaded
   useEffect(() => {
-    if (!isLoading && (conversationData || hostViewMounted) && !hostViewReady) {
+    if (!isLoading && !isValidating && isValid && (conversationData || hostViewMounted) && !hostViewReady) {
       setHostViewReady(true);
     }
 
     const readyTimeout = setTimeout(() => {
-      if (!hostViewReady) {
+      if (!hostViewReady && isValid) {
         console.log("Forcing host view ready after timeout");
         setHostViewReady(true);
       }
     }, 2000);
 
     return () => clearTimeout(readyTimeout);
-  }, [isLoading, conversationData, hostViewReady, hostViewMounted]);
+  }, [isLoading, isValidating, isValid, conversationData, hostViewReady, hostViewMounted]);
 
   // Reset messages when switching sessions
   useEffect(() => {
@@ -185,8 +194,13 @@ const SessionHost = () => {
     };
   }, [cleanupAutoStart]);
 
-  // Redirect logic
-  if (!hostViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
+  // Redirect if session is invalid
+  if (!isValidating && !isValid) {
+    return <Navigate to="/past-workshops" replace />;
+  }
+
+  // Redirect logic for missing conversation
+  if (!hostViewReady && !isLoading && !isValidating && !currentConversationId && !locationState?.newConversationId) {
     console.log("No conversation ID found, checking if we should show host interface anyway");
 
     if (window.location.pathname.includes('/host')) {

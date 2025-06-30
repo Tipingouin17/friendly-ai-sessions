@@ -154,7 +154,7 @@ const SessionHost = () => {
   // Check if session is started - use from useSessionInterface
   const sessionStartedStatus = isSessionStarted || Boolean(conversationData?.session_started);
 
-  // Add the session flow hook with enhanced state management
+  // Add the new session flow hook
   const {
     isSessionActive,
     currentResponseCollection,
@@ -162,8 +162,6 @@ const SessionHost = () => {
     sessionStartNotification,
     triggerSessionStart,
     startResponseCollection,
-    isStartingSession,
-    startProgress,
     responseProgress
   } = useSessionFlow({
     conversationId: currentConversationId,
@@ -173,7 +171,7 @@ const SessionHost = () => {
   });
 
   // Enhanced session start handler
-  const handleSessionStarted = async (): Promise<void> => {
+  const handleSessionStarted = async () => {
     console.log("🔥 SessionHost - Starting session through session flow");
     try {
       const success = await triggerSessionStart();
@@ -197,9 +195,7 @@ const SessionHost = () => {
   console.log("🔍 SessionHost - Passing to HostDashboard:", {
     participantCount,
     participantsLength: participants.length,
-    conversationId: currentConversationId,
-    isStartingSession,
-    startProgress
+    conversationId: currentConversationId
   });
 
   return (
@@ -221,8 +217,6 @@ const SessionHost = () => {
       onSessionStarted={handleSessionStarted}
       triggerSessionStart={triggerSessionStart}
       sessionStartNotification={sessionStartNotification}
-      isStartingSession={isStartingSession}
-      startProgress={startProgress}
       responseProgress={responseProgress}
     />
   );

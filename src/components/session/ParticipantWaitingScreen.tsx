@@ -27,7 +27,6 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   const [sessionStartDetected, setSessionStartDetected] = React.useState(false);
   const [welcomeMessageReceived, setWelcomeMessageReceived] = React.useState(false);
   const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const [checkedInitialState, setCheckedInitialState] = React.useState(false);
   
   console.log("ParticipantWaitingScreen props:", {
     conversationId,
@@ -37,70 +36,9 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     sessionStarted
   });
 
-  // HYBRID DETECTION: Check existing state on component mount (for late joiners)
-  const checkInitialSessionState = React.useCallback(async () => {
-    if (!conversationId || checkedInitialState) return;
-    
-    console.log('🔍 HYBRID: Checking initial session state for late joiners');
-    
-    try {
-      // Check if session is already started
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .select('session_started')
-        .eq('id', conversationId)
-        .single();
-        
-      if (convError) {
-        console.error('Error checking conversation state:', convError);
-        return;
-      }
-      
-      const isSessionStarted = Boolean(conversation?.session_started);
-      console.log('🔍 HYBRID: Initial session_started state =', isSessionStarted);
-      
-      if (isSessionStarted) {
-        setSessionStartDetected(true);
-        
-        // Check if welcome message already exists
-        const { data: messages, error: msgError } = await supabase
-          .from('messages')
-          .select('id, role, created_at')
-          .eq('conversation_id', conversationId)
-          .eq('role', 'assistant')
-          .order('created_at', { ascending: true })
-          .limit(1);
-          
-        if (msgError) {
-          console.error('Error checking for welcome message:', msgError);
-        } else if (messages && messages.length > 0) {
-          console.log('🔍 HYBRID: Found existing welcome message - late joiner can proceed immediately');
-          setWelcomeMessageReceived(true);
-          
-          toast({
-            title: "Session Ready",
-            description: "Welcome message found! You can join the conversation.",
-          });
-        } else {
-          console.log('🔍 HYBRID: Session started but no welcome message yet - will wait for real-time event');
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error in hybrid initial state check:', error);
-    } finally {
-      setCheckedInitialState(true);
-    }
-  }, [conversationId, checkedInitialState, toast]);
-
-  // Run hybrid check on mount
-  useEffect(() => {
-    checkInitialSessionState();
-  }, [checkInitialSessionState]);
-
   // PARTICIPANT SELF-DETERMINATION: Only proceed when BOTH conditions are met
   const handleParticipantReadyToProceed = React.useCallback(() => {
-    if (sessionStartDetected && welcomeMessageReceived && !isTransitioning && checkedInitialState) {
+    if (sessionStartDetected && welcomeMessageReceived && !isTransitioning) {
       console.log('🎯 PARTICIPANT READY: Both session started AND welcome message received');
       setIsTransitioning(true);
       
@@ -117,16 +55,16 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
         }, 1500);
       }
     }
-  }, [sessionStartDetected, welcomeMessageReceived, isTransitioning, checkedInitialState, onSessionStarted, toast]);
+  }, [sessionStartDetected, welcomeMessageReceived, isTransitioning, onSessionStarted, toast]);
 
   // Set up real-time listeners for participant self-determination
   useEffect(() => {
-    if (!conversationId || !checkedInitialState) {
-      console.log("Not setting up real-time listeners yet - waiting for initial state check");
+    if (!conversationId) {
+      console.log("No conversation ID provided to ParticipantWaitingScreen");
       return;
     }
     
-    console.log("🔄 Setting up participant real-time listeners for conversation:", conversationId);
+    console.log("🔄 Setting up participant self-determination listeners for conversation:", conversationId);
     
     // Update initial count from props
     setParticipantCount(currentParticipantCount || 0);
@@ -150,9 +88,9 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
               setParticipantCount(payload.new.current_participants);
             }
             
-            // Check if session was started (only if not already detected)
-            if (payload.new.session_started && (!payload.old || !payload.old.session_started) && !sessionStartDetected) {
-              console.log("🚦 Real-time session start detected - participant waits for welcome message");
+            // Check if session was started
+            if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
+              console.log("🚦 Session start detected - but participant waits for welcome message");
               setSessionStartDetected(true);
             }
           }
@@ -172,7 +110,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
         }, (payload) => {
           console.log("Received message INSERT event:", payload);
           
-          if (payload.new && payload.new.role === 'assistant' && !welcomeMessageReceived) {
+          if (payload.new && payload.new.role === 'assistant') {
             console.log("✅ Welcome message confirmed received via real-time INSERT");
             setWelcomeMessageReceived(true);
             
@@ -219,7 +157,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
       console.error("Error setting up participant waiting subscriptions:", err);
       return () => {}; // Empty cleanup function to avoid runtime errors
     }
-  }, [conversationId, currentParticipantCount, checkedInitialState, sessionStartDetected, welcomeMessageReceived]);
+  }, [conversationId, currentParticipantCount]);
 
   // Trigger participant ready check when conditions change
   useEffect(() => {
@@ -251,25 +189,6 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
 
   // Ensure we always have a valid display value
   const displayCount = participantCount || 0;
-
-  // Show loading state while checking initial state
-  if (!checkedInitialState) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
-        <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-          <div className="w-16 h-16 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
-            <Clock className="h-8 w-8 text-blue-500 animate-pulse" />
-          </div>
-          
-          <h2 className="text-xl sm:text-2xl font-bold mb-2">Checking Session Status</h2>
-          
-          <p className="text-gray-600 mb-6">
-            Please wait while we check if the session is ready...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // Show final transition state when participant is ready to proceed
   if (isTransitioning) {

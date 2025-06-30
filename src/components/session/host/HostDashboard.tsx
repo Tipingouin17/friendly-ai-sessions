@@ -1,34 +1,34 @@
 
-import React, { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import React from "react";
 import HostHeader from "./HostHeader";
 import HostSessionContent from "./HostSessionContent";
-import HostQrDialog from "./HostQrDialog";
-import HostWrapUpDialog from "./HostWrapUpDialog";
-import { Message } from "@/types/chat";
-import { useSessionClosure } from "@/hooks/useSessionClosure";
+import { Message, ParticipantInfo } from "@/types/chat";
+import { ConversationWithSession } from "@/types/database";
 
 interface HostDashboardProps {
-  conversation: any;
+  conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
   sessionMessages: Message[];
   participantColors: { [key: string]: string };
-  participants: any[];
+  participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
-  onSendMessage: (content: string) => Promise<void>;
-  isWaitingForResponses: boolean;
-  responseCount: number;
-  totalParticipants: number;
-  onTriggerFacilitatorResponse: () => Promise<void>;
-  isSessionStarted: boolean;
-  onSessionStarted: () => void;
+  onSendMessage: (message: string, isPinned?: boolean, recipientId?: string) => void;
+  
+  // Response collection props
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
+  onTriggerFacilitatorResponse?: () => void;
+  
+  // Session start props
+  isSessionStarted?: boolean;
+  onSessionStarted?: () => void;
+  
+  // Session flow props
   triggerSessionStart?: () => Promise<boolean>;
   sessionStartNotification?: string | null;
-  isStartingSession?: boolean;
-  startProgress?: string;
   responseProgress?: {
     collected: number;
     total: number;
@@ -46,108 +46,26 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isLoadingParticipants,
   currentConversationId,
   onSendMessage,
-  isWaitingForResponses,
-  responseCount,
-  totalParticipants,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
   onTriggerFacilitatorResponse,
-  isSessionStarted,
+  isSessionStarted = false,
   onSessionStarted,
   triggerSessionStart,
   sessionStartNotification,
-  isStartingSession = false,
-  startProgress = '',
   responseProgress
 }) => {
-  const [showQrDialog, setShowQrDialog] = useState(false);
-  const [showWrapUpDialog, setWrapUpDialog] = useState(false);
-
-  // Fetch active sessions for dropdown
-  const { data: sessions = [] } = useQuery({
-    queryKey: ['host-sessions'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          id,
-          created_at,
-          participants,
-          current_participants,
-          session_started,
-          is_session_ended,
-          sessions (
-            title,
-            facilitator_details:facilitators (
-              title,
-              profile_picture
-            )
-          )
-        `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  // Session closure hook with proper interface
-  const { 
-    closeSession, 
-    isClosing, 
-    downloadReport, 
-    isDownloading 
-  } = useSessionClosure({
-    conversationId: currentConversationId,
-    onSuccess: () => {
-      setWrapUpDialog(false);
-    }
-  });
-
-  const handleShowQrCode = useCallback(() => {
-    setShowQrDialog(true);
-  }, []);
-
-  const handleCloseQrDialog = useCallback(() => {
-    setShowQrDialog(false);
-  }, []);
-
-  const handleWrapUpSession = useCallback(() => {
-    setWrapUpDialog(true);
-  }, []);
-
-  const handleCloseWrapUpDialog = useCallback(() => {
-    setWrapUpDialog(false);
-  }, []);
-
-  if (!currentConversationId) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Session Selected</h2>
-          <p className="text-gray-600">Please select or create a session to continue.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50">
       <HostHeader
-        currentConversationId={currentConversationId}
         conversation={conversation}
-        sessions={sessions}
-        participants={participants}
-        isLoadingParticipants={isLoadingParticipants}
-        onShowQrCode={handleShowQrCode}
-        onWrapUpSession={handleWrapUpSession}
-        isSessionStarted={isSessionStarted}
-        onSessionStarted={onSessionStarted}
-        triggerSessionStart={triggerSessionStart}
+        isSessionPaused={isSessionPaused}
+        toggleSessionState={toggleSessionState}
         sessionStartNotification={sessionStartNotification}
-        isStartingSession={isStartingSession}
-        startProgress={startProgress}
+        responseProgress={responseProgress}
       />
-
+      
       <HostSessionContent
         sessionMessages={sessionMessages}
         participantColors={participantColors}
@@ -164,24 +82,6 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         onSessionStarted={onSessionStarted}
         triggerSessionStart={triggerSessionStart}
       />
-
-      {showQrDialog && (
-        <HostQrDialog
-          conversationId={currentConversationId}
-          onClose={handleCloseQrDialog}
-        />
-      )}
-
-      {showWrapUpDialog && (
-        <HostWrapUpDialog
-          conversationId={currentConversationId}
-          onClose={handleCloseWrapUpDialog}
-          onCloseSession={closeSession}
-          onDownloadReport={downloadReport}
-          isClosing={isClosing}
-          isDownloading={isDownloading}
-        />
-      )}
     </div>
   );
 };

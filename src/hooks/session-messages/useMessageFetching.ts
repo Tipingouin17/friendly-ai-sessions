@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Message } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +48,8 @@ export const useMessageFetching = ({
     fetchInProgress: fetchInProgressRef.current,
     sessionStarted: conversation?.session_started,
     autoStartProcessed: autoStartProcessedRef.current,
-    welcomeGenerated: welcomeGenerationRef.current
+    welcomeGenerated: welcomeGenerationRef.current,
+    hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
   });
   
   // Memoize conversation data to prevent unnecessary re-renders
@@ -62,9 +62,10 @@ export const useMessageFetching = ({
       language: conversation.language,
       session_started: conversation.session_started,
       current_participants: conversation.current_participants,
-      participants: conversation.participants
+      participants: conversation.participants,
+      sessions_id: conversation.sessions_id
     };
-  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language, conversation?.session_started, conversation?.current_participants, conversation?.participants]);
+  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language, conversation?.session_started, conversation?.current_participants, conversation?.participants, conversation?.sessions_id]);
   
   const { 
     getCachedWelcomeMessage, 
@@ -179,20 +180,20 @@ export const useMessageFetching = ({
       return null;
     }
 
-    console.log('🚀 Enhanced AI welcome generation for auto-start:', {
+    // Only proceed if we have rich context
+    if (!memoizedConversation?.sessions?.facilitator_details?.title || !memoizedConversation?.sessions?.objective) {
+      console.log('⚠️ Insufficient context for AI generation, using fallback');
+      return null;
+    }
+
+    console.log('🚀 Enhanced AI welcome generation for auto-start with rich context:', {
       conversationId,
       sessionStarted: memoizedConversation.session_started,
       isAdmin,
-      hasSessionData: !!memoizedConversation.sessions
+      hasSessionData: !!memoizedConversation.sessions,
+      facilitatorTitle: memoizedConversation.sessions.facilitator_details?.title,
+      sessionTitle: memoizedConversation.sessions?.title
     });
-
-    // Check if this is an auto-started session
-    const isAutoStarted = await checkIfAutoStarted(conversationId);
-    
-    if (!isAutoStarted) {
-      console.log('⏭️ Session was not auto-started, skipping AI welcome generation');
-      return null;
-    }
 
     // Mark as processed to prevent duplicates
     welcomeGenerationRef.current = true;
@@ -202,7 +203,7 @@ export const useMessageFetching = ({
       const deduplicationKey = `ai-welcome-${conversationId}`;
       
       return await requestDeduplicator.deduplicate(deduplicationKey, async () => {
-        console.log('🤖 Generating AI welcome message for auto-started session...');
+        console.log('🤖 Generating AI welcome message for auto-started session with rich context...');
         
         // Call the enhanced edge function with full context
         const { data: aiResponse, error } = await supabase.functions.invoke('handle-facilitator-response', {
@@ -251,7 +252,7 @@ export const useMessageFetching = ({
       welcomeGenerationRef.current = false; // Reset on error
       return null;
     }
-  }, [conversationId, memoizedConversation, checkIfAutoStarted]);
+  }, [conversationId, memoizedConversation]);
 
   // Enhanced session start monitoring for both admin and participant views
   useEffect(() => {
@@ -330,27 +331,20 @@ export const useMessageFetching = ({
           messages: data.map(msg => ({
             id: msg.id,
             role: msg.role,
-            contentType: typeof msg.content,
-            contentKeys: msg.content && typeof msg.content === 'object' ? Object.keys(msg.content) : []
+            contentType: typeof msg.content
           }))
         });
 
         const formattedMessages = await formatDatabaseMessages(data);
         debugLog('all', `Successfully fetched ${formattedMessages.length} database messages`);
         setMessages(formattedMessages);
-        
-        // Check if the last message was a facilitator question
-        const lastMessage = formattedMessages[formattedMessages.length - 1];
-        if (lastMessage) {
-          handleFacilitatorQuestion(lastMessage);
-        }
         return;
       }
       
-      // No database messages found - handle welcome generation
+      // No database messages found - handle welcome generation for admin
       console.log('📭 No database messages found, determining welcome generation strategy');
       
-      // For auto-started sessions with admins, try AI generation
+      // For admin views with auto-started sessions, try AI generation
       if (isAdmin && memoizedConversation?.session_started) {
         console.log('🎯 Admin view with started session, attempting AI welcome generation...');
         const aiMessage = await generateAIWelcomeForAutoStart();
@@ -419,7 +413,6 @@ export const useMessageFetching = ({
     clearCachedWelcomeMessage,
     formatDatabaseMessages,
     saveWelcomeMessageToDb,
-    handleFacilitatorQuestion,
     generateFetchKey,
     isInitialFetch,
     generateAIWelcomeForAutoStart
@@ -439,7 +432,29 @@ export const useMessageFetching = ({
     error: error || welcomeError,
     fetchMessages,
     isGeneratingWelcome,
-    processNewMessage,
+    processNewMessage: useCallback((message: Message) => {
+      console.log('📨 Enhanced processNewMessage called:', {
+        messageId: message.id,
+        sender: message.sender,
+        contentLength: message.content?.length,
+        isWaitingForResponses
+      });
+
+      // Record participant responses for aggregation
+      if (message.sender === 'user' && isWaitingForResponses) {
+        recordParticipantResponse(message);
+      }
+
+      // Add message to the list with deduplication
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === message.id);
+        if (exists) {
+          console.log('⚠️ Duplicate message detected, skipping:', message.id);
+          return prev;
+        }
+        return [...prev, message];
+      });
+    }, [isWaitingForResponses, recordParticipantResponse]),
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,

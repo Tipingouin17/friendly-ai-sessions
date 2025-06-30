@@ -22,8 +22,15 @@ export async function generateAIWelcomeMessage(
       facilitatorName: facilitatorContext.name,
       sessionTitle: sessionContext.title,
       participantCount: sessionContext.participantCount,
-      hasSessionData: !!conversation?.sessions
+      hasSessionData: !!conversation?.sessions,
+      hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
     });
+    
+    // Only proceed with AI generation if we have rich context
+    if (!conversation?.sessions?.facilitator_details?.title || !conversation?.sessions?.objective) {
+      console.log(`⚠️ [${requestId}] Insufficient context for AI generation, falling back to template`);
+      return null; // This will trigger fallback to template
+    }
     
     // Create contextual system prompt
     const systemPrompt = createContextualSystemPrompt(
@@ -35,7 +42,7 @@ export async function generateAIWelcomeMessage(
     
     const userPrompt = `Generate a warm, engaging welcome message for this ${sessionContext.sessionType} session. The session just started automatically when we reached ${sessionContext.participantCount} ${sessionContext.participantDescription}. Make it personal and set the tone for productive collaboration.`;
     
-    console.log(`🚀 [${requestId}] Calling OpenAI API for AI generation...`);
+    console.log(`🚀 [${requestId}] Calling OpenAI API for AI generation with rich context...`);
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -68,7 +75,9 @@ export async function generateAIWelcomeMessage(
     
     console.log(`✅ [${requestId}] AI welcome message generated successfully:`, {
       contentLength: aiContent.length,
-      model: 'gpt-4o-mini'
+      model: 'gpt-4o-mini',
+      facilitatorUsed: facilitatorContext.name,
+      sessionUsed: sessionContext.title
     });
     
     return {

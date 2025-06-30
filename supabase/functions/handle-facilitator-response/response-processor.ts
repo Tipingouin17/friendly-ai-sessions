@@ -26,13 +26,14 @@ export async function processResponse(
     wrapUpSession,
     generateReport,
     hasConversationData: !!conversation,
-    participantCount: participants?.length || 0
+    participantCount: participants?.length || 0,
+    hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
   });
 
   try {
     // Handle session start with deduplication
     if (sessionStart) {
-      console.log(`🎯 [${requestId}] Session start detected - generating contextual welcome message with FULL facilitator context`);
+      console.log(`🎯 [${requestId}] Session start detected - generating contextual welcome message`);
       
       // Check if generation is already in progress
       if (!checkAndLockGeneration(conversationId, requestId)) {
@@ -82,19 +83,19 @@ export async function processResponse(
           };
         }
 
-        // Try AI generation first if we have conversation data
-        if (conversation && conversation.sessions) {
+        // Try AI generation first if we have rich conversation data
+        const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+        if (openaiApiKey && conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective) {
           try {
-            const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-            if (openaiApiKey) {
-              console.log(`🤖 [${requestId}] Attempting AI generation with full context...`);
-              const aiResponse = await generateAIWelcomeMessage(
-                conversation,
-                participants,
-                openaiApiKey,
-                requestId
-              );
-              
+            console.log(`🤖 [${requestId}] Attempting AI generation with rich context...`);
+            const aiResponse = await generateAIWelcomeMessage(
+              conversation,
+              participants,
+              openaiApiKey,
+              requestId
+            );
+            
+            if (aiResponse) {
               unlockGeneration(conversationId, requestId);
               return {
                 id: `resp-${Date.now()}`,
@@ -122,10 +123,12 @@ export async function processResponse(
             console.error(`❌ [${requestId}] AI generation failed:`, aiError);
             // Fall through to template generation
           }
+        } else {
+          console.log(`⚠️ [${requestId}] Missing OpenAI key or rich context, using template generation`);
         }
 
         // Fall back to enhanced template generation
-        console.log(`📝 [${requestId}] Using enhanced template-based response generation with complete context`);
+        console.log(`📝 [${requestId}] Using enhanced template-based response generation`);
         const templateResponse = generateEnhancedTemplateMessage(conversation, participants, requestId);
         
         unlockGeneration(conversationId, requestId);

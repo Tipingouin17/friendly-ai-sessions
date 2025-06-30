@@ -8,7 +8,7 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
   console.log(`🔍 Fetching conversation data for ID: ${conversationId}`);
   
   try {
-    // Use a simpler, more reliable query approach
+    // First, fetch the conversation data
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select(`
@@ -17,7 +17,8 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
         language,
         participants,
         session_started,
-        current_participants
+        current_participants,
+        sessions_id
       `)
       .eq('id', conversationId)
       .single();
@@ -32,26 +33,41 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
       return null;
     }
 
-    // Fetch session data separately to avoid relationship issues
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('sessions')
-      .select(`
-        id,
-        title,
-        objective,
-        session_type,
-        welcome_message,
-        facilitator
-      `)
-      .eq('id', conversation.sessions_id)
-      .single();
+    console.log('✅ Conversation fetched:', {
+      id: conversation.id,
+      sessions_id: conversation.sessions_id,
+      session_started: conversation.session_started
+    });
 
-    if (sessionError) {
-      console.error('❌ Error fetching session:', sessionError);
-      // Continue without session data - we'll use fallbacks
+    // Fetch session data separately only if sessions_id exists and is valid
+    let sessionData = null;
+    if (conversation.sessions_id && conversation.sessions_id !== 'undefined') {
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select(`
+          id,
+          title,
+          objective,
+          session_type,
+          welcome_message,
+          facilitator
+        `)
+        .eq('id', conversation.sessions_id)
+        .single();
+
+      if (sessionError) {
+        console.error('❌ Error fetching session:', sessionError);
+      } else {
+        sessionData = session;
+        console.log('✅ Session data fetched:', {
+          id: session.id,
+          title: session.title,
+          facilitator: session.facilitator
+        });
+      }
     }
 
-    // Fetch facilitator data separately if we have a session
+    // Fetch facilitator data separately if we have a session with facilitator
     let facilitatorData = null;
     if (sessionData?.facilitator) {
       const { data: facilitator, error: facError } = await supabase
@@ -71,6 +87,10 @@ export async function fetchConversationData(supabase: any, conversationId: numbe
         console.error('❌ Error fetching facilitator:', facError);
       } else {
         facilitatorData = facilitator;
+        console.log('✅ Facilitator data fetched:', {
+          id: facilitator.id,
+          title: facilitator.title
+        });
       }
     }
 

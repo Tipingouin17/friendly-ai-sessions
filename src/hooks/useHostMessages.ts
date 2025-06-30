@@ -1,10 +1,10 @@
-
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { useMessageFetching } from "./session-messages/useMessageFetching";
 import { useResponseAggregation } from "./session-messages/useResponseAggregation";
 import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
 import { useSessionAutoStartMonitoring } from "./useSessionAutoStartMonitoring";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseHostMessagesProps {
   conversationId: number | null;
@@ -61,10 +61,11 @@ export const useHostMessages = ({
 
   // Enhanced immediate welcome generation for auto-started sessions
   const triggerImmediateWelcomeGeneration = useCallback(async () => {
-    if (!conversationId || welcomeGeneratedRef.current) {
-      console.log('⚠️ Skipping immediate welcome generation:', {
+    if (!conversationId || welcomeGeneratedRef.current || !conversationState) {
+      console.log('⚠️ [HOST] Skipping immediate welcome generation:', {
         hasConversationId: !!conversationId,
-        alreadyGenerated: welcomeGeneratedRef.current
+        alreadyGenerated: welcomeGeneratedRef.current,
+        hasConversationState: !!conversationState
       });
       return;
     }
@@ -73,17 +74,59 @@ export const useHostMessages = ({
     welcomeGeneratedRef.current = true;
 
     try {
-      // Fetch messages which will trigger AI generation if needed
-      setTimeout(() => {
-        console.log('⚡ [HOST] Executing immediate welcome message fetch...');
-        fetchMessages();
-      }, 100);
+      // Check if we already have messages
+      const { data: existingMessages, error: checkError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .limit(1);
+
+      if (checkError) {
+        console.error('❌ [HOST] Error checking existing messages:', checkError);
+        welcomeGeneratedRef.current = false;
+        return;
+      }
+
+      if (existingMessages && existingMessages.length > 0) {
+        console.log('📭 [HOST] Messages already exist, skipping generation');
+        return;
+      }
+
+      // Call the edge function directly with full context
+      console.log('🤖 [HOST] Calling edge function for AI welcome generation...');
+      const { data: response, error } = await supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          sessionStart: true,
+          generateReport: false,
+          conversation: conversationState
+        }
+      });
+
+      if (error) {
+        console.error('❌ [HOST] Edge function error:', error);
+        welcomeGeneratedRef.current = false;
+        return;
+      }
+
+      if (response?.content) {
+        console.log('✅ [HOST] AI welcome message generated:', {
+          contentLength: response.content.length,
+          generationMethod: response.metrics?.generationMethod
+        });
+
+        // Trigger message fetch to get the newly generated message
+        setTimeout(() => {
+          fetchMessages();
+        }, 100);
+      }
 
     } catch (error) {
       console.error('❌ [HOST] Error in immediate welcome generation:', error);
       welcomeGeneratedRef.current = false; // Reset on error
     }
-  }, [conversationId, fetchMessages]);
+  }, [conversationId, conversationState, fetchMessages]);
 
   // Handle conversation updates from realtime with enhanced auto-start detection
   const handleConversationUpdate = useCallback((payload: any) => {
@@ -100,7 +143,9 @@ export const useHostMessages = ({
         autoStartHandledRef.current = true;
         
         // Trigger immediate AI welcome generation
-        triggerImmediateWelcomeGeneration();
+        setTimeout(() => {
+          triggerImmediateWelcomeGeneration();
+        }, 500); // Small delay to ensure conversation state is updated
       }
     }
   }, [triggerImmediateWelcomeGeneration]);
@@ -119,8 +164,9 @@ export const useHostMessages = ({
       console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
       autoStartHandledRef.current = true;
       
-      // Trigger immediate AI welcome message generation
-      triggerImmediateWelcomeGeneration();
+      setTimeout(() => {
+        triggerImmediateWelcomeGeneration();
+      }, 500);
     }
   }, [triggerImmediateWelcomeGeneration]);
 
@@ -128,8 +174,21 @@ export const useHostMessages = ({
   useOptimizedRealtimeConnection({
     conversationId,
     onConversationUpdate: handleConversationUpdate,
-    onParticipantChange: handleParticipantChange,
-    onSessionEvent: handleSessionEvent,
+    onParticipantChange: useCallback((payload: any) => {
+      console.log('👥 [HOST] Enhanced participant change:', payload);
+    }, []),
+    onSessionEvent: useCallback((payload: any) => {
+      console.log('📋 [HOST] Enhanced session event:', payload);
+      
+      if (payload.new?.event_type === 'session_auto_started' && !autoStartHandledRef.current) {
+        console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
+        autoStartHandledRef.current = true;
+        
+        setTimeout(() => {
+          triggerImmediateWelcomeGeneration();
+        }, 500);
+      }
+    }, [triggerImmediateWelcomeGeneration]),
     isHost: true
   });
 
@@ -142,7 +201,9 @@ export const useHostMessages = ({
       if (!autoStartHandledRef.current) {
         console.log('🎯 [HOST] Auto-start monitoring detected session start, triggering AI generation...');
         autoStartHandledRef.current = true;
-        triggerImmediateWelcomeGeneration();
+        setTimeout(() => {
+          triggerImmediateWelcomeGeneration();
+        }, 500);
       }
     },
     isHost: true
@@ -157,7 +218,9 @@ export const useHostMessages = ({
       if (messages.length === 0) {
         console.log('📝 [HOST] No messages found, triggering immediate AI welcome generation...');
         autoStartHandledRef.current = true;
-        triggerImmediateWelcomeGeneration();
+        setTimeout(() => {
+          triggerImmediateWelcomeGeneration();
+        }, 500);
       }
     }
   }, [conversationState?.session_started, messages.length, triggerImmediateWelcomeGeneration]);

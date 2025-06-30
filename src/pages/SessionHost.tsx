@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -162,7 +163,9 @@ const SessionHost = () => {
     sessionStartNotification,
     triggerSessionStart,
     startResponseCollection,
-    responseProgress
+    responseProgress,
+    isStartingSession,
+    startProgress
   } = useSessionFlow({
     conversationId: currentConversationId,
     participants: participants || [],
@@ -218,6 +221,8 @@ const SessionHost = () => {
       triggerSessionStart={triggerSessionStart}
       sessionStartNotification={sessionStartNotification}
       responseProgress={responseProgress}
+      isStartingSession={isStartingSession}
+      startProgress={startProgress}
     />
   );
 };

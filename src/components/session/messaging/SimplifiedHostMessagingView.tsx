@@ -20,6 +20,8 @@ interface SimplifiedHostMessagingViewProps {
   onSessionStarted?: () => void;
   participants?: ParticipantInfo[];
   conversationId?: number | null;
+  isStartingSession?: boolean;
+  startProgress?: string;
 }
 
 const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = ({
@@ -34,7 +36,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   isSessionStarted = false,
   onSessionStarted,
   participants = [],
-  conversationId
+  conversationId,
+  isStartingSession = false,
+  startProgress = ""
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
 
@@ -46,6 +50,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
         conversationId={conversationId}
         participantCount={currentParticipantCount}
         onSessionStarted={onSessionStarted || (() => {})}
+        isStartingSession={isStartingSession}
+        startProgress={startProgress}
       />
     );
   }

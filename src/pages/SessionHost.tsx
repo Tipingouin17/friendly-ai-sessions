@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
 import { useHostStatusPersistence } from "@/hooks/useHostStatusPersistence";
@@ -10,6 +10,7 @@ import { useSessionInterface } from "@/hooks/useSessionInterface";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
+import { useAutoStartSession } from "@/hooks/useAutoStartSession";
 
 const SessionHost = () => {
   // Enforce host status
@@ -46,7 +47,38 @@ const SessionHost = () => {
     isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading
   });
 
-  // Participant state management
+  // Session interface for proper session start handling
+  const {
+    isSessionStarted,
+    handleStartSession
+  } = useSessionInterface(currentConversationId);
+
+  // Auto-start functionality
+  const {
+    isAutoStarting,
+    autoStartCountdown,
+    triggerAutoStart,
+    cancelAutoStart,
+    cleanup: cleanupAutoStart
+  } = useAutoStartSession({
+    onStartSession: handleStartSession,
+    isSessionStarted: isSessionStarted || Boolean(conversationData?.session_started),
+    maxParticipants: conversationData?.participants || 10
+  });
+
+  // Handle session full callback for auto-start
+  const handleSessionFull = useCallback(async () => {
+    const currentCount = participants.length;
+    const maxCount = conversationData?.participants || 10;
+    
+    console.log('🎯 Session full detected:', { currentCount, maxCount });
+    
+    if (currentCount >= maxCount && !isSessionStarted && !conversationData?.session_started) {
+      await triggerAutoStart(currentCount);
+    }
+  }, [participants.length, conversationData?.participants, isSessionStarted, conversationData?.session_started, triggerAutoStart]);
+
+  // Participant state management with auto-start callback
   const {
     participants,
     setParticipants,
@@ -54,7 +86,8 @@ const SessionHost = () => {
   } = useHostParticipantState({
     locationState,
     conversationData,
-    currentConversationId
+    currentConversationId,
+    onSessionFull: handleSessionFull
   });
 
   console.log("🔍 SessionHost - Participants from hook:", {
@@ -83,12 +116,6 @@ const SessionHost = () => {
     setMessages: setSessionMessages,
     conversationData
   });
-
-  // Session interface for proper session start handling
-  const {
-    isSessionStarted,
-    handleStartSession
-  } = useSessionInterface(currentConversationId);
 
   // Keep a state reference to preserve UI data
   const [hostViewReady, setHostViewReady] = useState(false);
@@ -136,6 +163,13 @@ const SessionHost = () => {
       forceHost();
     }
   }, [currentConversationId, forceHost]);
+
+  // Cleanup auto-start on unmount
+  useEffect(() => {
+    return () => {
+      cleanupAutoStart();
+    };
+  }, [cleanupAutoStart]);
 
   // Redirect logic
   if (!hostViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
@@ -196,6 +230,9 @@ const SessionHost = () => {
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       isSessionStarted={sessionStartedStatus}
       onSessionStarted={handleSessionStarted}
+      isAutoStarting={isAutoStarting}
+      autoStartCountdown={autoStartCountdown}
+      onCancelAutoStart={cancelAutoStart}
     />
   );
 };

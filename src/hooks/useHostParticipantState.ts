@@ -1,80 +1,80 @@
 
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
+import { ConversationWithSession } from "@/types/database";
+import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManager";
+import { createLogger } from "@/utils/debugLogger";
 
 interface UseHostParticipantStateProps {
-  locationState: any;
-  conversationData: any;
+  locationState?: any;
+  conversationData: ConversationWithSession | null;
   currentConversationId: number | null;
+  onSessionFull?: () => void;
 }
 
 export function useHostParticipantState({
   locationState,
   conversationData,
-  currentConversationId
+  currentConversationId,
+  onSessionFull
 }: UseHostParticipantStateProps) {
+  const logger = createLogger('HostParticipantState', 'host');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
 
-  console.log("🔍 useHostParticipantState - Starting with conversationId:", currentConversationId);
+  // Mock refetch function for participant manager
+  const mockRefetch = useCallback(async () => {
+    logger.category('host', 'Mock refetch called for host participant state');
+    return Promise.resolve();
+  }, [logger]);
 
-  const { data: participantsData, isLoading: isLoadingParticipants } = useQuery({
-    queryKey: ['session-participants', currentConversationId],
-    queryFn: async () => {
-      if (!currentConversationId) {
-        console.log("🔍 useHostParticipantState - No conversationId, returning empty array");
-        return [];
-      }
-      
-      console.log("🔍 useHostParticipantState - Fetching participants for conversation:", currentConversationId);
-      
-      const { data, error } = await supabase
-        .from('session_participants')
-        .select('*')
-        .eq('conversation_id', currentConversationId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error("🔍 useHostParticipantState - Error fetching participants:", error);
-        return [];
-      }
-
-      console.log("🔍 useHostParticipantState - Raw data from database:", data);
-      return data || [];
-    },
-    enabled: !!currentConversationId,
-    refetchInterval: 5000
+  // Use session participant manager with session full callback
+  const {
+    participants: managerParticipants,
+    isConnected,
+    connectionAttempts,
+    currentParticipantCount,
+    maxParticipantsForSession,
+    currentUserParticipantId,
+    isSessionFull,
+    error,
+    forceRefreshParticipants
+  } = useSessionParticipantManager({
+    conversationId: currentConversationId,
+    conversation: conversationData,
+    refetch: mockRefetch,
+    onSessionFull,
+    locationState
   });
 
+  // Update local participants state when manager participants change
   useEffect(() => {
-    if (participantsData) {
-      console.log("🔍 useHostParticipantState - Processing participants data:", participantsData);
-      
-      const formattedParticipants: ParticipantInfo[] = participantsData.map(p => ({
-        id: p.participant_id,
-        name: p.name,
-        avatarSeed: p.avatar_seed || `participant-${p.participant_id}`,
-        isAnonymous: p.is_anonymous || false,
-        isHost: p.is_host || false
-      }));
-
-      console.log("🔍 useHostParticipantState - Formatted participants:", formattedParticipants);
-      console.log("🔍 useHostParticipantState - Setting participants count to:", formattedParticipants.length);
-      
-      setParticipants(formattedParticipants);
+    if (managerParticipants && managerParticipants.length > 0) {
+      logger.category('host', `Updating participants from manager: ${managerParticipants.length} participants`);
+      setParticipants(managerParticipants);
     }
-  }, [participantsData]);
+  }, [managerParticipants, logger]);
 
-  console.log("🔍 useHostParticipantState - Current state:", {
-    participantsCount: participants.length,
-    isLoadingParticipants,
-    conversationId: currentConversationId
-  });
+  // Log state changes
+  useEffect(() => {
+    logger.category('host', 'Host participant state updated:', {
+      participantCount: participants.length,
+      currentParticipantCount,
+      maxParticipantsForSession,
+      isSessionFull,
+      isConnected,
+      connectionAttempts,
+      error: error || null
+    });
+  }, [participants.length, currentParticipantCount, maxParticipantsForSession, isSessionFull, isConnected, connectionAttempts, error, logger]);
 
   return {
     participants,
     setParticipants,
-    isLoadingParticipants
+    isLoadingParticipants: !isConnected && connectionAttempts === 0,
+    currentParticipantCount,
+    maxParticipantsForSession,
+    isSessionFull,
+    error,
+    forceRefreshParticipants
   };
 }

@@ -22,6 +22,11 @@ interface HostSessionContentProps {
   // Session start props
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
+  
+  // Auto-start props
+  isAutoStarting?: boolean;
+  autoStartCountdown?: number;
+  onCancelAutoStart?: () => void;
 }
 
 const HostSessionContent: React.FC<HostSessionContentProps> = ({
@@ -37,7 +42,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
-  onSessionStarted
+  onSessionStarted,
+  isAutoStarting = false,
+  autoStartCountdown = 0,
+  onCancelAutoStart
 }) => {
   // Use actual participant count from real-time data
   const actualParticipantCount = participants.length;
@@ -59,6 +67,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           onSessionStarted={onSessionStarted}
           participants={participants}
           conversationId={currentConversationId}
+          isAutoStarting={isAutoStarting}
+          autoStartCountdown={autoStartCountdown}
+          onCancelAutoStart={onCancelAutoStart}
         />
       </div>
 

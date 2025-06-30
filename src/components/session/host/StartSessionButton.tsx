@@ -1,20 +1,26 @@
 
 import React, { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Users } from "lucide-react";
+import { Play, Users, X } from "lucide-react";
 
 interface StartSessionButtonProps {
   onStartSession: () => void;
   participantCount: number;
   isSessionStarted: boolean;
   disabled?: boolean;
+  isAutoStarting?: boolean;
+  autoStartCountdown?: number;
+  onCancelAutoStart?: () => void;
 }
 
 const StartSessionButton: React.FC<StartSessionButtonProps> = ({
   onStartSession,
   participantCount,
   isSessionStarted,
-  disabled = false
+  disabled = false,
+  isAutoStarting = false,
+  autoStartCountdown = 0,
+  onCancelAutoStart
 }) => {
   const lastClickTime = useRef<number>(0);
   
@@ -27,9 +33,16 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       participantCount,
       isSessionStarted,
       disabled,
+      isAutoStarting,
       timeSinceLastClick,
-      isEnabled: !disabled && participantCount > 0 && !isSessionStarted
+      isEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isAutoStarting
     });
+    
+    // If auto-starting, allow cancellation
+    if (isAutoStarting && onCancelAutoStart) {
+      onCancelAutoStart();
+      return;
+    }
     
     // Prevent rapid clicks (debounce)
     if (timeSinceLastClick < 1000) {
@@ -50,7 +63,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     lastClickTime.current = now;
     console.log("🔥 StartSessionButton - Executing onStartSession");
     onStartSession();
-  }, [onStartSession, participantCount, isSessionStarted, disabled]);
+  }, [onStartSession, participantCount, isSessionStarted, disabled, isAutoStarting, onCancelAutoStart]);
 
   // Log state changes for debugging
   React.useEffect(() => {
@@ -58,9 +71,11 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       participantCount,
       isSessionStarted,
       disabled,
+      isAutoStarting,
+      autoStartCountdown,
       shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted
     });
-  }, [participantCount, isSessionStarted, disabled]);
+  }, [participantCount, isSessionStarted, disabled, isAutoStarting, autoStartCountdown]);
 
   if (isSessionStarted) {
     return (
@@ -68,6 +83,31 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
         <Users className="h-4 w-4 text-green-600" />
         <span className="text-green-800 font-medium">Session Active</span>
         <span className="text-green-600 text-sm">({participantCount} participants)</span>
+      </div>
+    );
+  }
+
+  if (isAutoStarting) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+          <span className="text-orange-800 font-medium">
+            Auto-starting in {autoStartCountdown}s...
+          </span>
+          <span className="text-orange-600 text-sm">({participantCount} participants)</span>
+        </div>
+        {onCancelAutoStart && (
+          <Button
+            onClick={handleClick}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-1 text-gray-600 hover:text-red-600 hover:border-red-300"
+          >
+            <X className="h-3 w-3" />
+            Cancel
+          </Button>
+        )}
       </div>
     );
   }
@@ -80,7 +120,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       disabled={isButtonDisabled}
       className="flex items-center gap-2 min-w-[140px]"
       size="lg"
-      style={{ pointerEvents: 'auto' }} // Ensure pointer events work
+      style={{ pointerEvents: 'auto' }}
     >
       <Play className="h-4 w-4" />
       Start Session

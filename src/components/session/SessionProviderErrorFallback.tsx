@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { isNetworkError } from "@/utils/networkUtils";
+import { isNetworkError, isAbortError } from "@/utils/networkUtils";
 
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
@@ -29,10 +29,11 @@ export const SessionProviderErrorFallback = ({
   const isSessionFullError = errorMessage.includes("session is full") || 
                             errorMessage.includes("maximum capacity");
   const isNetworkErr = isNetworkError({ message: errorMessage });
+  const isAbortErr = isAbortError({ message: errorMessage });
   
-  // Handle auto-retry for network errors
+  // Handle auto-retry for network errors (but not abort errors)
   useEffect(() => {
-    if (isNetworkErr && onRetry && autoRetryCount < 3) {
+    if (isNetworkErr && !isAbortErr && onRetry && autoRetryCount < 3) {
       const retryDelay = Math.min(1000 * Math.pow(2, autoRetryCount), 10000);
       console.log(`Auto-retrying network error in ${retryDelay}ms (attempt ${autoRetryCount + 1})`);
       
@@ -43,7 +44,19 @@ export const SessionProviderErrorFallback = ({
       
       return () => clearTimeout(timeoutId);
     }
-  }, [isNetworkErr, onRetry, autoRetryCount]);
+  }, [isNetworkErr, isAbortErr, onRetry, autoRetryCount]);
+  
+  // For abort errors, don't show error UI - just retry silently
+  useEffect(() => {
+    if (isAbortErr && onRetry) {
+      console.log("AbortError detected - retrying silently");
+      const timeoutId = setTimeout(() => {
+        onRetry();
+      }, 500); // Short delay for abort errors
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAbortErr, onRetry]);
   
   // Determine display error
   const displayError = isAdmin && isSessionFullError
@@ -121,6 +134,11 @@ export const SessionProviderErrorFallback = ({
     refetch: () => Promise.resolve({}),
     isAdmin: isAdmin
   };
+
+  // For abort errors, don't show any error UI - just render children
+  if (isAbortErr) {
+    return <>{children}</>;
+  }
 
   // For network errors, show a different UI
   if (isNetworkErr) {

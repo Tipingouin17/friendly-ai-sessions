@@ -30,8 +30,8 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       lastError = error as Error;
       
-      // Don't retry on certain types of errors
-      if (isNonRetryableError(error)) {
+      // Don't retry on certain types of errors or abort errors
+      if (isNonRetryableError(error) || isAbortError(error)) {
         throw error;
       }
       
@@ -62,7 +62,18 @@ function isNonRetryableError(error: any): boolean {
   return false;
 }
 
+export function isAbortError(error: any): boolean {
+  return error?.name === 'AbortError' || 
+         error?.message?.includes('abort') ||
+         error?.message?.includes('signal is aborted');
+}
+
 export function isNetworkError(error: any): boolean {
+  // Include AbortError as a recoverable network error for UI purposes
+  if (isAbortError(error)) {
+    return true;
+  }
+  
   return error?.message?.includes('Failed to fetch') ||
          error?.message?.includes('Network request failed') ||
          error?.name === 'TypeError' ||

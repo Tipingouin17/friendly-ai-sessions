@@ -7,7 +7,7 @@ import { getParticipantInfo } from "@/utils/participantUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
-import { retryWithBackoff, isNetworkError } from "@/utils/networkUtils";
+import { retryWithBackoff, isNetworkError, isAbortError } from "@/utils/networkUtils";
 import { requestDeduplicator } from "@/utils/requestDeduplication";
 
 type UseSessionParticipantSetupProps = {
@@ -42,6 +42,7 @@ export const useSessionParticipantSetup = ({
   const sessionFullCalledRef = useRef(false);
   const loadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const currentConversationIdRef = useRef<number | null>(null);
   
   // Enforce admin status if forceAdmin is true
   useEffect(() => {
@@ -52,23 +53,31 @@ export const useSessionParticipantSetup = ({
     }
   }, [forceAdmin, setAdminStatus]);
   
-  // Enhanced participant loading with retry logic
-  const loadParticipants = useCallback(async (attempt: number = 1) => {
+  // Enhanced participant loading with better abort handling
+  const loadParticipants = useCallback(async () => {
     if (!conversationId || loadingRef.current) {
       return;
     }
 
-    // Cancel any existing request
-    if (abortControllerRef.current) {
+    // Only abort if we're switching to a different conversation
+    if (abortControllerRef.current && currentConversationIdRef.current !== conversationId) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
 
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    // Update the current conversation ID reference
+    currentConversationIdRef.current = conversationId;
+
+    // Create new abort controller only if we don't have one for this conversation
+    if (!abortControllerRef.current) {
+      abortControllerRef.current = new AbortController();
+    }
+
+    const abortController = abortControllerRef.current;
     loadingRef.current = true;
     
     try {
-      console.log(`Loading participants for conversation ${conversationId} (attempt ${attempt})`);
+      console.log(`Loading participants for conversation ${conversationId}`);
       
       const requestKey = `participants-${conversationId}`;
       
@@ -87,11 +96,11 @@ export const useSessionParticipantSetup = ({
           
           return data;
         }, {
-          maxAttempts: isNetworkError(loadingError) ? 3 : 1,
+          maxAttempts: 2, // Reduce attempts to prevent loops
           baseDelay: 1000,
-          maxDelay: 5000
+          maxDelay: 3000
         });
-      });
+      }, abortController.signal);
       
       if (abortController.signal.aborted) {
         return;
@@ -138,43 +147,42 @@ export const useSessionParticipantSetup = ({
       }
       
     } catch (err: any) {
-      if (abortController.signal.aborted) {
+      if (isAbortError(err)) {
+        console.log("Request was aborted, ignoring error");
         return;
       }
       
       console.error("Error loading participants:", err);
-      setLoadingError(err.message || "Failed to load participants");
       setRetryCount(prev => prev + 1);
       
-      // Only call onError for non-network errors or after multiple failed attempts
-      if (!isNetworkError(err) || attempt >= 3) {
+      // Only set error for non-network errors and non-abort errors
+      if (!isNetworkError(err)) {
+        setLoadingError(err.message || "Failed to load participants");
         if (onError) {
           onError(`Failed to load session participants: ${err.message}`);
         }
       }
     } finally {
       loadingRef.current = false;
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
-      }
     }
-  }, [conversationId, locationState, onError, loadingError]);
+  }, [conversationId, locationState, onError]);
   
-  // Load participants when conversation changes
+  // Load participants when conversation changes (not on every render)
   useEffect(() => {
-    if (conversationId) {
+    if (conversationId && conversationId !== currentConversationIdRef.current) {
       loadParticipants();
     }
     
-    // Cleanup on unmount or conversation change
+    // Cleanup on unmount
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
       loadingRef.current = false;
+      currentConversationIdRef.current = null;
     };
-  }, [conversationId, loadParticipants]);
+  }, [conversationId]); // Only depend on conversationId
   
   // Update participant counts when conversation or participants change
   useEffect(() => {
@@ -208,21 +216,24 @@ export const useSessionParticipantSetup = ({
     onSessionStarted: () => {}
   });
   
-  // Handle realtime errors
+  // Handle realtime errors (exclude abort errors)
   useEffect(() => {
-    if (realtimeError && onError && !isNetworkError({ message: realtimeError })) {
+    if (realtimeError && onError && !isNetworkError({ message: realtimeError }) && !isAbortError({ message: realtimeError })) {
       onError(realtimeError);
     }
   }, [realtimeError, onError]);
   
-  // Force refresh participants function with retry logic
+  // Force refresh participants function
   const forceRefreshParticipants = useCallback(async () => {
     if (!conversationId) return;
     
     console.log("Forcing refresh of participants");
     requestDeduplicator.clear(`participants-${conversationId}`);
-    await loadParticipants(retryCount + 1);
-  }, [conversationId, loadParticipants, retryCount]);
+    
+    // Reset the conversation ID ref to force a reload
+    currentConversationIdRef.current = null;
+    await loadParticipants();
+  }, [conversationId, loadParticipants]);
   
   return {
     participants,

@@ -24,7 +24,7 @@ interface HostDashboardProps {
   totalParticipants: number;
   onTriggerFacilitatorResponse: () => Promise<void>;
   isSessionStarted: boolean;
-  onSessionStarted: () => Promise<void>;
+  onSessionStarted: () => void;
   triggerSessionStart?: () => Promise<boolean>;
   sessionStartNotification?: string | null;
   isStartingSession?: boolean;
@@ -135,7 +135,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       <HostHeader
         currentConversationId={currentConversationId}
         conversation={conversation}
-        activeSessions={sessions}
+        sessions={sessions}
         participants={participants}
         isLoadingParticipants={isLoadingParticipants}
         onShowQrCode={handleShowQrCode}
@@ -149,13 +149,12 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       />
 
       <HostSessionContent
-        conversationData={conversation}
+        conversation={conversation}
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
         sessionMessages={sessionMessages}
         participantColors={participantColors}
         participants={participants}
-        isLoadingParticipants={isLoadingParticipants}
         currentConversationId={currentConversationId}
         onSendMessage={onSendMessage}
         isWaitingForResponses={isWaitingForResponses}
@@ -175,11 +174,11 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
 
       {showWrapUpDialog && (
         <HostWrapUpDialog
-          onWrapUp={closeSession}
-          isWrappingUp={isClosing}
-          onClose={handleCloseWrapUpDialog}
-          onDownloadReport={downloadReport}
           conversationId={currentConversationId}
+          onClose={handleCloseWrapUpDialog}
+          onCloseSession={closeSession}
+          onDownloadReport={downloadReport}
+          isClosing={isClosing}
           isDownloading={isDownloading}
         />
       )}

@@ -1,3 +1,4 @@
+
 import { 
   checkAndLockGeneration, 
   unlockGeneration, 
@@ -5,7 +6,8 @@ import {
 } from "./message-deduplication.ts";
 import { 
   generateAIWelcomeMessage, 
-  generateEnhancedTemplateMessage 
+  generateEnhancedTemplateMessage,
+  generateAISubsequentMessage
 } from "./ai-generation.ts";
 import { 
   generateLateJoinerSummary,
@@ -30,6 +32,7 @@ export async function processResponse(
     generateReport,
     hasConversationData: !!conversation,
     participantCount: participants?.length || 0,
+    messageCount: messages?.length || 0,
     hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
   });
 
@@ -210,15 +213,136 @@ export async function processResponse(
       }
     }
 
-    // Handle other types of responses (reports, wrap-ups, etc.)
-    console.log(`📝 [${requestId}] Processing non-session-start response`);
-    
+    // Handle subsequent message generation (NEW ENHANCED LOGIC)
+    if (!generateReport && !wrapUpSession && !sessionStart) {
+      console.log(`💬 [${requestId}] Processing subsequent message generation`);
+      
+      const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+      if (openaiApiKey && conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective) {
+        try {
+          console.log(`🤖 [${requestId}] Attempting AI generation for subsequent message...`);
+          const aiResponse = await generateAISubsequentMessage(
+            supabase,
+            conversationId,
+            conversation,
+            participants,
+            messages,
+            openaiApiKey,
+            requestId
+          );
+          
+          if (aiResponse) {
+            return {
+              id: `resp-${Date.now()}`,
+              content: aiResponse.content,
+              is_report: false,
+              avatar: aiResponse.avatar,
+              facilitator_context: aiResponse.facilitator_context,
+              session_context: aiResponse.session_context,
+              metrics: {
+                generationMethod: 'ai_subsequent',
+                generationTime: 0,
+                responseQuality: 'high',
+                topicRelevance: 'high',
+                participationBalance: 0,
+                timestamp: Date.now(),
+                isOptimal: true,
+                qualityScore: 0.9,
+                reliabilityScore: 1,
+                speedClass: 'medium',
+                methodEfficiency: 1
+              }
+            };
+          }
+        } catch (aiError) {
+          console.error(`❌ [${requestId}] AI subsequent message generation failed:`, aiError);
+          // Fall through to enhanced template
+        }
+      }
+
+      // Fall back to enhanced template for subsequent messages
+      console.log(`📝 [${requestId}] Using enhanced template for subsequent message`);
+      const templateResponse = generateEnhancedTemplateMessage(conversation, participants, requestId);
+      
+      return {
+        id: `resp-${Date.now()}`,
+        content: templateResponse.content,
+        is_report: false,
+        avatar: templateResponse.avatar,
+        facilitator_context: templateResponse.facilitator_context,
+        session_context: templateResponse.session_context,
+        metrics: {
+          generationMethod: 'enhanced_template_subsequent',
+          generationTime: 0,
+          responseQuality: 'medium',
+          topicRelevance: 'medium',
+          participationBalance: 0,
+          timestamp: Date.now(),
+          isOptimal: false,
+          qualityScore: 0.7,
+          reliabilityScore: 1,
+          speedClass: 'fast',
+          methodEfficiency: 0.8
+        }
+      };
+    }
+
+    // Handle report generation
+    if (generateReport) {
+      console.log(`📊 [${requestId}] Processing report generation`);
+      
+      return {
+        id: `resp-${Date.now()}`,
+        content: "Session report has been generated. Thank you for your participation in this productive discussion.",
+        is_report: true,
+        metrics: {
+          generationMethod: 'report',
+          generationTime: 0,
+          responseQuality: 'high',
+          topicRelevance: 'high',
+          participationBalance: 0,
+          timestamp: Date.now(),
+          isOptimal: true,
+          qualityScore: 0.8,
+          reliabilityScore: 1,
+          speedClass: 'fast',
+          methodEfficiency: 1
+        }
+      };
+    }
+
+    // Handle session wrap-up
+    if (wrapUpSession) {
+      console.log(`🎯 [${requestId}] Processing session wrap-up`);
+      
+      return {
+        id: `resp-${Date.now()}`,
+        content: "Thank you all for your valuable contributions to this session. We've covered a lot of ground together, and I hope you found the discussion insightful and productive.",
+        is_report: false,
+        metrics: {
+          generationMethod: 'wrap_up',
+          generationTime: 0,
+          responseQuality: 'medium',
+          topicRelevance: 'medium',
+          participationBalance: 0,
+          timestamp: Date.now(),
+          isOptimal: false,
+          qualityScore: 0.7,
+          reliabilityScore: 1,
+          speedClass: 'fast',
+          methodEfficiency: 0
+        }
+      };
+    }
+
+    // Fallback for any other scenarios
+    console.log(`🔄 [${requestId}] Using fallback response`);
     return {
       id: `resp-${Date.now()}`,
-      content: "Thank you for your participation. How can I help you further?",
-      is_report: generateReport,
+      content: "I'm here to facilitate our discussion. Please share your thoughts and insights.",
+      is_report: false,
       metrics: {
-        generationMethod: 'standard',
+        generationMethod: 'fallback',
         generationTime: 0,
         responseQuality: 'medium',
         topicRelevance: 'medium',

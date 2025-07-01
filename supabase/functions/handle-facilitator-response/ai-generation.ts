@@ -94,6 +94,144 @@ export async function generateAIWelcomeMessage(
   }
 }
 
+export async function generateAISubsequentMessage(
+  supabase: any,
+  conversationId: number,
+  conversation: any,
+  participants: any[],
+  messages: any[],
+  openaiApiKey: string,
+  requestId: string
+): Promise<any> {
+  console.log(`🤖 [${requestId}] Starting AI subsequent message generation`);
+  
+  try {
+    // Extract enhanced context
+    const facilitatorContext = extractFacilitatorContext(conversation);
+    const sessionContext = extractSessionContext(conversation, participants);
+    
+    // Fetch recent messages for context
+    const { data: recentMessages, error: messagesError } = await supabase
+      .from('messages')
+      .select('content, role, created_at, name, participant')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messagesError) {
+      console.error(`❌ [${requestId}] Error fetching messages for context:`, messagesError);
+      throw messagesError;
+    }
+
+    const messageCount = recentMessages?.length || 0;
+    console.log(`📝 [${requestId}] Found ${messageCount} recent messages for context`);
+
+    // Determine conversation progress
+    let conversationProgress = 'early';
+    if (messageCount > 15) {
+      conversationProgress = 'concluding';
+    } else if (messageCount > 5) {
+      conversationProgress = 'middle';
+    }
+
+    // Analyze recent participant messages for themes
+    const participantMessages = recentMessages
+      ?.filter(msg => msg.role === 'user')
+      ?.slice(0, 5) || [];
+
+    const conversationContext = participantMessages
+      .reverse() // Put in chronological order
+      .map(msg => {
+        const participantName = msg.name || msg.participant || 'Participant';
+        const content = typeof msg.content === 'string' ? msg.content : 
+                       (typeof msg.content === 'object' && msg.content?.text) ? msg.content.text : 
+                       JSON.stringify(msg.content);
+        return `${participantName}: ${content}`;
+      })
+      .join('\n');
+
+    // Create contextual system prompt for subsequent messages
+    const systemPrompt = createContextualSystemPrompt(
+      facilitatorContext,
+      sessionContext,
+      conversationProgress,
+      false // not session start
+    );
+
+    // Create user prompt based on conversation context
+    let userPrompt = `Based on the recent discussion below, generate a thoughtful facilitator response that:
+1. Acknowledges key points raised by participants
+2. Asks follow-up questions to deepen the discussion
+3. Guides the conversation toward the session objective
+4. Encourages participation from all ${sessionContext.participantCount} ${sessionContext.participantDescription}
+5. Maintains the facilitator's expertise and persona
+
+Recent conversation:
+${conversationContext}
+
+Session progress: ${conversationProgress} stage
+Session objective: ${sessionContext.objective}
+
+Generate a response that moves the conversation forward constructively.`;
+
+    if (participantMessages.length === 0) {
+      userPrompt = `No participant messages have been received yet. Generate a gentle prompt to encourage the first participant to share their thoughts about ${sessionContext.objective}. Keep it welcoming and specific to the ${sessionContext.sessionType} context.`;
+    }
+
+    console.log(`🚀 [${requestId}] Calling OpenAI API for subsequent message generation...`);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 400,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    const aiContent = data.choices?.[0]?.message?.content;
+    
+    if (!aiContent) {
+      throw new Error('No content received from OpenAI API');
+    }
+    
+    console.log(`✅ [${requestId}] AI subsequent message generated successfully:`, {
+      contentLength: aiContent.length,
+      model: 'gpt-4o-mini',
+      conversationProgress,
+      participantMessageCount: participantMessages.length,
+      facilitatorUsed: facilitatorContext.name,
+      sessionUsed: sessionContext.title
+    });
+    
+    return {
+      content: aiContent,
+      generationMethod: 'ai_subsequent',
+      facilitator_context: facilitatorContext,
+      session_context: sessionContext,
+      avatar: facilitatorContext.profilePicture || '/api/avatar?name=' + encodeURIComponent(facilitatorContext.name) + '&variant=beam&palette=2'
+    };
+    
+  } catch (error) {
+    console.error(`❌ [${requestId}] AI subsequent message generation failed:`, error);
+    throw error;
+  }
+}
+
 export function generateEnhancedTemplateMessage(
   conversation: any,
   participants: any[],

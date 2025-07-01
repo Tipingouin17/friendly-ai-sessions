@@ -22,7 +22,7 @@ export function useSessionParticipantManager({
   onSessionFull,
   locationState
 }: UseSessionParticipantManagerProps) {
-  const logger = createLogger('SessionParticipantManager', 'participant');
+  const logger = createLogger('SessionParticipantManager', 'participants');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
@@ -59,7 +59,7 @@ export function useSessionParticipantManager({
   const setupParticipantSubscription = useCallback(() => {
     if (!conversationId || !mountedRef.current) return;
 
-    logger.category('participant', `Setting up participant subscription for conversation ${conversationId}`);
+    logger.category('participants', `Setting up participant subscription for conversation ${conversationId}`);
     
     cleanup();
     setError(null);
@@ -79,11 +79,11 @@ export function useSessionParticipantManager({
         }, (payload) => {
           if (!mountedRef.current) return;
           
-          logger.category('participant', 'Conversation update:', payload);
+          logger.category('participants', 'Conversation update:', payload);
           
           if (payload.new && refetch) {
             refetch().catch((err) => {
-              logger.category('participant', 'Refetch error:', err);
+              logger.category('participants', 'Refetch error:', err);
             });
           }
         })
@@ -96,7 +96,7 @@ export function useSessionParticipantManager({
         }, (payload) => {
           if (!mountedRef.current) return;
           
-          logger.category('participant', 'Participant change:', payload);
+          logger.category('participants', 'Participant change:', payload);
           
           if (payload.eventType === 'INSERT' && payload.new) {
             const newParticipant: ParticipantInfo = {
@@ -126,14 +126,14 @@ export function useSessionParticipantManager({
       channel.subscribe((status) => {
         if (!mountedRef.current) return;
         
-        logger.category('participant', `Channel status: ${status}`);
+        logger.category('participants', `Channel status: ${status}`);
         
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
           setError(null);
           setRetryCount(0);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          logger.category('participant', 'Channel error, will retry');
+          logger.category('participants', 'Channel error, will retry');
           setIsConnected(false);
           
           const errorMessage = 'Connection issue - retrying...';
@@ -158,7 +158,7 @@ export function useSessionParticipantManager({
         
       channelRef.current = channel;
     } catch (error) {
-      logger.category('participant', 'Error creating participant channel:', error);
+      logger.category('participants', 'Error creating participant channel:', error);
       const errorMessage = "Failed to establish connection";
       setError(errorMessage);
     }
@@ -175,7 +175,7 @@ export function useSessionParticipantManager({
         .eq('conversation_id', conversationId);
 
       if (participantsError) {
-        logger.category('participant', 'Error fetching initial participants:', participantsError);
+        logger.category('participants', 'Error fetching initial participants:', participantsError);
         return;
       }
 
@@ -192,10 +192,10 @@ export function useSessionParticipantManager({
         }));
         
         setParticipants(initialParticipants);
-        logger.category('participant', `Loaded ${initialParticipants.length} initial participants`);
+        logger.category('participants', `Loaded ${initialParticipants.length} initial participants`);
       }
     } catch (error) {
-      logger.category('participant', 'Exception during initial data fetch:', error);
+      logger.category('participants', 'Exception during initial data fetch:', error);
     }
   }, [conversationId, logger]);
 
@@ -217,14 +217,14 @@ export function useSessionParticipantManager({
   // Session full detection
   useEffect(() => {
     if (isSessionFull && onSessionFull) {
-      logger.category('participant', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
+      logger.category('participants', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
       onSessionFull();
     }
   }, [isSessionFull, onSessionFull, currentParticipantCount, maxParticipantsForSession, logger]);
 
   // Force refresh function
   const forceRefreshParticipants = useCallback(() => {
-    logger.category('participant', 'Force refreshing participants');
+    logger.category('participants', 'Force refreshing participants');
     fetchInitialParticipants();
     setupParticipantSubscription();
   }, [fetchInitialParticipants, setupParticipantSubscription, logger]);

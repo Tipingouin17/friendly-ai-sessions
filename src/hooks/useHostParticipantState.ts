@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManager";
-import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
+import { useHostParticipantManager } from "@/hooks/useHostParticipantManager";
 import { createLogger } from "@/utils/debugLogger";
 import { isNetworkError } from "@/utils/networkUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,42 +76,23 @@ export function useHostParticipantState({
     }
   }, [logger]);
 
-  // Handle participant changes from realtime
-  const handleParticipantChange = useCallback((payload: any) => {
-    console.log('👥 [HOST] Real-time participant change:', payload);
-    
-    if (payload.eventType === 'INSERT' && payload.new) {
-      const newParticipant: ParticipantInfo = {
-        id: payload.new.participant_id,
-        name: payload.new.name,
-        avatar: payload.new.avatar_seed 
-          ? `/api/avatar?name=${payload.new.avatar_seed}&variant=beam&palette=0` 
-          : null,
-        isAnonymous: payload.new.is_anonymous || false,
-        isHost: payload.new.is_host || false
-      };
-      
-      setParticipants(prev => {
-        const exists = prev.some(p => p.id === newParticipant.id);
-        if (exists) return prev;
-        
-        console.log(`👤 [HOST] Adding new participant: ${newParticipant.name} (${newParticipant.id})`);
-        return [...prev, newParticipant];
-      });
-    } else if (payload.eventType === 'DELETE' && payload.old) {
-      console.log(`👤 [HOST] Removing participant: ${payload.old.participant_id}`);
-      setParticipants(prev => prev.filter(p => p.id !== payload.old.participant_id));
-    }
-  }, []);
-
-  // Set up optimized realtime connection for participant updates
-  useOptimizedRealtimeConnection({
+  // Use dedicated host participant manager
+  const { 
+    isConnected: hostConnected, 
+    error: hostError, 
+    participants: hostParticipants,
+    currentCount: hostCurrentCount
+  } = useHostParticipantManager({
     conversationId: currentConversationId,
-    onParticipantChange: handleParticipantChange,
-    isHost: true
+    onParticipantsChange: (newParticipants) => {
+      logger.category('admin', `Host manager: Updating participants to ${newParticipants.length}`);
+      setParticipants(newParticipants);
+      setNetworkError(null); // Clear network error on successful update
+    },
+    enabled: !!currentConversationId
   });
 
-  // Use session participant manager with enhanced error handling and real refetch
+  // Use session participant manager as fallback with real refetch
   const {
     participants: managerParticipants,
     isConnected,
@@ -126,20 +107,23 @@ export function useHostParticipantState({
   } = useSessionParticipantManager({
     conversationId: currentConversationId,
     conversation: conversationData,
-    refetch: realRefetch, // Use real refetch instead of mock
+    refetch: realRefetch,
     onSessionFull,
     locationState
   });
 
-  // Update local participants state when manager participants change
+  // Use host participants when available, fall back to manager participants
   useEffect(() => {
-    if (managerParticipants && managerParticipants.length > 0) {
-      logger.category('admin', `Updating participants from manager: ${managerParticipants.length} participants`);
+    if (hostParticipants && hostParticipants.length > 0) {
+      logger.category('admin', `Using host participants: ${hostParticipants.length} participants`);
+      setParticipants(hostParticipants);
+      setNetworkError(null);
+    } else if (managerParticipants && managerParticipants.length > 0) {
+      logger.category('admin', `Falling back to manager participants: ${managerParticipants.length} participants`);
       setParticipants(managerParticipants);
-      // Clear network error if we successfully got participants
       setNetworkError(null);
     }
-  }, [managerParticipants, logger]);
+  }, [hostParticipants, managerParticipants, logger]);
 
   // Check for session full condition
   useEffect(() => {
@@ -156,25 +140,26 @@ export function useHostParticipantState({
   useEffect(() => {
     logger.category('admin', 'Host participant state updated:', {
       participantCount: participants.length,
-      currentParticipantCount,
+      currentParticipantCount: hostCurrentCount || currentParticipantCount,
       maxParticipantsForSession,
       isSessionFull,
+      hostConnected,
       isConnected,
       connectionAttempts,
-      error: error || null,
+      error: error || hostError || null,
       networkError,
       retryCount
     });
-  }, [participants.length, currentParticipantCount, maxParticipantsForSession, isSessionFull, isConnected, connectionAttempts, error, logger, networkError, retryCount]);
+  }, [participants.length, hostCurrentCount, currentParticipantCount, maxParticipantsForSession, isSessionFull, hostConnected, isConnected, connectionAttempts, error, hostError, logger, networkError, retryCount]);
 
   return {
     participants,
     setParticipants,
-    isLoadingParticipants: !isConnected && connectionAttempts === 0,
-    currentParticipantCount,
+    isLoadingParticipants: !hostConnected && !isConnected && connectionAttempts === 0,
+    currentParticipantCount: hostCurrentCount || currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    error: networkError || error, // Prioritize network errors for UI handling
+    error: networkError || hostError || error, // Prioritize network errors for UI handling
     forceRefreshParticipants,
     retryCount
   };

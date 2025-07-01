@@ -13,6 +13,9 @@ interface UseUnifiedParticipantManagerProps {
   isHost?: boolean;
 }
 
+// Global connection registry to prevent conflicts
+const connectionRegistry = new Map<string, boolean>();
+
 export function useUnifiedParticipantManager({
   conversationId,
   onParticipantCountChange,
@@ -32,7 +35,10 @@ export function useUnifiedParticipantManager({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const maxRetries = 3;
+  const maxRetries = isHost ? 1 : 3; // Reduced retries for hosts
+
+  // Create connection key for deduplication
+  const connectionKey = `unified-${conversationId}-${isHost ? 'host' : 'participant'}`;
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -48,11 +54,29 @@ export function useUnifiedParticipantManager({
       clearInterval(fallbackIntervalRef.current);
       fallbackIntervalRef.current = null;
     }
-  }, []);
+    
+    // Remove from registry
+    if (conversationId) {
+      connectionRegistry.delete(connectionKey);
+    }
+  }, [connectionKey, conversationId]);
+
+  // Check if another connection exists for this conversation/role combination
+  const canCreateConnection = useCallback(() => {
+    if (!conversationId) return false;
+    
+    // For hosts, always skip if a host connection already exists
+    if (isHost && connectionRegistry.has(connectionKey)) {
+      console.log(`🚫 Skipping unified manager - host connection already exists for conversation ${conversationId}`);
+      return false;
+    }
+    
+    return true;
+  }, [conversationId, isHost, connectionKey]);
 
   // Fallback polling for when realtime fails
   const startFallbackPolling = useCallback(async () => {
-    if (!conversationId || !mountedRef.current || fallbackIntervalRef.current) return;
+    if (!conversationId || !mountedRef.current || fallbackIntervalRef.current || !canCreateConnection()) return;
 
     console.log('🔄 Starting fallback polling for participant data');
     
@@ -120,19 +144,27 @@ export function useUnifiedParticipantManager({
       } catch (error) {
         console.error('Exception during fallback polling:', error);
       }
-    }, 3000);
-  }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, isHost]);
+    }, 5000); // Increased interval to reduce load
+  }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, isHost, canCreateConnection]);
 
   // Setup unified realtime subscription
   const setupSubscription = useCallback(() => {
-    if (!conversationId || !mountedRef.current || !enabled) return;
+    if (!conversationId || !mountedRef.current || !enabled || !canCreateConnection()) {
+      if (!canCreateConnection()) {
+        setError('Connection managed by another component');
+      }
+      return;
+    }
 
-    console.log(`🔗 Setting up unified participant manager for conversation ${conversationId}`);
+    console.log(`🔗 Setting up unified participant manager for conversation ${conversationId} (${isHost ? 'host' : 'participant'})`);
+    
+    // Register this connection
+    connectionRegistry.set(connectionKey, true);
     
     cleanup();
     setError(null);
     
-    const channelName = `unified-participant-${conversationId}-${Date.now()}`;
+    const channelName = `unified-participant-${conversationId}-${isHost ? 'host' : 'participant'}-${Date.now()}`;
     
     try {
       const channel = supabase
@@ -234,8 +266,8 @@ export function useUnifiedParticipantManager({
           
           startFallbackPolling();
           
-          // Implement retry with backoff
-          if (retryCountRef.current < maxRetries) {
+          // Implement retry with backoff for non-hosts only
+          if (!isHost && retryCountRef.current < maxRetries) {
             retryCountRef.current++;
             const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
             
@@ -257,11 +289,11 @@ export function useUnifiedParticipantManager({
       setError("Failed to establish connection");
       startFallbackPolling();
     }
-  }, [conversationId, enabled, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, isHost, cleanup, startFallbackPolling]);
+  }, [conversationId, enabled, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, isHost, cleanup, startFallbackPolling, canCreateConnection, connectionKey]);
 
   // Initial data fetch
   const fetchInitialData = useCallback(async () => {
-    if (!conversationId || !enabled) return;
+    if (!conversationId || !enabled || !canCreateConnection()) return;
 
     try {
       // Fetch conversation data
@@ -324,7 +356,7 @@ export function useUnifiedParticipantManager({
     } catch (error) {
       console.error('Exception during initial data fetch:', error);
     }
-  }, [conversationId, enabled, isHost, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange]);
+  }, [conversationId, enabled, isHost, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, canCreateConnection]);
 
   // Setup effect
   useEffect(() => {

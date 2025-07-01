@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Users } from "lucide-react";
-import { useSimplifiedParticipantMonitoring } from "@/hooks/useSimplifiedParticipantMonitoring";
+import { useUnifiedParticipantManager } from "@/hooks/useUnifiedParticipantManager";
 
 interface ParticipantCounterProps {
   currentParticipants: number;
@@ -21,8 +21,8 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
     setDisplayCount(currentParticipants);
   }, [currentParticipants]);
   
-  // Use simplified monitoring for realtime updates
-  useSimplifiedParticipantMonitoring({
+  // Use unified monitoring for realtime updates
+  const { currentCount } = useUnifiedParticipantManager({
     conversationId,
     onParticipantCountChange: (count) => {
       console.log(`ParticipantCounter: Setting display count to ${count}`);
@@ -31,11 +31,14 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
     enabled: !!conversationId
   });
   
+  // Use realtime count if available, otherwise fall back to props
+  const effectiveCount = currentCount > 0 ? currentCount : displayCount;
+  
   return (
     <div className="flex items-center mr-4 bg-gray-50 px-3 py-1 rounded-full">
       <Users size={16} className="text-gray-500 mr-1" />
       <span className="text-sm font-medium">
-        {displayCount}/{maxParticipants}
+        {effectiveCount}/{maxParticipants}
       </span>
     </div>
   );

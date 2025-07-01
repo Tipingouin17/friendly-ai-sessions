@@ -3,8 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useParticipantCounts } from "@/hooks/useParticipantCounts";
-import { useParticipantChannel } from "@/hooks/useParticipantChannel";
 import { useRealtimeConnectionHandler } from "@/hooks/useRealtimeConnectionHandler";
+import { useUnifiedParticipantManager } from "@/hooks/useUnifiedParticipantManager";
 import { supabase } from "@/integrations/supabase/client";
 import { retryWithBackoff, isNetworkError } from "@/utils/networkUtils";
 import { requestDeduplicator } from "@/utils/requestDeduplication";
@@ -34,10 +34,26 @@ export function useSessionParticipantManager({
   
   const currentUserParticipantId = locationState?.participantId || null;
   
-  // Realtime connection management with enhanced error handling
+  // Use unified participant manager instead of multiple hooks
   const {
     isConnected,
-    setIsConnected,
+    error: unifiedError,
+    participants: unifiedParticipants,
+    currentCount,
+    maxCount,
+    reconnect
+  } = useUnifiedParticipantManager({
+    conversationId,
+    onParticipantsChange: (newParticipants) => {
+      console.log("Session participant manager received participants update:", newParticipants.length);
+      setParticipants(newParticipants);
+    },
+    enabled: !!conversationId,
+    isHost: true // Enable participant tracking
+  });
+
+  // Realtime connection management with enhanced error handling
+  const {
     connectionAttempts,
     attemptReconnection,
     connectionError
@@ -51,23 +67,17 @@ export function useSessionParticipantManager({
     }
   });
 
-  // Participant counts management
+  // Participant counts management - use unified values when available
   const {
-    currentParticipantCount,
+    currentParticipantCount: fallbackCurrentCount,
     setCurrentParticipantCount,
-    maxParticipantsForSession,
+    maxParticipantsForSession: fallbackMaxCount,
     setMaxParticipantsForSession
   } = useParticipantCounts(conversation);
 
-  // Set up participant channel with error resilience
-  const { error: channelError } = useParticipantChannel({
-    conversationId,
-    setIsConnected,
-    attemptReconnection,
-    setCurrentParticipantCount,
-    setMaxParticipantsForSession,
-    refetch
-  });
+  // Use unified counts when available, fall back to existing logic
+  const currentParticipantCount = currentCount > 0 ? currentCount : fallbackCurrentCount;
+  const maxParticipantsForSession = maxCount > 0 ? maxCount : fallbackMaxCount;
 
   // Function to force refresh participant data with retry logic
   const forceRefreshParticipants = useCallback(async (): Promise<void> => {
@@ -149,20 +159,22 @@ export function useSessionParticipantManager({
     }
   }, [conversationId, conversation?.current_participants]);
 
-  // Initial load of participants
+  // Update participants from unified manager
   useEffect(() => {
-    if (conversationId) {
-      forceRefreshParticipants();
+    if (unifiedParticipants && unifiedParticipants.length > 0) {
+      console.log("Using unified participants:", unifiedParticipants.length);
+      setParticipants(unifiedParticipants);
+      setError(null);
     }
-  }, [conversationId, forceRefreshParticipants]);
+  }, [unifiedParticipants]);
 
-  // Handle channel errors (only non-network errors)
+  // Handle unified manager errors (only non-network errors)
   useEffect(() => {
-    if (channelError && !isNetworkError({ message: channelError })) {
-      console.error("Participant channel error:", channelError);
-      setError(channelError);
+    if (unifiedError && !isNetworkError({ message: unifiedError })) {
+      console.error("Unified participant manager error:", unifiedError);
+      setError(unifiedError);
     }
-  }, [channelError]);
+  }, [unifiedError]);
 
   // Check if session is full
   const isSessionFull = useCallback(() => {
@@ -182,10 +194,10 @@ export function useSessionParticipantManager({
     isSessionFull();
   }, [isSessionFull]);
 
-  // Update participants based on conversation data
+  // Update participants based on conversation data (fallback)
   useEffect(() => {
     if (conversation && conversation.current_participants > 0) {
-      if (conversation.current_participants > participants.length) {
+      if (conversation.current_participants > participants.length && participants.length === 0) {
         console.log("Updating participants based on conversation count:", 
                     conversation.current_participants, "current:", participants.length);
         
@@ -205,6 +217,7 @@ export function useSessionParticipantManager({
     isSessionFull: isSessionFull(),
     error: connectionError || error,
     forceRefreshParticipants,
-    retryCount
+    retryCount,
+    reconnect: reconnect || attemptReconnection
   };
 }

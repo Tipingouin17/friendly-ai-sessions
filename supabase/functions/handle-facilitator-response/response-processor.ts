@@ -1,4 +1,3 @@
-
 import { 
   checkAndLockGeneration, 
   unlockGeneration, 
@@ -8,6 +7,10 @@ import {
   generateAIWelcomeMessage, 
   generateEnhancedTemplateMessage 
 } from "./ai-generation.ts";
+import { 
+  generateLateJoinerSummary,
+  checkIsLateJoiner 
+} from "./late-joiner-handler.ts";
 
 export async function processResponse(
   supabase: any,
@@ -31,9 +34,9 @@ export async function processResponse(
   });
 
   try {
-    // Handle session start with deduplication
+    // Handle session start with enhanced late joiner detection
     if (sessionStart) {
-      console.log(`🎯 [${requestId}] Session start detected - generating contextual welcome message`);
+      console.log(`🎯 [${requestId}] Session start detected - checking for late joiner scenario`);
       
       // Check if generation is already in progress
       if (!checkAndLockGeneration(conversationId, requestId)) {
@@ -58,9 +61,56 @@ export async function processResponse(
       }
 
       try {
-        // Check if messages already exist
+        // Check if this is a late joiner scenario
+        const isLateJoiner = await checkIsLateJoiner(supabase, conversationId, requestId);
+        
+        if (isLateJoiner) {
+          console.log(`👋 [${requestId}] Late joiner detected - generating conversation summary`);
+          
+          const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+          if (openaiApiKey) {
+            try {
+              const lateJoinerResponse = await generateLateJoinerSummary(
+                supabase,
+                conversationId,
+                conversation,
+                participants,
+                openaiApiKey,
+                requestId
+              );
+              
+              unlockGeneration(conversationId, requestId);
+              return {
+                id: `resp-${Date.now()}`,
+                content: lateJoinerResponse.content,
+                is_report: false,
+                avatar: lateJoinerResponse.avatar,
+                facilitator_context: lateJoinerResponse.facilitator_context,
+                session_context: lateJoinerResponse.session_context,
+                metrics: {
+                  generationMethod: lateJoinerResponse.generationMethod,
+                  generationTime: 0,
+                  responseQuality: 'high',
+                  topicRelevance: 'high',
+                  participationBalance: 0,
+                  timestamp: Date.now(),
+                  isOptimal: true,
+                  qualityScore: 0.9,
+                  reliabilityScore: 1,
+                  speedClass: 'medium',
+                  methodEfficiency: 1
+                }
+              };
+            } catch (lateJoinerError) {
+              console.error(`❌ [${requestId}] Late joiner summary failed:`, lateJoinerError);
+              // Fall through to regular welcome message generation
+            }
+          }
+        }
+
+        // Check if messages already exist (for true session start)
         const hasExistingMessages = await checkExistingMessages(supabase, conversationId);
-        if (hasExistingMessages) {
+        if (hasExistingMessages && !isLateJoiner) {
           console.log(`📭 [${requestId}] Messages already exist for conversation ${conversationId}, skipping generation`);
           unlockGeneration(conversationId, requestId);
           return {

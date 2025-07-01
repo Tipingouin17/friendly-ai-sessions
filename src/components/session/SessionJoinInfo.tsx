@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { QrCode, Share2, Copy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { useUnifiedParticipantManager } from "@/hooks/useUnifiedParticipantManager";
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
@@ -23,24 +22,11 @@ const SessionJoinInfo = ({
   const { toast } = useToast();
   const [displayParticipantCount, setDisplayParticipantCount] = useState(currentParticipantCount);
   
-  // Update from props when they change
+  // Update from props when they change - no realtime subscription here
   useEffect(() => {
+    console.log(`SessionJoinInfo: Updating display count from props to ${currentParticipantCount}`);
     setDisplayParticipantCount(currentParticipantCount);
   }, [currentParticipantCount]);
-  
-  // Use unified monitoring for realtime updates
-  const { currentCount } = useUnifiedParticipantManager({
-    conversationId,
-    onParticipantCountChange: (count) => {
-      console.log(`SessionJoinInfo: Setting display count to ${count}`);
-      setDisplayParticipantCount(count);
-    },
-    enabled: !!conversationId && isAdmin,
-    isHost: isAdmin
-  });
-  
-  // Use realtime count if available, otherwise fall back to props
-  const effectiveCount = currentCount > 0 ? currentCount : displayParticipantCount;
   
   // If not admin or no conversation ID, don't render this component
   if (!isAdmin || !conversationId) return null;
@@ -59,13 +45,13 @@ const SessionJoinInfo = ({
   
   // Check if session is full and call the callback if provided
   React.useEffect(() => {
-    if (maxParticipants > 0 && effectiveCount >= maxParticipants && onSessionFull) {
+    if (maxParticipants > 0 && displayParticipantCount >= maxParticipants && onSessionFull) {
       console.log("Session is full, triggering onSessionFull callback from SessionJoinInfo");
       onSessionFull();
     }
-  }, [effectiveCount, maxParticipants, onSessionFull]);
+  }, [displayParticipantCount, maxParticipants, onSessionFull]);
   
-  const percentageFilled = maxParticipants ? (effectiveCount / maxParticipants) * 100 : 0;
+  const percentageFilled = maxParticipants ? (displayParticipantCount / maxParticipants) * 100 : 0;
   
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 mt-4">
@@ -74,7 +60,7 @@ const SessionJoinInfo = ({
           <Users className="w-4 h-4" /> Participants
         </h3>
         <div className="text-xl font-semibold text-primary">
-          {effectiveCount} <span className="text-gray-400 text-sm font-normal">/ {maxParticipants}</span>
+          {displayParticipantCount} <span className="text-gray-400 text-sm font-normal">/ {maxParticipants}</span>
         </div>
       </div>
       

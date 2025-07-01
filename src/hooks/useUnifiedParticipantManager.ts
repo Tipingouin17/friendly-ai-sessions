@@ -13,8 +13,31 @@ interface UseUnifiedParticipantManagerProps {
   isHost?: boolean;
 }
 
-// Global connection registry to prevent conflicts
-const connectionRegistry = new Map<string, boolean>();
+// Enhanced global connection registry to prevent conflicts
+const connectionRegistry = new Map<string, {
+  active: boolean;
+  timestamp: number;
+  channelRef: any;
+}>();
+
+// Clean up stale connections periodically
+const STALE_CONNECTION_TIMEOUT = 60000; // 1 minute
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, conn] of connectionRegistry.entries()) {
+    if (now - conn.timestamp > STALE_CONNECTION_TIMEOUT) {
+      console.log(`🧹 Cleaning up stale connection: ${key}`);
+      if (conn.channelRef) {
+        try {
+          removeChannel(conn.channelRef);
+        } catch (e) {
+          console.error('Error cleaning up stale channel:', e);
+        }
+      }
+      connectionRegistry.delete(key);
+    }
+  }
+}, STALE_CONNECTION_TIMEOUT);
 
 export function useUnifiedParticipantManager({
   conversationId,
@@ -33,12 +56,26 @@ export function useUnifiedParticipantManager({
   const channelRef = useRef<any>(null);
   const mountedRef = useRef(true);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryCountRef = useRef(0);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const maxRetries = isHost ? 1 : 3; // Reduced retries for hosts
+  const retryCountRef = useRef(0);
+  const maxRetries = isHost ? 1 : 2; // Reduced retries for hosts
 
   // Create connection key for deduplication
   const connectionKey = `unified-${conversationId}-${isHost ? 'host' : 'participant'}`;
+
+  // Enhanced connection checking
+  const canCreateConnection = useCallback(() => {
+    if (!conversationId || !enabled) return false;
+    
+    const existing = connectionRegistry.get(connectionKey);
+    if (existing && existing.active) {
+      console.log(`🚫 Skipping unified manager - connection already exists for ${connectionKey}`);
+      setError('Connection managed by another component');
+      return false;
+    }
+    
+    return true;
+  }, [conversationId, enabled, connectionKey]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -56,23 +93,12 @@ export function useUnifiedParticipantManager({
     }
     
     // Remove from registry
-    if (conversationId) {
+    const existing = connectionRegistry.get(connectionKey);
+    if (existing && existing.channelRef === channelRef.current) {
       connectionRegistry.delete(connectionKey);
+      console.log(`🗑️ Removed connection from registry: ${connectionKey}`);
     }
-  }, [connectionKey, conversationId]);
-
-  // Check if another connection exists for this conversation/role combination
-  const canCreateConnection = useCallback(() => {
-    if (!conversationId) return false;
-    
-    // For hosts, always skip if a host connection already exists
-    if (isHost && connectionRegistry.has(connectionKey)) {
-      console.log(`🚫 Skipping unified manager - host connection already exists for conversation ${conversationId}`);
-      return false;
-    }
-    
-    return true;
-  }, [conversationId, isHost, connectionKey]);
+  }, [connectionKey]);
 
   // Fallback polling for when realtime fails
   const startFallbackPolling = useCallback(async () => {
@@ -144,22 +170,23 @@ export function useUnifiedParticipantManager({
       } catch (error) {
         console.error('Exception during fallback polling:', error);
       }
-    }, 5000); // Increased interval to reduce load
+    }, 8000); // Increased interval to reduce server load
   }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, isHost, canCreateConnection]);
 
   // Setup unified realtime subscription
   const setupSubscription = useCallback(() => {
     if (!conversationId || !mountedRef.current || !enabled || !canCreateConnection()) {
-      if (!canCreateConnection()) {
-        setError('Connection managed by another component');
-      }
       return;
     }
 
     console.log(`🔗 Setting up unified participant manager for conversation ${conversationId} (${isHost ? 'host' : 'participant'})`);
     
     // Register this connection
-    connectionRegistry.set(connectionKey, true);
+    connectionRegistry.set(connectionKey, {
+      active: true,
+      timestamp: Date.now(),
+      channelRef: null // Will be set below
+    });
     
     cleanup();
     setError(null);
@@ -254,6 +281,12 @@ export function useUnifiedParticipantManager({
           setError(null);
           retryCountRef.current = 0;
           
+          // Update registry with channel reference
+          const existing = connectionRegistry.get(connectionKey);
+          if (existing) {
+            existing.channelRef = channel;
+          }
+          
           // Stop fallback polling if realtime is working
           if (fallbackIntervalRef.current) {
             clearInterval(fallbackIntervalRef.current);
@@ -266,10 +299,10 @@ export function useUnifiedParticipantManager({
           
           startFallbackPolling();
           
-          // Implement retry with backoff for non-hosts only
+          // Limited retry for hosts to prevent conflicts
           if (!isHost && retryCountRef.current < maxRetries) {
             retryCountRef.current++;
-            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
+            const delay = Math.min(2000 * Math.pow(2, retryCountRef.current), 15000);
             
             retryTimeoutRef.current = setTimeout(() => {
               if (mountedRef.current) {

@@ -1,24 +1,18 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { ParticipantInfo } from "@/types/chat";
-import { ConversationWithSession } from "@/types/database";
-import { useParticipantCounts } from "@/hooks/useParticipantCounts";
-import { useRealtimeConnectionHandler } from "@/hooks/useRealtimeConnectionHandler";
-import { useUnifiedParticipantManager } from "@/hooks/useUnifiedParticipantManager";
-import { supabase } from "@/integrations/supabase/client";
-import { retryWithBackoff, isNetworkError } from "@/utils/networkUtils";
-import { requestDeduplicator } from "@/utils/requestDeduplication";
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { removeChannel } from '@/utils/realtimeHelpers';
+import { ParticipantInfo } from '@/types/chat';
+import { ConversationWithSession } from '@/types/database';
+import { createLogger } from '@/utils/debugLogger';
+import { isNetworkError } from '@/utils/networkUtils';
 
 interface UseSessionParticipantManagerProps {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
-  refetch: () => Promise<any>;
+  refetch?: () => Promise<any>;
   onSessionFull?: () => void;
-  locationState?: { 
-    participantId?: number; 
-    isGuest?: boolean; 
-    participantName?: string;
-  } | null;
+  locationState?: any;
 }
 
 export function useSessionParticipantManager({
@@ -28,92 +22,165 @@ export function useSessionParticipantManager({
   onSessionFull,
   locationState
 }: UseSessionParticipantManagerProps) {
+  const logger = createLogger('SessionParticipantManager', 'participant');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   
-  const currentUserParticipantId = locationState?.participantId || null;
-  
-  // Use unified participant manager instead of multiple hooks
-  const {
-    isConnected,
-    error: unifiedError,
-    participants: unifiedParticipants,
-    currentCount,
-    maxCount,
-    reconnect
-  } = useUnifiedParticipantManager({
-    conversationId,
-    onParticipantsChange: (newParticipants) => {
-      console.log("Session participant manager received participants update:", newParticipants.length);
-      setParticipants(newParticipants);
-    },
-    enabled: !!conversationId,
-    isHost: true // Enable participant tracking
-  });
+  const channelRef = useRef<any>(null);
+  const mountedRef = useRef(true);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const maxRetries = 3;
 
-  // Realtime connection management with enhanced error handling
-  const {
-    connectionAttempts,
-    attemptReconnection,
-    connectionError
-  } = useRealtimeConnectionHandler({
-    conversationId,
-    refetch,
-    onConnectionError: (err) => {
-      if (!isNetworkError({ message: err })) {
-        setError(err);
-      }
+  // Memoized values
+  const currentParticipantCount = useMemo(() => participants.length, [participants.length]);
+  const maxParticipantsForSession = useMemo(() => conversation?.participants || 0, [conversation?.participants]);
+  const currentUserParticipantId = useMemo(() => locationState?.participantId || null, [locationState?.participantId]);
+  const isSessionFull = useMemo(() => 
+    currentParticipantCount >= maxParticipantsForSession && maxParticipantsForSession > 0,
+    [currentParticipantCount, maxParticipantsForSession]
+  );
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (channelRef.current) {
+      removeChannel(channelRef.current);
+      channelRef.current = null;
     }
-  });
-
-  // Participant counts management - use unified values when available
-  const {
-    currentParticipantCount: fallbackCurrentCount,
-    setCurrentParticipantCount,
-    maxParticipantsForSession: fallbackMaxCount,
-    setMaxParticipantsForSession
-  } = useParticipantCounts(conversation);
-
-  // Use unified counts when available, fall back to existing logic
-  const currentParticipantCount = currentCount > 0 ? currentCount : fallbackCurrentCount;
-  const maxParticipantsForSession = maxCount > 0 ? maxCount : fallbackMaxCount;
-
-  // Function to force refresh participant data with retry logic
-  const forceRefreshParticipants = useCallback(async (): Promise<void> => {
-    if (!conversationId) {
-      return Promise.resolve();
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
+  }, []);
+
+  // Setup realtime subscription for participants
+  const setupParticipantSubscription = useCallback(() => {
+    if (!conversationId || !mountedRef.current) return;
+
+    logger.category('participant', `Setting up participant subscription for conversation ${conversationId}`);
+    
+    cleanup();
+    setError(null);
+    setConnectionAttempts(prev => prev + 1);
+    
+    const channelName = `participant-manager-${conversationId}-${Date.now()}`;
     
     try {
-      console.log("Forcibly refreshing participant data for conversation:", conversationId);
-      
-      const requestKey = `refresh-participants-${conversationId}`;
-      
-      const data = await requestDeduplicator.deduplicate(requestKey, async () => {
-        return await retryWithBackoff(async () => {
-          const { data, error } = await supabase
-            .from('session_participants')
-            .select('*')
-            .eq('conversation_id', conversationId);
-            
-          if (error) {
-            console.error("Error fetching participant data:", error);
-            throw error;
-          }
+      const channel = supabase
+        .channel(channelName)
+        // Listen to conversation updates for participant counts
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        }, (payload) => {
+          if (!mountedRef.current) return;
           
-          return data;
-        }, {
-          maxAttempts: 3,
-          baseDelay: 1000,
-          maxDelay: 5000
+          logger.category('participant', 'Conversation update:', payload);
+          
+          if (payload.new && refetch) {
+            refetch().catch((err) => {
+              logger.category('participant', 'Refetch error:', err);
+            });
+          }
+        })
+        // Listen to participant changes
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'session_participants',
+          filter: `conversation_id=eq.${conversationId}`
+        }, (payload) => {
+          if (!mountedRef.current) return;
+          
+          logger.category('participant', 'Participant change:', payload);
+          
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newParticipant: ParticipantInfo = {
+              id: payload.new.participant_id,
+              name: payload.new.name,
+              avatar: payload.new.avatar_seed 
+                ? `/api/avatar?name=${payload.new.avatar_seed}&variant=beam&palette=0` 
+                : null,
+              avatarSeed: payload.new.avatar_seed,
+              isAnonymous: payload.new.is_anonymous || false,
+              isHost: payload.new.is_host || false,
+              joinedAt: new Date(payload.new.created_at),
+              lastActive: new Date(payload.new.created_at),
+            };
+            
+            setParticipants(prev => {
+              const exists = prev.some(p => p.id === newParticipant.id);
+              if (exists) return prev;
+              return [...prev, newParticipant];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setParticipants(prev => prev.filter(p => p.id !== payload.old.participant_id));
+          }
         });
-      });
-      
-      if (data && data.length > 0) {
-        console.log("Retrieved updated participant data:", data.length, "participants");
+
+      // Subscribe to the channel
+      channel.subscribe((status) => {
+        if (!mountedRef.current) return;
         
-        const updatedParticipants: ParticipantInfo[] = data.map(p => ({
+        logger.category('participant', `Channel status: ${status}`);
+        
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+          setError(null);
+          setRetryCount(0);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          logger.category('participant', 'Channel error, will retry');
+          setIsConnected(false);
+          
+          const errorMessage = 'Connection issue - retrying...';
+          setError(errorMessage);
+          
+          if (retryCount < maxRetries) {
+            setRetryCount(prev => prev + 1);
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+            
+            retryTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                setupParticipantSubscription();
+              }
+            }, delay);
+          } else {
+            setError('Connection failed after multiple attempts');
+          }
+        } else if (status === 'CLOSED') {
+          setIsConnected(false);
+        }
+      });
+        
+      channelRef.current = channel;
+    } catch (error) {
+      logger.category('participant', 'Error creating participant channel:', error);
+      const errorMessage = "Failed to establish connection";
+      setError(errorMessage);
+    }
+  }, [conversationId, refetch, retryCount, cleanup, logger]);
+
+  // Initial data fetch
+  const fetchInitialParticipants = useCallback(async () => {
+    if (!conversationId) return;
+
+    try {
+      const { data: participantsData, error: participantsError } = await supabase
+        .from('session_participants')
+        .select('*')
+        .eq('conversation_id', conversationId);
+
+      if (participantsError) {
+        logger.category('participant', 'Error fetching initial participants:', participantsError);
+        return;
+      }
+
+      if (participantsData) {
+        const initialParticipants: ParticipantInfo[] = participantsData.map(p => ({
           id: p.participant_id,
           name: p.name || `Participant ${p.participant_id}`,
           avatar: p.avatar_seed ? `/api/avatar?name=${p.avatar_seed}&variant=beam&palette=0` : null,
@@ -124,100 +191,54 @@ export function useSessionParticipantManager({
           lastActive: new Date(p.created_at),
         }));
         
-        setParticipants(updatedParticipants);
-        setError(null);
-        setRetryCount(0);
-      } else if (conversation?.current_participants) {
-        const count = conversation.current_participants;
-        console.log("No participant data found, creating placeholders for", count, "participants");
-        
-        const placeholders: ParticipantInfo[] = Array.from({ length: count }, (_, i) => ({
-          id: i + 1,
-          name: `Participant ${i + 1}`,
-          avatar: null,
-          avatarSeed: null,
-          isAnonymous: false,
-          isHost: false,
-          joinedAt: new Date(),
-          lastActive: new Date(),
-        }));
-        
-        setParticipants(placeholders);
+        setParticipants(initialParticipants);
+        logger.category('participant', `Loaded ${initialParticipants.length} initial participants`);
       }
-      
-      return Promise.resolve();
-    } catch (err: any) {
-      console.error("Error in forceRefreshParticipants:", err);
-      setRetryCount(prev => prev + 1);
-      
-      // Only set error for non-network errors
-      if (!isNetworkError(err)) {
-        setError(`Failed to refresh participants: ${err.message}`);
-      }
-      
-      return Promise.resolve();
+    } catch (error) {
+      logger.category('participant', 'Exception during initial data fetch:', error);
     }
-  }, [conversationId, conversation?.current_participants]);
+  }, [conversationId, logger]);
 
-  // Update participants from unified manager
+  // Setup effect
   useEffect(() => {
-    if (unifiedParticipants && unifiedParticipants.length > 0) {
-      console.log("Using unified participants:", unifiedParticipants.length);
-      setParticipants(unifiedParticipants);
-      setError(null);
-    }
-  }, [unifiedParticipants]);
-
-  // Handle unified manager errors (only non-network errors)
-  useEffect(() => {
-    if (unifiedError && !isNetworkError({ message: unifiedError })) {
-      console.error("Unified participant manager error:", unifiedError);
-      setError(unifiedError);
-    }
-  }, [unifiedError]);
-
-  // Check if session is full
-  const isSessionFull = useCallback(() => {
-    const isFull = maxParticipantsForSession > 0 && 
-           currentParticipantCount >= maxParticipantsForSession;
-           
-    if (isFull && onSessionFull) {
-      console.log("Session is full, triggering onSessionFull callback");
-      onSessionFull();
+    mountedRef.current = true;
+    
+    if (conversationId) {
+      fetchInitialParticipants();
+      setupParticipantSubscription();
     }
     
-    return isFull;
-  }, [currentParticipantCount, maxParticipantsForSession, onSessionFull]);
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
+  }, [conversationId, fetchInitialParticipants, setupParticipantSubscription, cleanup]);
 
-  // Update parent components when session becomes full
+  // Session full detection
   useEffect(() => {
-    isSessionFull();
-  }, [isSessionFull]);
-
-  // Update participants based on conversation data (fallback)
-  useEffect(() => {
-    if (conversation && conversation.current_participants > 0) {
-      if (conversation.current_participants > participants.length && participants.length === 0) {
-        console.log("Updating participants based on conversation count:", 
-                    conversation.current_participants, "current:", participants.length);
-        
-        forceRefreshParticipants();
-      }
+    if (isSessionFull && onSessionFull) {
+      logger.category('participant', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
+      onSessionFull();
     }
-  }, [conversation, participants.length, forceRefreshParticipants]);
+  }, [isSessionFull, onSessionFull, currentParticipantCount, maxParticipantsForSession, logger]);
+
+  // Force refresh function
+  const forceRefreshParticipants = useCallback(() => {
+    logger.category('participant', 'Force refreshing participants');
+    fetchInitialParticipants();
+    setupParticipantSubscription();
+  }, [fetchInitialParticipants, setupParticipantSubscription, logger]);
 
   return {
     participants,
-    setParticipants,
     isConnected,
     connectionAttempts,
     currentParticipantCount,
     maxParticipantsForSession,
     currentUserParticipantId,
-    isSessionFull: isSessionFull(),
-    error: connectionError || error,
+    isSessionFull,
+    error,
     forceRefreshParticipants,
-    retryCount,
-    reconnect: reconnect || attemptReconnection
+    retryCount
   };
 }

@@ -76,7 +76,7 @@ export function useHostParticipantState({
     }
   }, [logger]);
 
-  // Use dedicated host participant manager
+  // Use dedicated host participant manager as primary source
   const { 
     isConnected: hostConnected, 
     error: hostError, 
@@ -92,38 +92,43 @@ export function useHostParticipantState({
     enabled: !!currentConversationId
   });
 
-  // Use session participant manager as fallback with real refetch
+  // Use session participant manager as fallback only if host manager fails
   const {
     participants: managerParticipants,
-    isConnected,
+    isConnected: fallbackConnected,
     connectionAttempts,
-    currentParticipantCount,
+    currentParticipantCount: fallbackParticipantCount,
     maxParticipantsForSession,
     currentUserParticipantId,
     isSessionFull,
-    error,
+    error: fallbackError,
     forceRefreshParticipants,
     retryCount
   } = useSessionParticipantManager({
-    conversationId: currentConversationId,
+    conversationId: !hostConnected ? currentConversationId : null, // Only use if host manager fails
     conversation: conversationData,
     refetch: realRefetch,
     onSessionFull,
     locationState
   });
 
-  // Use host participants when available, fall back to manager participants
+  // Determine which data source to use
+  const isConnected = hostConnected || fallbackConnected;
+  const currentParticipantCount = hostCurrentCount || fallbackParticipantCount || 0;
+  const error = networkError || hostError || fallbackError;
+
+  // Use host participants when available, fall back to manager participants only if needed
   useEffect(() => {
-    if (hostParticipants && hostParticipants.length > 0) {
+    if (hostParticipants && hostParticipants.length >= 0) {
       logger.category('admin', `Using host participants: ${hostParticipants.length} participants`);
       setParticipants(hostParticipants);
       setNetworkError(null);
-    } else if (managerParticipants && managerParticipants.length > 0) {
+    } else if (!hostConnected && managerParticipants && managerParticipants.length >= 0) {
       logger.category('admin', `Falling back to manager participants: ${managerParticipants.length} participants`);
       setParticipants(managerParticipants);
       setNetworkError(null);
     }
-  }, [hostParticipants, managerParticipants, logger]);
+  }, [hostParticipants, managerParticipants, hostConnected, logger]);
 
   // Check for session full condition
   useEffect(() => {
@@ -140,26 +145,26 @@ export function useHostParticipantState({
   useEffect(() => {
     logger.category('admin', 'Host participant state updated:', {
       participantCount: participants.length,
-      currentParticipantCount: hostCurrentCount || currentParticipantCount,
+      currentParticipantCount,
       maxParticipantsForSession,
       isSessionFull,
       hostConnected,
-      isConnected,
+      fallbackConnected,
       connectionAttempts,
-      error: error || hostError || null,
+      error: error || null,
       networkError,
       retryCount
     });
-  }, [participants.length, hostCurrentCount, currentParticipantCount, maxParticipantsForSession, isSessionFull, hostConnected, isConnected, connectionAttempts, error, hostError, logger, networkError, retryCount]);
+  }, [participants.length, currentParticipantCount, maxParticipantsForSession, isSessionFull, hostConnected, fallbackConnected, connectionAttempts, error, logger, networkError, retryCount]);
 
   return {
     participants,
     setParticipants,
-    isLoadingParticipants: !hostConnected && !isConnected && connectionAttempts === 0,
-    currentParticipantCount: hostCurrentCount || currentParticipantCount,
+    isLoadingParticipants: !isConnected && connectionAttempts === 0,
+    currentParticipantCount,
     maxParticipantsForSession,
     isSessionFull,
-    error: networkError || hostError || error, // Prioritize network errors for UI handling
+    error, // Return the processed error
     forceRefreshParticipants,
     retryCount
   };

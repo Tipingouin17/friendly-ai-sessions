@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { QrCode, Share2, Copy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from "@/integrations/supabase/client";
+import { useSimplifiedParticipantMonitoring } from "@/hooks/useSimplifiedParticipantMonitoring";
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
@@ -28,60 +28,15 @@ const SessionJoinInfo = ({
     setDisplayParticipantCount(currentParticipantCount);
   }, [currentParticipantCount]);
   
-  // Set up realtime listener for participant count changes
-  useEffect(() => {
-    if (!conversationId) return;
-    
-    // Create a unique channel name
-    const channelName = `join-info-count-${conversationId}-${Date.now()}`;
-    
-    // Listen for changes to current_participants in the conversation
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'conversations',
-        filter: `id=eq.${conversationId}`
-      }, (payload) => {
-        console.log("JoinInfo: Participant count update payload:", payload);
-        
-        if (payload.new && typeof payload.new.current_participants === 'number') {
-          console.log(`JoinInfo: Setting display count to ${payload.new.current_participants}`);
-          setDisplayParticipantCount(payload.new.current_participants);
-        }
-      })
-      .subscribe();
-      
-    // Also listen for count_updated events
-    const eventsChannel = supabase
-      .channel(`join-info-events-${conversationId}-${Date.now()}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'session_events',
-        filter: `conversation_id=eq.${conversationId} AND event_type=eq.count_updated`
-      }, (payload) => {
-        console.log("JoinInfo: Count update event:", payload);
-        
-        if (payload.new && 
-            payload.new.data && 
-            typeof payload.new.data.current_count === 'number') {
-          console.log(`JoinInfo: Setting display count from event to ${payload.new.data.current_count}`);
-          setDisplayParticipantCount(payload.new.data.current_count);
-        }
-      })
-      .subscribe();
-    
-    return () => {
-      try {
-        supabase.removeChannel(channel);
-        supabase.removeChannel(eventsChannel);
-      } catch (err) {
-        console.error("Error removing join info counter channels:", err);
-      }
-    };
-  }, [conversationId]);
+  // Use simplified monitoring for realtime updates
+  useSimplifiedParticipantMonitoring({
+    conversationId,
+    onParticipantCountChange: (count) => {
+      console.log(`SessionJoinInfo: Setting display count to ${count}`);
+      setDisplayParticipantCount(count);
+    },
+    enabled: !!conversationId && isAdmin
+  });
   
   // If not admin or no conversation ID, don't render this component
   if (!isAdmin || !conversationId) return null;

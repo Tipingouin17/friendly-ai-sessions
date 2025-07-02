@@ -129,32 +129,55 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
-      console.log("Response collection status:", {
+      console.log("📊 Response collection status:", {
         totalParticipants,
-        responseCount: responseCount + 1, // +1 because we just added this response
+        responseCount,
+        responseCountAfterUpdate: responseCount + 1,
         allResponded: (responseCount + 1) >= totalParticipants,
-        isWaitingForResponses
+        isWaitingForResponses,
+        shouldTriggerAI: totalParticipants <= 1 || (responseCount + 1) >= totalParticipants
       });
       
-      // Check if we need a facilitator response
-      const updatedTotalResponses = sessionState.totalResponses + 1;
+      // For single participant sessions, ALWAYS trigger AI response immediately
+      // For multi-participant sessions, wait until all have responded
+      const shouldTriggerAIResponse = totalParticipants <= 1 || (responseCount + 1) >= totalParticipants;
       
-      // Only trigger facilitator response if all participants have responded OR it's a single participant session
-      if (totalParticipants <= 1 || (responseCount + 1) >= totalParticipants) {
+      console.log("🤖 AI Response Decision:", {
+        shouldTriggerAIResponse,
+        reason: totalParticipants <= 1 ? 'single-participant' : 'all-participants-responded',
+        totalParticipants,
+        currentResponseCount: responseCount + 1
+      });
+      
+      if (shouldTriggerAIResponse) {
+        console.log("🚀 Triggering AI facilitator response...");
         setIsWaitingForResponse(true);
         stopWaitingForResponses(); // Stop the waiting state
         const aiStartTime = performance.now();
 
         try {
-          // Get facilitator response
+          // Get facilitator response with updated messages including the new participant message
+          const updatedMessages = [...sessionState.messages, newMessage];
+          console.log("📨 Sending to AI:", {
+            conversationId: currentConversationId,
+            messageCount: updatedMessages.length,
+            lastMessage: updatedMessages[updatedMessages.length - 1]?.content?.substring(0, 100)
+          });
+          
           const aiResponse = await requestFacilitatorResponse(
             currentConversationId, 
-            sessionState.messages,
+            updatedMessages,
             conversation
           );
           
           const aiEndTime = performance.now();
           const aiResponseTime = aiEndTime - aiStartTime;
+          
+          console.log("✅ AI Response received:", {
+            responseTime: aiResponseTime,
+            contentLength: aiResponse.content?.length,
+            aiResponseId: aiResponse.id
+          });
           
           // Log AI response metrics
           logAIResponse(
@@ -169,15 +192,25 @@ export const useMessageSender = ({
             const newMessages = [...prev, aiResponse];
             // Start collecting responses for the new question
             if (totalParticipants > 1 && !aiResponse.isReport) {
+              console.log("🔄 Starting new response collection for multi-participant session");
               setTimeout(() => startResponseCollection(aiResponse.id), 100);
             }
             return newMessages;
           });
+        } catch (aiError) {
+          console.error("❌ AI Response Error:", aiError);
+          setError("Failed to get facilitator response. Please try again.");
+          toast({
+            title: "AI Response Error",
+            description: "Failed to get facilitator response. Please try again.",
+            variant: "destructive",
+          });
         } finally {
           setIsWaitingForResponse(false);
         }
+      } else {
+        console.log("⏳ Waiting for more participants to respond before triggering AI");
       }
-      // If not all participants have responded, we just wait (the UI will show the waiting indicator)
       
     } catch (error) {
       console.error("Error sending message:", error);

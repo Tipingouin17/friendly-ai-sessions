@@ -13,13 +13,21 @@ export const useFacilitatorResponse = () => {
     messages: Message[],
     conversation: any
   ): Promise<Message> => {
-    console.log('Calling edge function for facilitator response');
+    console.log('🔥 Calling edge function for facilitator response:', {
+      conversationId,
+      messageCount: messages.length,
+      hasConversation: !!conversation,
+      facilitator: conversation?.sessions?.facilitator_details?.title
+    });
 
     try {
       const response = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
           messages,
-          conversationId
+          conversationId,
+          conversation,
+          sessionStart: false,
+          generateReport: false
         }
       });
 

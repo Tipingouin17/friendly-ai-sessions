@@ -53,13 +53,7 @@ export function useHostParticipantState({
     enabled: !!currentConversationId
   });
 
-  // Update participants when enhanced manager provides them
-  useEffect(() => {
-    if (enhancedParticipants && enhancedParticipants.length >= 0) {
-      logger.category('admin', `Using enhanced participants: ${enhancedParticipants.length} participants`);
-      setParticipants(enhancedParticipants);
-    }
-  }, [enhancedParticipants, logger]);
+  // Remove this duplicate useEffect - participants are updated via onParticipantsChange callback only
 
   // Log state changes
   useEffect(() => {

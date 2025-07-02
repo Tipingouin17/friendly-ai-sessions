@@ -43,19 +43,27 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   isHostView = false
 }) => {
   const logger = createLogger('BaseParticipantList', 'participants');
-  const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
+  
+  // For host views, use props directly to avoid state synchronization issues
+  // For non-host views, use local state for real-time management
+  const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(
+    isHostView ? [] : participants
+  );
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(isLoading);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Synchronize the component's local state with the incoming props
+  // Only synchronize local state for non-host views
   useEffect(() => {
-    if (participants && participants.length >= 0) {
-      logger.category('participants', `${isHostView ? 'Host view' : 'Regular view'}: Updating participants list to ${participants.length}`);
+    if (!isHostView && participants && participants.length >= 0) {
+      logger.category('participants', `Regular view: Updating participants list to ${participants.length}`);
       setParticipantsList(participants);
     }
     
     setIsLoadingParticipants(isLoading);
   }, [participants, isLoading, logger, isHostView]);
+  
+  // Use participants directly for host views, local state for others
+  const effectiveParticipants = isHostView ? participants : participantsList;
   
   const { 
     displayCount, 
@@ -64,15 +72,15 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
     isRemoving
   } = useParticipantRemoval({
     conversationId: conversationData?.id || null,
-    currentParticipantCount: participantsList.length,
-    setParticipantsList
+    currentParticipantCount: effectiveParticipants.length,
+    setParticipantsList: isHostView ? () => {} : setParticipantsList
   });
   
   useEffect(() => {
-    const actualCount = participantsList.length;
+    const actualCount = effectiveParticipants.length;
     logger.category('participants', `${isHostView ? 'Host view' : 'Regular view'}: Setting display count to ${actualCount}`);
     setDisplayCount(actualCount);
-  }, [participantsList, setDisplayCount, logger, isHostView]);
+  }, [effectiveParticipants, setDisplayCount, logger, isHostView]);
   
   // Only use internal real-time management for non-host views
   // Host views rely on useEnhancedHostParticipantManager as the single source of truth
@@ -105,12 +113,12 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   };
   
   // Filter participants based on their actual name
-  const filteredParticipants = participantsList.filter(participant => {
+  const filteredParticipants = effectiveParticipants.filter(participant => {
     const displayName = participant.name || `Participant ${participant.id}`;
     return displayName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const actualParticipantCount = participantsList.length;
+  const actualParticipantCount = effectiveParticipants.length;
 
   return (
     <div className="w-80 border-l border-gray-200 bg-white flex flex-col h-full hidden md:flex">
@@ -173,7 +181,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
         <div className="border-t border-gray-200">
           <AdminMessageInput
             onSendMessage={onSendMessage}
-            participants={participantsList}
+            participants={effectiveParticipants}
           />
         </div>
       )}

@@ -174,12 +174,21 @@ export function useEnhancedHostParticipantManager({
           lastActive: new Date(p.created_at),
         }));
         
-        setParticipants(updatedParticipants);
-        if (onParticipantsChange) {
-          onParticipantsChange(updatedParticipants);
-        }
-        
-        logger.category('admin', `Updated participant list: ${updatedParticipants.length} participants`);
+        // Only update if the participant list has actually changed
+        setParticipants(prev => {
+          const isDifferent = prev.length !== updatedParticipants.length || 
+            prev.some((p, i) => p.id !== updatedParticipants[i]?.id);
+          
+          if (isDifferent) {
+            logger.category('admin', `Participant list changed: ${prev.length} -> ${updatedParticipants.length}`);
+            if (onParticipantsChange) {
+              onParticipantsChange(updatedParticipants);
+            }
+            return updatedParticipants;
+          }
+          
+          return prev;
+        });
       }
     } catch (error) {
       logger.category('admin', 'Exception fetching participants:', error);

@@ -303,15 +303,21 @@ export const useMessageFetching = ({
     }
   }, [memoizedConversation?.session_started, memoizedConversation?.sessions, isAdmin, generateAIWelcomeForAutoStart, messages.length, conversationId, saveWelcomeMessageToDb]);
 
-  // Generate unique fetch key to prevent unnecessary re-fetches
+  // Generate stable fetch key to prevent unnecessary re-fetches
   const generateFetchKey = useCallback(() => {
-    return `${conversationId}-${!!memoizedConversation}-${isAdmin}-${messages.length}-${welcomeGenerationRef.current}`;
-  }, [conversationId, memoizedConversation, isAdmin, messages.length]);
+    return `${conversationId}-${!!memoizedConversation}-${isAdmin}-${isInitialFetch}`;
+  }, [conversationId, memoizedConversation, isAdmin, isInitialFetch]);
 
   // Enhanced main fetch function with improved deduplication
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
       console.log('⚠️ fetchMessages: No conversation ID provided, skipping message fetch');
+      return;
+    }
+
+    // Only fetch if we have conversation data or this is the initial fetch
+    if (!memoizedConversation && !isInitialFetch) {
+      console.log('⚠️ fetchMessages: Waiting for conversation data to load...');
       return;
     }
 

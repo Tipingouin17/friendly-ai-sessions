@@ -58,10 +58,14 @@ export const useSessionMessages = ({
     isAdmin
   });
   
-  // Fetch messages when the conversation ID changes
+  // Fetch messages when the conversation ID changes and conversation data is available
   useEffect(() => {
-    fetchMessages();
-  }, [conversationId, welcomeMessage, conversation, fetchMessages]);
+    // Only fetch messages if we have conversation ID and either conversation data or it's initial load
+    if (conversationId && (conversation || !messages.length)) {
+      console.log('🚀 useSessionMessages: Triggering fetchMessages with conversation data loaded');
+      fetchMessages();
+    }
+  }, [conversationId, conversation, fetchMessages, messages.length]);
   
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {

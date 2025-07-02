@@ -10,7 +10,7 @@ const DEBUG_CONFIG = {
   session: true,          // Session setup and management - ENABLED for debugging
   provider: false,        // Session provider internals
   initialization: false,  // Initialization processes
-  connection: false,      // Connection and realtime events
+  connection: true,       // Connection and realtime events - ENABLED for performance monitoring
   
   // Data logs
   participants: true,     // Participant joining/leaving
@@ -19,7 +19,7 @@ const DEBUG_CONFIG = {
   
   // UI logs
   rendering: false,       // Component renders
-  state: false,           // State changes
+  state: true,            // State changes - ENABLED for performance monitoring
   
   // Special cases
   errors: true,           // Always log errors

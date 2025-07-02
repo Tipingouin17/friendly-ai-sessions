@@ -11,6 +11,7 @@ interface UseParticipantRealtimeProps {
   setParticipants: React.Dispatch<React.SetStateAction<ParticipantInfo[]>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   maxParticipants?: number;
+  enabled?: boolean; // Allow disabling the hook
 }
 
 export function useParticipantRealtime({
@@ -18,8 +19,13 @@ export function useParticipantRealtime({
   participants,
   setParticipants,
   setIsLoading,
-  maxParticipants
+  maxParticipants,
+  enabled = true
 }: UseParticipantRealtimeProps) {
+  // Early return if disabled
+  if (!enabled) {
+    return;
+  }
   const participantsChannelRef = useRef<any>(null);
   const eventsChannelRef = useRef<any>(null);
   const hasSetupSubscription = useRef(false);

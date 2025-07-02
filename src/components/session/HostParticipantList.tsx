@@ -19,6 +19,7 @@ const HostParticipantList: React.FC<HostParticipantListProps> = (props) => {
       {...props}
       title="Participants"
       showMessageInput={true}
+      isHostView={true}
     />
   );
 };

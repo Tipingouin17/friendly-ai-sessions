@@ -10,6 +10,7 @@ import ParticipantListSkeleton from "@/components/session/participant/Participan
 import AdminMessageInput from "@/components/session/AdminMessageInput";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { createLogger } from "@/utils/debugLogger";
 
 interface BaseParticipantListProps {
   participants: ParticipantInfo[];
@@ -21,6 +22,7 @@ interface BaseParticipantListProps {
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
   title?: string;
   showMessageInput?: boolean;
+  isHostView?: boolean; // When true, disables internal real-time management
 }
 
 const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
@@ -32,21 +34,23 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   messages = [],
   onSendMessage,
   title = "Participants",
-  showMessageInput = true
+  showMessageInput = true,
+  isHostView = false
 }) => {
+  const logger = createLogger('BaseParticipantList', 'participants');
   const [participantsList, setParticipantsList] = useState<ParticipantInfo[]>(participants);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(isLoading);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Synchronize the component's local state with the incoming props
   useEffect(() => {
-    if (participants && participants.length > 0) {
-      console.log('BaseParticipantList: Updating participants list', participants.length);
+    if (participants && participants.length >= 0) {
+      logger.category('participants', `${isHostView ? 'Host view' : 'Regular view'}: Updating participants list to ${participants.length}`);
       setParticipantsList(participants);
     }
     
     setIsLoadingParticipants(isLoading);
-  }, [participants, isLoading]);
+  }, [participants, isLoading, logger, isHostView]);
   
   const { 
     displayCount, 
@@ -61,16 +65,19 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   
   useEffect(() => {
     const actualCount = participantsList.length;
-    console.log('BaseParticipantList: Setting display count to', actualCount);
+    logger.category('participants', `${isHostView ? 'Host view' : 'Regular view'}: Setting display count to ${actualCount}`);
     setDisplayCount(actualCount);
-  }, [participantsList, setDisplayCount]);
+  }, [participantsList, setDisplayCount, logger, isHostView]);
   
+  // Only use internal real-time management for non-host views
+  // Host views rely on useEnhancedHostParticipantManager as the single source of truth
   useParticipantRealtime({
-    conversationId: conversationData?.id || null,
+    conversationId: !isHostView ? (conversationData?.id || null) : null,
     participants: participantsList,
     setParticipants: setParticipantsList,
     setIsLoading: setIsLoadingParticipants,
-    maxParticipants
+    maxParticipants,
+    enabled: !isHostView // Disable for host views
   });
   
   const getParticipantMessageCount = (participantId: number) => {

@@ -49,7 +49,8 @@ export const useMessageFetching = ({
     sessionStarted: conversation?.session_started,
     autoStartProcessed: autoStartProcessedRef.current,
     welcomeGenerated: welcomeGenerationRef.current,
-    hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
+    hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective),
+    canGenerateWelcome: isAdmin && !!conversation && !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
   });
   
   // Memoize conversation data to prevent unnecessary re-renders
@@ -169,8 +170,14 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
-  // Enhanced AI welcome generation for auto-started sessions
+  // Enhanced AI welcome generation for auto-started sessions (admin/host only)
   const generateAIWelcomeForAutoStart = useCallback(async () => {
+    // Only admin/host can generate welcome messages
+    if (!isAdmin) {
+      console.log('⚠️ Skipping AI welcome generation - not admin/host');
+      return null;
+    }
+
     if (!conversationId || !memoizedConversation || welcomeGenerationRef.current) {
       console.log('⚠️ Skipping AI welcome generation:', {
         hasConversationId: !!conversationId,
@@ -180,9 +187,19 @@ export const useMessageFetching = ({
       return null;
     }
 
-    // Only proceed if we have rich context
-    if (!memoizedConversation?.sessions?.facilitator_details?.title || !memoizedConversation?.sessions?.objective) {
-      console.log('⚠️ Insufficient context for AI generation, using fallback');
+    // Enhanced context validation - ensure we have rich context
+    const hasRichContext = !!(
+      memoizedConversation?.sessions?.facilitator_details?.title && 
+      memoizedConversation?.sessions?.objective &&
+      memoizedConversation?.sessions?.facilitator_details?.details
+    );
+
+    if (!hasRichContext) {
+      console.log('⚠️ Insufficient context for AI generation:', {
+        hasFacilitatorTitle: !!memoizedConversation?.sessions?.facilitator_details?.title,
+        hasObjective: !!memoizedConversation?.sessions?.objective,
+        hasFacilitatorDetails: !!memoizedConversation?.sessions?.facilitator_details?.details
+      });
       return null;
     }
 
@@ -254,29 +271,37 @@ export const useMessageFetching = ({
     }
   }, [conversationId, memoizedConversation]);
 
-  // Enhanced session start monitoring for both admin and participant views
+  // Enhanced session start monitoring for admin/host only
   useEffect(() => {
-    if (memoizedConversation?.session_started && !welcomeGenerationRef.current) {
-      console.log('🔄 Enhanced session start detected:', {
+    // Only admin/host should generate welcome messages
+    if (!isAdmin) return;
+    
+    // Ensure we have conversation data with rich context before generating
+    const hasRichContext = !!(
+      memoizedConversation?.sessions?.facilitator_details?.title && 
+      memoizedConversation?.sessions?.objective &&
+      memoizedConversation?.sessions?.facilitator_details?.details
+    );
+
+    if (memoizedConversation?.session_started && !welcomeGenerationRef.current && hasRichContext) {
+      console.log('🔄 Enhanced session start detected with rich context:', {
         conversationId,
         isAdmin,
         hasSessionData: !!memoizedConversation.sessions,
-        currentMessages: messages.length
+        currentMessages: messages.length,
+        hasRichContext
       });
 
-      // For admin views, generate AI welcome if auto-started
-      if (isAdmin) {
-        console.log('👨‍💼 Admin view - checking for auto-start AI generation...');
-        generateAIWelcomeForAutoStart().then(aiMessage => {
-          if (aiMessage) {
-            console.log('📝 Adding AI welcome message for admin view');
-            setMessages([aiMessage]);
-            saveWelcomeMessageToDb(aiMessage);
-          }
-        });
-      }
+      console.log('👨‍💼 Admin view - generating AI welcome with full context...');
+      generateAIWelcomeForAutoStart().then(aiMessage => {
+        if (aiMessage) {
+          console.log('📝 Adding AI welcome message for admin view');
+          setMessages([aiMessage]);
+          saveWelcomeMessageToDb(aiMessage);
+        }
+      });
     }
-  }, [memoizedConversation?.session_started, isAdmin, generateAIWelcomeForAutoStart, messages.length, conversationId, saveWelcomeMessageToDb]);
+  }, [memoizedConversation?.session_started, memoizedConversation?.sessions, isAdmin, generateAIWelcomeForAutoStart, messages.length, conversationId, saveWelcomeMessageToDb]);
 
   // Generate unique fetch key to prevent unnecessary re-fetches
   const generateFetchKey = useCallback(() => {
@@ -341,12 +366,19 @@ export const useMessageFetching = ({
         return;
       }
       
-      // No database messages found - handle welcome generation for admin
+      // No database messages found - handle welcome generation strategy
       console.log('📭 No database messages found, determining welcome generation strategy');
       
-      // For admin views with auto-started sessions, try AI generation
-      if (isAdmin && memoizedConversation?.session_started) {
-        console.log('🎯 Admin view with started session, attempting AI welcome generation...');
+      // Enhanced context validation
+      const hasRichContext = !!(
+        memoizedConversation?.sessions?.facilitator_details?.title && 
+        memoizedConversation?.sessions?.objective &&
+        memoizedConversation?.sessions?.facilitator_details?.details
+      );
+
+      // For admin views with auto-started sessions and rich context, try AI generation
+      if (isAdmin && memoizedConversation?.session_started && hasRichContext) {
+        console.log('🎯 Admin view with started session and rich context, attempting AI welcome generation...');
         const aiMessage = await generateAIWelcomeForAutoStart();
         if (aiMessage) {
           setMessages([aiMessage]);
@@ -355,30 +387,47 @@ export const useMessageFetching = ({
         }
       }
       
-      // For participants, use existing welcome message logic
+      // For participants, wait for host to generate welcome message OR show fallback
       if (!isAdmin) {
-        console.log('🎯 Participant view - generating welcome message');
+        console.log('🎯 Participant view - checking for host-generated welcome message');
         
-        // Clear outdated cache for sessions to force fresh generation when we have data
-        const cachedWelcomeMsg = getCachedWelcomeMessage();
-        if (cachedWelcomeMsg && cachedWelcomeMsg.id === 'welcome-static' && !cachedWelcomeMsg.isEnhanced) {
-          console.log('🗑️ Clearing outdated cached welcome message to force fresh generation');
-          clearCachedWelcomeMessage();
+        // If session has started but no welcome message, try to get one more time
+        if (memoizedConversation?.session_started) {
+          console.log('🔄 Session started for participant - checking for host welcome message...');
+          // Wait a bit for host to generate and save welcome message
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Try fetching messages again to see if host generated one
+          const { data: retryData } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('conversation_id', conversationId)
+            .order('created_at', { ascending: true });
+            
+          if (retryData && retryData.length > 0) {
+            const formattedMessages = await formatDatabaseMessages(retryData);
+            setMessages(formattedMessages);
+            return;
+          }
         }
         
-        // Generate welcome message with available data
-        console.log('🤖 Generating welcome message with available context...');
-        const welcomeMsg = await createWelcomeMessageWithFallback();
-        
-        if (welcomeMsg) {
-          setMessages([welcomeMsg]);
-          await saveWelcomeMessageToDb(welcomeMsg);
+        // Only generate fallback if we have conversation context
+        if (hasRichContext) {
+          console.log('🤖 Generating enhanced fallback welcome message with context...');
+          const welcomeMsg = await createWelcomeMessageWithFallback();
+          
+          if (welcomeMsg) {
+            setMessages([welcomeMsg]);
+            // Don't save to DB - only host should save
+          } else {
+            console.error('❌ Failed to generate welcome message');
+          }
         } else {
-          console.error('❌ Failed to generate welcome message');
+          console.log('⚠️ Waiting for conversation context to load...');
         }
       } else {
-        // For admin, just show empty state until session starts
-        console.log('👨‍💼 Admin view - showing empty state until session starts');
+        // For admin, just show empty state until session starts or context loads
+        console.log('👨‍💼 Admin view - showing empty state until session starts with full context');
         setMessages([]);
       }
       

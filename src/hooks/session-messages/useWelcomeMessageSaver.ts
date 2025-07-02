@@ -32,7 +32,7 @@ export const useWelcomeMessageSaver = ({
     }
 
     if (!isAdmin) {
-      console.log('⚠️ Skipping database save - not admin');
+      console.log('⚠️ Skipping database save - not admin/host');
       return;
     }
     

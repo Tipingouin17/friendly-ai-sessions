@@ -186,8 +186,14 @@ export const useWelcomeMessageWithFallback = ({
     return fallbackMessage;
   }, [conversationId, memoizedConversationData, welcomeMessage, logger]);
 
-  // Enhanced: AI generation with complete facilitator and session context
+  // Enhanced: AI generation with complete facilitator and session context (admin/host only)
   const attemptAIGeneration = useCallback(async (attempt: number = 1): Promise<Message | null> => {
+    // Only admin/host should attempt AI generation
+    if (!isAdmin) {
+      console.log('⚠️ attemptAIGeneration: Not admin/host - skipping AI generation');
+      return null;
+    }
+
     // Enhanced validation - ensure we have both conversation ID and conversation data
     if (!conversationId) {
       console.log('⚠️ attemptAIGeneration: Missing conversation ID');
@@ -196,6 +202,18 @@ export const useWelcomeMessageWithFallback = ({
 
     if (!memoizedConversationData) {
       console.log('⚠️ attemptAIGeneration: Missing conversation data - will use fallback');
+      return null;
+    }
+
+    // Enhanced context validation
+    const hasRichContext = !!(
+      memoizedConversationData?.sessions?.facilitator_details?.title && 
+      memoizedConversationData?.sessions?.objective &&
+      memoizedConversationData?.sessions?.facilitator_details?.details
+    );
+
+    if (!hasRichContext) {
+      console.log('⚠️ attemptAIGeneration: Insufficient context for AI generation');
       return null;
     }
 
@@ -322,7 +340,7 @@ export const useWelcomeMessageWithFallback = ({
       console.error('🚫 All AI generation attempts exhausted for session', conversationId);
       return null;
     }
-  }, [conversationId, memoizedConversationData, logger]);
+  }, [conversationId, memoizedConversationData, isAdmin, logger]);
 
   // Retrieve cached welcome message with version checking
   const getCachedWelcomeMessage = useCallback(() => {
@@ -411,9 +429,16 @@ export const useWelcomeMessageWithFallback = ({
         clearCachedWelcomeMessage();
       }
 
-      // Try AI generation first if we have conversation data
-      if (memoizedConversationData) {
-        console.log('🤖 Attempting AI generation for session', conversationId, '...');
+      // Enhanced context validation before generation
+      const hasRichContext = !!(
+        memoizedConversationData?.sessions?.facilitator_details?.title && 
+        memoizedConversationData?.sessions?.objective &&
+        memoizedConversationData?.sessions?.facilitator_details?.details
+      );
+
+      // For admin/host with rich context: Attempt AI generation first
+      if (isAdmin && hasRichContext) {
+        console.log('🤖 Admin/host attempting AI generation with rich context for session', conversationId);
         const aiMessage = await attemptAIGeneration();
         
         if (aiMessage) {
@@ -425,25 +450,36 @@ export const useWelcomeMessageWithFallback = ({
           });
           return aiMessage;
         }
-      } else {
-        console.log('⚠️ No conversation data available for AI generation, using fallback');
       }
 
-      // If AI fails or no conversation data, use enhanced static fallback
-      console.log('🔄 AI generation failed or unavailable for session', conversationId, ', using enhanced static fallback');
-      const fallbackMessage = await createStaticFallbackMessage();
-      
-      if (fallbackMessage) {
-        cacheWelcomeMessage(fallbackMessage);
-        const totalDuration = performance.now() - totalStart;
-        console.log('🎯 Welcome message created via enhanced fallback for session', conversationId, ':', {
-          totalDuration: totalDuration.toFixed(2) + 'ms',
-          contentLength: fallbackMessage.content.length,
-          isEnhanced: true
-        });
+      // For rich context: Fall back to enhanced static message
+      if (hasRichContext) {
+        console.log('🔄 AI generation failed or unavailable for session', conversationId, ', using enhanced static fallback');
+        const fallbackMessage = await createStaticFallbackMessage();
+        
+        if (fallbackMessage) {
+          cacheWelcomeMessage(fallbackMessage);
+          const totalDuration = performance.now() - totalStart;
+          console.log('🎯 Welcome message created via enhanced fallback for session', conversationId, ':', {
+            totalDuration: totalDuration.toFixed(2) + 'ms',
+            contentLength: fallbackMessage.content.length,
+            isEnhanced: true
+          });
+          return fallbackMessage;
+        }
+      } else {
+        console.log('⚠️ Insufficient context for welcome message generation - waiting for conversation data');
+        return null;
       }
-      
-      return fallbackMessage;
+
+      // Ultimate fallback
+      console.error('💥 All welcome message generation methods failed for session', conversationId);
+      return null;
+
+    } catch (error) {
+      console.error('💥 Exception in welcome message creation for session', conversationId, ':', error);
+      setLastError(error instanceof Error ? error.message : 'Unknown error');
+      return null;
 
     } finally {
       const totalDuration = performance.now() - totalStart;

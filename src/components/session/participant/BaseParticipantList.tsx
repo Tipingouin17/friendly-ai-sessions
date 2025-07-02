@@ -10,7 +10,12 @@ import ParticipantListSkeleton from "@/components/session/participant/Participan
 import AdminMessageInput from "@/components/session/AdminMessageInput";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { createLogger } from "@/utils/debugLogger";
+// Simple local logger to avoid import issues
+const createLogger = (component: string, category: string) => ({
+  category: (cat: string, message: string, ...data: any[]) => {
+    console.log(`[${cat.toUpperCase()}] ${component}: ${message}`, ...data);
+  }
+});
 
 interface BaseParticipantListProps {
   participants: ParticipantInfo[];

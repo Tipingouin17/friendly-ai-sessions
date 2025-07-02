@@ -39,6 +39,7 @@ export function useEnhancedHostParticipantManager({
   const [currentCount, setCurrentCount] = useState(0);
   const [maxCount, setMaxCount] = useState(0);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
+  const [pollingActive, setPollingActive] = useState(false);
   
   const channelRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -72,6 +73,7 @@ export function useEnhancedHostParticipantManager({
     if (fallbackIntervalRef.current) {
       clearInterval(fallbackIntervalRef.current);
       fallbackIntervalRef.current = null;
+      setPollingActive(false);
     }
     
     // Remove from registry
@@ -189,6 +191,7 @@ export function useEnhancedHostParticipantManager({
     if (!conversationId || fallbackIntervalRef.current) return;
 
     logger.category('admin', 'Starting fast polling fallback');
+    setPollingActive(true);
     
     fallbackIntervalRef.current = setInterval(async () => {
       if (!mountedRef.current || !conversationId) return;
@@ -203,6 +206,8 @@ export function useEnhancedHostParticipantManager({
 
         if (convError) {
           logger.category('admin', 'Polling error:', convError);
+          setPollingActive(false);
+          setIsConnected(false);
           return;
         }
 
@@ -214,6 +219,10 @@ export function useEnhancedHostParticipantManager({
           setCurrentCount(newCurrentCount);
           setMaxCount(newMaxCount);
           setIsSessionStarted(sessionStarted);
+          
+          // Set connected when polling successfully fetches data
+          setIsConnected(true);
+          setError('Using polling updates (real-time unavailable)');
           
           if (onParticipantCountChange) {
             onParticipantCountChange(newCurrentCount);
@@ -227,6 +236,9 @@ export function useEnhancedHostParticipantManager({
         }
       } catch (error) {
         logger.category('admin', 'Exception during polling:', error);
+        setPollingActive(false);
+        setIsConnected(false);
+        setError('Connection failed');
       }
     }, 5000); // 5 second polling instead of 30 seconds
   }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, fetchParticipantList, logger]);
@@ -324,6 +336,7 @@ export function useEnhancedHostParticipantManager({
             if (fallbackIntervalRef.current) {
               clearInterval(fallbackIntervalRef.current);
               fallbackIntervalRef.current = null;
+              setPollingActive(false);
             }
             
             // Set up pg_notify listeners
@@ -340,7 +353,7 @@ export function useEnhancedHostParticipantManager({
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             logger.category('admin', 'Enhanced channel error, starting fast polling');
             setIsConnected(false);
-            setError('Connection error, using fast polling updates');
+            setError('Real-time connection failed, switching to polling...');
             
             startFastPolling();
             

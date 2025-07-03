@@ -8,6 +8,7 @@ interface LoadingStateContentProps {
   elapsed: number;
   retryCount?: number;
   errorDescription?: string | null;
+  customMessage?: string;
 }
 
 const LoadingStateContent: React.FC<LoadingStateContentProps> = ({
@@ -15,9 +16,15 @@ const LoadingStateContent: React.FC<LoadingStateContentProps> = ({
   error,
   elapsed,
   retryCount = 0,
-  errorDescription
+  errorDescription,
+  customMessage
 }) => {
   const getStatusMessage = () => {
+    // Use custom message if provided
+    if (customMessage) {
+      return customMessage;
+    }
+    
     if (error) {
       return "Unable to connect to the session";
     }

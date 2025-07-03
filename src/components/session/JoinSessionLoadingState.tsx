@@ -11,13 +11,15 @@ interface JoinSessionLoadingStateProps {
   error?: string | null;
   retryCount?: number;
   loadingTimeElapsed?: number;
+  customMessage?: string;
 }
 
 const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({ 
   onRetry,
   error,
   retryCount = 0,
-  loadingTimeElapsed = 0
+  loadingTimeElapsed = 0,
+  customMessage
 }) => {
   const { elapsed, isLongWait, isVeryLongWait, mountedRef } = useLoadingStateTimer({
     loadingTimeElapsed,
@@ -42,6 +44,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
         elapsed={elapsed}
         retryCount={retryCount}
         errorDescription={errorDescription}
+        customMessage={customMessage}
       />
       
       <LoadingStateActions

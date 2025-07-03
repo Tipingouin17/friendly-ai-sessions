@@ -1,9 +1,10 @@
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import { useJoinSessionNavigation } from "@/hooks/useJoinSessionNavigation";
 import { useJoinSessionState } from "@/hooks/useJoinSessionState";
+import { useWelcomeMessageMonitor } from "@/hooks/useWelcomeMessageMonitor";
 import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import JoinSessionErrorState from "./JoinSessionErrorState";
 import JoinSessionRejoinPrompt from "./JoinSessionRejoinPrompt";
@@ -11,6 +12,14 @@ import JoinSessionMain from "./JoinSessionMain";
 
 const JoinSessionContainer = () => {
   const queryClient = useQueryClient();
+  
+  // Track join result to monitor welcome message generation
+  const [joinResult, setJoinResult] = useState<{
+    conversationId: number;
+    participantId: number;
+    name: string;
+    avatarSeed: string;
+  } | null>(null);
   
   // Navigation management
   const {
@@ -72,7 +81,20 @@ const JoinSessionContainer = () => {
     defaultAvatarSeed
   });
 
-  // Handle successful join - navigate immediately and synchronously
+  // Monitor welcome message generation after joining
+  const {
+    isWaiting: isWaitingForMessage,
+    hasMessage,
+    error: messageError,
+    retryCount: messageRetryCount,
+    waitForWelcomeMessage
+  } = useWelcomeMessageMonitor({
+    conversationId: joinResult?.conversationId || null,
+    participantId: joinResult?.participantId || null,
+    isEnabled: !!joinResult
+  });
+
+  // Handle successful join - wait for welcome message before redirecting
   const handleJoin = useCallback(async () => {
     // CRITICAL: Check navigation state first
     if (checkNavigationState() || hasJoinedBefore || isJoining) {
@@ -85,16 +107,35 @@ const JoinSessionContainer = () => {
     try {
       const result = await handleJoinSession();
       if (result && conversationId) {
-        console.log("Successfully joined session, navigating immediately:", result);
-        navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
+        console.log("Successfully joined session, waiting for welcome message:", result);
+        
+        // Store join result to start message monitoring
+        setJoinResult({
+          conversationId,
+          participantId: result.participantId,
+          name: result.name,
+          avatarSeed: result.avatarSeed
+        });
+        
+        // Wait for welcome message before navigating
+        const messageReady = await waitForWelcomeMessage();
+        
+        if (messageReady) {
+          console.log("Welcome message ready, navigating to session");
+          navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
+        } else {
+          console.log("Welcome message generation failed, but allowing navigation anyway");
+          navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
+        }
         return;
       }
     } catch (error) {
       console.error("Error during join:", error);
       // Reset navigation flags on error so user can retry
       resetNavigationFlags();
+      setJoinResult(null);
     }
-  }, [handleJoinSession, conversationId, navigateToSession, hasJoinedBefore, isJoining, checkNavigationState, resetNavigationFlags]);
+  }, [handleJoinSession, conversationId, navigateToSession, hasJoinedBefore, isJoining, checkNavigationState, resetNavigationFlags, waitForWelcomeMessage]);
 
   const handleRetry = useCallback(() => {
     if (conversationId && !checkNavigationState()) {
@@ -132,9 +173,16 @@ const JoinSessionContainer = () => {
     return null;
   }
 
-  // Show loading state when data is being fetched
-  if (isLoading && !invalidRequest) {
-    return <JoinSessionLoadingState onRetry={handleRetry} error={error} />;
+  // Show loading state when data is being fetched or waiting for welcome message
+  if ((isLoading && !invalidRequest) || isWaitingForMessage) {
+    return (
+      <JoinSessionLoadingState 
+        onRetry={handleRetry} 
+        error={error || messageError}
+        retryCount={isWaitingForMessage ? messageRetryCount : retryCount}
+        customMessage={isWaitingForMessage ? `Facilitator is preparing your session${messageRetryCount > 0 ? ` (${messageRetryCount}/6)` : ''}...` : undefined}
+      />
+    );
   }
 
   // Show error state if invalid request or no conversation data

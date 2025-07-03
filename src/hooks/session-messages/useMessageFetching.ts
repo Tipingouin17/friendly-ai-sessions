@@ -170,13 +170,10 @@ export const useMessageFetching = ({
     }
   }, [isAdmin, startResponseCollection]);
 
-  // Enhanced AI welcome generation for auto-started sessions (admin/host only)
+  // Enhanced AI welcome generation for auto-started sessions
   const generateAIWelcomeForAutoStart = useCallback(async () => {
-    // Only admin/host can generate welcome messages
-    if (!isAdmin) {
-      console.log('⚠️ Skipping AI welcome generation - not admin/host');
-      return null;
-    }
+    // For participants, generate locally without saving to DB
+    // For admin/host, generate and save to DB
 
     if (!conversationId || !memoizedConversation || welcomeGenerationRef.current) {
       console.log('⚠️ Skipping AI welcome generation:', {
@@ -271,11 +268,8 @@ export const useMessageFetching = ({
     }
   }, [conversationId, memoizedConversation]);
 
-  // Enhanced session start monitoring for admin/host only
+  // Enhanced session start monitoring for immediate welcome message generation
   useEffect(() => {
-    // Only admin/host should generate welcome messages
-    if (!isAdmin) return;
-    
     // Ensure we have conversation data with rich context before generating
     const hasRichContext = !!(
       memoizedConversation?.sessions?.facilitator_details?.title && 
@@ -283,6 +277,7 @@ export const useMessageFetching = ({
       memoizedConversation?.sessions?.facilitator_details?.details
     );
 
+    // Generate welcome message when session starts (for any view with rich context)
     if (memoizedConversation?.session_started && !welcomeGenerationRef.current && hasRichContext) {
       console.log('🔄 Enhanced session start detected with rich context:', {
         conversationId,
@@ -292,12 +287,16 @@ export const useMessageFetching = ({
         hasRichContext
       });
 
-      console.log('👨‍💼 Admin view - generating AI welcome with full context...');
+      console.log('🚀 Session started - generating AI welcome immediately...');
       generateAIWelcomeForAutoStart().then(aiMessage => {
         if (aiMessage) {
-          console.log('📝 Adding AI welcome message for admin view');
+          console.log('📝 Adding AI welcome message to session');
           setMessages([aiMessage]);
-          saveWelcomeMessageToDb(aiMessage);
+          
+          // Only save to DB if admin/host (to avoid duplicate saves)
+          if (isAdmin) {
+            saveWelcomeMessageToDb(aiMessage);
+          }
         }
       });
     }

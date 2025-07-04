@@ -12,23 +12,44 @@ export async function generateAIWelcomeMessage(
   requestId: string
 ): Promise<any> {
   console.log(`🤖 [${requestId}] Starting AI welcome message generation`);
+  console.log(`📊 [${requestId}] Input data analysis:`, {
+    conversationId: conversation?.id,
+    hasConversation: !!conversation,
+    participantCount: participants?.length || 0,
+    hasOpenAIKey: !!openaiApiKey,
+    sessionData: {
+      hasSession: !!conversation?.sessions,
+      facilitatorTitle: conversation?.sessions?.facilitator_details?.title,
+      sessionTitle: conversation?.sessions?.title,
+      objective: conversation?.sessions?.objective,
+      participantDescription: conversation?.participant_description
+    }
+  });
   
   try {
     // Extract enhanced context
     const facilitatorContext = extractFacilitatorContext(conversation);
     const sessionContext = extractSessionContext(conversation, participants);
     
-    console.log(`📋 [${requestId}] AI generation context:`, {
+    console.log(`📋 [${requestId}] AI generation context extracted:`, {
       facilitatorName: facilitatorContext.name,
+      facilitatorDetails: facilitatorContext.details,
+      facilitatorPicture: facilitatorContext.profilePicture,
       sessionTitle: sessionContext.title,
+      sessionObjective: sessionContext.objective,
       participantCount: sessionContext.participantCount,
+      participantDescription: sessionContext.participantDescription,
       hasSessionData: !!conversation?.sessions,
       hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
     });
     
     // Only proceed with AI generation if we have rich context
     if (!conversation?.sessions?.facilitator_details?.title || !conversation?.sessions?.objective) {
-      console.log(`⚠️ [${requestId}] Insufficient context for AI generation, falling back to template`);
+      console.log(`⚠️ [${requestId}] Insufficient context for AI generation - missing required fields:`, {
+        hasFacilitatorTitle: !!conversation?.sessions?.facilitator_details?.title,
+        hasObjective: !!conversation?.sessions?.objective,
+        availableData: Object.keys(conversation?.sessions || {})
+      });
       return null; // This will trigger fallback to template
     }
     
@@ -43,7 +64,17 @@ export async function generateAIWelcomeMessage(
     const userPrompt = `Generate a warm, engaging welcome message for this ${sessionContext.sessionType} session. The session just started automatically when we reached ${sessionContext.participantCount} ${sessionContext.participantDescription}. Make it personal and set the tone for productive collaboration.`;
     
     console.log(`🚀 [${requestId}] Calling OpenAI API for AI generation with rich context...`);
+    console.log(`📝 [${requestId}] OpenAI request details:`, {
+      model: 'gpt-4o-mini',
+      systemPromptLength: systemPrompt.length,
+      userPromptLength: userPrompt.length,
+      maxTokens: 500,
+      temperature: 0.7,
+      systemPromptPreview: systemPrompt.substring(0, 200) + '...',
+      userPromptPreview: userPrompt.substring(0, 200) + '...'
+    });
     
+    const apiStartTime = Date.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -61,15 +92,37 @@ export async function generateAIWelcomeMessage(
       }),
     });
 
+    const apiDuration = Date.now() - apiStartTime;
+    console.log(`⏱️ [${requestId}] OpenAI API call completed in ${apiDuration}ms with status: ${response.status}`);
+
     if (!response.ok) {
       const errorData = await response.text();
+      console.error(`❌ [${requestId}] OpenAI API error response:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        duration: apiDuration
+      });
       throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
     }
 
     const data = await response.json();
     const aiContent = data.choices?.[0]?.message?.content;
     
+    console.log(`📊 [${requestId}] OpenAI API response analysis:`, {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length || 0,
+      hasContent: !!aiContent,
+      contentLength: aiContent?.length || 0,
+      usage: data.usage,
+      finishReason: data.choices?.[0]?.finish_reason
+    });
+    
     if (!aiContent) {
+      console.error(`❌ [${requestId}] No content received from OpenAI API:`, {
+        responseData: data,
+        choices: data.choices
+      });
       throw new Error('No content received from OpenAI API');
     }
     
@@ -77,10 +130,13 @@ export async function generateAIWelcomeMessage(
       contentLength: aiContent.length,
       model: 'gpt-4o-mini',
       facilitatorUsed: facilitatorContext.name,
-      sessionUsed: sessionContext.title
+      sessionUsed: sessionContext.title,
+      duration: apiDuration,
+      tokensUsed: data.usage?.total_tokens,
+      contentPreview: aiContent.substring(0, 150) + '...'
     });
     
-    return {
+    const result = {
       content: aiContent,
       generationMethod: 'ai',
       facilitator_context: facilitatorContext,
@@ -88,8 +144,24 @@ export async function generateAIWelcomeMessage(
       avatar: facilitatorContext.profilePicture || '/api/avatar?name=' + encodeURIComponent(facilitatorContext.name) + '&variant=beam&palette=2'
     };
     
+    console.log(`🎉 [${requestId}] AI generation result prepared:`, {
+      hasContent: !!result.content,
+      contentLength: result.content.length,
+      generationMethod: result.generationMethod,
+      hasAvatar: !!result.avatar,
+      facilitatorName: result.facilitator_context.name,
+      sessionTitle: result.session_context.title
+    });
+    
+    return result;
+    
   } catch (error) {
-    console.error(`❌ [${requestId}] AI generation failed:`, error);
+    console.error(`❌ [${requestId}] AI generation failed:`, {
+      error: error.message,
+      stack: error.stack,
+      conversationId: conversation?.id,
+      facilitatorTitle: conversation?.sessions?.facilitator_details?.title
+    });
     throw error;
   }
 }

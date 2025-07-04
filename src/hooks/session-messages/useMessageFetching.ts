@@ -294,7 +294,19 @@ export const useMessageFetching = ({
         objective: memoizedConversation?.sessions?.objective
       });
 
-      console.log('🚀 Triggering AI welcome generation via edge function...');
+      console.log('🚀 [useMessageFetching] Triggering AI welcome generation via edge function...');
+      console.log('📋 [useMessageFetching] AI Generation Request Details:', {
+        conversationId,
+        isAdmin,
+        facilitatorName: memoizedConversation?.sessions?.facilitator_details?.title,
+        sessionTitle: memoizedConversation?.sessions?.title,
+        objective: memoizedConversation?.sessions?.objective,
+        participantDescription: memoizedConversation?.participant_description,
+        sessionStarted: memoizedConversation?.session_started,
+        timestamp: new Date().toISOString()
+      });
+      
+      const startTime = Date.now();
       
       // Use edge function for consistent AI generation
       supabase.functions.invoke('handle-facilitator-response', {
@@ -306,40 +318,98 @@ export const useMessageFetching = ({
           conversation: memoizedConversation
         }
       }).then(({ data, error }) => {
+        const duration = Date.now() - startTime;
+        
         if (error) {
-          console.error('❌ Edge function AI generation failed:', error);
+          console.error('❌ [useMessageFetching] Edge function AI generation failed:', {
+            error,
+            duration,
+            conversationId,
+            isAdmin,
+            errorDetails: error.message || error
+          });
+          
+          console.log('🔄 [useMessageFetching] Attempting fallback client-side generation...');
           // Fallback to client-side generation
           generateAIWelcomeForAutoStart().then(aiMessage => {
             if (aiMessage) {
-              console.log('📝 Fallback: Adding AI welcome message to session');
+              console.log('📝 [useMessageFetching] Fallback: Adding AI welcome message to session:', {
+                contentLength: aiMessage.content?.length || 0,
+                hasAvatar: !!aiMessage.avatar
+              });
               setMessages([aiMessage]);
               if (isAdmin) {
+                console.log('💾 [useMessageFetching] Saving fallback AI message to database...');
                 saveWelcomeMessageToDb(aiMessage);
               }
+            } else {
+              console.error('❌ [useMessageFetching] Fallback AI generation also failed');
             }
+          }).catch(fallbackError => {
+            console.error('💥 [useMessageFetching] Fallback generation exception:', fallbackError);
           });
         } else {
-          console.log('✅ Edge function AI generation successful:', data);
+          console.log('✅ [useMessageFetching] Edge function AI generation successful:', {
+            duration,
+            conversationId,
+            responseData: data,
+            hasContent: !!data?.content,
+            contentLength: data?.content?.length || 0,
+            generationMethod: data?.generationMethod
+          });
+          
+          console.log('⏳ [useMessageFetching] Waiting for message to be saved and fetching...');
           // The message will be picked up by real-time subscription or next fetch
           setTimeout(() => {
+            console.log('🔍 [useMessageFetching] Force checking for new AI-generated messages...');
             // Force fetch messages to get the AI-generated welcome
             const forceCheck = async () => {
-              const { data: newMessages } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('conversation_id', conversationId)
-                .order('created_at', { ascending: true });
-              
-              if (newMessages && newMessages.length > 0) {
-                const formattedMessages = await formatDatabaseMessages(newMessages);
-                setMessages(formattedMessages);
+              try {
+                const { data: newMessages, error: fetchError } = await supabase
+                  .from('messages')
+                  .select('*')
+                  .eq('conversation_id', conversationId)
+                  .order('created_at', { ascending: true });
+                
+                if (fetchError) {
+                  console.error('❌ [useMessageFetching] Error fetching new messages:', fetchError);
+                  return;
+                }
+                
+                console.log('📨 [useMessageFetching] Fetched messages after AI generation:', {
+                  messageCount: newMessages?.length || 0,
+                  messages: newMessages?.map(m => ({
+                    id: m.id,
+                    role: m.role,
+                    contentLength: typeof m.content === 'object' && m.content && (m.content as any).text 
+                      ? (m.content as any).text.length 
+                      : 0,
+                    created_at: m.created_at
+                  }))
+                });
+                
+                if (newMessages && newMessages.length > 0) {
+                  const formattedMessages = await formatDatabaseMessages(newMessages);
+                  console.log('✅ [useMessageFetching] Updated messages state with AI-generated content');
+                  setMessages(formattedMessages);
+                } else {
+                  console.warn('⚠️ [useMessageFetching] No messages found after AI generation - may need to wait longer');
+                }
+              } catch (fetchException) {
+                console.error('💥 [useMessageFetching] Exception during force message check:', fetchException);
               }
             };
             forceCheck();
           }, 2000);
         }
       }).catch(error => {
-        console.error('💥 Exception calling edge function:', error);
+        const duration = Date.now() - startTime;
+        console.error('💥 [useMessageFetching] Exception calling edge function:', {
+          error: error.message,
+          duration,
+          conversationId,
+          stack: error.stack
+        });
       });
       
       welcomeGenerationRef.current = true; // Mark as processed

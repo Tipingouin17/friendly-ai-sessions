@@ -170,9 +170,18 @@ export const useWelcomeMessageMonitor = ({
 
       // If we're past 60% of attempts and no AI message found, trigger AI generation
       if (attempt === Math.floor(maxRetries * 0.6) + 1) {
-        console.log('🤖 Triggering AI welcome message generation...');
+        console.log('🤖 [useWelcomeMessageMonitor] Triggering AI welcome message generation at attempt', attempt);
+        console.log('📋 [useWelcomeMessageMonitor] AI Generation Request:', {
+          conversationId,
+          sessionStart: true,
+          timestamp: new Date().toISOString(),
+          attempt,
+          maxRetries
+        });
+        
         try {
-          const { error } = await supabase.functions.invoke('handle-facilitator-response', {
+          const startTime = Date.now();
+          const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
             body: {
               messages: [],
               conversationId,
@@ -181,13 +190,32 @@ export const useWelcomeMessageMonitor = ({
             }
           });
           
+          const duration = Date.now() - startTime;
+          
           if (error) {
-            console.error('❌ Failed to trigger AI generation:', error);
+            console.error('❌ [useWelcomeMessageMonitor] AI generation failed:', {
+              error,
+              duration,
+              conversationId,
+              attempt
+            });
           } else {
-            console.log('✅ AI generation triggered, continuing to wait...');
+            console.log('✅ [useWelcomeMessageMonitor] AI generation completed successfully:', {
+              duration,
+              conversationId,
+              attempt,
+              responseData: data,
+              hasContent: !!data?.content,
+              contentLength: data?.content?.length || 0
+            });
           }
         } catch (error) {
-          console.error('💥 Exception triggering AI generation:', error);
+          console.error('💥 [useWelcomeMessageMonitor] Exception triggering AI generation:', {
+            error: error.message,
+            conversationId,
+            attempt,
+            stack: error.stack
+          });
         }
       }
 

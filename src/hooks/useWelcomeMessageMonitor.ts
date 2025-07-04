@@ -27,29 +27,62 @@ export const useWelcomeMessageMonitor = ({
     retryCount: 0
   });
 
-  const checkForWelcomeMessage = useCallback(async (): Promise<boolean> => {
+  const checkForWelcomeMessage = useCallback(async (onlyAcceptAI = false): Promise<boolean> => {
     if (!conversationId) return false;
 
     try {
-      console.log('🔍 Checking for welcome message in conversation:', conversationId);
+      console.log('🔍 Checking for welcome message in conversation:', conversationId, { onlyAcceptAI });
       
       const { data: messages, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
-        .limit(1);
+        .limit(3); // Get first few messages to check their type
 
       if (error) {
         console.error('❌ Error checking for welcome message:', error);
         return false;
       }
 
-      const hasWelcomeMessage = messages && messages.length > 0;
+      if (!messages || messages.length === 0) {
+        console.log('📭 No messages found');
+        return false;
+      }
+
+      // If we only want AI messages, check if the first message is AI-generated
+      if (onlyAcceptAI) {
+        const firstMessage = messages[0];
+        const content = firstMessage.content;
+        
+        // Check if it's a rich AI message (not just the fallback)
+        const isAIGenerated = typeof content === 'object' && 
+          content && 
+          !Array.isArray(content) &&
+          typeof (content as any).text === 'string' &&
+          (content as any).text.length > 200 && // AI messages are typically longer
+          !(content as any).text.includes("The facilitator will be with you shortly"); // Not the fallback text
+        
+        console.log('🤖 AI message check:', {
+          isAIGenerated,
+          contentLength: (content as any)?.text?.length || 0,
+          isFallback: (content as any)?.text?.includes("The facilitator will be with you shortly")
+        });
+        
+        return isAIGenerated;
+      }
+
+      const hasWelcomeMessage = messages.length > 0;
       console.log(`📨 Welcome message check result:`, {
         conversationId,
-        messageCount: messages?.length || 0,
-        hasWelcomeMessage
+        messageCount: messages.length,
+        hasWelcomeMessage,
+        firstMessageContent: typeof messages[0]?.content === 'object' && 
+          messages[0]?.content && 
+          !Array.isArray(messages[0]?.content) &&
+          typeof (messages[0]?.content as any).text === 'string' 
+            ? (messages[0]?.content as any).text.substring(0, 100) 
+            : 'No text content'
       });
 
       return hasWelcomeMessage;
@@ -111,7 +144,7 @@ export const useWelcomeMessageMonitor = ({
     setState(prev => ({ ...prev, isWaiting: true, error: null }));
     console.log('⏳ Starting welcome message monitoring for conversation:', conversationId);
 
-    const maxRetries = 6; // 30 seconds total (5 second intervals)
+    const maxRetries = 12; // 60 seconds total (5 second intervals) - increased for AI generation
     let attempt = 0;
 
     while (attempt < maxRetries) {
@@ -120,7 +153,9 @@ export const useWelcomeMessageMonitor = ({
 
       console.log(`🔍 Welcome message check attempt ${attempt}/${maxRetries}`);
       
-      const hasMessage = await checkForWelcomeMessage();
+      // For first half of attempts, only accept AI-generated messages
+      const onlyAcceptAI = attempt <= Math.floor(maxRetries * 0.6); // First 60% of attempts
+      const hasMessage = await checkForWelcomeMessage(onlyAcceptAI);
       
       if (hasMessage) {
         console.log('✅ Welcome message found! Ready to proceed.');
@@ -131,6 +166,29 @@ export const useWelcomeMessageMonitor = ({
           error: null 
         }));
         return true;
+      }
+
+      // If we're past 60% of attempts and no AI message found, trigger AI generation
+      if (attempt === Math.floor(maxRetries * 0.6) + 1) {
+        console.log('🤖 Triggering AI welcome message generation...');
+        try {
+          const { error } = await supabase.functions.invoke('handle-facilitator-response', {
+            body: {
+              messages: [],
+              conversationId,
+              sessionStart: true,
+              generateReport: false
+            }
+          });
+          
+          if (error) {
+            console.error('❌ Failed to trigger AI generation:', error);
+          } else {
+            console.log('✅ AI generation triggered, continuing to wait...');
+          }
+        } catch (error) {
+          console.error('💥 Exception triggering AI generation:', error);
+        }
       }
 
       // If this is the last attempt, try to generate a fallback

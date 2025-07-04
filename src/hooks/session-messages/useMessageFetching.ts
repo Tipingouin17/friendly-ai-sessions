@@ -277,28 +277,72 @@ export const useMessageFetching = ({
       memoizedConversation?.sessions?.facilitator_details?.details
     );
 
-    // Generate welcome message when session starts (for any view with rich context)
-    if (memoizedConversation?.session_started && !welcomeGenerationRef.current && hasRichContext) {
-      console.log('🔄 Enhanced session start detected with rich context:', {
+    // Generate welcome message when session starts OR when we have rich context and no messages
+    const shouldGenerateWelcome = (memoizedConversation?.session_started || 
+      (hasRichContext && messages.length === 0 && !isInitialFetch)) && 
+      !welcomeGenerationRef.current;
+
+    if (shouldGenerateWelcome) {
+      console.log('🔄 Enhanced AI generation trigger detected:', {
         conversationId,
         isAdmin,
-        hasSessionData: !!memoizedConversation.sessions,
-        currentMessages: messages.length,
-        hasRichContext
+        sessionStarted: memoizedConversation?.session_started,
+        hasRichContext,
+        messageCount: messages.length,
+        isInitialFetch,
+        facilitatorName: memoizedConversation?.sessions?.facilitator_details?.title,
+        objective: memoizedConversation?.sessions?.objective
       });
 
-      console.log('🚀 Session started - generating AI welcome immediately...');
-      generateAIWelcomeForAutoStart().then(aiMessage => {
-        if (aiMessage) {
-          console.log('📝 Adding AI welcome message to session');
-          setMessages([aiMessage]);
-          
-          // Only save to DB if admin/host (to avoid duplicate saves)
-          if (isAdmin) {
-            saveWelcomeMessageToDb(aiMessage);
-          }
+      console.log('🚀 Triggering AI welcome generation via edge function...');
+      
+      // Use edge function for consistent AI generation
+      supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          sessionStart: true,
+          generateReport: false,
+          conversation: memoizedConversation
         }
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('❌ Edge function AI generation failed:', error);
+          // Fallback to client-side generation
+          generateAIWelcomeForAutoStart().then(aiMessage => {
+            if (aiMessage) {
+              console.log('📝 Fallback: Adding AI welcome message to session');
+              setMessages([aiMessage]);
+              if (isAdmin) {
+                saveWelcomeMessageToDb(aiMessage);
+              }
+            }
+          });
+        } else {
+          console.log('✅ Edge function AI generation successful:', data);
+          // The message will be picked up by real-time subscription or next fetch
+          setTimeout(() => {
+            // Force fetch messages to get the AI-generated welcome
+            const forceCheck = async () => {
+              const { data: newMessages } = await supabase
+                .from('messages')
+                .select('*')
+                .eq('conversation_id', conversationId)
+                .order('created_at', { ascending: true });
+              
+              if (newMessages && newMessages.length > 0) {
+                const formattedMessages = await formatDatabaseMessages(newMessages);
+                setMessages(formattedMessages);
+              }
+            };
+            forceCheck();
+          }, 2000);
+        }
+      }).catch(error => {
+        console.error('💥 Exception calling edge function:', error);
       });
+      
+      welcomeGenerationRef.current = true; // Mark as processed
     }
   }, [memoizedConversation?.session_started, memoizedConversation?.sessions, isAdmin, generateAIWelcomeForAutoStart, messages.length, conversationId, saveWelcomeMessageToDb]);
 

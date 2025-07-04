@@ -308,20 +308,21 @@ export const useMessageFetching = ({
   }, [conversationId, memoizedConversation, isAdmin, isInitialFetch]);
 
   // Enhanced main fetch function with improved deduplication
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (forceRefetch = false) => {
     if (!conversationId) {
       console.log('⚠️ fetchMessages: No conversation ID provided, skipping message fetch');
       return;
     }
 
     // Only fetch if we have conversation data or this is the initial fetch
-    if (!memoizedConversation && !isInitialFetch) {
+    if (!memoizedConversation && !isInitialFetch && !forceRefetch) {
       console.log('⚠️ fetchMessages: Waiting for conversation data to load...');
       return;
     }
 
     const fetchKey = generateFetchKey();
-    if (lastFetchRef.current === fetchKey || fetchInProgressRef.current) {
+    // Allow forced refetch or if no previous fetch
+    if (!forceRefetch && lastFetchRef.current === fetchKey || fetchInProgressRef.current) {
       console.log('⚠️ fetchMessages: Skipping duplicate fetch or fetch in progress');
       return;
     }
@@ -485,6 +486,7 @@ export const useMessageFetching = ({
     setMessages,
     error: error || welcomeError,
     fetchMessages,
+    forceFetchMessages: () => fetchMessages(true), // Force refetch for participants
     isGeneratingWelcome,
     processNewMessage: useCallback((message: Message) => {
       console.log('📨 Enhanced processNewMessage called:', {

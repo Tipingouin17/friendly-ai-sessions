@@ -86,12 +86,24 @@ export const useWelcomeMessageMonitor = ({
       }
 
       console.log('✅ Fallback welcome message created successfully');
+      
+      // Wait a moment for database consistency
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verify message is actually readable
+      const verificationResult = await checkForWelcomeMessage();
+      if (!verificationResult) {
+        console.error('❌ Created message not readable from database');
+        return false;
+      }
+      
+      console.log('✅ Fallback message verified and ready');
       return true;
     } catch (error) {
       console.error('💥 Exception creating fallback message:', error);
       return false;
     }
-  }, [conversationId]);
+  }, [conversationId, checkForWelcomeMessage]);
 
   const waitForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId || !isEnabled) return false;

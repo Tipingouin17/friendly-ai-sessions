@@ -28,6 +28,7 @@ export const useSessionMessages = ({
     setMessages,
     error,
     fetchMessages,
+    forceFetchMessages,
     isGeneratingWelcome,
     processNewMessage,
     isWaitingForResponses,
@@ -66,6 +67,18 @@ export const useSessionMessages = ({
       fetchMessages();
     }
   }, [conversationId, conversation, fetchMessages, messages.length]);
+
+  // Force fetch messages on mount for participants to ensure they get welcome messages immediately
+  useEffect(() => {
+    if (conversationId && !isAdmin) {
+      console.log('🚀 useSessionMessages: Participant view - forcing initial message fetch');
+      const timer = setTimeout(() => {
+        forceFetchMessages();
+      }, 1000); // Give a moment for any pending DB operations
+      
+      return () => clearTimeout(timer);
+    }
+  }, [conversationId, isAdmin, forceFetchMessages]);
   
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {
@@ -93,6 +106,7 @@ export const useSessionMessages = ({
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,
-    isGeneratingResponse
+    isGeneratingResponse,
+    forceFetchMessages
   };
 };

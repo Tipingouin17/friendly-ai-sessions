@@ -64,9 +64,20 @@ export const useMessageFetching = ({
       session_started: conversation.session_started,
       current_participants: conversation.current_participants,
       participants: conversation.participants,
-      sessions_id: conversation.sessions_id
+      sessions_id: conversation.sessions_id,
+      welcome_message_status: conversation.welcome_message_status
     };
-  }, [conversation?.id, conversation?.sessions, conversation?.participant_description, conversation?.language, conversation?.session_started, conversation?.current_participants, conversation?.participants, conversation?.sessions_id]);
+  }, [
+    conversation?.id, 
+    conversation?.sessions, 
+    conversation?.participant_description, 
+    conversation?.language, 
+    conversation?.session_started, 
+    conversation?.current_participants, 
+    conversation?.participants, 
+    conversation?.sessions_id,
+    conversation?.welcome_message_status
+  ]);
   
   const { 
     getCachedWelcomeMessage, 
@@ -270,6 +281,24 @@ export const useMessageFetching = ({
 
   // Enhanced session start monitoring for immediate welcome message generation
   useEffect(() => {
+    // Enhanced AI generation tracking logs
+    console.log('🔍 [AI-TRACKING] Session start monitoring effect triggered:', {
+      conversationId,
+      hasConversation: !!memoizedConversation,
+      sessionStarted: memoizedConversation?.session_started,
+      welcomeMessageStatus: memoizedConversation?.welcome_message_status,
+      messageCount: messages.length,
+      isInitialFetch,
+      welcomeGenerated: welcomeGenerationRef.current,
+      facilitatorTitle: memoizedConversation?.sessions?.facilitator_details?.title,
+      sessionObjective: memoizedConversation?.sessions?.objective,
+      hasRichContext: !!(
+        memoizedConversation?.sessions?.facilitator_details?.title && 
+        memoizedConversation?.sessions?.objective &&
+        memoizedConversation?.sessions?.facilitator_details?.details
+      )
+    });
+
     // Ensure we have conversation data with rich context before generating
     const hasRichContext = !!(
       memoizedConversation?.sessions?.facilitator_details?.title && 
@@ -277,10 +306,28 @@ export const useMessageFetching = ({
       memoizedConversation?.sessions?.facilitator_details?.details
     );
 
+    console.log('🤖 [AI-TRACKING] Rich context analysis:', {
+      hasRichContext,
+      hasFacilitatorTitle: !!memoizedConversation?.sessions?.facilitator_details?.title,
+      hasObjective: !!memoizedConversation?.sessions?.objective,
+      hasFacilitatorDetails: !!memoizedConversation?.sessions?.facilitator_details?.details,
+      facilitatorTitle: memoizedConversation?.sessions?.facilitator_details?.title,
+      objective: memoizedConversation?.sessions?.objective?.substring(0, 100) + '...'
+    });
+
     // Generate welcome message when session starts OR when we have rich context and no messages
     const shouldGenerateWelcome = (memoizedConversation?.session_started || 
       (hasRichContext && messages.length === 0 && !isInitialFetch)) && 
       !welcomeGenerationRef.current;
+
+    console.log('🚀 [AI-TRACKING] Should generate welcome decision:', {
+      shouldGenerateWelcome,
+      sessionStarted: memoizedConversation?.session_started,
+      hasRichContextAndNoMessages: hasRichContext && messages.length === 0 && !isInitialFetch,
+      welcomeAlreadyGenerated: welcomeGenerationRef.current,
+      messageCount: messages.length,
+      isInitialFetch
+    });
 
     if (shouldGenerateWelcome) {
       console.log('🔄 Enhanced AI generation trigger detected:', {
@@ -294,8 +341,8 @@ export const useMessageFetching = ({
         objective: memoizedConversation?.sessions?.objective
       });
 
-      console.log('🚀 [useMessageFetching] Triggering AI welcome generation via edge function...');
-      console.log('📋 [useMessageFetching] AI Generation Request Details:', {
+      console.log('🚀 [useMessageFetching] [AI-TRACKING] Triggering AI welcome generation via edge function...');
+      console.log('📋 [useMessageFetching] [AI-TRACKING] AI Generation Request Details:', {
         conversationId,
         isAdmin,
         facilitatorName: memoizedConversation?.sessions?.facilitator_details?.title,
@@ -320,13 +367,23 @@ export const useMessageFetching = ({
       }).then(({ data, error }) => {
         const duration = Date.now() - startTime;
         
+        console.log('📡 [AI-TRACKING] Edge function response received:', {
+          duration,
+          success: !error,
+          hasData: !!data,
+          error: error?.message || null,
+          dataKeys: data ? Object.keys(data) : null
+        });
+        
         if (error) {
-          console.error('❌ [useMessageFetching] Edge function AI generation failed:', {
+          console.error('❌ [useMessageFetching] [AI-TRACKING] Edge function AI generation failed:', {
             error,
             duration,
             conversationId,
             isAdmin,
-            errorDetails: error.message || error
+            errorDetails: error.message || error,
+            errorType: typeof error,
+            fullError: error
           });
           
           console.log('🔄 [useMessageFetching] Attempting fallback client-side generation...');
@@ -349,16 +406,42 @@ export const useMessageFetching = ({
             console.error('💥 [useMessageFetching] Fallback generation exception:', fallbackError);
           });
         } else {
-          console.log('✅ [useMessageFetching] Edge function AI generation successful:', {
+          console.log('✅ [useMessageFetching] [AI-TRACKING] Edge function AI generation successful:', {
             duration,
             conversationId,
             responseData: data,
             hasContent: !!data?.content,
             contentLength: data?.content?.length || 0,
-            generationMethod: data?.generationMethod
+            generationMethod: data?.generationMethod,
+            avatar: data?.avatar,
+            facilitatorContext: data?.facilitator_context,
+            sessionContext: data?.session_context,
+            metrics: data?.metrics
           });
+
+          console.log('🔍 [AI-TRACKING] Checking if database trigger handled message generation...');
           
-          console.log('⏳ [useMessageFetching] Waiting for message to be saved and fetching...');
+          // Check welcome message status after AI generation
+          const checkWelcomeStatus = async () => {
+            try {
+              const { data: conversationData, error: convError } = await supabase
+                .from('conversations')
+                .select('welcome_message_status')
+                .eq('id', conversationId)
+                .single();
+                
+              console.log('📊 [AI-TRACKING] Welcome message status check:', {
+                status: conversationData?.welcome_message_status,
+                error: convError?.message || null
+              });
+            } catch (statusError) {
+              console.error('❌ [AI-TRACKING] Error checking welcome status:', statusError);
+            }
+          };
+          
+          checkWelcomeStatus();
+          
+          console.log('⏳ [useMessageFetching] [AI-TRACKING] Waiting for message to be saved and fetching...');
           // The message will be picked up by real-time subscription or next fetch
           setTimeout(() => {
             console.log('🔍 [useMessageFetching] Force checking for new AI-generated messages...');
@@ -376,7 +459,7 @@ export const useMessageFetching = ({
                   return;
                 }
                 
-                console.log('📨 [useMessageFetching] Fetched messages after AI generation:', {
+                console.log('📨 [useMessageFetching] [AI-TRACKING] Fetched messages after AI generation:', {
                   messageCount: newMessages?.length || 0,
                   messages: newMessages?.map(m => ({
                     id: m.id,
@@ -384,16 +467,63 @@ export const useMessageFetching = ({
                     contentLength: typeof m.content === 'object' && m.content && (m.content as any).text 
                       ? (m.content as any).text.length 
                       : 0,
-                    created_at: m.created_at
+                    created_at: m.created_at,
+                    hasAvatar: !!(m.content as any)?.avatar,
+                    participant_id: m.participant_id,
+                    isAIGenerated: (m.content as any)?.text?.includes('Welcome') || m.role === 'assistant'
+                  }))
+                });
+                
+                // Check for AI-generated messages
+                const aiMessages = newMessages?.filter(m => m.role === 'assistant') || [];
+                console.log('🤖 [AI-TRACKING] AI-generated messages found:', {
+                  aiMessageCount: aiMessages.length,
+                  aiMessages: aiMessages.map(m => ({
+                    id: m.id,
+                    role: m.role,
+                    name: m.name,
+                    contentPreview: typeof m.content === 'object' && m.content && (m.content as any).text 
+                      ? (m.content as any).text.substring(0, 100) + '...'
+                      : 'No text content',
+                    hasAvatar: !!(m.content as any)?.avatar
                   }))
                 });
                 
                 if (newMessages && newMessages.length > 0) {
                   const formattedMessages = await formatDatabaseMessages(newMessages);
-                  console.log('✅ [useMessageFetching] Updated messages state with AI-generated content');
+                  console.log('✅ [useMessageFetching] [AI-TRACKING] Updated messages state with AI-generated content:', {
+                    formattedMessageCount: formattedMessages.length,
+                    hasWelcomeMessages: formattedMessages.some(m => m.isWelcomeMessage || m.sender === 'assistant')
+                  });
                   setMessages(formattedMessages);
                 } else {
-                  console.warn('⚠️ [useMessageFetching] No messages found after AI generation - may need to wait longer');
+                  console.warn('⚠️ [useMessageFetching] [AI-TRACKING] No messages found after AI generation - database trigger may have failed');
+                  
+                  // Check session events for any generation failures
+                  const checkSessionEvents = async () => {
+                    try {
+                      const { data: events, error: eventsError } = await supabase
+                        .from('session_events')
+                        .select('*')
+                        .eq('conversation_id', conversationId)
+                        .in('event_type', ['welcome_message_generated', 'ai_generation_failed', 'ai_generation_error'])
+                        .order('created_at', { ascending: false })
+                        .limit(5);
+                        
+                      console.log('📋 [AI-TRACKING] Recent session events:', {
+                        events: events?.map(e => ({
+                          event_type: e.event_type,
+                          data: e.data,
+                          created_at: e.created_at
+                        })) || [],
+                        error: eventsError?.message || null
+                      });
+                    } catch (eventError) {
+                      console.error('❌ [AI-TRACKING] Error checking session events:', eventError);
+                    }
+                  };
+                  
+                  checkSessionEvents();
                 }
               } catch (fetchException) {
                 console.error('💥 [useMessageFetching] Exception during force message check:', fetchException);

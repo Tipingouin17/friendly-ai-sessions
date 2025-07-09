@@ -51,7 +51,7 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
               <div className="space-y-3">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                   <Clock className="w-3 h-3 mr-1" />
-                  Generating welcome message
+                  AI is crafting your welcome message
                 </Badge>
                 
                 <div className="space-y-2">
@@ -61,7 +61,7 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
                 </div>
                 
                 <p className="text-sm text-muted-foreground">
-                  This should only take a few seconds...
+                  Creating a personalized welcome based on your session context...
                 </p>
               </div>
             )}

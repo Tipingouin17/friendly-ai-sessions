@@ -92,7 +92,28 @@ export const useWelcomeMessageGate = ({
       return true;
     }
 
-    // Set up timeout (30 seconds for server-side generation)
+    // Check conversation status for AI generation progress
+    try {
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('welcome_message_status')
+        .eq('id', conversationId)
+        .single();
+
+      if (conversation?.welcome_message_status === 'ai_ready' || conversation?.welcome_message_status === 'template_ready') {
+        console.log('✅ [WelcomeMessageGate] Welcome message ready via status check');
+        setState(prev => ({ 
+          ...prev, 
+          isWaitingForMessage: false, 
+          messageReady: true 
+        }));
+        return true;
+      }
+    } catch (error) {
+      console.error('❌ [WelcomeMessageGate] Error checking conversation status:', error);
+    }
+
+    // Set up timeout (15 seconds for database trigger generation)
     timeoutRef.current = setTimeout(() => {
       console.log('⏰ [WelcomeMessageGate] Timeout reached, proceeding anyway');
       setState(prev => ({ 
@@ -101,9 +122,9 @@ export const useWelcomeMessageGate = ({
         messageReady: true, 
         timeoutReached: true 
       }));
-    }, 30000);
+    }, 15000);
 
-    // Listen for welcome message ready notification
+    // Listen for welcome message ready notification and status changes
     const channelName = `welcome-gate-${conversationId}-${Date.now()}`;
     channelRef.current = supabase
       .channel(channelName)
@@ -125,6 +146,28 @@ export const useWelcomeMessageGate = ({
           isWaitingForMessage: false, 
           messageReady: true 
         }));
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`
+      }, async (payload) => {
+        const newStatus = payload.new?.welcome_message_status;
+        console.log('🔄 [WelcomeMessageGate] Conversation status updated:', newStatus);
+        
+        if (newStatus === 'ai_ready' || newStatus === 'template_ready') {
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
+          setState(prev => ({ 
+            ...prev, 
+            isWaitingForMessage: false, 
+            messageReady: true 
+          }));
+        }
       })
       .subscribe();
 

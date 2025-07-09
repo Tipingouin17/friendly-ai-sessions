@@ -91,6 +91,18 @@ serve(async (req) => {
         participantDescription: conversation?.participant_description,
         hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
       });
+
+      // Update welcome message status to 'generating' when starting AI generation
+      try {
+        await supabase
+          .from('conversations')
+          .update({ welcome_message_status: 'generating' })
+          .eq('id', conversationId);
+        
+        console.log(`🔄 [${requestId}] Updated welcome message status to 'generating'`);
+      } catch (statusError) {
+        console.error(`❌ [${requestId}] Error updating welcome message status:`, statusError);
+      }
     }
 
     // Process the request and generate a response

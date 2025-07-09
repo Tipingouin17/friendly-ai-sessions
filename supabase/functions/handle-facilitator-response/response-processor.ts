@@ -149,6 +149,18 @@ export async function processResponse(
             );
             
             if (aiResponse) {
+              // Update welcome message status to 'ready'
+              try {
+                await supabase
+                  .from('conversations')
+                  .update({ welcome_message_status: 'ready' })
+                  .eq('id', conversationId);
+                
+                console.log(`✅ [${requestId}] Updated welcome message status to 'ready' after AI generation`);
+              } catch (statusError) {
+                console.error(`❌ [${requestId}] Error updating welcome message status to ready:`, statusError);
+              }
+
               unlockGeneration(conversationId, requestId);
               return {
                 id: `resp-${Date.now()}`,
@@ -184,6 +196,18 @@ export async function processResponse(
         console.log(`📝 [${requestId}] Using enhanced template-based response generation`);
         const templateResponse = generateEnhancedTemplateMessage(conversation, participants, requestId);
         
+        // Update welcome message status to 'ready' for template fallback
+        try {
+          await supabase
+            .from('conversations')
+            .update({ welcome_message_status: 'ready' })
+            .eq('id', conversationId);
+          
+          console.log(`✅ [${requestId}] Updated welcome message status to 'ready' after template generation`);
+        } catch (statusError) {
+          console.error(`❌ [${requestId}] Error updating welcome message status to ready:`, statusError);
+        }
+
         unlockGeneration(conversationId, requestId);
         return {
           id: `resp-${Date.now()}`,

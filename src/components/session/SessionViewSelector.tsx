@@ -5,6 +5,7 @@ import EmptyState from "./EmptyState";
 import AdminQrView from "./AdminQrView";
 import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
 import SessionView from "./SessionView";
+import SessionStartingGate from "./SessionStartingGate";
 import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
 import JoinSessionLoadingState from "./JoinSessionLoadingState";
@@ -12,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
 import { useSecurityAudit } from "@/hooks/useSecurityAudit";
+import { useWelcomeMessageGate } from "@/hooks/useWelcomeMessageGate";
 
 interface SessionViewSelectorProps {
   props: SessionContextProps;
@@ -41,6 +43,21 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const processedEventIds = useRef<Set<string>>(new Set());
   const isNavigatingRef = useRef(false);
   const sessionTransitionRef = useRef(false);
+
+  // Check session state to determine what view to show
+  const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
+  
+  // Welcome message gate for participants
+  const {
+    isWaitingForMessage,
+    messageReady,
+    timeoutReached,
+    waitForWelcomeMessage
+  } = useWelcomeMessageGate({
+    conversationId: props.currentConversationId,
+    isAdmin,
+    sessionStarted: sessionStartedInDB
+  });
   
   // Listen for session end events (for participants)
   useSessionEndListener(props.currentConversationId, isAdmin);
@@ -212,8 +229,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
 
-  // Check session state to determine what view to show
-  const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
   
   // FIXED LOGIC: Admin should see QR view when session hasn't started yet
   if (isAdmin && !sessionStartedInDB) {
@@ -248,6 +263,27 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           // They should stay on their current route and just see UI update
           onStartSession();
         }}
+      />
+    );
+  }
+
+  // For participants when session has started but welcome message isn't ready yet
+  if (!isAdmin && sessionStartedInDB && (isWaitingForMessage || (!messageReady && !timeoutReached))) {
+    console.log("Rendering SessionStartingGate - waiting for welcome message");
+    
+    // Start the welcome message wait process
+    if (!isWaitingForMessage && !messageReady) {
+      waitForWelcomeMessage();
+    }
+    
+    return (
+      <SessionStartingGate
+        conversationId={props.currentConversationId as number}
+        facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        isWaitingForMessage={isWaitingForMessage}
+        timeoutReached={timeoutReached}
+        currentParticipantCount={props.conversation?.current_participants || 0}
+        maxParticipants={props.conversation?.participants || 0}
       />
     );
   }

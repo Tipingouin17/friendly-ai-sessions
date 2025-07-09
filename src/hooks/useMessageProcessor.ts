@@ -58,10 +58,11 @@ export const useMessageProcessor = ({
       };
     });
 
-    // For participant mode, filter messages using the original participant key
+    // For participant mode, RLS policies now handle filtering at database level
+    // But we still apply client-side filtering as a backup layer
     if (viewMode === "participant") {
       const participantKey = `P${currentParticipant}`;
-      debugLog('all', `Filtering messages for participant key: ${participantKey}`);
+      debugLog('all', `Applying backup client-side filtering for participant key: ${participantKey}`);
       
       const filteredMessages = processedMessages.filter(message => {
         const isAssistantMessage = message.sender === "assistant";
@@ -73,7 +74,7 @@ export const useMessageProcessor = ({
         return isAssistantMessage || isCurrentParticipantMessage || isAdminMessage;
       });
       
-      debugLog('all', `Filtered ${filteredMessages.length} messages from ${processedMessages.length} total for participant view`);
+      debugLog('all', `Backup filtered ${filteredMessages.length} messages from ${processedMessages.length} total for participant view`);
       return filteredMessages;
     }
 

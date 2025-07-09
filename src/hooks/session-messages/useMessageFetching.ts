@@ -449,7 +449,7 @@ export const useMessageFetching = ({
     try {
       debugLog('all', `Fetching messages for conversation: ${conversationId}`);
       
-      // Always check for database messages first
+      // RLS policies now handle participant privacy automatically
       const { data, error } = await supabase
         .from('messages')
         .select('*')

@@ -423,6 +423,7 @@ export type Database = {
           facilitator_id: number | null
           id: number
           name: string | null
+          participant_id: number | null
           role: string | null
           updated_at: string | null
           user_id: string | null
@@ -434,6 +435,7 @@ export type Database = {
           facilitator_id?: number | null
           id?: number
           name?: string | null
+          participant_id?: number | null
           role?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -445,6 +447,7 @@ export type Database = {
           facilitator_id?: number | null
           id?: number
           name?: string | null
+          participant_id?: number | null
           role?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -952,6 +955,10 @@ export type Database = {
       calculate_session_analytics: {
         Args: { conv_id: number }
         Returns: undefined
+      }
+      get_user_participant_id: {
+        Args: { conv_id: number }
+        Returns: number
       }
       is_participant_or_owner: {
         Args: { conversation_id: number }

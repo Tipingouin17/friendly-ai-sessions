@@ -62,8 +62,23 @@ const InputFooter = ({
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const shouldAllowAnswer = lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered;
   
-  // In admin view, we don't show the input at all
-  if (viewMode === "admin") {
+  // Enhanced participant detection logic
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
+  const isParticipantContext = hasParticipantParams || viewMode === "participant";
+  
+  console.log("🎯 InputFooter - Context Analysis:", {
+    viewMode,
+    hasParticipantParams,
+    isParticipantContext,
+    currentParticipant,
+    participantName,
+    shouldShowInput: isParticipantContext
+  });
+  
+  // Don't show input for pure admin view (without participant context)
+  if (viewMode === "admin" && !isParticipantContext) {
+    console.log("🚫 InputFooter - Hiding input for pure admin view");
     return null;
   }
   
@@ -79,15 +94,15 @@ const InputFooter = ({
       )}
       
       <div className="w-full border-t border-gray-100 bg-white/90 backdrop-blur-sm">
-        {/* Always show input for participant view for now */}
-        {viewMode === "participant" ? (
+        {/* Show input for participant context (even if technically in admin view mode) */}
+        {isParticipantContext ? (
           <ChatInput
             inputMessage={inputMessage}
             setInputMessage={setInputMessage}
             onSendMessage={onSendMessage}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
-            placeholder="Type a message..."
+            placeholder={`Type your message as ${participantName}...`}
             disabled={false}
             isMobile={isMobile}
           />

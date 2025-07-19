@@ -66,32 +66,68 @@ export const useMessageSender = ({
   }, [totalParticipants, startNewResponseCollection]);
 
   const handleSendMessage = useCallback(async () => {
+    // Enhanced validation with detailed logging
+    console.log("📨 handleSendMessage called with state:", {
+      requestInProgress: requestInProgressRef.current,
+      isWaitingForResponse,
+      currentConversationId,
+      viewMode: sessionState.viewMode,
+      inputMessage: sessionState.inputMessage?.substring(0, 50) + "...",
+      currentParticipant: sessionState.currentParticipant
+    });
+
     // Prevent duplicate sends
-    if (requestInProgressRef.current || isWaitingForResponse || !currentConversationId) {
-      console.log("Request already in progress or missing conversation ID, ignoring duplicate send");
+    if (requestInProgressRef.current || isWaitingForResponse) {
+      console.log("🚫 Request already in progress, ignoring duplicate send");
       return;
     }
     
-    // Block sending in admin mode
-    if (sessionState.viewMode === "admin") return;
+    // Check for conversation ID
+    if (!currentConversationId) {
+      console.error("❌ No conversation ID available");
+      setError("Session not properly initialized. Please refresh the page.");
+      toast({
+        title: "Session Error",
+        description: "Session not properly initialized. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // FIXED: Allow message sending for participants regardless of view mode context
+    // Only block if we're explicitly in admin mode AND not a participant context
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
+    const isParticipantContext = hasParticipantParams || sessionState.viewMode === "participant";
+    
+    if (sessionState.viewMode === "admin" && !isParticipantContext) {
+      console.log("🚫 Blocked: Admin view without participant context");
+      return;
+    }
     
     // Don't send empty messages
-    if (!sessionState.inputMessage.trim()) return;
+    if (!sessionState.inputMessage.trim()) {
+      console.log("🚫 Blocked: Empty message");
+      return;
+    }
 
     const currentParticipant = sessionState.currentParticipant;
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
     const messageStartTime = performance.now();
     
-    console.log("Sending message with participant info:", {
+    console.log("✅ Sending message with participant info:", {
       currentParticipant,
       currentParticipantKey,
       participantInfo,
-      message: sessionState.inputMessage
+      message: sessionState.inputMessage.substring(0, 100),
+      isParticipantContext,
+      conversationId: currentConversationId
     });
     
     try {
       requestInProgressRef.current = true;
+      setError(null); // Clear any previous errors
       
       // Save user message
       const newMessage = await saveUserMessage({
@@ -111,9 +147,11 @@ export const useMessageSender = ({
         isAnonymous ? 'anonymous' : 'named'
       );
 
-      // Update UI
+      // Update UI immediately
       sessionState.setMessages(prev => [...prev, newMessage]);
       const sentMessage = sessionState.inputMessage;
+      
+      // CRITICAL: Clear the input field immediately after sending
       sessionState.setInputMessage("");
       
       // Record that this participant has responded
@@ -213,7 +251,7 @@ export const useMessageSender = ({
       }
       
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("❌ Error sending message:", error);
       setError("Failed to send message. Please try again.");
       toast({
         title: "Error sending message",

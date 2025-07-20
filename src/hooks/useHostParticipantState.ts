@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { useEnhancedHostParticipantManager } from "@/hooks/useEnhancedHostParticipantManager";
@@ -20,56 +20,91 @@ export function useHostParticipantState({
 }: UseHostParticipantStateProps) {
   const logger = createLogger('HostParticipantState', 'admin');
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  
+  // Debounce rapid updates
+  const lastSessionFullCallRef = useRef<number>(0);
+  const participantsRef = useRef<ParticipantInfo[]>([]);
 
-  // Use the enhanced host participant manager (single source of truth)
+  // Use the enhanced host participant manager with stabilized callbacks
   const { 
     isConnected, 
     error, 
     participants: enhancedParticipants,
     currentCount,
     maxCount,
-    refresh
+    refresh,
+    pollingActive
   } = useEnhancedHostParticipantManager({
     conversationId: currentConversationId,
     onParticipantCountChange: (count) => {
-      logger.category('admin', `Participant count updated to: ${count}`);
+      // Reduce logging frequency to prevent console spam
+      if (count !== participantsRef.current.length) {
+        logger.category('admin', `Participant count updated to: ${count}`);
+      }
     },
     onMaxParticipantsChange: (max) => {
-      logger.category('admin', `Max participants updated to: ${max}`);
+      // Only log when max actually changes
+      const currentMax = conversationData?.participants || 0;
+      if (max !== currentMax) {
+        logger.category('admin', `Max participants updated to: ${max}`);
+      }
     },
     onParticipantsChange: (newParticipants) => {
-      logger.category('admin', `Enhanced manager: Updating participants to ${newParticipants.length}`);
-      setParticipants(newParticipants);
+      // Only update if participants actually changed
+      const currentParticipantIds = participantsRef.current.map(p => p.id).sort();
+      const newParticipantIds = newParticipants.map(p => p.id).sort();
+      
+      if (JSON.stringify(currentParticipantIds) !== JSON.stringify(newParticipantIds)) {
+        logger.category('admin', `Enhanced manager: Updating participants from ${participantsRef.current.length} to ${newParticipants.length}`);
+        setParticipants(newParticipants);
+        participantsRef.current = newParticipants;
+      }
     },
     onSessionStarted: () => {
       logger.category('admin', 'Session started notification received');
     },
     onSessionFull: () => {
-      logger.category('admin', `Session full detected: ${currentCount}/${maxCount}`);
-      if (onSessionFull) {
-        onSessionFull();
+      const now = Date.now();
+      // Debounce session full calls to prevent rapid firing
+      if (now - lastSessionFullCallRef.current > 10000) { // 10 second cooldown
+        logger.category('admin', `Session full detected: ${currentCount}/${maxCount}`);
+        lastSessionFullCallRef.current = now;
+        if (onSessionFull) {
+          onSessionFull();
+        }
       }
     },
     enabled: !!currentConversationId
   });
 
-  // Remove this duplicate useEffect - participants are updated via onParticipantsChange callback only
-
-  // Log state changes
+  // Update participants ref when enhanced participants change
   useEffect(() => {
-    logger.category('admin', 'Host participant state updated:', {
-      participantCount: participants.length,
-      currentCount,
-      maxCount,
-      isConnected,
-      error: error || null
-    });
-  }, [participants.length, currentCount, maxCount, isConnected, error, logger]);
+    if (enhancedParticipants && enhancedParticipants.length !== participantsRef.current.length) {
+      participantsRef.current = enhancedParticipants;
+      setParticipants(enhancedParticipants);
+    }
+  }, [enhancedParticipants]);
+
+  // Log state changes less frequently
+  useEffect(() => {
+    const logTimeout = setTimeout(() => {
+      logger.category('admin', 'Host participant state summary:', {
+        participantCount: participants.length,
+        currentCount,
+        maxCount,
+        isConnected,
+        pollingActive,
+        hasError: !!error
+      });
+    }, 2000); // Log summary every 2 seconds at most
+
+    return () => clearTimeout(logTimeout);
+  }, [participants.length, currentCount, maxCount, isConnected, error, pollingActive, logger]);
 
   return {
     participants,
     setParticipants,
-    isLoadingParticipants: !isConnected,
+    isLoadingParticipants: !isConnected && !pollingActive,
     currentParticipantCount: currentCount,
     maxParticipantsForSession: maxCount,
     isSessionFull: currentCount >= maxCount && maxCount > 0,

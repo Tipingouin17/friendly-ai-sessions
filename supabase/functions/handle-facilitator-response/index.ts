@@ -58,30 +58,32 @@ serve(async (req) => {
     }
 
     // ENHANCED CONTEXT MANAGEMENT: Fetch conversation and participants data
-    console.log(`📋 [${requestId}] Fetching conversation data for ID: ${conversationId}...`);
+    console.log(`📋 [${requestId}] Fetching comprehensive conversation data for ID: ${conversationId}...`);
     const contextStart = performance.now();
     
     const conversation = await fetchConversationData(supabase, conversationId);
     const participants = await fetchParticipantsData(supabase, conversationId);
     
     const contextDuration = performance.now() - contextStart;
-    console.log(`✅ [${requestId}] Context fetched in ${contextDuration.toFixed(2)}ms:`, {
+    console.log(`✅ [${requestId}] Comprehensive context fetched in ${contextDuration.toFixed(2)}ms:`, {
       hasConversation: !!conversation,
       participantCount: participants?.length || 0,
       facilitatorName: conversation?.sessions?.facilitator_details?.title,
       sessionObjective: conversation?.sessions?.objective?.substring(0, 50) + '...',
       participantDescription: conversation?.participant_description,
+      language: conversation?.language || 'en',
       conversationStructure: {
         hasSession: !!conversation?.sessions,
         sessionKeys: conversation?.sessions ? Object.keys(conversation.sessions) : [],
         hasFacilitatorDetails: !!conversation?.sessions?.facilitator_details,
         facilitatorDetailsKeys: conversation?.sessions?.facilitator_details ? Object.keys(conversation.sessions.facilitator_details) : []
-      }
+      },
+      contextQuality: 'comprehensive'
     });
 
     // Enhanced debugging for session start with deduplication
     if (sessionStart && conversation) {
-      console.log(`🎯 [${requestId}] Session start request - Enhanced context analysis:`, {
+      console.log(`🎯 [${requestId}] Session start request - Comprehensive context analysis:`, {
         conversationId,
         sessionTitle: conversation?.sessions?.title,
         facilitatorTitle: conversation?.sessions?.facilitator_details?.title,
@@ -89,8 +91,10 @@ serve(async (req) => {
         facilitatorExpertise: conversation?.sessions?.facilitator_details?.expertise_level,
         sessionObjective: conversation?.sessions?.objective?.substring(0, 100) + '...',
         participantDescription: conversation?.participant_description,
+        language: conversation?.language || 'en',
         hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective),
-        welcomeMessageStatus: conversation?.welcome_message_status
+        welcomeMessageStatus: conversation?.welcome_message_status,
+        contextQuality: 'comprehensive'
       });
 
       // Check if welcome message is already being generated or completed
@@ -137,8 +141,8 @@ serve(async (req) => {
       }
     }
 
-    // Process the request and generate a response
-    console.log(`🤖 [${requestId}] Starting response processing...`);
+    // Process the request and generate a response with comprehensive context
+    console.log(`🤖 [${requestId}] Starting comprehensive response processing...`);
     const processingStart = performance.now();
     
     const responseObject = await processResponse(
@@ -155,7 +159,7 @@ serve(async (req) => {
     const processingDuration = performance.now() - processingStart;
     const totalDuration = performance.now() - requestStart;
 
-    console.log(`🎉 [${requestId}] Response processing complete:`, {
+    console.log(`🎉 [${requestId}] Comprehensive response processing complete:`, {
       processingDuration: `${processingDuration.toFixed(2)}ms`,
       totalDuration: `${totalDuration.toFixed(2)}ms`,
       responseData: {
@@ -165,11 +169,13 @@ serve(async (req) => {
         generationMethod: responseObject.metrics?.generationMethod,
         hasAvatar: !!responseObject.avatar,
         hasFacilitatorContext: !!responseObject.facilitator_context,
-        hasSessionContext: !!responseObject.session_context
+        hasSessionContext: !!responseObject.session_context,
+        language: responseObject.session_context?.language || 'en',
+        contextQuality: responseObject.metrics?.contextQuality || 'comprehensive'
       }
     });
 
-    console.log(`📤 [${requestId}] Sending facilitator response:`, {
+    console.log(`📤 [${requestId}] Sending comprehensive facilitator response:`, {
       id: responseObject.id,
       isReport: responseObject.is_report,
       contentLength: responseObject.content.length,
@@ -177,7 +183,9 @@ serve(async (req) => {
       wrapUpTriggered: wrapUpSession,
       sessionStartTriggered: sessionStart,
       facilitatorName: responseObject.facilitator_context?.name,
-      sessionObjective: responseObject.session_context?.objective?.substring(0, 50) + '...'
+      sessionObjective: responseObject.session_context?.objective?.substring(0, 50) + '...',
+      language: responseObject.session_context?.language || 'en',
+      contextQuality: 'comprehensive'
     });
     
     return new Response(

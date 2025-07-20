@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -10,6 +9,7 @@ import { useHostSessionInitialization } from "@/hooks/useHostSessionInitializati
 import { useSessionInterface } from "@/hooks/useSessionInterface";
 import { useOptimizedSessionState } from "@/hooks/useOptimizedSessionState";
 import { useSessionValidation } from "@/hooks/useSessionValidation";
+import { useHostParticipantContext } from "@/hooks/useHostParticipantContext";
 import HostDashboard from "@/components/session/host/HostDashboard";
 import { Message } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
@@ -55,6 +55,26 @@ const SessionHost = () => {
     isLoading: sessionPageLoading || loaderIsLoading || isConversationLoading,
     isValidating,
     isValid
+  });
+
+  // NEW: Host participant context for message sending
+  const {
+    participantMode,
+    currentUserParticipantId,
+    enableParticipantMode,
+    isRegistering,
+    canSendMessages
+  } = useHostParticipantContext({
+    conversationId: currentConversationId,
+    isHostPage: true,
+    hostName: "Host"
+  });
+
+  console.log("🔧 Host participant context:", {
+    participantMode,
+    currentUserParticipantId,
+    canSendMessages,
+    isRegistering
   });
 
   // Session interface for proper session start handling
@@ -122,7 +142,7 @@ const SessionHost = () => {
   // Initialize session messages with empty array
   const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
 
-  // Host message handling with response collection
+  // Host message handling with response collection - ENHANCED with participant context
   const {
     isSessionPaused,
     toggleSessionState,
@@ -137,7 +157,11 @@ const SessionHost = () => {
     participants: participants || [],
     messages: sessionMessages || [],
     setMessages: setSessionMessages,
-    conversationData
+    conversationData,
+    // NEW: Pass host participant context
+    isHostPage: true,
+    canSendMessages: canSendMessages,
+    currentUserParticipantId: currentUserParticipantId
   });
 
   // Keep a state reference to preserve UI data
@@ -245,7 +269,9 @@ const SessionHost = () => {
     participantsLength: participants?.length || 0,
     conversationId: currentConversationId,
     sessionStarted: sessionStartedStatus,
-    isTransitioning
+    isTransitioning,
+    participantMode,
+    canSendMessages
   });
 
   return (

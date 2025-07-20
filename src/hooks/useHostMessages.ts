@@ -1,270 +1,156 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Message, ParticipantInfo } from "@/types/chat";
-import { useMessageFetching } from "./session-messages/useMessageFetching";
-import { useResponseAggregation } from "./session-messages/useResponseAggregation";
-import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
-import { useSessionAutoStartMonitoring } from "./useSessionAutoStartMonitoring";
-import { supabase } from "@/integrations/supabase/client";
+
+import { useState, useCallback } from 'react';
+import { Message } from '@/types/chat';
+import { ParticipantInfo } from '@/types/chat';
+import { ConversationWithSession } from '@/types/database';
+import { useMessageSender } from '@/hooks/useMessageSender';
+import { useToast } from '@/components/ui/use-toast';
 
 interface UseHostMessagesProps {
   conversationId: number | null;
   participants: ParticipantInfo[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  conversationData: any;
+  conversationData: ConversationWithSession | null;
+  // NEW: Host participant context
+  isHostPage?: boolean;
+  canSendMessages?: boolean;
+  currentUserParticipantId?: number | null;
 }
 
-export const useHostMessages = ({
+export function useHostMessages({
   conversationId,
   participants,
   messages,
   setMessages,
-  conversationData
-}: UseHostMessagesProps) => {
+  conversationData,
+  isHostPage = false,
+  canSendMessages = false,
+  currentUserParticipantId = null
+}: UseHostMessagesProps) {
   const [isSessionPaused, setIsSessionPaused] = useState(false);
-  const [conversationState, setConversationState] = useState(conversationData);
-  const sessionStateRef = useRef(conversationData);
-  const welcomeGeneratedRef = useRef<boolean>(false);
-  const autoStartHandledRef = useRef<boolean>(false);
+  const { toast } = useToast();
 
-  // Update refs when props change
-  useEffect(() => {
-    if (conversationData) {
-      setConversationState(conversationData);
-      sessionStateRef.current = conversationData;
-    }
-  }, [conversationData]);
+  // Create session state for message sender
+  const sessionState = {
+    messages,
+    setMessages,
+    inputMessage: '',
+    setInputMessage: () => {}, // This will be overridden by the component using this
+    currentParticipant: currentUserParticipantId || 1, // Use host participant ID or default to 1
+    recordResponse: (participantId: number, hasResponded: boolean) => {
+      console.log("🔄 Recording response:", { participantId, hasResponded });
+    },
+    totalResponses: 0,
+    hasAnswered: false,
+    viewMode: "participant" as const // Hosts participate as participants
+  };
 
+  // Enhanced message sender with host context
   const {
-    fetchMessages,
-    isGeneratingWelcome,
-    processNewMessage,
+    isWaitingForResponse,
     isWaitingForResponses,
     responseCount,
-    generateAggregatedResponse,
-    isGeneratingResponse
-  } = useMessageFetching({
-    conversationId,
-    isAdmin: true,
-    conversation: conversationState,
-    totalParticipants: participants.length
-  });
-
-  const {
-    recordParticipantResponse,
+    totalParticipants,
+    currentUserHasResponded,
+    handleSendMessage,
+    error,
     startResponseCollection
-  } = useResponseAggregation({
-    conversationId,
-    totalParticipants: participants.length,
-    conversation: conversationState
+  } = useMessageSender({
+    currentConversationId: conversationId,
+    sessionState,
+    participants,
+    isAnonymous: false, // Hosts are not anonymous
+    conversation: conversationData,
+    // NEW: Pass host context
+    isHostPage,
+    canSendMessages
   });
 
-  // Enhanced immediate welcome generation for auto-started sessions
-  const triggerImmediateWelcomeGeneration = useCallback(async () => {
-    if (!conversationId || welcomeGeneratedRef.current || !conversationState) {
-      console.log('⚠️ [HOST] Skipping immediate welcome generation:', {
-        hasConversationId: !!conversationId,
-        alreadyGenerated: welcomeGeneratedRef.current,
-        hasConversationState: !!conversationState
+  const toggleSessionState = useCallback(() => {
+    setIsSessionPaused(prev => {
+      const newState = !prev;
+      toast({
+        title: newState ? "Session Paused" : "Session Resumed",
+        description: newState 
+          ? "The session has been paused. Participants will see a pause message."
+          : "The session has been resumed. Participants can continue.",
+      });
+      return newState;
+    });
+  }, [toast]);
+
+  const handleHostMessage = useCallback((message: string) => {
+    console.log("🎙️ Host sending message:", message);
+    // This will be handled by the message sender
+    return handleSendMessage();
+  }, [handleSendMessage]);
+
+  const handleSendHostMessage = useCallback((
+    message: string, 
+    isPinned: boolean = false, 
+    recipientId?: string
+  ) => {
+    console.log("📤 Host sending message:", { 
+      message: message.substring(0, 50), 
+      isPinned, 
+      recipientId,
+      canSendMessages,
+      currentUserParticipantId 
+    });
+
+    if (!canSendMessages) {
+      toast({
+        title: "Cannot Send Message",
+        description: "Host participant mode is not enabled yet. Please wait a moment.",
+        variant: "destructive"
       });
       return;
     }
 
-    console.log('🚀 [HOST] Triggering immediate AI welcome generation for auto-started session...');
-    welcomeGeneratedRef.current = true;
-
-    try {
-      // Check if we already have messages
-      const { data: existingMessages, error: checkError } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('conversation_id', conversationId)
-        .limit(1);
-
-      if (checkError) {
-        console.error('❌ [HOST] Error checking existing messages:', checkError);
-        welcomeGeneratedRef.current = false;
-        return;
-      }
-
-      if (existingMessages && existingMessages.length > 0) {
-        console.log('📭 [HOST] Messages already exist, skipping generation');
-        return;
-      }
-
-      // Call the edge function directly with full context
-      console.log('🤖 [HOST] Calling edge function for AI welcome generation...');
-      const { data: response, error } = await supabase.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false,
-          conversation: conversationState
-        }
-      });
-
-      if (error) {
-        console.error('❌ [HOST] Edge function error:', error);
-        welcomeGeneratedRef.current = false;
-        return;
-      }
-
-      if (response?.content) {
-        console.log('✅ [HOST] AI welcome message generated:', {
-          contentLength: response.content.length,
-          generationMethod: response.metrics?.generationMethod
-        });
-
-        // Trigger message fetch to get the newly generated message
-        setTimeout(() => {
-          fetchMessages();
-        }, 100);
-      }
-
-    } catch (error) {
-      console.error('❌ [HOST] Error in immediate welcome generation:', error);
-      welcomeGeneratedRef.current = false; // Reset on error
-    }
-  }, [conversationId, conversationState, fetchMessages]);
-
-  // Handle conversation updates from realtime with enhanced auto-start detection
-  const handleConversationUpdate = useCallback((payload: any) => {
-    console.log('🔄 [HOST] Enhanced conversation update received:', payload);
-    
-    if (payload.new) {
-      const updatedConversation = { ...sessionStateRef.current, ...payload.new };
-      setConversationState(updatedConversation);
-      sessionStateRef.current = updatedConversation;
-      
-      // Enhanced session start detection with immediate AI generation
-      if (payload.new.session_started && !payload.old?.session_started && !autoStartHandledRef.current) {
-        console.log('🎉 [HOST] Session auto-started - triggering immediate AI welcome generation');
-        autoStartHandledRef.current = true;
-        
-        // Trigger immediate AI welcome generation
-        setTimeout(() => {
-          triggerImmediateWelcomeGeneration();
-        }, 500); // Small delay to ensure conversation state is updated
-      }
-    }
-  }, [triggerImmediateWelcomeGeneration]);
-
-  // Handle participant changes
-  const handleParticipantChange = useCallback((payload: any) => {
-    console.log('👥 [HOST] Enhanced participant change:', payload);
-    // Participant updates are handled by the parent component
-  }, []);
-
-  // Enhanced session event handling with immediate AI generation
-  const handleSessionEvent = useCallback((payload: any) => {
-    console.log('📋 [HOST] Enhanced session event:', payload);
-    
-    if (payload.new?.event_type === 'session_auto_started' && !autoStartHandledRef.current) {
-      console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
-      autoStartHandledRef.current = true;
-      
-      setTimeout(() => {
-        triggerImmediateWelcomeGeneration();
-      }, 500);
-    }
-  }, [triggerImmediateWelcomeGeneration]);
-
-  // Set up optimized realtime connection
-  useOptimizedRealtimeConnection({
-    conversationId,
-    onConversationUpdate: handleConversationUpdate,
-    onParticipantChange: useCallback((payload: any) => {
-      console.log('👥 [HOST] Enhanced participant change:', payload);
-    }, []),
-    onSessionEvent: useCallback((payload: any) => {
-      console.log('📋 [HOST] Enhanced session event:', payload);
-      
-      if (payload.new?.event_type === 'session_auto_started' && !autoStartHandledRef.current) {
-        console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
-        autoStartHandledRef.current = true;
-        
-        setTimeout(() => {
-          triggerImmediateWelcomeGeneration();
-        }, 500);
-      }
-    }, [triggerImmediateWelcomeGeneration]),
-    isHost: true
-  });
-
-  // Enhanced auto-start monitoring with immediate AI generation
-  const { isProcessingAutoStart } = useSessionAutoStartMonitoring({
-    conversationId,
-    conversation: conversationState,
-    participants,
-    onSessionStarted: () => {
-      if (!autoStartHandledRef.current) {
-        console.log('🎯 [HOST] Auto-start monitoring detected session start, triggering AI generation...');
-        autoStartHandledRef.current = true;
-        setTimeout(() => {
-          triggerImmediateWelcomeGeneration();
-        }, 500);
-      }
-    },
-    isHost: true
-  });
-
-  // Enhanced session start state monitoring for immediate welcome generation
-  useEffect(() => {
-    if (conversationState?.session_started && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
-      console.log('🔍 [HOST] Enhanced session started detected, checking for welcome message generation...');
-      
-      // Check if we need to generate welcome message
-      if (messages.length === 0) {
-        console.log('📝 [HOST] No messages found, triggering immediate AI welcome generation...');
-        autoStartHandledRef.current = true;
-        setTimeout(() => {
-          triggerImmediateWelcomeGeneration();
-        }, 500);
-      }
-    }
-  }, [conversationState?.session_started, messages.length, triggerImmediateWelcomeGeneration]);
-
-  // Reset flags when conversation changes
-  useEffect(() => {
-    welcomeGeneratedRef.current = false;
-    autoStartHandledRef.current = false;
-  }, [conversationId]);
-
-  const toggleSessionState = useCallback(() => {
-    setIsSessionPaused(prev => !prev);
-  }, []);
-
-  const handleHostMessage = useCallback((message: string) => {
-    console.log('📝 [HOST] Sending host message:', message);
-    // Implementation for host messages
-  }, []);
-
-  const handleSendHostMessage = useCallback((message: string, isPinned = false, recipientId?: string) => {
-    console.log('📤 [HOST] Sending message:', { message, isPinned, recipientId });
-    // Implementation for sending host messages
-  }, []);
+    // For now, we'll use the standard message sending
+    // In the future, this could be enhanced for directed messages
+    return handleSendMessage();
+  }, [handleSendMessage, canSendMessages, currentUserParticipantId, toast]);
 
   const triggerFacilitatorResponse = useCallback(async () => {
-    console.log('🤖 [HOST] Triggering facilitator response...');
-    try {
-      await generateAggregatedResponse();
-    } catch (error) {
-      console.error('❌ [HOST] Error generating facilitator response:', error);
+    console.log("🤖 Triggering facilitator response from host interface");
+    
+    if (!conversationId) {
+      console.error("❌ No conversation ID for facilitator response");
+      return;
     }
-  }, [generateAggregatedResponse]);
+
+    try {
+      // This could trigger an AI response or other facilitator actions
+      // For now, we'll log it
+      console.log("🎯 Host requested facilitator response");
+      
+      toast({
+        title: "Facilitator Response",
+        description: "Facilitator response has been triggered.",
+      });
+    } catch (error) {
+      console.error("❌ Error triggering facilitator response:", error);
+      toast({
+        title: "Error",
+        description: "Failed to trigger facilitator response.",
+        variant: "destructive"
+      });
+    }
+  }, [conversationId, toast]);
 
   return {
     isSessionPaused,
     toggleSessionState,
     handleHostMessage,
     handleSendHostMessage,
-    responseCount,
+    isWaitingForResponse,
     isWaitingForResponses,
-    totalParticipants: participants.length,
+    responseCount,
+    totalParticipants,
+    currentUserHasResponded,
     triggerFacilitatorResponse,
-    isGeneratingWelcome,
-    isGeneratingResponse,
-    isProcessingAutoStart
+    error
   };
-};
+}

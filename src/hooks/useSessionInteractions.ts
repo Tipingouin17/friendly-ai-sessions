@@ -19,6 +19,9 @@ type UseSessionInteractionsProps = {
   conversation: any;
   participants: any[];
   isAnonymous: boolean;
+  // NEW: Enhanced props for host context
+  isHostPage?: boolean;
+  canSendMessages?: boolean;
 };
 
 export const useSessionInteractions = ({
@@ -26,9 +29,11 @@ export const useSessionInteractions = ({
   sessionState,
   conversation,
   participants,
-  isAnonymous
+  isAnonymous,
+  isHostPage = false,
+  canSendMessages = true
 }: UseSessionInteractionsProps) => {
-  // Set up message sending functionality
+  // Set up message sending functionality with enhanced host context
   const {
     isWaitingForResponse,
     isWaitingForResponses,
@@ -43,7 +48,10 @@ export const useSessionInteractions = ({
     sessionState,
     participants,
     isAnonymous,
-    conversation
+    conversation,
+    // NEW: Pass host context
+    isHostPage,
+    canSendMessages
   });
 
   // Set up real-time message subscription

@@ -94,14 +94,23 @@ export const useMessageSender = ({
       return;
     }
     
-    // FIXED: Allow message sending for participants regardless of view mode context
-    // Only block if we're explicitly in admin mode AND not a participant context
+    // CRITICAL FIX: Always allow message sending for participants
+    // Check URL parameters to determine if this is a participant context
     const urlParams = new URLSearchParams(window.location.search);
     const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
     const isParticipantContext = hasParticipantParams || sessionState.viewMode === "participant";
     
-    if (sessionState.viewMode === "admin" && !isParticipantContext) {
-      console.log("🚫 Blocked: Admin view without participant context");
+    console.log("🔍 Message sending context check:", {
+      hasParticipantParams,
+      isParticipantContext,
+      viewMode: sessionState.viewMode,
+      currentPath: window.location.pathname,
+      allowSending: isParticipantContext
+    });
+    
+    // Only block pure admin views without participant context
+    if (!isParticipantContext && sessionState.viewMode === "admin" && !hasParticipantParams) {
+      console.log("🚫 Blocked: Pure admin view without participant context");
       return;
     }
     

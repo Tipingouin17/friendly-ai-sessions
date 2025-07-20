@@ -10,7 +10,9 @@ export function useSessionPageState() {
   // Use refs for state that doesn't need to trigger re-renders and browser-only detection
   const stateRef = useRef({
     isOnAdminPath: false,
+    isOnHostPath: false,
     isAdmin: false,
+    isHost: false,
     connectionAttempts: 0,
     error: null as string | null,
     noSessionFound: false,
@@ -32,11 +34,37 @@ export function useSessionPageState() {
     stateRef.current.pageLoadTime = Date.now();
     
     const isOnAdminPath = location.pathname.includes('/admin');
+    const isOnHostPath = location.pathname.includes('/host');
+    
+    // CRITICAL FIX: Clear admin session storage when on participant URLs
+    const urlParams = new URLSearchParams(location.search);
+    const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
+    
+    if (hasParticipantParams) {
+      // Clear any admin flags when accessing participant URLs
+      console.log("🧹 Clearing admin session storage for participant URL");
+      sessionStorage.removeItem('isAdminSession');
+      sessionStorage.removeItem('isHostSession');
+    }
+    
+    // Separate admin and host detection
     const storedIsAdmin = sessionStorage.getItem('isAdminSession') === 'true';
+    const storedIsHost = sessionStorage.getItem('isHostSession') === 'true';
     
     stateRef.current.isOnAdminPath = isOnAdminPath;
-    stateRef.current.isAdmin = isOnAdminPath || storedIsAdmin;
-  }, [location.pathname]);
+    stateRef.current.isOnHostPath = isOnHostPath;
+    stateRef.current.isAdmin = isOnAdminPath || (storedIsAdmin && !hasParticipantParams);
+    stateRef.current.isHost = isOnHostPath || (storedIsHost && !hasParticipantParams);
+    
+    console.log("🔍 Session page state initialized:", {
+      isOnAdminPath,
+      isOnHostPath,
+      hasParticipantParams,
+      isAdmin: stateRef.current.isAdmin,
+      isHost: stateRef.current.isHost,
+      clearedStorage: hasParticipantParams
+    });
+  }, [location.pathname, location.search]);
   
   // Handle error function that doesn't cause re-renders
   const handleError = useCallback((errorMessage: string) => {
@@ -79,9 +107,9 @@ export function useSessionPageState() {
     // Update provider initialization state
     setHasInitializedProvider(true);
     
-    // For admin, ensure we're not stuck in loading
-    if ((stateRef.current.isAdmin || stateRef.current.isOnAdminPath) && isLoading) {
-      console.log("Admin detected, clearing loading state");
+    // For host, ensure we're not stuck in loading
+    if ((stateRef.current.isHost || stateRef.current.isOnHostPath) && isLoading) {
+      console.log("Host detected, clearing loading state");
       setIsLoading(false);
     }
   }, [isLoading]);
@@ -99,6 +127,8 @@ export function useSessionPageState() {
     handleProviderInitialized,
     stateRef,
     isOnAdminPath: stateRef.current.isOnAdminPath,
+    isOnHostPath: stateRef.current.isOnHostPath,
+    isHost: stateRef.current.isHost,
     isClient
   };
 }

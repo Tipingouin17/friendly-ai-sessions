@@ -16,7 +16,7 @@ import { getParticipantColor } from "@/utils/sessionHelpers";
 import { useAutoStartSession } from "@/hooks/useAutoStartSession";
 
 const SessionHost = () => {
-  // Enforce host status
+  // CRITICAL FIX: Set host status instead of admin status
   const { forceHost } = useHostStatusPersistence();
 
   // Session page state
@@ -43,10 +43,10 @@ const SessionHost = () => {
     hostViewMounted
   } = useHostSessionLoader();
 
-  // Session validation - check if session is still active
+  // Session validation - check if session is still active (host validation, not admin)
   const { isValidating, isValid } = useSessionValidation({
     conversationId: currentConversationId,
-    isAdmin: true
+    isAdmin: false // Host validation doesn't need admin flag
   });
 
   console.log("🔍 SessionHost - Current state:", {
@@ -179,11 +179,15 @@ const SessionHost = () => {
     }
   }, [currentConversationId]);
 
-  // Force host status when on host page
+  // CRITICAL FIX: Force host status when on host page, but don't set admin flags
   useEffect(() => {
     if (currentConversationId) {
-      console.log("🔧 SessionHost - Forcing host status for conversation:", currentConversationId);
+      console.log("🔧 SessionHost - Forcing host status (not admin) for conversation:", currentConversationId);
       forceHost();
+      
+      // Clear any admin flags that might interfere
+      sessionStorage.removeItem('isAdminSession');
+      sessionStorage.setItem('isHostSession', 'true');
     }
   }, [currentConversationId, forceHost]);
 

@@ -35,19 +35,21 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   children
 }) => {
   const [sessionStarted, setSessionStarted] = useState(false);
+  
   // Use ref for tracking setup and retries to prevent re-renders
   const stateRef = useRef({
     hasSetup: false,
     hasToggledRetry: false,
-    adminStatusDetermined: false,
-    effectiveAdmin: false
+    statusDetermined: false,
+    effectiveAdmin: false,
+    effectiveHost: false
   });
   
-  // Enhanced path and context analysis for better view mode detection
+  // Enhanced path and context analysis
   const currentPath = window.location.pathname;
   const urlParams = new URLSearchParams(window.location.search);
   
-  // Detect admin/host routes more precisely
+  // Detect different route types
   const isOnAdminPath = currentPath.includes('/admin');
   const isOnHostPath = currentPath.includes('/host');
   const isParticipantPath = currentPath.includes('/session') && !isOnAdminPath && !isOnHostPath;
@@ -65,26 +67,24 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     isAdmin
   });
   
-  // Determine the admin status once and store in ref to prevent loops
-  if (!stateRef.current.adminStatusDetermined) {
-    // Enhanced logic: Only treat as admin if explicitly on admin/host paths OR forced
-    // Participant URLs with participant params should never be treated as admin
-    stateRef.current.effectiveAdmin = (
-      (forceAdmin || isAdmin || isOnAdminPath || isOnHostPath) && 
-      !(hasParticipantParams && isParticipantPath)
-    );
-    stateRef.current.adminStatusDetermined = true;
+  // Determine the effective admin/host status once and store in ref to prevent loops
+  if (!stateRef.current.statusDetermined) {
+    // CRITICAL FIX: Only treat as admin if explicitly on admin paths
+    // Host paths should NOT set admin flags
+    stateRef.current.effectiveAdmin = forceAdmin || isAdmin || isOnAdminPath;
+    stateRef.current.effectiveHost = isOnHostPath;
+    stateRef.current.statusDetermined = true;
     
-    console.log("✅ SessionProviderWrapper - Admin status determined:", {
+    console.log("✅ SessionProviderWrapper - Status determined:", {
       effectiveAdmin: stateRef.current.effectiveAdmin,
+      effectiveHost: stateRef.current.effectiveHost,
       reasoning: {
         forceAdmin,
         isAdmin,
         isOnAdminPath,
         isOnHostPath,
         hasParticipantParams,
-        isParticipantPath,
-        finalDecision: stateRef.current.effectiveAdmin
+        isParticipantPath
       }
     });
   }
@@ -104,10 +104,10 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     onLoading,
     sessionMountedRef,
     effectiveAdmin: stateRef.current.effectiveAdmin,
-    isOnAdminPath: isOnAdminPath || isOnHostPath
+    isOnAdminPath: isOnAdminPath
   });
   
-  // CRITICAL FIX: Implement automatic retry for participants to ensure they can connect
+  // Auto-retry for participants to ensure they can connect
   useEffect(() => {
     if (!sessionMountedRef.current) return;
     
@@ -115,16 +115,17 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     if (stateRef.current.hasSetup) return;
     stateRef.current.hasSetup = true;
     
-    // Auto-retry for participants only, not for admin routes
+    // Auto-retry for participants only, not for admin/host routes
     if (isParticipantPath && !stateRef.current.hasToggledRetry && 
-        !stateRef.current.effectiveAdmin && connectionAttempts === 0) {
+        !stateRef.current.effectiveAdmin && !stateRef.current.effectiveHost && 
+        connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {
         if (!sessionMountedRef.current) return;
         
         console.log("🔄 Auto-retrying connection for participant");
         retryConnection();
         stateRef.current.hasToggledRetry = true;
-      }, 3000); // Short timeout to ensure participants can connect
+      }, 3000);
       
       return () => clearTimeout(retryTimeout);
     }
@@ -141,7 +142,7 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
         useSessionWrapperEffects({
           props,
           effectiveAdmin: stateRef.current.effectiveAdmin,
-          isOnAdminPath: isOnAdminPath || isOnHostPath,
+          isOnAdminPath: isOnAdminPath,
           forcedInitialization,
           providerInitialized,
           onInitialized,
@@ -158,16 +159,16 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
           });
         }
         
-        // Enhanced props with proper view mode detection
+        // CRITICAL FIX: Always set participant view mode when participant params are present
         const enhancedProps = {
           ...props,
-          // CRITICAL: Ensure participants get participant view mode regardless of admin context
           sessionState: {
             ...props.sessionState,
-            viewMode: (hasParticipantParams && isParticipantPath) ? "participant" as const : 
+            viewMode: hasParticipantParams ? "participant" as const : 
                      (stateRef.current.effectiveAdmin ? "admin" as const : props.sessionState.viewMode)
           },
-          isAdmin: isParticipantPath ? props.isAdmin : (props.isAdmin || stateRef.current.effectiveAdmin)
+          // IMPORTANT: Don't pass admin flags to participants
+          isAdmin: hasParticipantParams ? false : (props.isAdmin || stateRef.current.effectiveAdmin)
         };
         
         console.log("🎯 SessionProviderWrapper - Enhanced Props:", {

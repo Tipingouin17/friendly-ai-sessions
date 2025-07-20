@@ -956,6 +956,10 @@ export type Database = {
         Args: { conv_id: number }
         Returns: undefined
       }
+      create_template_welcome_message: {
+        Args: { conversation_id_param: number }
+        Returns: undefined
+      }
       get_user_participant_id: {
         Args: { conv_id: number }
         Returns: number

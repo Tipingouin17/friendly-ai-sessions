@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { removeChannel } from '@/utils/realtimeHelpers';
@@ -16,17 +15,12 @@ interface UseEnhancedHostParticipantManagerProps {
   enabled?: boolean;
 }
 
-// Enhanced global connection registry with better conflict prevention
+// Global connection registry to prevent duplicate subscriptions
 const hostConnectionRegistry = new Map<number, {
   active: boolean;
   timestamp: number;
   channelRef: any;
-  instanceId: string;
 }>();
-
-// Cleanup stale connections more aggressively
-const STALE_CONNECTION_TIMEOUT = 30000; // 30 seconds
-const CONNECTION_DEBOUNCE_TIME = 2000; // 2 seconds between connection attempts
 
 export function useEnhancedHostParticipantManager({
   conversationId,
@@ -52,80 +46,19 @@ export function useEnhancedHostParticipantManager({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<number>(0);
-  const instanceId = useRef<string>(Math.random().toString(36).substr(2, 9));
-  const lastStateRef = useRef({ currentCount: 0, maxCount: 0, participants: [] as ParticipantInfo[] });
 
-  // Check if we can create a connection with better deduplication
+  // Check if we can create a connection (prevent duplicates)
   const canCreateConnection = useCallback(() => {
     if (!conversationId || !enabled) return false;
     
     const existing = hostConnectionRegistry.get(conversationId);
-    const now = Date.now();
-    
-    if (existing && existing.active && (now - existing.timestamp) < CONNECTION_DEBOUNCE_TIME) {
-      if (existing.instanceId !== instanceId.current) {
-        logger.category('admin', `Skipping - active connection exists for conversation ${conversationId} (instance: ${existing.instanceId})`);
-        return false;
-      }
-    }
-    
-    // Clean up stale connections
-    if (existing && (now - existing.timestamp) > STALE_CONNECTION_TIMEOUT) {
-      hostConnectionRegistry.delete(conversationId);
-      logger.category('admin', `Cleaned up stale connection for conversation ${conversationId}`);
+    if (existing && existing.active && existing.timestamp > Date.now() - 5000) {
+      logger.category('admin', `Skipping - active connection exists for conversation ${conversationId}`);
+      return false;
     }
     
     return true;
   }, [conversationId, enabled, logger]);
-
-  // Debounced state update function to prevent rapid updates
-  const updateStateWithDebounce = useCallback((
-    newCurrentCount?: number,
-    newMaxCount?: number,
-    newParticipants?: ParticipantInfo[]
-  ) => {
-    const now = Date.now();
-    
-    // Prevent updates that are too frequent
-    if (now - lastUpdateRef.current < 1000) { // 1 second debounce
-      return;
-    }
-
-    let hasChanges = false;
-
-    // Only update if values actually changed
-    if (newCurrentCount !== undefined && newCurrentCount !== lastStateRef.current.currentCount) {
-      setCurrentCount(newCurrentCount);
-      lastStateRef.current.currentCount = newCurrentCount;
-      if (onParticipantCountChange) {
-        onParticipantCountChange(newCurrentCount);
-      }
-      hasChanges = true;
-    }
-
-    if (newMaxCount !== undefined && newMaxCount !== lastStateRef.current.maxCount) {
-      setMaxCount(newMaxCount);
-      lastStateRef.current.maxCount = newMaxCount;
-      if (onMaxParticipantsChange) {
-        onMaxParticipantsChange(newMaxCount);
-      }
-      hasChanges = true;
-    }
-
-    if (newParticipants && JSON.stringify(newParticipants) !== JSON.stringify(lastStateRef.current.participants)) {
-      setParticipants(newParticipants);
-      lastStateRef.current.participants = newParticipants;
-      if (onParticipantsChange) {
-        onParticipantsChange(newParticipants);
-      }
-      hasChanges = true;
-    }
-
-    if (hasChanges) {
-      lastUpdateRef.current = now;
-      logger.category('admin', `State updated: count=${newCurrentCount}, max=${newMaxCount}, participants=${newParticipants?.length || 'unchanged'}`);
-    }
-  }, [onParticipantCountChange, onMaxParticipantsChange, onParticipantsChange, logger]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -143,13 +76,10 @@ export function useEnhancedHostParticipantManager({
       setPollingActive(false);
     }
     
-    // Remove from registry only if it's our instance
+    // Remove from registry
     if (conversationId) {
-      const existing = hostConnectionRegistry.get(conversationId);
-      if (existing && existing.instanceId === instanceId.current) {
-        hostConnectionRegistry.delete(conversationId);
-        logger.category('admin', `Removed connection from registry for conversation ${conversationId} (instance: ${instanceId.current})`);
-      }
+      hostConnectionRegistry.delete(conversationId);
+      logger.category('admin', `Removed connection from registry for conversation ${conversationId}`);
     }
   }, [conversationId, logger]);
 
@@ -159,20 +89,39 @@ export function useEnhancedHostParticipantManager({
     
     try {
       const data = JSON.parse(payload);
-      markMilestone('participant_notification_received', data);
+      const timestamp = Date.now();
       
-      // Use debounced state update
-      updateStateWithDebounce(data.current_count, data.max_count);
-      
-      // Check for session full condition with proper debouncing
-      if (data.max_count && data.current_count >= data.max_count && onSessionFull) {
-        const now = Date.now();
-        if (now - lastUpdateRef.current > 5000) { // 5 second cooldown for session full
-          markMilestone('session_full_detected', { count: data.current_count, max: data.max_count });
-          logger.category('admin', `Session full detected: ${data.current_count}/${data.max_count}`);
-          onSessionFull();
-        }
+      // Prevent duplicate processing
+      if (timestamp - lastUpdateRef.current < 100) {
+        logger.category('admin', 'Skipping duplicate notification');
+        endTiming('participant_notification_processing', { skipped: true });
+        return;
       }
+      lastUpdateRef.current = timestamp;
+      
+      markMilestone('participant_notification_received', data);
+      logger.category('admin', 'Processing participant notification:', data);
+      
+      // Update current count immediately
+      if (data.current_count !== undefined) {
+        startTiming('participant_count_update');
+        setCurrentCount(data.current_count);
+        if (onParticipantCountChange) {
+          onParticipantCountChange(data.current_count);
+        }
+        endTiming('participant_count_update', { newCount: data.current_count });
+      }
+      
+      // Check for session full condition
+      if (data.max_count && data.current_count >= data.max_count && onSessionFull) {
+        markMilestone('session_full_detected', { count: data.current_count, max: data.max_count });
+        logger.category('admin', `Session full detected: ${data.current_count}/${data.max_count}`);
+        onSessionFull();
+      }
+      
+      // Refresh participant list immediately  
+      startTiming('participant_list_refresh');
+      // Will be called after fetchParticipantList is defined
       
       endTiming('participant_notification_processing', { completed: true });
       
@@ -180,7 +129,7 @@ export function useEnhancedHostParticipantManager({
       logger.category('admin', 'Error processing participant notification:', error);
       endTiming('participant_notification_processing', { error: true });
     }
-  }, [updateStateWithDebounce, onSessionFull, logger, conversationId]);
+  }, [onParticipantCountChange, onSessionFull, logger, conversationId]);
 
   // Process session start notifications
   const processSessionStartNotification = useCallback((payload: string) => {
@@ -198,7 +147,7 @@ export function useEnhancedHostParticipantManager({
     }
   }, [onSessionStarted, logger]);
 
-  // Fetch participant list with caching
+  // Fetch participant list
   const fetchParticipantList = useCallback(async () => {
     if (!conversationId) return;
 
@@ -225,19 +174,32 @@ export function useEnhancedHostParticipantManager({
           lastActive: new Date(p.created_at),
         }));
         
-        // Use debounced state update
-        updateStateWithDebounce(undefined, undefined, updatedParticipants);
+        // Only update if the participant list has actually changed
+        setParticipants(prev => {
+          const isDifferent = prev.length !== updatedParticipants.length || 
+            prev.some((p, i) => p.id !== updatedParticipants[i]?.id);
+          
+          if (isDifferent) {
+            logger.category('admin', `Participant list changed: ${prev.length} -> ${updatedParticipants.length}`);
+            if (onParticipantsChange) {
+              onParticipantsChange(updatedParticipants);
+            }
+            return updatedParticipants;
+          }
+          
+          return prev;
+        });
       }
     } catch (error) {
       logger.category('admin', 'Exception fetching participants:', error);
     }
-  }, [conversationId, updateStateWithDebounce, logger]);
+  }, [conversationId, onParticipantsChange, logger]);
 
-  // Reduced frequency polling fallback
+  // Fast polling fallback for critical updates
   const startFastPolling = useCallback(() => {
     if (!conversationId || fallbackIntervalRef.current) return;
 
-    logger.category('admin', 'Starting reduced frequency polling fallback');
+    logger.category('admin', 'Starting fast polling fallback');
     setPollingActive(true);
     
     fallbackIntervalRef.current = setInterval(async () => {
@@ -253,6 +215,8 @@ export function useEnhancedHostParticipantManager({
 
         if (convError) {
           logger.category('admin', 'Polling error:', convError);
+          setPollingActive(false);
+          setIsConnected(false);
           return;
         }
 
@@ -261,43 +225,52 @@ export function useEnhancedHostParticipantManager({
           const newMaxCount = convData.participants || 0;
           const sessionStarted = convData.session_started || false;
           
-          // Use debounced state update
-          updateStateWithDebounce(newCurrentCount, newMaxCount);
+          setCurrentCount(newCurrentCount);
+          setMaxCount(newMaxCount);
           setIsSessionStarted(sessionStarted);
           
           // Set connected when polling successfully fetches data
           setIsConnected(true);
           setError('Using polling updates (real-time unavailable)');
           
+          if (onParticipantCountChange) {
+            onParticipantCountChange(newCurrentCount);
+          }
+          if (onMaxParticipantsChange) {
+            onMaxParticipantsChange(newMaxCount);
+          }
+          
           // Fetch participant list
           await fetchParticipantList();
         }
       } catch (error) {
         logger.category('admin', 'Exception during polling:', error);
+        setPollingActive(false);
+        setIsConnected(false);
+        setError('Connection failed');
       }
-    }, 15000); // Increased to 15 seconds to reduce server load
-  }, [conversationId, updateStateWithDebounce, fetchParticipantList, logger]);
+    }, 5000); // 5 second polling instead of 30 seconds
+  }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, fetchParticipantList, logger]);
 
-  // Setup enhanced realtime subscription with better connection management
+  // Setup enhanced realtime subscription
   const setupEnhancedSubscription = useCallback(() => {
     if (!conversationId || !mountedRef.current || !enabled || !canCreateConnection()) {
       return;
     }
 
-    logger.category('admin', `Setting up enhanced host subscription for conversation ${conversationId} (instance: ${instanceId.current})`);
+    logger.category('admin', `Setting up enhanced host subscription for conversation ${conversationId}`);
     
-    // Register this connection with instance tracking
+    // Register this connection
     hostConnectionRegistry.set(conversationId, {
       active: true,
       timestamp: Date.now(),
-      channelRef: null,
-      instanceId: instanceId.current
+      channelRef: null
     });
     
     cleanup();
     setError(null);
     
-    const channelName = `enhanced-host-${conversationId}-${instanceId.current}-${Date.now()}`;
+    const channelName = `enhanced-host-${conversationId}-${Date.now()}`;
     
     try {
       const channel = supabase
@@ -318,9 +291,16 @@ export function useEnhancedHostParticipantManager({
             const newMaxCount = payload.new.participants || 0;
             const sessionStarted = payload.new.session_started || false;
             
-            updateStateWithDebounce(newCurrentCount, newMaxCount);
+            setCurrentCount(newCurrentCount);
+            setMaxCount(newMaxCount);
             setIsSessionStarted(sessionStarted);
             
+            if (onParticipantCountChange) {
+              onParticipantCountChange(newCurrentCount);
+            }
+            if (onMaxParticipantsChange) {
+              onMaxParticipantsChange(newMaxCount);
+            }
             if (sessionStarted && onSessionStarted) {
               onSessionStarted();
             }
@@ -337,13 +317,15 @@ export function useEnhancedHostParticipantManager({
           
           logger.category('admin', 'Enhanced participant change:', payload);
           
-          // Refresh participant list with debouncing
-          setTimeout(() => {
-            if (mountedRef.current) {
-              fetchParticipantList();
-            }
-          }, 500); // Debounce participant list refresh
+          // Refresh participant list immediately
+          fetchParticipantList();
         })
+        // Listen to PostgreSQL notifications
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: '*'
+        }, () => {}) // This enables the channel to receive pg_notify messages
         .subscribe((status) => {
           if (!mountedRef.current) return;
           
@@ -355,7 +337,7 @@ export function useEnhancedHostParticipantManager({
             
             // Update registry
             const existing = hostConnectionRegistry.get(conversationId);
-            if (existing && existing.instanceId === instanceId.current) {
+            if (existing) {
               existing.channelRef = channel;
             }
             
@@ -366,12 +348,31 @@ export function useEnhancedHostParticipantManager({
               setPollingActive(false);
             }
             
+            // Set up pg_notify listeners
+            channel.send({
+              type: 'postgres_changes',
+              event: 'pg_notify',
+              filters: [
+                { event: 'participant_joined', callback: processParticipantNotification },
+                { event: 'participant_left', callback: processParticipantNotification },
+                { event: 'session_auto_started', callback: processSessionStartNotification }
+              ]
+            });
+            
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            logger.category('admin', 'Enhanced channel error, starting reduced polling');
+            logger.category('admin', 'Enhanced channel error, starting fast polling');
             setIsConnected(false);
-            setError('Real-time connection failed, using polling...');
+            setError('Real-time connection failed, switching to polling...');
             
             startFastPolling();
+            
+            // Single retry for hosts to prevent conflicts
+            retryTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                logger.category('admin', 'Retrying enhanced connection');
+                setupEnhancedSubscription();
+              }
+            }, 3000);
             
           } else if (status === 'CLOSED') {
             setIsConnected(false);
@@ -384,9 +385,9 @@ export function useEnhancedHostParticipantManager({
       setError("Failed to establish enhanced connection");
       startFastPolling();
     }
-  }, [conversationId, enabled, canCreateConnection, cleanup, updateStateWithDebounce, onSessionStarted, fetchParticipantList, startFastPolling, logger]);
+  }, [conversationId, enabled, canCreateConnection, cleanup, onParticipantCountChange, onMaxParticipantsChange, onSessionStarted, fetchParticipantList, processParticipantNotification, processSessionStartNotification, startFastPolling, logger]);
 
-  // Initial data fetch with proper state initialization
+  // Initial data fetch
   const fetchInitialData = useCallback(async () => {
     if (!conversationId || !enabled || !canCreateConnection()) return;
 
@@ -408,9 +409,16 @@ export function useEnhancedHostParticipantManager({
         const initialMaxCount = convData.participants || 0;
         const sessionStarted = convData.session_started || false;
         
-        // Initialize state properly
-        updateStateWithDebounce(initialCurrentCount, initialMaxCount);
+        setCurrentCount(initialCurrentCount);
+        setMaxCount(initialMaxCount);
         setIsSessionStarted(sessionStarted);
+        
+        if (onParticipantCountChange) {
+          onParticipantCountChange(initialCurrentCount);
+        }
+        if (onMaxParticipantsChange) {
+          onMaxParticipantsChange(initialMaxCount);
+        }
       }
 
       // Fetch participants
@@ -419,25 +427,15 @@ export function useEnhancedHostParticipantManager({
     } catch (error) {
       logger.category('admin', 'Exception during initial data fetch:', error);
     }
-  }, [conversationId, enabled, canCreateConnection, updateStateWithDebounce, fetchParticipantList, logger]);
+  }, [conversationId, enabled, canCreateConnection, onParticipantCountChange, onMaxParticipantsChange, fetchParticipantList, logger]);
 
-  // Setup effect with proper cleanup
+  // Setup effect
   useEffect(() => {
     mountedRef.current = true;
     
     if (enabled && conversationId) {
       fetchInitialData();
-      
-      // Delay subscription setup to prevent rapid connections
-      const setupTimeout = setTimeout(() => {
-        if (mountedRef.current) {
-          setupEnhancedSubscription();
-        }
-      }, 1000);
-      
-      return () => {
-        clearTimeout(setupTimeout);
-      };
+      setupEnhancedSubscription();
     }
     
     return () => {
@@ -448,9 +446,8 @@ export function useEnhancedHostParticipantManager({
 
   // Manual reconnection
   const reconnect = useCallback(() => {
-    logger.category('admin', 'Manual reconnection requested');
     setupEnhancedSubscription();
-  }, [setupEnhancedSubscription, logger]);
+  }, [setupEnhancedSubscription]);
 
   return {
     isConnected,
@@ -461,7 +458,6 @@ export function useEnhancedHostParticipantManager({
     maxCount,
     isSessionStarted,
     // Expose refresh function for manual updates
-    refresh: fetchInitialData,
-    pollingActive
+    refresh: fetchInitialData
   };
 }

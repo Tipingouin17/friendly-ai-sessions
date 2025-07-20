@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ParticipantInfo, Message } from "@/types/chat";
-import StabilizedParticipantList from "@/components/session/participant/StabilizedParticipantList";
+import BaseParticipantList from "@/components/session/participant/BaseParticipantList";
 
 interface HostParticipantListProps {
   participants: ParticipantInfo[];
@@ -15,7 +15,7 @@ interface HostParticipantListProps {
 
 const HostParticipantList: React.FC<HostParticipantListProps> = (props) => {
   return (
-    <StabilizedParticipantList
+    <BaseParticipantList
       {...props}
       title="Participants"
       showMessageInput={true}

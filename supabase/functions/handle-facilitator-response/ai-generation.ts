@@ -1,4 +1,3 @@
-
 /**
  * Enhanced AI generation utilities with proper context handling
  */
@@ -182,10 +181,10 @@ export async function generateAISubsequentMessage(
     const facilitatorContext = extractFacilitatorContext(conversation);
     const sessionContext = extractSessionContext(conversation, participants);
     
-    // Fetch recent messages for context
+    // Fetch recent messages for context - FIXED: using participant_id instead of participant
     const { data: recentMessages, error: messagesError } = await supabase
       .from('messages')
-      .select('content, role, created_at, name, participant')
+      .select('content, role, created_at, name, participant_id')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -214,13 +213,22 @@ export async function generateAISubsequentMessage(
     const conversationContext = participantMessages
       .reverse() // Put in chronological order
       .map(msg => {
-        const participantName = msg.name || msg.participant || 'Participant';
+        // Use participant_id to find participant name
+        const participantInfo = participants?.find(p => p.participant_id === msg.participant_id);
+        const participantName = participantInfo ? participantInfo.name : `Participant ${msg.participant_id || 'Unknown'}`;
         const content = typeof msg.content === 'string' ? msg.content : 
                        (typeof msg.content === 'object' && msg.content?.text) ? msg.content.text : 
                        JSON.stringify(msg.content);
         return `${participantName}: ${content}`;
       })
       .join('\n');
+
+    console.log(`📋 [${requestId}] Conversation context built:`, {
+      participantMessageCount: participantMessages.length,
+      conversationProgress,
+      contextLength: conversationContext.length,
+      contextPreview: conversationContext.substring(0, 200) + '...'
+    });
 
     // Create contextual system prompt for subsequent messages
     const systemPrompt = createContextualSystemPrompt(
@@ -251,7 +259,17 @@ Generate a response that moves the conversation forward constructively.`;
     }
 
     console.log(`🚀 [${requestId}] Calling OpenAI API for subsequent message generation...`);
+    console.log(`📝 [${requestId}] OpenAI request details:`, {
+      model: 'gpt-4o-mini',
+      systemPromptLength: systemPrompt.length,
+      userPromptLength: userPrompt.length,
+      maxTokens: 400,
+      temperature: 0.7,
+      conversationProgress,
+      participantMessageCount: participantMessages.length
+    });
 
+    const apiStartTime = Date.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -269,8 +287,17 @@ Generate a response that moves the conversation forward constructively.`;
       }),
     });
 
+    const apiDuration = Date.now() - apiStartTime;
+    console.log(`⏱️ [${requestId}] OpenAI API call completed in ${apiDuration}ms with status: ${response.status}`);
+
     if (!response.ok) {
       const errorData = await response.text();
+      console.error(`❌ [${requestId}] OpenAI API error response:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        duration: apiDuration
+      });
       throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
     }
 
@@ -278,6 +305,10 @@ Generate a response that moves the conversation forward constructively.`;
     const aiContent = data.choices?.[0]?.message?.content;
     
     if (!aiContent) {
+      console.error(`❌ [${requestId}] No content received from OpenAI API:`, {
+        responseData: data,
+        choices: data.choices
+      });
       throw new Error('No content received from OpenAI API');
     }
     
@@ -287,7 +318,10 @@ Generate a response that moves the conversation forward constructively.`;
       conversationProgress,
       participantMessageCount: participantMessages.length,
       facilitatorUsed: facilitatorContext.name,
-      sessionUsed: sessionContext.title
+      sessionUsed: sessionContext.title,
+      duration: apiDuration,
+      tokensUsed: data.usage?.total_tokens,
+      contentPreview: aiContent.substring(0, 150) + '...'
     });
     
     return {
@@ -299,7 +333,12 @@ Generate a response that moves the conversation forward constructively.`;
     };
     
   } catch (error) {
-    console.error(`❌ [${requestId}] AI subsequent message generation failed:`, error);
+    console.error(`❌ [${requestId}] AI subsequent message generation failed:`, {
+      error: error.message,
+      stack: error.stack,
+      conversationId,
+      facilitatorTitle: conversation?.sessions?.facilitator_details?.title
+    });
     throw error;
   }
 }

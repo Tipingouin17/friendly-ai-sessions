@@ -24,9 +24,6 @@ type UseMessageSenderProps = {
   participants: any[];
   isAnonymous: boolean;
   conversation: any;
-  // New props for host context
-  isHostPage?: boolean;
-  canSendMessages?: boolean;
 };
 
 export const useMessageSender = ({
@@ -34,9 +31,7 @@ export const useMessageSender = ({
   sessionState,
   participants,
   isAnonymous,
-  conversation,
-  isHostPage = false,
-  canSendMessages = true
+  conversation
 }: UseMessageSenderProps) => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +73,7 @@ export const useMessageSender = ({
       currentConversationId,
       viewMode: sessionState.viewMode,
       inputMessage: sessionState.inputMessage?.substring(0, 50) + "...",
-      currentParticipant: sessionState.currentParticipant,
-      isHostPage,
-      canSendMessages
+      currentParticipant: sessionState.currentParticipant
     });
 
     // Prevent duplicate sends
@@ -101,33 +94,23 @@ export const useMessageSender = ({
       return;
     }
     
-    // ENHANCED FIX: Improved context detection for hosts
+    // CRITICAL FIX: Always allow message sending for participants
+    // Check URL parameters to determine if this is a participant context
     const urlParams = new URLSearchParams(window.location.search);
     const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
-    const isParticipantContext = hasParticipantParams || 
-                                sessionState.viewMode === "participant" || 
-                                (isHostPage && canSendMessages) || // NEW: Allow hosts to send when they can
-                                sessionState.currentParticipant > 0; // NEW: Allow if participant ID is set
+    const isParticipantContext = hasParticipantParams || sessionState.viewMode === "participant";
     
-    console.log("🔍 Enhanced message sending context check:", {
+    console.log("🔍 Message sending context check:", {
       hasParticipantParams,
       isParticipantContext,
       viewMode: sessionState.viewMode,
       currentPath: window.location.pathname,
-      isHostPage,
-      canSendMessages,
-      currentParticipant: sessionState.currentParticipant,
       allowSending: isParticipantContext
     });
     
-    // Only block pure admin views without any participant context
-    if (!isParticipantContext && sessionState.viewMode === "admin" && !hasParticipantParams && !isHostPage) {
+    // Only block pure admin views without participant context
+    if (!isParticipantContext && sessionState.viewMode === "admin" && !hasParticipantParams) {
       console.log("🚫 Blocked: Pure admin view without participant context");
-      toast({
-        title: "Participant Mode Required",
-        description: "You need to be in participant mode to send messages.",
-        variant: "destructive",
-      });
       return;
     }
     
@@ -137,40 +120,18 @@ export const useMessageSender = ({
       return;
     }
 
-    // Enhanced participant ID resolution
-    let currentParticipant = sessionState.currentParticipant;
-    
-    // ENHANCED FIX: Better participant ID resolution for hosts
-    if (currentParticipant <= 0 && isHostPage) {
-      // For hosts, default to participant ID 1
-      currentParticipant = 1;
-      console.log("🔧 Host participant ID defaulted to 1");
-    }
-
-    if (currentParticipant <= 0) {
-      console.error("❌ Invalid participant ID:", currentParticipant);
-      setError("Invalid participant session. Please refresh and try again.");
-      toast({
-        title: "Session Error",
-        description: "Invalid participant session. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    const currentParticipant = sessionState.currentParticipant;
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
     const messageStartTime = performance.now();
     
-    console.log("✅ Sending message with enhanced participant info:", {
+    console.log("✅ Sending message with participant info:", {
       currentParticipant,
       currentParticipantKey,
       participantInfo,
       message: sessionState.inputMessage.substring(0, 100),
       isParticipantContext,
-      conversationId: currentConversationId,
-      isHostPage,
-      canSendMessages
+      conversationId: currentConversationId
     });
     
     try {
@@ -326,9 +287,7 @@ export const useMessageSender = ({
     logPerformanceMetric,
     recordParticipantResponse,
     stopWaitingForResponses,
-    startResponseCollection,
-    isHostPage,
-    canSendMessages
+    startResponseCollection
   ]);
 
   return {

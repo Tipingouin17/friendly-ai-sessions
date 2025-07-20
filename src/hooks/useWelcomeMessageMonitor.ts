@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/chat';
@@ -92,6 +93,49 @@ export const useWelcomeMessageMonitor = ({
     }
   }, [conversationId]);
 
+  const checkWelcomeMessageStatus = useCallback(async (): Promise<string | null> => {
+    if (!conversationId) return null;
+
+    try {
+      const { data: conversation, error } = await supabase
+        .from('conversations')
+        .select('welcome_message_status')
+        .eq('id', conversationId)
+        .single();
+
+      if (error || !conversation) {
+        console.error('❌ Error checking welcome message status:', error);
+        return null;
+      }
+
+      return conversation.welcome_message_status;
+    } catch (error) {
+      console.error('💥 Exception checking welcome message status:', error);
+      return null;
+    }
+  }, [conversationId]);
+
+  const recoverStuckWelcomeMessage = useCallback(async (): Promise<boolean> => {
+    if (!conversationId) return false;
+
+    try {
+      console.log('🔧 Attempting to recover stuck welcome message for conversation:', conversationId);
+      
+      const { error } = await supabase.functions.invoke('recover-stuck-welcome-messages');
+      
+      if (error) {
+        console.error('❌ Error calling recovery function:', error);
+        return false;
+      }
+
+      console.log('✅ Recovery function called successfully');
+      return true;
+    } catch (error) {
+      console.error('💥 Exception calling recovery function:', error);
+      return false;
+    }
+  }, [conversationId]);
+
   const generateFallbackMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId) return false;
 
@@ -134,7 +178,7 @@ export const useWelcomeMessageMonitor = ({
     setState(prev => ({ ...prev, isWaiting: true, error: null }));
     console.log('⏳ Starting welcome message monitoring for conversation:', conversationId);
 
-    const maxRetries = 12; // 60 seconds total (5 second intervals) - increased for AI generation
+    const maxRetries = 15; // Increased for better recovery
     let attempt = 0;
 
     while (attempt < maxRetries) {
@@ -143,8 +187,20 @@ export const useWelcomeMessageMonitor = ({
 
       console.log(`🔍 Welcome message check attempt ${attempt}/${maxRetries}`);
       
+      // Check welcome message status first
+      const status = await checkWelcomeMessageStatus();
+      console.log(`📊 Welcome message status: ${status}`);
+      
+      // If status is failed or we're stuck in ai_generating for too long, try recovery
+      if ((status === 'failed' || (status === 'ai_generating' && attempt > 8)) && attempt === 9) {
+        console.log('🔧 Attempting recovery for stuck/failed welcome message...');
+        await recoverStuckWelcomeMessage();
+        // Give recovery some time
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      
       // For first half of attempts, only accept AI-generated messages
-      const onlyAcceptAI = attempt <= Math.floor(maxRetries * 0.6); // First 60% of attempts
+      const onlyAcceptAI = attempt <= Math.floor(maxRetries * 0.4); // First 40% of attempts
       const hasMessage = await checkForWelcomeMessage(onlyAcceptAI);
       
       if (hasMessage) {
@@ -158,8 +214,8 @@ export const useWelcomeMessageMonitor = ({
         return true;
       }
 
-      // If we're past 60% of attempts and no AI message found, trigger AI generation
-      if (attempt === Math.floor(maxRetries * 0.6) + 1) {
+      // If we're past 40% of attempts and no AI message found, trigger AI generation
+      if (attempt === Math.floor(maxRetries * 0.4) + 1) {
         console.log('🤖 [useWelcomeMessageMonitor] Triggering AI welcome message generation at attempt', attempt);
         console.log('📋 [useWelcomeMessageMonitor] AI Generation Request:', {
           conversationId,
@@ -233,12 +289,12 @@ export const useWelcomeMessageMonitor = ({
         }
       }
 
-      // Wait 5 seconds before next check
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait 4 seconds before next check (reduced for faster recovery)
+      await new Promise(resolve => setTimeout(resolve, 4000));
     }
 
     return false;
-  }, [conversationId, isEnabled, checkForWelcomeMessage, generateFallbackMessage]);
+  }, [conversationId, isEnabled, checkForWelcomeMessage, checkWelcomeMessageStatus, recoverStuckWelcomeMessage, generateFallbackMessage]);
 
   // Reset state when conversation changes
   useEffect(() => {

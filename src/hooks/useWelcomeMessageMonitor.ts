@@ -96,29 +96,19 @@ export const useWelcomeMessageMonitor = ({
     if (!conversationId) return false;
 
     try {
-      console.log('🔄 Generating fallback welcome message for conversation:', conversationId);
+      console.log('🔄 Triggering template fallback via database function for conversation:', conversationId);
       
-      // Create a simple fallback message
-      const fallbackMessage = {
-        conversation_id: conversationId,
-        content: {
-          text: "Welcome to your session! The facilitator will be with you shortly. Please feel free to introduce yourself and share what you'd like to get out of today's discussion.",
-          avatar: '/api/avatar?name=Facilitator&variant=beam&palette=2'
-        },
-        role: 'assistant',
-        created_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('messages')
-        .insert(fallbackMessage);
+      // Use the database function for template fallback
+      const { error } = await supabase.rpc('create_template_welcome_message', {
+        conversation_id_param: conversationId
+      });
 
       if (error) {
-        console.error('❌ Error creating fallback message:', error);
+        console.error('❌ Error creating template fallback message:', error);
         return false;
       }
 
-      console.log('✅ Fallback welcome message created successfully');
+      console.log('✅ Template fallback message created successfully');
       
       // Wait a moment for database consistency
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -130,10 +120,10 @@ export const useWelcomeMessageMonitor = ({
         return false;
       }
       
-      console.log('✅ Fallback message verified and ready');
+      console.log('✅ Template fallback message verified and ready');
       return true;
     } catch (error) {
-      console.error('💥 Exception creating fallback message:', error);
+      console.error('💥 Exception creating template fallback message:', error);
       return false;
     }
   }, [conversationId, checkForWelcomeMessage]);

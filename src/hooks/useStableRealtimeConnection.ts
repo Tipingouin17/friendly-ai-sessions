@@ -93,8 +93,8 @@ export function useStableRealtimeConnection({
           
           console.log(`📨 Stable message update for conversation ${conversationId}:`, {
             event: payload.eventType,
-            messageId: payload.new?.id || payload.old?.id,
-            role: payload.new?.role || payload.old?.role
+            messageId: (payload.new as any)?.id || (payload.old as any)?.id,
+            role: (payload.new as any)?.role || (payload.old as any)?.role
           });
           
           // Update last message check timestamp
@@ -115,7 +115,7 @@ export function useStableRealtimeConnection({
           
           console.log(`👥 Stable participant update for conversation ${conversationId}:`, {
             event: payload.eventType,
-            participantId: payload.new?.participant_id || payload.old?.participant_id
+            participantId: (payload.new as any)?.participant_id || (payload.old as any)?.participant_id
           });
           
           if (onParticipantUpdate) {

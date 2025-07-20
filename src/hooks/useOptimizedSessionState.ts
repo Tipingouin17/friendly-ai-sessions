@@ -15,86 +15,182 @@ export const useOptimizedSessionState = ({
 }: UseOptimizedSessionStateProps) => {
   const [isSessionStarted, setIsSessionStarted] = useState(initialSessionStarted);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  
   const channelRef = useRef<any>(null);
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
+  const stableConnectionRef = useRef(false);
   
+  const maxReconnectAttempts = 3;
+  const baseReconnectDelay = 3000; // 3 seconds
+  const connectionStabilityWindow = 8000; // 8 seconds
+
   // Memoized callback to prevent unnecessary re-renders
   const handleSessionStarted = useCallback(() => {
+    if (!mountedRef.current) return;
+    
     console.log("🎯 [useOptimizedSessionState] Session started callback triggered");
     setIsSessionStarted(true);
     setIsTransitioning(false);
     onSessionStarted?.();
   }, [onSessionStarted]);
 
-  // Set up optimized real-time subscription
-  useEffect(() => {
-    if (!conversationId) return;
-
-    console.log("🔗 [useOptimizedSessionState] Setting up optimized real-time subscription");
-
-    // Clean up existing channel
+  // Cleanup function
+  const cleanup = useCallback(() => {
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
+      try {
+        supabase.removeChannel(channelRef.current);
+      } catch (error) {
+        console.error("Error removing channel:", error);
+      }
       channelRef.current = null;
     }
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    stableConnectionRef.current = false;
+  }, []);
 
-    const channel = supabase
-      .channel(`optimized-session-state-${conversationId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'conversations',
-        filter: `id=eq.${conversationId}`
-      }, (payload) => {
-        console.log("📡 [useOptimizedSessionState] Real-time update:", {
-          sessionStartedOld: payload.old?.session_started,
-          sessionStartedNew: payload.new?.session_started,
-          currentParticipantsOld: payload.old?.current_participants,
-          currentParticipantsNew: payload.new?.current_participants
+  // Enhanced connection setup with stability monitoring
+  const setupOptimizedSubscription = useCallback(() => {
+    if (!conversationId || !mountedRef.current) return;
+
+    console.log("🔗 [useOptimizedSessionState] Setting up stable session state subscription");
+    
+    cleanup();
+    setConnectionAttempts(prev => prev + 1);
+
+    const channelName = `stable-session-state-${conversationId}-${Date.now()}`;
+    
+    try {
+      const channel = supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        }, (payload) => {
+          if (!mountedRef.current) return;
+          
+          console.log("📡 [useOptimizedSessionState] Stable session update:", {
+            sessionStartedOld: payload.old?.session_started,
+            sessionStartedNew: payload.new?.session_started,
+            currentParticipantsOld: payload.old?.current_participants,
+            currentParticipantsNew: payload.new?.current_participants,
+            welcomeStatus: payload.new?.welcome_message_status
+          });
+
+          // Handle session start detection with enhanced reliability
+          if (payload.new?.session_started === true && payload.old?.session_started !== true) {
+            console.log("🚀 [useOptimizedSessionState] Session start detected via stable connection!");
+            setIsTransitioning(true);
+            
+            // Clear any existing timeout
+            if (transitionTimeoutRef.current) {
+              clearTimeout(transitionTimeoutRef.current);
+            }
+            
+            // Add a small delay to ensure UI updates smoothly
+            transitionTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                handleSessionStarted();
+              }
+            }, 200);
+          }
+        })
+        .subscribe((status) => {
+          if (!mountedRef.current) return;
+          
+          console.log(`🔗 [useOptimizedSessionState] Stable channel status: ${status}`);
+          
+          if (status === 'SUBSCRIBED') {
+            setConnectionAttempts(0);
+            stableConnectionRef.current = true;
+            
+            // Monitor connection stability
+            setTimeout(() => {
+              if (mountedRef.current && stableConnectionRef.current) {
+                console.log("✅ [useOptimizedSessionState] Connection stabilized");
+              }
+            }, connectionStabilityWindow);
+            
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(`🚨 [useOptimizedSessionState] Connection error: ${status}`);
+            stableConnectionRef.current = false;
+            
+            // Implement exponential backoff for reconnection
+            if (connectionAttempts < maxReconnectAttempts && mountedRef.current) {
+              const delay = Math.min(baseReconnectDelay * Math.pow(2, connectionAttempts), 15000);
+              console.log(`⏰ [useOptimizedSessionState] Scheduling reconnection in ${delay}ms (attempt ${connectionAttempts + 1})`);
+              
+              reconnectTimeoutRef.current = setTimeout(() => {
+                if (mountedRef.current) {
+                  setupOptimizedSubscription();
+                }
+              }, delay);
+            } else {
+              console.error(`❌ [useOptimizedSessionState] Max reconnection attempts reached`);
+            }
+            
+          } else if (status === 'CLOSED') {
+            console.log("🔒 [useOptimizedSessionState] Connection closed");
+            stableConnectionRef.current = false;
+          }
         });
 
-        // Handle session start detection
-        if (payload.new?.session_started === true && payload.old?.session_started !== true) {
-          console.log("🚀 [useOptimizedSessionState] Session start detected via real-time!");
-          setIsTransitioning(true);
-          
-          // Clear any existing timeout
-          if (transitionTimeoutRef.current) {
-            clearTimeout(transitionTimeoutRef.current);
-          }
-          
-          // Add a small delay to ensure UI updates smoothly
-          transitionTimeoutRef.current = setTimeout(() => {
-            handleSessionStarted();
-          }, 100);
-        }
-      })
-      .subscribe((status) => {
-        console.log(`🔗 [useOptimizedSessionState] Channel status: ${status}`);
-      });
+      channelRef.current = channel;
+    } catch (error) {
+      console.error("❌ [useOptimizedSessionState] Error creating stable subscription:", error);
+      stableConnectionRef.current = false;
+    }
+  }, [conversationId, handleSessionStarted, cleanup, connectionAttempts]);
 
-    channelRef.current = channel;
+  // Setup effect with enhanced lifecycle management
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    if (conversationId) {
+      setupOptimizedSubscription();
+    }
 
     return () => {
-      console.log("🧹 [useOptimizedSessionState] Cleaning up optimized subscription");
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
+      mountedRef.current = false;
+      cleanup();
     };
-  }, [conversationId, handleSessionStarted]);
+  }, [conversationId, setupOptimizedSubscription, cleanup]);
 
-  // Initialize session state from props
+  // Initialize session state from props with stability check
   useEffect(() => {
-    setIsSessionStarted(initialSessionStarted);
-  }, [initialSessionStarted]);
+    if (initialSessionStarted !== isSessionStarted) {
+      console.log(`🔄 [useOptimizedSessionState] Syncing session state: ${initialSessionStarted}`);
+      setIsSessionStarted(initialSessionStarted);
+    }
+  }, [initialSessionStarted, isSessionStarted]);
+
+  // Manual reconnection function
+  const forceReconnect = useCallback(() => {
+    console.log("🔄 [useOptimizedSessionState] Force reconnecting...");
+    setConnectionAttempts(0);
+    setupOptimizedSubscription();
+  }, [setupOptimizedSubscription]);
 
   return {
     isSessionStarted,
     isTransitioning,
-    setIsSessionStarted
+    setIsSessionStarted,
+    connectionStatus: {
+      isStable: stableConnectionRef.current,
+      attempts: connectionAttempts,
+      hasChannel: !!channelRef.current
+    },
+    forceReconnect
   };
 };

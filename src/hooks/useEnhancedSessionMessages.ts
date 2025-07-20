@@ -1,0 +1,190 @@
+
+import { useEffect, useState, useCallback } from 'react';
+import { Message } from '@/types/chat';
+import { useStableRealtimeConnection } from './useStableRealtimeConnection';
+import { useMessageDeliveryTracker } from './useMessageDeliveryTracker';
+import { supabase } from '@/integrations/supabase/client';
+
+interface UseEnhancedSessionMessagesProps {
+  conversationId: number | null;
+  currentUserParticipantId: number | null;
+  isAdmin: boolean;
+  welcomeMessage?: string | null;
+  conversation?: any;
+  totalParticipants?: number;
+}
+
+export const useEnhancedSessionMessages = ({
+  conversationId,
+  currentUserParticipantId,
+  isAdmin,
+  welcomeMessage,
+  conversation,
+  totalParticipants = 1
+}: UseEnhancedSessionMessagesProps) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+
+  // Enhanced message fetching
+  const fetchMessages = useCallback(async (forceRefresh = false) => {
+    if (!conversationId) return;
+
+    const now = Date.now();
+    if (!forceRefresh && now - lastFetchTime < 1000) {
+      console.log('⏭️ Skipping fetch - too recent');
+      return;
+    }
+
+    console.log(`📨 Fetching messages for conversation ${conversationId} (force: ${forceRefresh})`);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError);
+        setError('Failed to load messages');
+        return;
+      }
+
+      const formattedMessages: Message[] = (messagesData || []).map(msg => ({
+        id: msg.id.toString(),
+        content: typeof msg.content === 'string' ? msg.content : msg.content?.text || '',
+        sender: msg.role === 'assistant' ? 'assistant' : 'user',
+        timestamp: new Date(msg.created_at),
+        participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
+        name: msg.name || undefined,
+        avatar: typeof msg.content === 'object' && msg.content?.avatar ? msg.content.avatar : undefined,
+        role: msg.role || 'user'
+      }));
+
+      console.log(`✅ Loaded ${formattedMessages.length} messages for conversation ${conversationId}`);
+      
+      setMessages(prev => {
+        // Only update if messages have actually changed
+        if (prev.length !== formattedMessages.length || 
+            prev.some((msg, i) => msg.id !== formattedMessages[i]?.id)) {
+          return formattedMessages;
+        }
+        return prev;
+      });
+      
+      setLastFetchTime(now);
+    } catch (err) {
+      console.error('Exception fetching messages:', err);
+      setError('Failed to load messages');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [conversationId, lastFetchTime]);
+
+  // Stable realtime connection
+  const { isConnected, hasStableConnection, forceReconnect } = useStableRealtimeConnection({
+    conversationId,
+    onMessageUpdate: () => {
+      console.log('📨 Message update received via realtime');
+      fetchMessages(true);
+    },
+    onParticipantUpdate: () => {
+      console.log('👥 Participant update received via realtime');
+    },
+    onSessionUpdate: () => {
+      console.log('🔄 Session update received via realtime');
+      fetchMessages(true);
+    },
+    enabled: !!conversationId
+  });
+
+  // Message delivery tracking
+  const { 
+    deliveryStatus, 
+    getDeliveryStats, 
+    forceCheck: forceDeliveryCheck,
+    isTracking 
+  } = useMessageDeliveryTracker({
+    conversationId,
+    onMessageReceived: (messageId) => {
+      console.log(`📬 Message ${messageId} delivered successfully`);
+      fetchMessages(true);
+    },
+    enabled: !!conversationId && !hasStableConnection // Only use when realtime is unreliable
+  });
+
+  // Initial fetch and conversation change effect
+  useEffect(() => {
+    if (conversationId && (conversation || !messages.length)) {
+      console.log('🚀 Initial message fetch triggered');
+      fetchMessages(true);
+    }
+  }, [conversationId, conversation, fetchMessages, messages.length]);
+
+  // Force fetch for participants to ensure immediate message visibility
+  useEffect(() => {
+    if (conversationId && !isAdmin) {
+      console.log('🚀 Participant view - ensuring immediate message visibility');
+      const timer = setTimeout(() => {
+        fetchMessages(true);
+      }, 1500); // Slight delay to allow any pending operations
+      
+      return () => clearTimeout(timer);
+    }
+  }, [conversationId, isAdmin, fetchMessages]);
+
+  // Connection recovery mechanism
+  useEffect(() => {
+    if (!hasStableConnection && conversationId) {
+      console.log('🔄 Connection not stable, using fallback polling');
+      const fallbackInterval = setInterval(() => {
+        fetchMessages(true);
+      }, 5000); // Poll every 5 seconds when connection is unstable
+      
+      return () => clearInterval(fallbackInterval);
+    }
+  }, [hasStableConnection, conversationId, fetchMessages]);
+
+  // Enhanced message handler
+  const handleNewMessage = useCallback((message: Message) => {
+    console.log('📝 Processing new message:', message.id);
+    
+    setMessages(prev => {
+      const exists = prev.some(m => m.id === message.id);
+      if (exists) {
+        console.log('⏭️ Message already exists, skipping');
+        return prev;
+      }
+      
+      const updated = [...prev, message];
+      console.log(`✅ Added new message, total: ${updated.length}`);
+      return updated;
+    });
+  }, []);
+
+  // Connection status and diagnostics
+  const connectionStatus = {
+    isConnected,
+    hasStableConnection,
+    isTracking,
+    deliveryStats: getDeliveryStats(),
+    lastFetchTime,
+    messageCount: messages.length
+  };
+
+  return {
+    messages,
+    setMessages,
+    error,
+    isLoading,
+    handleNewMessage,
+    forceFetchMessages: () => fetchMessages(true),
+    connectionStatus,
+    forceReconnect,
+    forceDeliveryCheck
+  };
+};

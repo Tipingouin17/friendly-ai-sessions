@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { Message } from '@/types/chat';
 import { useResponseTracking } from './session-messages/useResponseTracking';
-import { useMessageFetching } from './session-messages/useMessageFetching';
 import { useViewMode } from './session-messages/useViewMode';
+import { useEnhancedSessionMessages } from './useEnhancedSessionMessages';
 
 interface UseSessionMessagesProps {
   conversationId: number | null;
@@ -22,23 +22,22 @@ export const useSessionMessages = ({
   conversation,
   totalParticipants = 1
 }: UseSessionMessagesProps) => {
-  // Use enhanced message fetching with response aggregation
+  // Use enhanced message fetching with improved reliability
   const {
     messages,
     setMessages,
     error,
-    fetchMessages,
+    isLoading,
+    handleNewMessage: processNewMessage,
     forceFetchMessages,
-    isGeneratingWelcome,
-    processNewMessage,
-    isWaitingForResponses,
-    responseCount,
-    generateAggregatedResponse,
-    isGeneratingResponse
-  } = useMessageFetching({
+    connectionStatus,
+    forceReconnect,
+    forceDeliveryCheck
+  } = useEnhancedSessionMessages({
     conversationId,
-    welcomeMessage,
+    currentUserParticipantId,
     isAdmin,
+    welcomeMessage,
     conversation,
     totalParticipants
   });
@@ -59,27 +58,6 @@ export const useSessionMessages = ({
     isAdmin
   });
   
-  // Fetch messages when the conversation ID changes and conversation data is available
-  useEffect(() => {
-    // Only fetch messages if we have conversation ID and either conversation data or it's initial load
-    if (conversationId && (conversation || !messages.length)) {
-      console.log('🚀 useSessionMessages: Triggering fetchMessages with conversation data loaded');
-      fetchMessages();
-    }
-  }, [conversationId, conversation, fetchMessages, messages.length]);
-
-  // Force fetch messages on mount for participants to ensure they get welcome messages immediately
-  useEffect(() => {
-    if (conversationId && !isAdmin) {
-      console.log('🚀 useSessionMessages: Participant view - forcing initial message fetch');
-      const timer = setTimeout(() => {
-        forceFetchMessages();
-      }, 1000); // Give a moment for any pending DB operations
-      
-      return () => clearTimeout(timer);
-    }
-  }, [conversationId, isAdmin, forceFetchMessages]);
-  
   // Enhanced message handler that includes response processing
   const handleNewMessage = (message: Message) => {
     processNewMessage(message);
@@ -90,23 +68,35 @@ export const useSessionMessages = ({
       recordResponse(participantId, true);
     }
   };
+
+  // Log connection status for debugging
+  useEffect(() => {
+    if (conversationId) {
+      console.log(`🔍 Session messages connection status for ${conversationId}:`, connectionStatus);
+    }
+  }, [conversationId, connectionStatus]);
   
   return {
     messages,
     setMessages,
-    error,
+    error: error || null,
     currentParticipant,
     recordResponse,
     totalResponses,
     hasAnswered,
     viewMode,
     setViewMode,
-    isGeneratingWelcome,
+    isGeneratingWelcome: isLoading,
     handleNewMessage,
-    isWaitingForResponses,
-    responseCount,
-    generateAggregatedResponse,
-    isGeneratingResponse,
-    forceFetchMessages
+    isWaitingForResponses: false, // Not implemented in enhanced version yet
+    responseCount: 0, // Not implemented in enhanced version yet
+    generateAggregatedResponse: async () => {}, // Not implemented in enhanced version yet
+    isGeneratingResponse: false, // Not implemented in enhanced version yet
+    forceFetchMessages,
+    
+    // Enhanced reliability features
+    connectionStatus,
+    forceReconnect,
+    forceDeliveryCheck
   };
 };

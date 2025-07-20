@@ -11,6 +11,13 @@ import {
 // Import local modules
 import { parseRequest, initSupabaseClient, corsHeaders, createErrorResponse } from "./request-handler.ts";
 import { processResponse } from "./response-processor.ts";
+import { 
+  checkAndLockGeneration, 
+  unlockGeneration, 
+  checkDatabaseLock, 
+  checkExistingMessages,
+  releaseDatabaseLock 
+} from "./message-deduplication.ts";
 
 serve(async (req) => {
   const requestStart = performance.now();
@@ -57,6 +64,70 @@ serve(async (req) => {
       return createErrorResponse(new Error('OpenAI API key not configured'));
     }
 
+    // Enhanced session start handling with multi-level deduplication
+    if (sessionStart) {
+      console.log(`🎯 [${requestId}] Session start detected - applying enhanced deduplication`);
+      
+      // Level 1: In-memory lock check
+      if (!checkAndLockGeneration(conversationId, requestId)) {
+        console.log(`🚫 [${requestId}] In-memory lock failed - another request is processing`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Welcome message generation already in progress',
+            requestId 
+          }),
+          { 
+            status: 409, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      try {
+        // Level 2: Check if welcome message already exists
+        const hasExistingMessage = await checkExistingMessages(supabase, conversationId);
+        if (hasExistingMessage) {
+          console.log(`✅ [${requestId}] Welcome message already exists, skipping generation`);
+          unlockGeneration(conversationId, requestId);
+          return new Response(
+            JSON.stringify({ 
+              message: 'Welcome message already exists',
+              status: 'completed' 
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        // Level 3: Database-level lock
+        const databaseLockAcquired = await checkDatabaseLock(supabase, conversationId, requestId);
+        if (!databaseLockAcquired) {
+          console.log(`🚫 [${requestId}] Database lock failed - another process is generating`);
+          unlockGeneration(conversationId, requestId);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Welcome message generation already in progress (database)',
+              requestId 
+            }),
+            { 
+              status: 409, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        console.log(`🔒 [${requestId}] All locks acquired successfully, proceeding with generation`);
+
+      } catch (lockError) {
+        console.error(`❌ [${requestId}] Error during lock acquisition:`, lockError);
+        unlockGeneration(conversationId, requestId);
+        await releaseDatabaseLock(supabase, conversationId, 'pending');
+        return createErrorResponse(lockError);
+      }
+    }
+
     // ENHANCED CONTEXT MANAGEMENT: Fetch conversation and participants data
     console.log(`📋 [${requestId}] Fetching comprehensive conversation data for ID: ${conversationId}...`);
     const contextStart = performance.now();
@@ -81,120 +152,77 @@ serve(async (req) => {
       contextQuality: 'comprehensive'
     });
 
-    // Enhanced debugging for session start with deduplication
-    if (sessionStart && conversation) {
-      console.log(`🎯 [${requestId}] Session start request - Comprehensive context analysis:`, {
+    try {
+      // Process the request and generate a response with comprehensive context
+      console.log(`🤖 [${requestId}] Starting comprehensive response processing...`);
+      const processingStart = performance.now();
+      
+      const responseObject = await processResponse(
+        supabase,
+        messages,
         conversationId,
-        sessionTitle: conversation?.sessions?.title,
-        facilitatorTitle: conversation?.sessions?.facilitator_details?.title,
-        facilitatorDetails: conversation?.sessions?.facilitator_details?.details?.substring(0, 100) + '...',
-        facilitatorExpertise: conversation?.sessions?.facilitator_details?.expertise_level,
-        sessionObjective: conversation?.sessions?.objective?.substring(0, 100) + '...',
-        participantDescription: conversation?.participant_description,
-        language: conversation?.language || 'en',
-        hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective),
-        welcomeMessageStatus: conversation?.welcome_message_status,
-        contextQuality: 'comprehensive'
+        conversation,
+        participants,
+        generateReport,
+        wrapUpSession,
+        sessionStart
+      );
+
+      const processingDuration = performance.now() - processingStart;
+      const totalDuration = performance.now() - requestStart;
+
+      console.log(`🎉 [${requestId}] Comprehensive response processing complete:`, {
+        processingDuration: `${processingDuration.toFixed(2)}ms`,
+        totalDuration: `${totalDuration.toFixed(2)}ms`,
+        responseData: {
+          id: responseObject.id,
+          isReport: responseObject.is_report,
+          contentLength: responseObject.content.length,
+          generationMethod: responseObject.metrics?.generationMethod,
+          hasAvatar: !!responseObject.avatar,
+          hasFacilitatorContext: !!responseObject.facilitator_context,
+          hasSessionContext: !!responseObject.session_context,
+          language: responseObject.session_context?.language || 'en',
+          contextQuality: responseObject.metrics?.contextQuality || 'comprehensive'
+        }
       });
 
-      // Check if welcome message is already being generated or completed
-      if (conversation?.welcome_message_status === 'ai_generating' || conversation?.welcome_message_status === 'ai_ready') {
-        console.log(`⚠️ [${requestId}] Welcome message already in progress or completed, skipping duplicate generation`);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Welcome message already being processed',
-            status: conversation?.welcome_message_status 
-          }),
-          { 
-            status: 409, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
-
-      // Update welcome message status to 'ai_generating' to prevent duplicates
-      try {
-        const { error: updateError } = await supabase
-          .from('conversations')
-          .update({ welcome_message_status: 'ai_generating' })
-          .eq('id', conversationId)
-          .eq('welcome_message_status', 'pending'); // Only update if still pending
-        
-        if (updateError) {
-          console.log(`⚠️ [${requestId}] Could not update status (may already be processing):`, updateError);
-          return new Response(
-            JSON.stringify({ 
-              error: 'Welcome message already being processed',
-              details: updateError.message 
-            }),
-            { 
-              status: 409, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        }
-        
-        console.log(`🔄 [${requestId}] Updated welcome message status to 'ai_generating'`);
-      } catch (statusError) {
-        console.error(`❌ [${requestId}] Error updating welcome message status:`, statusError);
-        return createErrorResponse(statusError);
-      }
-    }
-
-    // Process the request and generate a response with comprehensive context
-    console.log(`🤖 [${requestId}] Starting comprehensive response processing...`);
-    const processingStart = performance.now();
-    
-    const responseObject = await processResponse(
-      supabase,
-      messages,
-      conversationId,
-      conversation,
-      participants,
-      generateReport,
-      wrapUpSession,
-      sessionStart
-    );
-
-    const processingDuration = performance.now() - processingStart;
-    const totalDuration = performance.now() - requestStart;
-
-    console.log(`🎉 [${requestId}] Comprehensive response processing complete:`, {
-      processingDuration: `${processingDuration.toFixed(2)}ms`,
-      totalDuration: `${totalDuration.toFixed(2)}ms`,
-      responseData: {
+      console.log(`📤 [${requestId}] Sending comprehensive facilitator response:`, {
         id: responseObject.id,
         isReport: responseObject.is_report,
         contentLength: responseObject.content.length,
-        generationMethod: responseObject.metrics?.generationMethod,
-        hasAvatar: !!responseObject.avatar,
-        hasFacilitatorContext: !!responseObject.facilitator_context,
-        hasSessionContext: !!responseObject.session_context,
+        metrics: responseObject.metrics,
+        wrapUpTriggered: wrapUpSession,
+        sessionStartTriggered: sessionStart,
+        facilitatorName: responseObject.facilitator_context?.name,
+        sessionObjective: responseObject.session_context?.objective?.substring(0, 50) + '...',
         language: responseObject.session_context?.language || 'en',
-        contextQuality: responseObject.metrics?.contextQuality || 'comprehensive'
-      }
-    });
+        contextQuality: 'comprehensive'
+      });
 
-    console.log(`📤 [${requestId}] Sending comprehensive facilitator response:`, {
-      id: responseObject.id,
-      isReport: responseObject.is_report,
-      contentLength: responseObject.content.length,
-      metrics: responseObject.metrics,
-      wrapUpTriggered: wrapUpSession,
-      sessionStartTriggered: sessionStart,
-      facilitatorName: responseObject.facilitator_context?.name,
-      sessionObjective: responseObject.session_context?.objective?.substring(0, 50) + '...',
-      language: responseObject.session_context?.language || 'en',
-      contextQuality: 'comprehensive'
-    });
-    
-    return new Response(
-      JSON.stringify(responseObject),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      // Clean up locks on successful completion
+      if (sessionStart) {
+        unlockGeneration(conversationId, requestId);
+        await releaseDatabaseLock(supabase, conversationId, 'ai_ready');
       }
-    );
+      
+      return new Response(
+        JSON.stringify(responseObject),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+
+    } catch (processingError) {
+      // Clean up locks on processing error
+      if (sessionStart) {
+        unlockGeneration(conversationId, requestId);
+        await releaseDatabaseLock(supabase, conversationId, 'pending');
+      }
+      throw processingError;
+    }
+
   } catch (error) {
     const totalDuration = performance.now() - requestStart;
     console.error(`💥 [${requestId}] Edge function error:`, {

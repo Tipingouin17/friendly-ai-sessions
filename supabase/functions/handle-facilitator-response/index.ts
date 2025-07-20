@@ -79,7 +79,7 @@ serve(async (req) => {
       }
     });
 
-    // Enhanced debugging for session 1558 and similar cases
+    // Enhanced debugging for session start with deduplication
     if (sessionStart && conversation) {
       console.log(`🎯 [${requestId}] Session start request - Enhanced context analysis:`, {
         conversationId,
@@ -89,19 +89,51 @@ serve(async (req) => {
         facilitatorExpertise: conversation?.sessions?.facilitator_details?.expertise_level,
         sessionObjective: conversation?.sessions?.objective?.substring(0, 100) + '...',
         participantDescription: conversation?.participant_description,
-        hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective)
+        hasRichContext: !!(conversation?.sessions?.facilitator_details?.title && conversation?.sessions?.objective),
+        welcomeMessageStatus: conversation?.welcome_message_status
       });
 
-      // Update welcome message status to 'generating' when starting AI generation
+      // Check if welcome message is already being generated or completed
+      if (conversation?.welcome_message_status === 'ai_generating' || conversation?.welcome_message_status === 'ai_ready') {
+        console.log(`⚠️ [${requestId}] Welcome message already in progress or completed, skipping duplicate generation`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Welcome message already being processed',
+            status: conversation?.welcome_message_status 
+          }),
+          { 
+            status: 409, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Update welcome message status to 'ai_generating' to prevent duplicates
       try {
-        await supabase
+        const { error: updateError } = await supabase
           .from('conversations')
-          .update({ welcome_message_status: 'generating' })
-          .eq('id', conversationId);
+          .update({ welcome_message_status: 'ai_generating' })
+          .eq('id', conversationId)
+          .eq('welcome_message_status', 'pending'); // Only update if still pending
         
-        console.log(`🔄 [${requestId}] Updated welcome message status to 'generating'`);
+        if (updateError) {
+          console.log(`⚠️ [${requestId}] Could not update status (may already be processing):`, updateError);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Welcome message already being processed',
+              details: updateError.message 
+            }),
+            { 
+              status: 409, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
+        console.log(`🔄 [${requestId}] Updated welcome message status to 'ai_generating'`);
       } catch (statusError) {
         console.error(`❌ [${requestId}] Error updating welcome message status:`, statusError);
+        return createErrorResponse(statusError);
       }
     }
 

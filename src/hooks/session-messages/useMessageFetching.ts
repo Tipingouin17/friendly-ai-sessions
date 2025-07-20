@@ -224,10 +224,23 @@ export const useMessageFetching = ({
     welcomeGenerationRef.current = true;
 
     try {
-      // Use deduplication to prevent multiple simultaneous generations
-      const deduplicationKey = `ai-welcome-${conversationId}`;
-      
-      return await requestDeduplicator.deduplicate(deduplicationKey, async () => {
+        // Check if welcome message already exists to prevent duplicates
+        const { data: existingMessages } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .eq('role', 'assistant')
+          .limit(1);
+          
+        if (existingMessages && existingMessages.length > 0) {
+          console.log('⚠️ Welcome message already exists, skipping generation');
+          return null;
+        }
+        
+        // Use deduplication to prevent multiple simultaneous generations
+        const deduplicationKey = `ai-welcome-${conversationId}`;
+        
+        return await requestDeduplicator.deduplicate(deduplicationKey, async () => {
         console.log('🤖 Generating AI welcome message for auto-started session with rich context...');
         
         // Call the enhanced edge function with full context

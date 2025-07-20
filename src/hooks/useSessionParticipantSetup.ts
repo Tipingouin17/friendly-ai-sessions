@@ -141,9 +141,43 @@ export const useSessionParticipantSetup = ({
       setLoadingError(null);
       setRetryCount(0);
       
-      // Set current participant ID from location state if available
+      // Enhanced participant ID detection from multiple sources
+      let participantId = null;
+      
+      // Priority 1: URL location state
       if (locationState?.participantId) {
-        setCurrentUserParticipantId(locationState.participantId);
+        participantId = locationState.participantId;
+        console.log('📍 Participant ID from location state:', participantId);
+      }
+      
+      // Priority 2: Find participant by checking if current user is in the participant list
+      if (!participantId && participantInfos.length > 0) {
+        // For participants accessing via direct URL, try to find their ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const participantName = urlParams.get('name');
+        
+        if (participantName) {
+          const matchingParticipant = participantInfos.find(p => 
+            p.name.toLowerCase() === participantName.toLowerCase()
+          );
+          if (matchingParticipant) {
+            participantId = matchingParticipant.id;
+            console.log('🔍 Found participant ID by name match:', participantId, participantName);
+          }
+        }
+      }
+      
+      // Priority 3: If still no ID and only one participant, assume it's them
+      if (!participantId && participantInfos.length === 1 && !window.location.pathname.includes('/admin') && !window.location.pathname.includes('/host')) {
+        participantId = participantInfos[0].id;
+        console.log('👤 Single participant detected, using their ID:', participantId);
+      }
+      
+      if (participantId) {
+        setCurrentUserParticipantId(participantId);
+        console.log('✅ Set current user participant ID:', participantId);
+      } else {
+        console.log('⚠️ Could not determine participant ID');
       }
       
     } catch (err: any) {

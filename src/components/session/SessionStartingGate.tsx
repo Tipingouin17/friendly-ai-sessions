@@ -1,8 +1,11 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Clock, MessageSquare, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, MessageSquare, Users, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SessionStartingGateProps {
   conversationId: number;
@@ -11,6 +14,7 @@ interface SessionStartingGateProps {
   timeoutReached: boolean;
   currentParticipantCount: number;
   maxParticipants: number;
+  onForceGeneration?: () => void;
 }
 
 const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
@@ -19,14 +23,63 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
   isWaitingForMessage,
   timeoutReached,
   currentParticipantCount,
-  maxParticipants
+  maxParticipants,
+  onForceGeneration
 }) => {
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [showRetryOption, setShowRetryOption] = useState(false);
+
   console.log('🚪 [SessionStartingGate] Rendering gate:', {
     conversationId,
     isWaitingForMessage,
     timeoutReached,
-    facilitatorTitle
+    facilitatorTitle,
+    retryCount
   });
+
+  // Show retry option after 30 seconds of waiting
+  useEffect(() => {
+    if (isWaitingForMessage && !timeoutReached) {
+      const timer = setTimeout(() => {
+        setShowRetryOption(true);
+      }, 30000);
+      return () => clearTimeout(timer);
+    }
+  }, [isWaitingForMessage, timeoutReached]);
+
+  const handleRetryGeneration = async () => {
+    if (isRetrying) return;
+    
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+    
+    try {
+      console.log('🔄 [SessionStartingGate] Manually retrying welcome message generation');
+      
+      const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          sessionStart: true,
+          generateReport: false
+        }
+      });
+      
+      if (error) {
+        console.error('❌ [SessionStartingGate] Retry failed:', error);
+      } else {
+        console.log('✅ [SessionStartingGate] Retry successful:', data);
+        // Reset retry state on success
+        setRetryCount(0);
+        setShowRetryOption(false);
+      }
+    } catch (error) {
+      console.error('💥 [SessionStartingGate] Exception during retry:', error);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
@@ -63,6 +116,28 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
                 <p className="text-sm text-muted-foreground">
                   Creating a personalized welcome based on your session context...
                 </p>
+                
+                {showRetryOption && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleRetryGeneration}
+                    disabled={isRetrying}
+                    className="mt-3"
+                  >
+                    {isRetrying ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                        Retrying...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Retry Generation
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
 
@@ -73,8 +148,28 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
                   Taking longer than expected
                 </Badge>
                 <p className="text-sm text-muted-foreground">
-                  Proceeding with session startup...
+                  The AI is working on your welcome message. This might take a moment...
                 </p>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRetryGeneration}
+                  disabled={isRetrying}
+                  className="mt-3"
+                >
+                  {isRetrying ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                      Retrying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Try Again
+                    </>
+                  )}
+                </Button>
               </div>
             )}
 
@@ -88,6 +183,12 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
                   Loading your session...
                 </p>
               </div>
+            )}
+            
+            {retryCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Retry attempts: {retryCount}
+              </p>
             )}
           </div>
 

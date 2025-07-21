@@ -16,7 +16,8 @@ import {
   unlockGeneration, 
   checkDatabaseLock, 
   checkExistingMessages,
-  releaseDatabaseLock 
+  releaseDatabaseLock,
+  createFallbackWelcomeMessage 
 } from "./message-deduplication.ts";
 
 serve(async (req) => {
@@ -64,16 +65,35 @@ serve(async (req) => {
       return createErrorResponse(new Error('OpenAI API key not configured'));
     }
 
-    // Enhanced session start handling with multi-level deduplication
+    // Enhanced session start handling with multi-level deduplication and fallback
     if (sessionStart) {
-      console.log(`🎯 [${requestId}] Session start detected - applying enhanced deduplication`);
+      console.log(`🎯 [${requestId}] Session start detected - applying enhanced deduplication with fallback`);
       
-      // Level 1: In-memory lock check
+      // Level 1: In-memory lock check (now allows retries)
       if (!checkAndLockGeneration(conversationId, requestId)) {
-        console.log(`🚫 [${requestId}] In-memory lock failed - another request is processing`);
+        console.log(`🚫 [${requestId}] In-memory lock failed - too many attempts`);
+        
+        // Try creating fallback message instead of failing
+        console.log(`🔄 [${requestId}] Attempting fallback welcome message creation`);
+        const fallbackSuccess = await createFallbackWelcomeMessage(supabase, conversationId);
+        
+        if (fallbackSuccess) {
+          return new Response(
+            JSON.stringify({ 
+              message: 'Fallback welcome message created successfully',
+              status: 'fallback_completed',
+              requestId 
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
         return new Response(
           JSON.stringify({ 
-            error: 'Welcome message generation already in progress',
+            error: 'Welcome message generation failed after multiple attempts',
             requestId 
           }),
           { 
@@ -101,14 +121,30 @@ serve(async (req) => {
           );
         }
 
-        // Level 3: Database-level lock
+        // Level 3: Database-level lock (now more permissive)
         const databaseLockAcquired = await checkDatabaseLock(supabase, conversationId, requestId);
         if (!databaseLockAcquired) {
-          console.log(`🚫 [${requestId}] Database lock failed - another process is generating`);
+          console.log(`🚫 [${requestId}] Database lock failed - trying fallback`);
           unlockGeneration(conversationId, requestId);
+          
+          // Try fallback instead of failing
+          const fallbackSuccess = await createFallbackWelcomeMessage(supabase, conversationId);
+          if (fallbackSuccess) {
+            return new Response(
+              JSON.stringify({ 
+                message: 'Fallback welcome message created',
+                status: 'fallback_completed' 
+              }),
+              { 
+                status: 200, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            );
+          }
+          
           return new Response(
             JSON.stringify({ 
-              error: 'Welcome message generation already in progress (database)',
+              error: 'Welcome message generation failed - database lock unsuccessful',
               requestId 
             }),
             { 
@@ -118,12 +154,28 @@ serve(async (req) => {
           );
         }
 
-        console.log(`🔒 [${requestId}] All locks acquired successfully, proceeding with generation`);
+        console.log(`🔒 [${requestId}] All locks acquired successfully, proceeding with AI generation`);
 
       } catch (lockError) {
         console.error(`❌ [${requestId}] Error during lock acquisition:`, lockError);
         unlockGeneration(conversationId, requestId);
         await releaseDatabaseLock(supabase, conversationId, 'pending');
+        
+        // Try fallback on error
+        const fallbackSuccess = await createFallbackWelcomeMessage(supabase, conversationId);
+        if (fallbackSuccess) {
+          return new Response(
+            JSON.stringify({ 
+              message: 'Fallback welcome message created after error',
+              status: 'fallback_completed' 
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
         return createErrorResponse(lockError);
       }
     }
@@ -215,11 +267,30 @@ serve(async (req) => {
       );
 
     } catch (processingError) {
+      console.error(`💥 [${requestId}] Processing error:`, processingError);
+      
       // Clean up locks on processing error
       if (sessionStart) {
         unlockGeneration(conversationId, requestId);
         await releaseDatabaseLock(supabase, conversationId, 'pending');
+        
+        // Try fallback on processing error
+        console.log(`🔄 [${requestId}] Attempting fallback after processing error`);
+        const fallbackSuccess = await createFallbackWelcomeMessage(supabase, conversationId);
+        if (fallbackSuccess) {
+          return new Response(
+            JSON.stringify({ 
+              message: 'Fallback welcome message created after processing error',
+              status: 'fallback_completed' 
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
       }
+      
       throw processingError;
     }
 

@@ -1,10 +1,10 @@
+
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { useMessageFetching } from "./session-messages/useMessageFetching";
 import { useResponseAggregation } from "./session-messages/useResponseAggregation";
 import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
 import { useSessionAutoStartMonitoring } from "./useSessionAutoStartMonitoring";
-import { supabase } from "@/integrations/supabase/client";
 
 interface UseHostMessagesProps {
   conversationId: number | null;
@@ -42,7 +42,8 @@ export const useHostMessages = ({
     isWaitingForResponses,
     responseCount,
     generateAggregatedResponse,
-    isGeneratingResponse
+    isGeneratingResponse,
+    forceRecovery
   } = useMessageFetching({
     conversationId,
     isAdmin: true,
@@ -73,60 +74,12 @@ export const useHostMessages = ({
     console.log('🚀 [HOST] Triggering immediate AI welcome generation for auto-started session...');
     welcomeGeneratedRef.current = true;
 
-    try {
-      // Check if we already have messages
-      const { data: existingMessages, error: checkError } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('conversation_id', conversationId)
-        .limit(1);
-
-      if (checkError) {
-        console.error('❌ [HOST] Error checking existing messages:', checkError);
-        welcomeGeneratedRef.current = false;
-        return;
-      }
-
-      if (existingMessages && existingMessages.length > 0) {
-        console.log('📭 [HOST] Messages already exist, skipping generation');
-        return;
-      }
-
-      // Call the edge function directly with full context
-      console.log('🤖 [HOST] Calling edge function for AI welcome generation...');
-      const { data: response, error } = await supabase.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false,
-          conversation: conversationState
-        }
-      });
-
-      if (error) {
-        console.error('❌ [HOST] Edge function error:', error);
-        welcomeGeneratedRef.current = false;
-        return;
-      }
-
-      if (response?.content) {
-        console.log('✅ [HOST] AI welcome message generated:', {
-          contentLength: response.content.length,
-          generationMethod: response.metrics?.generationMethod
-        });
-
-        // Trigger message fetch to get the newly generated message
-        setTimeout(() => {
-          fetchMessages();
-        }, 100);
-      }
-
-    } catch (error) {
-      console.error('❌ [HOST] Error in immediate welcome generation:', error);
-      welcomeGeneratedRef.current = false; // Reset on error
+    // The message fetching hook will handle the actual generation
+    // We just need to trigger it by updating the conversation state
+    if (conversationState.session_started && !conversationState.welcome_message_status) {
+      console.log('🔄 [HOST] Session started, message fetching hook will handle generation');
     }
-  }, [conversationId, conversationState, fetchMessages]);
+  }, [conversationId, conversationState]);
 
   // Handle conversation updates from realtime with enhanced auto-start detection
   const handleConversationUpdate = useCallback((payload: any) => {
@@ -265,6 +218,7 @@ export const useHostMessages = ({
     triggerFacilitatorResponse,
     isGeneratingWelcome,
     isGeneratingResponse,
-    isProcessingAutoStart
+    isProcessingAutoStart,
+    forceRecovery
   };
 };

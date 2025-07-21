@@ -77,7 +77,7 @@ export const useMessageFetching = ({
       setMessages(formattedMessages);
 
       // Check if we have a welcome message
-      const hasWelcomeMessage = formattedMessages.some(msg => msg.role === 'assistant');
+      const hasWelcomeMessage = formattedMessages.some(msg => msg.sender === 'assistant');
       if (hasWelcomeMessage) {
         setWelcomeMessageStatus('ai_ready');
         setIsGeneratingWelcome(false);
@@ -160,7 +160,7 @@ export const useMessageFetching = ({
     });
 
     // If this is a welcome message, update status
-    if (message.role === 'assistant' && !welcomeGeneratedRef.current) {
+    if (message.sender === 'assistant' && !welcomeGeneratedRef.current) {
       setWelcomeMessageStatus('ai_ready');
       setIsGeneratingWelcome(false);
       welcomeGeneratedRef.current = true;
@@ -178,7 +178,7 @@ export const useMessageFetching = ({
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
           messages: messages.map(msg => ({
-            role: msg.role,
+            role: msg.sender === 'assistant' ? 'assistant' : 'user',
             content: msg.content
           })),
           conversationId,

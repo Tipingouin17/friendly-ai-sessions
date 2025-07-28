@@ -4,66 +4,51 @@
  */
 
 /**
- * Validates that a user can access a specific session
- * Updated to allow anonymous access for active sessions while maintaining host security
+ * Validate user access to a session with enhanced security checks
  */
 export const validateSessionAccess = async (
   conversationId: number,
   userId?: string
 ): Promise<boolean> => {
   try {
+    // Validate conversation ID
+    if (!conversationId || !Number.isInteger(conversationId) || conversationId <= 0) {
+      return false;
+    }
+
     const { supabase } = await import('@/integrations/supabase/client');
     
-    // First, check if the session exists and is active
-    const { data: conversation, error: conversationError } = await supabase
+    const { data: conversation } = await supabase
       .from('conversations')
-      .select('id, user_id, is_session_ended, session_started, status')
+      .select('user_id, session_started, is_session_ended, status')
       .eq('id', conversationId)
       .single();
-      
-    if (conversationError || !conversation) {
-      console.log('Session not found or error fetching session:', conversationError);
-      return false;
-    }
     
-    // Check if session is ended
-    if (conversation.is_session_ended) {
-      console.log('Session has ended');
-      return false;
-    }
+    if (!conversation) return false;
     
-    // Check if session status is inactive
-    if (conversation.status && conversation.status !== 'active') {
-      console.log('Session is not active');
-      return false;
-    }
+    // Check if session is in valid state
+    if (conversation.status !== 'active') return false;
+    if (conversation.is_session_ended) return false;
     
-    // If no userId provided, allow access to active sessions (for anonymous participants)
-    if (!userId) {
-      console.log('Anonymous access to active session allowed');
+    // Allow access if user is the owner
+    if (userId && conversation.user_id === userId) return true;
+    
+    // For non-owners, only allow access if session has started
+    if (conversation.session_started) {
+      // Additional check: verify user is actually a participant
+      if (userId) {
+        const { data: participant } = await supabase
+          .from('session_participants')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .limit(1)
+          .maybeSingle();
+        
+        return !!participant;
+      }
       return true;
     }
     
-    // If userId is provided, check if user is the session owner
-    if (conversation.user_id === userId) {
-      console.log('User is session owner');
-      return true;
-    }
-    
-    // Check if user is a participant (for authenticated participants)
-    const { data: participant, error: participantError } = await supabase
-      .from('session_participants')
-      .select('id')
-      .eq('conversation_id', conversationId)
-      .limit(1)
-      .single();
-      
-    if (participant && !participantError) {
-      console.log('User is a session participant');
-      return true;
-    }
-    
-    console.log('User does not have access to this session');
     return false;
   } catch (error) {
     console.error('Error validating session access:', error);

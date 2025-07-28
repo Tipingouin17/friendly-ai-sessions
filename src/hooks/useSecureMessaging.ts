@@ -1,8 +1,8 @@
 
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { validateMessageContent, sanitizeHtml, messagingRateLimiter } from '@/utils/inputValidation';
-import { useSecurityAudit } from '@/hooks/useSecurityAudit';
+import { useState, useCallback, useRef } from 'react';
+import { useSecurityAudit } from './useSecurityAudit';
+import { validateMessageContent } from '@/utils/security/inputValidation';
+import { createSecureRateLimiter } from '@/utils/security/inputValidation';
 
 interface SecureMessage {
   content: string;
@@ -12,83 +12,86 @@ interface SecureMessage {
 
 export const useSecureMessaging = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
-  const { toast } = useToast();
   const { logSecurityViolation, logSensitiveAction } = useSecurityAudit();
-
-  const validateAndSanitizeMessage = (message: SecureMessage): { 
-    isValid: boolean; 
-    sanitizedContent?: string; 
-    error?: string 
-  } => {
-    // Rate limiting check
-    const rateLimitKey = `message_${message.conversationId}_${message.participantId || 'admin'}`;
-    if (messagingRateLimiter.isRateLimited(rateLimitKey, 10, 60000)) { // 10 messages per minute
-      setIsRateLimited(true);
-      logSecurityViolation('rate_limit_exceeded', {
-        type: 'messaging',
-        conversationId: message.conversationId,
-        participantId: message.participantId
-      });
-      
-      setTimeout(() => setIsRateLimited(false), 60000); // Reset after 1 minute
-      return { isValid: false, error: 'Rate limit exceeded. Please wait before sending another message.' };
-    }
-
-    // Content validation
-    const validation = validateMessageContent(message.content);
-    if (!validation.isValid) {
-      logSecurityViolation('invalid_message_content', {
-        error: validation.error,
-        conversationId: message.conversationId
-      });
-      return validation;
-    }
-
-    // Sanitize content
-    const sanitizedContent = sanitizeHtml(message.content);
+  const rateLimiter = useRef(createSecureRateLimiter(10, 60000)); // 10 messages per minute
+  
+  const validateAndSanitizeMessage = useCallback((message: SecureMessage) => {
+    const { content, conversationId, participantId } = message;
     
-    // Log if content was modified during sanitization
-    if (sanitizedContent !== message.content) {
-      logSecurityViolation('content_sanitized', {
-        conversationId: message.conversationId,
-        originalLength: message.content.length,
-        sanitizedLength: sanitizedContent.length
-      });
+    // Validate conversation ID
+    if (!conversationId || !Number.isInteger(conversationId) || conversationId <= 0) {
+      logSecurityViolation('invalid_conversation_id_message', { conversationId });
+      return { isValid: false, error: 'Invalid session ID' };
     }
-
-    // Log normal message activity for audit trail
-    logSensitiveAction('message_sent', message.conversationId);
-
-    return { isValid: true, sanitizedContent };
-  };
-
-  const checkMessageSecurity = (content: string): boolean => {
-    // Additional security checks for suspicious patterns
+    
+    // Rate limiting check
+    const key = participantId ? `participant-${participantId}` : `conversation-${conversationId}`;
+    
+    if (rateLimiter.current.isRateLimited(key)) {
+      setIsRateLimited(true);
+      logSecurityViolation('rate_limit_exceeded', { key });
+      return { isValid: false, error: 'Rate limit exceeded. Please slow down.' };
+    }
+    
+    // Enhanced content validation
+    const validation = validateMessageContent(content);
+    if (!validation.isValid) {
+      logSecurityViolation('invalid_message_content', { 
+        conversationId, 
+        participantId,
+        error: validation.error
+      });
+      return { isValid: false, error: validation.error };
+    }
+    
+    // Additional security checks
+    if (!checkMessageSecurity(content)) {
+      return { isValid: false, error: 'Message contains potentially harmful content' };
+    }
+    
+    // Log the message for audit
+    logSensitiveAction('message_sent', conversationId);
+    
+    return { isValid: true, sanitizedContent: validation.sanitized };
+  }, [logSecurityViolation, logSensitiveAction]);
+  
+  const checkMessageSecurity = useCallback((content: string): boolean => {
+    // Enhanced security checks for suspicious patterns
     const suspiciousPatterns = [
-      /eval\s*\(/i,
-      /document\.write/i,
-      /innerHTML\s*=/i,
-      /onclick\s*=/i,
-      /onerror\s*=/i,
-      /onload\s*=/i
+      /(?:password|token|secret|key|api_key)/i,
+      /(?:admin|root|sudo|administrator)/i,
+      /(?:drop|delete|truncate|alter)\s+table/i,
+      /(?:union|select|insert|update)\s+(?:from|into|set)/i,
+      /(?:script|iframe|object|embed|form)/i,
+      /(?:eval|function|constructor)/i,
+      /(?:document\.|window\.|location\.)/i,
+      /(?:onclick|onload|onerror|onmouseover)/i,
     ];
-
+    
     for (const pattern of suspiciousPatterns) {
       if (pattern.test(content)) {
-        logSecurityViolation('suspicious_message_content', {
+        logSecurityViolation('suspicious_message_patterns', { 
           pattern: pattern.toString(),
-          contentPreview: content.substring(0, 100)
+          content: content.slice(0, 100) // Log first 100 chars for context
         });
         return false;
       }
     }
-
+    
     return true;
-  };
-
+  }, [logSecurityViolation]);
+  
+  // Reset rate limit for a specific key
+  const resetRateLimit = useCallback((participantId?: number, conversationId?: number) => {
+    const key = participantId ? `participant-${participantId}` : `conversation-${conversationId}`;
+    rateLimiter.current.reset(key);
+    setIsRateLimited(false);
+  }, []);
+  
   return {
     validateAndSanitizeMessage,
     checkMessageSecurity,
+    resetRateLimit,
     isRateLimited
   };
 };

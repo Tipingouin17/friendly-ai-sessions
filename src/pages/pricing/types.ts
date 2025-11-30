@@ -1,5 +1,5 @@
 
-import { Json } from "@/integrations/supabase/types";
+
 
 export interface Plan {
   id: number;

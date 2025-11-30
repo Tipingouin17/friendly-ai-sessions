@@ -7,9 +7,11 @@ import { Plan } from '../pricing/types';
 
 interface OrderSummaryProps {
   plan: Plan;
+  promoCode: string;
+  setPromoCode: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export const OrderSummary = ({ plan }: OrderSummaryProps) => {
+export const OrderSummary = ({ plan, promoCode, setPromoCode }: OrderSummaryProps) => {
   // Format price with correct currency symbol
   const formatPrice = (price: number, currency: string = 'USD') => {
     const formatter = new Intl.NumberFormat('en-US', {
@@ -49,19 +51,19 @@ export const OrderSummary = ({ plan }: OrderSummaryProps) => {
               <span>{plan.title} Plan</span>
               <span className="flex items-center">{formattedPrice}/mo</span>
             </div>
-            
+
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Billing</span>
               <span>Monthly</span>
             </div>
-            
+
             <Separator />
-            
+
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
               <span className="flex items-center">{formattedPrice}/month</span>
             </div>
-            
+
             <div className="pt-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                 <Shield className="h-4 w-4" />

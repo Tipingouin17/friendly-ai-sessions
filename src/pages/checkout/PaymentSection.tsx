@@ -5,12 +5,14 @@ import { CheckoutForm } from './CheckoutForm';
 import { PaymentProvider } from './components/PaymentProvider';
 import { CheckoutFormProps } from './types';
 
-type PaymentSectionProps = CheckoutFormProps;
+interface PaymentSectionProps extends CheckoutFormProps {
+  promoCode?: string;
+}
 
-export const PaymentSection = ({ 
-  plan, 
-  billingDetails, 
-  onCancel 
+export const PaymentSection = ({
+  plan,
+  billingDetails,
+  onCancel
 }: PaymentSectionProps) => {
   const [isStripeLoading, setIsStripeLoading] = useState(true);
 
@@ -26,9 +28,9 @@ export const PaymentSection = ({
         <h3 className="text-lg font-semibold">Payment Method</h3>
         <span className="text-sm text-muted-foreground">(Required)</span>
       </div>
-      
+
       <PaymentProvider>
-        <CheckoutForm 
+        <CheckoutForm
           plan={plan}
           billingDetails={billingDetails}
           onCancel={onCancel}

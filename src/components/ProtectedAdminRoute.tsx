@@ -30,21 +30,24 @@ export const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
                     .single();
 
                 if (error) {
-                    console.error('Error checking admin status:', error);
+                    console.error('ProtectedAdminRoute: Error checking admin status:', error);
                     setIsAdmin(false);
                 } else {
-                    setIsAdmin(data?.role === 'admin');
+                    const isUserAdmin = data?.role === 'admin';
+                    setIsAdmin(isUserAdmin);
                 }
             } catch (error) {
-                console.error('Exception checking admin status:', error);
+                console.error('ProtectedAdminRoute: Exception checking admin status:', error);
                 setIsAdmin(false);
             } finally {
                 setChecking(false);
             }
         };
 
-        checkAdminStatus();
-    }, [user]);
+        if (!loading) {
+            checkAdminStatus();
+        }
+    }, [user?.id, loading]); // Use user.id to prevent re-runs on object reference change
 
     if (loading || checking) {
         return (
@@ -58,8 +61,10 @@ export const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
     }
 
     if (!user || !isAdmin) {
+        console.log('ProtectedAdminRoute: Access denied. Redirecting to home.', { user: !!user, isAdmin });
         return <Navigate to="/" replace />;
     }
 
+    console.log('ProtectedAdminRoute: Access granted. Rendering children.');
     return <>{children}</>;
 };

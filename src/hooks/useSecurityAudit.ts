@@ -1,4 +1,4 @@
-
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,10 +12,10 @@ interface SecurityEvent {
 export const useSecurityAudit = () => {
   const { toast } = useToast();
 
-  const logSecurityEvent = async (event: SecurityEvent) => {
+  const logSecurityEvent = useCallback(async (event: SecurityEvent) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { error } = await supabase
         .from('security_audit_log')
         .insert({
@@ -32,27 +32,27 @@ export const useSecurityAudit = () => {
     } catch (error) {
       console.error('Security audit logging failed:', error);
     }
-  };
+  }, []);
 
-  const logAuthAttempt = (success: boolean, method: string) => {
+  const logAuthAttempt = useCallback((success: boolean, method: string) => {
     logSecurityEvent({
       eventType: success ? 'auth_success' : 'auth_failure',
       eventDetails: { method, timestamp: new Date().toISOString() }
     });
-  };
+  }, [logSecurityEvent]);
 
-  const logSensitiveAction = (action: string, resourceId?: string | number) => {
+  const logSensitiveAction = useCallback((action: string, resourceId?: string | number) => {
     logSecurityEvent({
       eventType: 'sensitive_action',
-      eventDetails: { 
-        action, 
+      eventDetails: {
+        action,
         resourceId: resourceId?.toString(),
-        timestamp: new Date().toISOString() 
+        timestamp: new Date().toISOString()
       }
     });
-  };
+  }, [logSecurityEvent]);
 
-  const logSecurityViolation = (violation: string, details?: Record<string, any>) => {
+  const logSecurityViolation = useCallback((violation: string, details?: Record<string, any>) => {
     logSecurityEvent({
       eventType: 'security_violation',
       eventDetails: { violation, ...details, timestamp: new Date().toISOString() }
@@ -63,7 +63,7 @@ export const useSecurityAudit = () => {
       description: "Suspicious activity detected and logged.",
       variant: "destructive"
     });
-  };
+  }, [logSecurityEvent, toast]);
 
   return {
     logSecurityEvent,

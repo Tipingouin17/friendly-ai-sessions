@@ -134,23 +134,23 @@ export async function testSupabaseConnection() {
 }
 
 // Run the test if this file is executed directly
-if (typeof window !== 'undefined') {
-    testSupabaseConnection().then(results => {
-        console.log('\n📊 Test Results:', results);
-
-        const totalTables = Object.keys(results.tables).length;
-        const successfulTables = Object.values(results.tables).filter(Boolean).length;
-        const totalMigrations = Object.keys(results.migrations).length;
-        const successfulMigrations = Object.values(results.migrations).filter(Boolean).length;
-
-        console.log(`\n✅ Connection: ${results.connection ? 'PASS' : 'FAIL'}`);
-        console.log(`✅ Auth: ${results.auth ? 'PASS' : 'FAIL'}`);
-        console.log(`✅ Tables: ${successfulTables}/${totalTables} accessible`);
-        console.log(`✅ Migrations: ${successfulMigrations}/${totalMigrations} applied`);
-
-        if (results.errors.length > 0) {
-            console.log('\n❌ Errors:');
-            results.errors.forEach(err => console.log(`  - ${err}`));
-        }
-    });
-}
+// if (typeof window !== 'undefined') {
+//     testSupabaseConnection().then(results => {
+//         console.log('\n📊 Test Results:', results);
+//
+//         const totalTables = Object.keys(results.tables).length;
+//         const successfulTables = Object.values(results.tables).filter(Boolean).length;
+//         const totalMigrations = Object.keys(results.migrations).length;
+//         const successfulMigrations = Object.values(results.migrations).filter(Boolean).length;
+//
+//         console.log(`\n✅ Connection: ${results.connection ? 'PASS' : 'FAIL'}`);
+//         console.log(`✅ Auth: ${results.auth ? 'PASS' : 'FAIL'}`);
+//         console.log(`✅ Tables: ${successfulTables}/${totalTables} accessible`);
+//         console.log(`✅ Migrations: ${successfulMigrations}/${totalMigrations} applied`);
+//
+//         if (results.errors.length > 0) {
+//             console.log('\n❌ Errors:');
+//             results.errors.forEach(err => console.log(`  - ${err}`));
+//         }
+//     });
+// }

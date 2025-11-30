@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";
@@ -11,15 +10,18 @@ import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { PlanLimitAlert } from "@/components/facilitator/PlanLimitAlert";
 import { StepNavigation } from "@/components/facilitator/StepNavigation";
 import { useState, useEffect } from "react";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { UsageMeter } from "@/components/subscription/UsageMeter";
+import { useOnboarding } from "@/hooks/useOnboarding";
 
 const MyFacilitators = () => {
   const [isClient, setIsClient] = useState(false);
-  
+
   // Hydration-safe client detection
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
+
   const {
     currentStep,
     setCurrentStep,
@@ -49,6 +51,8 @@ const MyFacilitators = () => {
     isLoading: limitsLoading
   } = usePlanLimits();
 
+  const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
+
   const {
     data: facilitators = [],
     isLoading: isFacilitatorsLoading
@@ -71,23 +75,37 @@ const MyFacilitators = () => {
   const isStep1Disabled = false; // Never disable selection of facilitators
   const isStep2Disabled = !selectedFacilitator; // Only disable if no facilitator selected
   const isStep3Disabled = !selectedWorkshop; // Only disable if no workshop selected
-  
+
   // Only creation of new sessions should be blocked by session limit
   const isSubmitDisabled = hasReachedSessionLimit || !selectedWorkshop || !description.trim() || !agreed;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <WelcomeModal
+        isOpen={!hasSeenWelcome}
+        onClose={() => setHasSeenWelcome(true)}
+      />
+
       <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        <PlanLimitAlert 
+        <div className="mb-6">
+          <UsageMeter
+            currentUsage={currentSessionCount}
+            limit={maxSessions}
+            planName="Free Plan"
+            featureName="Sessions"
+          />
+        </div>
+
+        <PlanLimitAlert
           hasReachedSessionLimit={hasReachedSessionLimit}
           hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
           currentSessionCount={currentSessionCount}
           maxSessions={maxSessions}
           onUpgrade={handleUpgradePlan}
         />
-        
+
         <div className="bg-white rounded-3xl shadow-lg p-4 md:p-6">
-          <FacilitatorStepper 
+          <FacilitatorStepper
             currentStep={currentStep}
             setCurrentStep={setCurrentStep}
             isStep1Disabled={isStep1Disabled}
@@ -98,35 +116,35 @@ const MyFacilitators = () => {
           <div className="space-y-4 md:space-y-6">
             {/* Step 1: Facilitator Selection */}
             <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
-              <FacilitatorSelection 
-                facilitators={facilitators} 
-                selectedFacilitator={selectedFacilitator} 
-                onSelect={setSelectedFacilitator} 
-                isLoading={isFacilitatorsLoading} 
+              <FacilitatorSelection
+                facilitators={facilitators}
+                selectedFacilitator={selectedFacilitator}
+                onSelect={setSelectedFacilitator}
+                isLoading={isFacilitatorsLoading}
               />
             </div>
 
             {/* Step 2: Workshop Selection */}
             <div className={`transition-all ${currentStep === 2 ? 'block' : 'hidden'} ${!selectedFacilitator ? 'opacity-50 pointer-events-none' : ''}`}>
-              <WorkshopSelection 
-                workshops={workshops} 
-                selectedWorkshop={selectedWorkshop} 
-                onSelect={setSelectedWorkshop} 
-                isLoading={isWorkshopsLoading} 
+              <WorkshopSelection
+                workshops={workshops}
+                selectedWorkshop={selectedWorkshop}
+                onSelect={setSelectedWorkshop}
+                isLoading={isWorkshopsLoading}
               />
             </div>
 
             {/* Step 3: Workshop Setup */}
             <div className={`transition-all ${currentStep === 3 ? 'block' : 'hidden'} ${!selectedWorkshop ? 'opacity-50 pointer-events-none' : ''}`}>
-              <WorkshopSetup 
-                participantCount={participantCount} 
-                setParticipantCount={setParticipantCount} 
-                description={description} 
-                setDescription={setDescription} 
-                language={language} 
-                setLanguage={setLanguage} 
-                agreed={agreed} 
-                setAgreed={setAgreed} 
+              <WorkshopSetup
+                participantCount={participantCount}
+                setParticipantCount={setParticipantCount}
+                description={description}
+                setDescription={setDescription}
+                language={language}
+                setLanguage={setLanguage}
+                agreed={agreed}
+                setAgreed={setAgreed}
               />
             </div>
           </div>

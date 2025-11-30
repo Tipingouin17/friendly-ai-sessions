@@ -15,14 +15,20 @@ const Login = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  
-  const { login, resetPassword } = useAuth();
+
+  const { login, resetPassword, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
+
   const from = (location.state as { from: string })?.from || '/';
-  
+
+  // Redirect if already logged in
+  if (!loading && isAuthenticated) {
+    navigate(from, { replace: true });
+    return null;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -82,13 +88,13 @@ const Login = () => {
               <Label htmlFor="email" className="block text-sm font-medium mb-2 text-left">
                 Email
               </Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="Enter your email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                required 
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
               />
             </div>
             <div>
@@ -96,21 +102,21 @@ const Login = () => {
                 <Label htmlFor="password" className="block text-sm font-medium text-left">
                   Password
                 </Label>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowResetDialog(true)}
                   className="text-xs text-primary hover:underline"
                 >
                   Forgot password?
                 </button>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="Enter your password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
@@ -138,11 +144,11 @@ const Login = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Email</Label>
-                <Input 
-                  id="reset-email" 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  value={resetEmail} 
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   required
                 />

@@ -18,23 +18,25 @@ interface CheckoutContainerProps {
   onBackToPricing: () => void;
 }
 
-export const CheckoutContainer = ({ 
+export const CheckoutContainer = ({
   plan,
   billingDetails,
   handleBillingDetailsChange,
   onBackToPricing
 }: CheckoutContainerProps) => {
+  const [promoCode, setPromoCode] = React.useState('');
+
   return (
     <div className="min-h-screen pt-16 pb-16 bg-gray-50">
       <div className="container max-w-6xl mx-auto px-4">
-        <Button 
-          variant="ghost" 
-          className="mb-6" 
+        <Button
+          variant="ghost"
+          className="mb-6"
           onClick={onBackToPricing}
         >
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Pricing
         </Button>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Plan details and summary */}
           <div className="lg:col-span-2">
@@ -47,36 +49,41 @@ export const CheckoutContainer = ({
                   You're upgrading to the {plan.title} Plan
                 </CardDescription>
               </CardHeader>
-              
+
               <CardContent className="pt-6">
                 <div className="space-y-8">
                   {/* Plan Details Section */}
                   <PlanDetails plan={plan} />
-                  
+
                   <Separator />
-                  
+
                   {/* Billing Information Section */}
-                  <BillingSection 
+                  <BillingSection
                     billingDetails={billingDetails}
                     handleBillingDetailsChange={handleBillingDetailsChange}
                   />
-                  
+
                   <Separator />
-                  
+
                   {/* Payment Information Section */}
-                  <PaymentSection 
+                  <PaymentSection
                     plan={plan}
                     billingDetails={billingDetails}
                     onCancel={onBackToPricing}
+                    promoCode={promoCode}
                   />
                 </div>
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Right column: Order summary */}
           <div className="lg:col-span-1">
-            <OrderSummary plan={plan} />
+            <OrderSummary
+              plan={plan}
+              promoCode={promoCode}
+              setPromoCode={setPromoCode}
+            />
           </div>
         </div>
       </div>

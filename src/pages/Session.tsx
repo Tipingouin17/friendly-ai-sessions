@@ -18,25 +18,23 @@ const Session = () => {
     retryConnection,
     handleProviderInitialized,
     stateRef,
-    isOnAdminPath,
     isClient
   } = useSessionPageState();
-  
+
   // Check if we're on mobile (will be undefined during hydration)
   const isMobile = useIsMobile();
-  
+
+
   // Set up session page effects
   const { sessionMountedRef } = useSessionPageEffects({
     isLoading,
     hasInitializedProvider,
     setIsLoading,
-    retryConnection,
-    isAdmin: stateRef.current.isAdmin,
-    isOnAdminPath
+    retryConnection
   });
 
-  // Show mobile nav only when we know we're on mobile and not admin
-  const showMobileNav = isClient && isMobile && !isOnAdminPath;
+  // Show mobile nav only when we know we're on mobile
+  const showMobileNav = isClient && isMobile;
 
   return (
     <div className="flex flex-col h-screen">
@@ -44,7 +42,7 @@ const Session = () => {
       <div className={`${showMobileNav ? 'block' : 'hidden'}`}>
         <SessionMobileNav />
       </div>
-      
+
       <div className={`flex-1 overflow-hidden ${showMobileNav ? 'pt-16' : ''}`}>
         <SessionContent
           isLoading={isLoading}
@@ -53,14 +51,14 @@ const Session = () => {
           error={stateRef.current.error}
           noSessionFound={stateRef.current.noSessionFound}
           connectionAttempts={stateRef.current.connectionAttempts}
-          isAdmin={stateRef.current.isAdmin}
+          isAdmin={false}
           sessionMountedRef={sessionMountedRef}
           handleProviderInitialized={handleProviderInitialized}
           setIsLoading={setIsLoading}
           handleError={handleError}
           handleSessionFull={handleSessionFull}
           retryConnection={retryConnection}
-          forceAdmin={isOnAdminPath}
+          forceAdmin={false}
         />
       </div>
     </div>

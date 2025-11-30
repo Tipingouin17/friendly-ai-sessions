@@ -1,36 +1,56 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlanInfo } from '@/components/subscription/PlanInfo';
+import { AvatarUploadModal } from '@/components/profile/AvatarUploadModal';
+import { EditProfileModal } from '@/components/profile/EditProfileModal';
+import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal';
+import { TwoFactorSetupModal } from '@/components/profile/TwoFactorSetupModal';
+import { LoginActivityModal } from '@/components/profile/LoginActivityModal';
+import { SessionManagementModal } from '@/components/profile/SessionManagementModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Edit, Key, LogOut, User, Shield, Calendar } from 'lucide-react';
+import { Edit, Key, LogOut, User, Shield, Calendar, Camera, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getUserDisplayName } from '@/utils/userUtils';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Profile = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
+  const [isLoginActivityModalOpen, setIsLoginActivityModalOpen] = useState(false);
+  const [isSessionManagementModalOpen, setIsSessionManagementModalOpen] = useState(false);
+
   const userDisplayName = getUserDisplayName(user);
+
+  // Fetch user metadata including avatar_url
+  const { data: userMetadata } = useQuery({
+    queryKey: ['userMetadata', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      return data.user;
+    },
+    enabled: !!user,
+  });
 
   const getInitials = (name: string) => {
     return name.split(' ').map(part => part[0]).join('').toUpperCase();
   };
 
   const handleEditProfile = () => {
-    toast({
-      title: "Edit Profile",
-      description: "This feature will be available soon."
-    });
+    setIsEditProfileModalOpen(true);
   };
 
   const handleChangePassword = () => {
-    toast({
-      title: "Change Password",
-      description: "This feature will be available soon."
-    });
+    setIsChangePasswordModalOpen(true);
   };
 
   const handleLogout = () => {
@@ -45,7 +65,7 @@ const Profile = () => {
     <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-primary/10 to-white">
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
-        
+
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
             {/* User Profile Summary Card */}
@@ -54,10 +74,30 @@ const Profile = () => {
               <div className="px-6 pb-6">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end -mt-12 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-                    <Avatar className="h-24 w-24 border-4 border-white bg-white shadow-md">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${userDisplayName}`} alt={userDisplayName} />
-                      <AvatarFallback className="text-2xl">{getInitials(userDisplayName)}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative group">
+                      <Avatar className="h-24 w-24 border-4 border-white bg-white shadow-md">
+                        <AvatarImage
+                          src={userMetadata?.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${userDisplayName}`}
+                          alt={userDisplayName}
+                        />
+                        <AvatarFallback className="text-2xl">{getInitials(userDisplayName)}</AvatarFallback>
+                      </Avatar>
+
+                      {/* Camera Button Overlay */}
+                      <button
+                        onClick={() => setIsAvatarModalOpen(true)}
+                        className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center cursor-pointer"
+                        aria-label="Upload profile picture"
+                      >
+                        <Camera size={24} className="text-white" />
+                      </button>
+
+                      {userMetadata?.email_confirmed_at && (
+                        <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5 border-4 border-white shadow-lg">
+                          <CheckCircle2 size={12} className="text-white" />
+                        </div>
+                      )}
+                    </div>
                     <div className="mt-4 sm:mt-0">
                       <h2 className="text-2xl font-bold">{userDisplayName}</h2>
                       <p className="text-gray-500">{user?.email}</p>
@@ -72,7 +112,7 @@ const Profile = () => {
                 </div>
               </div>
             </Card>
-            
+
             {/* Account Information */}
             <Card className="overflow-hidden">
               <CardHeader className="border-b pb-6">
@@ -102,6 +142,27 @@ const Profile = () => {
                       <p className="text-lg font-medium">Active</p>
                     </div>
                   </div>
+
+                  {userMetadata?.user_metadata?.phone && (
+                    <div>
+                      <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Phone</h3>
+                      <p className="text-xl font-medium">{userMetadata.user_metadata.phone}</p>
+                    </div>
+                  )}
+
+                  {userMetadata?.user_metadata?.timezone && (
+                    <div>
+                      <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Timezone</h3>
+                      <p className="text-xl font-medium">{userMetadata.user_metadata.timezone}</p>
+                    </div>
+                  )}
+
+                  {userMetadata?.user_metadata?.bio && (
+                    <div className="md:col-span-2">
+                      <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Bio</h3>
+                      <p className="text-lg text-gray-700">{userMetadata.user_metadata.bio}</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
               <Separator />
@@ -116,7 +177,7 @@ const Profile = () => {
                 </Button>
               </CardFooter>
             </Card>
-            
+
             {/* Security Settings */}
             <Card className="overflow-hidden">
               <CardHeader className="border-b pb-6">
@@ -134,30 +195,63 @@ const Profile = () => {
                         <h3 className="text-xl font-semibold mb-1 text-left">Two-Factor Authentication</h3>
                         <p className="text-gray-500">Add an extra layer of security to your account</p>
                       </div>
-                      <Button variant="outline" size="lg" className="rounded-full px-6">Set Up</Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="rounded-full px-6"
+                        onClick={() => setIsTwoFactorModalOpen(true)}
+                      >
+                        Set Up
+                      </Button>
                     </div>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-xl font-semibold mb-1 text-left">Recent Login Activity</h3>
                         <p className="text-gray-500">View your recent login history</p>
                       </div>
-                      <Button variant="outline" size="lg" className="rounded-full px-6">View Activity</Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="rounded-full px-6"
+                        onClick={() => setIsLoginActivityModalOpen(true)}
+                      >
+                        View Activity
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1 text-left">Session Management</h3>
+                        <p className="text-gray-500">Manage active sessions across all your devices</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="rounded-full px-6"
+                        onClick={() => setIsSessionManagementModalOpen(true)}
+                      >
+                        Manage Sessions
+                      </Button>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-          
+
           <div>
             <div className="space-y-6">
               <PlanInfo />
-              
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Need Help?</CardTitle>
@@ -173,7 +267,42 @@ const Profile = () => {
           </div>
         </div>
       </div>
-    </div>
+
+
+      <AvatarUploadModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+        userId={user?.id || ''}
+        currentAvatarUrl={userMetadata?.user_metadata?.avatar_url}
+        userName={userDisplayName}
+      />
+
+      <EditProfileModal
+        isOpen={isEditProfileModalOpen}
+        onClose={() => setIsEditProfileModalOpen(false)}
+        user={userMetadata || user}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+      />
+
+      <TwoFactorSetupModal
+        isOpen={isTwoFactorModalOpen}
+        onClose={() => setIsTwoFactorModalOpen(false)}
+      />
+
+      <LoginActivityModal
+        isOpen={isLoginActivityModalOpen}
+        onClose={() => setIsLoginActivityModalOpen(false)}
+      />
+
+      <SessionManagementModal
+        isOpen={isSessionManagementModalOpen}
+        onClose={() => setIsSessionManagementModalOpen(false)}
+      />
+    </div >
   );
 };
 

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
+import { useSessionTracking } from "./hooks/useSessionTracking";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -22,8 +23,18 @@ import Pricing from "./pages/Pricing";
 import Checkout from "./pages/checkout/index";
 import NotFound from "./pages/NotFound";
 import FAQs from "./pages/FAQs";
+import AdminDashboard from "./pages/AdminDashboard";
+import SupabaseTest from "./pages/SupabaseTest";
+import FacilitatorDebug from "./pages/FacilitatorDebug";
+import SubscriptionDebug from "./pages/SubscriptionDebug";
+import Referrals from "./pages/Referrals";
+import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 
 function App() {
+  // Track user sessions automatically
+  // DISABLED - Session tracking causing errors, needs database schema fix
+  // useSessionTracking();
+
   return (
     <TooltipProvider>
       <Toaster />
@@ -62,11 +73,15 @@ function App() {
                 <PastWorkshops />
               </ProtectedRoute>
             } />
+            <Route path="/referrals" element={
+              <ProtectedRoute>
+                <Referrals />
+              </ProtectedRoute>
+            } />
           </Route>
-          
+
           {/* Routes outside the main layout */}
           <Route path="/session" element={<Session />} />
-          {/* Protected host route for session hosts */}
           <Route path="/session/host" element={
             <ProtectedHostRoute>
               <SessionHost />
@@ -74,6 +89,19 @@ function App() {
           } />
           <Route path="/session/report/:id" element={<SessionReport />} />
           <Route path="/join-session" element={<JoinSession />} />
+
+          {/* Debug routes */}
+          <Route path="/supabase-test" element={<SupabaseTest />} />
+          <Route path="/facilitator-debug" element={<FacilitatorDebug />} />
+          <Route path="/subscription-debug" element={<SubscriptionDebug />} />
+
+          {/* Protected admin route */}
+          <Route path="/admin" element={
+            <ProtectedAdminRoute>
+              <AdminDashboard />
+            </ProtectedAdminRoute>
+          } />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

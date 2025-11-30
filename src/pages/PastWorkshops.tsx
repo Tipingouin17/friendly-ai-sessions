@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
-import { useSessionHostStatus } from "@/hooks/useSessionHostStatus";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
 import { useReportDownloader } from "@/hooks/session-closure/useReportDownloader";
@@ -67,23 +66,23 @@ const fetchActiveWorkshops = async () => {
   return data as Workshop[];
 };
 
-const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: { 
-  workshop: Workshop, 
-  isActive: boolean, 
+const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
+  workshop: Workshop,
+  isActive: boolean,
   canGenerateReports: boolean,
-  reportData?: any 
+  reportData?: any
 }) => {
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
-  
+
   const handleHostView = async () => {
     if (isActive) {
       console.log("Navigating to host session for conversation:", workshop.id);
       await navigateToHostSession(workshop.id);
     }
   };
-  
+
   const handleDownloadReport = () => {
     if (reportData) {
       const sessionData = {
@@ -92,24 +91,24 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
         duration: workshop.session_duration_minutes || 0,
         engagementScore: workshop.participant_engagement_score || 0,
       };
-      
+
       const closureResult = {
         reportId: reportData.id || 'report',
         reportContent: reportData.report_content,
         sessionData
       };
-      
+
       setShowReportDialog(true);
     }
   };
 
   const participantCount = workshop.participants || 0;
   const participantText = participantCount === 1 ? 'participant' : 'participants';
-  
+
   const truncateText = (text: string, maxLength: number) => {
     return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
   };
-  
+
   return (
     <>
       <Card className={isActive ? "border-green-300 bg-green-50/30" : "hover:shadow-md transition-shadow"}>
@@ -124,28 +123,28 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
                   <Calendar className="w-4 h-4 mr-2" />
                   {format(new Date(workshop.created_at), 'PPP')}
                 </div>
-                <FacilitatorInfo 
+                <FacilitatorInfo
                   facilitatorName={workshop.sessions?.facilitators?.title}
                   facilitatorAvatar={workshop.sessions?.facilitators?.profile_picture}
                 />
               </div>
             </div>
           </div>
-          
-          <WorkshopTags 
+
+          <WorkshopTags
             difficulty={workshop.sessions?.difficulty_level}
             tags={workshop.sessions?.tags}
             isActive={isActive}
           />
         </CardHeader>
-        
+
         <CardContent className="pt-0">
           {workshop.sessions?.objective && (
             <p className="text-gray-600 text-sm mb-3 leading-relaxed">
               {truncateText(workshop.sessions.objective, 120)}
             </p>
           )}
-          
+
           {workshop.participant_description && (
             <p className="text-gray-500 text-xs mb-3 italic">
               "{truncateText(workshop.participant_description, 80)}"
@@ -167,7 +166,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
                 <span className="text-green-600 font-medium">In progress</span>
               )}
             </div>
-            
+
             <div className="flex gap-2">
               {isActive && (
                 <Button size="sm" onClick={handleHostView} className="bg-primary hover:bg-primary/90">
@@ -184,7 +183,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
           </div>
         </CardContent>
       </Card>
-      
+
       {showReportDialog && reportData && (
         <ReportDownloadDialog
           isOpen={showReportDialog}
@@ -196,13 +195,13 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
               duration: workshop.session_duration_minutes || 0,
               engagementScore: workshop.participant_engagement_score || 0,
             };
-            
+
             const closureResult = {
               reportId: reportData.id || 'report',
               reportContent: reportData.report_content,
               sessionData
             };
-            
+
             downloadReport(closureResult, format);
             setShowReportDialog(false);
           }}
@@ -262,34 +261,34 @@ const EmptyState = ({ isActive = false }) => (
   </Card>
 );
 
+
 const PastWorkshops = () => {
   const navigate = useNavigate();
   const { navigateToHostSession } = useNavigateToSession();
-  const { setHostStatus } = useSessionHostStatus();
   const queryClient = useQueryClient();
   const { planRestrictions } = useUserPlan();
-  
+
   const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
     queryKey: ['past-workshops'],
     queryFn: fetchPastWorkshops,
   });
-  
+
   const { data: activeWorkshops, isLoading: isActiveLoading, error: activeError } = useQuery({
     queryKey: ['active-workshops'],
     queryFn: fetchActiveWorkshops,
   });
-  
+
   // Get conversation IDs for fetching reports
   const pastWorkshopIds = pastWorkshops?.map(w => w.id) || [];
   const { data: reportsData = {} } = useWorkshopReports(pastWorkshopIds);
-  
+
   // Check if user can generate reports
   const canGenerateReports = !!planRestrictions?.session_reports;
-  
+
   // Set up real-time listener for workshop status changes
   useEffect(() => {
     console.log("🔄 Setting up real-time listener for workshop status changes");
-    
+
     const channel = supabase
       .channel('workshops-realtime')
       .on('postgres_changes', {
@@ -298,7 +297,7 @@ const PastWorkshops = () => {
         table: 'conversations'
       }, (payload) => {
         console.log("🔄 Workshop status updated:", payload);
-        
+
         // Invalidate both past and active workshops queries
         queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
         queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
@@ -312,22 +311,22 @@ const PastWorkshops = () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
-  
+
   // Handle auto-navigation to most recent active session with secure navigation
   useEffect(() => {
     const handleAutoNavigation = async () => {
       if (activeWorkshops && activeWorkshops.length > 0 && window.location.search.includes('auto=true')) {
         const mostRecentSession = activeWorkshops[0];
         console.log("Auto-navigating to most recent session with secure navigation:", mostRecentSession.id);
-        
+
         // Use secure navigation instead of client-side flags
         await navigateToHostSession(mostRecentSession.id);
       }
     };
-    
+
     handleAutoNavigation();
   }, [activeWorkshops, navigateToHostSession]);
-  
+
   const handleCreateNew = () => {
     navigate('/my-facilitators');
   };
@@ -339,7 +338,7 @@ const PastWorkshops = () => {
           <div>
             <h1 className="text-4xl font-bold flex items-center gap-2">
               <LayoutDashboard className="h-8 w-8" />
-              Admin Dashboard
+              Host Dashboard
             </h1>
             <p className="text-gray-500 mt-2">Manage and view all your session data</p>
           </div>
@@ -348,7 +347,7 @@ const PastWorkshops = () => {
             Create New Session
           </Button>
         </div>
-        
+
         <h2 className="text-2xl font-semibold mb-4">Active Sessions</h2>
         {isActiveLoading ? (
           <LoadingState />
@@ -359,16 +358,16 @@ const PastWorkshops = () => {
         ) : (
           <div className="space-y-4 mb-8">
             {activeWorkshops.map((workshop) => (
-              <WorkshopCard 
-                key={workshop.id} 
-                workshop={workshop} 
+              <WorkshopCard
+                key={workshop.id}
+                workshop={workshop}
                 isActive={true}
                 canGenerateReports={canGenerateReports}
               />
             ))}
           </div>
         )}
-        
+
         <h2 className="text-2xl font-semibold mb-4 mt-12">Past Workshops</h2>
         {isPastLoading ? (
           <LoadingState />
@@ -379,9 +378,9 @@ const PastWorkshops = () => {
         ) : (
           <div className="space-y-4">
             {pastWorkshops.map((workshop) => (
-              <WorkshopCard 
-                key={workshop.id} 
-                workshop={workshop} 
+              <WorkshopCard
+                key={workshop.id}
+                workshop={workshop}
                 isActive={false}
                 canGenerateReports={canGenerateReports}
                 reportData={reportsData[workshop.id]}

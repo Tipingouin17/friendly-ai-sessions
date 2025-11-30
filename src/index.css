@@ -1,213 +1,227 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 45 100% 50%; /* #FFC107 - Yellow */
-    --primary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 1rem;
-    --message-user: 0 100% 89%;
-    --message-assistant: 0 0% 100%;
-  }
-
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground font-['Inter'] text-left;
-    /* Force the body to be at least viewport height */
-    min-height: 100vh;
-    /* Prevent content from being hidden behind sticky footers */
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-
-  p, h1, h2, h3, h4, h5, h6, span, div, label {
-    @apply text-left;
-  }
-
-  .text-center {
-    text-align: center;
-  }
-
-  .glass-card {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
-  }
-
-  .hover-lift {
-    @apply transition-transform duration-300 hover:-translate-y-1;
-  }
-  
-  /* Add new spinner utility classes */
-  .spinner {
-    @apply w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
-  }
-  
-  .spinner-sm {
-    @apply w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
-  }
-  
-  /* Admin session page specific styles */
-  .admin-button {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors;
-  }
-  
-  .status-badge {
-    @apply px-3 py-1 text-sm font-medium rounded-full;
-  }
-  
-  .status-badge-active {
-    @apply bg-green-100 text-green-800;
-  }
-  
-  .status-badge-paused {
-    @apply bg-amber-100 text-amber-800;
-  }
-  
-  /* Session specific spacing */
-  .session-content {
-    @apply pt-16 md:pt-20;
-  }
-  
-  .session-message-container {
-    @apply pt-2 md:pt-4;
-  }
-  
-  /* Message list container */
-  .message-container {
-    @apply flex-1 overflow-y-auto pb-16;
-  }
-  
-  /* Fixed input footer */
-  .fixed-input-footer {
-    @apply fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-100 shadow-sm;
-  }
-  
-  /* Message area container to ensure proper layout with fixed footer */
-  .message-area-container {
-    @apply flex flex-col h-full min-h-[calc(100vh-16rem)];
-    padding-top: 4rem;
-    padding-bottom: 4rem;
-  }
-  
-  /* Mobile-optimized message bubbles */
-  @media (max-width: 640px) {
-    .message-bubble-user {
-      @apply rounded-lg shadow-sm bg-[#FFC8C8] text-gray-800;
-      width: fit-content;
-      min-width: 50%;
-      max-width: 85%;
-      word-break: break-word;
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        --primary: 45 100% 50%;
+        /* #FFC107 - Yellow */
+        --primary-foreground: 222.2 84% 4.9%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 1rem;
+        --message-user: 0 100% 89%;
+        --message-assistant: 0 0% 100%;
     }
-    
-    .message-bubble-assistant {
-      @apply rounded-lg shadow-sm bg-white text-gray-800 border border-gray-100;
-      width: fit-content;
-      min-width: 50%;
-      max-width: 85%;
-      word-break: break-word;
+
+    * {
+        @apply border-border;
     }
-    
-    /* Optimize textarea for mobile */
-    textarea.mobile-input {
-      @apply py-2 text-sm min-h-[45px] rounded-full;
+
+    body {
+        @apply bg-background text-foreground font-['Inter'] text-left;
+        /* Force the body to be at least viewport height */
+        min-height: 100vh;
+        /* Prevent content from being hidden behind sticky footers */
+        padding-bottom: env(safe-area-inset-bottom, 0);
     }
-  }
+
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    span,
+    div,
+    label {
+        @apply text-left;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .glass-card {
+        @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+    }
+
+    .hover-lift {
+        @apply transition-transform duration-300 hover:-translate-y-1;
+    }
+
+    /* Add new spinner utility classes */
+    .spinner {
+        @apply w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
+    }
+
+    .spinner-sm {
+        @apply w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin;
+    }
+
+    /* Admin session page specific styles */
+    .admin-button {
+        @apply inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors;
+    }
+
+    .status-badge {
+        @apply px-3 py-1 text-sm font-medium rounded-full;
+    }
+
+    .status-badge-active {
+        @apply bg-green-100 text-green-800;
+    }
+
+    .status-badge-paused {
+        @apply bg-amber-100 text-amber-800;
+    }
+
+    /* Session specific spacing */
+    .session-content {
+        @apply pt-16 md:pt-20;
+    }
+
+    .session-message-container {
+        @apply pt-2 md:pt-4;
+    }
+
+    /* Message list container */
+    .message-container {
+        @apply flex-1 overflow-y-auto pb-16;
+    }
+
+    /* Fixed input footer */
+    .fixed-input-footer {
+        @apply fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-100 shadow-sm;
+    }
+
+    /* Message area container to ensure proper layout with fixed footer */
+    .message-area-container {
+        @apply flex flex-col h-full min-h-[calc(100vh-16rem)];
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+    }
+
+    /* Mobile-optimized message bubbles */
+    @media (max-width: 640px) {
+        .message-bubble-user {
+            @apply rounded-lg shadow-sm bg-[#FFC8C8] text-gray-800;
+            width: fit-content;
+            min-width: 50%;
+            max-width: 85%;
+            word-break: break-word;
+        }
+
+        .message-bubble-assistant {
+            @apply rounded-lg shadow-sm bg-white text-gray-800 border border-gray-100;
+            width: fit-content;
+            min-width: 50%;
+            max-width: 85%;
+            word-break: break-word;
+        }
+
+        /* Optimize textarea for mobile */
+        textarea.mobile-input {
+            @apply py-2 text-sm min-h-[45px] rounded-full;
+        }
+    }
 }
 
 .glass-morphism {
-  @apply bg-white/70 backdrop-blur-lg border border-white/20;
+    @apply bg-white/70 backdrop-blur-lg border border-white/20;
 }
 
 /* Add explicit message width controls */
 .message-width-control {
-  width: fit-content !important;
-  min-width: 200px !important;
-  max-width: 85% !important;
-  word-break: break-word !important;
+    width: fit-content !important;
+    min-width: 200px !important;
+    max-width: 85% !important;
+    word-break: break-word !important;
 }
 
 @media (max-width: 640px) {
-  .message-width-control {
-    min-width: 50% !important;
-  }
+    .message-width-control {
+        min-width: 50% !important;
+    }
 }
 
 /* Ensure consistent text direction for mixed language content */
 [dir="auto"] {
-  text-align: left;
+    text-align: left;
 }
 
 /* Ensure avatars are always visible */
 .avatar-container {
-  display: flex !important;
-  min-width: 32px;
-  min-height: 32px;
-  align-items: center;
-  justify-content: center;
+    display: flex !important;
+    min-width: 32px;
+    min-height: 32px;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Ensure welcome message avatar is visible */
 .welcome-message-avatar {
-  margin-right: 8px;
-  display: flex !important;
+    margin-right: 8px;
+    display: flex !important;
 }
 
 /* Pricing Page Animations */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes fadeInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out;
+    animation: fadeInUp 0.6s ease-out;
 }
 
 .animate-fade-in-left {
-  animation: fadeInLeft 0.4s ease-out;
+    animation: fadeInLeft 0.4s ease-out;
 }
 
 .animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

@@ -7,11 +7,11 @@ import { Plan } from '../pricing/types';
 
 interface OrderSummaryProps {
   plan: Plan;
-  promoCode: string;
-  setPromoCode: React.Dispatch<React.SetStateAction<string>>;
+  promoCode?: string;
+  setPromoCode?: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export const OrderSummary = ({ plan, promoCode, setPromoCode }: OrderSummaryProps) => {
+export const OrderSummary = ({ plan }: OrderSummaryProps) => {
   // Format price with correct currency symbol
   const formatPrice = (price: number, currency: string = 'USD') => {
     const formatter = new Intl.NumberFormat('en-US', {

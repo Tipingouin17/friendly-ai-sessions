@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(newSession);
         setUser(newSession?.user ?? null);
         setLoading(false);
-        
+
         // Log authentication events
         if (event === 'SIGNED_IN') {
           logAuthAttempt(true, 'email');
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!email || !password) {
         throw new Error('Email and password are required');
       }
-      
+
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error('Invalid email format');
       }
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email.trim().toLowerCase(),
         password,
       });
-      
+
       if (error) {
         logAuthAttempt(false, 'email');
         throw error;
@@ -92,11 +92,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!email || !password || !name) {
         throw new Error('All fields are required');
       }
-      
+
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error('Invalid email format');
       }
-      
+
       if (password.length < 8) {
         throw new Error('Password must be at least 8 characters long');
       }
@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailRedirectTo: `${window.location.origin}/login`
         },
       });
-      
+
       if (error) {
         logAuthAttempt(false, 'signup');
         throw error;
@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       // Clear sensitive data before logout
-      const keysToRemove = Object.keys(localStorage).filter(key => 
+      const keysToRemove = Object.keys(localStorage).filter(key =>
         key.includes('session') || key.includes('participant') || key.includes('auth')
       );
       keysToRemove.forEach(key => localStorage.removeItem(key));

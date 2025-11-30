@@ -5,9 +5,7 @@ import { CheckoutForm } from './CheckoutForm';
 import { PaymentProvider } from './components/PaymentProvider';
 import { CheckoutFormProps } from './types';
 
-interface PaymentSectionProps extends CheckoutFormProps {
-  promoCode?: string;
-}
+type PaymentSectionProps = CheckoutFormProps;
 
 export const PaymentSection = ({
   plan,

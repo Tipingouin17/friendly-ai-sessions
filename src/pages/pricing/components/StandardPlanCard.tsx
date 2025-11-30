@@ -59,7 +59,8 @@ export const StandardPlanCard = ({
     if (feature.includes('branding')) return <Palette className="h-4 w-4" />;
     return <Check className="h-4 w-4" />;
   };
-  const getFeatureList = () => {
+
+  const getFeatureList = (): string[] => {
     const features: string[] = [];
     const restrictions = plan.plan_table_details;
 
@@ -67,9 +68,11 @@ export const StandardPlanCard = ({
 
     // Facilitator limit
     if (restrictions.facilitator_limit) {
-      features.push(restrictions.facilitator_limit === 1
-        ? '1 Facilitator'
-        : `${restrictions.facilitator_limit} Facilitators`);
+      const isUnlimited = restrictions.facilitator_limit >= 999999;
+      features.push(isUnlimited
+        ? 'Unlimited facilitators'
+        : `${restrictions.facilitator_limit} ${restrictions.facilitator_limit === 1 ? 'facilitator' : 'facilitators'}`
+      );
     }
 
     // Session limit
@@ -95,7 +98,21 @@ export const StandardPlanCard = ({
       const isUnlimited = restrictions.question_limit >= 999999;
       features.push(isUnlimited
         ? 'Unlimited questions per session'
-        : `${restrictions.question_limit} questions per session`);
+        : `Up to ${restrictions.question_limit} questions per session`
+      );
+    }
+
+    // Additional features
+    if (restrictions.customisable_sessions) {
+      features.push('Customizable sessions');
+    }
+
+    if (restrictions.customisable_facilitators) {
+      features.push('Customizable facilitators');
+    }
+
+    if (restrictions.saved_sessions) {
+      features.push('Save sessions');
     }
 
     if (restrictions.session_reports) {
@@ -113,10 +130,6 @@ export const StandardPlanCard = ({
     if (restrictions.custom_branding) {
       features.push('Custom branding');
     }
-
-    if (restrictions.customisable_sessions) features.push('Customizable Sessions');
-    if (restrictions.customisable_facilitators) features.push('Customizable Facilitators');
-    if (restrictions.saved_sessions) features.push('Save Sessions');
 
     return features;
   };

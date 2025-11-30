@@ -17,4 +17,5 @@ export interface CheckoutFormProps {
   plan: Plan;
   billingDetails: BillingDetails;
   onCancel: () => void;
+  promoCode?: string;
 }

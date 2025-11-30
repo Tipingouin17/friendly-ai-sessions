@@ -35,27 +35,9 @@ const Pricing = () => {
         throw new Error('No plans data returned');
       }
 
-      // LOG THE RAW DATA TO UNDERSTAND STRUCTURE
-      console.log('========== PRICING DATA DEBUG ==========');
-      console.log('Raw plans data:', JSON.stringify(data, null, 2));
-      console.log('Number of plans:', data.length);
-
-      data.forEach((plan, index) => {
-        console.log(`\n--- Plan ${index + 1}: ${plan.title} ---`);
-        console.log('Plan ID:', plan.id);
-        console.log('Price:', plan.price, plan.currency);
-        console.log('Plan Type:', plan.plan_type);
-        console.log('Is Popular:', plan.is_popular);
-        console.log('Stripe Plan ID:', plan.stripe_plan_id);
-        console.log('Restrictions:', plan.plan_restrictions);
-
-        if (plan.plan_restrictions && plan.plan_restrictions.length > 0) {
-          const restrictions = plan.plan_restrictions[0];
-          console.log('Restriction fields:', Object.keys(restrictions));
-          console.log('Restriction values:', restrictions);
-        }
-      });
-      console.log('========================================\n');
+      if (!data) {
+        throw new Error('No plans data returned');
+      }
 
       const processedData = data.map(plan => {
         const currency = plan.currency || 'USD';

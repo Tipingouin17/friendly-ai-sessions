@@ -12,7 +12,7 @@ import JoinSessionMain from "./JoinSessionMain";
 
 const JoinSessionContainer = () => {
   const queryClient = useQueryClient();
-  
+
   // Track join result to monitor welcome message generation
   const [joinResult, setJoinResult] = useState<{
     conversationId: number;
@@ -20,7 +20,7 @@ const JoinSessionContainer = () => {
     name: string;
     avatarSeed: string;
   } | null>(null);
-  
+
   // Navigation management
   const {
     hasNavigated,
@@ -30,13 +30,14 @@ const JoinSessionContainer = () => {
     resetNavigationFlags,
     checkNavigationState
   } = useJoinSessionNavigation();
-  
+
   // CRITICAL: Check navigation state first before any other processing
   if (checkNavigationState()) {
     console.log("Navigation already initiated, stopping component processing");
-    return null;
+    // We cannot return null here as it would violate Rules of Hooks
+    // subsequent hooks must still be executed
   }
-  
+
   // State management
   const {
     conversationId,
@@ -49,12 +50,12 @@ const JoinSessionContainer = () => {
     setShowRejoinPrompt,
     defaultParticipantName,
     defaultAvatarSeed
-  } = useJoinSessionState(checkNavigationState);
-  
+  } = useJoinSessionState();
+
   // Force refresh conversation data when joining a session (only once)
   useEffect(() => {
     if (checkNavigationState() || hasProcessedJoin.current) return;
-    
+
     if (conversationId) {
       console.log("JoinSession: Invalidating queries and forcing refresh for conversation:", conversationId);
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
@@ -62,7 +63,7 @@ const JoinSessionContainer = () => {
       hasProcessedJoin.current = true;
     }
   }, [conversationId, queryClient, checkNavigationState]);
-  
+
   const {
     participantName,
     setParticipantName,
@@ -96,19 +97,24 @@ const JoinSessionContainer = () => {
 
   // Handle successful join - wait for welcome message before redirecting
   const handleJoin = useCallback(async () => {
+    console.log("handleJoin triggered");
     // CRITICAL: Check navigation state first
     if (checkNavigationState() || hasJoinedBefore || isJoining) {
-      console.log("Navigation already initiated or join in progress, skipping");
+      console.log("Navigation already initiated or join in progress, skipping", {
+        nav: checkNavigationState(),
+        hasJoinedBefore,
+        isJoining
+      });
       return;
     }
-    
+
     console.log("Starting join process...");
-    
+
     try {
       const result = await handleJoinSession();
       if (result && conversationId) {
         console.log("Successfully joined session, waiting for welcome message:", result);
-        
+
         // Store join result to start message monitoring
         setJoinResult({
           conversationId,
@@ -116,10 +122,10 @@ const JoinSessionContainer = () => {
           name: result.name,
           avatarSeed: result.avatarSeed
         });
-        
+
         // Wait for welcome message before navigating
         const messageReady = await waitForWelcomeMessage();
-        
+
         if (messageReady) {
           console.log("Welcome message ready, navigating to session");
           navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
@@ -146,26 +152,34 @@ const JoinSessionContainer = () => {
       queryClient.refetchQueries({ queryKey: ['conversation', conversationId], exact: true, type: 'active' });
     }
   }, [conversationId, queryClient, checkNavigationState, resetNavigationFlags, setRetryCount]);
-  
+
   // Handle rejoining the session with existing data
   const handleRejoin = useCallback(() => {
     if (existingSessionData && conversationId && !checkNavigationState()) {
       console.log("Rejoining session with existing data:", existingSessionData);
       navigateToSession(
-        conversationId, 
-        existingSessionData.name, 
-        existingSessionData.participantId, 
+        conversationId,
+        existingSessionData.name,
+        existingSessionData.participantId,
         existingSessionData.avatarSeed
       );
     }
   }, [existingSessionData, conversationId, navigateToSession, checkNavigationState]);
-  
+
   // Handle joining as a new participant
   const handleJoinAsNew = useCallback(() => {
     if (!checkNavigationState()) {
       setShowRejoinPrompt(false);
     }
   }, [checkNavigationState, setShowRejoinPrompt]);
+
+  // Auto-redirect if session exists
+  useEffect(() => {
+    if (existingSessionData && conversationId && !checkNavigationState()) {
+      console.log("Auto-redirecting to existing session:", existingSessionData);
+      handleRejoin();
+    }
+  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin]);
 
   // CRITICAL: Check navigation state again before any rendering
   if (checkNavigationState()) {
@@ -176,21 +190,18 @@ const JoinSessionContainer = () => {
   // Show loading state when data is being fetched or waiting for welcome message
   if ((isLoading && !invalidRequest) || isWaitingForMessage) {
     return (
-      <JoinSessionLoadingState 
-        onRetry={handleRetry} 
-        error={error || messageError}
-        retryCount={isWaitingForMessage ? messageRetryCount : retryCount}
-        customMessage={isWaitingForMessage ? `Facilitator is preparing your session${messageRetryCount > 0 ? ` (${messageRetryCount}/6)` : ''}...` : undefined}
-      />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Loading... (Debug Mode)</div>
+      </div>
     );
   }
 
   // Show error state if invalid request or no conversation data
   if (invalidRequest || (!conversation && !isLoading)) {
     console.error("Session not found or error:", error, "Conversation ID:", conversationId);
-    
+
     return (
-      <JoinSessionErrorState 
+      <JoinSessionErrorState
         error={error}
         invalidRequest={invalidRequest}
         onRetry={handleRetry}

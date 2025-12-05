@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { removeChannel } from '@/utils/realtimeHelpers';
@@ -21,13 +20,16 @@ export function useStableRealtimeConnection({
   const [isConnected, setIsConnected] = useState(false);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [lastMessageCheck, setLastMessageCheck] = useState<number>(0);
-  
+
+  // Use ref for connection attempts to avoid dependency cycles
+  const connectionAttemptsRef = useRef(0);
+
   const channelRef = useRef<any>(null);
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const stabilityCheckRef = useRef<NodeJS.Timeout | null>(null);
   const connectionEstablishedRef = useRef(false);
-  
+
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 2000;
   const connectionStabilityWindow = 10000; // 10 seconds
@@ -51,21 +53,22 @@ export function useStableRealtimeConnection({
 
   // Exponential backoff reconnection
   const scheduleReconnect = useCallback(() => {
-    if (!mountedRef.current || connectionAttempts >= maxReconnectAttempts) {
+    if (!mountedRef.current || connectionAttemptsRef.current >= maxReconnectAttempts) {
       console.log(`🚫 Max reconnection attempts reached for conversation ${conversationId}`);
       return;
     }
 
-    const delay = Math.min(baseReconnectDelay * Math.pow(2, connectionAttempts), 30000);
-    console.log(`⏰ Scheduling reconnection attempt ${connectionAttempts + 1} in ${delay}ms`);
-    
+    const delay = Math.min(baseReconnectDelay * Math.pow(2, connectionAttemptsRef.current), 30000);
+    console.log(`⏰ Scheduling reconnection attempt ${connectionAttemptsRef.current + 1} in ${delay}ms`);
+
     reconnectTimeoutRef.current = setTimeout(() => {
       if (mountedRef.current) {
-        setConnectionAttempts(prev => prev + 1);
+        connectionAttemptsRef.current += 1;
+        setConnectionAttempts(connectionAttemptsRef.current);
         setupConnection();
       }
     }, delay);
-  }, [conversationId, connectionAttempts]);
+  }, [conversationId]);
 
   // Enhanced connection setup with stability monitoring
   const setupConnection = useCallback(() => {
@@ -73,12 +76,12 @@ export function useStableRealtimeConnection({
       return;
     }
 
-    console.log(`🔗 Setting up stable realtime connection for conversation ${conversationId} (attempt ${connectionAttempts + 1})`);
-    
+    console.log(`🔗 Setting up stable realtime connection for conversation ${conversationId} (attempt ${connectionAttemptsRef.current + 1})`);
+
     cleanup();
-    
+
     const channelName = `stable-realtime-${conversationId}-${Date.now()}`;
-    
+
     try {
       const channel = supabase
         .channel(channelName)
@@ -90,16 +93,16 @@ export function useStableRealtimeConnection({
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
           if (!mountedRef.current) return;
-          
+
           console.log(`📨 Stable message update for conversation ${conversationId}:`, {
             event: payload.eventType,
             messageId: (payload.new as any)?.id || (payload.old as any)?.id,
             role: (payload.new as any)?.role || (payload.old as any)?.role
           });
-          
+
           // Update last message check timestamp
           setLastMessageCheck(Date.now());
-          
+
           if (onMessageUpdate) {
             onMessageUpdate();
           }
@@ -112,12 +115,12 @@ export function useStableRealtimeConnection({
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
           if (!mountedRef.current) return;
-          
+
           console.log(`👥 Stable participant update for conversation ${conversationId}:`, {
             event: payload.eventType,
             participantId: (payload.new as any)?.participant_id || (payload.old as any)?.participant_id
           });
-          
+
           if (onParticipantUpdate) {
             onParticipantUpdate();
           }
@@ -130,71 +133,72 @@ export function useStableRealtimeConnection({
           filter: `id=eq.${conversationId}`
         }, (payload) => {
           if (!mountedRef.current) return;
-          
+
           console.log(`🔄 Stable conversation update for conversation ${conversationId}:`, {
             sessionStarted: payload.new?.session_started,
             currentParticipants: payload.new?.current_participants,
             welcomeStatus: payload.new?.welcome_message_status
           });
-          
+
           if (onSessionUpdate) {
             onSessionUpdate();
           }
         })
         .subscribe((status) => {
           if (!mountedRef.current) return;
-          
+
           console.log(`🔗 Stable channel status for conversation ${conversationId}: ${status}`);
-          
+
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
             setConnectionAttempts(0);
+            connectionAttemptsRef.current = 0;
             connectionEstablishedRef.current = true;
-            
+
             // Start stability monitoring
             stabilityCheckRef.current = setTimeout(() => {
               if (mountedRef.current && connectionEstablishedRef.current) {
                 console.log(`✅ Connection stable for conversation ${conversationId}`);
               }
             }, connectionStabilityWindow);
-            
+
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn(`🚨 Stable channel error for conversation ${conversationId}: ${status}`);
             setIsConnected(false);
             connectionEstablishedRef.current = false;
-            
+
             // Only reconnect if we haven't exceeded max attempts
-            if (connectionAttempts < maxReconnectAttempts) {
+            if (connectionAttemptsRef.current < maxReconnectAttempts) {
               scheduleReconnect();
             }
-            
+
           } else if (status === 'CLOSED') {
             console.log(`🔒 Stable channel closed for conversation ${conversationId}`);
             setIsConnected(false);
             connectionEstablishedRef.current = false;
           }
         });
-        
+
       channelRef.current = channel;
-      
+
     } catch (error) {
       console.error(`❌ Error creating stable realtime connection for conversation ${conversationId}:`, error);
       setIsConnected(false);
-      
-      if (connectionAttempts < maxReconnectAttempts) {
+
+      if (connectionAttemptsRef.current < maxReconnectAttempts) {
         scheduleReconnect();
       }
     }
-  }, [conversationId, enabled, connectionAttempts, onMessageUpdate, onParticipantUpdate, onSessionUpdate, cleanup, scheduleReconnect]);
+  }, [conversationId, enabled, onMessageUpdate, onParticipantUpdate, onSessionUpdate, cleanup, scheduleReconnect]);
 
   // Setup effect
   useEffect(() => {
     mountedRef.current = true;
-    
+
     if (enabled && conversationId) {
       setupConnection();
     }
-    
+
     return () => {
       mountedRef.current = false;
       cleanup();
@@ -205,6 +209,7 @@ export function useStableRealtimeConnection({
   const forceReconnect = useCallback(() => {
     console.log(`🔄 Force reconnecting stable realtime for conversation ${conversationId}`);
     setConnectionAttempts(0);
+    connectionAttemptsRef.current = 0;
     setupConnection();
   }, [conversationId, setupConnection]);
 

@@ -92,6 +92,23 @@ export const AddressAutocomplete = ({
         }
       }];
     }
+    if (query.toLowerCase().includes('paris') || query.toLowerCase().includes('rue')) {
+      return [{
+        description: "67 rue de la paix, 75001 Paris, France",
+        place_id: "place_id_5",
+        structured_formatting: {
+          main_text: "67 rue de la paix",
+          secondary_text: "75001 Paris, France"
+        }
+      }, {
+        description: "Paris, France",
+        place_id: "place_id_6",
+        structured_formatting: {
+          main_text: "Paris",
+          secondary_text: "France"
+        }
+      }];
+    }
 
     return [];
   };
@@ -187,6 +204,52 @@ export const AddressAutocomplete = ({
           }, {
             long_name: "United Kingdom",
             short_name: "GB",
+            types: ["country"]
+          }]
+        };
+      case "place_id_5":
+        return {
+          formatted_address: "67 rue de la paix, 75001 Paris, France",
+          address_components: [{
+            long_name: "67 rue de la paix",
+            short_name: "67 rue de la paix",
+            types: ["route"]
+          }, {
+            long_name: "Paris",
+            short_name: "Paris",
+            types: ["locality"]
+          }, {
+            long_name: "Île-de-France",
+            short_name: "IDF",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "75001",
+            short_name: "75001",
+            types: ["postal_code"]
+          }, {
+            long_name: "France",
+            short_name: "FR",
+            types: ["country"]
+          }]
+        };
+      case "place_id_6":
+        return {
+          formatted_address: "Paris, France",
+          address_components: [{
+            long_name: "Paris",
+            short_name: "Paris",
+            types: ["locality"]
+          }, {
+            long_name: "Île-de-France",
+            short_name: "IDF",
+            types: ["administrative_area_level_1"]
+          }, {
+            long_name: "75001",
+            short_name: "75001",
+            types: ["postal_code"]
+          }, {
+            long_name: "France",
+            short_name: "FR",
             types: ["country"]
           }]
         };
@@ -295,10 +358,10 @@ export const AddressAutocomplete = ({
       <Label htmlFor="address-autocomplete" className="text-left block">
         Address <span className="text-destructive">*</span>
       </Label>
-      
+
       <div className="relative">
-        <Popover 
-          open={open} 
+        <Popover
+          open={open}
           onOpenChange={(isOpen) => {
             setOpen(isOpen);
             if (!isOpen && document.activeElement !== inputRef.current) {
@@ -310,7 +373,7 @@ export const AddressAutocomplete = ({
         >
           <PopoverTrigger asChild>
             <div className="relative">
-              <Input 
+              <Input
                 id="address-autocomplete"
                 placeholder="Start typing your address..."
                 value={inputValue}
@@ -330,8 +393,8 @@ export const AddressAutocomplete = ({
               </div>
             </div>
           </PopoverTrigger>
-          <PopoverContent 
-            align="start" 
+          <PopoverContent
+            align="start"
             className="p-0 w-full bg-white z-50"
             onInteractOutside={(e) => {
               if (inputRef.current && inputRef.current.contains(e.target as Node)) {
@@ -343,9 +406,9 @@ export const AddressAutocomplete = ({
               <CommandList>
                 <CommandGroup heading="Suggestions">
                   {suggestions.map(suggestion => (
-                    <CommandItem 
-                      key={suggestion.place_id} 
-                      onSelect={() => handleAddressSelect(suggestion)} 
+                    <CommandItem
+                      key={suggestion.place_id}
+                      onSelect={() => handleAddressSelect(suggestion)}
                       className="flex items-center gap-2 py-2"
                     >
                       <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -366,7 +429,7 @@ export const AddressAutocomplete = ({
           </PopoverContent>
         </Popover>
       </div>
-      
+
       {!open && !shouldShowManualEntry && inputValue.length >= 3 && suggestions.length === 0 && !isLoading && (
         <div className="text-sm">
           <span className="text-muted-foreground">Your address doesn't appear? </span>
@@ -375,7 +438,7 @@ export const AddressAutocomplete = ({
           </Button>
         </div>
       )}
-      
+
       {error && (
         <Alert variant="destructive" className="mt-2">
           <AlertCircle className="h-4 w-4" />

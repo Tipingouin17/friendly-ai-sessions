@@ -11,47 +11,70 @@ export const validateSessionAccess = async (
   userId?: string
 ): Promise<boolean> => {
   try {
+    console.log("=== VALIDATE SESSION ACCESS START ===");
+    console.log("Validating access for conversation:", conversationId);
+    console.log("User ID:", userId || "anonymous");
+
     // Validate conversation ID
     if (!conversationId || !Number.isInteger(conversationId) || conversationId <= 0) {
+      console.error("❌ Invalid conversation ID:", conversationId);
       return false;
     }
+    console.log("✅ Conversation ID is valid");
 
     const { supabase } = await import('@/integrations/supabase/client');
-    
-    const { data: conversation } = await supabase
+
+    console.log("Fetching conversation data from database...");
+    const { data: conversation, error: fetchError } = await supabase
       .from('conversations')
       .select('user_id, session_started, is_session_ended, status')
       .eq('id', conversationId)
       .single();
-    
-    if (!conversation) return false;
-    
+
+    if (fetchError) {
+      console.error("❌ Error fetching conversation:", fetchError);
+      return false;
+    }
+
+    if (!conversation) {
+      console.error("❌ Conversation not found");
+      return false;
+    }
+
+    console.log("✅ Conversation found:", {
+      user_id: conversation.user_id,
+      session_started: conversation.session_started,
+      is_session_ended: conversation.is_session_ended,
+      status: conversation.status
+    });
+
     // Check if session is in valid state
-    if (conversation.status !== 'active') return false;
-    if (conversation.is_session_ended) return false;
-    
+    if (conversation.status !== 'active') {
+      console.error("❌ Session status is not active:", conversation.status);
+      return false;
+    }
+    console.log("✅ Session status is active");
+
+    if (conversation.is_session_ended) {
+      console.error("❌ Session has ended");
+      return false;
+    }
+    console.log("✅ Session has not ended");
+
     // Allow access if user is the owner
-    if (userId && conversation.user_id === userId) return true;
-    
-    // For non-owners, only allow access if session has started
-    if (conversation.session_started) {
-      // Additional check: verify user is actually a participant
-      if (userId) {
-        const { data: participant } = await supabase
-          .from('session_participants')
-          .select('id')
-          .eq('conversation_id', conversationId)
-          .limit(1)
-          .maybeSingle();
-        
-        return !!participant;
-      }
+    if (userId && conversation.user_id === userId) {
+      console.log("✅ User is session owner - access granted");
       return true;
     }
-    
-    return false;
+
+    // FIXED: Allow participants to join even if session hasn't started yet
+    // They will be in a waiting state until the host starts the session
+    // Only requirement is that the session is active and not ended
+    console.log("✅ Session is active and not ended - allowing participant to join (waiting state)");
+    return true;
+
   } catch (error) {
-    console.error('Error validating session access:', error);
+    console.error('❌ Error validating session access:', error);
     return false;
   }
 };
@@ -63,12 +86,12 @@ export const validateParticipantId = (participantId: unknown): participantId is 
   if (typeof participantId !== 'number') return false;
   if (!Number.isInteger(participantId)) return false;
   if (participantId <= 0 || participantId >= 10000) return false;
-  
+
   // Additional security: check for suspicious patterns
   const participantStr = participantId.toString();
   if (participantStr.includes('..') || participantStr.includes('/')) {
     return false;
   }
-  
+
   return true;
 };

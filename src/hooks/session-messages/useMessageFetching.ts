@@ -23,7 +23,7 @@ export const useMessageFetching = ({
   const [isWaitingForResponses, setIsWaitingForResponses] = useState(false);
   const [responseCount, setResponseCount] = useState(0);
   const [welcomeMessageStatus, setWelcomeMessageStatus] = useState<string>('pending');
-  
+
   const fetchInProgressRef = useRef(false);
   const welcomeGeneratedRef = useRef(false);
   const autoStartProcessedRef = useRef(false);
@@ -110,7 +110,7 @@ export const useMessageFetching = ({
       console.log('🚀 Session started, triggering welcome message generation');
       setIsGeneratingWelcome(true);
       welcomeGeneratedRef.current = true;
-      
+
       // Trigger AI generation
       supabase.functions.invoke('handle-facilitator-response', {
         body: {
@@ -146,14 +146,14 @@ export const useMessageFetching = ({
   // Process new messages from realtime
   const processNewMessage = useCallback((message: Message) => {
     console.log('📝 Processing new message:', message.id);
-    
+
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
         console.log('⏭️ Message already exists, skipping');
         return prev;
       }
-      
+
       const updated = [...prev, message];
       console.log(`✅ Added new message, total: ${updated.length}`);
       return updated;
@@ -193,10 +193,10 @@ export const useMessageFetching = ({
       }
 
       console.log('✅ Facilitator response generated successfully');
-      
+
       // Fetch messages to get the new response
       setTimeout(() => fetchMessages(true), 1000);
-      
+
     } catch (error) {
       console.error('💥 Exception generating facilitator response:', error);
     } finally {

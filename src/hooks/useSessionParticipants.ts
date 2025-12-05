@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,16 +7,16 @@ import { useParticipantChannel } from "@/hooks/useParticipantChannel";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
 
 export function useSessionParticipants(conversationId: number | null) {
-  const [error, setError] = useState<string | null>(null);
+  const [stateError, setStateError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
   const mountedRef = useRef(true);
-  
-  const { 
-    data: conversation, 
-    error: fetchError, 
-    refetch, 
-    isLoading 
+
+  const {
+    data: conversation,
+    error: fetchError,
+    refetch,
+    isLoading
   } = useConversation(conversationId);
 
   // Handle fetch errors
@@ -26,7 +25,7 @@ export function useSessionParticipants(conversationId: number | null) {
 
     if (fetchError) {
       console.error("Error fetching conversation:", fetchError);
-      setError(fetchError.message || "Session not found or no longer available");
+      setStateError(fetchError.message || "Session not found or no longer available");
     }
   }, [fetchError]);
 
@@ -36,18 +35,16 @@ export function useSessionParticipants(conversationId: number | null) {
 
     if (conversation?.is_session_ended) {
       console.log("Session has ended, updating error state");
-      setError("This session has ended and is no longer available");
-    } else if (conversation && error) {
-      // Reset any previous errors since we have data
-      console.log("Got conversation data, clearing previous error");
-      setError(null);
+      setStateError("This session has ended and is no longer available");
     }
-    
+
+    // We don't clear error here anymore to avoid conflicts
+
     if (conversation && !isInitialized) {
       console.log("Session participant hook initialized with conversation:", conversation.id);
       setIsInitialized(true);
     }
-  }, [conversation, error, isInitialized]);
+  }, [conversation, isInitialized]);
 
   // Set up cleanup on unmount
   useEffect(() => {
@@ -88,35 +85,24 @@ export function useSessionParticipants(conversationId: number | null) {
   // Monitor session status (ended, started, etc.)
   useSessionStatus(conversationId, refetch);
 
-  // Combine errors
-  useEffect(() => {
-    if (!mountedRef.current) return;
-
-    if (connectionError && !error) {
-      console.log("Setting error from connection error:", connectionError);
-      setError(connectionError);
-    }
-    
-    if (participantChannelResult.error && !error && !connectionError) {
-      console.log("Setting error from participant channel:", participantChannelResult.error);
-      setError(participantChannelResult.error);
-    }
-  }, [connectionError, participantChannelResult.error, error]);
+  // Derive final error from all sources
+  // This avoids the infinite loop caused by syncing different error states via useEffect
+  const finalError = stateError || connectionError || participantChannelResult.error;
 
   // Force periodic refresh to ensure data consistency - reduce interval for more up-to-date data
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
-    
+
     // Initial refresh to ensure we have the latest participant count
     refetch();
-    
+
     const intervalId = setInterval(() => {
       if (mountedRef.current) {
         console.log("Periodic refresh of session data");
         refetch();
       }
     }, 5000); // Reduced from 15000 to 5000 ms for more frequent updates
-    
+
     return () => {
       clearInterval(intervalId);
     };
@@ -126,7 +112,7 @@ export function useSessionParticipants(conversationId: number | null) {
     currentParticipantCount,
     maxParticipantsForSession,
     conversation,
-    error,
+    error: finalError,
     refetch,
     isLoading,
     isConnected,

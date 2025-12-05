@@ -70,7 +70,6 @@ export const CheckoutContainer = ({
                     plan={plan}
                     billingDetails={billingDetails}
                     onCancel={onBackToPricing}
-                    promoCode={promoCode}
                   />
                 </div>
               </CardContent>

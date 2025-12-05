@@ -11,18 +11,18 @@ export function useRealtimeConnection(
   const [error, setError] = useState<string | null>(null);
   const [isCrossOrigin, setIsCrossOrigin] = useState(false);
   const mountedRef = useRef(true);
-  
+
   // Check for cross-origin context on mount
   useEffect(() => {
     setIsCrossOrigin(isInCrossOriginContext());
-    
+
     // Set mounted flag for cleanup
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
   }, []);
-  
+
   // Use connection recovery hook
   const {
     connectionAttempts,
@@ -46,26 +46,28 @@ export function useRealtimeConnection(
           attemptReconnection();
         }
       }, 5000);
-      
+
       return () => {
         clearTimeout(timeoutId);
       };
     }
-    
+
     return undefined;
   }, [isConnected, conversationId, error, attemptReconnection]);
 
   // Wrapper for setting "connected" state
-  const setConnectedState = useCallback(() => {
+  const setConnectedState = useCallback((connected: boolean) => {
     if (!mountedRef.current) return;
-    setIsConnected(true);
-    handleConnectionEstablished();
+    setIsConnected(connected);
+    if (connected) {
+      handleConnectionEstablished();
+    }
   }, [handleConnectionEstablished]);
 
   // Update error state with cross-origin context info if needed
   useEffect(() => {
     if (connectionAttempts >= 5 && !error) {
-      setError(isCrossOrigin 
+      setError(isCrossOrigin
         ? "Unable to establish a connection. This may be due to cross-origin restrictions."
         : "Unable to establish a stable connection after multiple attempts");
     }

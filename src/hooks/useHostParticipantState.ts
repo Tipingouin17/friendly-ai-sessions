@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
-import { useEnhancedHostParticipantManager } from "@/hooks/useEnhancedHostParticipantManager";
+import { useHostParticipantManager } from "@/hooks/useHostParticipantManager";
 import { createLogger } from "@/utils/debugLogger";
 
 interface UseHostParticipantStateProps {
@@ -22,14 +22,14 @@ export function useHostParticipantState({
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
 
   // Use the enhanced host participant manager (single source of truth)
-  const { 
-    isConnected, 
-    error, 
+  const {
+    isConnected,
+    error,
     participants: enhancedParticipants,
     currentCount,
     maxCount,
     refresh
-  } = useEnhancedHostParticipantManager({
+  } = useHostParticipantManager({
     conversationId: currentConversationId,
     onParticipantCountChange: (count) => {
       logger.category('admin', `Participant count updated to: ${count}`);

@@ -191,16 +191,21 @@ export function useStableRealtimeConnection({
     }
   }, [conversationId, enabled, onMessageUpdate, onParticipantUpdate, onSessionUpdate, cleanup, scheduleReconnect]);
 
-  // Setup effect
+  // Setup effect with delay for stability
   useEffect(() => {
     mountedRef.current = true;
+    let timer: NodeJS.Timeout;
 
     if (enabled && conversationId) {
-      setupConnection();
+      // Add delay to prevent race conditions during mounting/unmounting (Strict Mode)
+      timer = setTimeout(() => {
+        setupConnection();
+      }, 500);
     }
 
     return () => {
       mountedRef.current = false;
+      if (timer) clearTimeout(timer);
       cleanup();
     };
   }, [conversationId, enabled, setupConnection, cleanup]);

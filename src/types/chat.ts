@@ -1,21 +1,22 @@
 export interface Message {
   id: string;
   content: string;
-  sender: "user" | "assistant" | "admin"; // Added "admin" as distinct sender type
+  sender: "user" | "assistant" | "admin";
   timestamp?: Date;
-  created_at?: string; // Added to support both timestamp and created_at
+  created_at?: string;
   participant?: string;
+  name?: string;
   color?: string;
   isReport?: boolean;
-  avatar?: string; // Added for participant avatar
-  isAnonymous?: boolean; // Flag for anonymous messages
-  isPinned?: boolean; // Flag for pinned messages
-  recipientId?: string; // For directed messages
-  isAdminMessage?: boolean; // Flag for admin messages
-  isWelcomeMessage?: boolean; // Flag for welcome messages
-  isFallback?: boolean; // Flag for fallback messages
-  isAIGenerated?: boolean; // Flag for AI-generated messages
-  isEnhanced?: boolean; // Flag for enhanced fallback messages
+  avatar?: string;
+  isAnonymous?: boolean;
+  isPinned?: boolean;
+  recipientId?: string;
+  isAdminMessage?: boolean;
+  isWelcomeMessage?: boolean;
+  isFallback?: boolean;
+  isAIGenerated?: boolean;
+  isEnhanced?: boolean;
 }
 
 export interface ParticipantInfo {
@@ -24,8 +25,8 @@ export interface ParticipantInfo {
   avatar?: string | null;
   avatarSeed?: string | null;
   isAnonymous?: boolean;
-  isAdmin?: boolean; // Keep for backward compatibility
-  isHost?: boolean; // New host property
+  isAdmin?: boolean;
+  isHost?: boolean;
   joinedAt?: Date;
   lastActive?: Date;
 }

@@ -22,16 +22,16 @@ interface SessionProviderCoreProps {
   forceAdmin?: boolean;
 }
 
-export const SessionProviderCore = ({ 
-  children, 
+export const SessionProviderCore = ({
+  children,
   childrenFn,
-  handleSessionFull, 
+  handleSessionFull,
   onError,
-  forceAdmin 
+  forceAdmin
 }: SessionProviderCoreProps) => {
   const location = useLocation();
   const { persistedParticipantData } = useParticipantPersistence();
-  
+
   // Log initialization only once
   const hasInitializedRef = React.useRef(false);
 
@@ -48,15 +48,15 @@ export const SessionProviderCore = ({
       });
     }
   }, [location, persistedParticipantData, forceAdmin]);
-  
+
   const locationState = useEnhancedLocationState(location.state);
-  
+
   const effectiveAdmin = useEffectiveAdminStatus({
-    forceAdmin, 
-    locationState, 
+    forceAdmin,
+    locationState,
     persistedParticipantData
   });
-  
+
   // Set admin status only once
   const adminStatusSetRef = React.useRef(false);
   useEffect(() => {
@@ -66,7 +66,7 @@ export const SessionProviderCore = ({
       sessionStorage.setItem('isAdminSession', 'true');
     }
   }, [effectiveAdmin]);
-  
+
   const {
     currentConversationId,
     conversation,
@@ -80,8 +80,8 @@ export const SessionProviderCore = ({
     handleError,
     enhancedHandleStartSession,
     isAdmin
-  } = useSessionProviderState({ 
-    onError, 
+  } = useSessionProviderState({
+    onError,
     forceAdmin: effectiveAdmin
   });
 
@@ -123,7 +123,7 @@ export const SessionProviderCore = ({
   useStuckStateHandler({
     isLoading,
     currentConversationId,
-    conversation, 
+    conversation,
     refetch,
     forceRefreshParticipants
   });
@@ -140,51 +140,35 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
-  try {
-    const sessionContextValue = useSessionContextValue({
-      isLoading,
-      conversation,
-      currentConversationId,
-      refetch,
-      showQrCodeView,
-      sessionLink,
-      isSessionStartedInDB,
-      roomState,
-      participants,
-      currentUserParticipantId,
-      isAdmin,
-      providerError,
-      connection,
-      handleStartSession: enhancedHandleStartSession,
-      effectiveAdmin
-    });
+  // Determine the effective admin/host status
+  const sessionContextValue = useSessionContextValue({
+    isLoading,
+    conversation,
+    currentConversationId,
+    refetch,
+    showQrCodeView,
+    sessionLink,
+    isSessionStartedInDB,
+    roomState,
+    participants,
+    currentUserParticipantId,
+    isAdmin,
+    providerError,
+    connection,
+    handleStartSession: enhancedHandleStartSession,
+    effectiveAdmin
+  });
 
-    // Memoize the error component to prevent re-renders
-    const errorComponent = useMemo(() => (
-      <SessionProviderCoreError
-        providerError={providerError}
-        effectiveAdmin={effectiveAdmin}
-        refetch={refetch}
-        sessionContextValue={sessionContextValue}
-        childrenFn={childrenFn}
-      >
-        {children}
-      </SessionProviderCoreError>
-    ), [providerError, effectiveAdmin, refetch, sessionContextValue, childrenFn, children]);
-
-    return errorComponent;
-  } catch (error) {
-    console.error("Fatal error in SessionProviderCore:", error);
-    
-    return (
-      <SessionProviderCoreError
-        providerError={error instanceof Error ? error.message : "Unknown error in SessionProviderCore"}
-        effectiveAdmin={effectiveAdmin}
-        refetch={refetch}
-        childrenFn={childrenFn}
-      >
-        {children}
-      </SessionProviderCoreError>
-    );
-  }
+  // Memoize the error component to prevent re-renders
+  return (
+    <SessionProviderCoreError
+      providerError={providerError}
+      effectiveAdmin={effectiveAdmin}
+      refetch={refetch}
+      sessionContextValue={sessionContextValue}
+      childrenFn={childrenFn}
+    >
+      {children}
+    </SessionProviderCoreError>
+  );
 };

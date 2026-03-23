@@ -1,6 +1,6 @@
 
 import { useMessageSender } from "./useMessageSender";
-import { useMessageRealtime } from "./useMessageRealtime";
+
 import { Message } from "@/types/chat";
 
 type UseSessionInteractionsProps = {
@@ -46,12 +46,7 @@ export const useSessionInteractions = ({
     conversation
   });
 
-  // Set up real-time message subscription
-  useMessageRealtime({
-    currentConversationId,
-    viewMode: sessionState.viewMode,
-    setMessages: sessionState.setMessages
-  });
+  // useMessageRealtime removed in favor of useEnhancedSessionMessages in parent component
 
   return {
     isWaitingForResponse,

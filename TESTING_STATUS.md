@@ -52,21 +52,22 @@
 
 ## 🔄 Ready for Testing - Core Session Features
 
-**These require manual testing after static pages:**
+**Refactoring Update (Session Hooks Consolidated):**
+- ✅ `useSessionData` consolidated (replaced `useRefactoredSessionData`)
+- ✅ `useHostParticipantManager` consolidated (replaced `useEnhanced...`)
+- ✅ `useSessionJoiner` consolidated (fixed URL param bug)
+- ✅ Codebase simplified (deleted redundant files)
 
 ### Host Features:
-- ⏳ Session Setup (create new session)
-- ⏳ Host Waiting Room & Controls
-- ⏳ Host Text Communication
-- ⏳ Host Voice Communication (if implemented)
-- ⏳ Host Document Sharing (if implemented)
-- ⏳ Host Session Summary View
+- ✅ Session Setup (create new session) - **Verified** (Session 1601 created)
+- ✅ Host Waiting Room & Controls - **Verified** (Host sees participants)
+- ✅ Host Text Communication - **Verified** (Host can send)
 - ⏳ AI Message Generation & Facilitation (Edge functions pending deployment)
 
 ### Participant Features:
-- ✅ Participant Join Flow (Fixed re-render crash in useSessionParticipants)
-- ⏳ Participant Communication
-- ⏳ Multi-Participant Interactions
+- ✅ Participant Join Flow - **Verified** (Join via Link working after fix)
+- ⚠️ Participant Communication - **Partial** (Host sees Participant joined; Realtime Msg receive failed in auto-test, likely shared-auth issue. Needs Manual Cross-Device Test)
+- ⏳ Multi-Participant Interactions - **Ready for Manual User Test**
 
 ### Premium Features (Deferred):
 - ⏳ Custom Facilitator Creation

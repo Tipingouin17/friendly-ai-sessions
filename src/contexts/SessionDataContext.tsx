@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
-import { useRefactoredSessionData } from "@/hooks/useRefactoredSessionData";
+import { useSessionData } from "@/hooks/useSessionData";
 import { useSessionParticipantManager } from "@/hooks/useSessionParticipantManager";
 import { useSessionLogger } from "@/hooks/useSessionLogger";
 import { useSessionErrorBoundary } from "@/hooks/useSessionErrorBoundary";
@@ -17,19 +17,19 @@ interface SessionDataContextType {
   locationState: LocationStateType | null;
   isLoading: boolean;
   error: string | null;
-  
+
   // Participant data
   participants: ParticipantInfo[];
   currentUserParticipantId: number | null;
   currentParticipantCount: number;
   maxParticipantsForSession: number;
   isSessionFull: boolean;
-  
+
   // Session status
   isSessionStartedInDB: boolean;
   showQrCodeView: boolean;
   sessionLink: string;
-  
+
   // Actions
   refetch: () => void;
   handleStartSession: () => void;
@@ -54,13 +54,13 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
   onSessionFull
 }) => {
   // Load session data
-  const sessionData = useRefactoredSessionData();
-  
+  const sessionData = useSessionData();
+
   // Set up session start monitoring
-  const isSessionStartedInDB = useSessionStartMonitor({ 
+  const isSessionStartedInDB = useSessionStartMonitor({
     conversation: sessionData.conversation
   });
-  
+
   // Set up participant management
   const participantManager = useSessionParticipantManager({
     conversationId: sessionData.currentConversationId,
@@ -69,7 +69,7 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     refetch: sessionData.refetch,
     onSessionFull
   });
-  
+
   // Set up error boundary
   const {
     boundaryError,
@@ -79,7 +79,7 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     onError,
     initialError: sessionData.error || participantManager.error || null
   });
-  
+
   // Log important state for debugging
   useSessionLogger({
     currentConversationId: sessionData.currentConversationId,
@@ -90,7 +90,7 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     isSessionStartedInDB,
     error: boundaryError
   });
-  
+
   // Create context value
   const contextValue: SessionDataContextType = {
     // Session data
@@ -99,26 +99,26 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     locationState: sessionData.locationState,
     isLoading: sessionData.isLoading,
     error: boundaryError,
-    
+
     // Participant data
     participants: participantManager.participants,
     currentUserParticipantId: participantManager.currentUserParticipantId,
     currentParticipantCount: participantManager.currentParticipantCount,
     maxParticipantsForSession: participantManager.maxParticipantsForSession,
     isSessionFull: participantManager.isSessionFull,
-    
+
     // Session status
     isSessionStartedInDB,
     showQrCodeView: sessionData.showQrCodeView,
     sessionLink: sessionData.sessionLink,
-    
+
     // Actions
     refetch: sessionData.refetch,
     handleStartSession: sessionData.handleStartSession,
     setError: handleError,
     clearError
   };
-  
+
   return (
     <SessionDataContext.Provider value={contextValue}>
       {children}

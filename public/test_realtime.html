@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Realtime Test Full</title>
+</head>
+
+<body>
+    <h2>Realtime Connection Test (Full)</h2>
+    <div id="status">Initializing...</div>
+    <pre id="logs"
+        style="background: #f0f0f0; padding: 10px; border: 1px solid #ccc; font-family: monospace; height: 300px; overflow: auto;"></pre>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://dsnfzlavmakmsnbvntgs.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbmZ6bGF2bWFrbXNuYnZudGdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzgzOTIsImV4cCI6MjA4MDAxNDM5Mn0.hZh2gss_JWYFTQOUHLIYzSMn2TToxS8xIQqOXj821cc';
+
+        function log(msg) {
+            const el = document.getElementById('logs');
+            el.innerHTML += new Date().toISOString() + ': ' + msg + '\n';
+            console.log(msg);
+        }
+
+        try {
+            const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            log('Client created');
+
+            // Test exact setup from useStableRealtimeConnection.ts
+            log('Testing Full Channel Setup (messages, participants, conversations)...');
+
+            const channel = client.channel('test-channel-full-' + Date.now())
+                // 1. Messages
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: 'conversation_id=eq.1599'
+                }, (payload) => log('Msg Event: ' + payload.eventType))
+
+                // 2. Participants
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'session_participants',
+                    filter: 'conversation_id=eq.1599'
+                }, (payload) => log('Participant Event: ' + payload.eventType))
+
+                // 3. Conversations
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'conversations',
+                    filter: 'id=eq.1599'
+                }, (payload) => log('Conversation Event: ' + payload.eventType))
+
+                .subscribe((status) => {
+                    log('Channel Status: ' + status);
+
+                    if (status === 'SUBSCRIBED') {
+                        document.getElementById('status').innerText = 'SUCCESS: Connected';
+                        document.getElementById('status').style.color = 'green';
+                    } else if (status === 'CHANNEL_ERROR') {
+                        document.getElementById('status').innerText = 'FAILURE: Channel Error';
+                        document.getElementById('status').style.color = 'red';
+                    } else if (status === 'TIMED_OUT') {
+                        document.getElementById('status').innerText = 'FAILURE: Timed Out';
+                        document.getElementById('status').style.color = 'orange';
+                    }
+                });
+
+        } catch (e) {
+            log('EXCEPTION: ' + e.message);
+        }
+    </script>
+</body>
+
+</html>

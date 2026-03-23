@@ -82,7 +82,7 @@ export const WorkshopSetup = ({
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-left">Description of the participants</label>
+          <label className="block text-sm font-medium text-left">Description of the participants <span className="text-red-500">*</span></label>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

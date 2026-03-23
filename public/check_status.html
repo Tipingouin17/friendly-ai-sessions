@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Session Status Check Extended</title>
+</head>
+
+<body>
+    <h2>Session Status Check Extended</h2>
+    <div id="status">Checking session...</div>
+    <pre id="logs"
+        style="background: #f0f0f0; padding: 10px; border: 1px solid #ccc; font-family: monospace; height: 300px; overflow: auto;"></pre>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://dsnfzlavmakmsnbvntgs.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbmZ6bGF2bWFrbXNuYnZudGdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzgzOTIsImV4cCI6MjA4MDAxNDM5Mn0.hZh2gss_JWYFTQOUHLIYzSMn2TToxS8xIQqOXj821cc';
+
+        function log(msg) {
+            const el = document.getElementById('logs');
+            el.innerHTML += new Date().toISOString() + ': ' + msg + '\n';
+            console.log(msg);
+        }
+
+        async function checkStatus() {
+            try {
+                const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                log('Client created');
+
+                const { data, error } = await client
+                    .from('conversations')
+                    .select('session_started, id, welcome_message_status')
+                    .eq('id', 1599)
+                    .single();
+
+                if (error) {
+                    log('ERROR: ' + JSON.stringify(error));
+                    document.getElementById('status').innerText = 'Error fetching props';
+                    document.getElementById('status').style.color = 'red';
+                } else {
+                    log('Session Started: ' + data.session_started);
+                    log('Welcome Message Status: ' + data.welcome_message_status);
+
+                    document.getElementById('status').innerText = `Started: ${data.session_started}, Status: ${data.welcome_message_status}`;
+                    document.getElementById('status').style.color = 'blue';
+                }
+            } catch (e) {
+                log('EXCEPTION: ' + e.message);
+            }
+        }
+
+        checkStatus();
+    </script>
+</body>
+
+</html>

@@ -66,12 +66,17 @@ export function useRealtimeConnection(
 
   // Update error state with cross-origin context info if needed
   useEffect(() => {
+    if (isConnected) {
+      setError(null);
+      return;
+    }
+
     if (connectionAttempts >= 5 && !error) {
       setError(isCrossOrigin
         ? "Unable to establish a connection. This may be due to cross-origin restrictions."
         : "Unable to establish a stable connection after multiple attempts");
     }
-  }, [connectionAttempts, isCrossOrigin, error]);
+  }, [connectionAttempts, isCrossOrigin, error, isConnected]);
 
   return {
     isConnected,

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
-import { useSessionJoiner } from "@/hooks/session-joining/useSessionJoiner";
+import { useSessionJoiner } from "@/hooks/session-joining";
 import { ConversationWithSession } from "@/types/database";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,24 +21,24 @@ interface JoinResult {
 }
 
 export function useJoinSessionData(
-  conversationId: number | null, 
+  conversationId: number | null,
   options?: UseJoinSessionDataOptions
 ) {
   const { toast } = useToast();
   const { isAdmin } = useSessionAdminStatus();
-  
+
   // Check if on admin route for stronger admin override
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const effectiveIsAdmin = isAdmin || isOnAdminPath || sessionStorage.getItem('isAdminSession') === 'true';
-  
+
   // Get persisted participant data
   const { getSessionByConversationId } = useParticipantPersistence();
   const existingSessionData = conversationId ? getSessionByConversationId(conversationId) : null;
-  
+
   // Initialize participant state with provided defaults (pure, no side effects)
   const [participantName, setParticipantName] = useState(() => options?.defaultParticipantName || "");
   const [avatarSeed, setAvatarSeed] = useState(() => options?.defaultAvatarSeed || Math.random().toString());
-  
+
   // Debug logging
   useEffect(() => {
     console.log("useJoinSessionData initialized", {
@@ -51,24 +51,24 @@ export function useJoinSessionData(
       existingSessionData
     });
   }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath, existingSessionData]);
-  
+
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
-  
+
   // Use our hooks
-  const { 
-    currentParticipantCount, 
-    maxParticipantsForSession, 
+  const {
+    currentParticipantCount,
+    maxParticipantsForSession,
     conversation,
     error: participantsError,
     refetch
   } = useSessionParticipants(conversationId);
-  
-  const { 
-    isJoining, 
-    error: joinerError, 
+
+  const {
+    isJoining,
+    error: joinerError,
     joinSession,
-    setError 
+    setError
   } = useSessionJoiner();
 
   // Combine errors from both hooks
@@ -83,16 +83,16 @@ export function useJoinSessionData(
 
   const handleJoinSession = async (): Promise<JoinResult | null> => {
     // Enhanced admin detection - check all sources
-    const effectiveIsAdmin = isAdmin || 
-                           isOnAdminPath ||
-                           sessionStorage.getItem('isAdminSession') === 'true' ||
-                           window.location.pathname.includes('/admin');
-    
+    const effectiveIsAdmin = isAdmin ||
+      isOnAdminPath ||
+      sessionStorage.getItem('isAdminSession') === 'true' ||
+      window.location.pathname.includes('/admin');
+
     // Force a refetch before joining to ensure we have the latest counts
     await refetch();
-    
+
     // Use session-specific max or fall back to plan limit
-    const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
+    const effectiveMaxParticipants = maxParticipantsForSession > 0 ?
       maxParticipantsForSession : planMaxParticipants;
 
     console.log("Join session check:", {
@@ -145,17 +145,17 @@ export function useJoinSessionData(
 
     return result;
   };
-  
+
   // Calculate effective max participants
-  const effectiveMaxParticipants = maxParticipantsForSession > 0 ? 
+  const effectiveMaxParticipants = maxParticipantsForSession > 0 ?
     maxParticipantsForSession : planMaxParticipants;
-    
+
   // Only consider session full if effectiveMaxParticipants is greater than 0
   // And we're not an admin
-  const isFull = !effectiveIsAdmin && 
-                !isOnAdminPath && 
-                effectiveMaxParticipants > 0 && 
-                currentParticipantCount >= effectiveMaxParticipants;
+  const isFull = !effectiveIsAdmin &&
+    !isOnAdminPath &&
+    effectiveMaxParticipants > 0 &&
+    currentParticipantCount >= effectiveMaxParticipants;
 
   return {
     participantName,

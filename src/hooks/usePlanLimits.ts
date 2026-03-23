@@ -21,24 +21,25 @@ export interface PlanLimits {
   maxQuestionsPerSession: number;
   currentFacilitatorCount: number;
   currentSessionCount: number;
+  planName: string;
 }
 
 export const usePlanLimits = (): PlanLimits => {
   const { user } = useAuth();
-  const { planRestrictions, isLoading: planLoading } = useUserPlan();
+  const { planRestrictions, plan, isLoading: planLoading } = useUserPlan();
   const { toast } = useToast();
-  
+
   const { data: counts, isLoading: countsLoading } = useQuery({
     queryKey: ['userUsage', user?.id],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
-      
+
       // Get facilitator count
       const { count: facilitatorCount, error: facilitatorError } = await supabase
         .from('facilitators')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
-      
+
       if (facilitatorError) {
         toast({
           title: "Error",
@@ -47,13 +48,13 @@ export const usePlanLimits = (): PlanLimits => {
         });
         throw facilitatorError;
       }
-      
+
       // Get session count
       const { count: sessionCount, error: sessionError } = await supabase
         .from('conversations')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
-      
+
       if (sessionError) {
         toast({
           title: "Error",
@@ -62,7 +63,7 @@ export const usePlanLimits = (): PlanLimits => {
         });
         throw sessionError;
       }
-      
+
       return {
         facilitatorCount: facilitatorCount || 0,
         sessionCount: sessionCount || 0
@@ -70,28 +71,28 @@ export const usePlanLimits = (): PlanLimits => {
     },
     enabled: !!user && !planLoading,
   });
-  
+
   const isLoading = planLoading || countsLoading;
-  
+
   // Handle unlimited values (null in database means unlimited)
   const maxFacilitators = planRestrictions?.facilitator_limit === null ? Infinity : (planRestrictions?.facilitator_limit || 0);
   const maxSessions = planRestrictions?.session_limit === null ? Infinity : (planRestrictions?.session_limit || 0);
   const maxParticipants = planRestrictions?.max_participants === null ? Infinity : (planRestrictions?.max_participants || 0);
-  
+
   // Get the maximum questions per session with a default of 10
-  const maxQuestionsPerSession = planRestrictions?.question_limit === null 
-    ? Infinity 
+  const maxQuestionsPerSession = planRestrictions?.question_limit === null
+    ? Infinity
     : (planRestrictions?.question_limit || 10);
-  
+
   // Check if the user can create custom facilitators based on the plan_table_details
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
-  
+
   // Check both the count limit and whether custom facilitators are allowed
   const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators && maxFacilitators !== Infinity);
-  
+
   // For session limit, only show the limit reached message if there's a finite limit and we've reached it
   const hasReachedSessionLimit = maxSessions !== Infinity && (counts?.sessionCount || 0) >= maxSessions;
-  
+
   return {
     hasReachedFacilitatorLimit,
     hasReachedSessionLimit,
@@ -107,6 +108,7 @@ export const usePlanLimits = (): PlanLimits => {
     canExportData: !!planRestrictions?.data_export,
     canSaveSessions: !!planRestrictions?.saved_sessions,
     canGenerateReports: !!planRestrictions?.session_reports,
-    isLoading
+    isLoading,
+    planName: plan?.title || "Free Plan"
   };
 };

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Check Messages</title>
+</head>
+
+<body>
+    <div id="status">Checking messages for session 1600...</div>
+    <pre id="logs"></pre>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const url = 'https://dsnfzlavmakmsnbvntgs.supabase.co';
+        const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbmZ6bGF2bWFrbXNuYnZudGdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzgzOTIsImV4cCI6MjA4MDAxNDM5Mn0.hZh2gss_JWYFTQOUHLIYzSMn2TToxS8xIQqOXj821cc';
+        const supabase = supabase.createClient(url, key);
+        const conversationId = 1600;
+
+        async function run() {
+            const { data, error } = await supabase.from('messages').select('*').eq('conversation_id', conversationId);
+            const log = document.getElementById('logs');
+            if (error) {
+                log.innerText = 'Error: ' + JSON.stringify(error);
+            } else {
+                log.innerText = 'Messages: ' + data.length + '\n' + JSON.stringify(data, null, 2);
+            }
+        }
+        run();
+    </script>
+</body>
+
+</html>

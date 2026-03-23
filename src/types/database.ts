@@ -3,6 +3,8 @@ import { Database } from "@/integrations/supabase/types";
 
 export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"] & {
   session_started: boolean;
+  is_session_ended?: boolean;
+  participants: number;
 };
 export type DbSession = Database["public"]["Tables"]["sessions"]["Row"];
 export type DbFacilitator = Database["public"]["Tables"]["facilitators"]["Row"];

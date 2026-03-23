@@ -48,7 +48,8 @@ const MyFacilitators = () => {
     hasReachedFacilitatorLimit,
     maxSessions,
     currentSessionCount,
-    isLoading: limitsLoading
+    isLoading: limitsLoading,
+    planName
   } = usePlanLimits();
 
   const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
@@ -91,7 +92,7 @@ const MyFacilitators = () => {
           <UsageMeter
             currentUsage={currentSessionCount}
             limit={maxSessions}
-            planName="Free Plan"
+            planName={planName}
             featureName="Sessions"
           />
         </div>

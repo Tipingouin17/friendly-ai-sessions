@@ -98,15 +98,8 @@ export const useMessageFetching = ({
     const currentStatus = conversation.welcome_message_status || 'pending';
     setWelcomeMessageStatus(currentStatus);
 
-    console.log('🔍 useMessageFetching - Welcome message status:', {
-      conversationId,
-      currentStatus,
-      sessionStarted: conversation.session_started,
-      hasMessages: messages.length > 0
-    });
-
     // If session started but no welcome message, trigger generation
-    if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current) {
+    if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current && messages.length === 0) {
       console.log('🚀 Session started, triggering welcome message generation');
       setIsGeneratingWelcome(true);
       welcomeGeneratedRef.current = true;
@@ -119,12 +112,47 @@ export const useMessageFetching = ({
           sessionStart: true,
           generateReport: false
         }
-      }).then(({ data, error }) => {
+      }).then(async ({ data, error }) => {
         if (error) {
           console.error('❌ Welcome message generation failed:', error);
-          setIsGeneratingWelcome(false);
-          // Trigger recovery on failure
-          setTimeout(() => attemptRecovery(), 5000);
+
+          // Client-side fallback if Edge Function fails (e.g., local dev without functions)
+          console.log('🔄 Attempting client-side fallback welcome message...');
+          try {
+            const fallbackContent = "Welcome to the session! I'm your AI facilitator. I'm here to guide the conversation and help you get the most out of our time together. To begin, could everyone please introduce themselves?";
+
+            const { error: insertError } = await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversationId,
+                content: { text: fallbackContent },
+                role: 'assistant',
+                name: 'Facilitator',
+                is_anonymous: false
+              });
+
+            if (insertError) {
+              console.error('❌ Client-side fallback failed:', insertError);
+              setIsGeneratingWelcome(false);
+              setTimeout(() => attemptRecovery(), 5000);
+            } else {
+              console.log('✅ Client-side fallback welcome message created');
+              setWelcomeMessageStatus('fallback_ready');
+              setIsGeneratingWelcome(false);
+              welcomeGeneratedRef.current = true;
+
+              // Update conversation status
+              await supabase
+                .from('conversations')
+                .update({ welcome_message_status: 'fallback_ready' })
+                .eq('id', conversationId);
+
+              setTimeout(() => fetchMessages(true), 1000);
+            }
+          } catch (e) {
+            console.error('💥 Exception during client-side fallback:', e);
+            setIsGeneratingWelcome(false);
+          }
         } else {
           console.log('✅ Welcome message generation successful:', data);
           setTimeout(() => fetchMessages(true), 1000);
@@ -142,6 +170,41 @@ export const useMessageFetching = ({
       }
     }
   }, [conversationId, conversation, messages.length, isGeneratingWelcome, attemptRecovery, fetchMessages]);
+
+  // Update response collection status based on messages
+  useEffect(() => {
+    if (messages.length === 0) {
+      setIsWaitingForResponses(false);
+      setResponseCount(0);
+      return;
+    }
+
+    // Find the last assistant message index
+    let lastAssistantIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === 'assistant') {
+        lastAssistantIndex = i;
+        break;
+      }
+    }
+
+    if (lastAssistantIndex !== -1) {
+      // We are in a response collection phase
+      setIsWaitingForResponses(true);
+
+      // Count user responses AFTER the last assistant message
+      const responses = messages.slice(lastAssistantIndex + 1).filter(m => m.sender === 'user');
+
+      // Count unique participants
+      const uniqueRespondents = new Set(responses.map(r => r.participant || r.name)).size;
+      setResponseCount(uniqueRespondents);
+    } else {
+      setIsWaitingForResponses(false);
+      setResponseCount(0);
+    }
+  }, [messages]);
+
+
 
   // Process new messages from realtime
   const processNewMessage = useCallback((message: Message) => {
@@ -203,6 +266,29 @@ export const useMessageFetching = ({
       setIsGeneratingResponse(false);
     }
   }, [conversationId, messages, isGeneratingResponse, fetchMessages]);
+
+  // Auto-advance logic: Trigger response when all participants have answered
+  const autoAdvanceTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    // Reset trigger flag when response count resets (new round)
+    if (responseCount === 0) {
+      autoAdvanceTriggeredRef.current = false;
+    }
+
+    // Check if we should auto-advance
+    if (
+      isWaitingForResponses &&
+      totalParticipants > 0 &&
+      responseCount >= totalParticipants &&
+      !isGeneratingResponse &&
+      !autoAdvanceTriggeredRef.current
+    ) {
+      console.log('🤖 Auto-advancing session: All participants have responded');
+      autoAdvanceTriggeredRef.current = true;
+      generateAggregatedResponse();
+    }
+  }, [isWaitingForResponses, responseCount, totalParticipants, isGeneratingResponse, generateAggregatedResponse]);
 
   // Reset flags when conversation changes
   useEffect(() => {

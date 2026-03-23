@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useConversationId } from "@/hooks/useConversationId";
 import { useConversation } from "@/hooks/useConversation";
-import { useEnhancedHostParticipantManager } from "@/hooks/useEnhancedHostParticipantManager";
+import { useHostParticipantManager } from "@/hooks/useHostParticipantManager";
 import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostStatusPersistence } from "@/hooks/useHostStatusPersistence";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
@@ -65,7 +65,7 @@ export function useSessionHostLogic() {
         maxCount,
         isSessionStarted: isManagerSessionStarted,
         refresh
-    } = useEnhancedHostParticipantManager({
+    } = useHostParticipantManager({
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionFull: () => {

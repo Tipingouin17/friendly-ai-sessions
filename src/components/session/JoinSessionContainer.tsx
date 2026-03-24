@@ -158,12 +158,16 @@ const JoinSessionContainer = () => {
     }
   }, [checkNavigationState, setShowRejoinPrompt]);
 
-  // Auto-redirect if session exists
+  // Auto-redirect if session exists (but NOT if session is completed)
   useEffect(() => {
     if (existingSessionData && conversationId && !checkNavigationState()) {
+      // Don't auto-redirect to a completed session
+      if (conversation && (conversation.status === 'completed' || conversation.is_session_ended)) {
+        return;
+      }
       handleRejoin();
     }
-  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin]);
+  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin, conversation]);
 
   // CRITICAL: Check navigation state again before any rendering
   if (checkNavigationState()) {
@@ -175,6 +179,31 @@ const JoinSessionContainer = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-xl">Loading session...</div>
+      </div>
+    );
+  }
+
+  // Show session ended message if the conversation is completed
+  if (conversation && (conversation.status === 'completed' || conversation.is_session_ended)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
+          <div className="mb-4 flex justify-center">
+            <svg className="h-12 w-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Session Has Ended</h2>
+          <p className="text-gray-600 mb-6">
+            This facilitated session has been completed. Thank you for your participation!
+          </p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="w-full bg-amber-400 hover:bg-amber-500 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            Return Home
+          </button>
+        </div>
       </div>
     );
   }

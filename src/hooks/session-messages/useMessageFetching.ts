@@ -142,7 +142,8 @@ export const useMessageFetching = ({
     setWelcomeMessageStatus(currentStatus);
 
     // If session started but no welcome message, trigger generation
-    if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current && messagesRef.current.length === 0) {
+    // Handle both 'pending' (no trigger) and 'ai_generating' (DB trigger set it but no edge function listener)
+    if (conversation.session_started && (currentStatus === 'pending' || currentStatus === 'ai_generating') && !welcomeGeneratedRef.current && messagesRef.current.length === 0) {
       setIsGeneratingWelcome(true);
       welcomeGeneratedRef.current = true;
 
@@ -203,9 +204,7 @@ export const useMessageFetching = ({
     }
 
     // Handle different welcome message states
-    if (currentStatus === 'ai_generating' && !isGeneratingWelcome) {
-      setIsGeneratingWelcome(true);
-    } else if (currentStatus === 'ai_ready' || currentStatus === 'fallback_ready') {
+    if (currentStatus === 'ai_ready' || currentStatus === 'fallback_ready') {
       setIsGeneratingWelcome(false);
       if (messagesRef.current.length === 0) {
         fetchMessagesFromDB();

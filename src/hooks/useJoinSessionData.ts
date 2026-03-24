@@ -51,7 +51,8 @@ export function useJoinSessionData(
     maxParticipantsForSession,
     conversation,
     error: participantsError,
-    refetch
+    refetch,
+    isLoading: isParticipantsLoading
   } = useSessionParticipants(conversationId);
 
   const {
@@ -144,7 +145,7 @@ export function useJoinSessionData(
     effectiveMaxParticipants,
     isFull,
     conversation,
-    isLoading: !conversation && !error,
+    isLoading: isParticipantsLoading || (!conversation && !error),
     error,
     handleJoinSession,
     existingSessionData

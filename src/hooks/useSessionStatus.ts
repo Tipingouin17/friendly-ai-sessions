@@ -11,6 +11,9 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
   const mountedRef = useRef(true);
   const [sessionEnded, setSessionEnded] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Don't auto-redirect on join-session page - let JoinSessionContainer handle it
+  const isJoinPage = useRef(window.location.pathname.includes('/join-session'));
   
   // Set up cleanup on unmount
   useEffect(() => {
@@ -56,8 +59,10 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
             description: "This session has been closed.",
           });
           
-          // Navigate away immediately
-          navigate('/past-workshops', { replace: true });
+          // Navigate away immediately (but not on join-session page)
+          if (!isJoinPage.current) {
+            navigate('/past-workshops', { replace: true });
+          }
         }
       } catch (error) {
         console.error('Exception during session status polling:', error);
@@ -91,8 +96,10 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
               description: "This session has been closed.",
             });
             
-            // Navigate away immediately
-            navigate('/past-workshops', { replace: true });
+            // Navigate away immediately (but not on join-session page)
+            if (!isJoinPage.current) {
+              navigate('/past-workshops', { replace: true });
+            }
           }
           // Check if session was started
           if (payload.new.session_started && !payload.old.session_started) {

@@ -7,6 +7,7 @@ import { SignupFooter } from '@/components/auth/SignupFooter';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
+import PageHead from '@/components/PageHead';
 
 const Signup = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -22,6 +23,7 @@ const Signup = () => {
 
   return (
     <SignupContainer>
+      <PageHead title="Sign Up" description="Create your MyFacilitator account" />
       <SignupForm />
       <SignupFooter />
     </SignupContainer>

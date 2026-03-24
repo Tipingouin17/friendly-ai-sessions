@@ -32,3 +32,5 @@ export const PageHead = ({ title, description }: PageHeadProps) => {
 
   return null;
 };
+
+export default PageHead;

@@ -16,6 +16,7 @@ import ReportDownloadDialog from "@/components/session/ReportDownloadDialog";
 import WorkshopMetrics from "@/components/session/WorkshopMetrics";
 import FacilitatorInfo from "@/components/session/FacilitatorInfo";
 import WorkshopTags from "@/components/session/WorkshopTags";
+import PageHead from "@/components/PageHead";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -406,6 +407,7 @@ const PastWorkshops = () => {
 
   return (
     <div className="min-h-screen pt-12 pb-16">
+      <PageHead title="Host Dashboard" description="Manage and view all your workshop sessions" />
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <div>

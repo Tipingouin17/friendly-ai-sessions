@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import PageHead from '@/components/PageHead';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, MessageSquare, BarChart3, Sparkles, ArrowRight, CheckCircle } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Users, MessageSquare, BarChart3, Sparkles, ArrowRight, CheckCircle } fr
 const Index = () => {
     return (
         <div className="min-h-screen">
+            <PageHead title="MyFacilitator - AI-Powered Workshop Facilitation" description="Transform your meetings into engaging, productive sessions with AI-powered workshop facilitation." />
             {/* Hero Section */}
             <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-primary/10 to-white">
                 <div className="container mx-auto max-w-6xl text-center">

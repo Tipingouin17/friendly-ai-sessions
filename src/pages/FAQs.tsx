@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import PageHead from "@/components/PageHead";
 import {
   Accordion,
   AccordionContent,
@@ -104,6 +105,7 @@ const FAQs = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/10 to-white pt-24 pb-16">
+      <PageHead title="FAQs" description="Find answers to common questions about MyFacilitator" />
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-4xl font-bold text-center mb-4">
           Frequently Asked Questions

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Settings as SettingsIcon, Bell, Shield, Trash2 } from "lucide-react";
+import PageHead from "@/components/PageHead";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +65,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <PageHead title="Settings" description="Manage your account settings and preferences" />
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center gap-3 mb-8">
           <SettingsIcon className="h-8 w-8 text-gray-700" />

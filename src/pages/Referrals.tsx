@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { pageVariants, staggerContainer, staggerItem } from "@/lib/animations";
+import PageHead from "@/components/PageHead";
 
 const Referrals = () => {
     const { user } = useAuth();
@@ -109,6 +110,7 @@ const Referrals = () => {
             animate="animate"
             exit="exit"
         >
+            <PageHead title="Referrals" description="Invite friends and earn free months" />
             <div className="text-center mb-12 space-y-4">
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}

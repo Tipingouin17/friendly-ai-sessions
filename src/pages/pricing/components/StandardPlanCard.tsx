@@ -168,7 +168,10 @@ export const StandardPlanCard = ({
 
       <div className="text-center mb-8">
         <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
-        <p className="text-muted-foreground">{plan.plan_type || `${plan.title} Plan`}</p>
+        {/* plan_type often duplicates title, only show if different */}
+        {plan.plan_type && plan.plan_type !== plan.title && (
+          <p className="text-muted-foreground">{plan.plan_type}</p>
+        )}
       </div>
 
       <div className="text-center mb-8">

@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
+import PageHead from '@/components/PageHead';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -95,6 +96,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
+      <PageHead title="Log In" description="Sign in to your MyFacilitator account" />
       <div className="max-w-md mx-auto px-4">
         <div className="bg-white rounded-3xl shadow-lg p-8">
           <h1 className="text-2xl font-bold text-center mb-2">Welcome Back!</h1>

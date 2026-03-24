@@ -76,7 +76,7 @@ export const PlanInfo = () => {
           {plan?.price ? <span>{formatPrice(plan.price)}</span> : <span>Free</span>}
         </CardTitle>
         <CardDescription>
-          {plan?.plan_type || 'Standard subscription'}
+          {plan?.title === plan?.plan_type ? 'Standard subscription' : (plan?.plan_type || 'Standard subscription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

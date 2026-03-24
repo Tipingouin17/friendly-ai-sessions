@@ -32,7 +32,7 @@ export const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="text-xl font-bold text-yellow-500">
-            AI Facilitator
+            MyFacilitator
           </Link>
 
           {isMobile ? (

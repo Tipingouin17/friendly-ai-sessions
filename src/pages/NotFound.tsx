@@ -2,10 +2,12 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, ArrowLeft } from "lucide-react";
+import PageHead from "@/components/PageHead";
 
 const NotFound = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <PageHead title="Page Not Found" />
       <div className="text-center max-w-md space-y-6">
         <div className="text-8xl font-bold text-gray-200">404</div>
         <div className="space-y-2">

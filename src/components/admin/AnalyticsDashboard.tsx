@@ -77,14 +77,16 @@ export const AnalyticsDashboard = () => {
                 .from('messages')
                 .select('*', { count: 'exact', head: true });
 
-            // Average session duration
+            // Average session duration (exclude 0-minute and null sessions)
             const { data: durationData } = await supabase
                 .from('conversations')
                 .select('session_duration_minutes')
-                .not('session_duration_minutes', 'is', null);
+                .not('session_duration_minutes', 'is', null)
+                .gt('session_duration_minutes', 0);
 
-            const avgSessionDuration = durationData && durationData.length > 0
-                ? durationData.reduce((sum, s) => sum + (s.session_duration_minutes || 0), 0) / durationData.length
+            const validDurations = durationData?.filter(s => s.session_duration_minutes && s.session_duration_minutes > 0) || [];
+            const avgSessionDuration = validDurations.length > 0
+                ? validDurations.reduce((sum, s) => sum + (s.session_duration_minutes || 0), 0) / validDurations.length
                 : 0;
 
             // User growth (last 30 days)
@@ -114,8 +116,12 @@ export const AnalyticsDashboard = () => {
 
             const facilitatorCounts: Record<string, number> = { /* no-op */ };
             sessionsData?.forEach(session => {
-                const title = session.sessions?.title || 'Unknown';
-                facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;
+                const title = session.sessions?.title || null;
+                if (title) {
+                    facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;
+                } else {
+                    facilitatorCounts['Other'] = (facilitatorCounts['Other'] || 0) + 1;
+                }
             });
 
             const sessionsByFacilitator = Object.entries(facilitatorCounts)

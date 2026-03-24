@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { UsageMeter } from "@/components/subscription/UsageMeter";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import PageHead from "@/components/PageHead";
 
 const MyFacilitators = () => {
   const [isClient, setIsClient] = useState(false);
@@ -82,6 +83,7 @@ const MyFacilitators = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHead title="My Facilitators" description="Choose your AI facilitator and create workshops" />
       <WelcomeModal
         isOpen={!hasSeenWelcome}
         onClose={() => setHasSeenWelcome(true)}

@@ -8,11 +8,11 @@
     <meta name="description" content="Lovable Generated Project" />
     <meta name="author" content="Lovable" />
     <meta property="og:image" content="/og-image.png" />
-    <!-- Updated CSP to resolve inline script, style, and Stripe integration issues -->
+    <!-- CSP: allows Vite dev mode (unsafe-eval, ws:) and production services -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self'; 
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://*.stripe.com https://*.lovableproject.com https://fonts.googleapis.com; 
-      script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://*.stripe.com https://js.stripe.com https://m.stripe.network https://lovable.app https://preview--friendly-ai-sessions.lovable.app; 
+      connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://api.openai.com https://*.stripe.com https://*.lovableproject.com https://fonts.googleapis.com http://localhost:*; 
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.gpteng.co https://*.stripe.com https://js.stripe.com https://m.stripe.network https://lovable.app https://preview--friendly-ai-sessions.lovable.app; 
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
       font-src 'self' https://fonts.gstatic.com; 
       img-src 'self' data: https://*.stripe.com https://api.qrserver.com https://*.supabase.co; 

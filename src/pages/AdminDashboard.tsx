@@ -12,6 +12,9 @@ import { AlertsMonitoring } from "@/components/admin/AlertsMonitoring";
 import { CommunicationCenter } from "@/components/admin/CommunicationCenter";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/animations";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import PageHead from "@/components/PageHead";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -28,6 +31,12 @@ const AdminDashboard = () => {
                 variants={pageVariants}
             >
                 <div className="container mx-auto px-4 py-8">
+                    <PageHead title="Admin Dashboard" description="Platform administration and management" />
+                    {/* Back Navigation */}
+                    <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4 transition-colors">
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to App
+                    </Link>
                     {/* Header */}
                     <div className="mb-8">
                         <div className="flex items-center gap-3 mb-2">

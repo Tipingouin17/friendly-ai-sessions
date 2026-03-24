@@ -227,18 +227,18 @@ export const RevenueDashboard = () => {
                     </CardContent>
                 </Card>
 
-                <Card className={`border-${revenue && revenue.churnRate > 5 ? 'red' : 'amber'}-200 bg-gradient-to-br from-${revenue && revenue.churnRate > 5 ? 'red' : 'amber'}-50 to-white`}>
+                <Card className={revenue && revenue.churnRate > 5 ? 'border-red-200 bg-gradient-to-br from-red-50 to-white' : 'border-amber-200 bg-gradient-to-br from-amber-50 to-white'}>
                     <CardHeader className="pb-2">
                         <CardDescription className="flex items-center gap-2">
-                            <AlertCircle className={`h-4 w-4 text-${revenue && revenue.churnRate > 5 ? 'red' : 'amber'}-600`} />
+                            <AlertCircle className={revenue && revenue.churnRate > 5 ? 'h-4 w-4 text-red-600' : 'h-4 w-4 text-amber-600'} />
                             Churn Rate (30d)
                         </CardDescription>
-                        <CardTitle className={`text-3xl font-bold text-${revenue && revenue.churnRate > 5 ? 'red' : 'amber'}-900`}>
+                        <CardTitle className={revenue && revenue.churnRate > 5 ? 'text-3xl font-bold text-red-900' : 'text-3xl font-bold text-amber-900'}>
                             {revenue?.churnRate.toFixed(1)}%
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className={`text-sm text-${revenue && revenue.churnRate > 5 ? 'red' : 'amber'}-600`}>
+                        <p className={revenue && revenue.churnRate > 5 ? 'text-sm text-red-600' : 'text-sm text-amber-600'}>
                             {revenue && revenue.churnRate > 5 ? 'High churn!' : 'Healthy'}
                         </p>
                     </CardContent>

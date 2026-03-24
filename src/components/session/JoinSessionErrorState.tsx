@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { AlertCircle, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 import SessionFullAlert from "./SessionFullAlert";
 
 interface JoinSessionErrorStateProps {
@@ -13,7 +12,6 @@ interface JoinSessionErrorStateProps {
 const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
   error,
   invalidRequest,
-  onRetry
 }) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
@@ -27,15 +25,6 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
             "Invalid session link. Please make sure you have the correct URL." : 
             "The session you're trying to join doesn't exist or has been closed."} 
         />
-        <div className="mt-4">
-          <Button
-            onClick={onRetry}
-            className="bg-amber-500 hover:bg-amber-600 text-white"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
       </div>
     </div>
   );

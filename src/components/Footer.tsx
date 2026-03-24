@@ -11,7 +11,7 @@ export const Footer = () => {
           {/* Brand */}
           <div className="space-y-3">
             <Link to="/" className="inline-block">
-              <span className="text-xl font-bold text-primary">AI Facilitator</span>
+              <span className="text-xl font-bold text-primary">MyFacilitator</span>
             </Link>
             <p className="text-sm text-gray-500 leading-relaxed">
               AI-powered facilitation for workshops, brainstorming sessions, and team discussions.
@@ -40,7 +40,7 @@ export const Footer = () => {
 
         <div className="mt-8 pt-6 border-t border-gray-200 text-center">
           <p className="text-sm text-gray-400">
-            &copy; {currentYear} AI Facilitator. All Rights Reserved.
+            &copy; {currentYear} MyFacilitator. All Rights Reserved.
           </p>
         </div>
       </div>

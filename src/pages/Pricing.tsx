@@ -12,6 +12,7 @@ import { useUserPlan } from '@/hooks/useUserPlan';
 import { Link } from 'react-router-dom';
 import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { Quote } from 'lucide-react';
+import PageHead from '@/components/PageHead';
 
 const Pricing = () => {
   const { toast } = useToast();
@@ -80,6 +81,7 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-24 pb-16">
+      <PageHead title="Pricing" description="Choose the right plan for your AI-powered workshop facilitation needs." />
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h1 className="text-4xl font-bold mb-4">Choose the Right Plan for Your Needs</h1>

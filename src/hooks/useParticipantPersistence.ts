@@ -15,6 +15,25 @@ export interface ParticipantSessionData {
 
 const PARTICIPANT_STORAGE_KEY = 'participantSessionData';
 
+/**
+ * Pure read function - does NOT update state or localStorage.
+ * Safe to call during render (e.g., inside useMemo).
+ */
+function readSessionFromStorage(conversationId?: number): ParticipantSessionData | null {
+  try {
+    const stored = localStorage.getItem(PARTICIPANT_STORAGE_KEY);
+    if (!stored) return null;
+    const data: ParticipantSessionData = JSON.parse(stored);
+    if (conversationId && data.conversationId !== conversationId) {
+      return null;
+    }
+    return data;
+  } catch (error) {
+    console.error('Failed to read participant data:', error);
+    return null;
+  }
+}
+
 export function useParticipantPersistence() {
   const [participantData, setParticipantData] = useState<ParticipantSessionData | null>(null);
 
@@ -61,12 +80,16 @@ export function useParticipantPersistence() {
     }
   }, []);
 
+  /**
+   * Pure read-only lookup - safe to call in useMemo or during render.
+   * Does NOT trigger state updates or localStorage writes.
+   */
   const getSessionByConversationId = useCallback((conversationId: number): ParticipantSessionData | null => {
-    return loadParticipantData(conversationId);
-  }, [loadParticipantData]);
+    return readSessionFromStorage(conversationId);
+  }, []);
 
   const updateSessionAccessTime = useCallback((conversationId: number) => {
-    const sessionData = getSessionByConversationId(conversationId);
+    const sessionData = readSessionFromStorage(conversationId);
     if (sessionData) {
       const updatedData = {
         ...sessionData,
@@ -80,7 +103,7 @@ export function useParticipantPersistence() {
         console.error('Failed to update session access time:', error);
       }
     }
-  }, [getSessionByConversationId]);
+  }, []);
 
   const clearParticipantData = useCallback(() => {
     try {

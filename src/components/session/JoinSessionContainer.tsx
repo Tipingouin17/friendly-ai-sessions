@@ -174,7 +174,7 @@ const JoinSessionContainer = () => {
   if ((isLoading && !invalidRequest) || isWaitingForMessage) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading... (Debug Mode)</div>
+        <div className="text-xl">Loading session...</div>
       </div>
     );
   }

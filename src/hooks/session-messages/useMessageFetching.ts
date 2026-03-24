@@ -11,6 +11,9 @@ interface UseMessageFetchingProps {
   totalParticipants: number;
 }
 
+// Polling interval in milliseconds
+const POLLING_INTERVAL = 3000;
+
 export const useMessageFetching = ({
   conversationId,
   isAdmin,
@@ -24,38 +27,40 @@ export const useMessageFetching = ({
   const [responseCount, setResponseCount] = useState(0);
   const [welcomeMessageStatus, setWelcomeMessageStatus] = useState<string>('pending');
 
-  const fetchInProgressRef = useRef(false);
   const welcomeGeneratedRef = useRef(false);
   const autoStartProcessedRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const conversationIdRef = useRef<number | null>(null);
+
+  // Keep messagesRef in sync
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Welcome message recovery hook
   const { isRecovering, attemptRecovery, forceRecovery } = useWelcomeMessageRecovery({
     conversationId,
     welcomeMessageStatus,
     onRecoverySuccess: () => {
-      fetchMessages();
+      fetchMessagesFromDB();
     }
   });
 
-  // Enhanced message fetching with recovery
-  const fetchMessages = useCallback(async (forceRefresh = false) => {
-    if (!conversationId || fetchInProgressRef.current) return;
-
-    if (!forceRefresh && messages.length > 0) {
-      return;
-    }
-
-    fetchInProgressRef.current = true;
+  // Core message fetching function - always fetches from DB
+  const fetchMessagesFromDB = useCallback(async () => {
+    const cId = conversationIdRef.current;
+    if (!cId) return;
 
     try {
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
         .select('*')
-        .eq('conversation_id', conversationId)
+        .eq('conversation_id', cId)
         .order('created_at', { ascending: true });
 
       if (messagesError) {
-        console.error('❌ Error fetching messages:', messagesError);
+        console.error('Error fetching messages:', messagesError);
         return;
       }
 
@@ -70,7 +75,13 @@ export const useMessageFetching = ({
         role: msg.role || 'user'
       }));
 
-      setMessages(formattedMessages);
+      // Only update state if messages actually changed
+      const currentIds = messagesRef.current.map(m => m.id).join(',');
+      const newIds = formattedMessages.map(m => m.id).join(',');
+      
+      if (currentIds !== newIds) {
+        setMessages(formattedMessages);
+      }
 
       // Check if we have a welcome message
       const hasWelcomeMessage = formattedMessages.some(msg => msg.sender === 'assistant');
@@ -81,11 +92,47 @@ export const useMessageFetching = ({
       }
 
     } catch (error) {
-      console.error('💥 Exception fetching messages:', error);
-    } finally {
-      fetchInProgressRef.current = false;
+      console.error('Exception fetching messages:', error);
     }
-  }, [conversationId, messages.length]);
+  }, []); // No dependencies - uses ref for conversationId
+
+  // Polling: set up and tear down based on conversationId
+  useEffect(() => {
+    // Update the ref
+    conversationIdRef.current = conversationId;
+    // Clear any existing polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    if (!conversationId) return;
+
+    // Reset state for new conversation
+    setMessages([]);
+    setWelcomeMessageStatus('pending');
+    setIsGeneratingWelcome(false);
+    welcomeGeneratedRef.current = false;
+    autoStartProcessedRef.current = false;
+
+    // Initial fetch after a short delay to let state settle
+    const initialFetchTimer = setTimeout(() => {
+      fetchMessagesFromDB();
+    }, 300);
+
+    // Set up polling interval
+    pollingRef.current = setInterval(() => {
+      fetchMessagesFromDB();
+    }, POLLING_INTERVAL);
+
+    return () => {
+      clearTimeout(initialFetchTimer);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [conversationId, fetchMessagesFromDB]);
 
   // Monitor conversation status for welcome message generation
   useEffect(() => {
@@ -95,7 +142,7 @@ export const useMessageFetching = ({
     setWelcomeMessageStatus(currentStatus);
 
     // If session started but no welcome message, trigger generation
-    if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current && messages.length === 0) {
+    if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current && messagesRef.current.length === 0) {
       setIsGeneratingWelcome(true);
       welcomeGeneratedRef.current = true;
 
@@ -109,9 +156,9 @@ export const useMessageFetching = ({
         }
       }).then(async ({ data, error }) => {
         if (error) {
-          console.error('❌ Welcome message generation failed:', error);
+          console.error('Welcome message generation failed:', error);
 
-          // Client-side fallback if Edge Function fails (e.g., local dev without functions)
+          // Client-side fallback if Edge Function fails
           try {
             const fallbackContent = "Welcome to the session! I'm your AI facilitator. I'm here to guide the conversation and help you get the most out of our time together. To begin, could everyone please introduce themselves?";
 
@@ -126,7 +173,7 @@ export const useMessageFetching = ({
               });
 
             if (insertError) {
-              console.error('❌ Client-side fallback failed:', insertError);
+              console.error('Client-side fallback failed:', insertError);
               setIsGeneratingWelcome(false);
               setTimeout(() => attemptRecovery(), 5000);
             } else {
@@ -140,14 +187,17 @@ export const useMessageFetching = ({
                 .update({ welcome_message_status: 'fallback_ready' })
                 .eq('id', conversationId);
 
-              setTimeout(() => fetchMessages(true), 1000);
+              // Force immediate re-fetch
+              setTimeout(() => fetchMessagesFromDB(), 500);
             }
           } catch (e) {
-            console.error('💥 Exception during client-side fallback:', e);
+            console.error('Exception during client-side fallback:', e);
             setIsGeneratingWelcome(false);
           }
         } else {
-          setTimeout(() => fetchMessages(true), 1000);
+          // Edge function succeeded - force immediate re-fetch
+          setIsGeneratingWelcome(false);
+          setTimeout(() => fetchMessagesFromDB(), 500);
         }
       });
     }
@@ -157,11 +207,11 @@ export const useMessageFetching = ({
       setIsGeneratingWelcome(true);
     } else if (currentStatus === 'ai_ready' || currentStatus === 'fallback_ready') {
       setIsGeneratingWelcome(false);
-      if (messages.length === 0) {
-        fetchMessages(true);
+      if (messagesRef.current.length === 0) {
+        fetchMessagesFromDB();
       }
     }
-  }, [conversationId, conversation, messages.length, isGeneratingWelcome, attemptRecovery, fetchMessages]);
+  }, [conversationId, conversation, isGeneratingWelcome, attemptRecovery, fetchMessagesFromDB]);
 
   // Update response collection status based on messages
   useEffect(() => {
@@ -196,15 +246,13 @@ export const useMessageFetching = ({
     }
   }, [messages]);
 
-  // Process new messages from realtime
+  // Process new messages from realtime (kept for compatibility)
   const processNewMessage = useCallback((message: Message) => {
-
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
         return prev;
       }
-
       const updated = [...prev, message];
       return updated;
     });
@@ -219,37 +267,37 @@ export const useMessageFetching = ({
 
   // Generate aggregated response
   const generateAggregatedResponse = useCallback(async () => {
-    if (!conversationId || isGeneratingResponse) return;
+    if (!conversationIdRef.current || isGeneratingResponse) return;
 
     setIsGeneratingResponse(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
-          messages: messages.map(msg => ({
+          messages: messagesRef.current.map(msg => ({
             role: msg.sender === 'assistant' ? 'assistant' : 'user',
             content: msg.content
           })),
-          conversationId,
+          conversationId: conversationIdRef.current,
           sessionStart: false,
           generateReport: false
         }
       });
 
       if (error) {
-        console.error('❌ Error generating facilitator response:', error);
+        console.error('Error generating facilitator response:', error);
         return;
       }
 
-      // Fetch messages to get the new response
-      setTimeout(() => fetchMessages(true), 1000);
+      // Force immediate re-fetch to get the new response
+      setTimeout(() => fetchMessagesFromDB(), 500);
 
     } catch (error) {
-      console.error('💥 Exception generating facilitator response:', error);
+      console.error('Exception generating facilitator response:', error);
     } finally {
       setIsGeneratingResponse(false);
     }
-  }, [conversationId, messages, isGeneratingResponse, fetchMessages]);
+  }, [isGeneratingResponse, fetchMessagesFromDB]);
 
   // Auto-advance logic: Trigger response when all participants have answered
   const autoAdvanceTriggeredRef = useRef(false);
@@ -273,19 +321,10 @@ export const useMessageFetching = ({
     }
   }, [isWaitingForResponses, responseCount, totalParticipants, isGeneratingResponse, generateAggregatedResponse]);
 
-  // Reset flags when conversation changes
-  useEffect(() => {
-    welcomeGeneratedRef.current = false;
-    autoStartProcessedRef.current = false;
-    setMessages([]);
-    setWelcomeMessageStatus('pending');
-    setIsGeneratingWelcome(false);
-  }, [conversationId]);
-
   return {
     messages,
     setMessages,
-    fetchMessages,
+    fetchMessages: fetchMessagesFromDB,
     isGeneratingWelcome: isGeneratingWelcome || isRecovering,
     isGeneratingResponse,
     processNewMessage,

@@ -37,6 +37,7 @@ export const useHostMessages = ({
   }, [conversationData]);
 
   const {
+    messages: fetchedMessages,
     fetchMessages,
     isGeneratingWelcome,
     processNewMessage,
@@ -51,6 +52,13 @@ export const useHostMessages = ({
     conversation: conversationState,
     totalParticipants: participants.length
   });
+
+  // Sync messages from useMessageFetching back to the parent's state
+  useEffect(() => {
+    if (fetchedMessages && fetchedMessages.length > 0) {
+      setMessages(fetchedMessages);
+    }
+  }, [fetchedMessages, setMessages]);
 
   const {
     recordParticipantResponse,

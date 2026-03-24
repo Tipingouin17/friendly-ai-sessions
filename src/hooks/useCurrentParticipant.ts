@@ -22,7 +22,6 @@ export const useCurrentParticipant = ({
   useEffect(() => {
     if (conversation) {
       const participantId = getCurrentParticipantId(locationState, conversation);
-      console.log("Setting current participant ID:", participantId, "from state:", locationState);
       setCurrentUserParticipantId(participantId);
     }
   }, [conversation, locationState]);

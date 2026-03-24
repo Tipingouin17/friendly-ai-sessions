@@ -107,13 +107,11 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   // Track session state transitions to prevent navigation during auto-start
   useEffect(() => {
     if (sessionStarted && !sessionTransitionRef.current) {
-      console.log("Session starting, setting navigation lock");
       sessionTransitionRef.current = true;
       
       // Clear the lock after a short delay to allow session to stabilize
       setTimeout(() => {
         sessionTransitionRef.current = false;
-        console.log("Session transition lock cleared");
       }, 3000);
     }
   }, [sessionStarted]);
@@ -137,7 +135,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           const eventId = `${payload.new.id}-${payload.new.created_at}`;
           
           if (processedEventIds.current.has(eventId)) {
-            console.log("Duplicate event detected, skipping:", eventId);
             return;
           }
           
@@ -145,13 +142,11 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           
           // Don't process removal events during session transitions
           if (sessionTransitionRef.current) {
-            console.log("Session in transition, ignoring participant removal event");
             return;
           }
           
           // Don't process events if we're already navigating
           if (isNavigatingRef.current) {
-            console.log("Already navigating, ignoring participant removal event");
             return;
           }
           
@@ -164,11 +159,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
             // Additional validation: ensure this is actually a removal and not a side effect
             const eventData = payload.new.data;
             if (!eventData.removed_by_admin && !eventData.reason) {
-              console.log("Invalid removal event data, ignoring");
               return;
             }
-            
-            console.log("Valid participant removal detected for:", props.currentUserParticipantId);
             
             isNavigatingRef.current = true;
             
@@ -229,10 +221,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     );
   }
 
-  
   // FIXED LOGIC: Admin should see QR view when session hasn't started yet
   if (isAdmin && !sessionStartedInDB) {
-    console.log("Rendering AdminQrView - session not started yet");
     return (
       <AdminQrView
         conversationId={props.currentConversationId as number}
@@ -240,7 +230,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         maxParticipants={props.conversation?.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onStartSession={() => {
-          console.log("Start session button clicked in AdminQrView");
           onStartSession();
         }}
         onSessionFull={onSessionFull}
@@ -250,7 +239,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   
   // For non-admins, show waiting screen until admin starts the session
   if (!isAdmin && !sessionStartedInDB) {
-    console.log("Rendering ParticipantWaitingScreen");
     return (
       <ParticipantWaitingScreen
         conversationId={props.currentConversationId as number}
@@ -258,7 +246,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         maxParticipants={props.conversation?.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         onSessionStarted={() => {
-          console.log("Session started callback from ParticipantWaitingScreen - participants should NOT navigate");
           // IMPORTANT: Participants should NOT navigate when session starts
           // They should stay on their current route and just see UI update
           onStartSession();
@@ -269,7 +256,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // For participants when session has started but welcome message isn't ready yet
   if (!isAdmin && sessionStartedInDB && (isWaitingForMessage || (!messageReady && !timeoutReached))) {
-    console.log("Rendering SessionStartingGate - waiting for welcome message");
     
     // Start the welcome message wait process
     if (!isWaitingForMessage && !messageReady) {
@@ -290,12 +276,10 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // Show loading if transitioning between states (but with a time limit now)
   if (isTransitioning && !hasResolvedTransition.current) {
-    console.log("Showing transition loading state");
     return <LoadingState />;
   }
 
   // Show the main session view (admin dashboard or participant messaging)
-  console.log("Rendering main SessionView", { isAdmin, sessionStartedInDB });
   return <SessionView props={props} isAdmin={isAdmin} />;
 };
 

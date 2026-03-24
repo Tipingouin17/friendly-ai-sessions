@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useSessionPage } from "@/hooks/useSessionPage";
@@ -97,7 +96,6 @@ const SessionAdmin = () => {
 
     const readyTimeout = setTimeout(() => {
       if (!adminViewReady) {
-        console.log("Forcing admin view ready after timeout");
         setAdminViewReady(true);
       }
     }, 2000);
@@ -114,10 +112,8 @@ const SessionAdmin = () => {
 
   // Redirect logic
   if (!adminViewReady && !isLoading && !currentConversationId && !locationState?.newConversationId) {
-    console.log("No conversation ID found, checking if we should show admin interface anyway");
 
     if (sessionStorage.getItem('isAdminSession') === 'true' || window.location.pathname.includes('/admin')) {
-      console.log("Admin session detected - showing admin interface despite missing conversation ID");
       setAdminViewReady(true);
     } else {
       console.error("No conversation ID found on admin page, redirecting home");
@@ -130,7 +126,6 @@ const SessionAdmin = () => {
 
   // Handle session start
   const handleSessionStarted = () => {
-    console.log("Session started successfully");
     // The session start will be reflected in conversationData on next refresh
     // or we could trigger a refetch here if needed
   };
@@ -139,7 +134,7 @@ const SessionAdmin = () => {
   const participantColors = participants.reduce((colors, participant) => {
     colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
     return colors;
-  }, {} as { [key: string]: string });
+  }, { /* no-op */ } as { [key: string]: string });
 
   return (
     <AdminDashboard

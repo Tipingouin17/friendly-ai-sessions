@@ -38,13 +38,11 @@ export function useSessionWrapperInitialization({
     
     initTimeoutRef.current = setTimeout(() => {
       if (!providerInitialized.current && sessionMountedRef.current) {
-        console.log(`Force initializing wrapper after ${adminTimeout}ms timeout, isAdmin:`, effectiveAdmin || isOnAdminPath);
         providerInitialized.current = true;
         onInitialized();
         
         // Force loading to false immediately for admin sessions
         if (effectiveAdmin || isOnAdminPath) {
-          console.log("Admin session: Forcing loading to false immediately");
           onLoading(false);
         }
       }

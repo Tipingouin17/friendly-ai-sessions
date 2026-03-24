@@ -32,14 +32,12 @@ export function useParticipantChannel({
   // Handle participant count changes
   const handleParticipantCountChange = useCallback((count: number) => {
     if (!mountedRef.current) return;
-    console.log(`Setting current participant count to ${count} from monitoring`);
     setCurrentParticipantCount(count);
   }, [setCurrentParticipantCount]);
 
   // Handle max participants changes
   const handleMaxParticipantsChange = useCallback((max: number) => {
     if (!mountedRef.current) return;
-    console.log(`Setting max participants to ${max} from monitoring`);
     setMaxParticipantsForSession(max);
   }, [setMaxParticipantsForSession]);
 

@@ -33,7 +33,6 @@ export const useMessageFetching = ({
     conversationId,
     welcomeMessageStatus,
     onRecoverySuccess: () => {
-      console.log('🎉 Welcome message recovery successful, fetching messages');
       fetchMessages();
     }
   });
@@ -43,12 +42,10 @@ export const useMessageFetching = ({
     if (!conversationId || fetchInProgressRef.current) return;
 
     if (!forceRefresh && messages.length > 0) {
-      console.log('⏭️ Skipping fetch - messages already loaded');
       return;
     }
 
     fetchInProgressRef.current = true;
-    console.log(`📨 Fetching messages for conversation ${conversationId}`);
 
     try {
       const { data: messagesData, error: messagesError } = await supabase
@@ -73,7 +70,6 @@ export const useMessageFetching = ({
         role: msg.role || 'user'
       }));
 
-      console.log(`✅ Loaded ${formattedMessages.length} messages for conversation ${conversationId}`);
       setMessages(formattedMessages);
 
       // Check if we have a welcome message
@@ -100,7 +96,6 @@ export const useMessageFetching = ({
 
     // If session started but no welcome message, trigger generation
     if (conversation.session_started && currentStatus === 'pending' && !welcomeGeneratedRef.current && messages.length === 0) {
-      console.log('🚀 Session started, triggering welcome message generation');
       setIsGeneratingWelcome(true);
       welcomeGeneratedRef.current = true;
 
@@ -117,7 +112,6 @@ export const useMessageFetching = ({
           console.error('❌ Welcome message generation failed:', error);
 
           // Client-side fallback if Edge Function fails (e.g., local dev without functions)
-          console.log('🔄 Attempting client-side fallback welcome message...');
           try {
             const fallbackContent = "Welcome to the session! I'm your AI facilitator. I'm here to guide the conversation and help you get the most out of our time together. To begin, could everyone please introduce themselves?";
 
@@ -136,7 +130,6 @@ export const useMessageFetching = ({
               setIsGeneratingWelcome(false);
               setTimeout(() => attemptRecovery(), 5000);
             } else {
-              console.log('✅ Client-side fallback welcome message created');
               setWelcomeMessageStatus('fallback_ready');
               setIsGeneratingWelcome(false);
               welcomeGeneratedRef.current = true;
@@ -154,7 +147,6 @@ export const useMessageFetching = ({
             setIsGeneratingWelcome(false);
           }
         } else {
-          console.log('✅ Welcome message generation successful:', data);
           setTimeout(() => fetchMessages(true), 1000);
         }
       });
@@ -204,21 +196,16 @@ export const useMessageFetching = ({
     }
   }, [messages]);
 
-
-
   // Process new messages from realtime
   const processNewMessage = useCallback((message: Message) => {
-    console.log('📝 Processing new message:', message.id);
 
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
-        console.log('⏭️ Message already exists, skipping');
         return prev;
       }
 
       const updated = [...prev, message];
-      console.log(`✅ Added new message, total: ${updated.length}`);
       return updated;
     });
 
@@ -235,7 +222,6 @@ export const useMessageFetching = ({
     if (!conversationId || isGeneratingResponse) return;
 
     setIsGeneratingResponse(true);
-    console.log('🤖 Generating aggregated facilitator response');
 
     try {
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
@@ -254,8 +240,6 @@ export const useMessageFetching = ({
         console.error('❌ Error generating facilitator response:', error);
         return;
       }
-
-      console.log('✅ Facilitator response generated successfully');
 
       // Fetch messages to get the new response
       setTimeout(() => fetchMessages(true), 1000);
@@ -284,7 +268,6 @@ export const useMessageFetching = ({
       !isGeneratingResponse &&
       !autoAdvanceTriggeredRef.current
     ) {
-      console.log('🤖 Auto-advancing session: All participants have responded');
       autoAdvanceTriggeredRef.current = true;
       generateAggregatedResponse();
     }

@@ -27,11 +27,6 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   
   // Set up component lifecycle
   useEffect(() => {
-    console.log("🔄 Session recovery hook mounted:", {
-      isAdmin: isAdminSession,
-      shouldSkipRecovery,
-      currentConversationId
-    });
     sessionMountedRef.current = true;
     
     // Only store status for actual admin paths to prevent conflicts
@@ -55,7 +50,6 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   // Reset connection state when conversation ID changes
   useEffect(() => {
     if (currentConversationId) {
-      console.log(`🔄 Connection recovery setup for conversation ID: ${currentConversationId}`);
       // Reset state for new conversation
       if (lastAttemptTime === 0) {
         setLastAttemptTime(Date.now());
@@ -71,13 +65,11 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
 
     // Skip recovery for admin sessions
     if (shouldSkipRecovery) {
-      console.log("🔑 Admin session - skipping connection recovery");
       return;
     }
 
     if (connectionAttempts < 5 && currentConversationId) {
       const newAttemptCount = connectionAttempts + 1;
-      console.log(`🔄 Attempting connection recovery (attempt ${newAttemptCount}/5) for ID:`, currentConversationId);
       
       setConnectionAttempts(newAttemptCount);
       setLastAttemptTime(Date.now());
@@ -91,22 +83,18 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
       
       // Use progressive backoff with longer delays
       const backoffTime = Math.min(3000 * Math.pow(1.5, newAttemptCount - 1), 15000);
-      console.log(`🔄 Using backoff time of ${backoffTime}ms for attempt ${newAttemptCount}`);
       
       recoveryTimerRef.current = setTimeout(() => {
         if (sessionMountedRef.current) {
-          console.log(`🔄 Executing connection recovery attempt ${newAttemptCount}`);
           setIsRecovering(false);
           
           // Force a page refresh for connection recovery on later attempts
           if (newAttemptCount > 2) {
-            console.log("🔄 Using page refresh for deep recovery");
             window.location.reload();
           }
         }
       }, backoffTime);
     } else if (connectionAttempts >= 5) {
-      console.log("🚫 Maximum recovery attempts reached");
       setIsRecovering(false);
       
       if (sessionMountedRef.current && !shouldSkipRecovery) {
@@ -123,7 +111,6 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
   const handleConnectionEstablished = useCallback(() => {
     if (!sessionMountedRef.current) return;
     
-    console.log("✅ Connection established successfully");
     setConnectionAttempts(0);
     setLastAttemptTime(Date.now());
     setIsRecovering(false);

@@ -37,7 +37,7 @@ export const useSessionData = () => {
   // Additional validation for conversation data
   useEffect(() => {
     if (conversation?.is_session_ended) {
-      console.log("Session has ended according to conversation data");
+      // Session has ended - no additional action needed here
     }
   }, [conversation]);
 

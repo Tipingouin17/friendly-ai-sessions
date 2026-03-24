@@ -17,4 +17,14 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 export const EDGE_FUNCTION_URL = SUPABASE_URL;
 export const EDGE_FUNCTION_KEY = SUPABASE_PUBLISHABLE_KEY;
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Disable realtime for local development to prevent WebSocket connection issues
+const isLocalDev = SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1');
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    realtime: isLocalDev ? { params: { eventsPerSecond: 0 } } : undefined,
+    auth: {
+        autoRefreshToken: !isLocalDev,
+        persistSession: true,
+        detectSessionInUrl: !isLocalDev,
+    },
+});

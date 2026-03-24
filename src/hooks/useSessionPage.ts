@@ -64,18 +64,6 @@ export function useSessionPage() {
     if (!renderRef.current.hasSetupInitialState) {
       renderRef.current.hasSetupInitialState = true;
       
-      console.log("Session page rendered with:", {
-        locationSearch: location.search,
-        locationState: location.state,
-        currentConversationId,
-        isAdmin: adminStatusRef.current,
-        error,
-        connectionAttempts,
-        isLoading,
-        isCrossOrigin,
-        hasInitializedProvider,
-        renderCount: renderRef.current.renderCount
-      });
     }
   }, [location, error, connectionAttempts, isLoading, isCrossOrigin, currentConversationId, hasInitializedProvider]);
 

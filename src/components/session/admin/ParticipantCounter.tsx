@@ -17,7 +17,6 @@ const ParticipantCounter: React.FC<ParticipantCounterProps> = ({
   
   // Update from props when they change - rely on parent admin state management
   useEffect(() => {
-    console.log('Admin ParticipantCounter: Updating display count to', currentParticipants);
     setDisplayCount(currentParticipants);
   }, [currentParticipants]);
   

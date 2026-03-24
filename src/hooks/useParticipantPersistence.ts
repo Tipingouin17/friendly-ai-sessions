@@ -28,7 +28,6 @@ export function useParticipantPersistence() {
     try {
       localStorage.setItem(PARTICIPANT_STORAGE_KEY, JSON.stringify(sessionData));
       setParticipantData(sessionData);
-      console.log('Participant data persisted:', sessionData);
     } catch (error) {
       console.error('Failed to persist participant data:', error);
     }
@@ -87,7 +86,6 @@ export function useParticipantPersistence() {
     try {
       localStorage.removeItem(PARTICIPANT_STORAGE_KEY);
       setParticipantData(null);
-      console.log('Participant data cleared');
     } catch (error) {
       console.error('Failed to clear participant data:', error);
     }

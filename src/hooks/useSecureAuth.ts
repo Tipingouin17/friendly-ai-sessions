@@ -51,7 +51,6 @@ export const useSecureAuth = () => {
       const timeInactive = Date.now() - securityContext.lastActivity;
       
       if (timeInactive > securityContext.sessionTimeout) {
-        console.log('Session timeout - logging out user');
         auth.logout();
       }
     };

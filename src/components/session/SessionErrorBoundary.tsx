@@ -23,7 +23,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   error = null,
   noSessionFound = false,
   connectionAttempts = 0,
-  retryConnection = () => {},
+  retryConnection = () => { /* no-op */ },
   lastAttemptTime = 0,
   isLoading = false,
   hasInitializedProvider = false,
@@ -64,24 +64,11 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   useEffect(() => {
     if (!isClient) return;
     
-    console.log("SessionErrorBoundary state:", {
-      error,
-      noSessionFound,
-      connectionAttempts,
-      lastAttemptTime,
-      isLoading,
-      hasInitializedProvider,
-      propIsAdmin,
-      storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
-      pathInfo,
-      currentPath: window.location.pathname
-    });
   }, [error, noSessionFound, connectionAttempts, lastAttemptTime, isLoading, 
       hasInitializedProvider, propIsAdmin, pathInfo, isClient]);
   
   // If on dedicated admin route, always bypass errors
   if (pathInfo.isOnAdminPath) {
-    console.log("🔑 On dedicated admin route - always bypassing error boundary");
     return <>{children}</>;
   }
   
@@ -96,7 +83,6 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   
   // CRITICAL FIX: Make participant route see the session even when there are initial connection issues
   if (effectiveIsAdmin || connectionAttempts < 2) {
-    console.log(`${effectiveIsAdmin ? "Admin user" : "Participant"} session - bypassing initial error boundary`);
     return <>{children}</>;
   }
 
@@ -107,7 +93,6 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   if (hasError || waitedTooLong) {
     // If there's an active session (based on URL parameter), bypass this error for participants too
     if (pathInfo.hasSessionId && connectionAttempts < 3) {
-      console.log("Session ID found in URL, bypassing error for participant");
       return <>{children}</>;
     }
     
@@ -135,7 +120,6 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
           <div className="space-y-2">
             <Button 
               onClick={() => {
-                console.log("Retry connection clicked, reconnecting...");
                 retryConnection();
                 
                 // Check if component is still mounted before showing toast

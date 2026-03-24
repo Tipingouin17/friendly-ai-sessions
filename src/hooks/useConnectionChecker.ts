@@ -35,11 +35,6 @@ export function useConnectionChecker({
     setIsPerformingConnectionCheck(true);
 
     try {
-      console.log("🔍 Performing resilient connection check...", {
-        conversationId,
-        consecutiveFailures,
-        timeSinceLastSuccess: Date.now() - lastSuccessfulCheckRef.current
-      });
 
       // Try channel-based ping first
       const pingResult = await createPingChannel(conversationId);
@@ -47,7 +42,6 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
 
       if (pingResult) {
-        console.log("✅ Connection check successful (channel subscription worked)");
         setIsConnected(true);
         setConsecutiveFailures(0);
         lastSuccessfulCheckRef.current = Date.now();
@@ -64,7 +58,6 @@ export function useConnectionChecker({
       if (!mountedRef.current) return false;
 
       if (databasePingResult) {
-        console.log("✅ Connection check successful (database query worked)");
         setIsConnected(true);
         setConsecutiveFailures(0);
         lastSuccessfulCheckRef.current = Date.now();
@@ -79,11 +72,6 @@ export function useConnectionChecker({
       const newFailureCount = consecutiveFailures + 1;
       setConsecutiveFailures(newFailureCount);
 
-      console.log("⚠️ Connection check failed", {
-        consecutiveFailures: newFailureCount,
-        timeSinceLastSuccess: Date.now() - lastSuccessfulCheckRef.current
-      });
-
       // Only mark as "lost" after multiple consecutive failures AND significant time passed
       const timeSinceLastSuccess = Date.now() - lastSuccessfulCheckRef.current;
       const shouldMarkAsLost = newFailureCount >= 3 && timeSinceLastSuccess > 30000; // 30 seconds
@@ -91,9 +79,7 @@ export function useConnectionChecker({
       if (shouldMarkAsLost) {
         console.error("❌ Connection marked as lost after multiple failures");
         setError("Connection to server lost");
-      } else {
-        console.log("📡 Temporary connection issue, not marking as lost yet");
-      }
+      } else { /* no-op */ }
 
       setIsPerformingConnectionCheck(false);
       return false;

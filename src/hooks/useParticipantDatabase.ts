@@ -13,8 +13,6 @@ export function useParticipantDatabase(conversationId: number | null) {
       return;
     }
 
-    console.log(`Fetching participants for conversation: ${conversationId}`);
-    
     const fetchParticipants = async () => {
       try {
         // First, get all participants from session_participants
@@ -91,12 +89,10 @@ export function useParticipantDatabase(conversationId: number | null) {
             lastActive: new Date(p.created_at),
           }));
 
-          console.log(`Found ${formattedParticipants.length} participants (${participantsData?.length || 0} in DB, ${missingParticipants.length} missing)`);
           setParticipants(formattedParticipants);
 
           // Insert missing participants into database for future consistency
           if (missingParticipants.length > 0) {
-            console.log(`Inserting ${missingParticipants.length} missing participants into database`);
             const { error: insertError } = await supabase
               .from('session_participants')
               .insert(
@@ -112,9 +108,7 @@ export function useParticipantDatabase(conversationId: number | null) {
 
             if (insertError) {
               console.error('Error inserting missing participants:', insertError);
-            } else {
-              console.log('Successfully inserted missing participants');
-            }
+            } else { /* no-op */ }
           }
         }
 
@@ -127,9 +121,7 @@ export function useParticipantDatabase(conversationId: number | null) {
 
           if (updateError) {
             console.error('Error updating participant count:', updateError);
-          } else {
-            console.log(`Updated conversation participant count to ${allParticipantsData.length}`);
-          }
+          } else { /* no-op */ }
         }
 
       } catch (err) {

@@ -56,11 +56,9 @@ export const createReliableChannel = (channelName: string, options = { maxRetrie
       
       // Add status handling
       channel.on('system', { event: 'disconnect' }, () => {
-        console.log(`Channel ${uniqueChannelName} disconnected`);
         
         if (retryCount < options.maxRetries) {
           retryCount++;
-          console.log(`Attempting to reconnect channel ${uniqueChannelName}, attempt ${retryCount}`);
           
           // Clean up the existing channel first
           try {

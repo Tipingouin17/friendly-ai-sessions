@@ -18,7 +18,6 @@ export function useAdminSessionLoader() {
   
   // Set admin view as mounted to prevent unmounting
   useEffect(() => {
-    console.log("Admin session loader - admin view mounted");
     
     // Set admin view as mounted to prevent unmounting
     adminViewMountedRef.current = true;
@@ -33,7 +32,6 @@ export function useAdminSessionLoader() {
   // Improved caching - keep the data even if the API returns null/undefined
   useEffect(() => {
     if (conversationData) {
-      console.log("Caching admin session data for persistence");
       cachedDataRef.current = conversationData;
     }
   }, [conversationData]);
@@ -46,7 +44,6 @@ export function useAdminSessionLoader() {
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
-        console.log("Admin: Completing initialization");
         setIsLoading(false);
         setHasInitializedProvider(true);
         wasInitializedRef.current = true;
@@ -64,7 +61,6 @@ export function useAdminSessionLoader() {
   useEffect(() => {
     const criticalTimeout = setTimeout(() => {
       if (!wasInitializedRef.current) {
-        console.log("Admin: Critical timeout reached - forcing initialization");
         setIsLoading(false);
         setHasInitializedProvider(true);
         wasInitializedRef.current = true;

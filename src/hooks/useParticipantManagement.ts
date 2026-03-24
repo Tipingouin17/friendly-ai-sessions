@@ -40,7 +40,6 @@ export const useParticipantManagement = (
     if (!conversationId) return Promise.resolve();
     
     try {
-      console.log("Forcibly refreshing participant data");
       // Any implementation would go here
       
       return Promise.resolve();

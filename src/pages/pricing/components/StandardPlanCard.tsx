@@ -19,8 +19,6 @@ export const StandardPlanCard = ({
   const handleGetStarted = () => {
     if (isCurrentPlan) {
       navigate('/profile');
-    } else if (plan.price === 0) {
-      navigate(`/checkout?plan=${plan.id}`);
     } else {
       navigate(`/checkout?plan=${plan.id}`);
     }
@@ -38,9 +36,10 @@ export const StandardPlanCard = ({
     }
   };
 
-  const formatDisplayPrice = (price: number) => {
-    if (price === 0) return 'Free';
-    return Number.isInteger(price) ? price.toString() : price.toFixed(2);
+  const formatDisplayPrice = (price: number | string) => {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    if (isNaN(numPrice) || numPrice === 0) return 'Free';
+    return Number.isInteger(numPrice) ? numPrice.toString() : numPrice.toFixed(2);
   };
 
   const isPlanPopular = plan.is_popular;
@@ -173,7 +172,7 @@ export const StandardPlanCard = ({
       </div>
 
       <div className="text-center mb-8">
-        {plan.price === 0 ? (
+        {Number(plan.price) === 0 ? (
           <div>
             <div className="text-6xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Free

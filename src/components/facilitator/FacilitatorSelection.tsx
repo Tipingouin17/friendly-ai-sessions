@@ -26,7 +26,7 @@ export const FacilitatorSelection = ({
   isLoading = false 
 }: FacilitatorSelectionProps) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({});
+  const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({ /* no-op */ });
   const [loadingImages, setLoadingImages] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
@@ -63,11 +63,10 @@ export const FacilitatorSelection = ({
       }
 
       setLoadingImages(true);
-      const imageMap: Record<number, string> = {};
+      const imageMap: Record<number, string> = { /* no-op */ };
       
       try {
         debugLog('all', `Loading images for ${facilitators.length} facilitators`);
-        console.log('Loading facilitator images for:', facilitators);
         
         // First priority: Use direct profile_picture URLs for public uploads
         facilitators.forEach(facilitator => {
@@ -111,7 +110,6 @@ export const FacilitatorSelection = ({
         }
         
         setFacilitatorImages(imageMap);
-        console.log('Finished loading facilitator images:', imageMap);
       } catch (error) {
         console.error('Error loading facilitator images:', error);
         if (isClient) {
@@ -135,15 +133,7 @@ export const FacilitatorSelection = ({
 
   useEffect(() => {
     // Debug log all facilitators and their profile_picture values
-    if (facilitators && facilitators.length > 0 && isClient) {
-      console.log('Facilitator data with profile pictures:', 
-        facilitators.map(f => ({
-          id: f.id,
-          title: f.title,
-          profile_picture: f.profile_picture
-        }))
-      );
-    }
+    if (facilitators && facilitators.length > 0 && isClient) { /* no-op */ }
   }, [facilitators, isClient]);
 
   const handleCreateSuccess = () => {

@@ -55,7 +55,6 @@ export function useSessionStateTransition({
           // Only redirect if we're certain the participant was removed
           // and we're not in the middle of a session transition
           if (!participantNavigationLockRef.current && !sessionStarted) {
-            console.log("Participant has been removed from the session");
             
             // Clear storage and redirect
             try {
@@ -100,18 +99,15 @@ export function useSessionStateTransition({
   // Enhanced session full handling with navigation lock
   useEffect(() => {
     if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current) {
-      console.log("Session is full, triggering onSessionFull callback");
       sessionFullTriggeredRef.current = true;
       
       // Set navigation lock for participants to prevent redirects during auto-start
       if (!isAdmin) {
         participantNavigationLockRef.current = true;
-        console.log("Setting participant navigation lock during session auto-start");
         
         // Clear the lock after session has time to stabilize
         setTimeout(() => {
           participantNavigationLockRef.current = false;
-          console.log("Participant navigation lock cleared");
         }, 5000);
       }
       
@@ -130,7 +126,6 @@ export function useSessionStateTransition({
       
       // Set a maximum transition time of 3 seconds
       transitionTimeoutRef.current = setTimeout(() => {
-        console.log("Transition timeout reached, forcing completion");
         setIsTransitioning(false);
         setShouldShowSession(true);
       }, 3000);
@@ -146,7 +141,6 @@ export function useSessionStateTransition({
   // Special handling for admin paths - always show session
   useEffect(() => {
     if (isOnAdminPath && !shouldShowSession) {
-      console.log("Admin path detected, forcing session display");
       setShouldShowSession(true);
       setSessionStarted(true);
     }
@@ -156,7 +150,6 @@ export function useSessionStateTransition({
   useEffect(() => {
     // CRITICAL FIX: Always show session if it's already started in DB
     if (props.isSessionStartedInDB && !shouldShowSession) {
-      console.log("Session already started in DB, showing session");
       setShouldShowSession(true);
       setSessionStarted(true);
       return;
@@ -164,11 +157,9 @@ export function useSessionStateTransition({
     
     // Track session started changes
     if (sessionStarted !== lastSessionStartedRef.current) {
-      console.log(`Session started changed from ${lastSessionStartedRef.current} to ${sessionStarted}`);
       lastSessionStartedRef.current = sessionStarted;
       
       if (sessionStarted) {
-        console.log("Transitioning to session view...");
         setIsTransitioning(true);
         
         // Short timeout to simulate transition
@@ -182,7 +173,6 @@ export function useSessionStateTransition({
   
   // Handle start session action
   const handleStartSession = useCallback(() => {
-    console.log("Starting session in useSessionStateTransition");
     setSessionStarted(true);
     props.handleStartSession();
   }, [props, setSessionStarted]);

@@ -9,9 +9,7 @@ import { LocationStateType } from "./useConversationId";
 export function useEnhancedLocationState(
   originalState: any
 ): LocationStateType | null {
-  useEffect(() => {
-    console.log("useEnhancedLocationState running...");
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   const { persistedParticipantData } = useParticipantPersistence();
 
@@ -33,7 +31,6 @@ export function useEnhancedLocationState(
       participantName: persistedParticipantData.name,
       isAdmin: persistedParticipantData.isAdmin
     };
-    console.log("Enhanced provider location state with persisted data:", locationState);
   }
   
   return locationState;

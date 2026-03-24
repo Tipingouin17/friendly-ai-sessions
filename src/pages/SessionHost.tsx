@@ -42,7 +42,7 @@ const SessionHost = () => {
     return (participants || []).reduce((colors, participant) => {
       colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
       return colors;
-    }, {} as { [key: string]: string });
+    }, { /* no-op */ } as { [key: string]: string });
   }, [participants]);
 
   // Show loading state only if we're not ready

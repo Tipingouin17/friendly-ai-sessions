@@ -22,8 +22,6 @@ export function useParticipantRealtimeSubscriptions({
   useEffect(() => {
     if (!conversationId) return;
     
-    console.log(`Setting up realtime participant tracking for conversation: ${conversationId}`);
-    
     // Clean up any existing subscription first
     if (participantsChannelRef.current) {
       try {
@@ -31,7 +29,6 @@ export function useParticipantRealtimeSubscriptions({
         participantsChannelRef.current = null;
         cleanupAttemptedRef.current.participants = true;
         
-        console.info('Cleaning up participants channel before creating new one');
         supabase.removeChannel(channel);
       } catch (err) {
         console.error('Error cleaning up participants channel:', err);
@@ -51,20 +48,17 @@ export function useParticipantRealtimeSubscriptions({
           table: 'session_participants',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Participant table change:", payload);
           
           // Handle different event types
           if (payload.eventType === 'INSERT') {
             // New participant joined
             const newParticipant = payload.new;
-            console.log("New participant data:", newParticipant);
             
             // Use functional update to avoid stale closure issues
             setParticipants(prevParticipants => {
               // Check if participant already exists to prevent duplicates
               const exists = prevParticipants.some(p => p.id === newParticipant.participant_id);
               if (exists) {
-                console.log(`Participant ${newParticipant.participant_id} already exists, skipping`);
                 return prevParticipants;
               }
               
@@ -80,7 +74,6 @@ export function useParticipantRealtimeSubscriptions({
                 lastActive: new Date(newParticipant.created_at),
               };
               
-              console.log(`Adding new participant to list:`, participantInfo);
               return [...prevParticipants, participantInfo];
             });
           } else if (payload.eventType === 'UPDATE') {
@@ -108,9 +101,7 @@ export function useParticipantRealtimeSubscriptions({
             setParticipants(prevParticipants => prevParticipants.filter(p => p.id !== removedParticipant.participant_id));
           }
         })
-        .subscribe(status => {
-          console.info(`Participants channel subscription status: ${status}`);
-        });
+        .subscribe(status => { /* no-op */ });
         
       // Store the channel reference for cleanup
       participantsChannelRef.current = channel;
@@ -126,7 +117,6 @@ export function useParticipantRealtimeSubscriptions({
         participantEventsChannelRef.current = null;
         cleanupAttemptedRef.current.events = true;
         
-        console.info('Cleaning up participant events channel before creating new one');
         supabase.removeChannel(eventsChannel);
       } catch (err) {
         console.error('Error cleaning up participant events channel:', err);
@@ -145,12 +135,10 @@ export function useParticipantRealtimeSubscriptions({
           table: 'session_events',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Session event received:", payload);
           
           // We're interested in join/leave events
           if (payload.new?.event_type === 'participant_joined') {
             const eventData = payload.new.data;
-            console.log("Participant joined event data:", eventData);
             
             if (eventData?.participant_id && eventData?.participant_name) {
               // Use functional update to avoid stale closure issues
@@ -158,7 +146,6 @@ export function useParticipantRealtimeSubscriptions({
                 // Check if we already have this participant
                 const exists = prevParticipants.some(p => p.id === eventData.participant_id);
                 if (exists) {
-                  console.log(`Participant ${eventData.participant_id} already exists from event, updating name if needed`);
                   // Update existing participant with latest data
                   return prevParticipants.map(p => 
                     p.id === eventData.participant_id 
@@ -179,7 +166,6 @@ export function useParticipantRealtimeSubscriptions({
                   lastActive: new Date(),
                 };
                 
-                console.log(`Adding participant from event:`, participantInfo);
                 return [...prevParticipants, participantInfo];
               });
             }
@@ -192,9 +178,7 @@ export function useParticipantRealtimeSubscriptions({
             }
           }
         })
-        .subscribe(status => {
-          console.info(`Participant events channel status: ${status}`);
-        });
+        .subscribe(status => { /* no-op */ });
         
       // Store the events channel reference for cleanup
       participantEventsChannelRef.current = eventsChannel;

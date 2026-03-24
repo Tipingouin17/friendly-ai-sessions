@@ -15,9 +15,7 @@ export function useSessionProviderErrorHandler({
   effectiveAdmin,
   handleError
 }: UseSessionProviderErrorHandlerProps) {
-  useEffect(() => {
-    console.log("useSessionProviderErrorHandler running...");
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   // Handle data errors
   useEffect(() => {
@@ -25,9 +23,7 @@ export function useSessionProviderErrorHandler({
       // Skip reporting session full errors for admin users
       const isSessionFullError = dataError.includes("full") || dataError.includes("maximum capacity");
       
-      if (isSessionFullError && effectiveAdmin) {
-        console.log("🔑 Suppressing session full error for admin in SessionProviderCore");
-      } else {
+      if (isSessionFullError && effectiveAdmin) { /* no-op */ } else {
         console.error("Session data error:", dataError);
         handleError(dataError);
       }

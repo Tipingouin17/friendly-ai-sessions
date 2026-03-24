@@ -29,21 +29,10 @@ export const useWelcomeMessageGate = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
 
-  console.log('🚪 [WelcomeMessageGate] [AI-TRACKING] State:', {
-    conversationId,
-    isAdmin,
-    sessionStarted,
-    isWaitingForMessage: state.isWaitingForMessage,
-    messageReady: state.messageReady,
-    timeoutReached: state.timeoutReached,
-    error: state.error
-  });
-
   const checkForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId) return false;
 
     try {
-      console.log('🔍 [WelcomeMessageGate] Checking for welcome message...');
       
       const { data: messages, error } = await supabase
         .from('messages')
@@ -58,18 +47,6 @@ export const useWelcomeMessageGate = ({
       }
 
       const hasMessage = messages && messages.length > 0;
-      console.log(`📨 [WelcomeMessageGate] [AI-TRACKING] Welcome message check:`, {
-        conversationId,
-        hasMessage,
-        messageCount: messages?.length || 0,
-        firstMessage: messages?.[0] ? {
-          id: messages[0].id,
-          role: messages[0].role,
-          contentPreview: typeof messages[0].content === 'object' && messages[0].content && (messages[0].content as any).text 
-            ? (messages[0].content as any).text.substring(0, 100) + '...'
-            : 'No text content'
-        } : null
-      });
 
       return hasMessage;
     } catch (error) {
@@ -81,8 +58,6 @@ export const useWelcomeMessageGate = ({
   const waitForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId || !sessionStarted) return true;
 
-    console.log('⏳ [WelcomeMessageGate] Starting welcome message wait...');
-    
     setState(prev => ({ 
       ...prev, 
       isWaitingForMessage: true, 
@@ -93,7 +68,6 @@ export const useWelcomeMessageGate = ({
     // First check if message already exists
     const messageExists = await checkForWelcomeMessage();
     if (messageExists) {
-      console.log('✅ [WelcomeMessageGate] Welcome message already exists');
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
@@ -110,24 +84,14 @@ export const useWelcomeMessageGate = ({
         .eq('id', conversationId)
         .single();
 
-      console.log('📊 [AI-TRACKING] Conversation welcome message status:', {
-        conversationId,
-        welcomeMessageStatus: conversation?.welcome_message_status
-      });
-
       if (conversation?.welcome_message_status === 'ai_ready' || conversation?.welcome_message_status === 'template_ready') {
-        console.log('✅ [WelcomeMessageGate] [AI-TRACKING] Welcome message ready via status check:', {
-          status: conversation.welcome_message_status
-        });
         setState(prev => ({ 
           ...prev, 
           isWaitingForMessage: false, 
           messageReady: true 
         }));
         return true;
-      } else if (conversation?.welcome_message_status === 'ai_generating') {
-        console.log('🤖 [AI-TRACKING] AI generation in progress, continuing to wait...');
-      } else if (conversation?.welcome_message_status === 'failed') {
+      } else if (conversation?.welcome_message_status === 'ai_generating') { /* no-op */ } else if (conversation?.welcome_message_status === 'failed') {
         console.error('❌ [AI-TRACKING] Welcome message generation failed');
       }
     } catch (error) {
@@ -136,7 +100,6 @@ export const useWelcomeMessageGate = ({
 
     // Set up timeout (15 seconds for database trigger generation)
     timeoutRef.current = setTimeout(() => {
-      console.log('⏰ [WelcomeMessageGate] Timeout reached, proceeding anyway');
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
@@ -155,16 +118,6 @@ export const useWelcomeMessageGate = ({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, async (payload) => {
-        console.log('📬 [WelcomeMessageGate] [AI-TRACKING] Message inserted:', {
-          messageId: payload.new?.id,
-          role: payload.new?.role,
-          conversationId: payload.new?.conversation_id,
-          participantId: payload.new?.participant_id,
-          hasContent: !!payload.new?.content,
-          contentPreview: payload.new?.content?.text ? 
-            payload.new.content.text.substring(0, 100) + '...' : 
-            'No text content'
-        });
         
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
@@ -184,14 +137,8 @@ export const useWelcomeMessageGate = ({
         filter: `id=eq.${conversationId}`
       }, async (payload) => {
         const newStatus = payload.new?.welcome_message_status;
-        console.log('🔄 [WelcomeMessageGate] [AI-TRACKING] Conversation status updated:', {
-          oldStatus: payload.old?.welcome_message_status,
-          newStatus,
-          conversationId: payload.new?.id
-        });
         
         if (newStatus === 'ai_ready' || newStatus === 'template_ready') {
-          console.log('✅ [AI-TRACKING] Welcome message generation completed:', { status: newStatus });
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;

@@ -67,18 +67,8 @@ const InputFooter = ({
   const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
   const isParticipantContext = hasParticipantParams || viewMode === "participant";
   
-  console.log("🎯 InputFooter - Context Analysis:", {
-    viewMode,
-    hasParticipantParams,
-    isParticipantContext,
-    currentParticipant,
-    participantName,
-    shouldShowInput: isParticipantContext
-  });
-  
   // Don't show input for pure admin view (without participant context)
   if (viewMode === "admin" && !isParticipantContext) {
-    console.log("🚫 InputFooter - Hiding input for pure admin view");
     return null;
   }
   

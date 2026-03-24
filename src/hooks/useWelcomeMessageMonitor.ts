@@ -32,7 +32,6 @@ export const useWelcomeMessageMonitor = ({
     if (!conversationId) return false;
 
     try {
-      console.log('🔍 Checking for welcome message in conversation:', conversationId, { onlyAcceptAI });
       
       const { data: messages, error } = await supabase
         .from('messages')
@@ -47,7 +46,6 @@ export const useWelcomeMessageMonitor = ({
       }
 
       if (!messages || messages.length === 0) {
-        console.log('📭 No messages found');
         return false;
       }
 
@@ -64,27 +62,10 @@ export const useWelcomeMessageMonitor = ({
           (content as any).text.length > 200 && // AI messages are typically longer
           !(content as any).text.includes("The facilitator will be with you shortly"); // Not the fallback text
         
-        console.log('🤖 AI message check:', {
-          isAIGenerated,
-          contentLength: (content as any)?.text?.length || 0,
-          isFallback: (content as any)?.text?.includes("The facilitator will be with you shortly")
-        });
-        
         return isAIGenerated;
       }
 
       const hasWelcomeMessage = messages.length > 0;
-      console.log(`📨 Welcome message check result:`, {
-        conversationId,
-        messageCount: messages.length,
-        hasWelcomeMessage,
-        firstMessageContent: typeof messages[0]?.content === 'object' && 
-          messages[0]?.content && 
-          !Array.isArray(messages[0]?.content) &&
-          typeof (messages[0]?.content as any).text === 'string' 
-            ? (messages[0]?.content as any).text.substring(0, 100) 
-            : 'No text content'
-      });
 
       return hasWelcomeMessage;
     } catch (error) {
@@ -119,7 +100,6 @@ export const useWelcomeMessageMonitor = ({
     if (!conversationId) return false;
 
     try {
-      console.log('🔧 Attempting to recover stuck welcome message for conversation:', conversationId);
       
       const { error } = await supabase.functions.invoke('recover-stuck-welcome-messages');
       
@@ -128,7 +108,6 @@ export const useWelcomeMessageMonitor = ({
         return false;
       }
 
-      console.log('✅ Recovery function called successfully');
       return true;
     } catch (error) {
       console.error('💥 Exception calling recovery function:', error);
@@ -140,7 +119,6 @@ export const useWelcomeMessageMonitor = ({
     if (!conversationId) return false;
 
     try {
-      console.log('🔄 Triggering template fallback via database function for conversation:', conversationId);
       
       // Use the database function for template fallback
       const { error } = await supabase.rpc('create_template_welcome_message', {
@@ -152,8 +130,6 @@ export const useWelcomeMessageMonitor = ({
         return false;
       }
 
-      console.log('✅ Template fallback message created successfully');
-      
       // Wait a moment for database consistency
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -164,7 +140,6 @@ export const useWelcomeMessageMonitor = ({
         return false;
       }
       
-      console.log('✅ Template fallback message verified and ready');
       return true;
     } catch (error) {
       console.error('💥 Exception creating template fallback message:', error);
@@ -176,7 +151,6 @@ export const useWelcomeMessageMonitor = ({
     if (!conversationId || !isEnabled) return false;
 
     setState(prev => ({ ...prev, isWaiting: true, error: null }));
-    console.log('⏳ Starting welcome message monitoring for conversation:', conversationId);
 
     const maxRetries = 15; // Increased for better recovery
     let attempt = 0;
@@ -185,15 +159,11 @@ export const useWelcomeMessageMonitor = ({
       attempt++;
       setState(prev => ({ ...prev, retryCount: attempt }));
 
-      console.log(`🔍 Welcome message check attempt ${attempt}/${maxRetries}`);
-      
       // Check welcome message status first
       const status = await checkWelcomeMessageStatus();
-      console.log(`📊 Welcome message status: ${status}`);
       
       // If status is failed or we're stuck in ai_generating for too long, try recovery
       if ((status === 'failed' || (status === 'ai_generating' && attempt > 8)) && attempt === 9) {
-        console.log('🔧 Attempting recovery for stuck/failed welcome message...');
         await recoverStuckWelcomeMessage();
         // Give recovery some time
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -204,7 +174,6 @@ export const useWelcomeMessageMonitor = ({
       const hasMessage = await checkForWelcomeMessage(onlyAcceptAI);
       
       if (hasMessage) {
-        console.log('✅ Welcome message found! Ready to proceed.');
         setState(prev => ({ 
           ...prev, 
           isWaiting: false, 
@@ -216,14 +185,6 @@ export const useWelcomeMessageMonitor = ({
 
       // If we're past 40% of attempts and no AI message found, trigger AI generation
       if (attempt === Math.floor(maxRetries * 0.4) + 1) {
-        console.log('🤖 [useWelcomeMessageMonitor] Triggering AI welcome message generation at attempt', attempt);
-        console.log('📋 [useWelcomeMessageMonitor] AI Generation Request:', {
-          conversationId,
-          sessionStart: true,
-          timestamp: new Date().toISOString(),
-          attempt,
-          maxRetries
-        });
         
         try {
           const startTime = Date.now();
@@ -245,16 +206,7 @@ export const useWelcomeMessageMonitor = ({
               conversationId,
               attempt
             });
-          } else {
-            console.log('✅ [useWelcomeMessageMonitor] AI generation completed successfully:', {
-              duration,
-              conversationId,
-              attempt,
-              responseData: data,
-              hasContent: !!data?.content,
-              contentLength: data?.content?.length || 0
-            });
-          }
+          } else { /* no-op */ }
         } catch (error) {
           console.error('💥 [useWelcomeMessageMonitor] Exception triggering AI generation:', {
             error: error.message,
@@ -267,7 +219,6 @@ export const useWelcomeMessageMonitor = ({
 
       // If this is the last attempt, try to generate a fallback
       if (attempt === maxRetries) {
-        console.log('⚠️ Max retries reached, generating fallback message...');
         const fallbackCreated = await generateFallbackMessage();
         
         if (fallbackCreated) {

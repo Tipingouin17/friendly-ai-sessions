@@ -31,7 +31,6 @@ export const useSessionMonitoring = ({
   // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
     if (forceAdmin && !adminStatusSetRef.current) {
-      console.log("useSessionMonitoring: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
       adminStatusSetRef.current = true;
@@ -53,7 +52,6 @@ export const useSessionMonitoring = ({
       
       // Check if the session is already started in the DB
       const isStarted = Boolean(conversation.session_started);
-      console.log("Session started status from conversation:", isStarted);
       
       // Only update state if different to prevent render loops
       if (isStarted !== isSessionStartedInDB) {

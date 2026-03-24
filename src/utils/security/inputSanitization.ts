@@ -19,7 +19,7 @@ export const sanitizeNavigationPath = (path: string): string => {
   const safePath = path.startsWith('/') ? path : `/${path}`;
   
   // Remove script tags and suspicious content
-  let sanitized = safePath
+  const sanitized = safePath
     .replace(/<script.*?>.*?<\/script>/gi, '')
     .replace(/[<>]/g, '') // Remove angle brackets
     .replace(/['"]/g, '') // Remove quotes

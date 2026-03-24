@@ -29,7 +29,7 @@ export const useParticipantResponses = ({
       // On error, clear the storage to avoid persistent problems
       localStorage.removeItem('participant_responses');
     }
-    return {};
+    return { /* no-op */ };
   };
   
   const [participantResponded, setParticipantResponded] = useState<{[key: number]: boolean}>(getInitialResponseState());
@@ -41,7 +41,6 @@ export const useParticipantResponses = ({
     const onlyWelcomeMessage = messages.length <= 1 && messages.some(msg => msg.sender === 'assistant');
     
     if ((messages.length === 0 || onlyWelcomeMessage) && currentUserParticipantId) {
-      console.log('New session detected, resetting response state for participant', currentUserParticipantId);
       setParticipantResponded(prev => {
         const updated = {...prev};
         delete updated[currentUserParticipantId];
@@ -74,7 +73,6 @@ export const useParticipantResponses = ({
       );
       
       if (hasUserResponded) {
-        console.log(`User participant ${currentUserParticipantId} has already responded`);
         setParticipantResponded(prev => {
           // Only update if the value is different to avoid unnecessary rerenders
           if (prev[currentUserParticipantId] !== true) {
@@ -111,7 +109,6 @@ export const useParticipantResponses = ({
       
       // Only reset if participant hasn't responded to this new message
       if (!hasRespondedToLatestFacilitatorMessage) {
-        console.log('New facilitator message detected, resetting hasAnswered state');
         setParticipantResponded(prev => {
           // Only update if the participant is marked as having responded
           if (prev[currentUserParticipantId] === true) {
@@ -147,7 +144,6 @@ export const useParticipantResponses = ({
 
   // Record if a participant has responded - memoized to prevent recreation between renders
   const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {
-    console.log(`Recording participant ${participantId} response status: ${hasResponded}`);
     setParticipantResponded(prev => {
       // Only update if the value is different
       if (prev[participantId] !== hasResponded) {
@@ -166,8 +162,7 @@ export const useParticipantResponses = ({
 
   // Function to clear all participant responses (useful for joining new sessions)
   const clearAllResponses = useCallback(() => {
-    console.log('Clearing all participant responses');
-    setParticipantResponded({});
+    setParticipantResponded({ /* no-op */ });
     try {
       localStorage.removeItem('participant_responses');
     } catch (e) {

@@ -35,7 +35,6 @@ const JoinSessionDialog = ({
   // Auto-close dialog when session is full
   useEffect(() => {
     if (isOpen && maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
-      console.log('Session is full, auto-closing QR dialog');
       setIsOpen(false);
     }
   }, [isOpen, currentParticipantCount, maxParticipants, setIsOpen]);
@@ -60,7 +59,6 @@ const JoinSessionDialog = ({
     // Generate QR code URL when the join URL is available
     if (internalJoinUrl) {
       setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(internalJoinUrl)}`);
-      console.log("Generated QR code for URL:", internalJoinUrl);
     }
   }, [internalJoinUrl]);
 

@@ -25,22 +25,12 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   const [participantCount, setParticipantCount] = React.useState(currentParticipantCount || 0);
   
   // Debug log to verify props
-  console.log("ParticipantWaitingScreen mounted with props:", {
-    conversationId,
-    currentParticipantCount,
-    maxParticipants,
-    facilitatorTitle
-  });
   
   // Set up real-time listener for conversation updates
   useEffect(() => {
     if (!conversationId) {
-      console.log("No conversation ID provided to ParticipantWaitingScreen");
       return;
     }
-    
-    console.log("Setting up realtime subscription for participant waiting screen:", conversationId);
-    console.log("Initial participant count:", currentParticipantCount);
     
     // Update initial count from props
     setParticipantCount(currentParticipantCount || 0);
@@ -55,18 +45,15 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received conversation update in participant waiting screen:", payload);
           
           if (payload.new) {
             // Update participant count
             if (payload.new.current_participants !== null && payload.new.current_participants >= 0) {
-              console.log("Updating participant count from conversation update:", payload.new.current_participants);
               setParticipantCount(payload.new.current_participants);
             }
             
             // Check if session was started
             if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-              console.log("Session was started, triggering callback");
               toast({
                 title: "Session Started",
                 description: "The session has been started by the admin."
@@ -80,9 +67,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             }
           }
         })
-        .subscribe((status) => {
-          console.log(`Conversation updates channel status:`, status);
-        });
+        .subscribe((status) => { /* no-op */ });
       
       // Also listen for session events for more immediate updates
       const eventsChannel = supabase
@@ -93,28 +78,23 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
           table: 'session_events',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received session event in participant waiting screen:", payload);
           
           if (payload.new && payload.new.event_type === 'participant_joined') {
             const eventData = payload.new.data;
             if (eventData && eventData.current_count !== undefined) {
-              console.log("Updating participant count from event:", eventData.current_count);
               setParticipantCount(eventData.current_count);
             }
           }
         })
-        .subscribe((status) => {
-          console.log(`Session events channel status:`, status);
-        });
+        .subscribe((status) => { /* no-op */ });
       
       return () => {
-        console.log("Cleaning up participant waiting screen channels");
         removeChannel(conversationChannel);
         removeChannel(eventsChannel);
       };
     } catch (err) {
       console.error("Error setting up participant waiting subscription:", err);
-      return () => {}; // Empty cleanup function to avoid runtime errors
+      return () => { /* no-op */ }; // Empty cleanup function to avoid runtime errors
     }
   }, [conversationId, currentParticipantCount, onSessionStarted, toast]);
 

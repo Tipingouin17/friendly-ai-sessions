@@ -48,7 +48,6 @@ export const useSessionValidation = ({ conversationId, isAdmin = false }: UseSes
 
         // Check if session is ended
         if (data.is_session_ended || data.status !== 'active') {
-          console.log('Session is ended or inactive, redirecting...');
           setIsValid(false);
           
           toast({

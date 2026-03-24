@@ -325,7 +325,7 @@ export function useHostParticipantManager({
           event: '*',
           schema: 'public',
           table: '*'
-        }, () => { }) // This enables the channel to receive pg_notify messages
+        }, () => { /* no-op */ }) // This enables the channel to receive pg_notify messages
         .subscribe((status) => {
           if (!mountedRef.current) return;
 

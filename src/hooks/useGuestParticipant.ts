@@ -23,8 +23,6 @@ export function useGuestParticipant({
       return;
     }
 
-    console.log("Guest participant joining with data:", locationState);
-    
     const avatarUrl = locationState.avatarSeed 
       ? `/api/avatar?name=${locationState.avatarSeed}&variant=beam&palette=0` 
       : null;
@@ -34,9 +32,6 @@ export function useGuestParticipant({
     setParticipants(prev => {
       const exists = prev.some(p => p.id === locationState.participantId);
       if (exists) return prev;
-      
-      console.log("Adding participant with ID:", locationState.participantId);
-      console.log("Adding participant with name:", locationState.participantName);
       
       return [...prev, {
         id: locationState.participantId!,

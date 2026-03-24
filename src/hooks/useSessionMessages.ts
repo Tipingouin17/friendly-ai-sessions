@@ -71,9 +71,7 @@ export const useSessionMessages = ({
 
   // Log connection status for debugging
   useEffect(() => {
-    if (conversationId) {
-      console.log(`🔍 Session messages connection status for ${conversationId}:`, connectionStatus);
-    }
+    if (conversationId) { /* no-op */ }
   }, [conversationId, connectionStatus]);
   
   return {
@@ -90,7 +88,7 @@ export const useSessionMessages = ({
     handleNewMessage,
     isWaitingForResponses: false, // Not implemented in enhanced version yet
     responseCount: 0, // Not implemented in enhanced version yet
-    generateAggregatedResponse: async () => {}, // Not implemented in enhanced version yet
+    generateAggregatedResponse: async () => { /* no-op */ }, // Not implemented in enhanced version yet
     isGeneratingResponse: false, // Not implemented in enhanced version yet
     forceFetchMessages,
     

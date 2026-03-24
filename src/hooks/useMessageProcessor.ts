@@ -35,7 +35,7 @@ export const useMessageProcessor = ({
     const participantMap = participants.reduce((map, p) => {
       map[p.id] = p;
       return map;
-    }, {} as { [key: number]: ParticipantInfo });
+    }, { /* no-op */ } as { [key: number]: ParticipantInfo });
 
     // Process each message to ensure correct avatar and participant info
     const processedMessages = messages.map(message => {

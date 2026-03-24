@@ -20,12 +20,6 @@ export function useSessionCrossOrigin() {
     const inIframe = isInIframe();
     setIsCrossOrigin(crossOriginContext);
     
-    console.log("Session environment:", {
-      isInCrossOriginContext: crossOriginContext,
-      isInIframe: inIframe,
-      locationSearch: location.search,
-    });
-
     if (crossOriginContext) {
       toast({
         title: "Cross-Origin Session",

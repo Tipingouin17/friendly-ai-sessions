@@ -41,7 +41,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const { data: reportData, isLoading, error, refetch } = useQuery({
     queryKey: ['sessionReport', reportConversationId],
     queryFn: async () => {
-      console.log('🔍 Fetching session report for conversation:', reportConversationId);
       
       // Fetch conversation with sessions
       const { data: conversation, error: convError } = await supabase
@@ -69,8 +68,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         throw new Error('Conversation not found');
       }
 
-      console.log('✅ Conversation found:', conversation.id);
-
       // Get facilitator details separately if facilitator exists
       let facilitatorData = null;
       if (conversation.sessions?.facilitator) {
@@ -82,7 +79,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         
         if (!facilitatorError && facilitator) {
           facilitatorData = facilitator;
-          console.log('✅ Facilitator data loaded:', facilitator.title);
         }
       }
 
@@ -104,8 +100,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         console.error('❌ No report found for conversation:', reportConversationId);
         throw new Error('Session report not found. The session may not have been closed yet.');
       }
-
-      console.log('✅ Report found:', report.id);
 
       // Fetch messages
       const { data: messages, error: msgError } = await supabase
@@ -129,8 +123,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         console.error('❌ Error fetching participants:', partError);
         // Don't throw here, continue with empty participants
       }
-
-      console.log(`✅ Data loaded - Messages: ${messages?.length || 0}, Participants: ${participants?.length || 0}`);
 
       return {
         conversation: {
@@ -174,7 +166,6 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   };
 
   const handleRetry = () => {
-    console.log('🔄 Retrying session report fetch...');
     refetch();
   };
 
@@ -498,7 +489,7 @@ function calculateParticipationStats(messages: any[], participants: any[]) {
   const totalMessages = userMessages.length;
   
   // Count messages per participant
-  const messageCounts: {[key: string]: number} = {};
+  const messageCounts: {[key: string]: number} = { /* no-op */ };
   userMessages.forEach(msg => {
     const participantId = msg.participant || 'unknown';
     messageCounts[participantId] = (messageCounts[participantId] || 0) + 1;

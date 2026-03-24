@@ -50,7 +50,6 @@ export const useSessionClosure = () => {
       setClosureProgress('Updating dashboard...');
       
       // Additional query invalidation for safety
-      console.log("🔄 Final query invalidation for UI consistency...");
       queryClient.invalidateQueries({ queryKey: ['conversation'] });
       queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['active-workshops'] });

@@ -52,7 +52,6 @@ export const useSessionRealtime = ({
     if (conversation) {
       // Check if session is already started
       if (conversation.session_started && !sessionStartedCalled) {
-        console.log("Session already started, triggering callback");
         setSessionStartedCalled(true);
         if (onSessionStarted) onSessionStarted();
       }
@@ -61,7 +60,6 @@ export const useSessionRealtime = ({
       if (conversation.current_participants >= (conversation.participants || 0) && 
           (conversation.participants || 0) > 0 && 
           !sessionFullCalled) {
-        console.log("Session is already full, triggering callback");
         setSessionFullCalled(true);
         if (handleSessionFull) handleSessionFull();
       }
@@ -72,12 +70,10 @@ export const useSessionRealtime = ({
       conversationChannelRef.current = createConversationChannel(
         currentConversationId,
         (payload) => {
-          console.log("Conversation update:", payload);
           
           if (payload.new) {
             // Handle session started
             if (payload.new.session_started && !sessionStartedCalled) {
-              console.log("Session started detected");
               setSessionStartedCalled(true);
               if (onSessionStarted) onSessionStarted();
             }
@@ -86,7 +82,6 @@ export const useSessionRealtime = ({
             if (payload.new.current_participants >= (payload.new.participants || 0) && 
                 (payload.new.participants || 0) > 0 && 
                 !sessionFullCalled) {
-              console.log("Session full detected");
               setSessionFullCalled(true);
               if (handleSessionFull) handleSessionFull();
             }
@@ -101,7 +96,6 @@ export const useSessionRealtime = ({
       participantsChannelRef.current = createParticipantsChannel(
         currentConversationId,
         async (payload) => {
-          console.log("Participant update:", payload);
           
           if (payload.new) {
             // Add new participant if not already in list
@@ -128,7 +122,6 @@ export const useSessionRealtime = ({
       messagesChannelRef.current = createMessagesChannel(
         currentConversationId,
         (payload) => {
-          console.log("Message update:", payload);
           refetch();
         }
       );
@@ -166,7 +159,6 @@ export const useSessionRealtime = ({
     if (conversation && currentConversationId) {
       // Check for session status
       if (conversation.session_started && !sessionStartedCalled) {
-        console.log("Session already started from props, triggering onSessionStarted");
         setSessionStartedCalled(true);
         if (onSessionStarted && typeof onSessionStarted === 'function') {
           onSessionStarted();
@@ -177,7 +169,6 @@ export const useSessionRealtime = ({
       if (conversation.current_participants >= (conversation.participants || 0) && 
           (conversation.participants || 0) > 0 && 
           !sessionFullCalled) {
-        console.log("Session is full from props, triggering handleSessionFull");
         setSessionFullCalled(true);
         if (handleSessionFull && typeof handleSessionFull === 'function') {
           handleSessionFull();

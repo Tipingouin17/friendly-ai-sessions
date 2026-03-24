@@ -21,7 +21,6 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
   onSessionFull
 }) => {
   const handleStartClick = () => {
-    console.log("Start session button clicked in QRCodeView");
     onStartSession();
   };
 

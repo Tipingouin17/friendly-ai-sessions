@@ -128,7 +128,7 @@ export const WorkshopSetup = ({
         <Checkbox id="terms" checked={agreed} onCheckedChange={checked => setAgreed(checked as boolean)} />
         <label htmlFor="terms" className="text-sm text-left">
           I agree to the{" "}
-          <a href="#" className="text-primary hover:underline">
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             terms and conditions
           </a>
         </label>

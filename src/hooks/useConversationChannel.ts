@@ -26,7 +26,6 @@ export function useConversationChannel({
   // Set up real-time subscription for conversation updates
   useEffect(() => {
     if (!conversationId) {
-      console.log("No conversation ID provided, skipping conversation channel setup");
       return;
     }
     
@@ -35,7 +34,6 @@ export function useConversationChannel({
         conversation.current_participants >= (conversation.participants || 0) && 
         (conversation.participants || 0) > 0 && 
         !sessionFullCalledRef.current) {
-      console.log("Session is already full on component mount, triggering handleSessionFull");
       sessionFullCalledRef.current = true;
       if (onSessionFull) {
         onSessionFull();
@@ -44,12 +42,9 @@ export function useConversationChannel({
 
     // Clean up existing channel if it exists
     if (channelRef.current) {
-      console.log("Cleaning up existing conversation channel");
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    
-    console.log("Setting up realtime channel for conversation:", conversationId);
     
     try {
       // Use stable channel name
@@ -61,12 +56,10 @@ export function useConversationChannel({
           table: 'conversations',
           filter: `id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Received realtime update for conversation:", payload);
           
           if (payload.new) {
             // Check for session_started flag
             if (payload.new.session_started && !sessionStartedCalledRef.current) {
-              console.log("Session started flag detected, triggering onSessionStarted");
               sessionStartedCalledRef.current = true;
               if (onSessionStarted && typeof onSessionStarted === 'function') {
                 onSessionStarted();
@@ -80,7 +73,6 @@ export function useConversationChannel({
               if (currentCount >= (payload.new.participants || 0) && 
                   (payload.new.participants || 0) > 0 && 
                   !sessionFullCalledRef.current) {
-                console.log("All participants have joined, triggering session start");
                 sessionFullCalledRef.current = true;
                 if (onSessionFull && typeof onSessionFull === 'function') {
                   onSessionFull();
@@ -92,15 +84,12 @@ export function useConversationChannel({
             refetch();
           }
         })
-        .subscribe((status) => {
-          console.log(`Conversation channel subscription status: ${status}`);
-        });
+        .subscribe((status) => { /* no-op */ });
       
       channelRef.current = conversationChannel;
       
       return () => {
         if (channelRef.current) {
-          console.log("Cleaning up conversation channel");
           supabase.removeChannel(channelRef.current);
           channelRef.current = null;
         }
@@ -117,7 +106,6 @@ export function useConversationChannel({
     if (conversation && conversationId) {
       // Check for session status
       if (conversation.session_started && !sessionStartedCalledRef.current) {
-        console.log("Session already started from props, triggering onSessionStarted");
         sessionStartedCalledRef.current = true;
         if (onSessionStarted && typeof onSessionStarted === 'function') {
           onSessionStarted();
@@ -128,7 +116,6 @@ export function useConversationChannel({
       if (conversation.current_participants >= (conversation.participants || 0) && 
           (conversation.participants || 0) > 0 && 
           !sessionFullCalledRef.current) {
-        console.log("Session is full from props, triggering handleSessionFull");
         sessionFullCalledRef.current = true;
         if (onSessionFull && typeof onSessionFull === 'function') {
           onSessionFull();

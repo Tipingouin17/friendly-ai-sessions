@@ -9,11 +9,6 @@ export function useParticipantCounts(conversation: ConversationWithSession | nul
   // Set conversation data
   useEffect(() => {
     if (conversation) {
-      console.log("Conversation data loaded in useParticipantCounts:", {
-        current: conversation.current_participants,
-        max: conversation.participants,
-        id: conversation.id
-      });
       
       // Set the maximum participants for this specific session
       if (conversation.participants !== null && conversation.participants > 0) {
@@ -24,7 +19,6 @@ export function useParticipantCounts(conversation: ConversationWithSession | nul
       if (conversation.current_participants !== null && 
           typeof conversation.current_participants === 'number' && 
           conversation.current_participants >= 0) {
-        console.log(`Setting current participant count to ${conversation.current_participants} from conversation data`);
         setCurrentParticipantCount(conversation.current_participants);
       }
     }

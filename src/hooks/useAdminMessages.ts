@@ -12,7 +12,6 @@ const logChannelStatus = (channelRef: any, label: string) => {
   
   try {
     const status = channelRef.current?.state || 'UNKNOWN';
-    console.info(`Message channel subscription status (${label}): ${status}`);
   } catch (err) {
     // Silently ignore errors from logging
   }
@@ -73,7 +72,6 @@ export function useAdminMessages({
     
     const loadInitialMessages = async () => {
       try {
-        console.info(`Admin: Fetching initial messages for conversation: ${conversationId}`);
         
         // Query the database for messages
         const { data: dbMessages, error } = await supabase
@@ -88,12 +86,10 @@ export function useAdminMessages({
         }
         
         if (!dbMessages || dbMessages.length === 0) {
-          console.info('No database messages found for admin view');
           
           // Only create welcome message if session has already started
           if (conversationData?.session_started && conversationData?.sessions?.welcome_message) {
             const welcomeMsg = conversationData.sessions.welcome_message;
-            console.info(`Admin: Session started, using welcome message: ${welcomeMsg.substring(0, 50)}...`);
             setWelcomeMessage(welcomeMsg);
             
             // Create welcome message in the expected format
@@ -108,7 +104,6 @@ export function useAdminMessages({
             // Set it as the first message
             setMessages([initialWelcomeMessage]);
           } else {
-            console.info('Session not started yet, not creating welcome message');
             // Clear any existing messages to ensure clean state
             setMessages([]);
           }
@@ -181,12 +176,9 @@ export function useAdminMessages({
     // Skip if no conversation ID or channel is already initialized
     if (!conversationId || hasInitializedChannel) return;
     
-    console.info(`Setting up realtime subscription for messages in conversation: ${conversationId} (admin view)`);
-    
     // Clean up any existing subscription to avoid duplicate listeners
     if (messageSubscriptionRef.current) {
       try {
-        console.info('Cleaning up existing message subscription before creating new one');
         supabase.removeChannel(messageSubscriptionRef.current);
         messageSubscriptionRef.current = null;
         cleanupAttemptedRef.current = true;
@@ -232,9 +224,7 @@ export function useAdminMessages({
             setMessages(prev => [...prev, message]);
           }
         })
-        .subscribe(status => {
-          console.info(`Admin message channel subscription status: ${status}`);
-        });
+        .subscribe(status => { /* no-op */ });
       
       // Store the subscription ref for cleanup
       messageSubscriptionRef.current = subscription;
@@ -250,7 +240,6 @@ export function useAdminMessages({
     // Cleanup function
     return () => {
       try {
-        console.info('Cleaning up message sync channel for admin');
         logChannelStatus(messageSubscriptionRef, 'admin');
         
         // Only attempt cleanup if there's a valid subscription
@@ -263,7 +252,6 @@ export function useAdminMessages({
           supabase.removeChannel(channel);
         }
       } catch (err) {
-        console.info('Channel error detected in admin view, will clean up and restart');
         logChannelStatus(messageSubscriptionRef, 'admin');
         
         // Ensure the ref is cleared to avoid infinite recursion

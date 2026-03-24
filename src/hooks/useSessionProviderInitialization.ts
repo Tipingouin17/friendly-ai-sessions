@@ -26,15 +26,12 @@ export const useSessionProviderInitialization = ({
     if (initializationAttempted.current) return;
     initializationAttempted.current = true;
     
-    console.log("Setting up initialization safety timeout, isAdmin:", isAdmin || forceAdmin);
-    
     // Use shorter timeouts for both admin and participant sessions to prevent stuck states
     const initialTimeout = (isAdmin || forceAdmin) ? 2000 : 3000;
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (!sessionMountedRef.current || forcedInitialization.current) return;
       
-      console.log("Forcing provider initialization after timeout, isAdmin:", isAdmin || forceAdmin);
       forcedInitialization.current = true;
       onInitialized();
       
@@ -53,7 +50,6 @@ export const useSessionProviderInitialization = ({
     const criticalTimeoutId = setTimeout(() => {
       if (!sessionMountedRef.current || forcedInitialization.current) return;
       
-      console.log("Critical initialization timeout reached, forcing initialization, isAdmin:", isAdmin || forceAdmin);
       forcedInitialization.current = true;
       onInitialized();
       onLoading(false); // Force loading state to false

@@ -35,7 +35,7 @@ const StepperItem = React.forwardRef<HTMLDivElement, StepperItemProps>(
             className,
           )}
           data-state={state}
-          {...(isLoading ? { "data-loading": true } : {})}
+          {...(isLoading ? { "data-loading": true } : { /* no-op */ })}
           {...props}
         >
           {children}

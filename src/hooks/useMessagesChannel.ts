@@ -17,18 +17,14 @@ export function useMessagesChannel({
   // Set up real-time subscription for message updates
   useEffect(() => {
     if (!conversationId) {
-      console.log("No conversation ID provided, skipping messages channel setup");
       return;
     }
     
     // Clean up existing channel if it exists
     if (channelRef.current) {
-      console.log("Cleaning up existing messages channel");
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    
-    console.log("Setting up realtime channel for messages:", conversationId);
     
     try {
       // Channel to track messages for admin view
@@ -40,20 +36,16 @@ export function useMessagesChannel({
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Messages table change detected:", payload);
           
           // Force a refetch to update UI with new messages
           refetch();
         })
-        .subscribe((status) => {
-          console.log(`Messages channel subscription status: ${status}`);
-        });
+        .subscribe((status) => { /* no-op */ });
         
       channelRef.current = messagesChannel;
       
       return () => {
         if (channelRef.current) {
-          console.log("Cleaning up messages channel");
           supabase.removeChannel(channelRef.current);
           channelRef.current = null;
         }

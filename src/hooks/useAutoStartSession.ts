@@ -43,8 +43,6 @@ export const useAutoStartSession = ({
       return;
     }
 
-    console.log(`🚀 Auto-starting session: ${currentParticipantCount}/${maxParticipants} participants reached`);
-    
     setIsAutoStarting(true);
     setAutoStartCountdown(3);
 
@@ -71,7 +69,6 @@ export const useAutoStartSession = ({
     // Set auto-start timer
     autoStartTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('🤖 Executing auto-start...');
         await onStartSession();
         toast({
           title: "Session Started",
@@ -92,7 +89,6 @@ export const useAutoStartSession = ({
   }, [isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
 
   const cancelAutoStart = useCallback(() => {
-    console.log('🛑 Auto-start cancelled by host');
     clearAutoStartTimer();
     toast({
       title: "Auto-start Cancelled",

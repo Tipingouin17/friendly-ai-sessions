@@ -33,12 +33,8 @@ export const registerParticipant = async ({
   isHost = false
 }: RegisterParticipantParams) => {
   try {
-    console.log("=== REGISTER PARTICIPANT START ===");
-    console.log(`Registering participant ${participantId} for conversation ${conversationId}`);
-    console.log("Participant details:", { participantName, avatarSeed, isAnonymous, isAdmin, isHost });
 
     // Insert into session_participants table
-    console.log("Attempting to insert into session_participants table...");
     const insertData = {
       conversation_id: conversationId,
       participant_id: participantId,
@@ -47,7 +43,6 @@ export const registerParticipant = async ({
       is_anonymous: isAnonymous,
       is_host: isHost || isAdmin // Map isAdmin to isHost for compatibility
     };
-    console.log("Insert data:", insertData);
 
     const { error: insertError } = await supabase
       .from('session_participants')
@@ -63,11 +58,9 @@ export const registerParticipant = async ({
       });
       throw insertError;
     }
-    console.log("✅ Participant inserted successfully");
 
     // FIXED: Update the conversation participant count to match actual participants
     // This ensures data consistency after successful participant registration
-    console.log("Fetching current participant count...");
     const { data: participantCount, error: countError } = await supabase
       .from('session_participants')
       .select('participant_id', { count: 'exact' })
@@ -77,8 +70,6 @@ export const registerParticipant = async ({
       console.error('⚠️ Error getting participant count:', countError);
     } else {
       const actualCount = participantCount?.length || 0;
-      console.log(`Current participant count: ${actualCount}`);
-      console.log(`Updating conversation ${conversationId} participant count to ${actualCount}`);
 
       const { error: updateError } = await supabase
         .from('conversations')
@@ -87,13 +78,9 @@ export const registerParticipant = async ({
 
       if (updateError) {
         console.error('⚠️ Error updating participant count:', updateError);
-      } else {
-        console.log(`✅ Successfully updated participant count to ${actualCount}`);
-      }
+      } else { /* no-op */ }
     }
 
-    console.log(`✅ Successfully registered participant ${participantId}`);
-    console.log("=== REGISTER PARTICIPANT END ===");
     return { success: true };
   } catch (error) {
     console.error('❌ Failed to register participant:', error);

@@ -24,11 +24,17 @@ const SessionJoinInfo = ({
   
   // Update from props when they change - no realtime subscription here
   useEffect(() => {
-    console.log(`SessionJoinInfo: Updating display count from props to ${currentParticipantCount}`);
     setDisplayParticipantCount(currentParticipantCount);
   }, [currentParticipantCount]);
   
-  // If not admin or no conversation ID, don't render this component
+  // Check if session is full and call the callback if provided
+  useEffect(() => {
+    if (maxParticipants > 0 && displayParticipantCount >= maxParticipants && onSessionFull) {
+      onSessionFull();
+    }
+  }, [displayParticipantCount, maxParticipants, onSessionFull]);
+
+  // Early return AFTER all hooks have been called
   if (!isAdmin || !conversationId) return null;
   
   // Generate join URL
@@ -42,14 +48,6 @@ const SessionJoinInfo = ({
       description: "Session link copied to clipboard.",
     });
   };
-  
-  // Check if session is full and call the callback if provided
-  React.useEffect(() => {
-    if (maxParticipants > 0 && displayParticipantCount >= maxParticipants && onSessionFull) {
-      console.log("Session is full, triggering onSessionFull callback from SessionJoinInfo");
-      onSessionFull();
-    }
-  }, [displayParticipantCount, maxParticipants, onSessionFull]);
   
   const percentageFilled = maxParticipants ? (displayParticipantCount / maxParticipants) * 100 : 0;
   

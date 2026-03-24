@@ -21,18 +21,14 @@ export function useParticipantsChannel({
   // Set up real-time subscription for participant updates
   useEffect(() => {
     if (!conversationId) {
-      console.log("No conversation ID provided, skipping participants channel setup");
       return;
     }
     
     // Clean up existing channel if it exists
     if (channelRef.current) {
-      console.log("Cleaning up existing participants channel");
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    
-    console.log("Setting up realtime channel for participants:", conversationId);
     
     try {
       // Channel for session_participants updates
@@ -44,7 +40,6 @@ export function useParticipantsChannel({
           table: 'session_participants',
           filter: `conversation_id=eq.${conversationId}`
         }, async (payload) => {
-          console.log("Received new participant:", payload);
           
           if (payload.new) {
             const newParticipant = payload.new;
@@ -60,7 +55,6 @@ export function useParticipantsChannel({
                     return current;
                   }
                   const updatedParticipants = [...current, participantInfo];
-                  console.log("Updated participant list:", updatedParticipants);
                   return updatedParticipants;
                 });
               } catch (error) {
@@ -70,15 +64,12 @@ export function useParticipantsChannel({
             }
           }
         })
-        .subscribe((status) => {
-          console.log(`Participants channel subscription status: ${status}`);
-        });
+        .subscribe((status) => { /* no-op */ });
         
       channelRef.current = participantsChannel;
       
       return () => {
         if (channelRef.current) {
-          console.log("Cleaning up participants channel");
           supabase.removeChannel(channelRef.current);
           channelRef.current = null;
         }

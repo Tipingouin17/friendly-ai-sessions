@@ -71,7 +71,6 @@ export const useConversationId = () => {
     }
     // Also check location state.newConversationId which might be used
     else if (locationState?.newConversationId) {
-      console.log("Found conversation ID in state.newConversationId:", locationState.newConversationId);
       currentConversationId = locationState.newConversationId;
     }
     // Finally, check persisted data

@@ -11,8 +11,6 @@ export function useNavigateToSession() {
     participantId: number, 
     avatarSeed: string
   ) => {
-    console.log(`[DEPRECATED] Direct navigation call - prefer using Navigate component in JoinSession`);
-    console.log(`Navigation data: ${name}, participantId: ${participantId}`);
     navigateToParticipantSession(conversationId, name, participantId, avatarSeed);
   };
 

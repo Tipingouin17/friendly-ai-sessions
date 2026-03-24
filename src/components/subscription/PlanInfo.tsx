@@ -52,8 +52,10 @@ export const PlanInfo = () => {
       </Card>;
   }
 
-  const formatPrice = (price: number | null | undefined) => {
+  const formatPrice = (price: number | string | null | undefined) => {
     if (price === null || price === undefined) return '';
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    if (isNaN(numPrice)) return '';
 
     const currency = plan?.currency || 'USD';
     const formatter = new Intl.NumberFormat('en-US', {
@@ -62,7 +64,8 @@ export const PlanInfo = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     });
-    return `${formatter.format(price / 100).replace(/[A-Z]{3}/, '').trim()}/month`;
+    // Prices are stored in full currency units (e.g., €29), not cents
+    return `${formatter.format(numPrice).replace(/[A-Z]{3}/, '').trim()}/month`;
   };
 
   const isHighestTier = plan?.id === 3 || plan?.id === 4;

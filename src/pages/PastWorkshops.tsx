@@ -1,9 +1,9 @@
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import { Calendar, PlusCircle, LayoutDashboard, Download } from "lucide-react";
+import { Calendar, PlusCircle, LayoutDashboard, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, differenceInMinutes } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +16,48 @@ import ReportDownloadDialog from "@/components/session/ReportDownloadDialog";
 import WorkshopMetrics from "@/components/session/WorkshopMetrics";
 import FacilitatorInfo from "@/components/session/FacilitatorInfo";
 import WorkshopTags from "@/components/session/WorkshopTags";
+
+const ITEMS_PER_PAGE = 12;
+
+/**
+ * Calculate workshop duration from timestamps.
+ * Falls back to session_duration_minutes if available,
+ * otherwise calculates from created_at to ended_at.
+ */
+const calculateDuration = (workshop: Workshop): number => {
+  if (workshop.session_duration_minutes && workshop.session_duration_minutes > 0) {
+    return workshop.session_duration_minutes;
+  }
+  if (workshop.created_at && workshop.ended_at) {
+    const minutes = differenceInMinutes(
+      new Date(workshop.ended_at),
+      new Date(workshop.created_at)
+    );
+    return Math.max(1, minutes); // At least 1 minute
+  }
+  return 0;
+};
+
+/**
+ * Get a meaningful workshop title.
+ * Uses session title, then facilitator name, then a date-based fallback.
+ */
+const getWorkshopTitle = (workshop: Workshop): string => {
+  if (workshop.sessions?.title && workshop.sessions.title !== 'Untitled Workshop') {
+    return workshop.sessions.title;
+  }
+  if (workshop.sessions?.facilitators?.title) {
+    return `${workshop.sessions.facilitators.title} Session`;
+  }
+  if (workshop.sessions?.objective) {
+    const obj = workshop.sessions.objective;
+    return obj.length > 50 ? `${obj.slice(0, 47)}...` : obj;
+  }
+  if (workshop.created_at) {
+    return `Workshop ${format(new Date(workshop.created_at), 'MMM d, yyyy')}`;
+  }
+  return 'Workshop';
+};
 
 const fetchPastWorkshops = async () => {
   const { data, error } = await supabase
@@ -70,7 +112,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
   workshop: Workshop,
   isActive: boolean,
   canGenerateReports: boolean,
-  reportData?: any
+  reportData?: Record<string, unknown>
 }) => {
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
@@ -78,36 +120,27 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
 
   const handleHostView = async () => {
     if (isActive) {
-      console.log("Navigating to host session for conversation:", workshop.id);
       await navigateToHostSession(workshop.id);
     }
   };
 
   const handleDownloadReport = () => {
     if (reportData) {
-      const sessionData = {
-        participantCount: workshop.participants || 0,
-        messageCount: workshop.total_messages || 0,
-        duration: workshop.session_duration_minutes || 0,
-        engagementScore: workshop.participant_engagement_score || 0,
-      };
-
-      const closureResult = {
-        reportId: reportData.id || 'report',
-        reportContent: reportData.report_content,
-        sessionData
-      };
-
       setShowReportDialog(true);
     }
   };
 
   const participantCount = workshop.participants || 0;
-  const participantText = participantCount === 1 ? 'participant' : 'participants';
+  const messageCount = workshop.total_messages || 0;
+  const duration = calculateDuration(workshop);
+  const title = getWorkshopTitle(workshop);
 
   const truncateText = (text: string, maxLength: number) => {
     return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
   };
+
+  // Only show download report if there are actual messages
+  const hasContent = messageCount > 0;
 
   return (
     <>
@@ -116,7 +149,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
           <div className="flex justify-between items-start">
             <div className="flex-1">
               <CardTitle className="text-lg font-semibold mb-2">
-                {workshop.sessions?.title || 'Untitled Workshop'}
+                {title}
               </CardTitle>
               <div className="flex items-center justify-between">
                 <div className="flex items-center text-gray-500 text-sm">
@@ -153,8 +186,8 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
 
           <WorkshopMetrics
             participantCount={participantCount}
-            messageCount={workshop.total_messages || 0}
-            duration={workshop.session_duration_minutes || 0}
+            messageCount={messageCount}
+            duration={duration}
             engagementScore={workshop.participant_engagement_score || 0}
           />
 
@@ -173,7 +206,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
                   Manage Session
                 </Button>
               )}
-              {!isActive && canGenerateReports && reportData && (
+              {!isActive && canGenerateReports && reportData && hasContent && (
                 <Button size="sm" variant="outline" onClick={handleDownloadReport}>
                   <Download className="w-4 h-4 mr-2" />
                   Download Report
@@ -188,31 +221,31 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
         <ReportDownloadDialog
           isOpen={showReportDialog}
           onClose={() => setShowReportDialog(false)}
-          onDownload={(format) => {
+          onDownload={(fmt) => {
             const sessionData = {
               participantCount: workshop.participants || 0,
               messageCount: workshop.total_messages || 0,
-              duration: workshop.session_duration_minutes || 0,
+              duration: duration,
               engagementScore: workshop.participant_engagement_score || 0,
             };
 
             const closureResult = {
-              reportId: reportData.id || 'report',
-              reportContent: reportData.report_content,
+              reportId: (reportData as Record<string, unknown>).id as string || 'report',
+              reportContent: (reportData as Record<string, unknown>).report_content as string,
               sessionData
             };
 
-            downloadReport(closureResult, format);
+            downloadReport(closureResult, fmt);
             setShowReportDialog(false);
           }}
           sessionData={{
             participantCount: workshop.participants || 0,
             messageCount: workshop.total_messages || 0,
-            duration: workshop.session_duration_minutes || 0,
+            duration: duration,
             engagementScore: workshop.participant_engagement_score || 0,
           }}
-          sessionTitle={workshop.sessions?.title || 'Untitled Workshop'}
-          reportContent={reportData?.report_content}
+          sessionTitle={title}
+          reportContent={(reportData as Record<string, unknown>)?.report_content as string}
         />
       )}
     </>
@@ -261,12 +294,57 @@ const EmptyState = ({ isActive = false }) => (
   </Card>
 );
 
+/**
+ * Pagination component for workshop lists.
+ */
+const Pagination = ({ currentPage, totalPages, onPageChange }: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) => {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-2 mt-6">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+        <Button
+          key={page}
+          variant={page === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => onPageChange(page)}
+          className="min-w-[36px]"
+        >
+          {page}
+        </Button>
+      ))}
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
 
 const PastWorkshops = () => {
   const navigate = useNavigate();
   const { navigateToHostSession } = useNavigateToSession();
   const queryClient = useQueryClient();
   const { planRestrictions } = useUserPlan();
+  const [pastPage, setPastPage] = useState(1);
 
   const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
     queryKey: ['past-workshops'],
@@ -278,48 +356,43 @@ const PastWorkshops = () => {
     queryFn: fetchActiveWorkshops,
   });
 
-  // Get conversation IDs for fetching reports
-  const pastWorkshopIds = pastWorkshops?.map(w => w.id) || [];
-  const { data: reportsData = {} } = useWorkshopReports(pastWorkshopIds);
+  // Get conversation IDs for fetching reports (only for current page)
+  const totalPastPages = Math.ceil((pastWorkshops?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedPastWorkshops = pastWorkshops?.slice(
+    (pastPage - 1) * ITEMS_PER_PAGE,
+    pastPage * ITEMS_PER_PAGE
+  ) || [];
+
+  const pastWorkshopIds = paginatedPastWorkshops.map(w => w.id);
+  const { data: reportsData = { /* no-op */ } } = useWorkshopReports(pastWorkshopIds);
 
   // Check if user can generate reports
   const canGenerateReports = !!planRestrictions?.session_reports;
 
   // Set up real-time listener for workshop status changes
   useEffect(() => {
-    console.log("🔄 Setting up real-time listener for workshop status changes");
-
     const channel = supabase
       .channel('workshops-realtime')
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'conversations'
-      }, (payload) => {
-        console.log("🔄 Workshop status updated:", payload);
-
-        // Invalidate both past and active workshops queries
+      }, () => {
         queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
         queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
       })
-      .subscribe((status) => {
-        console.log("🔄 Workshops real-time subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("🔄 Cleaning up workshops real-time listener");
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
-  // Handle auto-navigation to most recent active session with secure navigation
+  // Handle auto-navigation to most recent active session
   useEffect(() => {
     const handleAutoNavigation = async () => {
       if (activeWorkshops && activeWorkshops.length > 0 && window.location.search.includes('auto=true')) {
         const mostRecentSession = activeWorkshops[0];
-        console.log("Auto-navigating to most recent session with secure navigation:", mostRecentSession.id);
-
-        // Use secure navigation instead of client-side flags
         await navigateToHostSession(mostRecentSession.id);
       }
     };
@@ -368,7 +441,14 @@ const PastWorkshops = () => {
           </div>
         )}
 
-        <h2 className="text-2xl font-semibold mb-4 mt-12">Past Workshops</h2>
+        <div className="flex items-center justify-between mt-12 mb-4">
+          <h2 className="text-2xl font-semibold">Past Workshops</h2>
+          {pastWorkshops && pastWorkshops.length > 0 && (
+            <span className="text-sm text-gray-500">
+              {pastWorkshops.length} workshop{pastWorkshops.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
         {isPastLoading ? (
           <LoadingState />
         ) : pastError ? (
@@ -376,17 +456,24 @@ const PastWorkshops = () => {
         ) : !pastWorkshops?.length ? (
           <EmptyState />
         ) : (
-          <div className="space-y-4">
-            {pastWorkshops.map((workshop) => (
-              <WorkshopCard
-                key={workshop.id}
-                workshop={workshop}
-                isActive={false}
-                canGenerateReports={canGenerateReports}
-                reportData={reportsData[workshop.id]}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-4">
+              {paginatedPastWorkshops.map((workshop) => (
+                <WorkshopCard
+                  key={workshop.id}
+                  workshop={workshop}
+                  isActive={false}
+                  canGenerateReports={canGenerateReports}
+                  reportData={reportsData[workshop.id]}
+                />
+              ))}
+            </div>
+            <Pagination
+              currentPage={pastPage}
+              totalPages={totalPastPages}
+              onPageChange={setPastPage}
+            />
+          </>
         )}
       </div>
     </div>

@@ -25,7 +25,7 @@ export const useSessionContainerState = ({
   messages,
   viewMode,
   participants,
-  participantNames = {},
+  participantNames = { /* no-op */ },
   currentParticipant
 }: UseSessionContainerStateProps) => {
   const [adminNotification, setAdminNotification] = useState<string | null>(null);

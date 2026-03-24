@@ -25,16 +25,6 @@ export const SessionProviderErrorFallback = ({
   const [lastRetryTime, setLastRetryTime] = useState(0);
   const [isCircuitBreakerOpen, setIsCircuitBreakerOpen] = useState(false);
   
-  console.log("🔍 SessionProviderErrorFallback state:", {
-    errorMessage,
-    isAdmin,
-    retryCount,
-    autoRetryCount,
-    isCircuitBreakerOpen,
-    timeSinceLastRetry: Date.now() - lastRetryTime
-  });
-  
-  const originalError = errorMessage;
   const isSessionFullError = errorMessage.includes("session is full") || 
                             errorMessage.includes("maximum capacity");
   const isNetworkErr = isNetworkError({ message: errorMessage });
@@ -44,12 +34,10 @@ export const SessionProviderErrorFallback = ({
   // Circuit breaker: prevent infinite retry loops
   useEffect(() => {
     if (autoRetryCount >= 3) {
-      console.log("🚫 Circuit breaker: Too many auto-retries, opening circuit");
       setIsCircuitBreakerOpen(true);
       
       // Reset circuit breaker after 30 seconds
       const resetTimeout = setTimeout(() => {
-        console.log("🔄 Circuit breaker: Resetting after cooldown");
         setIsCircuitBreakerOpen(false);
         setAutoRetryCount(0);
       }, 30000);
@@ -67,15 +55,13 @@ export const SessionProviderErrorFallback = ({
         autoRetryCount < 3) {
       
       const timeSinceLastRetry = Date.now() - lastRetryTime;
-      const minimumRetryDelay = 5000; // 5 seconds minimum between retries
+      const minimumRetryDelay = 5000;
       
       if (timeSinceLastRetry < minimumRetryDelay) {
-        console.log("⏰ Delaying auto-retry to prevent rapid cycling");
         return;
       }
       
-      const retryDelay = Math.min(2000 * Math.pow(2, autoRetryCount), 10000); // Exponential backoff
-      console.log(`🔄 Auto-retrying network error in ${retryDelay}ms (attempt ${autoRetryCount + 1}/3)`);
+      const retryDelay = Math.min(2000 * Math.pow(2, autoRetryCount), 10000);
       
       const timeoutId = setTimeout(() => {
         setAutoRetryCount(prev => prev + 1);
@@ -87,12 +73,11 @@ export const SessionProviderErrorFallback = ({
     }
   }, [isNetworkErr, isAbortErr, onRetry, autoRetryCount, isCircuitBreakerOpen, lastRetryTime]);
   
-  // For abort errors, don't show error UI - just retry silently once
+  // For abort errors, retry silently once
   useEffect(() => {
     if (isAbortErr && onRetry && autoRetryCount === 0) {
-      console.log("🔄 AbortError detected - retrying silently once");
       const timeoutId = setTimeout(() => {
-        setAutoRetryCount(1); // Prevent infinite abort retries
+        setAutoRetryCount(1);
         onRetry();
       }, 1000);
       
@@ -100,31 +85,23 @@ export const SessionProviderErrorFallback = ({
     }
   }, [isAbortErr, onRetry, autoRetryCount]);
   
-  // For connection lost errors, be more lenient for participants
-  if (isConnectionLostError && !isAdmin && autoRetryCount < 2) {
-    console.log("📡 Connection lost for participant - allowing retry before showing error");
-    if (onRetry && Date.now() - lastRetryTime > 3000) {
-      setLastRetryTime(Date.now());
-      setAutoRetryCount(prev => prev + 1);
-      onRetry();
+  // For connection lost errors for participants, auto-retry
+  useEffect(() => {
+    if (isConnectionLostError && !isAdmin && autoRetryCount < 2 && onRetry) {
+      if (Date.now() - lastRetryTime > 3000) {
+        setLastRetryTime(Date.now());
+        setAutoRetryCount(prev => prev + 1);
+        onRetry();
+      }
     }
-    return <>{children}</>; // Don't show error UI immediately
-  }
-  
-  // Determine display error
-  const displayError = isAdmin && isSessionFullError
-    ? "You are an admin - overriding session full restriction" 
-    : errorMessage;
+  }, [isConnectionLostError, isAdmin, autoRetryCount, onRetry, lastRetryTime]);
   
   // Force set admin status in session storage and auto-retry for admin session full
   useEffect(() => {
     if (isAdmin) {
-      console.log("🔑 Admin detected in error fallback - enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
       
-      // If it's a session full error and we're admin, auto-retry once
       if (onRetry && isSessionFullError && autoRetryCount === 0) {
-        console.log("🔑 Admin detected with session full error - auto-retrying once");
         setTimeout(() => {
           setAutoRetryCount(1);
           onRetry();
@@ -138,7 +115,6 @@ export const SessionProviderErrorFallback = ({
       setIsRetrying(true);
       setLastRetryTime(Date.now());
       
-      // Reset circuit breaker on manual retry
       if (isCircuitBreakerOpen) {
         setIsCircuitBreakerOpen(false);
         setAutoRetryCount(0);
@@ -151,51 +127,18 @@ export const SessionProviderErrorFallback = ({
       }
     }
   }, [onRetry, isRetrying, isCircuitBreakerOpen]);
+
+  // All hooks are above this line - early returns below
+
+  // For connection lost errors for participants, show children while retrying
+  if (isConnectionLostError && !isAdmin && autoRetryCount < 2) {
+    return <>{children}</>;
+  }
   
-  // Create safe default props for fallback context
-  const fallbackSessionContext: SessionContextProps = {
-    isLoading: false,
-    conversation: null,
-    currentConversationId: null,
-    sessionState: {
-      messages: [],
-      inputMessage: "",
-      setInputMessage: () => {},
-      currentParticipant: 0,
-      isRecording: false,
-      setIsRecording: () => {},
-      hasAnswered: false,
-      totalResponses: 0,
-      viewMode: "participant",
-      setViewMode: () => {},
-      handleGenerateReport: async () => { return Promise.resolve(); },
-      isGeneratingReport: false,
-      setMessages: () => {},
-      recordResponse: () => {},
-      error: null
-    },
-    participants: [],
-    participantColors: {
-      P1: "#FCA5A5", P2: "#FDBA74", P3: "#BEF264", P4: "#86EFAC",
-      P5: "#6EE7B7", P6: "#5EEAD4", P7: "#67E8F9", P8: "#7DD3FC",
-    },
-    isWaitingForResponse: false,
-    handleStartSession: () => {},
-    handleSendMessage: async () => { return Promise.resolve(); },
-    showQrCodeView: false,
-    sessionLink: '',
-    currentUserParticipantId: null,
-    anonymousState: {
-      isAnonymous: false,
-      toggleAnonymous: () => {}
-    },
-    isSessionStartedInDB: false,
-    error: displayError,
-    isConnected: false,
-    connectionAttempts: 0,
-    refetch: () => Promise.resolve({}),
-    isAdmin: isAdmin
-  };
+  // Determine display error
+  const displayError = isAdmin && isSessionFullError
+    ? "You are an admin - overriding session full restriction" 
+    : errorMessage;
 
   // For abort errors, don't show any error UI - just render children
   if (isAbortErr) {

@@ -33,11 +33,9 @@ export const useEnhancedSessionMessages = ({
 
     const now = Date.now();
     if (!forceRefresh && now - lastFetchTime < 1000) {
-      console.log('⏭️ Skipping fetch - too recent');
       return;
     }
 
-    console.log(`📨 Fetching messages for conversation ${conversationId} (force: ${forceRefresh})`);
     setIsLoading(true);
     setError(null);
 
@@ -65,8 +63,6 @@ export const useEnhancedSessionMessages = ({
         role: msg.role || 'user'
       }));
 
-      console.log(`✅ Loaded ${formattedMessages.length} messages for conversation ${conversationId}`);
-      
       setMessages(prev => {
         // Only update if messages have actually changed
         if (prev.length !== formattedMessages.length || 
@@ -89,14 +85,10 @@ export const useEnhancedSessionMessages = ({
   const { isConnected, hasStableConnection, forceReconnect } = useStableRealtimeConnection({
     conversationId,
     onMessageUpdate: () => {
-      console.log('📨 Message update received via realtime');
       fetchMessages(true);
     },
-    onParticipantUpdate: () => {
-      console.log('👥 Participant update received via realtime');
-    },
+    onParticipantUpdate: () => { /* no-op */ },
     onSessionUpdate: () => {
-      console.log('🔄 Session update received via realtime');
       fetchMessages(true);
     },
     enabled: !!conversationId
@@ -111,7 +103,6 @@ export const useEnhancedSessionMessages = ({
   } = useMessageDeliveryTracker({
     conversationId,
     onMessageReceived: (messageId) => {
-      console.log(`📬 Message ${messageId} delivered successfully`);
       fetchMessages(true);
     },
     enabled: !!conversationId && !hasStableConnection // Only use when realtime is unreliable
@@ -120,7 +111,6 @@ export const useEnhancedSessionMessages = ({
   // Initial fetch and conversation change effect
   useEffect(() => {
     if (conversationId && (conversation || !messages.length)) {
-      console.log('🚀 Initial message fetch triggered');
       fetchMessages(true);
     }
   }, [conversationId, conversation, fetchMessages, messages.length]);
@@ -128,7 +118,6 @@ export const useEnhancedSessionMessages = ({
   // Force fetch for participants to ensure immediate message visibility
   useEffect(() => {
     if (conversationId && !isAdmin) {
-      console.log('🚀 Participant view - ensuring immediate message visibility');
       const timer = setTimeout(() => {
         fetchMessages(true);
       }, 1500); // Slight delay to allow any pending operations
@@ -140,7 +129,6 @@ export const useEnhancedSessionMessages = ({
   // Connection recovery mechanism
   useEffect(() => {
     if (!hasStableConnection && conversationId) {
-      console.log('🔄 Connection not stable, using fallback polling');
       const fallbackInterval = setInterval(() => {
         fetchMessages(true);
       }, 5000); // Poll every 5 seconds when connection is unstable
@@ -151,17 +139,14 @@ export const useEnhancedSessionMessages = ({
 
   // Enhanced message handler
   const handleNewMessage = useCallback((message: Message) => {
-    console.log('📝 Processing new message:', message.id);
     
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
-        console.log('⏭️ Message already exists, skipping');
         return prev;
       }
       
       const updated = [...prev, message];
-      console.log(`✅ Added new message, total: ${updated.length}`);
       return updated;
     });
   }, []);

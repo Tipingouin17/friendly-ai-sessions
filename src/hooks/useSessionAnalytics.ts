@@ -143,7 +143,6 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
         table: 'session_events',
         filter: `conversation_id=eq.${conversationId}`
       }, () => {
-        console.log('📊 Session event detected, recalculating analytics');
         calculateAnalytics();
       })
       .subscribe();

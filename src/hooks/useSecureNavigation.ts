@@ -15,7 +15,6 @@ export function useSecureNavigation() {
     participantId: number, 
     avatarSeed: string
   ) => {
-    console.log(`Secure navigation to participant session: ${name}, participantId: ${participantId}`);
     
     // Clear any admin session flags to prevent security issues
     try {
@@ -65,7 +64,6 @@ export function useSecureNavigation() {
       }
 
       logSensitiveAction('admin_session_navigation', String(conversationId));
-      console.log(`Secure navigation to admin session for conversation: ${conversationId}`);
       
       // Navigate to admin session path - ProtectedAdminRoute will handle final security check
       navigate(`/session/admin?id=${conversationId}`, {
@@ -111,7 +109,6 @@ export function useSecureNavigation() {
       }
 
       logSensitiveAction('host_session_navigation', String(conversationId));
-      console.log(`Secure navigation to host session for conversation: ${conversationId}`);
       
       // Navigate to host session path
       navigate(`/session/host?id=${conversationId}`, {

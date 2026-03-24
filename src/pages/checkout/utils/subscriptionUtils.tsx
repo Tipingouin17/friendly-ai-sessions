@@ -6,11 +6,6 @@ export const updateUserSubscription = async (userId: string, planId: number) => 
     throw new Error("User must be logged in to update subscription");
   }
   
-  console.log("Updating user subscription:", {
-    userId: userId,
-    planId: planId
-  });
-  
   const { data, error: updateError } = await supabase
     .from('profiles')
     .update({ 
@@ -25,8 +20,6 @@ export const updateUserSubscription = async (userId: string, planId: number) => 
     console.error('Error updating user profile:', updateError);
     throw new Error('Failed to update user profile with new subscription');
   }
-  
-  console.log("Subscription update successful:", data);
   
   return data;
 };

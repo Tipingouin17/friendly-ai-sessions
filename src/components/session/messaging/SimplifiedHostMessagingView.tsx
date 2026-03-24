@@ -51,7 +51,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
         conversationData={conversationData}
         conversationId={conversationId}
         participantCount={currentParticipantCount}
-        onSessionStarted={onSessionStarted || (() => {})}
+        onSessionStarted={onSessionStarted || (() => { /* no-op */ })}
         isAutoStarting={isAutoStarting}
         autoStartCountdown={autoStartCountdown}
         onCancelAutoStart={onCancelAutoStart}

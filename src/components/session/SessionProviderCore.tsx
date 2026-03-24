@@ -38,14 +38,6 @@ export const SessionProviderCore = ({
   useEffect(() => {
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
-      console.log("SessionProviderCore initialized", {
-        pathname: location.pathname,
-        search: location.search,
-        hasLocationState: !!location.state,
-        hasPersistedData: !!persistedParticipantData,
-        forceAdmin,
-        isAdminInStorage: sessionStorage.getItem('isAdminSession') === 'true'
-      });
     }
   }, [location, persistedParticipantData, forceAdmin]);
 
@@ -62,7 +54,6 @@ export const SessionProviderCore = ({
   useEffect(() => {
     if (effectiveAdmin && !adminStatusSetRef.current) {
       adminStatusSetRef.current = true;
-      console.log("SessionProviderCore: Enforcing admin status");
       sessionStorage.setItem('isAdminSession', 'true');
     }
   }, [effectiveAdmin]);

@@ -21,7 +21,7 @@ export const useSecurityAudit = () => {
         .insert({
           user_id: user?.id || null,
           event_type: event.eventType,
-          event_details: event.eventDetails || {},
+          event_details: event.eventDetails || { /* no-op */ },
           ip_address: event.ipAddress,
           user_agent: event.userAgent || navigator.userAgent
         });

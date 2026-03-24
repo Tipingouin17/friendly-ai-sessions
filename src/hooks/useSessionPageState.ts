@@ -42,7 +42,6 @@ export function useSessionPageState() {
     
     if (hasParticipantParams) {
       // Clear any admin flags when accessing participant URLs
-      console.log("🧹 Clearing admin session storage for participant URL");
       sessionStorage.removeItem('isAdminSession');
       sessionStorage.removeItem('isHostSession');
     }
@@ -56,14 +55,6 @@ export function useSessionPageState() {
     stateRef.current.isAdmin = isOnAdminPath || (storedIsAdmin && !hasParticipantParams);
     stateRef.current.isHost = isOnHostPath || (storedIsHost && !hasParticipantParams);
     
-    console.log("🔍 Session page state initialized:", {
-      isOnAdminPath,
-      isOnHostPath,
-      hasParticipantParams,
-      isAdmin: stateRef.current.isAdmin,
-      isHost: stateRef.current.isHost,
-      clearedStorage: hasParticipantParams
-    });
   }, [location.pathname, location.search]);
   
   // Handle error function that doesn't cause re-renders
@@ -93,7 +84,6 @@ export function useSessionPageState() {
   // Retry connection handler
   const retryConnection = useCallback(() => {
     stateRef.current.connectionAttempts++;
-    console.log(`Retrying connection (attempt ${stateRef.current.connectionAttempts})`);
     
     // Force loading state during retry
     setIsLoading(true);
@@ -109,7 +99,6 @@ export function useSessionPageState() {
     
     // For host, ensure we're not stuck in loading
     if ((stateRef.current.isHost || stateRef.current.isOnHostPath) && isLoading) {
-      console.log("Host detected, clearing loading state");
       setIsLoading(false);
     }
   }, [isLoading]);

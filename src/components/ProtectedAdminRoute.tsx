@@ -61,10 +61,8 @@ export const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
     }
 
     if (!user || !isAdmin) {
-        console.log('ProtectedAdminRoute: Access denied. Redirecting to home.', { user: !!user, isAdmin });
         return <Navigate to="/" replace />;
     }
 
-    console.log('ProtectedAdminRoute: Access granted. Rendering children.');
     return <>{children}</>;
 };

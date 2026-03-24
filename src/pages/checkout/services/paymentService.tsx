@@ -59,7 +59,6 @@ export const createSubscription = async (
   
   // Create the return URL with proper cross-origin support
   const returnUrl = createSafeUrl('/profile');
-  console.log("Using return URL:", returnUrl);
 
   // Apply safe cookie parameters to fetch options
   const fetchOptions = applySafeCookieParams({
@@ -78,7 +77,6 @@ export const createSubscription = async (
   });
 
   // Remove sensitive logging
-  console.log("Creating subscription for plan:", plan.id);
 
   const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/create-subscription`, fetchOptions);
 
@@ -180,7 +178,6 @@ export const confirmSubscription = async (
   });
 
   // Remove sensitive logging
-  console.log("Confirming subscription:", subscriptionId);
 
   const confirmResponse = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/confirm-subscription`, confirmOptions);
 

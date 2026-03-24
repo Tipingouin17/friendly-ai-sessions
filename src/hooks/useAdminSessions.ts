@@ -15,7 +15,6 @@ export function useAdminSessions() {
     queryKey: ['admin-sessions'],
     queryFn: async () => {
       try {
-        console.log("Fetching active sessions for admin");
         
         const { data, error } = await supabase
           .from('conversations')
@@ -45,7 +44,6 @@ export function useAdminSessions() {
           throw new Error("Failed to load active sessions");
         }
         
-        console.log('Found active sessions:', data?.length || 0);
         return data as ConversationWithSession[];
       } catch (error) {
         console.error('Error in query function:', error);
@@ -60,7 +58,6 @@ export function useAdminSessions() {
   
   // Set up real-time listener for conversations changes
   useEffect(() => {
-    console.log("🔄 Setting up real-time listener for active sessions");
     
     const channel = supabase
       .channel('admin-sessions-realtime')
@@ -69,7 +66,6 @@ export function useAdminSessions() {
         schema: 'public',
         table: 'conversations'
       }, (payload) => {
-        console.log("🔄 Conversations table updated:", payload);
         
         // Check if the change affects session status
         if (payload.new && payload.old) {
@@ -81,8 +77,6 @@ export function useAdminSessions() {
               newRecord.status !== oldRecord.status ||
               newRecord.current_participants !== oldRecord.current_participants) {
             
-            console.log("🔄 Session status change detected, refreshing admin sessions");
-            
             // Invalidate and refetch the admin sessions query
             queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
             
@@ -91,12 +85,9 @@ export function useAdminSessions() {
           }
         }
       })
-      .subscribe((status) => {
-        console.log("🔄 Admin sessions real-time subscription status:", status);
-      });
+      .subscribe((status) => { /* no-op */ });
 
     return () => {
-      console.log("🔄 Cleaning up admin sessions real-time listener");
       supabase.removeChannel(channel);
     };
   }, [queryClient, refetch]);
@@ -120,7 +111,6 @@ export function useAdminSessions() {
   }, [error, toast]);
   
   const refreshSessions = () => {
-    console.log("🔄 Manual refresh triggered for admin sessions");
     refetch();
   };
   

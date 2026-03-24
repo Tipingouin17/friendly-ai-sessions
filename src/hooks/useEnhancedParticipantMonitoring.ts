@@ -33,7 +33,6 @@ export function useEnhancedParticipantMonitoring({
 
   const setupFallbackPolling = useCallback(async () => {
     // Disabled - handled by simplified monitoring
-    console.log('Enhanced monitoring disabled to prevent conflicts');
   }, []);
 
   const performHealthCheck = useCallback(() => {

@@ -15,7 +15,7 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
-  config: Partial<RetryConfig> = {}
+  config: Partial<RetryConfig> = { /* no-op */ }
 ): Promise<T> {
   const { maxAttempts, baseDelay, maxDelay, backoffMultiplier } = {
     ...DEFAULT_RETRY_CONFIG,
@@ -40,7 +40,6 @@ export async function retryWithBackoff<T>(
       }
       
       const delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), maxDelay);
-      console.log(`Attempt ${attempt} failed, retrying in ${delay}ms:`, error);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

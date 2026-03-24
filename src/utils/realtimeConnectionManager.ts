@@ -12,7 +12,6 @@ import { removeChannel, createUniqueChannelName, createReliableChannel } from ".
  */
 export const removeChannels = (channels: any[]) => {
   if (channels && channels.length > 0) {
-    console.log(`Cleaning up ${channels.length} realtime channels`);
     channels.forEach(channel => {
       try {
         removeChannel(channel);
@@ -33,7 +32,6 @@ export const createConversationChannel = (
   conversationId: number,
   onUpdate: (payload: any) => void
 ) => {
-  console.log(`Creating enhanced conversation channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`conversation-${conversationId}`);
@@ -48,19 +46,15 @@ export const createConversationChannel = (
         filter: `id=eq.${conversationId}`
       }, (payload) => {
         try {
-          console.log(`Enhanced conversation update for ${conversationId}:`, payload);
           onUpdate(payload);
         } catch (error) {
           console.error('Error in conversation update handler:', error);
         }
       })
       .subscribe((status) => {
-        console.log(`Enhanced conversation channel subscription status: ${status}`);
         if (status === 'CHANNEL_ERROR') {
           console.error('Conversation channel subscription failed');
-        } else if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to conversation updates');
-        }
+        } else if (status === 'SUBSCRIBED') { /* no-op */ }
       });
   } catch (error) {
     console.error("Error creating conversation channel:", error);
@@ -78,7 +72,6 @@ export const createParticipantsChannel = (
   conversationId: number,
   onParticipantJoin: (payload: any) => void
 ) => {
-  console.log(`Creating enhanced participants channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`participants-${conversationId}`);
@@ -93,19 +86,15 @@ export const createParticipantsChannel = (
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         try {
-          console.log(`Enhanced participant join for ${conversationId}:`, payload);
           onParticipantJoin(payload);
         } catch (error) {
           console.error('Error in participant join handler:', error);
         }
       })
       .subscribe((status) => {
-        console.log(`Enhanced participants channel subscription status: ${status}`);
         if (status === 'CHANNEL_ERROR') {
           console.error('Participants channel subscription failed');
-        } else if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to participant updates');
-        }
+        } else if (status === 'SUBSCRIBED') { /* no-op */ }
       });
   } catch (error) {
     console.error("Error creating participants channel:", error);
@@ -123,7 +112,6 @@ export const createMessagesChannel = (
   conversationId: number,
   onMessageChange: (payload: any) => void
 ) => {
-  console.log(`Creating enhanced messages channel for ID: ${conversationId}`);
   
   // Use unique channel name to prevent collisions
   const channelName = createUniqueChannelName(`messages-${conversationId}`);
@@ -138,19 +126,15 @@ export const createMessagesChannel = (
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         try {
-          console.log(`Enhanced message change for ${conversationId}:`, payload);
           onMessageChange(payload);
         } catch (error) {
           console.error('Error in message change handler:', error);
         }
       })
       .subscribe((status) => {
-        console.log(`Enhanced messages channel subscription status: ${status}`);
         if (status === 'CHANNEL_ERROR') {
           console.error('Messages channel subscription failed');
-        } else if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to message updates');
-        }
+        } else if (status === 'SUBSCRIBED') { /* no-op */ }
       });
   } catch (error) {
     console.error("Error creating messages channel:", error);

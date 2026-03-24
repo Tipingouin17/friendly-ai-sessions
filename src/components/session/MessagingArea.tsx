@@ -55,15 +55,15 @@ const MessagingArea = ({
   
   // Input props with defaults
   inputMessage = '',
-  setInputMessage = () => {},
-  onSendMessage = () => {},
+  setInputMessage = () => { /* no-op */ },
+  onSendMessage = () => { /* no-op */ },
   isRecording = false,
-  setIsRecording = () => {},
+  setIsRecording = () => { /* no-op */ },
   isAnonymous = false,
-  toggleAnonymous = () => {},
+  toggleAnonymous = () => { /* no-op */ },
   hasAnswered = false,
   totalResponses = 0,
-  participantNames = {},
+  participantNames = { /* no-op */ },
   currentUserParticipantId = null,
   
   // Session data
@@ -82,7 +82,6 @@ const MessagingArea = ({
   
   // Log messages count for debugging
   useEffect(() => {
-    console.log(`MessagingArea: Rendering with ${messages.length} messages in ${viewMode} view`);
     
     // Check if we're in participant view
     if (viewMode === "participant" && !isAdmin) {
@@ -92,7 +91,6 @@ const MessagingArea = ({
       const facilitatorMsgCount = messages.filter(m => m.sender === "assistant").length;
       const otherMsgCount = messages.length - userMsgCount - facilitatorMsgCount;
       
-      console.log(`For participant ${participantKey}: user messages=${userMsgCount}, facilitator messages=${facilitatorMsgCount}, other messages=${otherMsgCount}`);
     }
   }, [messages, viewMode, isAdmin, currentParticipant]);
   

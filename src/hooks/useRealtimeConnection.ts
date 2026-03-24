@@ -42,7 +42,6 @@ export function useRealtimeConnection(
       // Only attempt recovery if we have a conversation ID and no current connection
       const timeoutId = setTimeout(() => {
         if (mountedRef.current) {
-          console.log("Connection not established, attempting recovery");
           attemptReconnection();
         }
       }, 5000);

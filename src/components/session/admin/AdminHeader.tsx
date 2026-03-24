@@ -41,7 +41,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   
   const handleBack = () => {
-    console.log("Dashboard button clicked - navigating to past workshops");
     try {
       navigate('/past-workshops', { replace: true });
     } catch (error) {
@@ -57,7 +56,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
       return;
     }
     
-    console.log("Attempting to close session with ID:", conversation.id);
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
@@ -72,11 +70,9 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
 
     if (conversation.is_session_ended) {
-      console.log("Session already ended, cannot close again");
       return;
     }
 
-    console.log("Opening session closure dialog for proper report generation");
     setShowClosureDialog(true);
   };
 

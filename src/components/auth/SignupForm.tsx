@@ -22,7 +22,7 @@ export const SignupForm: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({ /* no-op */ });
   const [attempts, setAttempts] = useState(0);
   
   const { signup } = useAuth();
@@ -37,11 +37,11 @@ export const SignupForm: React.FC = () => {
         password, 
         confirmPassword 
       });
-      setErrors({});
+      setErrors({ /* no-op */ });
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
+        const newErrors: Record<string, string> = { /* no-op */ };
         error.errors.forEach(err => {
           if (err.path[0]) {
             newErrors[err.path[0] as string] = err.message;

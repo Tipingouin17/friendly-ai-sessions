@@ -50,7 +50,6 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
 
       // If a profile picture is provided, upload it to the storage bucket
       if (profilePicture && facilitator) {
-        console.log(`Uploading profile picture for facilitator ${facilitator.id}`);
         
         // Convert base64 to blob
         const base64Response = await fetch(profilePicture);
@@ -63,8 +62,6 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
             contentType: 'image/jpeg',
             upsert: true
           });
-        
-        console.log("Upload result:", uploadData);
         
         if (uploadError) {
           console.error('Error uploading profile picture:', uploadError);
@@ -79,8 +76,6 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
             .from('facilitator-avatars')
             .getPublicUrl(`${facilitator.id}.jpg`);
             
-          console.log("Public URL:", publicUrlData.publicUrl);
-          
           // Update the facilitator with the profile picture URL
           const { error: updateError } = await supabase
             .from('facilitators')

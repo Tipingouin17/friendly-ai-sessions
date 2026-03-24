@@ -112,7 +112,7 @@ export const AnalyticsDashboard = () => {
           )
         `);
 
-            const facilitatorCounts: Record<string, number> = {};
+            const facilitatorCounts: Record<string, number> = { /* no-op */ };
             sessionsData?.forEach(session => {
                 const title = session.sessions?.title || 'Unknown';
                 facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;

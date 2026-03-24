@@ -29,20 +29,11 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
   
-  React.useEffect(() => {
-    console.log("Admin view received messages:", 
-      messages.map(m => ({
-        id: m.id,
-        sender: m.sender,
-        content: m.content.substring(0, 20) + "...",
-        participant: m.participant
-      }))
-    );
-  }, [messages]);
+  React.useEffect(() => { /* no-op */ }, [messages]);
 
   // Create a mapping of participant IDs to names
   const participantNameMap = useMemo(() => {
-    const nameMap: { [key: string]: string } = {};
+    const nameMap: { [key: string]: string } = { /* no-op */ };
     
     messages.forEach(message => {
       if (message.participant && typeof message.participant === 'string') {
@@ -60,7 +51,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
   }, [messages]);
 
   const groupedMessages = useMemo(() => {
-    console.log("Grouping messages for admin view:", messages.length);
 
     if (messages.length > 0 && !messages.some(m => m.sender === "assistant")) {
       const userMessages = messages.filter(m => 
@@ -70,7 +60,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
       );
       
       if (userMessages.length > 0) {
-        console.log("Creating default group for user messages without facilitator prompt");
         return [{
           question: {
             id: "default-question",
@@ -127,7 +116,6 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
       groups.push(currentGroup);
     }
     
-    console.log("Created message groups:", groups.length);
     return groups;
   }, [messages, showAnonymous, searchTerm]);
 

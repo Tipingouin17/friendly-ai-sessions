@@ -29,15 +29,6 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     const now = Date.now();
     const timeSinceLastClick = now - lastClickTime.current;
     
-    console.log("🔥 StartSessionButton - Click detected!", {
-      participantCount,
-      isSessionStarted,
-      disabled,
-      isAutoStarting,
-      timeSinceLastClick,
-      isEnabled: !disabled && participantCount > 0 && !isSessionStarted && !isAutoStarting
-    });
-    
     // If auto-starting, allow cancellation
     if (isAutoStarting && onCancelAutoStart) {
       onCancelAutoStart();
@@ -46,36 +37,20 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
     
     // Prevent rapid clicks (debounce)
     if (timeSinceLastClick < 1000) {
-      console.log("🔥 StartSessionButton - Click ignored (too fast)");
       return;
     }
     
     // Check if button should be enabled
     if (disabled || participantCount === 0 || isSessionStarted) {
-      console.log("🔥 StartSessionButton - Click ignored (button disabled)", {
-        disabled,
-        participantCount,
-        isSessionStarted
-      });
       return;
     }
     
     lastClickTime.current = now;
-    console.log("🔥 StartSessionButton - Executing onStartSession");
     onStartSession();
   }, [onStartSession, participantCount, isSessionStarted, disabled, isAutoStarting, onCancelAutoStart]);
 
   // Log state changes for debugging
-  React.useEffect(() => {
-    console.log("🔥 StartSessionButton - State changed:", {
-      participantCount,
-      isSessionStarted,
-      disabled,
-      isAutoStarting,
-      autoStartCountdown,
-      shouldBeEnabled: !disabled && participantCount > 0 && !isSessionStarted
-    });
-  }, [participantCount, isSessionStarted, disabled, isAutoStarting, autoStartCountdown]);
+  React.useEffect(() => { /* no-op */ }, [participantCount, isSessionStarted, disabled, isAutoStarting, autoStartCountdown]);
 
   if (isSessionStarted) {
     return (

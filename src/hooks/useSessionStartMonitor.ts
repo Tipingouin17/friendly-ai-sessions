@@ -14,7 +14,6 @@ export const useSessionStartMonitor = ({
     if (conversation) {
       // Check if the session is already started in the DB
       const isStarted = Boolean(conversation.session_started);
-      console.log("Session started status from conversation:", isStarted);
       setIsSessionStartedInDB(isStarted);
     }
   }, [conversation]);

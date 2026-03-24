@@ -31,7 +31,6 @@ export const useOptimizedSessionState = ({
   const handleSessionStarted = useCallback(() => {
     if (!mountedRef.current) return;
     
-    console.log("🎯 [useOptimizedSessionState] Session started callback triggered");
     setIsSessionStarted(true);
     setIsTransitioning(false);
     onSessionStarted?.();
@@ -62,8 +61,6 @@ export const useOptimizedSessionState = ({
   const setupOptimizedSubscription = useCallback(() => {
     if (!conversationId || !mountedRef.current) return;
 
-    console.log("🔗 [useOptimizedSessionState] Setting up stable session state subscription");
-    
     cleanup();
     setConnectionAttempts(prev => prev + 1);
 
@@ -80,17 +77,8 @@ export const useOptimizedSessionState = ({
         }, (payload) => {
           if (!mountedRef.current) return;
           
-          console.log("📡 [useOptimizedSessionState] Stable session update:", {
-            sessionStartedOld: payload.old?.session_started,
-            sessionStartedNew: payload.new?.session_started,
-            currentParticipantsOld: payload.old?.current_participants,
-            currentParticipantsNew: payload.new?.current_participants,
-            welcomeStatus: payload.new?.welcome_message_status
-          });
-
           // Handle session start detection with enhanced reliability
           if (payload.new?.session_started === true && payload.old?.session_started !== true) {
-            console.log("🚀 [useOptimizedSessionState] Session start detected via stable connection!");
             setIsTransitioning(true);
             
             // Clear any existing timeout
@@ -109,17 +97,13 @@ export const useOptimizedSessionState = ({
         .subscribe((status) => {
           if (!mountedRef.current) return;
           
-          console.log(`🔗 [useOptimizedSessionState] Stable channel status: ${status}`);
-          
           if (status === 'SUBSCRIBED') {
             setConnectionAttempts(0);
             stableConnectionRef.current = true;
             
             // Monitor connection stability
             setTimeout(() => {
-              if (mountedRef.current && stableConnectionRef.current) {
-                console.log("✅ [useOptimizedSessionState] Connection stabilized");
-              }
+              if (mountedRef.current && stableConnectionRef.current) { /* no-op */ }
             }, connectionStabilityWindow);
             
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -129,7 +113,6 @@ export const useOptimizedSessionState = ({
             // Implement exponential backoff for reconnection
             if (connectionAttempts < maxReconnectAttempts && mountedRef.current) {
               const delay = Math.min(baseReconnectDelay * Math.pow(2, connectionAttempts), 15000);
-              console.log(`⏰ [useOptimizedSessionState] Scheduling reconnection in ${delay}ms (attempt ${connectionAttempts + 1})`);
               
               reconnectTimeoutRef.current = setTimeout(() => {
                 if (mountedRef.current) {
@@ -141,7 +124,6 @@ export const useOptimizedSessionState = ({
             }
             
           } else if (status === 'CLOSED') {
-            console.log("🔒 [useOptimizedSessionState] Connection closed");
             stableConnectionRef.current = false;
           }
         });
@@ -170,14 +152,12 @@ export const useOptimizedSessionState = ({
   // Initialize session state from props with stability check
   useEffect(() => {
     if (initialSessionStarted !== isSessionStarted) {
-      console.log(`🔄 [useOptimizedSessionState] Syncing session state: ${initialSessionStarted}`);
       setIsSessionStarted(initialSessionStarted);
     }
   }, [initialSessionStarted, isSessionStarted]);
 
   // Manual reconnection function
   const forceReconnect = useCallback(() => {
-    console.log("🔄 [useOptimizedSessionState] Force reconnecting...");
     setConnectionAttempts(0);
     setupOptimizedSubscription();
   }, [setupOptimizedSubscription]);

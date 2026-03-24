@@ -13,7 +13,6 @@ export const useSessionClosureValidation = () => {
       throw new Error('No conversation ID provided');
     }
 
-    console.log("🔍 Step 1: Checking user authentication...");
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
@@ -27,9 +26,6 @@ export const useSessionClosureValidation = () => {
       throw new Error('User not authenticated');
     }
     
-    console.log("✅ User authenticated:", user.id);
-
-    console.log("🔍 Step 2: Performing security validation...");
     const securityValidation = await validateSecureSessionOperation(
       conversationId, 
       user.id, 
@@ -46,7 +42,6 @@ export const useSessionClosureValidation = () => {
       throw new Error(securityValidation.error || 'Security validation failed');
     }
 
-    console.log("🔍 Step 3: Verifying conversation ownership...");
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('user_id, is_session_ended')
@@ -78,7 +73,6 @@ export const useSessionClosureValidation = () => {
       throw new Error('Session is already ended');
     }
 
-    console.log("✅ Conversation ownership verified");
     return { user, conversation };
   };
 

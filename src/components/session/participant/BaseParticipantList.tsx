@@ -12,9 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 // Simple local logger to avoid import issues
 const createLogger = (component: string, category: string) => ({
-  category: (cat: string, message: string, ...data: any[]) => {
-    console.log(`[${cat.toUpperCase()}] ${component}: ${message}`, ...data);
-  }
+  category: (cat: string, message: string, ...data: any[]) => { /* no-op */ }
 });
 
 interface BaseParticipantListProps {
@@ -73,7 +71,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   } = useParticipantRemoval({
     conversationId: conversationData?.id || null,
     currentParticipantCount: effectiveParticipants.length,
-    setParticipantsList: isHostView ? () => {} : setParticipantsList
+    setParticipantsList: isHostView ? () => { /* no-op */ } : setParticipantsList
   });
   
   useEffect(() => {

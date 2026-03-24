@@ -39,7 +39,6 @@ export const useWelcomeMessageRecovery = ({
 
         // If stuck for more than 60 seconds, attempt recovery
         if (timeSinceUpdate > 60000 && recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
-          console.log('🔄 Auto-recovery triggered for stuck welcome message generation');
           attemptRecovery();
         }
       }
@@ -54,12 +53,10 @@ export const useWelcomeMessageRecovery = ({
 
     // Check cooldown
     if (lastRecoveryTime && Date.now() - lastRecoveryTime < RECOVERY_COOLDOWN) {
-      console.log('⏰ Recovery cooldown active, skipping attempt');
       return;
     }
 
     if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
-      console.log('🚫 Max recovery attempts reached');
       return;
     }
 
@@ -68,7 +65,6 @@ export const useWelcomeMessageRecovery = ({
     setLastRecoveryTime(Date.now());
 
     try {
-      console.log(`🔄 Attempting welcome message recovery (attempt ${recoveryAttempts + 1}/${MAX_RECOVERY_ATTEMPTS})`);
 
       // First, reset the status to pending
       await supabase
@@ -95,7 +91,6 @@ export const useWelcomeMessageRecovery = ({
       if (error) {
         console.error('❌ Recovery attempt failed:', error);
       } else {
-        console.log('✅ Recovery attempt successful:', data);
         setRecoveryAttempts(0); // Reset on success
         if (onRecoverySuccess) {
           onRecoverySuccess();
@@ -115,7 +110,6 @@ export const useWelcomeMessageRecovery = ({
     setRecoveryAttempts(prev => prev + 1);
 
     try {
-      console.log('🔧 Force recovery triggered by user');
 
       // Reset conversation status
       await supabase
@@ -139,7 +133,6 @@ export const useWelcomeMessageRecovery = ({
       if (error) {
         console.error('❌ Force recovery failed:', error);
       } else {
-        console.log('✅ Force recovery successful:', data);
         setRecoveryAttempts(0);
         if (onRecoverySuccess) {
           onRecoverySuccess();

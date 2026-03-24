@@ -77,7 +77,6 @@ export const useSessionParticipantSetup = ({
     loadingRef.current = true;
     
     try {
-      console.log(`Loading participants for conversation ${conversationId}`);
       
       const requestKey = `participants-${conversationId}`;
       
@@ -107,7 +106,6 @@ export const useSessionParticipantSetup = ({
       }
       
       if (!result || result.length === 0) {
-        console.log("No participants found for conversation:", conversationId);
         setParticipants([]);
         setLoadingError(null);
         setRetryCount(0);
@@ -135,7 +133,6 @@ export const useSessionParticipantSetup = ({
       });
       
       const participantInfos = (await Promise.all(participantPromises)).filter(Boolean) as ParticipantInfo[];
-      console.log("Successfully loaded participants:", participantInfos.length);
       
       setParticipants(participantInfos);
       setLoadingError(null);
@@ -147,7 +144,6 @@ export const useSessionParticipantSetup = ({
       // Priority 1: URL location state
       if (locationState?.participantId) {
         participantId = locationState.participantId;
-        console.log('📍 Participant ID from location state:', participantId);
       }
       
       // Priority 2: Find participant by checking if current user is in the participant list
@@ -162,7 +158,6 @@ export const useSessionParticipantSetup = ({
           );
           if (matchingParticipant) {
             participantId = matchingParticipant.id;
-            console.log('🔍 Found participant ID by name match:', participantId, participantName);
           }
         }
       }
@@ -170,19 +165,14 @@ export const useSessionParticipantSetup = ({
       // Priority 3: If still no ID and only one participant, assume it's them
       if (!participantId && participantInfos.length === 1 && !window.location.pathname.includes('/admin') && !window.location.pathname.includes('/host')) {
         participantId = participantInfos[0].id;
-        console.log('👤 Single participant detected, using their ID:', participantId);
       }
       
       if (participantId) {
         setCurrentUserParticipantId(participantId);
-        console.log('✅ Set current user participant ID:', participantId);
-      } else {
-        console.log('⚠️ Could not determine participant ID');
-      }
+      } else { /* no-op */ }
       
     } catch (err: any) {
       if (isAbortError(err)) {
-        console.log("Request was aborted, ignoring error");
         return;
       }
       
@@ -247,7 +237,7 @@ export const useSessionParticipantSetup = ({
     conversation,
     refetch,
     handleSessionFull: onSessionFull,
-    onSessionStarted: () => {}
+    onSessionStarted: () => { /* no-op */ }
   });
   
   // Handle realtime errors (exclude abort errors)
@@ -261,7 +251,6 @@ export const useSessionParticipantSetup = ({
   const forceRefreshParticipants = useCallback(async () => {
     if (!conversationId) return;
     
-    console.log("Forcing refresh of participants");
     requestDeduplicator.clear(`participants-${conversationId}`);
     
     // Reset the conversation ID ref to force a reload

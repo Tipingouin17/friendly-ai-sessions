@@ -71,7 +71,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isAdmin,
   onSendAdminMessage,
   isAnonymous = false,
-  toggleAnonymous = () => {}
+  toggleAnonymous = () => { /* no-op */ }
 }) => {
   const mobileState = useIsMobile();
   const isMobile = mobileState === true;
@@ -89,9 +89,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   });
   
   // Debug logging for messages
-  useEffect(() => {
-    console.log(`SessionContainer - Rendering with ${messages.length} messages, participant: ${currentParticipant}, hasAnswered: ${hasAnswered}`);
-  }, [messages.length, currentParticipant, hasAnswered]);
+  useEffect(() => { /* no-op */ }, [messages.length, currentParticipant, hasAnswered]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50">

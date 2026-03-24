@@ -1,116 +1,79 @@
 
 /**
- * Debug logger utility to manage console logs across the application
- * Provides a way to selectively enable/disable logs by category
+ * Debug logger utility to manage console logs across the application.
+ * In production mode, only errors and warnings are logged.
+ * Debug logs are suppressed unless explicitly enabled via VITE_DEBUG=true.
  */
 
-// Configuration for which log categories are enabled
+const IS_PRODUCTION = import.meta.env.PROD;
+const DEBUG_ENABLED = import.meta.env.VITE_DEBUG === 'true';
+
+// Configuration for which log categories are enabled (only active in development or when VITE_DEBUG=true)
 const DEBUG_CONFIG = {
-  // Core logs
-  session: true,          // Session setup and management - ENABLED for debugging
-  provider: false,        // Session provider internals
-  initialization: false,  // Initialization processes
-  connection: true,       // Connection and realtime events - ENABLED for performance monitoring
-  
-  // Data logs
-  participants: true,     // Participant joining/leaving
-  messages: true,         // Message sending/receiving - ENABLED for AI debugging
-  conversation: false,    // Conversation data
-  
-  // UI logs
-  rendering: false,       // Component renders
-  state: true,            // State changes - ENABLED for performance monitoring
-  
-  // Special cases
-  errors: true,           // Always log errors
-  warnings: true,         // Always log warnings
-  admin: true,            // Admin-specific logs
-  all: false,             // Generic logs that don't fit in other categories - DISABLED by default
+  session: false,
+  provider: false,
+  initialization: false,
+  connection: false,
+  participants: false,
+  messages: false,
+  conversation: false,
+  rendering: false,
+  state: false,
+  errors: true,
+  warnings: true,
+  admin: false,
+  all: false,
 };
 
-// Enable all logs with this flag (overrides individual settings)
-const ENABLE_ALL_LOGS = false;
-
-// Force disable all logs with this flag (highest priority)
-const DISABLE_ALL_LOGS = false;
-
 /**
- * Logger function that respects debug configuration
- * @param category The logging category
- * @param message The primary message
- * @param data Optional data to log
+ * Logger function that respects debug configuration.
+ * Suppressed entirely in production unless VITE_DEBUG is set.
  */
 export function debugLog(
-  category: keyof typeof DEBUG_CONFIG, 
-  message: string, 
-  ...data: any[]
+  category: keyof typeof DEBUG_CONFIG,
+  message: string,
+  ...data: unknown[]
 ) {
-  // Skip logging if all logs are disabled
-  if (DISABLE_ALL_LOGS) return;
-  
-  // Log everything if all logs are enabled
-  if (ENABLE_ALL_LOGS) {
-    console.log(`[${category.toUpperCase()}] ${message}`, ...data);
-    return;
-  }
-  
-  // Special case for 'all' category
-  if (category === 'all') {
-    if (DEBUG_CONFIG.all) {
-      console.log(`[INFO] ${message}`, ...data);
-    }
-    return;
-  }
-  
-  // Check if this category is enabled in config
-  if (DEBUG_CONFIG[category]) {
-    console.log(`[${category.toUpperCase()}] ${message}`, ...data);
-  }
+  if (IS_PRODUCTION && !DEBUG_ENABLED) return;
+  if (!DEBUG_CONFIG[category] && !DEBUG_ENABLED) return;
+
+   
+  console.log(`[${category.toUpperCase()}] ${message}`, ...data);
 }
 
 /**
- * Log errors (these generally shouldn't be filtered)
+ * Log errors - always active in all environments.
  */
-export function errorLog(message: string, ...data: any[]) {
-  if (DISABLE_ALL_LOGS) return;
-  
-  if (ENABLE_ALL_LOGS || DEBUG_CONFIG.errors) {
-    console.error(`[ERROR] ${message}`, ...data);
-  }
+export function errorLog(message: string, ...data: unknown[]) {
+  console.error(`[ERROR] ${message}`, ...data);
 }
 
 /**
- * Log warnings (these generally shouldn't be filtered)
+ * Log warnings - always active in all environments.
  */
-export function warnLog(message: string, ...data: any[]) {
-  if (DISABLE_ALL_LOGS) return;
-  
-  if (ENABLE_ALL_LOGS || DEBUG_CONFIG.warnings) {
-    console.warn(`[WARN] ${message}`, ...data);
-  }
+export function warnLog(message: string, ...data: unknown[]) {
+  console.warn(`[WARN] ${message}`, ...data);
 }
 
 /**
- * Helper to create a namespaced logger for a specific component
+ * Helper to create a namespaced logger for a specific component.
  */
 export function createLogger(component: string, defaultCategory: keyof typeof DEBUG_CONFIG = 'all') {
   const timestamp = () => new Date().toISOString().split('T')[1].split('.')[0];
-  
+
   return {
-    log: (message: string, ...data: any[]) => 
+    log: (message: string, ...data: unknown[]) =>
       debugLog(defaultCategory, `[${timestamp()}] ${component}: ${message}`, ...data),
-    
-    error: (message: string, ...data: any[]) => 
+
+    error: (message: string, ...data: unknown[]) =>
       errorLog(`[${timestamp()}] ${component}: ${message}`, ...data),
-    
-    warn: (message: string, ...data: any[]) => 
+
+    warn: (message: string, ...data: unknown[]) =>
       warnLog(`[${timestamp()}] ${component}: ${message}`, ...data),
-    
-    // Allow specifying a different category
-    category: (category: keyof typeof DEBUG_CONFIG, message: string, ...data: any[]) => 
+
+    category: (category: keyof typeof DEBUG_CONFIG, message: string, ...data: unknown[]) =>
       debugLog(category, `[${timestamp()}] ${component}: ${message}`, ...data)
   };
 }
 
-// Export the config for reference
 export const debugConfig = DEBUG_CONFIG;

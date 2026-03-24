@@ -62,12 +62,6 @@ export function useConnectionMonitor({
       
       const timeSinceLastSuccess = Date.now() - lastPingSuccess;
       
-      console.log("🔍 Connection monitor check:", {
-        timeSinceLastSuccess: timeSinceLastSuccess / 1000,
-        isConnected,
-        connectionQuality
-      });
-      
       // Update connection quality based on time since last success
       if (timeSinceLastSuccess > 120000) { // 2 minutes
         setConnectionQuality('offline');
@@ -79,7 +73,6 @@ export function useConnectionMonitor({
       
       // Only perform active check if connection appears poor
       if (connectionQuality === 'poor' || timeSinceLastSuccess > 90000) {
-        console.log("🔍 Performing active connection check due to poor quality");
         performConnectionCheck().then(success => {
           if (success) {
             setLastPingSuccess(Date.now());

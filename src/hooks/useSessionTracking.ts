@@ -117,9 +117,7 @@ export const useSessionTracking = () => {
                 .from('user_sessions')
                 .update({ last_activity: new Date().toISOString() })
                 .eq('session_token', sessionToken)
-                .then(() => {
-                    console.log('Session activity updated');
-                });
+                .then(() => { /* no-op */ });
         }, 5 * 60 * 1000); // 5 minutes
 
         return () => clearInterval(interval);

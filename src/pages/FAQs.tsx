@@ -67,7 +67,7 @@ const FAQAccordion = ({ faqs }: { faqs: FAQ[] }) => {
     }
     acc[category].push(faq);
     return acc;
-  }, {} as Record<string, FAQ[]>);
+  }, { /* no-op */ } as Record<string, FAQ[]>);
 
   return (
     <>

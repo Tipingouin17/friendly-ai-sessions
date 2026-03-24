@@ -28,7 +28,6 @@ export function useSessionInterface(conversationId: number | null) {
       // Check if session is already marked as started in the database
       const checkSessionStarted = async () => {
         try {
-          console.log("🔍 [useSessionInterface] Checking if session is already started for conversation:", conversationId);
           const { data, error } = await supabase
             .from('conversations')
             .select('session_started')
@@ -38,12 +37,10 @@ export function useSessionInterface(conversationId: number | null) {
           if (error) {
             console.error("❌ [useSessionInterface] Error checking session_started:", error);
           } else if (data && data.session_started) {
-            console.log("✅ [useSessionInterface] Session is already marked as started in DB:", data);
             setIsSessionStarted(true);
             setShowQrCodeView(false);
             lastSessionStarted.current = true;
           } else {
-            console.log("⏳ [useSessionInterface] Session not yet started in DB:", data);
             setShowQrCodeView(true);
             setIsSessionStarted(false);
             lastSessionStarted.current = false;
@@ -61,11 +58,8 @@ export function useSessionInterface(conversationId: number | null) {
   useEffect(() => {
     if (!conversationId) return;
 
-    console.log("🔗 [useSessionInterface] Setting up real-time subscription for conversation:", conversationId);
-
     // Clean up any existing channel
     if (channelRef.current) {
-      console.log("🧹 [useSessionInterface] Cleaning up existing channel");
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
@@ -79,18 +73,11 @@ export function useSessionInterface(conversationId: number | null) {
         table: 'conversations',
         filter: `id=eq.${conversationId}`
       }, (payload) => {
-        console.log("📡 [useSessionInterface] Real-time update received:", {
-          old: payload.old,
-          new: payload.new,
-          sessionStartedChanged: payload.old?.session_started !== payload.new?.session_started
-        });
         
         // Check if session_started field changed
         if (payload.new && 
             payload.old?.session_started !== payload.new.session_started &&
             payload.new.session_started === true) {
-          
-          console.log("🎉 [useSessionInterface] Session started detected via real-time update!");
           
           // Prevent duplicate processing
           if (!lastSessionStarted.current) {
@@ -105,15 +92,12 @@ export function useSessionInterface(conversationId: number | null) {
           }
         }
       })
-      .subscribe((status) => {
-        console.log(`🔗 [useSessionInterface] Real-time channel status: ${status}`);
-      });
+      .subscribe((status) => { /* no-op */ });
 
     channelRef.current = channel;
 
     // Cleanup function
     return () => {
-      console.log("🧹 [useSessionInterface] Cleaning up real-time subscription");
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -129,13 +113,11 @@ export function useSessionInterface(conversationId: number | null) {
     const isAdminPage = location.pathname.includes('/admin');
     
     if (!isAdminPage && (isMobile && locationState?.isGuest) || locationState?.showMessaging === true) {
-      console.log("📱 [useSessionInterface] Setting showQrCodeView to false based on location state:", locationState);
       setShowQrCodeView(false);
     }
   }, [isMobile, location.state, location.pathname]);
   
   const handleStartSession = async () => {
-    console.log("🚀 [useSessionInterface] Starting session for conversation:", conversationId);
     
     if (!conversationId) {
       console.error("❌ [useSessionInterface] Cannot start session: No conversation ID provided");
@@ -167,7 +149,6 @@ export function useSessionInterface(conversationId: number | null) {
           variant: "destructive",
         });
       } else {
-        console.log("✅ [useSessionInterface] Successfully updated session_started in DB for conversation:", conversationId);
         
         // Update local state immediately (real-time will confirm)
         setIsSessionStarted(true);
@@ -180,7 +161,6 @@ export function useSessionInterface(conversationId: number | null) {
         });
         
         // Use secure navigation for host redirect
-        console.log("🧭 [useSessionInterface] Using secure navigation to redirect to host session");
         await navigateToHostSession(conversationId);
       }
     } catch (err) {

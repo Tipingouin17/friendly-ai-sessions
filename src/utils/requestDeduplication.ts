@@ -16,7 +16,6 @@ class RequestDeduplicator {
       // Check if the request hasn't timed out and isn't aborted
       if (Date.now() - existing.timestamp < this.requestTimeout && 
           !existing.abortController?.signal.aborted) {
-        console.log(`Deduplicating request for key: ${key}`);
         return existing.promise;
       } else {
         // Remove timed out or aborted request

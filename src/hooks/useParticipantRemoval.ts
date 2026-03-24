@@ -52,7 +52,6 @@ export const useParticipantRemoval = ({
     });
     
     try {
-      console.log(`🗑️ Admin removing participant ${participantId} from conversation ${conversationId}`);
       
       // Remove from session_participants table
       const { error: removeError, data } = await supabase
@@ -135,8 +134,6 @@ export const useParticipantRemoval = ({
         title: "Participant removed",
         description: `Successfully removed participant from session`,
       });
-      
-      console.log(`✅ Successfully removed participant ${participantId}, new count: ${newCount}`);
       
     } catch (err) {
       console.error("💥 Exception removing participant:", err);

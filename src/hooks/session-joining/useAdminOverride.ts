@@ -36,8 +36,6 @@ export function useAdminOverride() {
         throw new Error("Unauthorized: Admin privileges required");
       }
 
-      console.log("🔑 Verified admin override for session full error");
-      
       // For verified admins, allow them to join with a special participant ID
       const adminParticipantId = Math.floor(Math.random() * 900) + 9000; // Use a very high ID for admin override
       

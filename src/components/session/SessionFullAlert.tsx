@@ -33,14 +33,12 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   // Skip showing session full alert for admin users immediately
   useEffect(() => {
     if (isAdmin && type === 'full' && onClose) {
-      console.log("🔑 Suppressing session full alert for admin user");
       onClose();
     }
   }, [isAdmin, type, onClose]);
 
   // If we're an admin and this is a full session alert, don't render anything
   if (isAdmin && type === 'full') {
-    console.log("🔑 Admin user detected - not rendering session full alert");
     return null;
   }
 

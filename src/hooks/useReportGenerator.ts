@@ -27,7 +27,6 @@ export const useReportGenerator = ({
     setIsGeneratingReport(true);
     
     try {
-      console.log('Generating report for conversation:', conversationId);
       
       // Find the last participant message to determine where we are in the conversation
       let lastParticipantMessageIndex = -1;

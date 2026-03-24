@@ -57,6 +57,5 @@ export const toast: ToastFunction = (props) => {
   // This is a simple implementation that will work without the context
   // The complete solution would use the context when available
   const id = Math.random().toString(36).substring(2, 9);
-  console.log("Toast created:", props.title || "Notification");
   return id;
 };

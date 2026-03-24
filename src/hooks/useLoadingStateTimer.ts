@@ -23,7 +23,6 @@ export function useLoadingStateTimer({
   const autoRetryAttempted = useRef(false);
   
   useEffect(() => {
-    console.log("JoinSessionLoadingState mounted", { error, retryCount });
     mountedRef.current = true;
     
     // CRITICAL FIX: Automatically retry connection sooner for better participant experience
@@ -43,7 +42,6 @@ export function useLoadingStateTimer({
         if (onRetry && !autoRetryAttempted.current) {
           if ((newElapsed > 3 && retryCount === 0) || 
               (error && newElapsed > 2)) {
-            console.log("Auto-retrying connection after wait or error");
             onRetry();
             autoRetryAttempted.current = true;
           }

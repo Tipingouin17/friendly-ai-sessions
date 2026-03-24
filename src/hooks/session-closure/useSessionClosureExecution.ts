@@ -24,21 +24,16 @@ export const useSessionClosureExecution = () => {
     conversationId: number,
     userId: string
   ): Promise<SessionClosureResult> => {
-    console.log("🚀 Starting session closure process for conversation:", conversationId);
 
     // Log the sensitive action
     logSensitiveAction('session_closure_initiated', conversationId);
 
-    console.log("🔍 Step 4: Calling edge function to close session and generate report...");
-    
     const { data, error } = await supabase.functions.invoke('close-session-and-generate-report', {
       body: {
         conversationId,
         userId
       }
     });
-
-    console.log("📡 Edge function response received:", { data, error });
 
     if (error) {
       console.error("❌ Edge function error:", error);
@@ -54,13 +49,10 @@ export const useSessionClosureExecution = () => {
       throw new Error(data?.error || 'Failed to process session closure');
     }
 
-    console.log("✅ Session closed successfully:", data);
-    
     // Log successful closure
     logSensitiveAction('session_closure_completed', conversationId);
 
     // Immediately invalidate all relevant queries
-    console.log("🔄 Invalidating queries after session closure...");
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] }),
       queryClient.invalidateQueries({ queryKey: ['admin-sessions'] }),
@@ -70,7 +62,6 @@ export const useSessionClosureExecution = () => {
     ]);
 
     // Navigate away immediately to prevent UI confusion
-    console.log("🔄 Navigating to past workshops after successful closure...");
     navigate('/past-workshops', { replace: true });
 
     return data;

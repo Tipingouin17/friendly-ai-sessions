@@ -13,12 +13,6 @@ export const useFacilitatorResponse = () => {
     messages: Message[],
     conversation: any
   ): Promise<Message> => {
-    console.log('🔥 Calling edge function for facilitator response:', {
-      conversationId,
-      messageCount: messages.length,
-      hasConversation: !!conversation,
-      facilitator: conversation?.sessions?.facilitator_details?.title
-    });
 
     try {
       const response = await supabase.functions.invoke('handle-facilitator-response', {
@@ -53,8 +47,6 @@ export const useFacilitatorResponse = () => {
         avatar: avatarUrl
       };
       
-      console.log("Got AI response with avatar:", aiResponse.avatar);
-      
       // Save AI response to database
       await supabase.from('messages').insert({
         conversation_id: conversationId,
@@ -65,8 +57,6 @@ export const useFacilitatorResponse = () => {
         role: 'assistant',
         user_id: null
       });
-      
-      console.log("AI response saved to database with avatar");
       
       return aiResponse;
     } catch (error) {

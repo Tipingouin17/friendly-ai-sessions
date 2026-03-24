@@ -21,7 +21,7 @@ const ParticipantSelector = ({
   participantCount,
   currentParticipant,
   onParticipantSwitch,
-  participantNames = {},
+  participantNames = { /* no-op */ },
   participants = [],
   disableSwitching = false,
   currentUserParticipantId

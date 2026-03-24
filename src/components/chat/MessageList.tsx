@@ -23,7 +23,7 @@ interface MessageListProps {
 
 const MessageList = ({ 
   messages, 
-  participantColors = {},
+  participantColors = { /* no-op */ },
   currentParticipant,
   isWaitingForResponse = false,
   isWaitingForResponses = false,

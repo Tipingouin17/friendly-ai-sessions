@@ -30,20 +30,10 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   const {
     toast
   } = useToast();
-  console.log("🔍 PreSessionHostView - Received props:", {
-    conversationId,
-    participantCount,
-    conversationData: conversationData?.id
-  });
 
   // Stabilize participant count to prevent rapid state changes
   const stableParticipantCount = useMemo(() => {
     const count = Number(participantCount) || 0;
-    console.log("🔥 PreSessionHostView - Stabilized participant count:", {
-      original: participantCount,
-      stabilized: count,
-      type: typeof participantCount
-    });
     return count;
   }, [participantCount]);
 
@@ -74,10 +64,6 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 
   // Stable session start handler with logging
   const handleSessionStart = useCallback(() => {
-    console.log("🔥 PreSessionHostView - Session start requested", {
-      participantCount: stableParticipantCount,
-      conversationId
-    });
     onSessionStarted();
   }, [onSessionStarted, stableParticipantCount, conversationId]);
 

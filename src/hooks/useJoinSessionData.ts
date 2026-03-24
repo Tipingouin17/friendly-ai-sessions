@@ -40,17 +40,7 @@ export function useJoinSessionData(
   const [avatarSeed, setAvatarSeed] = useState(() => options?.defaultAvatarSeed || Math.random().toString());
 
   // Debug logging
-  useEffect(() => {
-    console.log("useJoinSessionData initialized", {
-      conversationId,
-      isAdmin,
-      effectiveIsAdmin,
-      isOnAdminPath,
-      storedIsAdmin: sessionStorage.getItem('isAdminSession') === 'true',
-      currentPath: window.location.pathname,
-      existingSessionData
-    });
-  }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath, existingSessionData]);
+  useEffect(() => { /* no-op */ }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath, existingSessionData]);
 
   // Fetch plan limits as fallback
   const { maxParticipants: planMaxParticipants } = usePlanLimits();
@@ -76,9 +66,7 @@ export function useJoinSessionData(
 
   // Check if this is an admin joining
   useEffect(() => {
-    if (effectiveIsAdmin && conversationId) {
-      console.log("Admin detected in useJoinSessionData - should bypass session full checks");
-    }
+    if (effectiveIsAdmin && conversationId) { /* no-op */ }
   }, [effectiveIsAdmin, conversationId]);
 
   const handleJoinSession = async (): Promise<JoinResult | null> => {
@@ -94,16 +82,6 @@ export function useJoinSessionData(
     // Use session-specific max or fall back to plan limit
     const effectiveMaxParticipants = maxParticipantsForSession > 0 ?
       maxParticipantsForSession : planMaxParticipants;
-
-    console.log("Join session check:", {
-      participantName,
-      conversationId,
-      currentParticipantCount,
-      effectiveMaxParticipants,
-      isFull: effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants,
-      isAdmin: effectiveIsAdmin,
-      isOnAdminPath
-    });
 
     if (!participantName.trim()) {
       toast({
@@ -139,7 +117,6 @@ export function useJoinSessionData(
     });
 
     if (result) {
-      console.log("Join session successful, returning result:", result);
       // Just return the result - don't store it in state
     }
 

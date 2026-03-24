@@ -16,14 +16,11 @@ export function useStuckStateHandler({
   refetch,
   forceRefreshParticipants
 }: UseStuckStateHandlerProps) {
-  useEffect(() => {
-    console.log("useStuckStateHandler running...");
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (isLoading && currentConversationId && !conversation) {
-        console.log("Session appears stuck in loading state - forcing data refresh");
         refetch();
         
         // Also refresh participants

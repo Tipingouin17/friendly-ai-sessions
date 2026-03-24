@@ -9,7 +9,6 @@ const fetchConversation = async (id: number | null) => {
   if (!id) return null;
   
   try {
-    console.log('🔍 Fetching conversation with enhanced facilitator context for ID:', id);
     
     // Enhanced query with proper facilitator joins through sessions table
     const { data, error } = await supabase
@@ -51,15 +50,6 @@ const fetchConversation = async (id: number | null) => {
       return null;
     }
 
-    console.log('📋 Fetched conversation data:', {
-      id: data.id,
-      hasSession: !!data.sessions,
-      hasFacilitatorDetails: !!data.sessions?.facilitator_details,
-      facilitatorName: data.sessions?.facilitator_details?.title,
-      participantDescription: data.participant_description,
-      objective: data.sessions?.objective
-    });
-    
     return data as ConversationWithSession;
   } catch (error) {
     console.error('💥 Exception in fetchConversation:', error);
@@ -103,7 +93,6 @@ export const useConversation = (conversationId: number | null) => {
             if (cachedAvatar && (now - cachedAvatar.timestamp) < AVATAR_CACHE_TTL) {
               // Use cached avatar URL
               facilitator.profile_picture = cachedAvatar.url;
-              console.log('✅ Using cached facilitator profile picture:', cachedAvatar.url);
             } else {
               // Process and cache the new avatar URL
               try {
@@ -116,7 +105,6 @@ export const useConversation = (conversationId: number | null) => {
                   timestamp: now
                 });
                 
-                console.log('✅ Processed and cached facilitator profile picture:', avatarUrl);
               } catch (error) {
                 console.error('❌ Error processing facilitator avatar:', error);
                 facilitator.profile_picture = '/placeholder.svg';

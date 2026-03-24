@@ -21,11 +21,6 @@ class TestScriptLogger {
     this.testSteps = [];
     this.startTime = performance.now();
     
-    console.log('🧪 TEST SCRIPT STARTED', {
-      conversationId,
-      timestamp: new Date().toISOString()
-    });
-
     this.logTestEvent('test_script_started', {
       test_start_time: this.startTime,
       conversation_id: conversationId
@@ -40,13 +35,6 @@ class TestScriptLogger {
 
     this.testSteps.push(testStep);
     
-    console.log(`📝 TEST STEP: ${step.phase} - ${step.action}`, {
-      expected: step.expectedOutcome,
-      actual: step.actualOutcome,
-      success: step.success,
-      timing: testStep.timestamp
-    });
-
     this.logTestEvent('test_step_completed', {
       step: testStep,
       step_number: this.testSteps.length
@@ -57,13 +45,6 @@ class TestScriptLogger {
     const phaseSteps = this.testSteps.filter(step => step.phase === phase);
     const phaseSuccessRate = phaseSteps.filter(step => step.success).length / phaseSteps.length;
     
-    console.log(`✅ PHASE COMPLETED: ${phase}`, {
-      success,
-      successRate: phaseSuccessRate,
-      stepCount: phaseSteps.length,
-      notes
-    });
-
     this.logTestEvent('test_phase_completed', {
       phase,
       success,
@@ -88,8 +69,6 @@ class TestScriptLogger {
       summary,
       steps: this.testSteps
     };
-
-    console.log('🏁 TEST SCRIPT COMPLETED', testResults);
 
     this.logTestEvent('test_script_completed', testResults);
 
@@ -220,23 +199,10 @@ export const executeTestScript = async (conversationId: number) => {
   const script = testScriptLogger.getTestScript();
   testScriptLogger.startTest(conversationId);
   
-  console.log('📋 TEST SCRIPT READY FOR EXECUTION');
-  console.log('Copy and paste these test steps:');
-  console.log('=====================================');
-  
   script.phases.forEach((phase, phaseIndex) => {
-    console.log(`\n🔸 PHASE ${phaseIndex + 1}: ${phase.name}`);
-    console.log(`Description: ${phase.description}\n`);
     
-    phase.steps.forEach((step, stepIndex) => {
-      console.log(`${phaseIndex + 1}.${stepIndex + 1} ${step.action}`);
-      console.log(`   Expected: ${step.expectedOutcome}\n`);
-    });
+    phase.steps.forEach((step, stepIndex) => { /* no-op */ });
   });
-  
-  console.log('=====================================');
-  console.log('After completing each step, call:');
-  console.log('testScriptLogger.logStep({phase, action, expectedOutcome, success, actualOutcome})');
   
   return script;
 };

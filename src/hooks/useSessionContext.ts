@@ -29,7 +29,6 @@ export const useSessionContext = ({
   // Update session active status based on DB status
   useEffect(() => {
     if (isSessionStartedInDB) {
-      console.log("Session started status from DB:", isSessionStartedInDB);
       setIsSessionActive(true);
     }
   }, [isSessionStartedInDB]);

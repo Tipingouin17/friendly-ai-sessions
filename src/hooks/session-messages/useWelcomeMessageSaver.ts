@@ -15,24 +15,13 @@ export const useWelcomeMessageSaver = ({
 }: UseWelcomeMessageSaverProps) => {
   // Save a welcome message to the database (admin only)
   const saveWelcomeMessageToDb = useCallback(async (welcomeMsg: Message) => {
-    console.log('💾 saveWelcomeMessageToDb called:', {
-      isAdmin,
-      conversationId,
-      messageId: welcomeMsg.id,
-      contentLength: welcomeMsg.content?.length,
-      hasAvatar: !!welcomeMsg.avatar,
-      conversationIdType: typeof conversationId,
-      conversationIdValid: conversationId !== null && conversationId !== undefined && !isNaN(conversationId)
-    });
 
     // Enhanced validation - check for valid conversation ID
     if (!conversationId || isNaN(conversationId)) {
-      console.log('⚠️ Skipping database save - invalid conversation ID:', conversationId);
       return;
     }
 
     if (!isAdmin) {
-      console.log('⚠️ Skipping database save - not admin/host');
       return;
     }
     
@@ -42,12 +31,6 @@ export const useWelcomeMessageSaver = ({
       text: welcomeMsg.content,
       avatar: welcomeMsg.avatar
     };
-
-    console.log('📝 Preparing message for database:', {
-      conversationId,
-      messageContent,
-      role: 'assistant'
-    });
 
     try {
       const { data, error } = await supabase
@@ -60,17 +43,9 @@ export const useWelcomeMessageSaver = ({
         })
         .select();
         
-      console.log('💾 Database insert result:', {
-        success: !error,
-        error: error?.message,
-        insertedData: data
-      });
-        
       if (error) {
         console.error('❌ Error saving welcome message to database:', error);
-      } else {
-        console.log('✅ Welcome message saved to database successfully');
-      }
+      } else { /* no-op */ }
     } catch (err) {
       console.error('💥 Exception saving welcome message:', err);
     }

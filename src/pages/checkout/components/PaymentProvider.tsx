@@ -37,7 +37,6 @@ export const PaymentProvider = ({ children }: PaymentProviderProps) => {
   
   // Handle Stripe cookies in cross-origin contexts with more aggressive approach
   useEffect(() => {
-    console.log("PaymentProvider: Setting up cookies with SameSite=None");
     
     // Force-set Stripe cookies with SameSite=None for cross-origin contexts
     const setStripeCookies = () => {

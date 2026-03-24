@@ -30,14 +30,6 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
   const [isRetrying, setIsRetrying] = useState(false);
   const [showRetryOption, setShowRetryOption] = useState(false);
 
-  console.log('🚪 [SessionStartingGate] Rendering gate:', {
-    conversationId,
-    isWaitingForMessage,
-    timeoutReached,
-    facilitatorTitle,
-    retryCount
-  });
-
   // Show retry option after 30 seconds of waiting
   useEffect(() => {
     if (isWaitingForMessage && !timeoutReached) {
@@ -55,7 +47,6 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
     setRetryCount(prev => prev + 1);
     
     try {
-      console.log('🔄 [SessionStartingGate] Manually retrying welcome message generation');
       
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
         body: {
@@ -69,7 +60,6 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
       if (error) {
         console.error('❌ [SessionStartingGate] Retry failed:', error);
       } else {
-        console.log('✅ [SessionStartingGate] Retry successful:', data);
         // Reset retry state on success
         setRetryCount(0);
         setShowRetryOption(false);

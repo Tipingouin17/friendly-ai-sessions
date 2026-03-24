@@ -32,23 +32,12 @@ export function useSessionPageEffects({
     if (stateRef.current.hasSetupTimeout) return;
     stateRef.current.hasSetupTimeout = true;
     
-    console.log("Session page mounted", {
-      time: new Date().toISOString(),
-      isAdmin,
-      isLoading,
-      path: window.location.pathname
-    });
-    
     // Different timeouts based on user role
     const initialTimeout = isOnAdminPath ? 3000 : 5000;
     
     // Set a timeout to check if initialization takes too long
     stateRef.current.initializeTimeout = setTimeout(() => {
       if (sessionMountedRef.current && !stateRef.current.hasShownToast) {
-        console.log("Session initialization status:", {
-          isLoading,
-          hasInitializedProvider
-        });
         
         if (isLoading && !hasInitializedProvider) {
           stateRef.current.hasShownToast = true;
@@ -69,7 +58,6 @@ export function useSessionPageEffects({
     
     setTimeout(() => {
       if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
-        console.log("Critical timeout reached, session may be stuck");
         
         // Skip toast for admin
         if (!isOnAdminPath && !isAdmin && !stateRef.current.hasShownToast) {

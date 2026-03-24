@@ -32,9 +32,7 @@ export const validateEnvironmentSecurity = (): { isSecure: boolean; errors: stri
   }
   
   // Development mode warning
-  if (import.meta.env.DEV) {
-    console.log('🔒 Security: Running in development mode - some security features may be relaxed');
-  }
+  if (import.meta.env.DEV) { /* no-op */ }
   
   return {
     isSecure: errors.length === 0,

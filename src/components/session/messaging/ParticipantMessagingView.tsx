@@ -56,16 +56,16 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   
   // InputFooter props with defaults
   inputMessage = '',
-  setInputMessage = () => {},
-  onSendMessage = () => {},
+  setInputMessage = () => { /* no-op */ },
+  onSendMessage = () => { /* no-op */ },
   isRecording = false,
-  setIsRecording = () => {},
+  setIsRecording = () => { /* no-op */ },
   isAnonymous = false,
-  toggleAnonymous = () => {},
+  toggleAnonymous = () => { /* no-op */ },
   hasAnswered = false,
   totalResponses = 0,
   viewMode = "participant",
-  participantNames = {},
+  participantNames = { /* no-op */ },
   currentUserParticipantId = null,
   showResponseStats = false,
 }) => {
@@ -86,10 +86,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   });
   
   // Debug logging
-  useEffect(() => {
-    console.log(`ParticipantMessagingView: currentParticipant=${currentParticipant}, currentUserParticipantId=${currentUserParticipantId}, effectiveParticipantId=${effectiveParticipantId}`);
-    console.log(`Filtered ${filteredMessages.length} messages from ${messages.length} total`);
-  }, [currentParticipant, currentUserParticipantId, effectiveParticipantId, filteredMessages.length, messages.length]);
+  useEffect(() => { /* no-op */ }, [currentParticipant, currentUserParticipantId, effectiveParticipantId, filteredMessages.length, messages.length]);
   
   return (
     <div className="h-full flex">

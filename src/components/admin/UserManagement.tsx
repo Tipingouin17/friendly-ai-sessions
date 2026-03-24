@@ -159,7 +159,7 @@ export const UserManagement = () => {
     const confirmAction = () => {
         if (!selectedUser || !actionType) return;
 
-        const updates: Partial<Profile> = {};
+        const updates: Partial<Profile> = { /* no-op */ };
 
         switch (actionType) {
             case 'ban':

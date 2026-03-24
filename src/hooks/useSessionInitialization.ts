@@ -18,7 +18,6 @@ export function useSessionInitialization({
   // Check if the session is already started in the database
   useEffect(() => {
     if (props.isSessionStartedInDB) {
-      console.log("Session is already started in the database");
       setSessionStarted(true);
     }
     
@@ -27,7 +26,6 @@ export function useSessionInitialization({
     
     const timer = setTimeout(() => {
       setInitializing(false);
-      console.log(`Initialization complete after ${initializationTime}ms, isAdmin:`, isAdmin);
     }, initializationTime);
     
     return () => clearTimeout(timer);

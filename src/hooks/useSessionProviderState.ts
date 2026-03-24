@@ -12,10 +12,8 @@ type UseSessionProviderStateProps = {
 export const useSessionProviderState = ({
   onError,
   forceAdmin
-}: UseSessionProviderStateProps = {}) => {
-  useEffect(() => {
-    console.log("useSessionProviderState running...");
-  }, []);
+}: UseSessionProviderStateProps = { /* no-op */ }) => {
+  useEffect(() => { /* no-op */ }, []);
 
   const [providerError, setProviderError] = useState<string | null>(null);
   const location = useLocation();
@@ -25,7 +23,6 @@ export const useSessionProviderState = ({
   // Enforce admin status if forceAdmin is true - wrapped in useEffect to prevent render loops
   useEffect(() => {
     if (forceAdmin && !adminStatusSetRef.current) {
-      console.log("useSessionProviderState: Enforcing admin status with forceAdmin=true");
       sessionStorage.setItem('isAdminSession', 'true');
       setAdminStatus(true);
       adminStatusSetRef.current = true;

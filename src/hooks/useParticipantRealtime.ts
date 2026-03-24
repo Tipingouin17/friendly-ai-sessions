@@ -22,21 +22,22 @@ export function useParticipantRealtime({
   maxParticipants,
   enabled = true
 }: UseParticipantRealtimeProps) {
-  // Early return if disabled
-  if (!enabled) {
-    return;
-  }
-  const participantsChannelRef = useRef<any>(null);
-  const eventsChannelRef = useRef<any>(null);
+  const participantsChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const eventsChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const hasSetupSubscription = useRef(false);
   const currentConversationIdRef = useRef<number | null>(null);
   
   useEffect(() => {
+    // Early return if disabled
+    if (!enabled) {
+      return () => { /* no-op */ };
+    }
+
     // Only set up once per conversation id - prevent duplicate subscriptions
     if (!conversationId || 
         hasSetupSubscription.current || 
         currentConversationIdRef.current === conversationId) {
-      return () => {};
+      return () => { /* no-op */ };
     }
     
     // Clean up existing channels if they exist and we're switching to a new conversation
@@ -55,7 +56,6 @@ export function useParticipantRealtime({
     }
     
     hasSetupSubscription.current = true;
-    console.log("Setting up realtime participant tracking for conversation:", conversationId);
     
     try {
       // Subscribe to direct table changes (INSERT, UPDATE, DELETE)
@@ -67,15 +67,12 @@ export function useParticipantRealtime({
           table: 'session_participants',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Participant table change:", payload);
           
           if (payload.eventType === 'INSERT' && payload.new) {
             const participant = payload.new;
             
             setParticipants(prev => {
               if (prev.some(p => p.id === participant.participant_id)) return prev;
-              
-              console.log("Adding participant from realtime event:", participant);
               
               return [...prev, {
                 id: participant.participant_id,
@@ -90,7 +87,6 @@ export function useParticipantRealtime({
           } else if (payload.eventType === 'DELETE' && payload.old) {
             // Handle direct deletion from database
             const deletedParticipant = payload.old;
-            console.log("Participant deleted from database:", deletedParticipant);
             
             setParticipants(prev => prev.filter(p => p.id !== deletedParticipant.participant_id));
           } else if (payload.eventType === 'UPDATE' && payload.new) {
@@ -114,9 +110,7 @@ export function useParticipantRealtime({
           }
         })
         .subscribe((status) => {
-          console.log(`Participants channel subscription status: ${status}`);
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-            console.log("Successfully subscribed to participant updates");
             setIsLoading(false);
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant updates");
@@ -140,7 +134,6 @@ export function useParticipantRealtime({
           table: 'session_events',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          console.log("Admin received participant event:", payload);
           
           if (payload.new) {
             const eventData = payload.new.data;
@@ -150,13 +143,10 @@ export function useParticipantRealtime({
               const participantId = eventData.participant_id;
               const participantName = eventData.participant_name;
               
-              console.log("Participant joined event data:", eventData);
-              
               if (participantId && participantName) {
                 setParticipants(prev => {
                   if (prev.some(p => p.id === participantId)) return prev;
                   
-                  console.log("Adding new participant from event:", eventData);
                   return [...prev, {
                     id: participantId,
                     name: participantName,
@@ -171,14 +161,12 @@ export function useParticipantRealtime({
               const participantId = eventData.participant_id;
               
               if (participantId) {
-                console.log("Participant removed via event:", participantId);
                 setParticipants(prev => prev.filter(p => p.id !== participantId));
               }
             }
             
             // Auto-start session when max participants reached
             if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
-              console.log(`Maximum participants (${maxParticipants}) reached, updating session_started flag`);
               supabase
                 .from('conversations')
                 .update({ session_started: true })
@@ -192,9 +180,7 @@ export function useParticipantRealtime({
           }
         })
         .subscribe((status) => {
-          console.log(`Participant events channel status: ${status}`);
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-            console.log("Successfully subscribed to participant events");
             setIsLoading(false);
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             console.error("Error subscribing to participant events");

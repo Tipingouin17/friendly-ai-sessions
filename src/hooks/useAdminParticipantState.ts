@@ -24,7 +24,7 @@ export const useAdminParticipantState = ({
 
   // Response tracking state for admin monitoring
   const [totalResponses, setTotalResponses] = useState(0);
-  const [participantResponses, setParticipantResponses] = useState<{ [key: number]: boolean }>({});
+  const [participantResponses, setParticipantResponses] = useState<{ [key: number]: boolean }>({ /* no-op */ });
 
   const recordResponse = (participantId: number, hasResponded: boolean) => {
     setParticipantResponses(prev => {

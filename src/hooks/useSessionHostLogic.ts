@@ -69,7 +69,6 @@ export function useSessionHostLogic() {
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionFull: () => {
-            console.log("Session full detected in host logic");
             triggerAutoStart(currentCount);
         }
     });
@@ -114,7 +113,6 @@ export function useSessionHostLogic() {
         // Fallback: Force ready after timeout (Safe Mode)
         const timeout = setTimeout(() => {
             if (mountedRef.current && isLoading) {
-                console.log("Forcing host view ready after timeout (Safe Mode)");
                 setIsLoading(false);
                 setHostViewReady(true);
                 if (!conversationData) {

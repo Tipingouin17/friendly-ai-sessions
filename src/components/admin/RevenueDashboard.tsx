@@ -67,7 +67,7 @@ export const RevenueDashboard = () => {
             // Calculate MRR (Monthly Recurring Revenue)
             let mrr = 0;
             let activeSubscriptions = 0;
-            const revenueByPlan: Record<string, { revenue: number; users: number }> = {};
+            const revenueByPlan: Record<string, { revenue: number; users: number }> = { /* no-op */ };
 
             profiles?.forEach(profile => {
                 if (profile.subscription_status === 'active' && profile.current_plan_id) {

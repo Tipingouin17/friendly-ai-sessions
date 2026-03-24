@@ -45,7 +45,6 @@ export function useSessionLoadingState(
     
     // If provider is initialized, we're no longer loading
     if (hasInitializedProvider && isLoading) {
-      console.log("Provider initialized, clearing loading state");
       safeSetIsLoading(false);
     }
     
@@ -57,7 +56,6 @@ export function useSessionLoadingState(
       const loadingTimeout = setTimeout(() => {
         if (sessionMountedRef.current && !hasInitializedProvider) {
           // Only show loading if needed
-          console.log(`Setting loading state to true after connection attempt ${connectionAttempts}`);
           safeSetIsLoading(true);
         }
       }, Math.min(connectionAttempts * 500, 1500));

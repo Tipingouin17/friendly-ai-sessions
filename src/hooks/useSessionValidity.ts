@@ -14,7 +14,6 @@ export function useSessionValidity() {
     const sessionId = searchParams.get('id');
     
     if (!sessionId && !location.state && !currentConversationId) {
-      console.log("No session ID found in URL or state");
       setNoSessionFound(true);
     }
   }, [location, currentConversationId]);

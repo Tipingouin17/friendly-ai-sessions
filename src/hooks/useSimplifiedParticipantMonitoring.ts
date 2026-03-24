@@ -45,8 +45,6 @@ export function useSimplifiedParticipantMonitoring({
   const startFallbackPolling = useCallback(async () => {
     if (!conversationId || !mountedRef.current || fallbackIntervalRef.current) return;
 
-    console.log('Starting fallback polling for participant count');
-    
     fallbackIntervalRef.current = setInterval(async () => {
       if (!mountedRef.current || !conversationId) return;
 
@@ -80,8 +78,6 @@ export function useSimplifiedParticipantMonitoring({
   const setupSubscription = useCallback(() => {
     if (!conversationId || !mountedRef.current || !enabled) return;
 
-    console.log(`Setting up simplified participant monitoring for conversation ${conversationId}`);
-    
     // Clean up any existing subscription
     cleanup();
     
@@ -99,8 +95,6 @@ export function useSimplifiedParticipantMonitoring({
           filter: `id=eq.${conversationId}`
         }, (payload) => {
           if (!mountedRef.current) return;
-          
-          console.log("Participant monitoring update:", payload);
           
           try {
             if (payload.new) {
@@ -121,8 +115,6 @@ export function useSimplifiedParticipantMonitoring({
         })
         .subscribe((status) => {
           if (!mountedRef.current) return;
-          
-          console.log(`Participant monitoring channel status: ${status}`);
           
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
@@ -149,7 +141,6 @@ export function useSimplifiedParticipantMonitoring({
               
               retryTimeoutRef.current = setTimeout(() => {
                 if (mountedRef.current) {
-                  console.log(`Retrying participant monitoring (attempt ${retryCountRef.current}/${maxRetries})`);
                   setupSubscription();
                 }
               }, delay);

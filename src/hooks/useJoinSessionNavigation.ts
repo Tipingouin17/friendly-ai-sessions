@@ -17,7 +17,6 @@ export const useJoinSessionNavigation = () => {
     
     // Navigate immediately and synchronously
     const navigationPath = `/session?id=${conversationId}&name=${encodeURIComponent(participantName)}&participantId=${participantId}&avatarSeed=${encodeURIComponent(avatarSeed)}`;
-    console.log("🚀 Navigating to participant session:", navigationPath);
     
     // Use replace to prevent back navigation issues
     navigate(navigationPath, { replace: true });

@@ -26,7 +26,6 @@ export const useAdminSessionInitialization = ({
 
   // Track URL params for session switching
   useEffect(() => {
-    console.log("Location or conversation ID changed in SessionAdmin");
     setHasInitializedProvider(false);
     setIsLoading(true);
   }, [location.search, location.pathname, setHasInitializedProvider, setIsLoading]);
@@ -35,15 +34,6 @@ export const useAdminSessionInitialization = ({
   useEffect(() => {
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
-      console.log("Admin session page mounted", {
-        time: new Date().toISOString(),
-        isAdmin: true,
-        currentConversationId,
-        locationState,
-        conversationData,
-        path: window.location.pathname,
-        participantsCount: participants?.length || 0
-      });
 
       toast({
         title: "Admin Session Interface",

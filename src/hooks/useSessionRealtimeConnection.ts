@@ -15,9 +15,7 @@ export function useSessionRealtimeConnection({
   onError,
   isAdmin
 }: UseSessionRealtimeConnectionProps) {
-  useEffect(() => {
-    console.log("useSessionRealtimeConnection running...");
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   // Set up realtime connection handling with better error handling
   const connection = useRealtimeConnectionHandler({
@@ -27,9 +25,7 @@ export function useSessionRealtimeConnection({
       // Only pass errors to parent if not in admin mode
       if (!isAdmin && onError) {
         onError(error);
-      } else if (isAdmin) {
-        console.log("🔑 Suppressing connection error for admin user:", error);
-      }
+      } else if (isAdmin) { /* no-op */ }
     }
   });
   

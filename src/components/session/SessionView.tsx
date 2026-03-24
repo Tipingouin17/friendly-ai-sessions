@@ -19,16 +19,7 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
   }, [isAdmin, props.sessionState]);
 
   // Log key properties for debugging
-  useEffect(() => {
-    console.log("SessionView rendering with:", {
-      isAdmin,
-      viewMode: props.sessionState.viewMode,
-      participantId: props.currentUserParticipantId,
-      messagesCount: props.sessionState.messages.length,
-      participantCount: props.conversation?.participants || props.participants.length,
-      participantDescription: props.conversation?.participant_description || ""
-    });
-  }, [
+  useEffect(() => { /* no-op */ }, [
     isAdmin, 
     props.sessionState.viewMode, 
     props.currentUserParticipantId, 
@@ -53,10 +44,10 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       setIsRecording={props.sessionState.setIsRecording}
       isRecording={props.sessionState.isRecording}
       participantColors={props.participantColors}
-      participantNames={{}}
+      participantNames={{ /* no-op */ }}
       participants={props.participants}
       conversationId={props.currentConversationId}
-      facilitator={props.conversation?.sessions?.facilitator_details || {}}
+      facilitator={props.conversation?.sessions?.facilitator_details || { /* no-op */ }}
       objective={props.conversation?.sessions?.objective || ''}
       currentParticipantCount={props.conversation?.current_participants || 0}
       currentUserParticipantId={props.currentUserParticipantId}

@@ -15,7 +15,6 @@ export const isInCrossOriginContext = (): boolean => {
     }
     return true;
   } catch (e) {
-    console.log("Detected cross-origin context");
     return true;
   }
 };
@@ -122,7 +121,6 @@ export const handleStripeCookies = (): void => {
       document.cookie = `__stripe_mid=; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
       document.cookie = `__stripe_sid=; expires=${expires.toUTCString()}; path=/; SameSite=None; Secure`;
       
-      console.log("Stripe cookies handled for cross-origin context");
     } catch (e) {
       console.error("Error handling Stripe cookies:", e);
     }

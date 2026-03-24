@@ -14,14 +14,12 @@ export const resolveFacilitatorAvatar = async (
   // If no avatar from conversation, try the avatar from AI response
   if (!avatarUrl && response?.avatar) {
     avatarUrl = response.avatar;
-    console.log('Using avatar URL from AI response:', avatarUrl);
   }
   
   // If still no avatar but we have facilitator details, try to get the avatar URL
   if (!avatarUrl && conversation?.sessions?.facilitator_details) {
     if (conversation.sessions.facilitator_details.id) {
       avatarUrl = await getFacilitatorAvatarUrl(conversation.sessions.facilitator_details);
-      console.log('Using facilitator profile from conversation with ID:', avatarUrl);
     } else {
       let picUrl = conversation.sessions.facilitator_details.profile_picture;
       if (picUrl && typeof picUrl === 'string') {
@@ -31,7 +29,6 @@ export const resolveFacilitatorAvatar = async (
         profile_picture: picUrl,
         title: conversation.sessions.facilitator_details.title
       });
-      console.log('Using facilitator profile from conversation:', avatarUrl);
     }
   }
 

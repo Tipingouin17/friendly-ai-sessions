@@ -7,7 +7,6 @@ export function useHostStatusPersistence() {
 
   // Force host status for host routes
   const forceHost = () => {
-    console.log("Forcing host status for session host page");
     setHostStatus(true);
   };
 

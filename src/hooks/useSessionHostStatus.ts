@@ -24,7 +24,6 @@ export function useSessionHostStatus() {
       if (conversationError) {
         console.error('Error checking conversation ownership:', conversationError);
       } else if (conversationData?.user_id === user.id) {
-        console.log('User is conversation owner (host)');
         setIsHost(true);
         return true;
       }
@@ -41,7 +40,6 @@ export function useSessionHostStatus() {
       }
 
       const hostStatus = rpcResult || false;
-      console.log('Host status from RPC:', hostStatus);
       setIsHost(hostStatus);
       return hostStatus;
     } catch (error) {

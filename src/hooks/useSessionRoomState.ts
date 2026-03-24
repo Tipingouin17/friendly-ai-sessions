@@ -25,9 +25,7 @@ export const useSessionRoomState = ({
   isAdmin
 }: UseSessionRoomStateProps) => {
   // Log initialization once
-  useEffect(() => {
-    console.log("useSessionRoomState running...");
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -73,7 +71,6 @@ export const useSessionRoomState = ({
     try {
       // Placeholder for report generation logic
       await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log("Report generated for conversation", conversationId);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {

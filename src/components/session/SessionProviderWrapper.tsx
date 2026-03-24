@@ -21,12 +21,103 @@ interface SessionProviderWrapperProps {
   children?: (props: SessionContextProps) => React.ReactElement;
 }
 
+/**
+ * Inner component that receives session props and can safely call hooks.
+ * This solves the rules-of-hooks violation where useSessionWrapperEffects
+ * was being called inside a render callback.
+ */
+const SessionProviderInner: React.FC<{
+  props: SessionContextProps;
+  effectiveAdmin: boolean;
+  isOnAdminPath: boolean;
+  forcedInitialization: boolean;
+  providerInitialized: boolean;
+  onInitialized: () => void;
+  onLoading: (isLoading: boolean) => void;
+  onError: (error: string) => void;
+  sessionMountedRef: React.RefObject<boolean>;
+  hasParticipantParams: boolean;
+  isParticipantPath: boolean;
+  error: string | null;
+  retryConnection: () => void;
+  connectionAttempts: number;
+  sessionStarted: boolean;
+  setSessionStarted: React.Dispatch<React.SetStateAction<boolean>>;
+  handleSessionFull: () => void;
+  children?: (props: SessionContextProps) => React.ReactElement;
+}> = ({
+  props,
+  effectiveAdmin,
+  isOnAdminPath,
+  forcedInitialization,
+  providerInitialized,
+  onInitialized,
+  onLoading,
+  onError,
+  sessionMountedRef,
+  hasParticipantParams,
+  isParticipantPath,
+  error,
+  retryConnection,
+  connectionAttempts,
+  sessionStarted,
+  setSessionStarted,
+  handleSessionFull,
+  children
+}) => {
+  // Now this hook is called at the top level of a component, not in a callback
+  useSessionWrapperEffects({
+    props,
+    effectiveAdmin,
+    isOnAdminPath,
+    forcedInitialization,
+    providerInitialized,
+    onInitialized,
+    onLoading,
+    onError,
+    sessionMountedRef
+  });
+
+  // If custom children are provided, render them with enhanced props
+  if (children) {
+    return children({
+      ...props,
+      isAdmin: props.isAdmin || effectiveAdmin
+    });
+  }
+
+  // Set participant view mode when participant params are present
+  const enhancedProps = {
+    ...props,
+    sessionState: {
+      ...props.sessionState,
+      viewMode: hasParticipantParams ? "participant" as const :
+        (effectiveAdmin ? "admin" as const : props.sessionState.viewMode)
+    },
+    isAdmin: hasParticipantParams ? false : (props.isAdmin || effectiveAdmin)
+  };
+
+  return (
+    <SessionStateRenderer
+      props={enhancedProps}
+      isLoading={props.isLoading}
+      error={error}
+      effectiveAdmin={effectiveAdmin}
+      retryConnection={retryConnection}
+      connectionAttempts={connectionAttempts}
+      sessionStarted={sessionStarted}
+      setSessionStarted={setSessionStarted}
+      handleSessionFull={handleSessionFull}
+    />
+  );
+};
+
 const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
-  onInitialized = () => { },
-  onLoading = () => { },
-  onError = () => { },
-  handleSessionFull = () => { },
-  retryConnection = () => { },
+  onInitialized = () => { /* no-op */ },
+  onLoading = () => { /* no-op */ },
+  onError = () => { /* no-op */ },
+  handleSessionFull = () => { /* no-op */ },
+  retryConnection = () => { /* no-op */ },
   connectionAttempts = 0,
   error = null,
   sessionMountedRef = { current: true },
@@ -57,36 +148,11 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   // Check for participant-specific URL parameters
   const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
 
-  console.log("🔍 SessionProviderWrapper - Path Analysis:", {
-    currentPath,
-    isOnAdminPath,
-    isOnHostPath,
-    isParticipantPath,
-    hasParticipantParams,
-    forceAdmin,
-    isAdmin
-  });
-
   // Determine the effective admin/host status once and store in ref to prevent loops
   if (!stateRef.current.statusDetermined) {
-    // CRITICAL FIX: Only treat as admin if explicitly on admin paths
-    // Host paths should NOT set admin flags
     stateRef.current.effectiveAdmin = forceAdmin || isAdmin || isOnAdminPath;
     stateRef.current.effectiveHost = isOnHostPath;
     stateRef.current.statusDetermined = true;
-
-    console.log("✅ SessionProviderWrapper - Status determined:", {
-      effectiveAdmin: stateRef.current.effectiveAdmin,
-      effectiveHost: stateRef.current.effectiveHost,
-      reasoning: {
-        forceAdmin,
-        isAdmin,
-        isOnAdminPath,
-        isOnHostPath,
-        hasParticipantParams,
-        isParticipantPath
-      }
-    });
   }
 
   // Use initialization hook
@@ -111,18 +177,14 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
   useEffect(() => {
     if (!sessionMountedRef.current) return;
 
-    // Only run setup once using the ref to prevent re-renders
     if (stateRef.current.hasSetup) return;
     stateRef.current.hasSetup = true;
 
-    // Auto-retry for participants only, not for admin/host routes
     if (isParticipantPath && !stateRef.current.hasToggledRetry &&
       !stateRef.current.effectiveAdmin && !stateRef.current.effectiveHost &&
       connectionAttempts === 0) {
       const retryTimeout = setTimeout(() => {
         if (!sessionMountedRef.current) return;
-
-        console.log("🔄 Auto-retrying connection for participant");
         retryConnection();
         stateRef.current.hasToggledRetry = true;
       }, 3000);
@@ -137,63 +199,28 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
       onError={onError}
       forceAdmin={stateRef.current.effectiveAdmin}
     >
-      {(props: SessionContextProps) => {
-        // Use wrapper effects hook
-        useSessionWrapperEffects({
-          props,
-          effectiveAdmin: stateRef.current.effectiveAdmin,
-          isOnAdminPath: isOnAdminPath,
-          forcedInitialization,
-          providerInitialized,
-          onInitialized,
-          onLoading,
-          onError,
-          sessionMountedRef
-        });
-
-        // If custom children are provided, render them with enhanced props
-        if (children) {
-          return children({
-            ...props,
-            isAdmin: props.isAdmin || stateRef.current.effectiveAdmin
-          });
-        }
-
-        // CRITICAL FIX: Always set participant view mode when participant params are present
-        const enhancedProps = {
-          ...props,
-          sessionState: {
-            ...props.sessionState,
-            viewMode: hasParticipantParams ? "participant" as const :
-              (stateRef.current.effectiveAdmin ? "admin" as const : props.sessionState.viewMode)
-          },
-          // IMPORTANT: Don't pass admin flags to participants
-          isAdmin: hasParticipantParams ? false : (props.isAdmin || stateRef.current.effectiveAdmin)
-        };
-
-        console.log("🎯 SessionProviderWrapper - Enhanced Props:", {
-          originalViewMode: props.sessionState?.viewMode,
-          enhancedViewMode: enhancedProps.sessionState?.viewMode,
-          isAdmin: enhancedProps.isAdmin,
-          hasParticipantParams,
-          isParticipantPath
-        });
-
-        // Render appropriate state based on current conditions
-        return (
-          <SessionStateRenderer
-            props={enhancedProps}
-            isLoading={props.isLoading}
-            error={error}
-            effectiveAdmin={stateRef.current.effectiveAdmin}
-            retryConnection={retryConnection}
-            connectionAttempts={connectionAttempts}
-            sessionStarted={sessionStarted}
-            setSessionStarted={setSessionStarted}
-            handleSessionFull={handleSessionFull}
-          />
-        );
-      }}
+      {(props: SessionContextProps) => (
+        <SessionProviderInner
+          props={props}
+          effectiveAdmin={stateRef.current.effectiveAdmin}
+          isOnAdminPath={isOnAdminPath}
+          forcedInitialization={forcedInitialization}
+          providerInitialized={providerInitialized}
+          onInitialized={onInitialized}
+          onLoading={onLoading}
+          onError={onError}
+          sessionMountedRef={sessionMountedRef}
+          hasParticipantParams={hasParticipantParams}
+          isParticipantPath={isParticipantPath}
+          error={error}
+          retryConnection={retryConnection}
+          connectionAttempts={connectionAttempts}
+          sessionStarted={sessionStarted}
+          setSessionStarted={setSessionStarted}
+          handleSessionFull={handleSessionFull}
+          children={children}
+        />
+      )}
     </SessionProvider>
   );
 };

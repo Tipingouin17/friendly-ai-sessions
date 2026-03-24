@@ -67,18 +67,9 @@ export const useMessageSender = ({
 
   const handleSendMessage = useCallback(async () => {
     // Enhanced validation with detailed logging
-    console.log("📨 handleSendMessage called with state:", {
-      requestInProgress: requestInProgressRef.current,
-      isWaitingForResponse,
-      currentConversationId,
-      viewMode: sessionState.viewMode,
-      inputMessage: sessionState.inputMessage?.substring(0, 50) + "...",
-      currentParticipant: sessionState.currentParticipant
-    });
 
     // Prevent duplicate sends
     if (requestInProgressRef.current || isWaitingForResponse) {
-      console.log("🚫 Request already in progress, ignoring duplicate send");
       return;
     }
     
@@ -100,23 +91,13 @@ export const useMessageSender = ({
     const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
     const isParticipantContext = hasParticipantParams || sessionState.viewMode === "participant";
     
-    console.log("🔍 Message sending context check:", {
-      hasParticipantParams,
-      isParticipantContext,
-      viewMode: sessionState.viewMode,
-      currentPath: window.location.pathname,
-      allowSending: isParticipantContext
-    });
-    
     // Only block pure admin views without participant context
     if (!isParticipantContext && sessionState.viewMode === "admin" && !hasParticipantParams) {
-      console.log("🚫 Blocked: Pure admin view without participant context");
       return;
     }
     
     // Don't send empty messages
     if (!sessionState.inputMessage.trim()) {
-      console.log("🚫 Blocked: Empty message");
       return;
     }
 
@@ -124,15 +105,6 @@ export const useMessageSender = ({
     const currentParticipantKey = `P${currentParticipant}`;
     const participantInfo = participants.find(p => p.id === currentParticipant);
     const messageStartTime = performance.now();
-    
-    console.log("✅ Sending message with participant info:", {
-      currentParticipant,
-      currentParticipantKey,
-      participantInfo,
-      message: sessionState.inputMessage.substring(0, 100),
-      isParticipantContext,
-      conversationId: currentConversationId
-    });
     
     try {
       requestInProgressRef.current = true;
@@ -176,28 +148,11 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
-      console.log("📊 Response collection status:", {
-        totalParticipants,
-        responseCount,
-        responseCountAfterUpdate: responseCount + 1,
-        allResponded: (responseCount + 1) >= totalParticipants,
-        isWaitingForResponses,
-        shouldTriggerAI: totalParticipants <= 1 || (responseCount + 1) >= totalParticipants
-      });
-      
       // For single participant sessions, ALWAYS trigger AI response immediately
       // For multi-participant sessions, wait until all have responded
       const shouldTriggerAIResponse = totalParticipants <= 1 || (responseCount + 1) >= totalParticipants;
       
-      console.log("🤖 AI Response Decision:", {
-        shouldTriggerAIResponse,
-        reason: totalParticipants <= 1 ? 'single-participant' : 'all-participants-responded',
-        totalParticipants,
-        currentResponseCount: responseCount + 1
-      });
-      
       if (shouldTriggerAIResponse) {
-        console.log("🚀 Triggering AI facilitator response...");
         setIsWaitingForResponse(true);
         stopWaitingForResponses(); // Stop the waiting state
         const aiStartTime = performance.now();
@@ -205,11 +160,6 @@ export const useMessageSender = ({
         try {
           // Get facilitator response with updated messages including the new participant message
           const updatedMessages = [...sessionState.messages, newMessage];
-          console.log("📨 Sending to AI:", {
-            conversationId: currentConversationId,
-            messageCount: updatedMessages.length,
-            lastMessage: updatedMessages[updatedMessages.length - 1]?.content?.substring(0, 100)
-          });
           
           const aiResponse = await requestFacilitatorResponse(
             currentConversationId, 
@@ -219,12 +169,6 @@ export const useMessageSender = ({
           
           const aiEndTime = performance.now();
           const aiResponseTime = aiEndTime - aiStartTime;
-          
-          console.log("✅ AI Response received:", {
-            responseTime: aiResponseTime,
-            contentLength: aiResponse.content?.length,
-            aiResponseId: aiResponse.id
-          });
           
           // Log AI response metrics
           logAIResponse(
@@ -239,7 +183,6 @@ export const useMessageSender = ({
             const newMessages = [...prev, aiResponse];
             // Start collecting responses for the new question
             if (totalParticipants > 1 && !aiResponse.isReport) {
-              console.log("🔄 Starting new response collection for multi-participant session");
               setTimeout(() => startResponseCollection(aiResponse.id), 100);
             }
             return newMessages;
@@ -255,9 +198,7 @@ export const useMessageSender = ({
         } finally {
           setIsWaitingForResponse(false);
         }
-      } else {
-        console.log("⏳ Waiting for more participants to respond before triggering AI");
-      }
+      } else { /* no-op */ }
       
     } catch (error) {
       console.error("❌ Error sending message:", error);

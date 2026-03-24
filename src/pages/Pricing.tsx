@@ -35,14 +35,10 @@ const Pricing = () => {
         throw new Error('No plans data returned');
       }
 
-      if (!data) {
-        throw new Error('No plans data returned');
-      }
-
       const processedData = data.map(plan => {
         const currency = plan.currency || 'USD';
-        const price = plan.price || 0;
-        const restrictions = plan.plan_restrictions?.[0] || {};
+        const price = typeof plan.price === 'string' ? parseFloat(plan.price) : (plan.price || 0);
+        const restrictions = plan.plan_restrictions?.[0] || { /* no-op */ };
 
         return {
           id: plan.id,

@@ -62,8 +62,6 @@ export function useMessageDeliveryTracker({
           // We have new message(s)
           const newMessages = messages.filter(msg => msg.id > lastKnownMessageId);
           
-          console.log(`📬 Detected ${newMessages.length} new message(s) for conversation ${conversationId}`);
-          
           newMessages.forEach(message => {
             // Mark as delivered
             setDeliveryStatus(prev => {
@@ -97,8 +95,6 @@ export function useMessageDeliveryTracker({
       clearInterval(pollIntervalRef.current);
     }
 
-    console.log(`🔄 Starting message delivery tracking for conversation ${conversationId}`);
-    
     // Initial check
     checkForNewMessages();
     

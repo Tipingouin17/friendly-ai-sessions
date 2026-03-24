@@ -43,9 +43,7 @@ export const useEnhancedSessionLogger = () => {
 
       if (error) {
         console.error('Failed to log session event:', error);
-      } else {
-        console.log(`✅ Logged session event: ${event.eventType}`, eventRecord.data);
-      }
+      } else { /* no-op */ }
     } catch (error) {
       console.error('Error logging session event:', error);
     }

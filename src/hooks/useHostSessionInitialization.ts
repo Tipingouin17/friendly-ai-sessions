@@ -26,7 +26,6 @@ export const useHostSessionInitialization = ({
 
   // Track URL params for session switching
   useEffect(() => {
-    console.log("Location or conversation ID changed in SessionHost");
     setHasInitializedProvider(false);
     setIsLoading(true);
   }, [location.search, location.pathname, setHasInitializedProvider, setIsLoading]);
@@ -35,15 +34,6 @@ export const useHostSessionInitialization = ({
   useEffect(() => {
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
-      console.log("Host session page mounted", {
-        time: new Date().toISOString(),
-        isHost: true,
-        currentConversationId,
-        locationState,
-        conversationData,
-        path: window.location.pathname,
-        participantsCount: participants?.length || 0
-      });
 
       toast({
         title: "Host Session Interface",

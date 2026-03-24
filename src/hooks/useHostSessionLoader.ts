@@ -18,7 +18,6 @@ export function useHostSessionLoader() {
   
   // Set host view as mounted to prevent unmounting
   useEffect(() => {
-    console.log("Host session loader - host view mounted");
     
     // Set host view as mounted to prevent unmounting
     hostViewMountedRef.current = true;
@@ -33,7 +32,6 @@ export function useHostSessionLoader() {
   // Improved caching - keep the data even if the API returns null/undefined
   useEffect(() => {
     if (conversationData) {
-      console.log("Caching host session data for persistence");
       cachedDataRef.current = conversationData;
     }
   }, [conversationData]);
@@ -46,7 +44,6 @@ export function useHostSessionLoader() {
     
     initializeTimeoutRef.current = setTimeout(() => {
       if (isLoading && !hasInitializedProvider) {
-        console.log("Host: Completing initialization");
         setIsLoading(false);
         setHasInitializedProvider(true);
         wasInitializedRef.current = true;
@@ -64,7 +61,6 @@ export function useHostSessionLoader() {
   useEffect(() => {
     const criticalTimeout = setTimeout(() => {
       if (!wasInitializedRef.current) {
-        console.log("Host: Critical timeout reached - forcing initialization");
         setIsLoading(false);
         setHasInitializedProvider(true);
         wasInitializedRef.current = true;

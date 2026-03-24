@@ -50,7 +50,6 @@ export const AddressAutocomplete = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchAddressSuggestions = async (query: string): Promise<AddressSuggestion[]> => {
-    console.log("Fetching suggestions for:", query);
 
     await new Promise(resolve => setTimeout(resolve, 500));
     if (!query || query.length < 3) return [];
@@ -114,7 +113,6 @@ export const AddressAutocomplete = ({
   };
 
   const fetchPlaceDetails = async (placeId: string): Promise<PlaceDetails | null> => {
-    console.log("Fetching details for place ID:", placeId);
 
     await new Promise(resolve => setTimeout(resolve, 700));
 

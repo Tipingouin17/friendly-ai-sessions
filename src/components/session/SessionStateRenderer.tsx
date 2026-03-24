@@ -47,9 +47,7 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
   
   useEffect(() => {
-    if (effectiveAdmin && !props.isAdmin) {
-      console.log("Admin status detected but not reflected in props. Forcing admin override in SessionStateRenderer");
-    }
+    if (effectiveAdmin && !props.isAdmin) { /* no-op */ }
   }, [effectiveAdmin, props.isAdmin]);
 
   const isOnAdminRoute = window.location.pathname.includes('/admin');
@@ -59,10 +57,8 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     (props.isAdmin || false) : effectiveAdmin;
   
   if (isOnAdminRoute || (shouldUseAdminPrivileges && props.isAdmin)) {
-    console.log("🔑 On admin route or confirmed admin - bypassing error screens");
     
     if (!props.conversation && props.refetch) {
-      console.log("Admin view: No conversation data found, attempting to force refresh data");
       props.refetch();
     }
     
@@ -85,10 +81,8 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
                            props.error?.includes("full") || props.error?.includes("maximum capacity");
   
   if (shouldUseAdminPrivileges && isSessionFullError) {
-    console.log("🔑 Admin detected with session full error - bypassing error screen");
     
     if (!props.conversation) {
-      console.log("Admin bypass: No conversation data found, attempting to force refresh data");
       props.refetch();
     }
     
@@ -108,7 +102,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }
   
   if ((isLoading || props.isLoading) && !props.conversation) {
-    console.log("Showing provider loading state");
     return <JoinSessionLoadingState 
       onRetry={retryConnection}
       retryCount={connectionAttempts} 
@@ -116,7 +109,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }
   
   if (props.error || error) {
-    console.log("Showing provider error state:", props.error || error);
     return <JoinSessionLoadingState 
       error={props.error || error} 
       onRetry={retryConnection}

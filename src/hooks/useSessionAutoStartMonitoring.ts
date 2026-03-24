@@ -33,24 +33,13 @@ export const useSessionAutoStartMonitoring = ({
     if (currentCount === lastProcessedCountRef.current) return;
     lastProcessedCountRef.current = currentCount;
 
-    console.log(`🔍 [${isHost ? 'HOST' : 'PARTICIPANT'}] Session auto-start check:`, {
-      conversationId,
-      currentCount,
-      maxCount,
-      sessionStarted,
-      participantsLength: participants.length
-    });
-
     // Check if session should auto-start
     if (currentCount >= maxCount && maxCount > 0 && !sessionStarted) {
       sessionStartProcessingRef.current = true;
       
-      console.log(`🚀 [${isHost ? 'HOST' : 'PARTICIPANT'}] Session auto-start triggered for session ${conversationId}`);
-      
       try {
         // For host, trigger AI message generation immediately
         if (isHost) {
-          console.log(`🤖 [HOST] Triggering AI welcome message generation...`);
           // The database trigger will handle setting session_started = true
           // We just need to wait for that update to propagate
           onSessionStarted?.();

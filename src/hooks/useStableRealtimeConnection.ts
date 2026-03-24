@@ -54,12 +54,10 @@ export function useStableRealtimeConnection({
   // Exponential backoff reconnection
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current || connectionAttemptsRef.current >= maxReconnectAttempts) {
-      console.log(`🚫 Max reconnection attempts reached for conversation ${conversationId}`);
       return;
     }
 
     const delay = Math.min(baseReconnectDelay * Math.pow(2, connectionAttemptsRef.current), 30000);
-    console.log(`⏰ Scheduling reconnection attempt ${connectionAttemptsRef.current + 1} in ${delay}ms`);
 
     reconnectTimeoutRef.current = setTimeout(() => {
       if (mountedRef.current) {
@@ -75,8 +73,6 @@ export function useStableRealtimeConnection({
     if (!conversationId || !enabled || !mountedRef.current) {
       return;
     }
-
-    console.log(`🔗 Setting up stable realtime connection for conversation ${conversationId} (attempt ${connectionAttemptsRef.current + 1})`);
 
     cleanup();
 
@@ -94,12 +90,6 @@ export function useStableRealtimeConnection({
         }, (payload) => {
           if (!mountedRef.current) return;
 
-          console.log(`📨 Stable message update for conversation ${conversationId}:`, {
-            event: payload.eventType,
-            messageId: (payload.new as any)?.id || (payload.old as any)?.id,
-            role: (payload.new as any)?.role || (payload.old as any)?.role
-          });
-
           // Update last message check timestamp
           setLastMessageCheck(Date.now());
 
@@ -116,11 +106,6 @@ export function useStableRealtimeConnection({
         }, (payload) => {
           if (!mountedRef.current) return;
 
-          console.log(`👥 Stable participant update for conversation ${conversationId}:`, {
-            event: payload.eventType,
-            participantId: (payload.new as any)?.participant_id || (payload.old as any)?.participant_id
-          });
-
           if (onParticipantUpdate) {
             onParticipantUpdate();
           }
@@ -134,20 +119,12 @@ export function useStableRealtimeConnection({
         }, (payload) => {
           if (!mountedRef.current) return;
 
-          console.log(`🔄 Stable conversation update for conversation ${conversationId}:`, {
-            sessionStarted: payload.new?.session_started,
-            currentParticipants: payload.new?.current_participants,
-            welcomeStatus: payload.new?.welcome_message_status
-          });
-
           if (onSessionUpdate) {
             onSessionUpdate();
           }
         })
         .subscribe((status) => {
           if (!mountedRef.current) return;
-
-          console.log(`🔗 Stable channel status for conversation ${conversationId}: ${status}`);
 
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
@@ -157,9 +134,7 @@ export function useStableRealtimeConnection({
 
             // Start stability monitoring
             stabilityCheckRef.current = setTimeout(() => {
-              if (mountedRef.current && connectionEstablishedRef.current) {
-                console.log(`✅ Connection stable for conversation ${conversationId}`);
-              }
+              if (mountedRef.current && connectionEstablishedRef.current) { /* no-op */ }
             }, connectionStabilityWindow);
 
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -173,7 +148,6 @@ export function useStableRealtimeConnection({
             }
 
           } else if (status === 'CLOSED') {
-            console.log(`🔒 Stable channel closed for conversation ${conversationId}`);
             setIsConnected(false);
             connectionEstablishedRef.current = false;
           }
@@ -212,7 +186,6 @@ export function useStableRealtimeConnection({
 
   // Manual reconnection function
   const forceReconnect = useCallback(() => {
-    console.log(`🔄 Force reconnecting stable realtime for conversation ${conversationId}`);
     setConnectionAttempts(0);
     connectionAttemptsRef.current = 0;
     setupConnection();

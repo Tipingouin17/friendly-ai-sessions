@@ -42,9 +42,7 @@ export const useJoinSessionState = () => {
     if (!conversationId) {
       console.error("No valid conversation ID found in URL parameters:", idParam);
       setInvalidRequest(true);
-    } else {
-      console.log("JoinSession: Using conversation ID:", conversationId);
-    }
+    } else { /* no-op */ }
   }, [conversationId, idParam, checkNavigationState]);
 
   return {

@@ -64,27 +64,18 @@ export const useHostMessages = ({
   // Enhanced immediate welcome generation for auto-started sessions
   const triggerImmediateWelcomeGeneration = useCallback(async () => {
     if (!conversationId || welcomeGeneratedRef.current || !conversationState) {
-      console.log('⚠️ [HOST] Skipping immediate welcome generation:', {
-        hasConversationId: !!conversationId,
-        alreadyGenerated: welcomeGeneratedRef.current,
-        hasConversationState: !!conversationState
-      });
       return;
     }
 
-    console.log('🚀 [HOST] Triggering immediate AI welcome generation for auto-started session...');
     welcomeGeneratedRef.current = true;
 
     // The message fetching hook will handle the actual generation
     // We just need to trigger it by updating the conversation state
-    if (conversationState.session_started && !conversationState.welcome_message_status) {
-      console.log('🔄 [HOST] Session started, message fetching hook will handle generation');
-    }
+    if (conversationState.session_started && !conversationState.welcome_message_status) { /* no-op */ }
   }, [conversationId, conversationState]);
 
   // Handle conversation updates from realtime with enhanced auto-start detection
   const handleConversationUpdate = useCallback((payload: any) => {
-    console.log('🔄 [HOST] Enhanced conversation update received:', payload);
 
     if (payload.new) {
       const updatedConversation = { ...sessionStateRef.current, ...payload.new };
@@ -93,7 +84,6 @@ export const useHostMessages = ({
 
       // Enhanced session start detection with immediate AI generation
       if (payload.new.session_started && !payload.old?.session_started && !autoStartHandledRef.current) {
-        console.log('🎉 [HOST] Session auto-started - triggering immediate AI welcome generation');
         autoStartHandledRef.current = true;
 
         // Trigger immediate AI welcome generation
@@ -106,16 +96,13 @@ export const useHostMessages = ({
 
   // Handle participant changes
   const handleParticipantChange = useCallback((payload: any) => {
-    console.log('👥 [HOST] Enhanced participant change:', payload);
     // Participant updates are handled by the parent component
   }, []);
 
   // Enhanced session event handling with immediate AI generation
   const handleSessionEvent = useCallback((payload: any) => {
-    console.log('📋 [HOST] Enhanced session event:', payload);
 
     if (payload.new?.event_type === 'session_auto_started' && !autoStartHandledRef.current) {
-      console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
       autoStartHandledRef.current = true;
 
       setTimeout(() => {
@@ -128,14 +115,10 @@ export const useHostMessages = ({
   useOptimizedRealtimeConnection({
     conversationId,
     onConversationUpdate: handleConversationUpdate,
-    onParticipantChange: useCallback((payload: any) => {
-      console.log('👥 [HOST] Enhanced participant change:', payload);
-    }, []),
+    onParticipantChange: useCallback((payload: any) => { /* no-op */ }, []),
     onSessionEvent: useCallback((payload: any) => {
-      console.log('📋 [HOST] Enhanced session event:', payload);
 
       if (payload.new?.event_type === 'session_auto_started' && !autoStartHandledRef.current) {
-        console.log('🚀 [HOST] Auto-start event detected - triggering immediate AI generation');
         autoStartHandledRef.current = true;
 
         setTimeout(() => {
@@ -153,7 +136,6 @@ export const useHostMessages = ({
     participants,
     onSessionStarted: () => {
       if (!autoStartHandledRef.current) {
-        console.log('🎯 [HOST] Auto-start monitoring detected session start, triggering AI generation...');
         autoStartHandledRef.current = true;
         setTimeout(() => {
           triggerImmediateWelcomeGeneration();
@@ -166,11 +148,9 @@ export const useHostMessages = ({
   // Enhanced session start state monitoring for immediate welcome generation
   useEffect(() => {
     if (conversationState?.session_started && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
-      console.log('🔍 [HOST] Enhanced session started detected, checking for welcome message generation...');
 
       // Check if we need to generate welcome message
       if (messages.length === 0) {
-        console.log('📝 [HOST] No messages found, triggering immediate AI welcome generation...');
         autoStartHandledRef.current = true;
         setTimeout(() => {
           triggerImmediateWelcomeGeneration();
@@ -190,12 +170,10 @@ export const useHostMessages = ({
   }, []);
 
   const handleHostMessage = useCallback((message: string) => {
-    console.log('📝 [HOST] Sending host message:', message);
     // Implementation for host messages
   }, []);
 
   const handleSendHostMessage = useCallback(async (message: string, isPinned = false, recipientId?: string) => {
-    console.log('📤 [HOST] Sending message:', { message, isPinned, recipientId });
     if (!conversationId || !message.trim()) return;
 
     try {
@@ -217,7 +195,6 @@ export const useHostMessages = ({
   }, [conversationId]);
 
   const triggerFacilitatorResponse = useCallback(async () => {
-    console.log('🤖 [HOST] Triggering facilitator response...');
     try {
       await generateAggregatedResponse();
     } catch (error) {

@@ -5,11 +5,11 @@ import { CardElement } from '@stripe/react-stripe-js';
 import { BillingDetails } from '../types';
 
 export const useCheckoutFormValidation = () => {
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({ /* no-op */ });
   const [error, setError] = useState<string | null>(null);
 
   const validateForm = (billingDetails: BillingDetails, stripe: any, elements: any): Record<string, string> => {
-    const newFieldErrors: Record<string, string> = {};
+    const newFieldErrors: Record<string, string> = { /* no-op */ };
     
     if (!billingDetails.name) {
       newFieldErrors['name'] = "Full name is required";

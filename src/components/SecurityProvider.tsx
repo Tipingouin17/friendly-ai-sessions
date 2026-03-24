@@ -19,7 +19,7 @@ export const useSecurityContext = () => {
 };
 
 export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isSecureEnvironment, setIsSecureEnvironment] = useState(false);
+  const [isSecureEnvironment, setIsSecureEnvironment] = useState(true);
   const [securityAlerts, setSecurityAlerts] = useState<string[]>([]);
   const { logSecurityViolation } = useSecurityAudit();
 
@@ -47,36 +47,10 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [logSecurityViolation]);
 
-  // Monitor for potentially dangerous activities
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Log potential security-related key combinations
-      if (event.ctrlKey && event.shiftKey && event.key === 'I') {
-        logSecurityViolation('developer_tools_opened', { 
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent 
-        });
-      }
-    };
-
-    const handleRightClick = (event: MouseEvent) => {
-      // In production, consider logging right-click events on sensitive areas
-      if (process.env.NODE_ENV === 'production') {
-        logSecurityViolation('right_click_detected', { 
-          target: (event.target as Element)?.tagName,
-          timestamp: new Date().toISOString()
-        });
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('contextmenu', handleRightClick);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('contextmenu', handleRightClick);
-    };
-  }, [logSecurityViolation]);
+  // NOTE: Removed DevTools detection and right-click logging.
+  // These are security theater that annoy legitimate users and developers
+  // while providing zero protection against actual threats.
+  // Real security should be enforced server-side via RLS policies and auth.
 
   const clearSecurityAlerts = () => {
     setSecurityAlerts([]);

@@ -51,17 +51,13 @@ export const CheckoutForm = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    console.log("Stripe loaded?", !!stripe);
-    console.log("Elements loaded?", !!elements);
-    console.log("User logged in?", !!user);
-    
     if (!user) {
       setError("You must be logged in to complete this purchase.");
       return;
     }
 
     setError(null);
-    setFieldErrors({});
+    setFieldErrors({ /* no-op */ });
     
     const newFieldErrors = validateForm(billingDetails, stripe, elements);
     
@@ -87,11 +83,8 @@ export const CheckoutForm = ({
     setLoading(true);
 
     try {
-      console.log("Creating subscription with plan ID:", plan.id);
-      console.log("Using stripe plan ID:", plan.stripe_plan_id);
       
       if (process.env.NODE_ENV === 'development' || !stripe || !elements || !plan.stripe_plan_id) {
-        console.log("⚠️ Using direct database update (development mode or Stripe not available)");
         
         await updateUserSubscription(user.id, plan.id);
         

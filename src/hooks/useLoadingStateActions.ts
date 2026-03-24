@@ -15,7 +15,6 @@ export function useLoadingStateActions({ elapsed, onRetry, mountedRef }: UseLoad
   useEffect(() => {
     const autoRefreshTimeout = setTimeout(() => {
       if (elapsed > 15 && mountedRef.current) {
-        console.log("Session taking too long to load - navigating to session with retry param");
         // Use navigateHandler instead of window.location.reload()
         if (onRetry) {
           onRetry();

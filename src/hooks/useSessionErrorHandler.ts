@@ -5,7 +5,7 @@ interface UseSessionErrorHandlerProps {
   onError?: (error: string) => void;
 }
 
-export const useSessionErrorHandler = ({ onError }: UseSessionErrorHandlerProps = {}) => {
+export const useSessionErrorHandler = ({ onError }: UseSessionErrorHandlerProps = { /* no-op */ }) => {
   const [providerError, setProviderError] = useState<string | null>(null);
   
   const handleError = useCallback((errorMessage: string) => {

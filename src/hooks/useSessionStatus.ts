@@ -45,7 +45,6 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
         }
 
         if (data && (data.is_session_ended || data.status !== 'active')) {
-          console.log('Session ended detected via polling');
           setSessionEnded(true);
           
           if (pollIntervalRef.current) {
@@ -69,8 +68,6 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
     
-    console.log("Setting up enhanced session status listener for conversation:", conversationId);
-    
     // Create a unique channel name to prevent stale connections
     const channelName = `session-status-${conversationId}-${Date.now()}`;
     
@@ -84,11 +81,9 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
       }, (payload) => {
         if (!mountedRef.current) return;
         
-        console.log("Session status update:", payload);
         if (payload.new) {
           // Check if session was ended or status changed
           if (payload.new.is_session_ended || payload.new.status !== 'active') {
-            console.log('Session ended detected via realtime');
             setSessionEnded(true);
             
             toast({
@@ -101,7 +96,6 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
           }
           // Check if session was started
           if (payload.new.session_started && !payload.old.session_started) {
-            console.log("Session was started remotely");
             toast({
               title: "Session Started",
               description: "The session has been started.",
@@ -111,11 +105,8 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
         }
       })
       .subscribe((status) => {
-        console.log(`Session status channel ${channelName} status:`, status);
         
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to session status updates');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'SUBSCRIBED') { /* no-op */ } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('Session status channel error, starting fallback polling');
           startFallbackPolling();
         }
@@ -125,9 +116,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
     startFallbackPolling();
 
     return () => {
-      if (mountedRef.current) {
-        console.log("Cleaning up session status listener");
-      }
+      if (mountedRef.current) { /* no-op */ }
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }

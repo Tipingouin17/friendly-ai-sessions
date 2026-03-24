@@ -38,8 +38,6 @@ export function useHostOverride() {
         throw new Error("Unauthorized: Host privileges required");
       }
 
-      console.log("🔑 Verified host override for session full error");
-      
       // For verified hosts, allow them to join with a special participant ID
       const hostParticipantId = Math.floor(Math.random() * 900) + 9000; // Use a very high ID for host override
       

@@ -96,7 +96,7 @@ export const validateSecureEnvironment = (): { isSecure: boolean; warnings: stri
  */
 export const enforceContentSecurity = (content: string): { isSafe: boolean; sanitized: string } => {
   // Remove potentially dangerous content
-  let sanitized = content
+  const sanitized = content
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/javascript:/gi, '')
     .replace(/data:/gi, '')

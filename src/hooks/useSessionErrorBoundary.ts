@@ -9,7 +9,7 @@ interface UseSessionErrorBoundaryProps {
 export const useSessionErrorBoundary = ({ 
   onError, 
   initialError = null 
-}: UseSessionErrorBoundaryProps = {}) => {
+}: UseSessionErrorBoundaryProps = { /* no-op */ }) => {
   const [boundaryError, setBoundaryError] = useState<string | null>(initialError);
   
   // Reset error when initialError changes to null

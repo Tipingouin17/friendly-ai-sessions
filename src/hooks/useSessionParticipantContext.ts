@@ -14,13 +14,13 @@ export const useSessionParticipantContext = ({
   participants,
   currentUserParticipantId
 }: UseSessionParticipantContextProps) => {
-  const [participantMap, setParticipantMap] = useState<{[id: number]: ParticipantInfo}>({});
+  const [participantMap, setParticipantMap] = useState<{[id: number]: ParticipantInfo}>({ /* no-op */ });
   const [participantCount, setParticipantCount] = useState(0);
   const [maxParticipants, setMaxParticipants] = useState(0);
   
   // Build participant map for easy access
   useEffect(() => {
-    const map: {[id: number]: ParticipantInfo} = {};
+    const map: {[id: number]: ParticipantInfo} = { /* no-op */ };
     participants.forEach(participant => {
       map[participant.id] = participant;
     });

@@ -75,7 +75,6 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-        console.log("New conversation created with ID:", data.id, "redirecting host with secure navigation");
 
         // Use secure navigation for host sessions instead of direct navigate
         await navigateToHostSession(data.id);

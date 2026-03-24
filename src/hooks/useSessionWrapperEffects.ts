@@ -44,7 +44,6 @@ export function useSessionWrapperEffects({
       // Only set if not already set
       if (sessionStorage.getItem('isAdminSession') !== 'true') {
         sessionStorage.setItem('isAdminSession', 'true');
-        console.log("useSessionWrapperEffects: Setting admin status for admin path (once)");
       }
     }
     
@@ -71,7 +70,6 @@ export function useSessionWrapperEffects({
     
     // For admin sessions, initialize IMMEDIATELY
     if (isAdmin) {
-      console.log("Admin session: Fast-tracked initialization in wrapper effects");
       providerInitialized.current = true;
       onInitialized();
       
@@ -99,7 +97,6 @@ export function useSessionWrapperEffects({
                            props.isSessionStartedInDB;
     
     if (shouldInitialize) {
-      console.log("Provider successfully initialized with data or session ID");
       providerInitialized.current = true;
       onInitialized();
       
@@ -109,7 +106,6 @@ export function useSessionWrapperEffects({
         onLoading(false);
       }
     } else if (props.error) {
-      console.log("Provider initialization with error:", props.error);
       providerInitialized.current = true;
       onInitialized();
     }
@@ -146,9 +142,7 @@ export function useSessionWrapperEffects({
     stateRef.current.hasHandledError = true;
     
     // For admin sessions, suppress ALL errors
-    if (effectiveAdmin || isOnAdminPath) {
-      console.log("🔑 Suppressing all errors for admin user: ", props.error);
-    } else {
+    if (effectiveAdmin || isOnAdminPath) { /* no-op */ } else {
       onError(props.error);
     }
   }, [props.error, onError, effectiveAdmin, isOnAdminPath, sessionMountedRef]);

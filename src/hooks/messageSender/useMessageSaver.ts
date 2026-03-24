@@ -41,8 +41,6 @@ export const useMessageSaver = () => {
       isAnonymous: isAnonymous
     };
 
-    console.log("Message created for UI:", newMessage);
-
     // Save to database with participant_id column for privacy
     const { data, error } = await supabase.from('messages').insert({
       conversation_id: currentConversationId,
@@ -62,7 +60,6 @@ export const useMessageSaver = () => {
       throw new Error(error.message);
     }
 
-    console.log("Message saved to database:", data);
     return newMessage;
   };
 

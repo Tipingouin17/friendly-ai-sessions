@@ -51,7 +51,6 @@ const SessionContent: React.FC<{
     // Force session to be shown when on admin route
     useEffect(() => {
       if (isOnAdminPath && !sessionStarted) {
-        console.log("Forcing session started state for admin route");
         setSessionStarted(true);
       }
     }, [isOnAdminPath, sessionStarted, setSessionStarted]);
@@ -79,12 +78,10 @@ const SessionContent: React.FC<{
 
     // Error and loading states are handled first with early returns
     if (props.isLoading || initializing) {
-      console.log("Showing loading state - isLoading:", props.isLoading, "initializing:", initializing);
       return <LoadingState />;
     }
 
     if (props.error) {
-      console.log("Showing error state:", props.error);
       return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
@@ -96,12 +93,10 @@ const SessionContent: React.FC<{
     }
 
     if (!props.conversation) {
-      console.log("No conversation data, showing empty state");
       return <EmptyState />;
     }
 
     if (!props.currentConversationId) {
-      console.log("No conversation ID, showing empty state");
       return <EmptyState />;
     }
 
@@ -109,17 +104,8 @@ const SessionContent: React.FC<{
     const isParticipant = !isAdmin && !isOnAdminPath;
     const sessionHasStarted = props.isSessionStartedInDB || sessionStarted;
 
-    console.log("Session state check:", {
-      isParticipant,
-      sessionHasStarted,
-      isSessionStartedInDB: props.isSessionStartedInDB,
-      sessionStarted,
-      currentParticipants: transitionState.currentParticipants
-    });
-
     // If participant and session hasn't started, show waiting screen
     if (isParticipant && !sessionHasStarted) {
-      console.log("Showing participant waiting screen");
       return (
         <ParticipantWaitingScreen
           conversationId={props.currentConversationId}
@@ -127,7 +113,6 @@ const SessionContent: React.FC<{
           maxParticipants={transitionState.maxParticipants}
           facilitatorTitle={props.conversation?.sessions?.facilitator_details?.title}
           onSessionStarted={() => {
-            console.log("Session started callback triggered");
             setSessionStarted(true);
           }}
         />
@@ -136,7 +121,6 @@ const SessionContent: React.FC<{
 
     // Always show session for admin route
     if (isOnAdminPath) {
-      console.log("Admin route detected in SessionContent, bypassing transition logic");
       return (
         <SessionStateProvider
           sessionData={props}
@@ -205,7 +189,6 @@ const SessionContent: React.FC<{
           isTransitioning={isTransitioning}
           shouldShowSession={shouldShowSession}
           onStartSession={() => {
-            console.log("Start session button clicked in SessionViewSelector");
             toast({
               title: "Starting Session",
               description: "The session is now starting for all participants.",
@@ -235,7 +218,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
   // Force start session if on admin route
   useEffect(() => {
     if (isOnAdminPath && !sessionStarted) {
-      console.log("Admin route detected, forcing session start");
       setSessionStarted(true);
     }
   }, [isOnAdminPath, sessionStarted, setSessionStarted]);

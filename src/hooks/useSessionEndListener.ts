@@ -21,8 +21,6 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
     // Only listen for session end events if we're not an admin
     if (!conversationId || !mountedRef.current || isAdmin) return;
     
-    console.log("Setting up session end listener for conversation:", conversationId);
-    
     // Create a unique channel name to prevent stale connections
     const channelName = `session-end-${conversationId}-${Date.now()}`;
     
@@ -35,8 +33,6 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         if (!mountedRef.current) return;
-        
-        console.log("Session event received:", payload);
         
         if (payload.new && payload.new.event_type === 'session_ended') {
           toast({
@@ -59,14 +55,10 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
           }, 3000);
         }
       })
-      .subscribe((status) => {
-        console.log(`Session end channel ${channelName} status:`, status);
-      });
+      .subscribe((status) => { /* no-op */ });
 
     return () => {
-      if (mountedRef.current) {
-        console.log("Cleaning up session end listener");
-      }
+      if (mountedRef.current) { /* no-op */ }
       try {
         supabase.removeChannel(channel);
       } catch (err) {

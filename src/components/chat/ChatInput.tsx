@@ -22,7 +22,7 @@ const ChatInput = ({
   setInputMessage,
   onSendMessage,
   isRecording = false,
-  setIsRecording = () => {},
+  setIsRecording = () => { /* no-op */ },
   placeholder = "Type a message", // Updated to consistent placeholder
   disabled = false,
   isMobile = false
@@ -93,35 +93,20 @@ const ChatInput = ({
   };
 
   const handleSendClick = () => {
-    console.log("🖱️ ChatInput - Send button clicked:", {
-      hasMessage: !!inputMessage.trim(),
-      messageLength: inputMessage.length,
-      disabled
-    });
     
     if (!inputMessage.trim() || disabled) {
-      console.log("🚫 ChatInput - Send blocked: empty message or disabled");
       return;
     }
     
-    console.log("✅ ChatInput - Calling onSendMessage");
     onSendMessage();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !disabled) {
       e.preventDefault();
-      console.log("⌨️ ChatInput - Enter key pressed, calling handleSendClick");
       handleSendClick();
     }
   };
-
-  console.log("🎨 ChatInput - Rendering with:", {
-    inputMessage: inputMessage.substring(0, 50) + (inputMessage.length > 50 ? "..." : ""),
-    placeholder,
-    disabled,
-    messageLength: inputMessage.length
-  });
 
   return (
     <div className={`${isMobile ? 'p-3' : 'p-4'} border-t border-gray-200 bg-white`}>
@@ -130,7 +115,6 @@ const ChatInput = ({
           ref={textareaRef}
           value={inputMessage}
           onChange={(e) => {
-            console.log("📝 ChatInput - Input changed:", e.target.value.substring(0, 50));
             setInputMessage(e.target.value);
           }}
           placeholder={disabled ? "You have already answered this question" : placeholder}

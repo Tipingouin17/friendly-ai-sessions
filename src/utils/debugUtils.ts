@@ -12,29 +12,27 @@ export function useRenderCounter(componentName: string) {
   
   logger.log(`render #${++renderCount.current}`);
   
-  // If render count gets too high, warn about potential infinite loop
   if (renderCount.current > 25) {
     logger.warn(`Component has rendered ${renderCount.current} times! Check for potential infinite render loops.`);
   }
 }
 
 /**
- * Helper to track state/prop changes between renders
+ * Custom hook to track state/prop changes between renders.
+ * Renamed from trackChanges to useTrackChanges to follow React Hooks naming convention.
  * @param props Object containing props/state to track
  * @param componentName Name of the component
  */
-export function trackChanges(props: Record<string, any>, componentName: string) {
-  const prevProps = React.useRef<Record<string, any>>({});
+export function useTrackChanges(props: Record<string, unknown>, componentName: string) {
+  const prevProps = React.useRef<Record<string, unknown>>({ /* no-op */ });
   const logger = createLogger(componentName, "state");
   
-  // On first render, just store the props
   if (Object.keys(prevProps.current).length === 0) {
     prevProps.current = { ...props };
     return;
   }
   
-  // Track which props have changed
-  const changedProps: Record<string, { from: any, to: any }> = {};
+  const changedProps: Record<string, { from: unknown, to: unknown }> = { /* no-op */ };
   
   Object.entries(props).forEach(([key, value]) => {
     if (prevProps.current[key] !== value) {
@@ -49,25 +47,28 @@ export function trackChanges(props: Record<string, any>, componentName: string) 
     logger.log(`props changed:`, changedProps);
   }
   
-  // Update stored props
   prevProps.current = { ...props };
 }
+
+// Keep backward-compatible alias
+export const trackChanges = useTrackChanges;
 
 /**
  * Check if a value is a function
  * @param value Value to check
  */
-export function isFunction(value: any): boolean {
+export function isFunction(value: unknown): boolean {
   return typeof value === 'function';
 }
 
 /**
- * Helper to debug React hook dependencies
+ * Custom hook to debug React hook dependencies.
+ * Renamed from logDependencyChanges to useLogDependencyChanges to follow React Hooks naming convention.
  * @param dependencies Array of dependencies
  * @param hookName Name of the hook 
  */
-export function logDependencyChanges(dependencies: any[], hookName: string) {
-  const prevDepsRef = React.useRef<any[]>([]);
+export function useLogDependencyChanges(dependencies: unknown[], hookName: string) {
+  const prevDepsRef = React.useRef<unknown[]>([]);
   const logger = createLogger(hookName, "state");
   
   React.useEffect(() => {
@@ -76,7 +77,7 @@ export function logDependencyChanges(dependencies: any[], hookName: string) {
       return;
     }
     
-    const changes: {index: number, from: any, to: any}[] = [];
+    const changes: {index: number, from: unknown, to: unknown}[] = [];
     
     dependencies.forEach((dep, index) => {
       if (dep !== prevDepsRef.current[index]) {
@@ -93,25 +94,28 @@ export function logDependencyChanges(dependencies: any[], hookName: string) {
     }
     
     prevDepsRef.current = [...dependencies];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);
 }
 
+// Keep backward-compatible alias
+export const logDependencyChanges = useLogDependencyChanges;
+
 /**
- * Detect memoization issues by logging when expected memoized values change
+ * Custom hook to detect memoization issues by logging when expected memoized values change.
+ * Renamed from checkMemoization to useCheckMemoization to follow React Hooks naming convention.
  * @param value The value to monitor
  * @param dependencies The expected dependencies
  * @param valueName Name of the value for logging
  */
-export function checkMemoization(value: any, dependencies: any[], valueName: string) {
-  const prevValueRef = React.useRef<any>(null);
+export function useCheckMemoization(value: unknown, dependencies: unknown[], valueName: string) {
+  const prevValueRef = React.useRef<unknown>(null);
   const renderCountRef = React.useRef(0);
+  const prevDepsRef = React.useRef<unknown[]>([]);
   const logger = createLogger("MemoCheck", "rendering");
   
   if (renderCountRef.current > 0 && prevValueRef.current !== value) {
     logger.warn(`Memoization failed for ${valueName}. Value changed when dependencies shouldn't have changed.`);
-    
-    // Try to find which dependency might have changed
-    const prevDepsRef = React.useRef<any[]>([]);
     
     if (prevDepsRef.current.length > 0) {
       const changedDeps = dependencies.map((dep, i) => {
@@ -134,3 +138,6 @@ export function checkMemoization(value: any, dependencies: any[], valueName: str
   prevValueRef.current = value;
   renderCountRef.current++;
 }
+
+// Keep backward-compatible alias
+export const checkMemoization = useCheckMemoization;

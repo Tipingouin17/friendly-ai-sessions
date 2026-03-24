@@ -23,7 +23,7 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
   participantColor = '#444',
   participantName,
   isExpanded = false,
-  toggleExpand = () => {},
+  toggleExpand = () => { /* no-op */ },
   index
 }) => {
   const isFacilitator = message.sender === 'assistant';

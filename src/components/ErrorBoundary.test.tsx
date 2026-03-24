@@ -19,7 +19,7 @@ describe('ErrorBoundary', () => {
 
     it('renders error UI when a child throws', () => {
         // Prevent console.error from cluttering the test output
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { /* no-op */ });
 
         render(
             <ErrorBoundary>

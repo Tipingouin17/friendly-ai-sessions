@@ -34,14 +34,12 @@ export function useSessionParticipants(conversationId: number | null) {
     if (!mountedRef.current) return;
 
     if (conversation?.is_session_ended) {
-      console.log("Session has ended, updating error state");
       setStateError("This session has ended and is no longer available");
     }
 
     // We don't clear error here anymore to avoid conflicts
 
     if (conversation && !isInitialized) {
-      console.log("Session participant hook initialized with conversation:", conversation.id);
       setIsInitialized(true);
     }
   }, [conversation, isInitialized]);
@@ -98,7 +96,6 @@ export function useSessionParticipants(conversationId: number | null) {
 
     const intervalId = setInterval(() => {
       if (mountedRef.current) {
-        console.log("Periodic refresh of session data");
         refetch();
       }
     }, 5000); // Reduced from 15000 to 5000 ms for more frequent updates

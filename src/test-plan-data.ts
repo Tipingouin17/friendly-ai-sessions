@@ -9,9 +9,7 @@ async function testPlanRestrictions() {
 
     if (error) {
         console.error('Error:', error);
-    } else {
-        console.log('Sample plan data:', JSON.stringify(data, null, 2));
-    }
+    } else { /* no-op */ }
 }
 
 // Run this in browser console: testPlanRestrictions()

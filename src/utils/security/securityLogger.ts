@@ -26,8 +26,6 @@ export const logSecurityEvent = (
     }
   });
   
-  console.log(`🔒 Security Event: ${eventType}`, sanitizedDetails);
-  
   // In production, this would also send to monitoring service
   if (!import.meta.env.DEV) {
     // Send to monitoring service

@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export async function debugGenerateWelcomeMessage(conversationId: number) {
   try {
-    console.log(`🔧 Debug: Manually triggering welcome message generation for session ${conversationId}`);
     
     // First, fetch the conversation data to verify context
     const { data: conversation, error: convError } = await supabase
@@ -43,13 +42,6 @@ export async function debugGenerateWelcomeMessage(conversationId: number) {
       return { success: false, error: 'Conversation not found' };
     }
 
-    console.log('📋 Retrieved conversation context:', {
-      facilitatorName: conversation.sessions?.facilitator_details?.title,
-      objective: conversation.sessions?.objective,
-      participantDescription: conversation.participant_description,
-      participantCount: conversation.participants
-    });
-
     // Call the edge function to generate welcome message
     const { data: response, error: funcError } = await supabase.functions.invoke('handle-facilitator-response', {
       body: {
@@ -70,11 +62,6 @@ export async function debugGenerateWelcomeMessage(conversationId: number) {
       console.error('❌ Empty response from edge function');
       return { success: false, error: 'Empty response' };
     }
-
-    console.log('✅ Successfully generated welcome message:', {
-      contentLength: response.content.length,
-      hasAvatar: !!response.avatar
-    });
 
     // Save the welcome message to the database
     const { error: insertError } = await supabase
@@ -111,7 +98,6 @@ export async function debugGenerateWelcomeMessage(conversationId: number) {
  */
 export async function testEdgeFunction(conversationId: number = 1529) {
   try {
-    console.log(`🧪 Testing edge function with session ${conversationId}`);
     
     const result = await supabase.functions.invoke('handle-facilitator-response', {
       body: {
@@ -122,7 +108,6 @@ export async function testEdgeFunction(conversationId: number = 1529) {
       }
     });
 
-    console.log('🧪 Edge function test result:', result);
     return result;
   } catch (error) {
     console.error('💥 Edge function test error:', error);

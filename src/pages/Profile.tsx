@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageHead } from '@/components/PageHead';
 import { PlanInfo } from '@/components/subscription/PlanInfo';
 import { AvatarUploadModal } from '@/components/profile/AvatarUploadModal';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
@@ -63,6 +64,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-primary/10 to-white">
+      <PageHead title="Profile" description="Manage your MyFacilitator profile" />
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
 
@@ -132,7 +134,14 @@ const Profile = () => {
                     <h3 className="text-lg text-gray-500 font-medium mb-2 text-left">Account Created</h3>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-gray-400" />
-                      <p className="text-lg">Not available</p>
+                      <p className="text-lg">
+                        {userMetadata?.created_at 
+                          ? new Date(userMetadata.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                          : user?.created_at
+                            ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                            : 'Not available'
+                        }
+                      </p>
                     </div>
                   </div>
                   <div>

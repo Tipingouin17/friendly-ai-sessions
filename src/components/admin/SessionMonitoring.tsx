@@ -80,7 +80,7 @@ export const SessionMonitoring = () => {
     const { data: conversations, isLoading } = useQuery({
         queryKey: ['admin-conversations', searchTerm],
         queryFn: async () => {
-            let query = supabase
+            const query = supabase
                 .from('conversations')
                 .select(`
           id,

@@ -6,7 +6,7 @@ export const useWorkshopReports = (conversationIds: number[]) => {
   return useQuery({
     queryKey: ['workshop-reports', conversationIds],
     queryFn: async () => {
-      if (conversationIds.length === 0) return {};
+      if (conversationIds.length === 0) return { /* no-op */ };
       
       const { data, error } = await supabase
         .from('session_reports')
@@ -16,7 +16,7 @@ export const useWorkshopReports = (conversationIds: number[]) => {
       if (error) throw error;
       
       // Create a map of conversation_id to report data
-      const reportsMap: Record<number, any> = {};
+      const reportsMap: Record<number, any> = { /* no-op */ };
       data?.forEach(report => {
         reportsMap[report.conversation_id] = report;
       });

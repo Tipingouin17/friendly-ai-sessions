@@ -93,7 +93,7 @@ const InputFooter = ({
             isRecording={isRecording}
             setIsRecording={setIsRecording}
             placeholder={`Type your message as ${participantName}...`}
-            disabled={false}
+            disabled={!shouldAllowAnswer}
             isMobile={isMobile}
           />
         ) : (

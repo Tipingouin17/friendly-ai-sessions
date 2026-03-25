@@ -721,6 +721,7 @@ def edge_function(func_name):
         conv_id = data.get("conversationId")
         is_session_start = data.get("sessionStart", False)
         generate_report = data.get("generateReport", False)
+        host_instruction = data.get("hostInstruction", "").strip()
 
         # ── Fetch full session context from DB ──
         session_title = "this workshop"
@@ -802,6 +803,21 @@ def edge_function(func_name):
             "- Use a professional yet approachable tone.\n"
             "- Do NOT use markdown headers (##) in chat messages.\n"
             "- Do NOT use placeholder text like [Your Name] - always use your actual name.")
+
+        # ── Inject host instruction if provided ──
+        if host_instruction:
+            system_parts.append(
+                "HOST INSTRUCTION (HIGH PRIORITY):\n"
+                f"The session host has given you the following directive: \"{host_instruction}\"\n"
+                "You MUST follow this instruction in your next response. Adapt your message "
+                "accordingly while maintaining your facilitator persona. For example:\n"
+                "- If asked to \"wrap up\", provide a concise summary and closing remarks instead of a new question.\n"
+                "- If asked to \"change topic\", smoothly transition to the new direction.\n"
+                "- If asked to \"focus on X\", steer the discussion toward that specific area.\n"
+                "- If asked to \"ask about X\", pose a question about that specific topic.\n"
+                "The host instruction takes priority over the default behavior of asking follow-up questions.")
+            print(f"[AI] Host instruction injected: {host_instruction}")
+
         system_message = "\n\n".join(system_parts)
 
         # ── Build the user prompt based on message type ──
@@ -886,14 +902,23 @@ def edge_function(func_name):
                 if role == 'user':
                     participant_answers.append(f"{name}: {text}")
 
-            user_prompt = (
-                f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
-                f"{conversation_context}\n"
-                "Based on the participants' responses above:\n"
-                "1. Briefly acknowledge and synthesize the key themes from their answers\n"
-                "2. Highlight any interesting connections or contrasts between different participants' views\n"
-                "3. Ask a thoughtful follow-up question that builds on what they shared and deepens the discussion\n\n"
-                "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
+            if host_instruction:
+                user_prompt = (
+                    f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
+                    f"{conversation_context}\n"
+                    f"The host has instructed you to: {host_instruction}\n\n"
+                    "Follow the host's instruction above. "
+                    "Reference the participants' contributions where relevant. "
+                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
+            else:
+                user_prompt = (
+                    f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
+                    f"{conversation_context}\n"
+                    "Based on the participants' responses above:\n"
+                    "1. Briefly acknowledge and synthesize the key themes from their answers\n"
+                    "2. Highlight any interesting connections or contrasts between different participants' views\n"
+                    "3. Ask a thoughtful follow-up question that builds on what they shared and deepens the discussion\n\n"
+                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
 
         # ── Call OpenAI API ──
         print(f"[AI] Calling {model} for conv={conv_id} (start={is_session_start}, report={generate_report})")

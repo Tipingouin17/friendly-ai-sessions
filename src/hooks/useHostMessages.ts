@@ -202,9 +202,9 @@ export const useHostMessages = ({
     }
   }, [conversationId]);
 
-  const triggerFacilitatorResponse = useCallback(async () => {
+  const triggerFacilitatorResponse = useCallback(async (hostInstruction?: string) => {
     try {
-      await generateAggregatedResponse();
+      await generateAggregatedResponse(hostInstruction);
     } catch (error) {
       console.error('❌ [HOST] Error generating facilitator response:', error);
     }

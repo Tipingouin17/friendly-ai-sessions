@@ -20,7 +20,7 @@ interface HostDashboardProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
-  onTriggerFacilitatorResponse?: () => void;
+  onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   
   // Session start props
   isSessionStarted?: boolean;

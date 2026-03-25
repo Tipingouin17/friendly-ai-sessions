@@ -264,23 +264,31 @@ export const useMessageFetching = ({
     }
   }, []);
 
-  // Generate aggregated response
-  const generateAggregatedResponse = useCallback(async () => {
+  // Generate aggregated response - accepts optional host instruction
+  const generateAggregatedResponse = useCallback(async (hostInstruction?: string) => {
     if (!conversationIdRef.current || isGeneratingResponse) return;
 
     setIsGeneratingResponse(true);
 
     try {
+      const body: any = {
+        messages: messagesRef.current.map(msg => ({
+          role: msg.sender === 'assistant' ? 'assistant' : 'user',
+          content: msg.content
+        })),
+        conversationId: conversationIdRef.current,
+        sessionStart: false,
+        generateReport: false
+      };
+
+      // Include host instruction if provided
+      if (hostInstruction && hostInstruction.trim()) {
+        body.hostInstruction = hostInstruction.trim();
+        console.log('[HOST] Sending instruction to AI:', hostInstruction.trim());
+      }
+
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: messagesRef.current.map(msg => ({
-            role: msg.sender === 'assistant' ? 'assistant' : 'user',
-            content: msg.content
-          })),
-          conversationId: conversationIdRef.current,
-          sessionStart: false,
-          generateReport: false
-        }
+        body
       });
 
       if (error) {

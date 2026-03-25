@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { Message, ParticipantInfo } from '@/types/chat';
 import PreSessionHostView from '@/components/session/host/PreSessionHostView';
-import { MessageSquare, Users, Play, Clock } from 'lucide-react';
+import { MessageSquare, Users, Play, Clock, Wand2, SendHorizonal, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
   messages: Message[];
@@ -15,7 +16,7 @@ interface SimplifiedHostMessagingViewProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
-  onTriggerFacilitatorResponse?: () => void;
+  onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
   participants?: ParticipantInfo[];
@@ -43,6 +44,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   onCancelAutoStart
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
+  const [hostInstruction, setHostInstruction] = useState('');
+  const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // Show pre-session view if session hasn't started
   if (!isSessionStarted) {
@@ -61,6 +65,39 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 
   const facilitatorMessages = messages.filter(m => m.sender === 'assistant');
   const participantMessages = messages.filter(m => m.sender === 'user');
+
+  // Handle sending instruction with the next AI response
+  const handleSendWithInstruction = async () => {
+    if (!onTriggerFacilitatorResponse) return;
+    setIsSending(true);
+    try {
+      const instruction = hostInstruction.trim() || undefined;
+      await onTriggerFacilitatorResponse(instruction);
+      setHostInstruction('');
+      setIsInstructionExpanded(false);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handle continue without instruction (normal flow)
+  const handleContinueNormal = async () => {
+    if (!onTriggerFacilitatorResponse) return;
+    setIsSending(true);
+    try {
+      await onTriggerFacilitatorResponse();
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Quick instruction presets
+  const quickInstructions = [
+    { label: 'Wrap up', instruction: 'Please wrap up the session. Summarize the key takeaways and provide closing remarks instead of asking another question.' },
+    { label: 'Go deeper', instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question.' },
+    { label: 'Change topic', instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet.' },
+    { label: 'Be practical', instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas.' },
+  ];
 
   return (
     <div className="flex flex-col h-full">
@@ -114,7 +151,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
       {/* Content area */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'overview' ? (
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 overflow-y-auto h-full">
             {/* Session Status */}
             <Card>
               <CardHeader>
@@ -155,7 +192,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-4">
                     <div>
                       <p className="text-sm text-gray-600">
                         {responseCount} of {totalParticipants} participants have responded
@@ -173,18 +210,96 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     </div>
                     
                     {onTriggerFacilitatorResponse && (
-                      <Button 
-                        onClick={onTriggerFacilitatorResponse}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Continue
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          onClick={handleContinueNormal}
+                          variant="outline"
+                          size="sm"
+                          disabled={isSending}
+                        >
+                          Continue
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Host Instruction Panel - Always visible during active session */}
+            <Card className="border-amber-200 bg-amber-50/50">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-amber-800">
+                    <Wand2 className="h-5 w-5" />
+                    Instruct AI Facilitator
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsInstructionExpanded(!isInstructionExpanded)}
+                    className="text-amber-700 hover:text-amber-900"
+                  >
+                    {isInstructionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-amber-600 mt-1">
+                  Guide the AI's next response. Participants will not see your instruction.
+                </p>
+              </CardHeader>
+              
+              {isInstructionExpanded && (
+                <CardContent className="pt-2">
+                  {/* Quick instruction buttons */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {quickInstructions.map((qi) => (
+                      <Button
+                        key={qi.label}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                        onClick={() => setHostInstruction(qi.instruction)}
+                      >
+                        {qi.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Textarea
+                    value={hostInstruction}
+                    onChange={(e) => setHostInstruction(e.target.value)}
+                    placeholder="Type your instruction for the AI facilitator... (e.g., 'Wrap up the session', 'Ask about implementation challenges', 'Focus on team collaboration')"
+                    className="min-h-[80px] resize-none bg-white border-amber-200 focus:border-amber-400"
+                  />
+                  
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-xs text-amber-600">
+                      {hostInstruction.trim() 
+                        ? 'Click "Send with Instruction" to generate AI response with your guidance'
+                        : 'Or click "Continue" above to let the AI respond naturally'}
+                    </span>
+                    <Button
+                      onClick={handleSendWithInstruction}
+                      size="sm"
+                      disabled={!hostInstruction.trim() || isSending}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {isSending ? (
+                        <span className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                          Generating...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <SendHorizonal className="h-4 w-4" />
+                          Send with Instruction
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
 
             {/* Session Info */}
             <Card>

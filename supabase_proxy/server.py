@@ -18,6 +18,10 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
+from openai import OpenAI
+
+# OpenAI client – uses OPENAI_API_KEY and OPENAI_BASE_URL env vars automatically
+openai_client = OpenAI()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True,
@@ -29,6 +33,17 @@ DB_HOST = "localhost"
 DB_PORT = 5432
 JWT_SECRET = "super-secret-jwt-token-for-local-dev"
 STORAGE_DIR = "/home/ubuntu/supabase_proxy/storage"
+
+# Map session gpt_version values to available models
+# The proxy supports: gpt-4.1-mini, gpt-4.1-nano, gemini-2.5-flash
+GPT_MODEL_MAP = {
+    "gpt-4": "gpt-4.1-mini",
+    "gpt-4o": "gpt-4.1-mini",
+    "gpt-4-turbo": "gpt-4.1-mini",
+    "gpt-3.5-turbo": "gpt-4.1-nano",
+    "gpt-3.5": "gpt-4.1-nano",
+}
+DEFAULT_AI_MODEL = "gpt-4.1-mini"
 
 USERS = {}
 SESSIONS_AUTH = {}
@@ -707,15 +722,27 @@ def edge_function(func_name):
         is_session_start = data.get("sessionStart", False)
         generate_report = data.get("generateReport", False)
 
-        # Get session context for a richer welcome message
+        # ── Fetch full session context from DB ──
         session_title = "this workshop"
         facilitator_name = "Facilitator"
+        facilitator_details = ""
         objective = "facilitate a productive discussion"
+        session_prompt = ""
+        welcome_message_template = ""
+        session_scope = ""
+        gpt_version = None
+        max_tokens_cfg = None
+        randomness_cfg = None
+        avatar_url = ""
+
         if conv_id:
             try:
                 conn = get_db(); cur = conn.cursor()
                 cur.execute(
-                    "SELECT c.id, s.title, s.facilitator, s.objective, f.title as facilitator_name "
+                    "SELECT c.id, s.title, s.facilitator, s.objective, s.prompt, "
+                    "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
+                    "f.title as facilitator_name, f.details as facilitator_details, "
+                    "f.profile_picture "
                     "FROM conversations c "
                     "LEFT JOIN sessions s ON c.sessions_id = s.id "
                     "LEFT JOIN facilitators f ON s.facilitator = f.id "
@@ -725,34 +752,190 @@ def edge_function(func_name):
                 if row:
                     session_title = row.get('title') or session_title
                     facilitator_name = row.get('facilitator_name') or facilitator_name
+                    facilitator_details = row.get('facilitator_details') or ""
                     objective = row.get('objective') or objective
+                    session_prompt = row.get('prompt') or ""
+                    welcome_message_template = row.get('welcome_message') or ""
+                    session_scope = row.get('scope') or ""
+                    gpt_version = row.get('gpt_version')
+                    max_tokens_cfg = row.get('max_tokens')
+                    randomness_cfg = row.get('randomness')
+                    pp = row.get('profile_picture') or ""
+                    if pp:
+                        avatar_url = f"/storage/v1/object/public/facilitator-avatars/{pp}"
                 conn.close()
             except Exception as e:
                 print(f"Error fetching session context: {e}")
+                traceback.print_exc()
 
-        if is_session_start:
-            txt = (f"Welcome to \"{session_title}\"! I'm {facilitator_name}, and I'm excited to facilitate our session today.\n\n"
-                   f"Our objective is: {objective}\n\n"
-                   f"To get us started, I'd like everyone to introduce themselves briefly. Please share:\n\n"
-                   f"\u2022 Your name\n"
-                   f"\u2022 Your background or role\n"
-                   f"\u2022 What you hope to take away from this session\n\n"
-                   f"Feel free to jump in!")
-        elif generate_report:
-            txt = "## Session Report\n\nThank you all for participating. Here is a summary of our discussion."
+        # ── Resolve AI model parameters ──
+        model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), DEFAULT_AI_MODEL) if gpt_version else DEFAULT_AI_MODEL
+        try:
+            max_tokens = int(max_tokens_cfg) if max_tokens_cfg and str(max_tokens_cfg) != 'None' else 600
+        except (ValueError, TypeError):
+            max_tokens = 600
+        try:
+            temperature = float(randomness_cfg) if randomness_cfg and str(randomness_cfg) != 'None' else 0.7
+        except (ValueError, TypeError):
+            temperature = 0.7
+        temperature = max(0.0, min(2.0, temperature))  # clamp
+
+        # ── Build the system prompt ──
+        system_parts = []
+        if session_prompt:
+            system_parts.append(session_prompt)
         else:
-            txt = ("Thank you for sharing your thoughts! I've noted some interesting perspectives.\n\n"
-                   "Let me ask a follow-up question to dig deeper: What challenges or obstacles do you see "
-                   "in applying these ideas in practice? And what strategies might help overcome them?")
+            system_parts.append(
+                f"You are {facilitator_name}, an AI workshop facilitator. "
+                f"You are facilitating a session titled \"{session_title}\".")
+        if facilitator_details:
+            system_parts.append(f"Background: {facilitator_details}")
+        system_parts.append(f"Session objective: {objective}")
+        if session_scope:
+            system_parts.append(f"Session scope: {session_scope}")
+        system_parts.append(
+            f"Your name is {facilitator_name}. Always introduce yourself using this exact name.\n\n"
+            "IMPORTANT RULES:\n"
+            "- Keep responses concise (2-4 paragraphs max).\n"
+            "- Always end with a clear, engaging question to keep the discussion going.\n"
+            "- Address participants warmly and reference their specific contributions when responding to answers.\n"
+            "- Use a professional yet approachable tone.\n"
+            "- Do NOT use markdown headers (##) in chat messages.\n"
+            "- Do NOT use placeholder text like [Your Name] - always use your actual name.")
+        system_message = "\n\n".join(system_parts)
 
-        # Save the AI message to the database
+        # ── Build the user prompt based on message type ──
+        if is_session_start:
+            user_prompt = (
+                f"Generate a warm, engaging welcome message for the workshop \"{session_title}\".\n"
+                f"The objective is: {objective}\n")
+            if welcome_message_template:
+                user_prompt += f"Use this as inspiration (but make it your own): {welcome_message_template}\n"
+            user_prompt += (
+                "Include:\n"
+                "1. A warm greeting introducing yourself by name\n"
+                "2. Brief mention of the session topic and what participants will gain\n"
+                "3. An opening question to get participants engaged and sharing\n\n"
+                "Keep it to 2-3 short paragraphs. Be enthusiastic but professional.")
+
+        elif generate_report:
+            # Fetch all messages for the report
+            all_messages = []
+            try:
+                conn = get_db(); cur = conn.cursor()
+                cur.execute(
+                    "SELECT m.content, m.role, m.name, m.created_at "
+                    "FROM messages m WHERE m.conversation_id = %s ORDER BY m.created_at",
+                    (conv_id,))
+                all_messages = cur.fetchall()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching messages for report: {e}")
+
+            conversation_text = ""
+            for msg in all_messages:
+                content = msg.get('content', {})
+                if isinstance(content, str):
+                    try: content = json.loads(content)
+                    except: content = {"text": content}
+                text = content.get('text', str(content))
+                role = msg.get('role', 'unknown')
+                name = msg.get('name', role)
+                conversation_text += f"[{role.upper()} - {name}]: {text}\n\n"
+
+            user_prompt = (
+                f"Generate a comprehensive session report for the workshop \"{session_title}\".\n"
+                f"Objective: {objective}\n\n"
+                f"Here is the full conversation:\n\n{conversation_text}\n\n"
+                "Please create a structured report with:\n"
+                "1. Executive Summary\n"
+                "2. Key Discussion Points\n"
+                "3. Participant Insights (summarize what participants shared)\n"
+                "4. Key Takeaways\n"
+                "5. Recommended Next Steps\n\n"
+                "Use markdown formatting with ## headers for sections.")
+            max_tokens = min(max_tokens * 2, 1500)  # Allow more tokens for reports
+
+        else:
+            # Follow-up: fetch recent messages to build context
+            recent_messages = []
+            try:
+                conn = get_db(); cur = conn.cursor()
+                cur.execute(
+                    "SELECT m.content, m.role, m.name, m.created_at "
+                    "FROM messages m WHERE m.conversation_id = %s "
+                    "ORDER BY m.created_at DESC LIMIT 20",
+                    (conv_id,))
+                recent_messages = list(reversed(cur.fetchall()))
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching recent messages: {e}")
+
+            # Build conversation context
+            conversation_context = ""
+            participant_answers = []
+            for msg in recent_messages:
+                content = msg.get('content', {})
+                if isinstance(content, str):
+                    try: content = json.loads(content)
+                    except: content = {"text": content}
+                text = content.get('text', str(content))
+                role = msg.get('role', 'unknown')
+                name = msg.get('name', role)
+                conversation_context += f"[{role.upper()} - {name}]: {text}\n\n"
+                if role == 'user':
+                    participant_answers.append(f"{name}: {text}")
+
+            user_prompt = (
+                f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
+                f"{conversation_context}\n"
+                "Based on the participants' responses above:\n"
+                "1. Briefly acknowledge and synthesize the key themes from their answers\n"
+                "2. Highlight any interesting connections or contrasts between different participants' views\n"
+                "3. Ask a thoughtful follow-up question that builds on what they shared and deepens the discussion\n\n"
+                "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
+
+        # ── Call OpenAI API ──
+        print(f"[AI] Calling {model} for conv={conv_id} (start={is_session_start}, report={generate_report})")
+        try:
+            ai_messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_prompt}
+            ]
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=ai_messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            txt = response.choices[0].message.content.strip()
+            print(f"[AI] Response received ({len(txt)} chars)")
+        except Exception as e:
+            print(f"[AI] OpenAI API error: {e}")
+            traceback.print_exc()
+            # Graceful fallback to hardcoded text
+            if is_session_start:
+                txt = (f"Welcome to \"{session_title}\"! I'm {facilitator_name}, and I'm excited to facilitate our session today.\n\n"
+                       f"Our objective is: {objective}\n\n"
+                       f"To get us started, I'd love to hear from each of you. What brings you here today, and what do you hope to take away from this session?")
+            elif generate_report:
+                txt = f"## Session Report: {session_title}\n\nThank you all for participating in this workshop. The discussion covered our objective of: {objective}."
+            else:
+                txt = ("Thank you for sharing your thoughts! I've noted some interesting perspectives.\n\n"
+                       "Let me ask a follow-up question: What challenges or obstacles do you see "
+                       "in applying these ideas in practice?")
+
+        # ── Save the AI message to the database ──
         msg_id = None
         if conv_id:
             try:
                 conn = get_db(); cur = conn.cursor()
+                content_json = json.dumps({"text": txt})
+                if avatar_url:
+                    content_json = json.dumps({"text": txt, "avatar": avatar_url})
                 cur.execute(
                     "INSERT INTO messages (conversation_id, content, role, name) VALUES (%s, %s, 'assistant', %s) RETURNING id",
-                    (conv_id, json.dumps({"text": txt, "avatar": f"/api/avatar?name={facilitator_name}"}), facilitator_name)
+                    (conv_id, content_json, facilitator_name)
                 )
                 msg_id = cur.fetchone()['id']
                 # Update welcome_message_status so the frontend knows the message is ready
@@ -764,6 +947,7 @@ def edge_function(func_name):
                 conn.close()
             except Exception as e:
                 print(f"Error saving AI message: {e}")
+                traceback.print_exc()
 
         # Return in the format the frontend expects: { content, id }
         return jsonify({"content": txt, "id": str(msg_id) if msg_id else str(uuid.uuid4()), "success": True})
@@ -774,10 +958,13 @@ def edge_function(func_name):
     elif func_name == "close-session-and-generate-report":
         conv_id = data.get("conversationId")
         user_id = data.get("userId")
-        report_content = "## Session Report\n\nThis session has been completed successfully. A detailed report will be available when connected to the production AI service."
+        report_content = ""
         report_id = str(uuid.uuid4())
         participant_count = 0
         message_count = 0
+        session_title = "Workshop Session"
+        objective = ""
+        duration_minutes = 0
 
         if conv_id:
             conn = None
@@ -785,14 +972,88 @@ def edge_function(func_name):
                 conn = get_db()
                 conn.autocommit = True
                 cur = conn.cursor()
+
+                # Fetch session info
+                cur.execute(
+                    "SELECT s.title, s.objective, s.scope, s.prompt, f.title as facilitator_name "
+                    "FROM conversations c "
+                    "LEFT JOIN sessions s ON c.sessions_id = s.id "
+                    "LEFT JOIN facilitators f ON s.facilitator = f.id "
+                    "WHERE c.id = %s", (conv_id,))
+                srow = cur.fetchone()
+                if srow:
+                    session_title = srow.get('title') or session_title
+                    objective = srow.get('objective') or ""
+
                 # Count participants
                 cur.execute("SELECT COUNT(*) FROM session_participants WHERE conversation_id = %s", (conv_id,))
                 row = cur.fetchone()
                 participant_count = row['count'] if isinstance(row, dict) else row[0]
+
+                # Fetch participant names
+                cur.execute("SELECT name FROM session_participants WHERE conversation_id = %s", (conv_id,))
+                participant_names = [r['name'] for r in cur.fetchall() if r.get('name')]
+
                 # Count messages
                 cur.execute("SELECT COUNT(*) FROM messages WHERE conversation_id = %s", (conv_id,))
                 row = cur.fetchone()
                 message_count = row['count'] if isinstance(row, dict) else row[0]
+
+                # Fetch all messages for AI report generation
+                cur.execute(
+                    "SELECT content, role, name, created_at FROM messages "
+                    "WHERE conversation_id = %s ORDER BY created_at", (conv_id,))
+                all_msgs = cur.fetchall()
+
+                # Build conversation transcript
+                transcript = ""
+                for msg in all_msgs:
+                    content = msg.get('content', {})
+                    if isinstance(content, str):
+                        try: content = json.loads(content)
+                        except: content = {"text": content}
+                    text = content.get('text', str(content))
+                    role = msg.get('role', 'unknown')
+                    name = msg.get('name', role)
+                    transcript += f"[{name} ({role})]: {text}\n\n"
+
+                # Generate AI report
+                try:
+                    print(f"[AI] Generating session report for conv={conv_id}")
+                    report_prompt = (
+                        f"Generate a comprehensive session report for the workshop \"{session_title}\".\n"
+                        f"Objective: {objective}\n"
+                        f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
+                        f"Total messages: {message_count}\n\n"
+                        f"Full conversation transcript:\n{transcript}\n\n"
+                        "Create a well-structured report with these sections:\n"
+                        "## Executive Summary\n"
+                        "## Key Discussion Points\n"
+                        "## Participant Contributions\n"
+                        "## Key Takeaways & Insights\n"
+                        "## Recommended Next Steps\n\n"
+                        "Use markdown formatting. Be specific and reference actual content from the discussion.")
+
+                    resp = openai_client.chat.completions.create(
+                        model=DEFAULT_AI_MODEL,
+                        messages=[
+                            {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
+                            {"role": "user", "content": report_prompt}
+                        ],
+                        max_tokens=1500,
+                        temperature=0.5,
+                    )
+                    report_content = resp.choices[0].message.content.strip()
+                    print(f"[AI] Report generated ({len(report_content)} chars)")
+                except Exception as e:
+                    print(f"[AI] Report generation error: {e}")
+                    report_content = (
+                        f"## Session Report: {session_title}\n\n"
+                        f"**Objective:** {objective}\n\n"
+                        f"**Participants:** {participant_count}\n"
+                        f"**Messages exchanged:** {message_count}\n\n"
+                        f"This session has been completed successfully.")
+
                 # Insert session report
                 cur.execute(
                     "INSERT INTO session_reports (id, conversation_id, report_content, report_type, generated_by, metadata) VALUES (%s, %s, %s, 'comprehensive', %s, %s) RETURNING id",
@@ -812,9 +1073,10 @@ def edge_function(func_name):
                 )
                 print(f"Session {conv_id} closed successfully. Report: {report_id}, Participants: {participant_count}, Messages: {message_count}")
             except Exception as e:
-                import traceback
                 print(f"Error closing session: {e}")
                 traceback.print_exc()
+                if not report_content:
+                    report_content = f"## Session Report\n\nSession completed. Participants: {participant_count}, Messages: {message_count}"
             finally:
                 if conn:
                     try: conn.close()
@@ -827,8 +1089,8 @@ def edge_function(func_name):
             "sessionData": {
                 "participantCount": participant_count,
                 "messageCount": message_count,
-                "duration": 0,
-                "engagementScore": 0
+                "duration": duration_minutes,
+                "engagementScore": min(100, int((message_count / max(participant_count, 1)) * 20))
             }
         })
 

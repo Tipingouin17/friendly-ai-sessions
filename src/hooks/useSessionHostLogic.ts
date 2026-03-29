@@ -59,6 +59,7 @@ export function useSessionHostLogic() {
     // 2. Participant & Session State Management (Single Source of Truth)
     const {
         isConnected,
+        isDataLoaded,
         error: participantError,
         participants,
         currentCount,
@@ -162,7 +163,7 @@ export function useSessionHostLogic() {
         // Participants
         participants,
         participantCount: participants.length,
-        isLoadingParticipants: !isConnected,
+        isLoadingParticipants: !isDataLoaded,
 
         // Session Status
         isSessionStarted: isManagerSessionStarted || conversationData?.session_started,

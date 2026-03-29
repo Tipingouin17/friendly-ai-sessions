@@ -34,6 +34,7 @@ export function useHostParticipantManager({
   const logger = createLogger('EnhancedHostParticipantManager', 'admin');
 
   const [isConnected, setIsConnected] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [currentCount, setCurrentCount] = useState(0);
@@ -161,6 +162,8 @@ export function useHostParticipantManager({
         logger.category('admin', 'Error fetching participants:', participantsError);
         return;
       }
+
+      setIsDataLoaded(true);
 
       if (participantsData) {
         const updatedParticipants: ParticipantInfo[] = participantsData.map(p => ({
@@ -451,6 +454,7 @@ export function useHostParticipantManager({
 
   return {
     isConnected,
+    isDataLoaded,
     error,
     reconnect,
     participants,

@@ -24,6 +24,7 @@ export function useHostParticipantState({
   // Use the enhanced host participant manager (single source of truth)
   const {
     isConnected,
+    isDataLoaded,
     error,
     participants: enhancedParticipants,
     currentCount,
@@ -69,7 +70,7 @@ export function useHostParticipantState({
   return {
     participants,
     setParticipants,
-    isLoadingParticipants: !isConnected,
+    isLoadingParticipants: !isDataLoaded,
     currentParticipantCount: currentCount,
     maxParticipantsForSession: maxCount,
     isSessionFull: currentCount >= maxCount && maxCount > 0,

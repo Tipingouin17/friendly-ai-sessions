@@ -27,13 +27,15 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True,
      allow_headers=["*"], expose_headers=["Content-Range", "X-Total-Count"])
 
-# Database configuration – read from environment variables in production
-DB_URL = os.environ.get("DATABASE_URL")  # Railway provides this as a full URL
-DB_NAME = os.environ.get("DB_NAME", "ai_facilitator")
-DB_USER = os.environ.get("DB_USER", "postgres")
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_PORT = int(os.environ.get("DB_PORT", "5432"))
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+# Database configuration – read from environment variables in production.
+# Railway auto-injects PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD from the linked Postgres service.
+# DATABASE_URL (full URL) takes priority if explicitly set.
+DB_URL = os.environ.get("DATABASE_URL")  # Full URL takes priority if set
+DB_NAME = os.environ.get("PGDATABASE") or os.environ.get("DB_NAME", "ai_facilitator")
+DB_USER = os.environ.get("PGUSER") or os.environ.get("DB_USER", "postgres")
+DB_HOST = os.environ.get("PGHOST") or os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", "5432"))
+DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
 

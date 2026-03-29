@@ -539,13 +539,50 @@ def rpc_call(func_name):
     data = request.json or {}
     try:
         conn = get_db(); cur = conn.cursor()
-        # Set auth.uid() to the current authenticated user
+        # Set auth.uid() to the current authenticated user using SET LOCAL
+        # This is the standard PostgREST approach for passing JWT claims to PostgreSQL functions
         user = get_current_user()
+        user_id = None
         if user:
-            cur.execute("UPDATE auth._current_user SET uid = %s", (user.get('sub', user.get('id')),))
-        else:
-            cur.execute("UPDATE auth._current_user SET uid = NULL")
-        conn.commit()
+            user_id = user.get('sub', user.get('id'))
+
+        # Handle special RPC functions that need auth.uid() by implementing them directly
+        # to avoid dependency on auth._current_user table which may not exist
+        if func_name == 'is_session_host':
+            conversation_id = data.get('conversation_id')
+            if not user_id or not conversation_id:
+                return jsonify(False)
+            cur.execute(
+                "SELECT EXISTS(SELECT 1 FROM public.conversations WHERE id = %s AND user_id = %s::uuid)",
+                (conversation_id, user_id)
+            )
+            result = cur.fetchone()
+            conn.close()
+            val = list(result.values())[0] if isinstance(result, dict) else result[0]
+            return jsonify(bool(val))
+
+        if func_name == 'is_system_admin':
+            if not user_id:
+                return jsonify(False)
+            cur.execute(
+                "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = %s::uuid AND is_admin = true)",
+                (user_id,)
+            )
+            result = cur.fetchone()
+            conn.close()
+            val = list(result.values())[0] if isinstance(result, dict) else result[0]
+            return jsonify(bool(val))
+
+        # For other RPC functions, try using SET LOCAL to set auth context
+        try:
+            if user_id:
+                import json as _json
+                claims = _json.dumps({'sub': user_id, 'role': 'authenticated'})
+                cur.execute("SET LOCAL request.jwt.claims = %s", (claims,))
+                cur.execute("SET LOCAL role = 'authenticated'")
+        except Exception:
+            pass  # Ignore if SET LOCAL fails
+
         if data:
             param_names = ", ".join([f"{k} := %s" for k in data.keys()])
             cur.execute(f"SELECT * FROM public.{func_name}({param_names})", list(data.values()))

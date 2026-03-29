@@ -113,8 +113,21 @@ serve(async (req) => {
 
     console.log(`✅ Fetched ${participants?.length || 0} participants`);
 
-    // Step 4: Calculate session analytics
-    console.log("🔍 Step 4: Calculating session analytics...");
+    // Step 4a: Set ended_at FIRST so that calculate_session_analytics can compute duration correctly
+    console.log("🔍 Step 4a: Setting ended_at timestamp before analytics...");
+    const endedAt = new Date().toISOString();
+    const { error: endedAtError } = await supabaseClient
+      .from('conversations')
+      .update({ ended_at: endedAt })
+      .eq('id', conversationId);
+    if (endedAtError) {
+      console.error("⚠️ Warning: Failed to set ended_at:", endedAtError);
+    } else {
+      console.log("✅ ended_at timestamp set:", endedAt);
+    }
+
+    // Step 4b: Calculate session analytics (now ended_at is set, so duration will be correct)
+    console.log("🔍 Step 4b: Calculating session analytics...");
     const { error: analyticsError } = await supabaseClient
       .rpc('calculate_session_analytics', { conv_id: conversationId })
 
@@ -124,6 +137,15 @@ serve(async (req) => {
     } else {
       console.log("✅ Session analytics calculated");
     }
+
+    // Step 4c: Fetch updated analytics values after calculate_session_analytics ran
+    const { data: updatedConv } = await supabaseClient
+      .from('conversations')
+      .select('session_duration_minutes, participant_engagement_score')
+      .eq('id', conversationId)
+      .single();
+    const sessionDurationMinutes = updatedConv?.session_duration_minutes || 0;
+    const engagementScore = updatedConv?.participant_engagement_score || 0;
 
     // Step 5: Generate comprehensive report
     console.log("🔍 Step 5: Generating comprehensive report...");
@@ -160,8 +182,8 @@ serve(async (req) => {
         metadata: {
           participant_count: participantCount,
           message_count: messages?.length || 0,
-          session_duration: conversation.session_duration_minutes || 0,
-          engagement_score: conversation.participant_engagement_score || 0,
+          session_duration: sessionDurationMinutes,
+          engagement_score: engagementScore,
           topics: userTopics,
           participation_stats: participantStats,
           highlights: extractHighlights(messages || []),
@@ -178,13 +200,12 @@ serve(async (req) => {
 
     console.log("✅ Session report record created:", reportData.id);
 
-    // Step 7: Close the session
+    // Step 7: Close the session (ended_at already set in Step 4a; set remaining closure fields)
     console.log("🔍 Step 7: Closing the session...");
     const { error: closeError } = await supabaseClient
       .from('conversations')
       .update({
         is_session_ended: true,
-        ended_at: new Date().toISOString(),
         status: 'completed',
         final_report_id: reportData.id
       })
@@ -227,8 +248,8 @@ serve(async (req) => {
       sessionData: {
         participantCount,
         messageCount: messages?.length || 0,
-        duration: conversation.session_duration_minutes || 0,
-        engagementScore: conversation.participant_engagement_score || 0
+        duration: sessionDurationMinutes,
+        engagementScore: engagementScore
       }
     };
 

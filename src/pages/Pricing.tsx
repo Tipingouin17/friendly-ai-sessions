@@ -3,19 +3,21 @@ import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { StandardPlanCard } from './pricing/components/StandardPlanCard';
+import { EnterprisePlanCard } from './pricing/components/EnterprisePlanCard';
 import { ComparisonTable } from './pricing/components/ComparisonTable';
 import { LoadingState } from './pricing/components/LoadingState';
 import { ErrorState } from './pricing/components/ErrorState';
 import { useToast } from '@/components/ui/use-toast';
 import { Plan } from './pricing/types';
 import { useUserPlan } from '@/hooks/useUserPlan';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { Quote } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 
 const Pricing = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { currentPlanId, isLoading: isUserPlanLoading } = useUserPlan();
 
   const { data: plans, isLoading, error } = useQuery({
@@ -77,7 +79,9 @@ const Pricing = () => {
     return <ErrorState error={error as Error} />;
   }
 
+  // Separate standard plans (Free, Starter, Premium) from Enterprise
   const standardPlans = plans.filter(plan => plan.title !== 'Enterprise');
+  const enterprisePlan = plans.find(plan => plan.title === 'Enterprise');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-24 pb-16">
@@ -102,6 +106,7 @@ const Pricing = () => {
           </div>
         )}
 
+        {/* Standard plan cards: Free, Starter, Premium */}
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           {standardPlans.map((plan, index) => (
             <StandardPlanCard
@@ -113,15 +118,14 @@ const Pricing = () => {
           ))}
         </div>
 
-        <div className="text-center mb-16">
-          <p className="text-lg text-gray-600">
-            For large organizations with custom needs, please{" "}
-            <Link to="/contact" className="text-primary font-medium hover:underline">
-              contact us
-            </Link>
-            .
-          </p>
-        </div>
+        {/* Enterprise plan card */}
+        {enterprisePlan && (
+          <div className="max-w-4xl mx-auto mb-16">
+            <EnterprisePlanCard
+              onContactClick={() => navigate('/contact')}
+            />
+          </div>
+        )}
 
         {/* Testimonials */}
         <div className="mb-16">
@@ -152,7 +156,8 @@ const Pricing = () => {
           </div>
         </div>
 
-        {standardPlans.length > 0 && <ComparisonTable plans={standardPlans} />}
+        {/* Full comparison table — shows all plans including Enterprise */}
+        {plans.length > 0 && <ComparisonTable plans={plans} />}
       </div>
     </div>
   );

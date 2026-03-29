@@ -28,8 +28,8 @@ export const PricingFeatureValue = ({ value }: PricingFeatureValueProps) => {
   }
   
   if (typeof value === 'number') {
-    // Check if the value is greater than 999999 for unlimited display
-    if (value > 999999) {
+    // Check if the value is greater than or equal to 999999 for unlimited display
+    if (value >= 999999) {
       return (
         <div className="flex flex-col items-center">
           <Infinity className="h-5 w-5 text-primary mx-auto" />

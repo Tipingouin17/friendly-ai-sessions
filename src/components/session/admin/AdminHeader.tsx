@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, FileText, BarChart3 } from "lucide-react";
+import { LayoutDashboard, FileText, BarChart3, Lock } from "lucide-react";
 import AdminQrDialog from "./AdminQrDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
 import SessionAnalyticsDashboard from "./SessionAnalyticsDashboard";
@@ -15,6 +15,9 @@ import ReportDownloadDialog from "../ReportDownloadDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AdminHeaderProps {
   conversation: ConversationWithSession | null;
@@ -28,6 +31,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   toggleSessionState
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { activeSessions, isLoading, refreshSessions } = useAdminSessions();
   const { 
     isClosing, 
@@ -35,6 +39,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     closeSessionAndGenerateReport, 
     downloadReport 
   } = useSessionClosure();
+  const { canGenerateReports } = usePlanLimits();
   
   const [showClosureDialog, setShowClosureDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -59,7 +64,15 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
-      setShowReportDialog(true);
+      if (canGenerateReports) {
+        setShowReportDialog(true);
+      } else {
+        toast({
+          title: "Session Closed",
+          description: "Your session has been closed. Upgrade your plan to access session reports.",
+          variant: "default",
+        });
+      }
     }
   };
 
@@ -70,6 +83,16 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
 
     if (conversation.is_session_ended) {
+      return;
+    }
+
+    if (!canGenerateReports) {
+      toast({
+        title: "Reports Locked",
+        description: "Session reports are not available on your current plan. Upgrade to access this feature.",
+        variant: "destructive",
+      });
+      navigate('/pricing');
       return;
     }
 
@@ -182,19 +205,41 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
               />
             )}
 
-            {/* Close & Get Report Button */}
-            <Button 
-              variant={isSessionEnded ? "outline" : "default"}
-              size="sm" 
-              className="flex items-center gap-2 min-w-0"
-              onClick={handleCloseAndGetReport}
-              disabled={isClosing}
-            >
-              <FileText className="h-4 w-4" />
-              <span className="whitespace-nowrap">
-                {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
-              </span>
-            </Button>
+            {/* Close & Get Report Button - gated by session_reports plan restriction */}
+            {!canGenerateReports ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline"
+                      size="sm" 
+                      className="flex items-center gap-2 min-w-0 opacity-60 cursor-not-allowed"
+                      onClick={handleCloseAndGetReport}
+                      disabled={isClosing}
+                    >
+                      <Lock className="h-4 w-4" />
+                      <span className="whitespace-nowrap">Reports (Upgrade)</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Session reports are not available on your current plan. Upgrade to access this feature.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Button 
+                variant={isSessionEnded ? "outline" : "default"}
+                size="sm" 
+                className="flex items-center gap-2 min-w-0"
+                onClick={handleCloseAndGetReport}
+                disabled={isClosing}
+              >
+                <FileText className="h-4 w-4" />
+                <span className="whitespace-nowrap">
+                  {isClosing ? 'Closing...' : isSessionEnded ? 'Session Ended' : 'Close & Get Report'}
+                </span>
+              </Button>
+            )}
           </div>
         </div>
 

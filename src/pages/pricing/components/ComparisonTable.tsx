@@ -58,8 +58,8 @@ export const ComparisonTable = ({
     // Access the feature value directly from plan_table_details object
     const value = (plan.plan_table_details as Record<string, any>)[feature];
 
-    // If the value is a number and greater than 999999, return 'unlimited'
-    if (typeof value === 'number' && value > 999999) {
+    // If the value is a number and greater than or equal to 999999, return 'unlimited'
+    if (typeof value === 'number' && value >= 999999) {
       return 'unlimited';
     }
     return value;

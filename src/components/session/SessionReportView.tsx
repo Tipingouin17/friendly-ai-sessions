@@ -18,11 +18,13 @@ import {
   Star,
   Quote,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { useToast } from '@/hooks/use-toast';
 
 interface SessionReportViewProps {
@@ -36,6 +38,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const { planRestrictions } = useUserPlan();
   
   const reportConversationId = conversationId || parseInt(params.id || '0');
+  const { canGenerateReports } = usePlanLimits();
   
   // Fetch session report data
   const { data: reportData, isLoading, error, refetch } = useQuery({
@@ -143,6 +146,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   });
 
   const canDownloadPDF = planRestrictions?.data_export;
+  const canViewReport = canGenerateReports;
 
   const handleBack = () => {
     navigate('/past-workshops');
@@ -168,6 +172,30 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const handleRetry = () => {
     refetch();
   };
+
+  // Gate: users without session_reports access cannot view reports
+  if (!canViewReport && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <Lock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Reports Not Available</h2>
+          <p className="text-gray-500 mb-6">
+            Session reports are not included in your current plan. Upgrade to access detailed session analytics and reports.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={handleBack} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Sessions
+            </Button>
+            <Button onClick={() => navigate('/pricing')} variant="default">
+              Upgrade Plan
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

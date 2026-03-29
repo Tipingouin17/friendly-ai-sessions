@@ -34,7 +34,7 @@ export const usePlanLimits = (): PlanLimits => {
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      // Get facilitator count
+      // Get facilitator count (user-created custom facilitators only)
       const { count: facilitatorCount, error: facilitatorError } = await supabase
         .from('facilitators')
         .select('*', { count: 'exact', head: true })
@@ -74,13 +74,30 @@ export const usePlanLimits = (): PlanLimits => {
 
   const isLoading = planLoading || countsLoading;
 
-  // Handle unlimited values (null in database means unlimited)
-  const maxFacilitators = planRestrictions?.facilitator_limit === null ? Infinity : (planRestrictions?.facilitator_limit || 0);
-  const maxSessions = planRestrictions?.session_limit === null ? Infinity : (planRestrictions?.session_limit || 0);
-  const maxParticipants = planRestrictions?.max_participants === null ? Infinity : (planRestrictions?.max_participants || 0);
+  // Handle unlimited values (null in database means unlimited; 999999 is also treated as unlimited)
+  const rawFacilitatorLimit = planRestrictions?.facilitator_limit;
+  const maxFacilitators = rawFacilitatorLimit === null
+    ? Infinity
+    : (rawFacilitatorLimit !== undefined && rawFacilitatorLimit >= 999999)
+      ? Infinity
+      : (rawFacilitatorLimit || 0);
+
+  const rawSessionLimit = planRestrictions?.session_limit;
+  const maxSessions = rawSessionLimit === null
+    ? Infinity
+    : (rawSessionLimit !== undefined && rawSessionLimit >= 999999)
+      ? Infinity
+      : (rawSessionLimit || 0);
+
+  const rawParticipantLimit = planRestrictions?.max_participants;
+  const maxParticipants = rawParticipantLimit === null
+    ? Infinity
+    : (rawParticipantLimit !== undefined && rawParticipantLimit >= 999999)
+      ? Infinity
+      : (rawParticipantLimit || 5);
 
   // Get the maximum questions per session with a default of 10
-  // Treat very large values (1000000+) as effectively unlimited
+  // Treat very large values (999999+) as effectively unlimited
   const rawQuestionLimit = planRestrictions?.question_limit;
   const maxQuestionsPerSession = rawQuestionLimit === null
     ? Infinity
@@ -88,11 +105,16 @@ export const usePlanLimits = (): PlanLimits => {
       ? Infinity
       : (rawQuestionLimit || 10);
 
-  // Check if the user can create custom facilitators based on the plan_table_details
+  // Check if the user can create custom facilitators based on the plan
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;
 
-  // Check both the count limit and whether custom facilitators are allowed
-  const hasReachedFacilitatorLimit = !canCreateCustomFacilitators || ((counts?.facilitatorCount || 0) >= maxFacilitators && maxFacilitators !== Infinity);
+  // hasReachedFacilitatorLimit only applies when the user CAN create custom facilitators
+  // and has reached their numeric limit. Free plan users cannot create custom facilitators
+  // at all (canCreateCustomFacilitators = false), but this does NOT block them from
+  // selecting pre-built facilitators — that is handled separately via canCreateCustomFacilitators.
+  const hasReachedFacilitatorLimit = canCreateCustomFacilitators
+    ? (maxFacilitators !== Infinity && (counts?.facilitatorCount || 0) >= maxFacilitators)
+    : false;
 
   // For session limit, only show the limit reached message if there's a finite limit and we've reached it
   const hasReachedSessionLimit = maxSessions !== Infinity && (counts?.sessionCount || 0) >= maxSessions;

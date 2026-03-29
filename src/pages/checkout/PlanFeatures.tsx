@@ -12,50 +12,78 @@ export const PlanFeatures = ({ plan }: PlanFeaturesProps) => {
   const getFeatureList = () => {
     if (!plan.plan_table_details) return [];
     
-    const features = [];
+    const features: string[] = [];
+    const d = plan.plan_table_details;
     
     // Number of facilitators
-    if (plan.plan_table_details.no_of_facilitator) {
-      const facilitators = plan.plan_table_details.no_of_facilitator === 'unlimited' 
-        ? 'Unlimited facilitators' 
-        : `${plan.plan_table_details.no_of_facilitator} facilitators`;
-      features.push(facilitators);
+    if (d.facilitator_limit !== null && d.facilitator_limit !== undefined) {
+      const isUnlimited = d.facilitator_limit >= 999999;
+      features.push(isUnlimited
+        ? 'Unlimited facilitators'
+        : `${d.facilitator_limit} ${d.facilitator_limit === 1 ? 'facilitator' : 'facilitators'}`
+      );
     }
     
     // Number of sessions
-    if (plan.plan_table_details.no_of_sessions) {
-      const sessions = plan.plan_table_details.no_of_sessions === 'unlimited' 
-        ? 'Unlimited sessions per month' 
-        : `${plan.plan_table_details.no_of_sessions} sessions per month`;
-      features.push(sessions);
+    if (d.session_limit !== null && d.session_limit !== undefined) {
+      const isUnlimited = d.session_limit >= 999999;
+      features.push(isUnlimited
+        ? 'Unlimited sessions per month'
+        : `${d.session_limit} ${d.session_limit === 1 ? 'session' : 'sessions'} per month`
+      );
     }
     
     // Max participants
-    if (plan.plan_table_details.max_participants) {
-      const participants = plan.plan_table_details.max_participants === 'unlimited' 
-        ? 'Unlimited participants per session' 
-        : `Up to ${plan.plan_table_details.max_participants} participants per session`;
-      features.push(participants);
+    if (d.max_participants !== null && d.max_participants !== undefined) {
+      const isUnlimited = d.max_participants >= 999999;
+      features.push(isUnlimited
+        ? 'Unlimited participants per session'
+        : `Up to ${d.max_participants} participants per session`
+      );
+    }
+
+    // Question limit
+    if (d.question_limit !== null && d.question_limit !== undefined && d.question_limit > 0) {
+      const isUnlimited = d.question_limit >= 999999;
+      features.push(isUnlimited
+        ? 'Unlimited questions per session'
+        : `Up to ${d.question_limit} questions per session`
+      );
     }
     
     // Customizable sessions
-    if (plan.plan_table_details.customisable_sessions) {
-      features.push('Create customized sessions');
+    if (d.customisable_sessions) {
+      features.push('Customizable sessions');
+    }
+
+    // Customizable facilitators
+    if (d.customisable_facilitators) {
+      features.push('Customizable facilitators');
     }
     
     // Saved sessions
-    if (plan.plan_table_details.saved_sessions) {
+    if (d.saved_sessions) {
       features.push('Save sessions for later');
     }
     
     // Session reports
-    if (plan.plan_table_details.session_reports) {
+    if (d.session_reports) {
       features.push('Detailed session reports');
     }
     
     // Data export
-    if (plan.plan_table_details.data_export) {
+    if (d.data_export) {
       features.push('Export session data');
+    }
+
+    // Priority support
+    if (d.priority_support) {
+      features.push('Priority support');
+    }
+
+    // Custom branding
+    if (d.custom_branding) {
+      features.push('Custom branding');
     }
     
     return features;

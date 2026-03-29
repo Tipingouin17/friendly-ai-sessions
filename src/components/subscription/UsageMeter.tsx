@@ -1,9 +1,6 @@
 import { motion } from "framer-motion";
-import { TrendingUp, AlertCircle } from "lucide-react";
+import { TrendingUp, Infinity as InfinityIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useNavigate } from "react-router-dom";
 
 interface UsageMeterProps {
     currentUsage: number;
@@ -13,9 +10,36 @@ interface UsageMeterProps {
 }
 
 export const UsageMeter = ({ currentUsage, limit, planName, featureName }: UsageMeterProps) => {
-    const navigate = useNavigate();
-    const percentage = (currentUsage / limit) * 100;
-    const remaining = limit - currentUsage;
+    const isUnlimited = limit === Infinity || limit >= 999999;
+
+    // For unlimited plans, show a simple "unlimited" display
+    if (isUnlimited) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+            >
+                <Card className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                    <div className="flex items-center gap-3">
+                        <InfinityIcon className="h-5 w-5 text-green-600" />
+                        <div>
+                            <span className="font-semibold text-gray-900">{featureName} Usage</span>
+                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded ml-2">
+                                {planName}
+                            </span>
+                        </div>
+                        <span className="ml-auto text-sm font-medium text-green-700">
+                            {currentUsage} used — Unlimited
+                        </span>
+                    </div>
+                </Card>
+            </motion.div>
+        );
+    }
+
+    const percentage = limit > 0 ? (currentUsage / limit) * 100 : 0;
+    const remaining = Math.max(0, limit - currentUsage);
 
     // Determine color based on usage
     const getColor = () => {
@@ -61,11 +85,10 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
                                 </span>
                             </div>
 
-                            <div className="relative">
-                                <Progress value={percentage} className="h-2" />
+                            <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div
                                     className={`absolute top-0 left-0 h-2 rounded-full transition-all ${getProgressColor()}`}
-                                    style={{ width: `${percentage}%` }}
+                                    style={{ width: `${Math.min(100, percentage)}%` }}
                                 />
                             </div>
                         </div>
@@ -76,22 +99,19 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
                                 animate={{ opacity: 1, height: "auto" }}
                                 className="flex items-start gap-2 pt-2 border-t border-purple-200"
                             >
-                                <AlertCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                                 <p className="text-sm text-gray-700">
-                                    You're running low on {featureName.toLowerCase()}. Upgrade to continue without interruption.
+                                    You're running low on {featureName.toLowerCase()}. Consider upgrading your plan.
                                 </p>
                             </motion.div>
                         )}
                     </div>
 
                     {shouldShowUpgrade && (
-                        <Button
-                            onClick={() => navigate("/pricing")}
-                            size="sm"
-                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 whitespace-nowrap"
-                        >
-                            Upgrade Plan
-                        </Button>
+                        <a href="/pricing">
+                            <button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap">
+                                Upgrade Plan
+                            </button>
+                        </a>
                     )}
                 </div>
             </Card>

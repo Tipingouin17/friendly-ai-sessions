@@ -27,12 +27,15 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True,
      allow_headers=["*"], expose_headers=["Content-Range", "X-Total-Count"])
 
-DB_NAME = "ai_facilitator"
-DB_USER = "postgres"
-DB_HOST = "localhost"
-DB_PORT = 5432
-JWT_SECRET = "super-secret-jwt-token-for-local-dev"
-STORAGE_DIR = "/home/ubuntu/supabase_proxy/storage"
+# Database configuration – read from environment variables in production
+DB_URL = os.environ.get("DATABASE_URL")  # Railway provides this as a full URL
+DB_NAME = os.environ.get("DB_NAME", "ai_facilitator")
+DB_USER = os.environ.get("DB_USER", "postgres")
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
+STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
 
 # Map session gpt_version values to available models
 # The proxy supports: gpt-4.1-mini, gpt-4.1-nano, gemini-2.5-flash
@@ -106,8 +109,15 @@ for cname, (tbl, col, ftbl, fcol) in FK_MAP.items():
 
 
 def get_db():
-    conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, host=DB_HOST, port=DB_PORT,
-                            cursor_factory=psycopg2.extras.RealDictCursor)
+    if DB_URL:
+        # Railway / production: use the full DATABASE_URL connection string
+        conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        # Local development: use individual parameters
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, host=DB_HOST, port=DB_PORT,
+            password=DB_PASSWORD,
+            cursor_factory=psycopg2.extras.RealDictCursor)
     conn.autocommit = True
     return conn
 
@@ -1162,6 +1172,7 @@ def realtime_ws():
     return jsonify({"error": "WebSocket not supported in local proxy. Using polling fallback."}), 400
 
 @app.route("/", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "supabase-local-proxy", "version": "2.0.0"})
 
@@ -1175,6 +1186,9 @@ if __name__ == "__main__":
     os.makedirs(STORAGE_DIR, exist_ok=True)
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3333
     print(f"Starting Supabase-compatible local proxy v2 on port {port}...")
-    print(f"Database: {DB_NAME} | Storage: {STORAGE_DIR}")
+    if DB_URL:
+        print(f"Database: DATABASE_URL set ({DB_URL[:40]}...) | Storage: {STORAGE_DIR}")
+    else:
+        print(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT} | Storage: {STORAGE_DIR}")
     print(f"Pre-registered users: {list(USERS.keys())}")
     app.run(host="0.0.0.0", port=port, debug=False)

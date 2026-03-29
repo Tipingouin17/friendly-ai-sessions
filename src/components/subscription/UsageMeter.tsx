@@ -40,21 +40,24 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
 
     const percentage = limit > 0 ? (currentUsage / limit) * 100 : 0;
     const remaining = Math.max(0, limit - currentUsage);
+    const hasReachedLimit = remaining === 0;
 
     // Determine color based on usage
     const getColor = () => {
-        if (percentage >= 90) return "text-red-600";
-        if (percentage >= 70) return "text-yellow-600";
+        if (percentage >= 100) return "text-red-600";
+        if (percentage >= 70) return "text-amber-600";
         return "text-green-600";
     };
 
     const getProgressColor = () => {
-        if (percentage >= 90) return "bg-red-600";
-        if (percentage >= 70) return "bg-yellow-600";
+        if (percentage >= 100) return "bg-red-600";
+        if (percentage >= 70) return "bg-amber-500";
         return "bg-green-600";
     };
 
-    const shouldShowUpgrade = percentage >= 80;
+    // Only show the inline upgrade nudge when approaching (≥80%) but NOT yet at the limit.
+    // When the limit IS reached, PlanLimitAlert (rendered separately) already shows the full message.
+    const shouldShowUpgradeNudge = percentage >= 80 && !hasReachedLimit;
 
     return (
         <motion.div
@@ -62,7 +65,7 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
         >
-            <Card className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+            <Card className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
@@ -70,7 +73,7 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
                             <h3 className="font-semibold text-gray-900">
                                 {featureName} Usage
                             </h3>
-                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border border-gray-200">
                                 {planName}
                             </span>
                         </div>
@@ -93,22 +96,22 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
                             </div>
                         </div>
 
-                        {shouldShowUpgrade && (
+                        {shouldShowUpgradeNudge && (
                             <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
-                                className="flex items-start gap-2 pt-2 border-t border-purple-200"
+                                className="flex items-start gap-2 pt-2 border-t border-gray-200"
                             >
                                 <p className="text-sm text-gray-700">
-                                    You're running low on {featureName.toLowerCase()}. Consider upgrading your plan.
+                                    You're running low on {featureName.toLowerCase()}. Upgrade to continue without interruption.
                                 </p>
                             </motion.div>
                         )}
                     </div>
 
-                    {shouldShowUpgrade && (
+                    {shouldShowUpgradeNudge && (
                         <a href="/pricing">
-                            <button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap">
+                            <button className="bg-amber-400 hover:bg-amber-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-full whitespace-nowrap transition-colors">
                                 Upgrade Plan
                             </button>
                         </a>

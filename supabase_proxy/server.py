@@ -1137,8 +1137,8 @@ def edge_function(func_name):
                 report_id = str(row['id'] if isinstance(row, dict) else row[0])
                 # Close the session
                 cur.execute(
-                    "UPDATE conversations SET is_session_ended = true, ended_at = NOW(), status = 'completed', final_report_id = %s WHERE id = %s",
-                    (report_id, conv_id)
+                    "UPDATE conversations SET is_session_ended = true, ended_at = NOW(), status = 'completed', final_report_id = %s, total_messages = %s WHERE id = %s",
+                    (report_id, message_count, conv_id)
                 )
                 # Insert session ended event
                 cur.execute(

@@ -18,8 +18,9 @@ RUN pip install --no-cache-dir PyJWT==2.8.0
 # Copy application code
 COPY server.py .
 
-# Create storage directory
-RUN mkdir -p /app/storage/facilitator-avatars
+# Copy facilitator avatar images and any other storage assets into the image
+# This ensures avatars are available in production without needing a volume mount
+COPY storage/ /app/storage/
 
 # Expose port
 EXPOSE 3333

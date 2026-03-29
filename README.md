@@ -1,69 +1,64 @@
-# Welcome to your Lovable project
+# MyFacilitator - AI-Powered Workshop Facilitation
 
-## Project info
+Welcome to the MyFacilitator project repository. This application provides AI-powered workshop facilitation that transforms meetings into engaging, productive sessions.
 
-**URL**: https://lovable.dev/projects/50a728d4-ff85-485e-b250-0940659d7dcc
+## Project Info
 
-## How can I edit this code?
+**Production URL**: Deployed on Railway (URL provided by Railway dashboard)
+**Original Lovable Project**: https://lovable.dev/projects/50a728d4-ff85-485e-b250-0940659d7dcc
 
-There are several ways of editing your application.
+## Deployment
 
-**Use Lovable**
+This project is configured for deployment on **Railway**. It uses a multi-service architecture:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/50a728d4-ff85-485e-b250-0940659d7dcc) and start prompting.
+1. **Frontend**: React SPA built with Vite, served via Nginx
+2. **Backend Proxy**: Python Flask server acting as a Supabase proxy and AI integration layer
+3. **Database**: PostgreSQL database (managed by Railway)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Railway Deployment Steps
 
-**Use your preferred IDE**
+1. Connect your GitHub repository to Railway
+2. Railway will automatically detect the `Dockerfile` in the `supabase_proxy` directory for the backend
+3. Configure the following environment variables in Railway:
+   - `DATABASE_URL`: Your PostgreSQL connection string
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `JWT_SECRET`: Secret for JWT token generation
+4. The frontend will be built and served automatically
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Local Development
+
+If you want to work locally using your own IDE, you can clone this repo and push changes.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
 Follow these steps:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Step 1: Clone the repository
+git clone https://github.com/Tipingouin17/friendly-ai-sessions.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Step 2: Navigate to the project directory
+cd friendly-ai-sessions
 
-# Step 3: Install the necessary dependencies.
+# Step 3: Install the necessary dependencies
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Technologies Used
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project is built with:
 
-**Use GitHub Codespaces**
+- **Frontend**: Vite, TypeScript, React, shadcn-ui, Tailwind CSS
+- **Backend**: Python, Flask, PostgreSQL
+- **AI Integration**: OpenAI API (GPT-4o)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Documentation
 
-## What technologies are used for this project?
+For detailed technical documentation, architecture overview, and testing reports, please refer to the `docs/` directory:
 
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/50a728d4-ff85-485e-b250-0940659d7dcc) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- `docs/PROJECT_DOCUMENTATION.md`: Comprehensive system architecture and feature documentation
+- `docs/OPENAI_INTEGRATION.md`: Details on the AI facilitator implementation
+- `docs/TEST_REPORT.md`: Quality assurance and testing results

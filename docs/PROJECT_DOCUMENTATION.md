@@ -20,10 +20,12 @@ MyFacilitator is an AI-powered workshop facilitation platform that enables hosts
 - **AI**: OpenAI API (GPT-4.1-mini) for facilitator responses
 - **Auth**: JWT-based authentication with mock user system
 
-### Deployment
-- **Web Server**: Nginx serving static files on port 8080
-- **Proxy Server**: Flask on port 3333
-- **Database**: PostgreSQL on port 5432
+### Deployment (Railway)
+- **Platform**: Railway
+- **Frontend**: React SPA built with Vite, served via Nginx
+- **Backend Proxy**: Python Flask server acting as a Supabase proxy and AI integration layer
+- **Database**: PostgreSQL database (managed by Railway)
+- **Environment Variables**: `DATABASE_URL`, `OPENAI_API_KEY`, `JWT_SECRET`
 
 ---
 

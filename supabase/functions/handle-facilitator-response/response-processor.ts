@@ -55,10 +55,14 @@ export async function processResponse(
       responseObject = await generateAIWelcomeMessage(conversation, participants, openaiApiKey);
       
       // Save welcome message to database
+      const facilitatorId = conversation?.sessions?.facilitator_details?.id
+        || conversation?.sessions?.facilitator
+        || null;
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
+          facilitator_id: facilitatorId,
           content: {
             text: responseObject.content,
             avatar: responseObject.avatar,
@@ -123,10 +127,14 @@ export async function processResponse(
       responseObject = await generateAISubsequentMessage(messages, conversation, participants, openaiApiKey);
       
       // Save subsequent message to database
+      const facilitatorIdSubseq = conversation?.sessions?.facilitator_details?.id
+        || conversation?.sessions?.facilitator
+        || null;
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
+          facilitator_id: facilitatorIdSubseq,
           content: {
             text: responseObject.content,
             avatar: responseObject.avatar,

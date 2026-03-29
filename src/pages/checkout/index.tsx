@@ -29,7 +29,7 @@ const Checkout = () => {
     },
   });
 
-  // Fetch plan details
+  // Fetch plan details using the plans table + plan_restrictions join
   const { data: plan, isLoading: planLoading, error: planError } = useQuery({
     queryKey: ['checkout-plan', planId],
     queryFn: async () => {
@@ -39,33 +39,36 @@ const Checkout = () => {
       const numericPlanId = parseInt(planId, 10);
       if (isNaN(numericPlanId)) throw new Error('Invalid plan ID');
 
-      // Query the plan_features view instead of the plans table
+      // Query the plans table with plan_restrictions join (consistent with Pricing page)
       const { data, error } = await supabase
-        .from('plan_features')
-        .select('*')
+        .from('plans')
+        .select('*, plan_restrictions(*)')
         .eq('id', numericPlanId)
         .single();
 
       if (error) throw error;
 
-      // Process the data to match our Plan type
+      const restrictions = data.plan_restrictions?.[0] || {};
+      const price = typeof data.price === 'string' ? parseFloat(data.price) : (data.price || 0);
+
+      // Process the data to match our Plan type using correct column names
       const processedPlan: Plan = {
         id: data.id,
         title: data.title,
-        price: data.price || 0,
+        price: price,
         plan_type: data.plan_type,
         plan_table_details: {
-          facilitator_limit: data.no_of_facilitator,
-          session_limit: data.no_of_sessions,
-          max_participants: data.max_participants,
-          question_limit: 0, // Default value, not in view
-          customisable_sessions: data.customisable_sessions,
-          customisable_facilitators: data.customisable_facilitators,
-          saved_sessions: data.saved_sessions,
-          session_reports: data.session_reports,
-          data_export: data.data_export,
-          priority_support: false, // Default value, not in view
-          custom_branding: false // Default value, not in view
+          facilitator_limit: restrictions.facilitator_limit ?? null,
+          session_limit: restrictions.session_limit ?? null,
+          max_participants: restrictions.max_participants ?? null,
+          question_limit: restrictions.question_limit ?? null,
+          customisable_sessions: restrictions.customisable_sessions ?? false,
+          customisable_facilitators: restrictions.customisable_facilitators ?? false,
+          saved_sessions: restrictions.saved_sessions ?? false,
+          session_reports: restrictions.session_reports ?? false,
+          data_export: restrictions.data_export ?? false,
+          priority_support: restrictions.priority_support ?? false,
+          custom_branding: restrictions.custom_branding ?? false,
         },
         is_popular: data.is_popular,
         stripe_plan_id: data.stripe_plan_id,

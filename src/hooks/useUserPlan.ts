@@ -4,22 +4,76 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Plan } from "@/pages/pricing/types";
 
+export interface PlanRestrictions {
+  facilitator_limit: number | null;
+  session_limit: number | null;
+  max_participants: number | null;
+  question_limit: number | null;
+  customisable_sessions: boolean | null;
+  customisable_facilitators: boolean | null;
+  saved_sessions: boolean | null;
+  session_reports: boolean | null;
+  data_export: boolean | null;
+  priority_support: boolean | null;
+  custom_branding: boolean | null;
+}
+
 export interface UserPlanDetails {
   currentPlanId: number | null;
   plan: Plan | null;
-  planRestrictions: {
-    facilitator_limit: number | null;
-    session_limit: number | null;
-    max_participants: number | null;
-    customisable_sessions: boolean | null;
-    customisable_facilitators: boolean | null;
-    saved_sessions: boolean | null;
-    session_reports: boolean | null;
-    data_export: boolean | null;
-    question_limit?: number | null;
-  } | null;
+  planRestrictions: PlanRestrictions | null;
   isLoading: boolean;
   error: Error | null;
+}
+
+// Helper function to parse numbers or null values
+function parseNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  return isNaN(num) ? null : num;
+}
+
+// Default restrictions for Free plan fallback
+const DEFAULT_FREE_RESTRICTIONS: PlanRestrictions = {
+  facilitator_limit: 2,
+  session_limit: 5,
+  max_participants: 10,
+  question_limit: 10,
+  customisable_sessions: false,
+  customisable_facilitators: false,
+  saved_sessions: false,
+  session_reports: false,
+  data_export: false,
+  priority_support: false,
+  custom_branding: false,
+};
+
+function mapRestrictions(r: Record<string, unknown>): PlanRestrictions {
+  return {
+    facilitator_limit: parseNumberOrNull(r.facilitator_limit),
+    session_limit: parseNumberOrNull(r.session_limit),
+    max_participants: parseNumberOrNull(r.max_participants),
+    question_limit: parseNumberOrNull(r.question_limit) ?? 10,
+    customisable_sessions: (r.customisable_sessions as boolean) ?? false,
+    customisable_facilitators: (r.customisable_facilitators as boolean) ?? false,
+    saved_sessions: (r.saved_sessions as boolean) ?? false,
+    session_reports: (r.session_reports as boolean) ?? false,
+    data_export: (r.data_export as boolean) ?? false,
+    priority_support: (r.priority_support as boolean) ?? false,
+    custom_branding: (r.custom_branding as boolean) ?? false,
+  };
+}
+
+function mapPlanForUI(planData: Record<string, unknown>): Plan {
+  return {
+    id: planData.id as number,
+    title: (planData.title as string) || '',
+    price: (planData.price as number) || 0,
+    plan_type: (planData.plan_type as string) || '',
+    is_popular: (planData.is_popular as boolean) || false,
+    stripe_plan_id: (planData.stripe_plan_id as string) || '',
+    currency: planData.currency as string | undefined,
+  };
 }
 
 export const useUserPlan = (): UserPlanDetails => {
@@ -39,8 +93,11 @@ export const useUserPlan = (): UserPlanDetails => {
       
       if (profileError) throw profileError;
       
-      if (!profileData?.current_plan_id) {
-        // If no plan found, return default free plan (id 1)
+      // Determine which plan ID to use (default to Free plan if none set)
+      let planId = profileData?.current_plan_id;
+      
+      if (!planId) {
+        // Look up the Free plan
         const { data: freePlan, error: planError } = await supabase
           .from('plans')
           .select('*')
@@ -48,88 +105,19 @@ export const useUserPlan = (): UserPlanDetails => {
           .single();
           
         if (planError) throw planError;
-        
-        // Get plan restrictions from plan_restrictions table
-        const { data: planRestrictions, error: restrictionsError } = await supabase
-          .from('plan_restrictions')
-          .select('*')
-          .eq('plan_id', freePlan.id)
-          .single();
-        
-        if (restrictionsError) {
-          console.error("Error fetching plan restrictions:", restrictionsError);
-          // Create default restrictions if none found
-          const defaultRestrictions = {
-            facilitator_limit: 1,
-            session_limit: 3,
-            max_participants: 10,
-            customisable_sessions: false,
-            customisable_facilitators: false,
-            saved_sessions: false,
-            session_reports: false,
-            data_export: false,
-            question_limit: 10
-          };
-          
-          // Create a compatible plan object for the UI
-          const planForUI: Plan = {
-            id: freePlan.id,
-            title: freePlan.title,
-            price: freePlan.price || 0,
-            plan_type: freePlan.plan_type || '',
-            is_popular: freePlan.is_popular || false,
-            stripe_plan_id: freePlan.stripe_plan_id || '',
-            currency: freePlan.currency
-          };
-          
-          return {
-            currentPlanId: freePlan.id,
-            plan: planForUI,
-            planRestrictions: defaultRestrictions
-          };
-        }
-        
-        // Create the plan restrictions object from the plan restrictions table
-        const planRestrictionsObj = {
-          facilitator_limit: parseNumberOrNull(planRestrictions.facilitator_limit), 
-          session_limit: parseNumberOrNull(planRestrictions.session_limit),
-          max_participants: parseNumberOrNull(planRestrictions.max_participants),
-          customisable_sessions: planRestrictions.customisable_sessions,
-          customisable_facilitators: planRestrictions.customisable_facilitators,
-          saved_sessions: planRestrictions.saved_sessions,
-          session_reports: planRestrictions.session_reports,
-          data_export: planRestrictions.data_export,
-          question_limit: parseNumberOrNull(planRestrictions.question_limit) || 10
-        };
-        
-        // Create a compatible plan object for the UI
-        const planForUI: Plan = {
-          id: freePlan.id,
-          title: freePlan.title,
-          price: freePlan.price || 0,
-          plan_type: freePlan.plan_type || '',
-          is_popular: freePlan.is_popular || false,
-          stripe_plan_id: freePlan.stripe_plan_id || '',
-          currency: freePlan.currency
-        };
-        
-        return {
-          currentPlanId: freePlan.id,
-          plan: planForUI,
-          planRestrictions: planRestrictionsObj
-        };
+        planId = freePlan.id;
       }
       
-      // Get the plan details from the plans table
+      // Get the plan details
       const { data: planData, error: planError } = await supabase
         .from('plans')
         .select('*')
-        .eq('id', profileData.current_plan_id)
+        .eq('id', planId)
         .single();
       
       if (planError) throw planError;
       
-      // Get plan restrictions from plan_restrictions table
+      // Get plan restrictions
       const { data: planRestrictions, error: restrictionsError } = await supabase
         .from('plan_restrictions')
         .select('*')
@@ -138,76 +126,21 @@ export const useUserPlan = (): UserPlanDetails => {
       
       if (restrictionsError) {
         console.error("Error fetching plan restrictions:", restrictionsError);
-        // Create default restrictions if none found
-        const defaultRestrictions = {
-          facilitator_limit: 1,
-          session_limit: 3,
-          max_participants: 10,
-          customisable_sessions: false,
-          customisable_facilitators: false,
-          saved_sessions: false,
-          session_reports: false,
-          data_export: false,
-          question_limit: 10
-        };
-        
-        // Create a compatible plan object for the UI
-        const planForUI: Plan = {
-          id: planData.id,
-          title: planData.title || '',
-          price: planData.price || 0,
-          plan_type: planData.plan_type || '',
-          is_popular: planData.is_popular || false,
-          stripe_plan_id: planData.stripe_plan_id || '',
-          currency: planData.currency
-        };
-        
         return {
-          currentPlanId: profileData.current_plan_id,
-          plan: planForUI,
-          planRestrictions: defaultRestrictions
+          currentPlanId: planId,
+          plan: mapPlanForUI(planData as Record<string, unknown>),
+          planRestrictions: DEFAULT_FREE_RESTRICTIONS,
         };
       }
       
-      // Create the plan restrictions object from the plan restrictions table
-      const planRestrictionsObj = {
-        facilitator_limit: parseNumberOrNull(planRestrictions.facilitator_limit),
-        session_limit: parseNumberOrNull(planRestrictions.session_limit),
-        max_participants: parseNumberOrNull(planRestrictions.max_participants),
-        customisable_sessions: planRestrictions.customisable_sessions,
-        customisable_facilitators: planRestrictions.customisable_facilitators,
-        saved_sessions: planRestrictions.saved_sessions,
-        session_reports: planRestrictions.session_reports,
-        data_export: planRestrictions.data_export,
-        question_limit: parseNumberOrNull(planRestrictions.question_limit) || 10
-      };
-
-      // Create a compatible plan object for the UI
-      const planForUI: Plan = {
-        id: planData.id,
-        title: planData.title || '',
-        price: planData.price || 0,
-        plan_type: planData.plan_type || '',
-        is_popular: planData.is_popular || false,
-        stripe_plan_id: planData.stripe_plan_id || '',
-        currency: planData.currency
-      };
-      
       return {
-        currentPlanId: profileData.current_plan_id,
-        plan: planForUI,
-        planRestrictions: planRestrictionsObj
+        currentPlanId: planId,
+        plan: mapPlanForUI(planData as Record<string, unknown>),
+        planRestrictions: mapRestrictions(planRestrictions as Record<string, unknown>),
       };
     },
     enabled: !!user,
   });
-
-  // Helper function to parse numbers or null values
-  function parseNumberOrNull(value: any): number | null {
-    if (value === null) return null;
-    const num = Number(value);
-    return isNaN(num) ? null : num;
-  }
   
   return {
     currentPlanId: data?.currentPlanId || null,

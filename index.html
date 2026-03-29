@@ -11,11 +11,11 @@
     <!-- CSP: allows Vite dev mode (unsafe-eval, ws:) and production services -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self'; 
-      connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://api.openai.com https://*.stripe.com https://*.lovableproject.com https://fonts.googleapis.com http://localhost:*; 
+      connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://*.railway.app wss://*.railway.app https://api.openai.com https://*.stripe.com https://*.lovableproject.com https://fonts.googleapis.com http://localhost:*; 
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.gpteng.co https://*.stripe.com https://js.stripe.com https://m.stripe.network https://lovable.app https://preview--friendly-ai-sessions.lovable.app; 
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
       font-src 'self' https://fonts.gstatic.com; 
-      img-src 'self' data: https://*.stripe.com https://api.qrserver.com https://*.supabase.co; 
+      img-src 'self' data: https://*.stripe.com https://api.qrserver.com https://*.supabase.co https://*.railway.app; 
       frame-src 'self' https://*.stripe.com https://js.stripe.com;
       object-src 'none';
       worker-src 'self' blob:;" />

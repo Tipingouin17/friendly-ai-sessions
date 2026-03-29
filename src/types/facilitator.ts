@@ -9,6 +9,7 @@ export interface Facilitator {
   lock?: boolean;
   order?: number;
   is_promoted?: boolean;
+  plan_id?: number | null;
 }
 
 export interface Workshop {

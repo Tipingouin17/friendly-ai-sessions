@@ -32,7 +32,7 @@ export const FacilitatorSelection = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const { planRestrictions } = useUserPlan();
+  const { planRestrictions, currentPlanId } = useUserPlan();
   const { 
     hasReachedFacilitatorLimit, 
     maxFacilitators, 
@@ -44,10 +44,6 @@ export const FacilitatorSelection = ({
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
-  // Filter facilitators based on your ability to USE them, not CREATE them
-  // All existing facilitators should be accessible for selection
-  const accessibleFacilitators = facilitators;
   
   // Load all facilitator images only on client-side
   useEffect(() => {
@@ -131,11 +127,6 @@ export const FacilitatorSelection = ({
     }
   }, [facilitators, toast, isClient]);
 
-  useEffect(() => {
-    // Debug log all facilitators and their profile_picture values
-    if (facilitators && facilitators.length > 0 && isClient) { /* no-op */ }
-  }, [facilitators, isClient]);
-
   const handleCreateSuccess = () => {
     // Use React Router navigation instead of window.location.reload()
     navigate(0); // This refreshes the current route
@@ -159,7 +150,7 @@ export const FacilitatorSelection = ({
   return (
     <div>
       <FacilitatorCarousel
-        facilitators={accessibleFacilitators}
+        facilitators={facilitators}
         selectedFacilitator={selectedFacilitator}
         onSelect={onSelect}
         onCreateNew={() => setIsCreateModalOpen(true)}
@@ -168,6 +159,7 @@ export const FacilitatorSelection = ({
         maxFacilitators={maxFacilitators}
         canCreateCustomFacilitators={canCreateCustomFacilitators}
         isLoading={loadingImages || !isClient}
+        userPlanId={currentPlanId}
       />
       
       <FacilitatorDetailsPanel

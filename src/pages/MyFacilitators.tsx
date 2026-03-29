@@ -53,6 +53,9 @@ const MyFacilitators = () => {
     planName
   } = usePlanLimits();
 
+  // Don't render plan-dependent UI until data is loaded
+  const planDataReady = !limitsLoading && maxSessions > 0;
+
   const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
 
   const {
@@ -90,22 +93,26 @@ const MyFacilitators = () => {
       />
 
       <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        <div className="mb-6">
-          <UsageMeter
-            currentUsage={currentSessionCount}
-            limit={maxSessions}
-            planName={planName}
-            featureName="Sessions"
-          />
-        </div>
+        {planDataReady && (
+          <div className="mb-6">
+            <UsageMeter
+              currentUsage={currentSessionCount}
+              limit={maxSessions}
+              planName={planName}
+              featureName="Sessions"
+            />
+          </div>
+        )}
 
-        <PlanLimitAlert
-          hasReachedSessionLimit={hasReachedSessionLimit}
-          hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
-          currentSessionCount={currentSessionCount}
-          maxSessions={maxSessions}
-          onUpgrade={handleUpgradePlan}
-        />
+        {planDataReady && (
+          <PlanLimitAlert
+            hasReachedSessionLimit={hasReachedSessionLimit}
+            hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
+            currentSessionCount={currentSessionCount}
+            maxSessions={maxSessions}
+            onUpgrade={handleUpgradePlan}
+          />
+        )}
 
         <div className="bg-white rounded-3xl shadow-lg p-4 md:p-6">
           <FacilitatorStepper

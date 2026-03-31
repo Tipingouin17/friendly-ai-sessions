@@ -1,8 +1,12 @@
 FROM python:3.11-slim
 
+# Security: create a non-root user to run the application
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid appgroup --shell /bin/sh --create-home appuser
+
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (build-time only; remove after pip install)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -22,8 +26,16 @@ COPY server.py .
 # This ensures avatars are available in production without needing a volume mount
 COPY storage/ /app/storage/
 
+# Security: set ownership and switch to non-root user
+RUN chown -R appuser:appgroup /app
+USER appuser
+
 # Expose port
 EXPOSE 3333
 
-# Run the application
-CMD ["python", "server.py"]
+# Health check so Railway/Docker can verify the service is alive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:3333/health')" || exit 1
+
+# Run the application with gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:3333", "--workers", "2", "--timeout", "120", "server:app"]

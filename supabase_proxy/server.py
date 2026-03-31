@@ -48,7 +48,8 @@ ALLOWED_CORS_ORIGINS = [
 CORS(app,
      resources={r"/*": {"origins": ALLOWED_CORS_ORIGINS}},
      supports_credentials=True,
-     allow_headers=["authorization", "x-client-info", "apikey", "content-type", "prefer", "range"],
+     allow_headers=["authorization", "x-client-info", "apikey", "content-type", "prefer", "range",
+                    "x-supabase-api-version", "x-upsert", "x-profile-id", "cache-control", "pragma"],
      expose_headers=["Content-Range", "X-Total-Count"])
 
 # Database configuration – read from environment variables in production.

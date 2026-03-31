@@ -49,8 +49,10 @@ CORS(app,
      resources={r"/*": {"origins": ALLOWED_CORS_ORIGINS}},
      supports_credentials=True,
      allow_headers=["authorization", "x-client-info", "apikey", "content-type", "prefer", "range",
-                    "x-supabase-api-version", "x-upsert", "x-profile-id", "cache-control", "pragma"],
-     expose_headers=["Content-Range", "X-Total-Count"])
+                    "x-supabase-api-version", "x-upsert", "x-profile-id", "cache-control", "pragma",
+                    "content-profile", "accept-profile", "accept", "origin", "x-forwarded-for",
+                    "x-request-id", "x-real-ip", "baggage", "sentry-trace"],
+     expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"])
 
 # Database configuration – read from environment variables in production.
 # Railway auto-injects PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD from the linked Postgres service.

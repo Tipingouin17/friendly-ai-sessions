@@ -18,14 +18,38 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from openai import OpenAI
 
 # OpenAI client – uses OPENAI_API_KEY and OPENAI_BASE_URL env vars automatically
 openai_client = OpenAI()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True,
-     allow_headers=["*"], expose_headers=["Content-Range", "X-Total-Count"])
+
+# Rate limiting: protects AI endpoints and auth routes from abuse
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per minute"],
+    storage_uri="memory://",
+)
+# CORS: restrict to known origins. Set ALLOWED_ORIGINS env var (comma-separated) in production.
+# Defaults to localhost for local development.
+_cors_env = os.environ.get("ALLOWED_ORIGINS", "")
+ALLOWED_CORS_ORIGINS = [
+    o.strip() for o in _cors_env.split(",") if o.strip()
+] if _cors_env else [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://friendly-ai-sessions.vercel.app",
+]
+CORS(app,
+     resources={r"/*": {"origins": ALLOWED_CORS_ORIGINS}},
+     supports_credentials=True,
+     allow_headers=["authorization", "x-client-info", "apikey", "content-type", "prefer", "range"],
+     expose_headers=["Content-Range", "X-Total-Count"])
 
 # Database configuration – read from environment variables in production.
 # Railway auto-injects PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD from the linked Postgres service.
@@ -81,6 +105,28 @@ USERS["guest@myfacilitator.com"] = {
     "password": hashlib.sha256("test123".encode()).hexdigest(),
     "created_at": "2025-02-28T03:15:56Z",
     "email_confirmed_at": "2025-02-28T03:15:56Z",
+}
+
+# ============================================================
+# Security: Allowlists for table and RPC access
+# Only tables and functions explicitly listed here can be accessed
+# via the REST API. This prevents enumeration and access to
+# internal PostgreSQL system tables.
+# ============================================================
+ALLOWED_TABLES = {
+    "profiles", "facilitators", "sessions", "conversations",
+    "messages", "session_participants", "session_reports",
+    "session_events", "plans", "plan_restrictions",
+    "configurations", "contact_form", "faqs",
+    "admin_notifications", "security_audit_log",
+    "conversations_config", "feedback", "referrals",
+    "login_activity", "user_sessions", "sessions_history",
+}
+
+ALLOWED_RPC_FUNCTIONS = {
+    "is_session_host", "is_system_admin",
+    "calculate_session_analytics", "get_plan_restrictions",
+    "increment_conversation_participants",
 }
 
 # FK map: constraint_name -> (table, column, foreign_table, foreign_column)
@@ -414,6 +460,7 @@ def build_order(order_str):
 # Auth Endpoints
 # ============================================================
 @app.route("/auth/v1/signup", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour")
 def auth_signup():
     data = request.json or {}
     email, password = data.get("email", ""), data.get("password", "")
@@ -443,6 +490,7 @@ def auth_signup():
 
 
 @app.route("/auth/v1/token", methods=["POST"])
+@limiter.limit("10 per minute; 50 per hour")
 def auth_token():
     gt = request.args.get("grant_type", "password")
     data = request.json or {}
@@ -536,6 +584,9 @@ def auth_sso():
 # ============================================================
 @app.route("/rest/v1/rpc/<func_name>", methods=["POST"])
 def rpc_call(func_name):
+    # Security: only allow explicitly whitelisted RPC functions
+    if func_name not in ALLOWED_RPC_FUNCTIONS:
+        return jsonify({"error": f"RPC function '{func_name}' is not allowed"}), 403
     data = request.json or {}
     try:
         conn = get_db(); cur = conn.cursor()
@@ -565,7 +616,7 @@ def rpc_call(func_name):
             if not user_id:
                 return jsonify(False)
             cur.execute(
-                "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = %s::uuid AND is_admin = true)",
+                "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = %s::uuid AND role = 'admin')",
                 (user_id,)
             )
             result = cur.fetchone()
@@ -608,6 +659,9 @@ def rpc_call(func_name):
 
 @app.route("/rest/v1/<table>", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
 def rest_table(table):
+    # Security: only allow explicitly whitelisted tables
+    if table not in ALLOWED_TABLES:
+        return jsonify({"error": f"Table '{table}' is not accessible"}), 403
     try:
         conn = get_db(); cur = conn.cursor()
 
@@ -754,6 +808,7 @@ def rest_table(table):
 # Edge Functions
 # ============================================================
 @app.route("/functions/v1/<func_name>", methods=["POST", "OPTIONS"])
+@limiter.limit("30 per minute", exempt_when=lambda: request.method == "OPTIONS")
 def edge_function(func_name):
     if request.method == "OPTIONS":
         return "", 204

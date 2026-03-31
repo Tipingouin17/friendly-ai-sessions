@@ -50,7 +50,7 @@ const Index = () => {
             <section className="py-24 px-4">
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">What is MyFacilitator?</h2>
+                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">What is MyFacilitator?</h2>
                         <p className="text-lg text-gray-500 max-w-2xl mx-auto">
                             Everything you need to run structured, effective workshops — powered by AI
                         </p>
@@ -97,7 +97,7 @@ const Index = () => {
             <section className="py-24 px-4 bg-amber-50/50">
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">How It Works</h2>
                         <p className="text-lg text-gray-500 max-w-2xl mx-auto">
                             From setup to insights in four simple steps
                         </p>
@@ -141,7 +141,7 @@ const Index = () => {
             <section className="py-24 px-4">
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">Why MyFacilitator?</h2>
+                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">Why MyFacilitator?</h2>
                         <p className="text-lg text-gray-500 max-w-2xl mx-auto">
                             Built for teams that value time, quality, and results
                         </p>

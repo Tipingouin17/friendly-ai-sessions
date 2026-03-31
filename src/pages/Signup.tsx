@@ -1,12 +1,10 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SignupContainer } from '@/components/auth/SignupContainer';
 import { SignupForm } from '@/components/auth/SignupForm';
 import { SignupFooter } from '@/components/auth/SignupFooter';
-
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
 import PageHead from '@/components/PageHead';
 
 const Signup = () => {

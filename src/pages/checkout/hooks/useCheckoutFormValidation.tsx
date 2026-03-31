@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import { Elements } from '@stripe/react-stripe-js';
 import { CardElement } from '@stripe/react-stripe-js';
 import { BillingDetails } from '../types';
 

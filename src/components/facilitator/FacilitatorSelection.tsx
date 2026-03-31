@@ -66,7 +66,7 @@ export const FacilitatorSelection = ({
         
         // First priority: Use direct profile_picture URLs for public uploads
         facilitators.forEach(facilitator => {
-          if (facilitator.id && facilitator.profile_picture && facilitator.profile_picture.startsWith('/lovable-uploads/')) {
+          if (facilitator.id && facilitator.profile_picture && (facilitator.profile_picture.startsWith('/avatars/') || facilitator.profile_picture.startsWith('http'))) {
             imageMap[facilitator.id] = facilitator.profile_picture;
             debugLog('all', `Using direct profile_picture for facilitator ${facilitator.id}: ${facilitator.profile_picture}`);
           }

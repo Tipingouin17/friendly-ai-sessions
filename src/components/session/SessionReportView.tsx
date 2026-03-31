@@ -162,11 +162,16 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       return;
     }
 
-    // TODO: Implement PDF generation
+    // Generate PDF using browser's built-in print dialog with a print-optimised stylesheet
     toast({
-      title: "PDF Export",
-      description: "PDF export functionality will be implemented soon.",
+      title: "Preparing PDF",
+      description: "Opening print dialog to save as PDF...",
     });
+    
+    // Small delay to let the toast render before print dialog opens
+    setTimeout(() => {
+      window.print();
+    }, 300);
   };
 
   const handleRetry = () => {

@@ -1,8 +1,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { StepItemContext } from "./stepper-context";
-import { useStepper } from "./stepper-context";
+import { StepItemContext, useStepper } from "./stepper-context";
 import { StepState } from "./types";
 
 interface StepperItemProps extends React.HTMLAttributes<HTMLDivElement> {

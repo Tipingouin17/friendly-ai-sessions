@@ -1,6 +1,5 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
+import { supabase, EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { BillingDetails } from '../types';
 import { createSafeUrl, applySafeCookieParams, handleStripeCookies, setCrossDomainCookie } from '@/utils/crossOriginUtils';
 import { CardElement } from '@stripe/react-stripe-js';

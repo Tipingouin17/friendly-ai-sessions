@@ -95,17 +95,17 @@ export async function processResponse(
 }`);
 
     } else if (generateReport) {
-      console.log(`📊 [${processingId}] [AI-TRACKING] Processing report generation request`);
-      
-      // Report generation logic would go here
+      console.log(`📊 [${processingId}] [AI-TRACKING] generateReport flag received — report generation is handled by the close-session-and-generate-report edge function`);
+      // Report generation is delegated to the dedicated close-session-and-generate-report edge function.
+      // This branch should not be reached in normal operation. Return a no-op response.
       responseObject = {
-        id: `report-${Date.now()}`,
-        content: 'Report generation functionality will be implemented here.',
+        id: `report-noop-${Date.now()}`,
+        content: '',
         role: 'assistant',
         isReport: true,
         created_at: new Date().toISOString(),
         metrics: {
-          generationMethod: 'report_generation',
+          generationMethod: 'noop_delegated_to_close_session',
           timestamp: Date.now()
         }
       };

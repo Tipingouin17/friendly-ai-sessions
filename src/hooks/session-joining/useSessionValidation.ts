@@ -1,8 +1,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { sessionJoinSchema } from "@/utils/inputValidation";
-import { sanitizeInput, createRateLimiter } from "@/utils/inputValidation";
+import { sessionJoinSchema, sanitizeInput, createRateLimiter } from "@/utils/inputValidation";
 
 // Create rate limiter: max 5 join attempts per minute
 const joinRateLimiter = createRateLimiter(5, 60000);

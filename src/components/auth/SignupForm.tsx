@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { signupSchema } from '@/utils/inputValidation';
-import { sanitizeInput } from '@/utils/inputValidation';
+import { signupSchema, sanitizeInput } from '@/utils/inputValidation';
 import { SignupFormFields } from './SignupFormFields';
 
 // Define validation schema

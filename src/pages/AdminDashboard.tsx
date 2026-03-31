@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Settings, Users, FileText, BarChart3, TrendingUp, DollarSign, Bell, MessageSquare } from "lucide-react";
+import { Shield, Settings, Users, FileText, BarChart3, TrendingUp, DollarSign, Bell, MessageSquare, ArrowLeft } from "lucide-react";
 import { PromptManagement } from "@/components/admin/PromptManagement";
 import { PlanManagement } from "@/components/admin/PlanManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
@@ -13,7 +13,6 @@ import { CommunicationCenter } from "@/components/admin/CommunicationCenter";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/animations";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import PageHead from "@/components/PageHead";
 
 import ErrorBoundary from "@/components/ErrorBoundary";

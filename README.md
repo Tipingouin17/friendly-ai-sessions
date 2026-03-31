@@ -5,8 +5,6 @@ Welcome to the MyFacilitator project repository. This application provides AI-po
 ## Project Info
 
 **Production URL**: Deployed on Railway (URL provided by Railway dashboard)
-**Original Lovable Project**: https://lovable.dev/projects/50a728d4-ff85-485e-b250-0940659d7dcc
-
 ## Deployment
 
 This project is configured for deployment on **Railway**. It uses a multi-service architecture:

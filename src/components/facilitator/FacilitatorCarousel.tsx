@@ -52,7 +52,7 @@ export const FacilitatorCarousel = ({
   const getAvatarUrl = (facilitator: Facilitator) => {
     if (!facilitator.id) return '/placeholder.svg';
     
-    if (facilitator.profile_picture && facilitator.profile_picture.startsWith('/lovable-uploads/')) {
+    if (facilitator.profile_picture && (facilitator.profile_picture.startsWith('/avatars/') || facilitator.profile_picture.startsWith('http'))) {
       return facilitator.profile_picture;
     }
     

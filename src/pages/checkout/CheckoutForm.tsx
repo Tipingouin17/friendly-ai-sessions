@@ -84,7 +84,7 @@ export const CheckoutForm = ({
 
     try {
       
-      if (process.env.NODE_ENV === 'development' || !stripe || !elements || !plan.stripe_plan_id) {
+      if (import.meta.env.DEV || !stripe || !elements || !plan.stripe_plan_id) {
         
         await updateUserSubscription(user.id, plan.id);
         

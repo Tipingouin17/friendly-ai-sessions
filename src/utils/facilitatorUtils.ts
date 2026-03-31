@@ -50,9 +50,9 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
         return pic;
       }
 
-      // If it's a relative path to lovable-uploads, use it directly
-      if (pic.startsWith('/lovable-uploads/')) {
-        debugLog('all', `Using lovable-uploads path: ${pic}`);
+      // If it's a relative path to public assets, use it directly
+      if (pic.startsWith('/avatars/') || pic.startsWith('/public/')) {
+        debugLog('all', `Using public asset path: ${pic}`);
         return pic;
       }
 
@@ -111,7 +111,7 @@ export const isImageUrl = (url: string): boolean => {
   if (!url) return false;
 
   // Direct paths to public images
-  if (url.startsWith('/lovable-uploads/')) return true;
+  if (url.startsWith('/avatars/') || url.startsWith('/public/')) return true;
 
   // Normalize URL before checking
   const normalizedUrl = url.replace(/([^:])\/\//g, '$1/');

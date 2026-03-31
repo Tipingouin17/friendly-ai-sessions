@@ -225,3 +225,47 @@
 .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ============================================================
+   Print / PDF export styles (used by SessionReportView)
+   ============================================================ */
+@media print {
+    /* Hide navigation, buttons, sticky headers, and non-report UI */
+    header,
+    nav,
+    .sticky,
+    button,
+    [role="button"],
+    .no-print {
+        display: none !important;
+    }
+
+    /* Remove background colours and shadows for cleaner output */
+    body {
+        background: white !important;
+        color: black !important;
+    }
+
+    .bg-gray-50,
+    .bg-white,
+    .shadow-sm,
+    .shadow {
+        background: white !important;
+        box-shadow: none !important;
+    }
+
+    /* Ensure full-width content */
+    .max-w-6xl,
+    .max-w-4xl,
+    .max-w-3xl {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+
+    /* Avoid page breaks inside cards */
+    .card,
+    [class*="Card"] {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}

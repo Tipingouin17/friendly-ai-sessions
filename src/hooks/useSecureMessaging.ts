@@ -1,8 +1,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useSecurityAudit } from './useSecurityAudit';
-import { validateMessageContent } from '@/utils/security/inputValidation';
-import { createSecureRateLimiter } from '@/utils/security/inputValidation';
+import { validateMessageContent, createSecureRateLimiter } from '@/utils/security/inputValidation';
 
 interface SecureMessage {
   content: string;

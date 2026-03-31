@@ -51,7 +51,7 @@ const Index = () => {
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
                         <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">What is MyFacilitator?</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
                             Everything you need to run structured, effective workshops — powered by AI
                         </p>
                     </div>
@@ -98,7 +98,7 @@ const Index = () => {
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
                         <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">How It Works</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
                             From setup to insights in four simple steps
                         </p>
                     </div>
@@ -142,7 +142,7 @@ const Index = () => {
                 <div className="container mx-auto max-w-6xl">
                     <div className="text-center mb-14">
                         <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">Why MyFacilitator?</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
                             Built for teams that value time, quality, and results
                         </p>
                     </div>

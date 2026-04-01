@@ -133,6 +133,11 @@ USERS["test@myfacilitator.com"] = {
 }
 
 # ============================================================
+# Idempotency lock for AI responses (prevents duplicate inserts)
+# ============================================================
+_ai_response_locks: Dict[str, float] = {}
+
+# ============================================================
 # Allowed RPC functions (security whitelist)
 # ============================================================
 ALLOWED_RPC_FUNCTIONS = {
@@ -977,6 +982,15 @@ async def edge_function(func_name: str, request: Request):
         is_session_start = data.get("sessionStart", False)
         generate_report = data.get("generateReport", False)
         host_instruction = (data.get("hostInstruction") or "").strip()
+
+        # Idempotency guard: prevent duplicate AI responses within 8 seconds
+        if conv_id and not generate_report:
+            _now = time.time()
+            _lock_key = f"ai_lock_{conv_id}_{is_session_start}"
+            _last = _ai_response_locks.get(_lock_key, 0)
+            if _now - _last < 8:
+                return {"success": True, "skipped": True, "reason": "duplicate_prevention"}
+            _ai_response_locks[_lock_key] = _now
 
         session_title = "this workshop"
         facilitator_name = "Facilitator"

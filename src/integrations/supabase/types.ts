@@ -175,6 +175,7 @@ export type Database = {
           engagement_metrics: Json | null
           conversation_memory: Json | null
           welcome_message_status: string | null
+          join_token: string | null
         }
         Insert: {
           id: number

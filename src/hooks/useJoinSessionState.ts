@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useParticipantPersistence } from './useParticipantPersistence';
 import { useJoinSessionNavigation } from './useJoinSessionNavigation';
+import { setJoinToken, clearJoinToken } from '@/lib/api';
 
 export const useJoinSessionState = () => {
   const [searchParams] = useSearchParams();
@@ -15,6 +16,20 @@ export const useJoinSessionState = () => {
   // Safely parse the conversation ID from URL
   const idParam = searchParams.get("id");
   const conversationId = idParam && !isNaN(Number(idParam)) ? Number(idParam) : null;
+
+  // Extract and store the join token from the URL so that subsequent
+  // API requests automatically include it in the X-Join-Token header.
+  const joinTokenParam = searchParams.get("token");
+  useEffect(() => {
+    if (joinTokenParam) {
+      setJoinToken(joinTokenParam);
+    } else {
+      // No token in URL — clear any stale token from a previous session
+      clearJoinToken();
+    }
+    // Do NOT clear on unmount: the token must persist while the participant
+    // is in the session.  It will be cleared when they navigate away.
+  }, [joinTokenParam]);
 
   // Memoize existingSessionData to prevent infinite re-renders
   const existingSessionData = useMemo(() => {
@@ -47,6 +62,7 @@ export const useJoinSessionState = () => {
 
   return {
     conversationId,
+    joinTokenParam,
     invalidRequest,
     setInvalidRequest,
     retryCount,

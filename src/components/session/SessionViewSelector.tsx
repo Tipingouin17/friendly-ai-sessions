@@ -229,6 +229,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         currentParticipantCount={props.conversation?.current_participants || 0}
         maxParticipants={props.conversation?.participants || 0}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        joinToken={props.conversation?.join_token}
         onStartSession={() => {
           onStartSession();
         }}

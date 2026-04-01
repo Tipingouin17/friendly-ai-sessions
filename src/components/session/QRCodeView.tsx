@@ -8,6 +8,8 @@ interface QRCodeViewProps {
   currentParticipantCount: number;
   maxParticipants: number;
   facilitatorTitle?: string;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
   onStartSession: () => void;
   onSessionFull: () => void;
 }
@@ -17,6 +19,7 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
   currentParticipantCount,
   maxParticipants,
   facilitatorTitle,
+  joinToken,
   onStartSession,
   onSessionFull
 }) => {
@@ -40,6 +43,7 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
             currentParticipantCount={currentParticipantCount}
             maxParticipants={maxParticipants}
             onSessionFull={onSessionFull}
+            joinToken={joinToken}
           />
           
           <Button 

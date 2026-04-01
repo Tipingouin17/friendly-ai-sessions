@@ -10,6 +10,8 @@ interface QrDialogManagerProps {
   joinUrl: string;
   currentParticipantCount: number;
   maxParticipants: number;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
 }
 
 const QrDialogManager = ({
@@ -19,7 +21,8 @@ const QrDialogManager = ({
   setIsQrDialogOpen,
   joinUrl,
   currentParticipantCount,
-  maxParticipants
+  maxParticipants,
+  joinToken
 }: QrDialogManagerProps) => {
   // Only show QR dialog for admin view on mobile
   if (isMobile && viewMode === "admin") {
@@ -30,6 +33,7 @@ const QrDialogManager = ({
         joinUrl={joinUrl}
         currentParticipantCount={currentParticipantCount}
         maxParticipants={maxParticipants}
+        joinToken={joinToken}
       />
     );
   }

@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useConversationId } from "@/hooks/useConversationId";
+import { buildJoinUrl } from '@/utils/joinUrl';
 
 interface JoinSessionDialogProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ interface JoinSessionDialogProps {
   joinUrl: string;
   currentParticipantCount: number;
   maxParticipants: number;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
 }
 
 const JoinSessionDialog = ({
@@ -25,7 +28,8 @@ const JoinSessionDialog = ({
   setIsOpen,
   joinUrl,
   currentParticipantCount,
-  maxParticipants
+  maxParticipants,
+  joinToken
 }: JoinSessionDialogProps) => {
   const { toast } = useToast();
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -40,20 +44,21 @@ const JoinSessionDialog = ({
   }, [isOpen, currentParticipantCount, maxParticipants, setIsOpen]);
 
   useEffect(() => {
-    // Generate the join URL if it's not provided but we have a conversation ID
+    // Use the provided joinUrl if available, otherwise build one from the conversation ID.
+    // Always prefer the token-bearing URL when we have a token.
     const generateJoinUrl = () => {
-      if (joinUrl) {
+      if (joinToken && currentConversationId) {
+        // Build a fresh secure URL with the token
+        setInternalJoinUrl(buildJoinUrl(currentConversationId, joinToken));
+      } else if (joinUrl) {
         setInternalJoinUrl(joinUrl);
       } else if (currentConversationId) {
-        const baseUrl = window.location.origin;
-        // Update to use the correct path
-        const generatedUrl = `${baseUrl}/join-session?id=${currentConversationId}`;
-        setInternalJoinUrl(generatedUrl);
+        setInternalJoinUrl(buildJoinUrl(currentConversationId, null));
       }
     };
 
     generateJoinUrl();
-  }, [joinUrl, currentConversationId]);
+  }, [joinUrl, joinToken, currentConversationId]);
 
   useEffect(() => {
     // Generate QR code URL when the join URL is available

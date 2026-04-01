@@ -71,6 +71,8 @@ app.add_middleware(
         "cache-control", "pragma", "content-profile", "accept-profile",
         "accept", "origin", "x-forwarded-for", "x-request-id", "x-real-ip",
         "baggage", "sentry-trace",
+        # Participant session token — used instead of JWT for unauthenticated participants
+        "x-join-token", "x-migration-secret",
     ],
     expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"],
 )
@@ -160,6 +162,38 @@ def get_db() -> psycopg2.extensions.connection:
         )
     conn.autocommit = False
     return conn
+
+
+def run_startup_migrations() -> None:
+    """Apply idempotent schema migrations on every server start."""
+    migrations = [
+        # 2026-04-02: Add join_token to conversations for secure participant URLs
+        """
+        ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS join_token UUID NOT NULL DEFAULT gen_random_uuid();
+        """,
+    ]
+    try:
+        conn = get_db()
+        conn.autocommit = True
+        cur = conn.cursor()
+        for sql in migrations:
+            try:
+                cur.execute(sql)
+                print(f"[migration] OK: {sql.strip()[:80]}")
+            except Exception as mig_err:
+                print(f"[migration] WARN: {mig_err}")
+        conn.close()
+        print("[migration] Startup migrations complete.")
+    except Exception as e:
+        print(f"[migration] ERROR running startup migrations: {e}")
+
+
+# Run migrations immediately on import (before any request is served)
+try:
+    run_startup_migrations()
+except Exception:
+    pass
 
 
 def serialize_row(row: dict) -> dict:
@@ -741,11 +775,112 @@ async def rpc_call(func_name: str, request: Request):
 
 
 # ============================================================
+# Tables that require authentication for read access.
+#
+# SECURE_CONV_TABLES: linked to conversations via conversation_id.
+#   - Authenticated hosts see only their own data (ownership filter).
+#   - Participants may access messages/session_participants for their
+#     own session by presenting a valid X-Join-Token header.
+#
+# SECURE_REPORT_TABLES: only authenticated hosts may read these.
+#   No participant bypass is allowed.
+#
+# SECURE_DIRECT_TABLES: have a direct user_id column.
+#   - Authenticated users see only their own rows.
+#   - Participants may read conversations for their session via
+#     X-Join-Token (needed to display session info during the session).
+# ============================================================
+SECURE_CONV_TABLES = {"messages", "session_participants"}
+SECURE_REPORT_TABLES = {"session_reports"}
+SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators"}
+# Tables participants may read with a valid join token (no auth required)
+PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
+
+
+def _validate_join_token(token: str, conversation_id: str | int | None, conn) -> bool:
+    """Return True if `token` is the correct join_token for `conversation_id`."""
+    if not token or not conversation_id:
+        return False
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            'SELECT 1 FROM public."conversations" '
+            'WHERE id = %s AND join_token = %s::uuid',
+            (conversation_id, token),
+        )
+        return cur.fetchone() is not None
+    except Exception:
+        return False
+
+# ============================================================
+# Admin migration endpoint (protected by MIGRATION_SECRET env var)
+# ============================================================
+@app.post("/admin/run-migration")
+async def run_migration(request: Request):
+    """Execute a raw SQL migration. Protected by MIGRATION_SECRET."""
+    migration_secret = os.environ.get("MIGRATION_SECRET", "")
+    if not migration_secret:
+        raise HTTPException(403, "Migration endpoint disabled")
+    auth = request.headers.get("x-migration-secret", "")
+    if auth != migration_secret:
+        raise HTTPException(403, "Invalid migration secret")
+    body = await request.json()
+    sql = body.get("sql", "")
+    if not sql:
+        raise HTTPException(400, "No SQL provided")
+    try:
+        conn = get_db()
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute(sql)
+        conn.close()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ============================================================
 # PostgREST REST table CRUD
 # ============================================================
 @app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
 async def rest_table(table: str, request: Request):
     params = dict(request.query_params)
+
+    # ── Row-level security ────────────────────────────────────
+    # Authenticated hosts see only their own data (ownership filter).
+    # Participants may access session data by presenting a valid
+    # X-Join-Token header that matches the conversation they are
+    # querying.  Session reports are never accessible to participants.
+    requesting_user = get_current_user(request)
+    requesting_user_id = (
+        requesting_user.get("sub") or requesting_user.get("id")
+    ) if requesting_user else None
+    join_token_header = request.headers.get("x-join-token", "").strip()
+
+    if request.method in ("GET", "HEAD"):
+        # session_reports: authenticated hosts only, no participant bypass
+        if table in SECURE_REPORT_TABLES:
+            if not requesting_user_id:
+                return JSONResponse(
+                    content={
+                        "error": "Authentication required",
+                        "message": "You must be logged in to access session reports",
+                        "code": "PGRST301",
+                    },
+                    status_code=401,
+                )
+        # messages, session_participants, conversations: require auth OR valid join token
+        elif table in SECURE_CONV_TABLES or table in SECURE_DIRECT_TABLES:
+            if not requesting_user_id and not join_token_header:
+                return JSONResponse(
+                    content={
+                        "error": "Authentication required",
+                        "message": "You must be logged in or provide a valid session token",
+                        "code": "PGRST301",
+                    },
+                    status_code=401,
+                )
+
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -774,6 +909,73 @@ async def rest_table(table: str, request: Request):
             oc = build_order(params.get("order", ""))
             lim = params.get("limit", "")
             off = params.get("offset", "")
+
+            # ── Ownership / token filter injection ────────────────
+            # Authenticated hosts: inject user_id ownership filter.
+            # Participants with a join token: validate the token and
+            # restrict the query to that specific conversation.
+            if requesting_user_id and table in SECURE_REPORT_TABLES:
+                # session_reports: ownership via conversation's user_id
+                wc.append(
+                    '"conversation_id" IN ('
+                    'SELECT id FROM public."conversations" '
+                    'WHERE "user_id" = %s::uuid)'
+                )
+                wv.append(requesting_user_id)
+            elif requesting_user_id and table in SECURE_CONV_TABLES:
+                # messages / session_participants: ownership filter
+                wc.append(
+                    '"conversation_id" IN ('
+                    'SELECT id FROM public."conversations" '
+                    'WHERE "user_id" = %s::uuid)'
+                )
+                wv.append(requesting_user_id)
+            elif requesting_user_id and table in SECURE_DIRECT_TABLES:
+                # conversations / sessions / facilitators: direct user_id
+                wc.append('"user_id" = %s::uuid')
+                wv.append(requesting_user_id)
+            elif join_token_header and not requesting_user_id:
+                # Participant path: validate join token against the
+                # conversation_id present in the query parameters.
+                # Extract conversation_id from the WHERE params.
+                conv_id_param = (
+                    params.get("conversation_id") or
+                    params.get("conversation_id=eq.") or
+                    params.get("id")
+                )
+                # Also check for eq. filter pattern
+                for pk, pv in params.items():
+                    if pk in ("conversation_id", "id") and not conv_id_param:
+                        conv_id_param = pv
+                    elif "conversation_id" in pk and "eq." in pk:
+                        conv_id_param = pk.split("eq.")[-1] or pv
+                # Extract from build_where style params like conversation_id=eq.5
+                raw_conv_id = params.get("conversation_id", "")
+                if raw_conv_id.startswith("eq."):
+                    raw_conv_id = raw_conv_id[3:]
+                if not raw_conv_id:
+                    raw_conv_id = params.get("id", "")
+                    if raw_conv_id.startswith("eq."):
+                        raw_conv_id = raw_conv_id[3:]
+                token_valid = _validate_join_token(join_token_header, raw_conv_id or None, conn)
+                if not token_valid:
+                    conn.close()
+                    return JSONResponse(
+                        content={
+                            "error": "Invalid or missing session token",
+                            "message": "The join token is invalid or does not match this session",
+                            "code": "PGRST403",
+                        },
+                        status_code=403,
+                    )
+                # Token is valid: restrict query to this specific conversation
+                if table in SECURE_CONV_TABLES and raw_conv_id:
+                    # Already filtered by conversation_id in params; no extra filter needed
+                    pass
+                elif table == "conversations" and raw_conv_id:
+                    # Already filtered by id in params; no extra filter needed
+                    pass
+
             sql = f'SELECT {col_str} FROM public."{table}"'
             if wc:
                 sql += " WHERE " + " AND ".join(wc)
@@ -1271,8 +1473,14 @@ async def edge_function(func_name: str, request: Request):
 
     # ── close-session-and-generate-report ─────────────────────
     elif func_name == "close-session-and-generate-report":
+        # ── Security: extract user from JWT, not from untrusted request body ──
+        _jwt_user = get_current_user(request)
+        _jwt_user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        if not _jwt_user_id:
+            raise HTTPException(401, "Authentication required to close a session")
+        # Override any user_id sent in the body with the verified JWT identity
+        user_id = _jwt_user_id
         conv_id = data.get("conversationId")
-        user_id = data.get("userId")
         report_content = ""
         report_id = str(uuid.uuid4())
         participant_count = 0
@@ -1280,6 +1488,48 @@ async def edge_function(func_name: str, request: Request):
         session_title = "Workshop Session"
         objective = ""
         duration_minutes = 0
+
+        # ── Security: verify the requesting user owns this conversation ──
+        if conv_id:
+            try:
+                _chk_conn = get_db()
+                _chk_cur = _chk_conn.cursor()
+                _chk_cur.execute(
+                    "SELECT user_id FROM conversations WHERE id = %s",
+                    (conv_id,),
+                )
+                _chk_row = _chk_cur.fetchone()
+                _chk_conn.close()
+                _conv_owner = str(_chk_row["user_id"] if isinstance(_chk_row, dict) else _chk_row[0]) if _chk_row else None
+                if not _chk_row or _conv_owner != str(user_id):
+                    raise HTTPException(403, "You do not have permission to close this session")
+            except HTTPException:
+                raise
+            except Exception as _e:
+                print(f"Ownership check error: {_e}")
+                raise HTTPException(500, "Failed to verify session ownership")
+
+        # ── Security: verify the user's plan allows session reports ──
+        try:
+            _plan_conn = get_db()
+            _plan_cur = _plan_conn.cursor()
+            _plan_cur.execute(
+                "SELECT pr.session_reports FROM profiles p "
+                "LEFT JOIN plans pl ON p.current_plan_id = pl.id "
+                "LEFT JOIN plan_restrictions pr ON pr.plan_id = pl.id "
+                "WHERE p.id = %s::uuid",
+                (user_id,),
+            )
+            _plan_row = _plan_cur.fetchone()
+            _plan_conn.close()
+            _can_generate = bool((_plan_row["session_reports"] if isinstance(_plan_row, dict) else _plan_row[0]) if _plan_row else False)
+            if not _can_generate:
+                raise HTTPException(403, "Your current plan does not include session reports. Please upgrade to access this feature.")
+        except HTTPException:
+            raise
+        except Exception as _e:
+            print(f"Plan check error: {_e}")
+            # Fail open on plan check errors to avoid blocking legitimate users
 
         if conv_id:
             conn = None

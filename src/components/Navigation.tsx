@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { UserCircle, Settings, BookOpen, ChevronDown, Menu } from "lucide-react";
+import { UserCircle, Settings, BookOpen, ChevronDown, Menu, Zap } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getUserDisplayName } from "@/utils/userUtils";
@@ -13,26 +13,34 @@ export const Navigation = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const isMobile = useIsMobile();
 
-  // Check if we're on a session page or admin page
   const isSessionPage = location.pathname.includes('/session');
   const isAdminPage = location.pathname.includes('admin');
 
-  // Different styling for admin pages
-  const adminPageClass = isAdminPage ? 'bg-transparent border-transparent z-30' : 'bg-white/80 backdrop-blur-md border-gray-100';
+  const adminPageClass = isAdminPage ? 'bg-transparent border-transparent z-30' : 'bg-white/90 backdrop-blur-md border-gray-100';
 
-  // If we're on a mobile session page, don't render the main navigation
   if (isMobile && isSessionPage) {
     return null;
   }
 
   const userDisplayName = getUserDisplayName(user);
 
+  const navLinkClass = (path: string) =>
+    `text-sm font-medium transition-colors ${
+      location.pathname === path
+        ? 'text-indigo-600'
+        : 'text-gray-600 hover:text-indigo-600'
+    }`;
+
   return (
     <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage ? 'hidden md:flex' : 'flex'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="text-xl font-bold text-yellow-500">
-            MyFacilitator
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600">
+              <Zap className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-lg font-bold text-gray-900">MyFacilitator</span>
           </Link>
 
           {isMobile ? (
@@ -45,35 +53,35 @@ export const Navigation = () => {
               <SheetContent className="flex flex-col">
                 <div className="flex flex-col space-y-6 mt-8">
                   {isAuthenticated && (
-                    <Link to="/my-facilitators" className="text-gray-800 hover:text-yellow-500 font-medium text-lg">
+                    <Link to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
                       My Facilitators
                     </Link>
                   )}
-                  <Link to="/" className={`${location.pathname === '/' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                  <Link to="/" className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
                     Home
                   </Link>
-                  <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                  <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
                     Pricing
                   </Link>
-                  <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                  <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
                     FAQs
                   </Link>
-                  <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500 text-lg`}>
+                  <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
                     Contact Us
                   </Link>
                 </div>
-                
+
                 <div className="mt-auto mb-8">
                   {!isAuthenticated ? (
                     <div className="flex flex-col space-y-3">
                       <Link to="/login" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-full">
+                        <Button variant="outline" className="w-full text-center rounded-xl">
                           Log in
                         </Button>
                       </Link>
                       <Link to="/signup" className="w-full">
-                        <Button className="w-full text-center bg-yellow-500 hover:bg-yellow-600 rounded-full">
-                          Sign up
+                        <Button className="w-full text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">
+                          Get Started Free
                         </Button>
                       </Link>
                     </div>
@@ -81,23 +89,23 @@ export const Navigation = () => {
                     <div className="flex flex-col space-y-3">
                       <div className="text-sm text-gray-600 mb-2">Hi, {userDisplayName}</div>
                       <Link to="/profile" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <UserCircle className="h-4 w-4" /> Profile
                         </Button>
                       </Link>
                       <Link to="/settings" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <Settings className="h-4 w-4" /> Settings
                         </Button>
                       </Link>
                       <Link to="/past-workshops" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-full flex items-center gap-2">
+                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <BookOpen className="h-4 w-4" /> Past Workshops
                         </Button>
                       </Link>
-                      <Button 
-                        variant="outline" 
-                        className="w-full text-center rounded-full"
+                      <Button
+                        variant="outline"
+                        className="w-full text-center rounded-xl"
                         onClick={logout}
                       >
                         Log out
@@ -110,33 +118,25 @@ export const Navigation = () => {
           ) : (
             <div className="hidden md:flex items-center space-x-8">
               {isAuthenticated && (
-                <Link to="/my-facilitators" className={`${location.pathname.includes('/my-facilitators') ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
+                <Link to="/my-facilitators" className={navLinkClass('/my-facilitators')}>
                   My Facilitators
                 </Link>
               )}
-              <Link to="/" className={`${location.pathname === '/' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
-                Home
-              </Link>
-              <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
-                Pricing
-              </Link>
-              <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
-                FAQs
-              </Link>
-              <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-yellow-500 font-medium' : 'text-gray-600'} hover:text-yellow-500`}>
-                Contact Us
-              </Link>
-              
+              <Link to="/" className={navLinkClass('/')}>Home</Link>
+              <Link to="/pricing" className={navLinkClass('/pricing')}>Pricing</Link>
+              <Link to="/faqs" className={navLinkClass('/faqs')}>FAQs</Link>
+              <Link to="/contact" className={navLinkClass('/contact')}>Contact</Link>
+
               {isAuthenticated ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">Hi, {userDisplayName}</span>
+                  <span className="text-sm text-gray-500">Hi, {userDisplayName}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2 rounded-full">
+                      <Button variant="outline" className="gap-2 rounded-xl text-sm border-gray-200 hover:border-indigo-300 hover:text-indigo-600">
                         My Account <ChevronDown className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 bg-white">
+                    <DropdownMenuContent align="end" className="w-48 bg-white rounded-xl shadow-lg border-gray-100">
                       <DropdownMenuItem asChild>
                         <Link to="/profile" className="flex items-center gap-2">
                           <UserCircle className="h-4 w-4" /> Profile
@@ -159,12 +159,14 @@ export const Navigation = () => {
                   </DropdownMenu>
                 </div>
               ) : (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <Link to="/login">
-                    <Button variant="outline" className="rounded-full">Log in</Button>
+                    <Button variant="ghost" className="rounded-xl text-sm text-gray-600 hover:text-indigo-600">Log in</Button>
                   </Link>
                   <Link to="/signup">
-                    <Button className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Sign up</Button>
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 rounded-xl text-sm font-semibold px-5 shadow-sm shadow-indigo-500/20">
+                      Get Started Free
+                    </Button>
                   </Link>
                 </div>
               )}

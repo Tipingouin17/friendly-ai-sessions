@@ -11,6 +11,8 @@ interface SessionQrManagerProps {
   joinUrl: string;
   currentParticipantCount: number;
   maxParticipants: number;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
 }
 
 const SessionQrManager: React.FC<SessionQrManagerProps> = ({
@@ -21,7 +23,8 @@ const SessionQrManager: React.FC<SessionQrManagerProps> = ({
   setIsQrDialogOpen,
   joinUrl,
   currentParticipantCount,
-  maxParticipants
+  maxParticipants,
+  joinToken
 }) => {
   // Only render for admin users, return null for participants
   if (!isAdmin) return null;
@@ -35,6 +38,7 @@ const SessionQrManager: React.FC<SessionQrManagerProps> = ({
       joinUrl={joinUrl}
       currentParticipantCount={currentParticipantCount}
       maxParticipants={maxParticipants}
+      joinToken={joinToken}
     />
   );
 };

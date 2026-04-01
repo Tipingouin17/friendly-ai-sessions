@@ -93,6 +93,23 @@ function getToken(): string | null {
   return loadSession()?.access_token ?? null;
 }
 
+// ─── Join token store (for unauthenticated participants) ─────────────────────
+// Participants store their session join token here after joining.
+// It is automatically included in REST API requests as X-Join-Token.
+const JOIN_TOKEN_KEY = "mf_join_token";
+
+export function setJoinToken(token: string): void {
+  sessionStorage.setItem(JOIN_TOKEN_KEY, token);
+}
+
+export function clearJoinToken(): void {
+  sessionStorage.removeItem(JOIN_TOKEN_KEY);
+}
+
+function getJoinToken(): string | null {
+  return sessionStorage.getItem(JOIN_TOKEN_KEY);
+}
+
 // ─── HTTP helper ──────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(
@@ -101,12 +118,14 @@ async function apiFetch<T>(
 ): Promise<ApiResponse<T>> {
   try {
     const token = getToken();
+    const joinToken = getJoinToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       apikey: ANON_KEY,
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
 
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
@@ -311,12 +330,14 @@ class QueryBuilder<T = Record<string, unknown>> {
 
   private async exec(): Promise<ApiResponse<T | T[]>> {
     const token = getToken();
+    const joinToken = getJoinToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       apikey: ANON_KEY,
       ...this.xHeaders(),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("GET")}`, { headers });
       let count: number | null = null;
@@ -351,8 +372,10 @@ class QueryBuilder<T = Record<string, unknown>> {
 
   async head(): Promise<ApiResponse<null>> {
     const token = getToken();
+    const joinToken = getJoinToken();
     const headers: Record<string, string> = { apikey: ANON_KEY, ...this.xHeaders() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("HEAD")}`, { method: "HEAD", headers });
       let count: number | null = null;

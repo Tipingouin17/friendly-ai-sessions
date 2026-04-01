@@ -6,12 +6,15 @@ import { Copy, CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import ParticipantCounter from './ParticipantCounter';
 import StartSessionButton from './admin/StartSessionButton';
+import { buildJoinUrl } from '@/utils/joinUrl';
 
 interface AdminQrViewProps {
   conversationId: number;
   currentParticipantCount: number;
   maxParticipants: number;
   facilitatorTitle?: string;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
   onStartSession: () => void;
   onSessionFull: () => void;
 }
@@ -21,6 +24,7 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
   currentParticipantCount,
   maxParticipants,
   facilitatorTitle,
+  joinToken,
   onStartSession,
   onSessionFull
 }) => {
@@ -30,9 +34,8 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
   const isMobile = window.innerWidth < 768;
 
   useEffect(() => {
-    const baseUrl = window.location.origin;
-    setSessionLink(`${baseUrl}/join-session?id=${conversationId}`);
-  }, [conversationId]);
+    setSessionLink(buildJoinUrl(conversationId, joinToken));
+  }, [conversationId, joinToken]);
 
   const copyToClipboard = useCallback(() => {
     navigator.clipboard.writeText(sessionLink)

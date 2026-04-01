@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { QrCode, Share2, Copy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { buildJoinUrl } from '@/utils/joinUrl';
 
 interface SessionJoinInfoProps {
   conversationId: number | null;
@@ -10,6 +11,8 @@ interface SessionJoinInfoProps {
   maxParticipants: number;
   onSessionFull?: () => void;
   isAdmin?: boolean;
+  /** UUID join token from the conversations table — required for secure join URLs */
+  joinToken?: string | null;
 }
 
 const SessionJoinInfo = ({ 
@@ -17,7 +20,8 @@ const SessionJoinInfo = ({
   currentParticipantCount = 0, 
   maxParticipants = 0,
   onSessionFull,
-  isAdmin = false
+  isAdmin = false,
+  joinToken
 }: SessionJoinInfoProps) => {
   const { toast } = useToast();
   const [displayParticipantCount, setDisplayParticipantCount] = useState(currentParticipantCount);
@@ -37,9 +41,8 @@ const SessionJoinInfo = ({
   // Early return AFTER all hooks have been called
   if (!isAdmin || !conversationId) return null;
   
-  // Generate join URL
-  const baseUrl = window.location.origin;
-  const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
+  // Generate secure join URL (includes join_token to prevent enumeration)
+  const joinUrl = buildJoinUrl(conversationId, joinToken);
   
   const copyToClipboard = () => {
     navigator.clipboard.writeText(joinUrl);

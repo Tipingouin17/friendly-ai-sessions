@@ -188,14 +188,15 @@ const HostHeader: React.FC<HostHeaderProps> = ({
 
             {/* Analytics Button */}
             {conversation?.id && (
-              <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Analytics</span>
-                  </Button>
-                </CollapsibleTrigger>
-              </Collapsible>
+              <Button
+                variant={analyticsOpen ? "default" : "outline"}
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => setAnalyticsOpen(prev => !prev)}
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </Button>
             )}
 
             {/* Wrap Up Button - only show if session has started */}
@@ -245,17 +246,15 @@ const HostHeader: React.FC<HostHeaderProps> = ({
         </div>
 
         {/* Analytics Dashboard */}
-        {conversation?.id && (
-          <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-            <CollapsibleContent className="px-6 pb-4">
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <SessionAnalyticsDashboard
-                  conversationId={conversation.id}
-                  className="bg-white rounded-md"
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+        {conversation?.id && analyticsOpen && (
+          <div className="px-6 pb-4">
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <SessionAnalyticsDashboard
+                conversationId={conversation.id}
+                className="bg-white rounded-md"
+              />
+            </div>
+          </div>
         )}
       </div>
 

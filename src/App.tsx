@@ -85,7 +85,11 @@ function App() {
                 <SessionHost />
               </ProtectedHostRoute>
             } />
-            <Route path="/session/report/:id" element={<SessionReport />} />
+            <Route path="/session/report/:id" element={
+              <ProtectedRoute>
+                <SessionReport />
+              </ProtectedRoute>
+            } />
             <Route path="/join-session" element={<JoinSession />} />
 
             {/* Protected admin route */}

@@ -17,14 +17,14 @@ export const getParticipantColor = (participantName: string) => {
   return colorPalette[Math.abs(hash) % colorPalette.length];
 };
 
-// Keep backwards compatibility for existing code
+// Participant color map keyed by plain numeric string ID (e.g. "1", "2", ...)
 export const participantColors: { [key: string]: string } = {
-  P1: colorPalette[0],
-  P2: colorPalette[1],
-  P3: colorPalette[2],
-  P4: colorPalette[3],
-  P5: colorPalette[4],
-  P6: colorPalette[5],
-  P7: colorPalette[6],
-  P8: colorPalette[7],
+  "1": colorPalette[0],
+  "2": colorPalette[1],
+  "3": colorPalette[2],
+  "4": colorPalette[3],
+  "5": colorPalette[4],
+  "6": colorPalette[5],
+  "7": colorPalette[6],
+  "8": colorPalette[7],
 };

@@ -136,7 +136,7 @@ export function useAdminMessages({
             }
             
             if ('participant_id' in msg.content) {
-              participantId = `P${msg.content.participant_id}`;
+              participantId = String(msg.content.participant_id);
             }
             
             if ('isPinned' in msg.content) {
@@ -214,7 +214,7 @@ export function useAdminMessages({
               sender: newMsg.role === 'user' ? 'user' : 'assistant',
               timestamp: new Date(newMsg.created_at),
               isAnonymous: newMsg.is_anonymous,
-              participant: newMsg.participant_id ? `P${newMsg.participant_id}` : undefined,
+              participant: newMsg.participant_id != null ? String(newMsg.participant_id) : undefined,
               isPinned: newMsg.content?.isPinned || false,
               isAdminMessage: newMsg.role === 'admin',
               recipientId: newMsg.content?.recipientId

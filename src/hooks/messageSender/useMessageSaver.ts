@@ -31,7 +31,7 @@ export const useMessageSaver = () => {
     const urlParticipantId = urlParams.get('participantId');
     const effectiveParticipantId = currentParticipant || (urlParticipantId ? parseInt(urlParticipantId, 10) : 0);
 
-    const currentParticipantKey = `P${effectiveParticipantId}`;
+    const currentParticipantKey = String(effectiveParticipantId);
 
     // Resolve participant name: use participantInfo, then URL name param, then fallback
     const urlName = urlParams.get('name') || undefined;

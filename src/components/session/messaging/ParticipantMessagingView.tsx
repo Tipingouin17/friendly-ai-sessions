@@ -112,7 +112,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           <MessageList 
             messages={filteredMessages} 
             participantColors={participantColors}
-            currentParticipant={`P${effectiveParticipantId}`}
+            currentParticipant={String(effectiveParticipantId)}
             isWaitingForResponse={isWaitingForResponse}
             isWaitingForResponses={isWaitingForResponses}
             responseCount={responseCount}

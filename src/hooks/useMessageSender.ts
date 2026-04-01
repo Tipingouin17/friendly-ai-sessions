@@ -102,7 +102,7 @@ export const useMessageSender = ({
     }
 
     const currentParticipant = sessionState.currentParticipant;
-    const currentParticipantKey = `P${currentParticipant}`;
+    const currentParticipantKey = String(currentParticipant);
     const participantInfo = participants.find(p => p.id === currentParticipant);
     const messageStartTime = performance.now();
     

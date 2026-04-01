@@ -40,7 +40,7 @@ const SessionHost = () => {
   // Generate participant colors mapping
   const participantColors = useMemo(() => {
     return (participants || []).reduce((colors, participant) => {
-      colors[`P${participant.id}`] = getParticipantColor(`P${participant.id}`);
+      colors[String(participant.id)] = getParticipantColor(String(participant.id));
       return colors;
     }, { /* no-op */ } as { [key: string]: string });
   }, [participants]);

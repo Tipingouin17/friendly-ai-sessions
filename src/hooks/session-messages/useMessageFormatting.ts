@@ -34,7 +34,7 @@ export const useMessageFormatting = ({ conversation }: UseMessageFormattingProps
         }
         
         if ('participant_id' in contentObj) {
-          participantId = `P${contentObj.participant_id}`;
+          participantId = String(contentObj.participant_id);
         }
         
         if ('likes' in contentObj && Array.isArray(contentObj.likes)) {

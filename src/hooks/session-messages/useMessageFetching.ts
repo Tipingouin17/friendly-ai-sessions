@@ -69,7 +69,7 @@ export const useMessageFetching = ({
         content: typeof msg.content === 'string' ? msg.content : (msg.content && typeof msg.content === 'object' && 'text' in msg.content ? String(msg.content.text) : ''),
         sender: msg.role === 'assistant' ? 'assistant' : 'user',
         timestamp: new Date(msg.created_at),
-        participant: msg.participant_id ? `P${msg.participant_id}` : undefined,
+        participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
         name: msg.name || undefined,
         avatar: typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content) && 'avatar' in msg.content ? String(msg.content.avatar) : undefined,
         role: msg.role || 'user'

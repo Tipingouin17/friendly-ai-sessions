@@ -86,7 +86,7 @@ const MessagingArea = ({
     // Check if we're in participant view
     if (viewMode === "participant" && !isAdmin) {
       // Log participant filtering information for debugging
-      const participantKey = `P${currentParticipant}`;
+      const participantKey = String(currentParticipant);
       const userMsgCount = messages.filter(m => m.sender === "user" && m.participant === participantKey).length;
       const facilitatorMsgCount = messages.filter(m => m.sender === "assistant").length;
       const otherMsgCount = messages.length - userMsgCount - facilitatorMsgCount;

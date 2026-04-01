@@ -68,7 +68,7 @@ export const useParticipantResponses = ({
   useEffect(() => {
     if (currentUserParticipantId) {
       const hasUserResponded = messages.some(message => 
-        message.participant === `P${currentUserParticipantId}` && 
+        message.participant === String(currentUserParticipantId) && 
         message.sender === "user"
       );
       
@@ -100,7 +100,7 @@ export const useParticipantResponses = ({
         if (message.id === lastMessage.id) {
           // Check if there are any participant messages after this facilitator message
           return messages.slice(index + 1).some(m => 
-            m.participant === `P${currentUserParticipantId}` && 
+            m.participant === String(currentUserParticipantId) && 
             m.sender === "user"
           );
         }

@@ -24,6 +24,8 @@ interface SimplifiedHostMessagingViewProps {
   isAutoStarting?: boolean;
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
+  isSessionEnded?: boolean;
+  isSessionPaused?: boolean;
 }
 
 const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = ({
@@ -41,8 +43,12 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   conversationId,
   isAutoStarting = false,
   autoStartCountdown = 0,
-  onCancelAutoStart
+  onCancelAutoStart,
+  isSessionEnded = false,
+  isSessionPaused = false,
 }) => {
+  const sessionStatus = isSessionEnded ? 'Ended' : isSessionPaused ? 'Paused' : 'Active';
+  const statusColor = isSessionEnded ? 'text-red-600' : isSessionPaused ? 'text-yellow-600' : 'text-orange-600';
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
@@ -142,8 +148,17 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
             </div>
           </div>
           
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            Session Active
+          <Badge
+            variant="default"
+            className={
+              isSessionEnded
+                ? 'bg-red-100 text-red-800'
+                : isSessionPaused
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-green-100 text-green-800'
+            }
+          >
+            Session {sessionStatus}
           </Badge>
         </div>
       </div>
@@ -168,14 +183,14 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">{facilitatorMessages.length}</div>
-                    <div className="text-sm text-gray-600">Questions</div>
+                    <div className="text-sm text-gray-600">AI Messages</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">{participantMessages.length}</div>
                     <div className="text-sm text-gray-600">Responses</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">Active</div>
+                    <div className={`text-2xl font-bold ${statusColor}`}>{sessionStatus}</div>
                     <div className="text-sm text-gray-600">Status</div>
                   </div>
                 </div>

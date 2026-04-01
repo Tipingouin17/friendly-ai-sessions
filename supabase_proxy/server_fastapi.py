@@ -1005,12 +1005,22 @@ async def edge_function(func_name: str, request: Request):
         avatar_url = ""
         facilitator_language = None
 
+        # Map ISO 639-1 language codes to full names for the AI instruction
+        LANGUAGE_CODE_MAP = {
+            "en": "English", "fr": "French", "es": "Spanish", "de": "German",
+            "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "pl": "Polish",
+            "ru": "Russian", "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
+            "ar": "Arabic", "hi": "Hindi", "tr": "Turkish", "sv": "Swedish",
+            "da": "Danish", "fi": "Finnish", "nb": "Norwegian", "cs": "Czech",
+        }
+
         if conv_id:
             try:
                 conn = get_db()
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT c.id, s.title, s.facilitator, s.objective, s.prompt, "
+                    "SELECT c.id, c.language as conversation_language, "
+                    "s.title, s.facilitator, s.objective, s.prompt, "
                     "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
                     "f.title as facilitator_name, f.details as facilitator_details, "
                     "f.profile_picture, f.languages as facilitator_languages "
@@ -1035,11 +1045,19 @@ async def edge_function(func_name: str, request: Request):
                     pp = row.get("profile_picture") or ""
                     if pp:
                         avatar_url = f"/storage/v1/object/public/facilitator-avatars/{pp}"
-                    langs = row.get("facilitator_languages")
-                    if langs and isinstance(langs, list) and len(langs) > 0:
-                        facilitator_language = langs[0]
-                    elif langs and isinstance(langs, str) and langs.strip():
-                        facilitator_language = langs.strip()
+                    # Priority 1: use the conversation's chosen language (ISO code → full name)
+                    conv_lang_code = (row.get("conversation_language") or "").strip().lower()
+                    if conv_lang_code and conv_lang_code != "en":
+                        facilitator_language = LANGUAGE_CODE_MAP.get(conv_lang_code, conv_lang_code.capitalize())
+                    elif conv_lang_code == "en":
+                        facilitator_language = "English"  # explicit English — still set so instruction is clear
+                    else:
+                        # Fallback: use first language from facilitator's supported languages
+                        langs = row.get("facilitator_languages")
+                        if langs and isinstance(langs, list) and len(langs) > 0:
+                            facilitator_language = langs[0]
+                        elif langs and isinstance(langs, str) and langs.strip():
+                            facilitator_language = langs.strip()
                 conn.close()
             except Exception as e:
                 print(f"Error fetching session context: {e}")

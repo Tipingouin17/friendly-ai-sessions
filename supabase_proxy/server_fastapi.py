@@ -270,6 +270,8 @@ def _parse_select(select_str: str):
     """
     if not select_str or select_str == "*":
         return ["*"], []
+    # Normalize whitespace (template literals may have newlines/spaces)
+    select_str = re.sub(r'\s+', ' ', select_str).strip()
     cols, joins = [], []
     for part in _split_top_level(select_str):
         if "(" in part:

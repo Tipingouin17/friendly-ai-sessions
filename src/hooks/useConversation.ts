@@ -119,10 +119,10 @@ export const useConversation = (conversationId: number | null) => {
     enabled: !!conversationId,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 30000, // 30 seconds
-    gcTime: 300000, // 5 minutes
+    staleTime: 0, // Always refetch fresh data (joins must be current)
+    gcTime: 60000, // 1 minute
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
+    refetchOnMount: 'always',
     refetchOnReconnect: true,
     refetchInterval: (queryData) => {
       // Only poll every 30 seconds for active admin sessions

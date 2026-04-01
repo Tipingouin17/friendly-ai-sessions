@@ -131,15 +131,23 @@ const Pricing = () => {
   const enterprisePlan = plans.find(plan => plan.title === 'Enterprise');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-24 pb-16">
-      <PageHead title="Pricing" description="Choose the right plan for your AI-powered workshop facilitation needs." />
-      <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-4xl font-bold mb-4">Choose the Right Plan for Your Needs</h1>
-          <p className="text-lg text-gray-600">
-            Whether you're just starting out or looking to scale, we have a plan that's right for you.
-          </p>
+    <div className="min-h-screen bg-white pt-24 pb-16">
+      <PageHead title="Pricing | MyFacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
+      {/* Hero */}
+      <div className="bg-gradient-to-b from-indigo-50 to-white pb-12 px-4">
+        <div className="container mx-auto">
+          <div className="text-center max-w-3xl mx-auto pt-8">
+            <span className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
+              Simple, transparent pricing
+            </span>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">Choose the right plan for your team</h1>
+            <p className="text-lg text-gray-500">
+              Start free, scale as you grow. No hidden fees, cancel anytime.
+            </p>
+          </div>
         </div>
+      </div>
+      <div className="container mx-auto px-4">
 
         {/* Only show limited time offer for Free and Starter plans */}
         {currentPlanId && currentPlanId < 3 && (

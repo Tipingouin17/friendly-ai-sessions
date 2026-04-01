@@ -30,16 +30,16 @@ export default {
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: "#FFD54F",
-          foreground: "#1A1F2C",
+          DEFAULT: "#EEF2FF",
+          foreground: "#4F46E5",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "#FEF7CD",
-          foreground: "#1A1F2C",
+          DEFAULT: "#EEF2FF",
+          foreground: "#4F46E5",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",

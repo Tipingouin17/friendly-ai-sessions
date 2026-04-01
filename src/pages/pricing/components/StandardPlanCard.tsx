@@ -26,13 +26,10 @@ export const StandardPlanCard = ({
 
   const getCurrencySymbol = (currency: string) => {
     switch (currency.toUpperCase()) {
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
       case 'USD':
-      default:
-        return '$';
+      default: return '$';
     }
   };
 
@@ -44,7 +41,6 @@ export const StandardPlanCard = ({
 
   const isPlanPopular = plan.is_popular;
 
-  // Get icon for feature type
   const getFeatureIcon = (feature: string) => {
     if (feature.includes('facilitator')) return <Users className="h-4 w-4" />;
     if (feature.includes('session') && !feature.includes('question')) return <Calendar className="h-4 w-4" />;
@@ -62,172 +58,134 @@ export const StandardPlanCard = ({
   const getFeatureList = (): string[] => {
     const features: string[] = [];
     const restrictions = plan.plan_table_details;
-
     if (!restrictions) return features;
 
-    // Facilitator limit
     if (restrictions.facilitator_limit) {
       const isUnlimited = restrictions.facilitator_limit >= 999999;
-      features.push(isUnlimited
-        ? 'Unlimited facilitators'
-        : `${restrictions.facilitator_limit} ${restrictions.facilitator_limit === 1 ? 'facilitator' : 'facilitators'}`
-      );
+      features.push(isUnlimited ? 'Unlimited facilitators' : `${restrictions.facilitator_limit} ${restrictions.facilitator_limit === 1 ? 'facilitator' : 'facilitators'}`);
     }
-
-    // Session limit
     if (restrictions.session_limit) {
       const isUnlimited = restrictions.session_limit >= 999999;
-      features.push(isUnlimited
-        ? 'Unlimited sessions per month'
-        : `${restrictions.session_limit} ${restrictions.session_limit === 1 ? 'session' : 'sessions'} per month`
-      );
+      features.push(isUnlimited ? 'Unlimited sessions per month' : `${restrictions.session_limit} sessions per month`);
     }
-
-    // Max participants
     if (restrictions.max_participants) {
       const isUnlimited = restrictions.max_participants >= 999999;
-      features.push(isUnlimited
-        ? 'Unlimited participants per session'
-        : `Up to ${restrictions.max_participants} participants per session`
-      );
+      features.push(isUnlimited ? 'Unlimited participants per session' : `Up to ${restrictions.max_participants} participants per session`);
     }
-
-    // Question limit
     if (restrictions.question_limit) {
       const isUnlimited = restrictions.question_limit >= 999999;
-      features.push(isUnlimited
-        ? 'Unlimited questions per session'
-        : `Up to ${restrictions.question_limit} questions per session`
-      );
+      features.push(isUnlimited ? 'Unlimited questions per session' : `Up to ${restrictions.question_limit} questions per session`);
     }
-
-    // Additional features
-    if (restrictions.customisable_sessions) {
-      features.push('Customizable sessions');
-    }
-
-    if (restrictions.customisable_facilitators) {
-      features.push('Customizable facilitators');
-    }
-
-    if (restrictions.saved_sessions) {
-      features.push('Save sessions');
-    }
-
-    if (restrictions.session_reports) {
-      features.push('Detailed session reports');
-    }
-
-    if (restrictions.data_export) {
-      features.push('Export session data');
-    }
-
-    if (restrictions.priority_support) {
-      features.push('Priority support');
-    }
-
-    if (restrictions.custom_branding) {
-      features.push('Custom branding');
-    }
+    if (restrictions.customisable_sessions) features.push('Customizable sessions');
+    if (restrictions.customisable_facilitators) features.push('Customizable facilitators');
+    if (restrictions.saved_sessions) features.push('Save sessions');
+    if (restrictions.session_reports) features.push('Detailed session reports');
+    if (restrictions.data_export) features.push('Export session data');
+    if (restrictions.priority_support) features.push('Priority support');
+    if (restrictions.custom_branding) features.push('Custom branding');
 
     return features;
   };
 
   const planFeatures = getFeatureList();
+  const isFree = Number(plan.price) === 0;
 
   return (
     <div
       className={`
-        glass-card p-8 rounded-2xl relative min-h-[700px] flex flex-col
+        relative rounded-2xl flex flex-col min-h-[680px]
         transition-all duration-300 ease-out
-        hover:scale-105 hover:shadow-2xl
-        ${isPlanPopular ? 'ring-2 ring-primary shadow-xl' : 'hover:ring-2 hover:ring-primary/50'}
-        ${isCurrentPlan ? 'ring-2 ring-green-500' : ''}
+        hover:-translate-y-1 hover:shadow-xl
         animate-fade-in-up
+        ${isPlanPopular
+          ? 'bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-xl shadow-indigo-500/30 ring-0'
+          : 'bg-white border border-gray-100 shadow-sm hover:border-indigo-100'
+        }
+        ${isCurrentPlan && !isPlanPopular ? 'ring-2 ring-indigo-500' : ''}
       `}
-      style={{
-        animationDelay: `${index * 100}ms`,
-        animationFillMode: 'backwards'
-      }}
+      style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
     >
+      {/* Badges */}
       {isPlanPopular && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 animate-pulse">
-          <span className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-4 py-1 rounded-full text-sm font-medium shadow-lg">
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+          <span className="bg-white text-indigo-700 px-4 py-1 rounded-full text-sm font-semibold shadow-lg border border-indigo-100">
             ⭐ Most Popular
           </span>
         </div>
       )}
-
       {isCurrentPlan && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-          <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-medium shadow-lg">
+          <span className="bg-emerald-500 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
             ✓ Current Plan
           </span>
         </div>
       )}
 
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
-        {/* plan_type often duplicates title, only show if different */}
-        {plan.plan_type && plan.plan_type !== plan.title && (
-          <p className="text-muted-foreground">{plan.plan_type}</p>
-        )}
-      </div>
+      <div className="p-8 flex flex-col flex-1">
+        {/* Plan name */}
+        <div className="mb-6">
+          <h3 className={`text-xl font-bold mb-1 ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
+            {plan.title}
+          </h3>
+          <p className={`text-sm ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>
+            {isFree ? 'Perfect to get started' : isPlanPopular ? 'Best for growing teams' : 'For power users'}
+          </p>
+        </div>
 
-      <div className="text-center mb-8">
-        {Number(plan.price) === 0 ? (
-          <div>
-            <div className="text-6xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              Free
+        {/* Price */}
+        <div className="mb-8">
+          {isFree ? (
+            <div>
+              <div className={`text-5xl font-extrabold ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>Free</div>
+              <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>forever</div>
             </div>
-            <div className="text-muted-foreground mt-1">/month</div>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-center">
-              <span className="text-yellow-500 text-2xl mr-1">
-                {getCurrencySymbol(plan.currency || 'USD')}
-              </span>
-              <span className="text-6xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 bg-clip-text text-transparent">
-                {formatDisplayPrice(plan.price)}
-              </span>
-            </div>
-            <div className="text-muted-foreground mt-1">/month</div>
-          </>
-        )}
-      </div>
-
-      <div className="flex-grow">
-        <ul className="space-y-4 text-left">
-          {planFeatures.map((feature, featureIndex) => (
-            <li
-              key={featureIndex}
-              className="flex items-start gap-3 animate-fade-in-left"
-              style={{
-                animationDelay: `${(index * 100) + (featureIndex * 50)}ms`,
-                animationFillMode: 'backwards'
-              }}
-            >
-              <div className="text-yellow-500 mt-0.5 flex-shrink-0">
-                {getFeatureIcon(feature)}
+          ) : (
+            <div>
+              <div className="flex items-end gap-1">
+                <span className={`text-2xl font-bold ${isPlanPopular ? 'text-indigo-200' : 'text-gray-500'}`}>
+                  {getCurrencySymbol(plan.currency || 'USD')}
+                </span>
+                <span className={`text-5xl font-extrabold leading-none ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
+                  {formatDisplayPrice(plan.price)}
+                </span>
               </div>
-              <span className="text-sm">{feature}</span>
+              <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>/month</div>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className={`mb-6 h-px ${isPlanPopular ? 'bg-indigo-500' : 'bg-gray-100'}`} />
+
+        {/* Features */}
+        <ul className="space-y-3 flex-1">
+          {planFeatures.map((feature, featureIndex) => (
+            <li key={featureIndex} className="flex items-start gap-3">
+              <div className={`mt-0.5 flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full ${
+                isPlanPopular ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600'
+              }`}>
+                <Check className="h-3 w-3" />
+              </div>
+              <span className={`text-sm ${isPlanPopular ? 'text-indigo-100' : 'text-gray-600'}`}>{feature}</span>
             </li>
           ))}
         </ul>
-      </div>
 
-      <Button
-        className={`
-          w-full mt-8 transition-all duration-300
-          ${isPlanPopular || !isCurrentPlan ? 'bg-yellow-500 hover:bg-yellow-600 text-black hover:scale-105' : ''}
-          ${isCurrentPlan ? 'hover:scale-105' : ''}
-        `}
-        variant={isCurrentPlan ? "outline" : "default"}
-        onClick={handleGetStarted}
-      >
-        {isCurrentPlan ? "Manage Plan" : "Get Started"}
-      </Button>
+        {/* CTA */}
+        <Button
+          className={`w-full mt-8 py-5 font-semibold rounded-xl transition-all ${
+            isPlanPopular
+              ? 'bg-white text-indigo-700 hover:bg-indigo-50 shadow-lg'
+              : isCurrentPlan
+              ? 'border-2 border-indigo-200 text-indigo-600 bg-transparent hover:bg-indigo-50'
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-500/20'
+          }`}
+          variant={isCurrentPlan && !isPlanPopular ? "outline" : "default"}
+          onClick={handleGetStarted}
+        >
+          {isCurrentPlan ? "Manage Plan" : isFree ? "Get Started Free" : "Get Started"}
+        </Button>
+      </div>
     </div>
   );
 };

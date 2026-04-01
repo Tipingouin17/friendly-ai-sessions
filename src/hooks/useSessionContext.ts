@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ConversationWithSession } from "@/types/database";
 import { Message } from "@/types/chat";
 
@@ -22,6 +22,9 @@ export const useSessionContext = ({
   onError
 }: UseSessionContextProps) => {
   const [error, setError] = useState<string | null>(null);
+  // Use a ref for onError to avoid re-triggering the effect when the callback reference changes
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
   
   // Track session start status
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -33,20 +36,20 @@ export const useSessionContext = ({
     }
   }, [isSessionStartedInDB]);
   
-  // Handle errors
+  // Handle errors — use ref so this only fires once per unique error value
   useEffect(() => {
-    if (error && onError) {
+    if (error && onErrorRef.current) {
       console.error("Session context error:", error);
-      onError(error);
+      onErrorRef.current(error);
     }
-  }, [error, onError]);
+  }, [error]);
   
   // Check if session has ended
   useEffect(() => {
     if (conversation?.is_session_ended) {
       setError("This session has ended and is no longer available");
     }
-  }, [conversation]);
+  }, [conversation?.is_session_ended]);
   
   return {
     isSessionActive,

@@ -184,6 +184,13 @@ export const useWelcomeMessageMonitor = ({
       }
 
       // If we're past 40% of attempts and no AI message found, trigger AI generation
+      // But first check if ANY message already exists (even non-AI) to avoid double-triggering
+      const anyMessageExists = await checkForWelcomeMessage(false);
+      if (anyMessageExists) {
+        // A message exists but isn't AI-quality yet — just wait for it
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        continue;
+      }
       if (attempt === Math.floor(maxRetries * 0.4) + 1) {
         
         try {

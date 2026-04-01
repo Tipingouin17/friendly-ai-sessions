@@ -63,11 +63,19 @@ export const useEnhancedSessionMessages = ({
         role: msg.role || 'user'
       }));
 
+      // Deduplicate by ID before updating state (prevents duplicate rows from multiple triggers)
+      const seen = new Set<string>();
+      const deduped = formattedMessages.filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+
       setMessages(prev => {
         // Only update if messages have actually changed
-        if (prev.length !== formattedMessages.length || 
-            prev.some((msg, i) => msg.id !== formattedMessages[i]?.id)) {
-          return formattedMessages;
+        if (prev.length !== deduped.length || 
+            prev.some((msg, i) => msg.id !== deduped[i]?.id)) {
+          return deduped;
         }
         return prev;
       });
@@ -115,16 +123,8 @@ export const useEnhancedSessionMessages = ({
     }
   }, [conversationId, conversation, fetchMessages, messages.length]);
 
-  // Force fetch for participants to ensure immediate message visibility
-  useEffect(() => {
-    if (conversationId && !isAdmin) {
-      const timer = setTimeout(() => {
-        fetchMessages(true);
-      }, 1500); // Slight delay to allow any pending operations
-      
-      return () => clearTimeout(timer);
-    }
-  }, [conversationId, isAdmin, fetchMessages]);
+  // NOTE: Removed redundant delayed participant fetch (was causing duplicate renders).
+  // The initial fetch + realtime subscription already covers this case.
 
   // Connection recovery mechanism
   useEffect(() => {

@@ -32,21 +32,29 @@ export const FacilitatorCarousel = ({
   userPlanId,
 }: FacilitatorCarouselProps) => {
   const [startIndex, setStartIndex] = useState(0);
-  const itemsToShow = 4;
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const itemsToShow = windowWidth < 480 ? 2 : windowWidth < 768 ? 3 : 4;
 
   useEffect(() => {
     if (startIndex > 0 && startIndex >= facilitators.length - itemsToShow) {
       setStartIndex(Math.max(0, facilitators.length - itemsToShow));
     }
-  }, [facilitators, startIndex]);
+  }, [facilitators, startIndex, itemsToShow]);
 
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
   };
 
   const handleNext = () => {
-    setStartIndex(Math.min(facilitators.length - itemsToShow, startIndex + 1));
+    setStartIndex(Math.min(Math.max(0, facilitators.length - itemsToShow), startIndex + 1));
   };
 
   const getAvatarUrl = (facilitator: Facilitator) => {

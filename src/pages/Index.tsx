@@ -17,7 +17,7 @@ const Index = () => {
             />
 
             {/* ── Hero Section ─────────────────────────────────────────── */}
-            <section className="relative pt-28 pb-24 px-4 overflow-hidden">
+            <section className="relative pt-28 pb-16 md:pb-24 px-4 overflow-hidden">
                 {/* Background gradient */}
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-violet-50 pointer-events-none" />
                 {/* Decorative orbs */}
@@ -32,7 +32,7 @@ const Index = () => {
                     </span>
 
                     {/* Headline */}
-                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-[1.1] tracking-tight text-center">
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-[1.1] tracking-tight text-center">
                         <span className="text-gray-900">Run Better</span>
                         <br />
                         <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent">
@@ -41,26 +41,26 @@ const Index = () => {
                     </h1>
 
                     {/* Subheadline */}
-                    <p className="text-xl md:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center">
+                    <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center px-2">
                         Expert AI facilitators that guide your team through structured conversations, decisions, and outcomes — every time.
                     </p>
 
                     {/* CTAs */}
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                        <Link to="/signup">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10 px-4 sm:px-0">
+                        <Link to="/signup" className="w-full sm:w-auto">
                             <Button
                                 size="lg"
-                                className="text-base font-semibold px-8 py-6 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all rounded-xl"
+                                className="w-full sm:w-auto text-base font-semibold px-8 py-6 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all rounded-xl"
                             >
                                 Get Started Free
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
-                        <Link to="/pricing">
+                        <Link to="/pricing" className="w-full sm:w-auto">
                             <Button
                                 size="lg"
                                 variant="outline"
-                                className="text-base font-semibold px-8 py-6 border-2 border-gray-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all rounded-xl"
+                                className="w-full sm:w-auto text-base font-semibold px-8 py-6 border-2 border-gray-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all rounded-xl"
                             >
                                 View Pricing
                             </Button>
@@ -68,18 +68,18 @@ const Index = () => {
                     </div>
 
                     {/* Trust signals */}
-                    <p className="text-sm text-gray-400 mb-10">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Cancel anytime</p>
+                    <p className="text-sm text-gray-400 mb-8">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Cancel anytime</p>
 
-                    {/* Social proof stats */}
-                    <div className="inline-flex flex-wrap justify-center gap-8 px-8 py-5 rounded-2xl bg-white border border-gray-100 shadow-sm">
+                    {/* Social proof stats — 2×2 on mobile, 4-column on sm+ */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 px-4 py-5 rounded-2xl bg-white border border-gray-100 shadow-sm max-w-lg sm:max-w-none mx-auto">
                         {[
                             { value: '10,000+', label: 'Sessions run' },
                             { value: '500+', label: 'Teams worldwide' },
                             { value: '4.9 / 5', label: 'Average rating' },
                             { value: '98%', label: 'Satisfaction rate' },
                         ].map(({ value, label }) => (
-                            <div key={label} className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">{value}</div>
+                            <div key={label} className="text-center py-1">
+                                <div className="text-xl sm:text-2xl font-bold text-gray-900">{value}</div>
                                 <div className="text-xs text-gray-500 mt-0.5">{label}</div>
                             </div>
                         ))}
@@ -88,16 +88,16 @@ const Index = () => {
             </section>
 
             {/* ── Features Section ─────────────────────────────────────── */}
-            <section className="py-24 px-4 bg-white">
+            <section className="py-16 md:py-24 px-4 bg-white">
                 <div className="container mx-auto max-w-6xl">
-                    <div className="text-center mb-14">
+                    <div className="text-center mb-10 md:mb-14">
                         <span className="inline-block mb-3 text-sm font-semibold text-indigo-600 uppercase tracking-widest">What we do</span>
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">Everything you need to run great workshops</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
+                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">Everything you need to run great workshops</h2>
+                        <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto text-center px-2">
                             From expert AI facilitators to real-time collaboration and actionable reports — all in one platform.
                         </p>
                     </div>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
                         {[
                             {
                                 icon: <Sparkles className="h-6 w-6 text-indigo-600" />,
@@ -126,13 +126,13 @@ const Index = () => {
                         ].map(({ icon, bg, title, desc }) => (
                             <div
                                 key={title}
-                                className="group rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all duration-200"
+                                className="group rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all duration-200 flex flex-col items-center sm:items-start text-center sm:text-left"
                             >
                                 <div className={`mb-4 inline-flex items-center justify-center w-12 h-12 rounded-xl ${bg}`}>
                                     {icon}
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+                                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 text-center sm:text-left">{title}</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed text-center sm:text-left">{desc}</p>
                             </div>
                         ))}
                     </div>
@@ -140,16 +140,16 @@ const Index = () => {
             </section>
 
             {/* ── How It Works Section ─────────────────────────────────── */}
-            <section className="py-24 px-4 bg-gradient-to-b from-slate-50 to-white">
+            <section className="py-16 md:py-24 px-4 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto max-w-6xl">
-                    <div className="text-center mb-14">
+                    <div className="text-center mb-10 md:mb-14">
                         <span className="inline-block mb-3 text-sm font-semibold text-indigo-600 uppercase tracking-widest">Simple process</span>
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">From setup to insights in minutes</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
+                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">From setup to insights in minutes</h2>
+                        <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto text-center px-2">
                             No training required. Start your first AI-facilitated workshop in under 5 minutes.
                         </p>
                     </div>
-                    <div className="relative grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div className="relative grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
                         {/* Connector line (desktop only) */}
                         <div className="hidden lg:block absolute top-6 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-indigo-200 via-violet-200 to-indigo-200" />
                         {[
@@ -174,12 +174,12 @@ const Index = () => {
                                 desc: 'Get comprehensive reports with insights, action items, and next steps.',
                             },
                         ].map(({ step, title, desc }) => (
-                            <div key={step} className="relative flex flex-col items-start">
+                            <div key={step} className="relative flex flex-col items-center sm:items-start">
                                 <div className="relative mb-5 flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-500/30 z-10">
                                     {step}
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+                                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 text-center sm:text-left">{title}</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed text-center sm:text-left">{desc}</p>
                             </div>
                         ))}
                     </div>
@@ -187,16 +187,16 @@ const Index = () => {
             </section>
 
             {/* ── Benefits Section ─────────────────────────────────────── */}
-            <section className="py-24 px-4 bg-white">
+            <section className="py-16 md:py-24 px-4 bg-white">
                 <div className="container mx-auto max-w-6xl">
-                    <div className="text-center mb-14">
+                    <div className="text-center mb-10 md:mb-14">
                         <span className="inline-block mb-3 text-sm font-semibold text-indigo-600 uppercase tracking-widest">Why teams love us</span>
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">Built for teams that value results</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto text-center">
+                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">Built for teams that value results</h2>
+                        <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto text-center px-2">
                             MyFacilitator replaces expensive, inconsistent external facilitators with a scalable, always-available AI alternative.
                         </p>
                     </div>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
                         {[
                             {
                                 icon: <Clock className="h-5 w-5 text-indigo-600" />,
@@ -237,13 +237,13 @@ const Index = () => {
                         ].map(({ icon, bg, title, desc }) => (
                             <div
                                 key={title}
-                                className="flex gap-4 items-start rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-indigo-100 hover:-translate-y-0.5 transition-all duration-200"
+                                className="flex gap-4 items-start rounded-2xl border border-gray-100 bg-white p-5 md:p-6 shadow-sm hover:shadow-md hover:border-indigo-100 hover:-translate-y-0.5 transition-all duration-200"
                             >
                                 <div className={`flex-shrink-0 mt-0.5 flex items-center justify-center w-9 h-9 rounded-lg ${bg}`}>
                                     {icon}
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-semibold text-gray-900 mb-1">{title}</h3>
+                                    <h3 className="text-sm md:text-base font-semibold text-gray-900 mb-1">{title}</h3>
                                     <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
                                 </div>
                             </div>
@@ -253,13 +253,13 @@ const Index = () => {
             </section>
 
             {/* ── Testimonial / Trust Section ──────────────────────────── */}
-            <section className="py-20 px-4 bg-gradient-to-b from-slate-50 to-white">
+            <section className="py-16 md:py-20 px-4 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto max-w-5xl">
-                    <div className="text-center mb-12">
+                    <div className="text-center mb-10 md:mb-12">
                         <span className="inline-block mb-3 text-sm font-semibold text-indigo-600 uppercase tracking-widest">What teams say</span>
                         <h2 className="text-3xl font-bold text-gray-900 text-center">Trusted by teams worldwide</h2>
                     </div>
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5 md:gap-6">
                         {[
                             {
                                 quote: "MyFacilitator transformed how we run retrospectives. Our team is more engaged and we leave every session with clear action items.",
@@ -295,33 +295,33 @@ const Index = () => {
             </section>
 
             {/* ── CTA Section ──────────────────────────────────────────── */}
-            <section className="py-24 px-4 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700">
+            <section className="py-16 md:py-24 px-4 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700">
                 <div className="container mx-auto max-w-3xl text-center">
-                    <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 text-center">Ready to transform your workshops?</h2>
-                    <p className="text-lg text-indigo-200 mb-10 max-w-xl mx-auto text-center">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 text-center">Ready to transform your workshops?</h2>
+                    <p className="text-base md:text-lg text-indigo-200 mb-10 max-w-xl mx-auto text-center px-2">
                         Join thousands of teams already running more effective, engaging sessions with MyFacilitator.
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                        <Link to="/signup">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 px-4 sm:px-0">
+                        <Link to="/signup" className="w-full sm:w-auto">
                             <Button
                                 size="lg"
-                                className="text-base font-semibold px-10 py-6 bg-white text-indigo-700 hover:bg-indigo-50 border-0 shadow-xl shadow-indigo-900/30 transition-colors rounded-xl"
+                                className="w-full sm:w-auto text-base font-semibold px-10 py-6 bg-white text-indigo-700 hover:bg-indigo-50 border-0 shadow-xl shadow-indigo-900/30 transition-colors rounded-xl"
                             >
                                 Start Your Free Trial
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
-                        <Link to="/pricing">
+                        <Link to="/pricing" className="w-full sm:w-auto">
                             <Button
                                 size="lg"
                                 variant="outline"
-                                className="text-base font-semibold px-10 py-6 border-2 border-white/30 text-white hover:bg-white/10 transition-colors rounded-xl"
+                                className="w-full sm:w-auto text-base font-semibold px-10 py-6 border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 transition-colors rounded-xl"
                             >
                                 See Pricing
                             </Button>
                         </Link>
                     </div>
-                    <div className="flex flex-wrap justify-center gap-6 text-sm text-indigo-200">
+                    <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm text-indigo-200">
                         {['Free plan available', 'No credit card required', 'Cancel anytime'].map(item => (
                             <span key={item} className="flex items-center gap-1.5">
                                 <CheckCircle2 className="h-4 w-4 text-indigo-300" />

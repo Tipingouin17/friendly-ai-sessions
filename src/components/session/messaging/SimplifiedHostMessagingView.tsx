@@ -287,7 +287,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     className="min-h-[80px] resize-none bg-white border-indigo-200 focus:border-indigo-400"
                   />
                   
-                  <div className="flex items-center justify-between mt-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-3">
                     <span className="text-xs text-indigo-600">
                       {hostInstruction.trim() 
                         ? 'Click "Send with Instruction" to generate AI response with your guidance'
@@ -297,7 +297,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       onClick={handleSendWithInstruction}
                       size="sm"
                       disabled={!hostInstruction.trim() || isSending}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                     >
                       {isSending ? (
                         <span className="flex items-center gap-2">

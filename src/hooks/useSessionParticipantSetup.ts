@@ -145,6 +145,15 @@ export const useSessionParticipantSetup = ({
       if (locationState?.participantId) {
         participantId = locationState.participantId;
       }
+
+      // Priority 1.5: Direct URL params (for direct navigation without React Router state)
+      if (!participantId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlParticipantId = urlParams.get('participantId');
+        if (urlParticipantId) {
+          participantId = parseInt(urlParticipantId, 10);
+        }
+      }
       
       // Priority 2: Find participant by checking if current user is in the participant list
       if (!participantId && participantInfos.length > 0) {

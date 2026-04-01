@@ -37,12 +37,10 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
     
     messages.forEach(message => {
       if (message.participant && typeof message.participant === 'string') {
-        // If the participant field already contains a name and not just an ID
-        if (!message.participant.startsWith('P') || message.participant.includes(' ')) {
-          const participantId = message.participant.startsWith('P') 
-            ? message.participant 
-            : `P${message.participant}`;
-          nameMap[participantId] = message.participant;
+        // participant is now a plain numeric string ID (e.g. "1", "2")
+        // Only store if it looks like a name (contains non-numeric chars)
+        if (isNaN(Number(message.participant)) && message.participant.includes(' ')) {
+          nameMap[message.participant] = message.participant;
         }
       }
     });

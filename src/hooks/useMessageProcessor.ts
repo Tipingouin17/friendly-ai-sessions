@@ -61,7 +61,7 @@ export const useMessageProcessor = ({
     // For participant mode, RLS policies now handle filtering at database level
     // But we still apply client-side filtering as a backup layer
     if (viewMode === "participant") {
-      const participantKey = `P${currentParticipant}`;
+      const participantKey = String(currentParticipant);
       debugLog('all', `Applying backup client-side filtering for participant key: ${participantKey}`);
       
       const filteredMessages = processedMessages.filter(message => {

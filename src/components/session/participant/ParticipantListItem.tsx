@@ -22,7 +22,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   lastActiveTime,
   isRemoving = false
 }) => {
-  const participantColor = getParticipantColor(`P${participant.id}`);
+  const participantColor = getParticipantColor(String(participant.id));
   
   // Calculate time since last active in minutes
   const minutesSinceActive = lastActiveTime 

@@ -82,7 +82,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   // Calculate participant colors if needed
   const enhancedParticipantColors = { ...participantColors };
   participants.forEach(p => {
-    const key = `P${p.id}`;
+    const key = String(p.id);
     if (!enhancedParticipantColors[key]) {
       enhancedParticipantColors[key] = getParticipantColor(key);
     }

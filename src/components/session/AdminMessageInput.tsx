@@ -43,8 +43,8 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
             <SelectItem value="all">Everyone</SelectItem>
             {participants.map(participant => (
               <SelectItem 
-                key={`P${participant.id}`} 
-                value={`P${participant.id}`}
+                key={String(participant.id)} 
+                value={String(participant.id)}
               >
                 {participant.name || `Participant ${participant.id}`}
               </SelectItem>
@@ -75,7 +75,7 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
       <div className="mt-2 text-xs text-gray-500">
         {recipient === 'all' 
           ? 'This message will be sent to all participants' 
-          : `This message will only be sent to ${participants.find(p => `P${p.id}` === recipient)?.name || participants.find(p => `P${p.id}` === recipient)?.name || 'the selected participant'}`
+          : `This message will only be sent to ${participants.find(p => String(p.id) === recipient)?.name || 'the selected participant'}`
         }
       </div>
     </div>

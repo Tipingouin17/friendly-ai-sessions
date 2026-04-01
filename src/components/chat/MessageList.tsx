@@ -78,17 +78,20 @@ const MessageList = ({
 
       // Get participant info if this is a user message
       let participantInfo = null;
-      if (message.sender === "user" && message.participant && message.participant.startsWith('P')) {
-        const participantNumber = parseInt(message.participant.slice(1));
-        participantInfo = participants.find(p => p.id === participantNumber);
-        
-        // If we couldn't find participant info, create a basic placeholder
-        if (!participantInfo && participantNumber > 0) {
-          participantInfo = {
-            id: participantNumber,
-            name: `Participant ${participantNumber}`,
-            avatar: null
-          };
+      if (message.sender === "user" && message.participant) {
+        // participant is now a plain numeric string ID (e.g. "1", "2")
+        const participantNumber = parseInt(message.participant, 10);
+        if (!isNaN(participantNumber)) {
+          participantInfo = participants.find(p => p.id === participantNumber);
+          
+          // If we couldn't find participant info, create a basic placeholder
+          if (!participantInfo && participantNumber > 0) {
+            participantInfo = {
+              id: participantNumber,
+              name: `Participant ${participantNumber}`,
+              avatar: null
+            };
+          }
         }
       }
 

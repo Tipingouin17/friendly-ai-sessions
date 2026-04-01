@@ -30,7 +30,7 @@ export const useMessageAvatarProcessor = () => {
     
     // Show "You" for current user
     if (currentUserParticipantId && 
-        message.participant === `P${currentUserParticipantId}` && 
+        message.participant === String(currentUserParticipantId) && 
         !isAnonymous) {
       displayName = "You";
     }

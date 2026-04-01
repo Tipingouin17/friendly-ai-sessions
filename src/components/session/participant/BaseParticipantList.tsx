@@ -94,14 +94,14 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   const getParticipantMessageCount = (participantId: number) => {
     return messages.filter(msg => 
       msg.sender === 'user' && 
-      msg.participant === `P${participantId}`
+      msg.participant === String(participantId)
     ).length;
   };
   
   const getParticipantLastActive = (participantId: number) => {
     const participantMessages = messages.filter(msg => 
       msg.sender === 'user' && 
-      msg.participant === `P${participantId}`
+      msg.participant === String(participantId)
     );
     
     if (participantMessages.length === 0) return undefined;

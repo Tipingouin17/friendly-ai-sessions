@@ -73,6 +73,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const isMobileDevice = useIsMobile();
   const isActuallyMobile = isMobile || isMobileDevice;
   
+  // Check if session has ended
+  const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
+
   // Use the correct participant ID for filtering - prioritize currentUserParticipantId
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
   
@@ -120,28 +123,49 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           />
         </div>
         
-        {/* Fixed footer with input */}
-        <div className="fixed-input-footer shrink-0">
-          <InputFooter
-            participantCount={maxParticipants}
-            currentParticipant={effectiveParticipantId}
-            participantNames={participantNames}
-            participants={participants}
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            onSendMessage={onSendMessage}
-            isRecording={isRecording}
-            setIsRecording={setIsRecording}
-            currentUserParticipantId={effectiveParticipantId}
-            isAnonymous={isAnonymous}
-            toggleAnonymous={toggleAnonymous}
-            hasAnswered={hasAnswered}
-            totalResponses={totalResponses}
-            viewMode={viewMode}
-            messages={messages}
-            showResponseStats={showResponseStats}
-          />
-        </div>
+        {/* Session ended banner — replaces the input footer */}
+        {isSessionEnded ? (
+          <div className="bg-amber-50 border-t border-amber-200 px-4 py-3 flex items-center gap-3 shrink-0">
+            <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">This session has ended</p>
+              <p className="text-xs text-amber-600">Thank you for your participation!</p>
+            </div>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+            >
+              Return Home
+            </button>
+          </div>
+        ) : (
+          /* Fixed footer with input */
+          <div className="fixed-input-footer shrink-0">
+            <InputFooter
+              participantCount={maxParticipants}
+              currentParticipant={effectiveParticipantId}
+              participantNames={participantNames}
+              participants={participants}
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              onSendMessage={onSendMessage}
+              isRecording={isRecording}
+              setIsRecording={setIsRecording}
+              currentUserParticipantId={effectiveParticipantId}
+              isAnonymous={isAnonymous}
+              toggleAnonymous={toggleAnonymous}
+              hasAnswered={hasAnswered}
+              totalResponses={totalResponses}
+              viewMode={viewMode}
+              messages={messages}
+              showResponseStats={showResponseStats}
+            />
+          </div>
+        )}
       </div>
 
       {/* Desktop Session Info Panel */}

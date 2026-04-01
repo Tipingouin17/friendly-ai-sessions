@@ -30,6 +30,9 @@ interface HostDashboardProps {
   isAutoStarting?: boolean;
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
+
+  // Session state
+  isSessionEnded?: boolean;
 }
 
 const HostDashboard: React.FC<HostDashboardProps> = ({
@@ -50,7 +53,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   onSessionStarted,
   isAutoStarting = false,
   autoStartCountdown = 0,
-  onCancelAutoStart
+  onCancelAutoStart,
+  isSessionEnded = false,
 }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -77,6 +81,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isAutoStarting={isAutoStarting}
         autoStartCountdown={autoStartCountdown}
         onCancelAutoStart={onCancelAutoStart}
+        isSessionEnded={isSessionEnded}
+        isSessionPaused={isSessionPaused}
       />
     </div>
   );

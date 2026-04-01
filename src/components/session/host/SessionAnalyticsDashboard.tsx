@@ -15,7 +15,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
 }) => {
   const [analytics, setAnalytics] = useState({
     totalParticipants: 0,
-    totalMessages: 0,
+    totalResponses: 0,
     sessionDurationMinutes: 0,
     participantResponseRate: 0,
   });
@@ -26,49 +26,59 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
 
     const fetchAnalytics = async () => {
       try {
-        // Fetch conversation metadata (start time, participant count)
+        // 1. Fetch conversation metadata — use created_at as session start time
         const { data: conv } = await supabase
           .from('conversations')
-          .select('created_at, current_participants, max_participants')
+          .select('created_at, is_session_ended')
           .eq('id', conversationId)
           .single();
 
-        // Fetch all messages for this conversation
-        const { data: messages } = await supabase
-          .from('messages')
-          .select('role, created_at')
+        // 2. Fetch registered participants (ground truth for participant count)
+        const { data: participants } = await supabase
+          .from('session_participants')
+          .select('id, participant_id')
           .eq('conversation_id', conversationId);
 
-        const participantMessages = (messages || []).filter(m => m.role === 'user');
-        const totalMessages = participantMessages.length;
-        const totalParticipants = conv?.current_participants || 0;
+        const totalParticipants = (participants || []).length;
 
-        // Calculate duration from first message to now (or last message)
+        // 3. Fetch participant messages (role = 'user') with participant_id
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('role, created_at, participant_id')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true });
+
+        const participantMessages = (messages || []).filter(m => m.role === 'user');
+        const totalResponses = participantMessages.length;
+
+        // 4. Duration: from conversation.created_at to now (or last message if ended)
         let durationMinutes = 0;
-        if (messages && messages.length > 0) {
-          const sorted = [...messages].sort((a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          const start = new Date(sorted[0].created_at).getTime();
-          const end = new Date(sorted[sorted.length - 1].created_at).getTime();
-          durationMinutes = Math.round((end - start) / 60000);
-        } else if (conv?.created_at) {
+        if (conv?.created_at) {
           const start = new Date(conv.created_at).getTime();
-          durationMinutes = Math.round((Date.now() - start) / 60000);
+          let end: number;
+          if (conv.is_session_ended && messages && messages.length > 0) {
+            // Use last message time as end for closed sessions
+            end = new Date(messages[messages.length - 1].created_at).getTime();
+          } else {
+            end = Date.now();
+          }
+          durationMinutes = Math.max(0, Math.round((end - start) / 60000));
         }
 
-        // Participation rate: unique participants who sent a message / total participants
-        const uniqueRespondents = new Set(
-          participantMessages.map(m => (m as any).name || 'unknown')
-        ).size;
+        // 5. Participation rate: unique participant_ids who sent ≥1 message / registered participants
+        const uniqueRespondentIds = new Set(
+          participantMessages
+            .map(m => (m as any).participant_id)
+            .filter((id): id is number => id != null && id > 0)
+        );
         const participantResponseRate =
           totalParticipants > 0
-            ? Math.round((uniqueRespondents / totalParticipants) * 100)
-            : 0;
+            ? Math.round((uniqueRespondentIds.size / totalParticipants) * 100)
+            : totalResponses > 0 ? 100 : 0; // If no registered participants but there are responses, show 100%
 
         setAnalytics({
           totalParticipants,
-          totalMessages,
+          totalResponses,
           sessionDurationMinutes: durationMinutes,
           participantResponseRate,
         });
@@ -106,7 +116,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
             <div className="text-2xl font-bold">
               {loading ? '—' : analytics.totalParticipants}
             </div>
-            <p className="text-xs text-muted-foreground">Active in session</p>
+            <p className="text-xs text-muted-foreground">Registered in session</p>
           </CardContent>
         </Card>
 
@@ -117,7 +127,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '—' : analytics.totalMessages}
+              {loading ? '—' : analytics.totalResponses}
             </div>
             <p className="text-xs text-muted-foreground">Participant messages</p>
           </CardContent>
@@ -132,7 +142,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
             <div className="text-2xl font-bold">
               {loading ? '—' : formatDuration(analytics.sessionDurationMinutes)}
             </div>
-            <p className="text-xs text-muted-foreground">Session length</p>
+            <p className="text-xs text-muted-foreground">Since session created</p>
           </CardContent>
         </Card>
 
@@ -145,7 +155,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
             <div className="text-2xl font-bold">
               {loading ? '—' : `${analytics.participantResponseRate}%`}
             </div>
-            <p className="text-xs text-muted-foreground">Response rate</p>
+            <p className="text-xs text-muted-foreground">Participants who responded</p>
           </CardContent>
         </Card>
       </div>

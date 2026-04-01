@@ -77,6 +77,7 @@ const SessionHost = () => {
       isAutoStarting={isAutoStarting}
       autoStartCountdown={autoStartCountdown}
       onCancelAutoStart={cancelAutoStart}
+      isSessionEnded={conversationData?.is_session_ended === true}
     />
   );
 };

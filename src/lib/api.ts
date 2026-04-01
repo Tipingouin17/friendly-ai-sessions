@@ -359,38 +359,80 @@ class QueryBuilder<T = Record<string, unknown>> {
     }
   }
 
-  async insert(rows: Partial<T> | Partial<T>[]): Promise<ApiResponse<T | T[]>> {
-    return apiFetch<T | T[]>(`/rest/v1/${this.s.table}`, {
-      method: "POST",
-      body: JSON.stringify(rows),
-      headers: this.xHeaders(),
-    });
+  insert(rows: Partial<T> | Partial<T>[]): MutationBuilder<T> {
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters);
   }
 
-  async update(patch: Partial<T>): Promise<ApiResponse<T | T[]>> {
-    const p = new URLSearchParams();
-    this.s.filters.forEach(([col, val]) => p.append(col, val));
-    return apiFetch<T | T[]>(`/rest/v1/${this.s.table}?${p.toString()}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-      headers: this.xHeaders(),
-    });
+  update(patch: Partial<T>): MutationBuilder<T> {
+    return new MutationBuilder<T>(this.s.table, "PATCH", JSON.stringify(patch), this.s.filters);
   }
 
-  async upsert(rows: Partial<T> | Partial<T>[], opts?: { onConflict?: string }): Promise<ApiResponse<T | T[]>> {
-    const p = new URLSearchParams();
-    if (opts?.onConflict) p.set("on_conflict", opts.onConflict);
-    return apiFetch<T | T[]>(`/rest/v1/${this.s.table}${p.toString() ? "?" + p.toString() : ""}`, {
-      method: "POST",
-      body: JSON.stringify(rows),
-      headers: { ...this.xHeaders(), Prefer: "resolution=merge-duplicates,return=representation" },
-    });
+  upsert(rows: Partial<T> | Partial<T>[], opts?: { onConflict?: string }): MutationBuilder<T> {
+    const extra: Record<string, string> = { Prefer: "resolution=merge-duplicates,return=representation" };
+    if (opts?.onConflict) extra["on_conflict"] = opts.onConflict;
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters, extra);
   }
 
-  async delete(): Promise<ApiResponse<T | T[]>> {
+  delete(): MutationBuilder<T> {
+    return new MutationBuilder<T>(this.s.table, "DELETE", undefined, this.s.filters);
+  }
+}
+
+// ─── Mutation builder (supports .select() chaining after insert/update/upsert/delete) ─
+class MutationBuilder<T = Record<string, unknown>> {
+  private table: string;
+  private method: string;
+  private body: string | undefined;
+  private filters: Array<[string, string]>;
+  private extra: Record<string, string>;
+  private selectCols = "*";
+  private singleFlag = false;
+  private maybeSingleFlag = false;
+
+  constructor(
+    table: string,
+    method: string,
+    body: string | undefined,
+    filters: Array<[string, string]>,
+    extra: Record<string, string> = {}
+  ) {
+    this.table = table;
+    this.method = method;
+    this.body = body;
+    this.filters = [...filters];
+    this.extra = extra;
+  }
+
+  select(cols = "*"): this { this.selectCols = cols; return this; }
+  single(): this { this.singleFlag = true; return this; }
+  maybeSingle(): this { this.maybeSingleFlag = true; return this; }
+
+  private async exec(): Promise<ApiResponse<T | T[]>> {
     const p = new URLSearchParams();
-    this.s.filters.forEach(([col, val]) => p.append(col, val));
-    return apiFetch<T | T[]>(`/rest/v1/${this.s.table}?${p.toString()}`, { method: "DELETE" });
+    this.filters.forEach(([col, val]) => p.append(col, val));
+    // Always request representation so we get rows back
+    const basePrefer = this.extra["Prefer"] ?? "";
+    const prefer = basePrefer ? `${basePrefer},return=representation` : "return=representation";
+    const headers: Record<string, string> = { Prefer: prefer };
+    if (this.singleFlag || this.maybeSingleFlag) headers["Accept"] = "application/vnd.pgrst.object+json";
+    // Add select cols to query string so the server returns the requested columns
+    p.set("select", this.selectCols);
+    if (this.extra["on_conflict"]) p.set("on_conflict", this.extra["on_conflict"]);
+    const url = `/rest/v1/${this.table}?${p.toString()}`;
+    return apiFetch<T | T[]>(url, { method: this.method, body: this.body, headers });
+  }
+
+  then<R1 = ApiResponse<T | T[]>, R2 = never>(
+    onfulfilled: (v: ApiResponse<T | T[]>) => R1 | PromiseLike<R1>,
+    onrejected?: ((r: unknown) => R2 | PromiseLike<R2>) | null
+  ): Promise<R1 | R2> {
+    return this.exec().then(onfulfilled, onrejected ?? undefined);
+  }
+  catch<R = never>(onrejected: (r: unknown) => R | PromiseLike<R>): Promise<ApiResponse<T | T[]> | R> {
+    return this.exec().catch(onrejected);
+  }
+  finally(fn?: (() => void) | null): Promise<ApiResponse<T | T[]>> {
+    return this.exec().finally(fn ?? undefined);
   }
 }
 

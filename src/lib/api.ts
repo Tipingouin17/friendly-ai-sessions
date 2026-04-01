@@ -503,19 +503,139 @@ interface ChannelFilter {
   filter?: string;
 }
 
-class RealtimeChannelImpl implements RealtimeChannel {
+/**
+ * SharedWSManager: a singleton WebSocket connection multiplexed across all channels.
+ * This prevents the connection storm caused by one WebSocket per channel.
+ */
+class SharedWSManager {
   private ws: WebSocket | null = null;
+  private channels = new Map<string, RealtimeChannelImpl>();
+  private ref = 0;
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 8;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private ping: ReturnType<typeof setInterval> | null = null;
+  private connecting = false;
+
+  register(ch: RealtimeChannelImpl): void {
+    this.channels.set(ch.getTopic(), ch);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      ch.sendJoin(this.ws, String(++this.ref));
+    } else {
+      this.ensureConnected();
+    }
+  }
+
+  unregister(ch: RealtimeChannelImpl): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ event: "phx_leave", topic: ch.getTopic(), payload: {}, ref: String(++this.ref) }));
+    }
+    this.channels.delete(ch.getTopic());
+  }
+
+  private ensureConnected(): void {
+    if (this.connecting || this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
+    this.connecting = true;
+    const token = getToken() || ANON_KEY;
+    const wsBase = API_URL.replace(/^http/, "ws");
+    try {
+      this.ws = new WebSocket(`${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(token)}&vsn=1.0.0`);
+    } catch {
+      this.connecting = false;
+      this.scheduleReconnect();
+      return;
+    }
+    this.ws.onopen = () => {
+      this.connecting = false;
+      this.retryCount = 0;
+      // Join all registered channels
+      for (const ch of this.channels.values()) {
+        ch.sendJoin(this.ws!, String(++this.ref));
+      }
+      // Start heartbeat
+      this.ping = setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ event: "heartbeat", topic: "phoenix", payload: {}, ref: String(++this.ref) }));
+        }
+      }, 25_000);
+    };
+    this.ws.onmessage = (ev: MessageEvent) => {
+      try {
+        const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
+        const topic = msg.topic as string;
+        const event = msg.event as string;
+        const payload = msg.payload as Record<string, unknown>;
+        const ch = this.channels.get(topic);
+        if (!ch) return;
+        if (event === "phx_reply" && (payload?.status as string) === "ok") {
+          ch.notifyStatus("SUBSCRIBED");
+          return;
+        }
+        if (payload?.type && (payload.type === "INSERT" || payload.type === "UPDATE" || payload.type === "DELETE")) {
+          ch.dispatch({
+            eventType: payload.type as RealtimeEvent,
+            new: (payload.record ?? {}) as Record<string, unknown>,
+            old: (payload.old_record ?? {}) as Record<string, unknown>,
+            table: (payload.table as string) ?? "",
+            schema: "public",
+          });
+          return;
+        }
+        if (event === "postgres_changes" || event === "INSERT" || event === "UPDATE" || event === "DELETE") {
+          ch.dispatch(payload as RealtimePayload);
+        }
+      } catch { /* ignore */ }
+    };
+    this.ws.onerror = () => {
+      this.connecting = false;
+      for (const ch of this.channels.values()) ch.notifyStatus("CHANNEL_ERROR");
+    };
+    this.ws.onclose = () => {
+      this.connecting = false;
+      if (this.ping) { clearInterval(this.ping); this.ping = null; }
+      for (const ch of this.channels.values()) ch.notifyStatus("CLOSED");
+      if (this.channels.size > 0) this.scheduleReconnect();
+    };
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) return;
+    if (this.retryCount >= this.MAX_RETRIES) return;
+    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), 60_000);
+    this.retryCount++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.channels.size > 0) this.ensureConnected();
+    }, delay);
+  }
+}
+
+const sharedWS = new SharedWSManager();
+
+class RealtimeChannelImpl implements RealtimeChannel {
   private topic: string;
   private listeners: Array<{ filter: ChannelFilter; cb: RealtimeCallback }> = [];
   private statusCb: ((s: SubscriptionStatus) => void) | null = null;
-  private ping: ReturnType<typeof setInterval> | null = null;
-  private reconnect: ReturnType<typeof setTimeout> | null = null;
   private dead = false;
-  private ref = 0;
-  private retryCount = 0;
-  private readonly MAX_RETRIES = 5;
 
   constructor(topic: string) { this.topic = topic; }
+
+  getTopic(): string { return this.topic; }
+
+  sendJoin(ws: WebSocket, ref: string): void {
+    ws.send(JSON.stringify({ event: "phx_join", topic: this.topic, payload: {}, ref }));
+  }
+
+  notifyStatus(s: SubscriptionStatus): void { this.statusCb?.(s); }
+
+  dispatch(rec: RealtimePayload): void {
+    for (const { filter, cb } of this.listeners) {
+      if ((filter.event === "*" || filter.event === rec.eventType) &&
+          (!filter.table || filter.table === rec.table)) {
+        cb(rec);
+      }
+    }
+  }
 
   on<T = Record<string, unknown>>(
     _type: "postgres_changes",
@@ -527,102 +647,15 @@ class RealtimeChannelImpl implements RealtimeChannel {
   }
 
   subscribe(cb?: (s: SubscriptionStatus, err?: Error) => void): this {
+    if (this.dead) return this;
     this.statusCb = cb ?? null;
-    this.connect();
+    sharedWS.register(this);
     return this;
-  }
-
-  private connect(): void {
-    if (this.dead) return;
-    const token = getToken() || ANON_KEY;
-    const wsBase = API_URL.replace(/^http/, "ws");
-    try {
-      this.ws = new WebSocket(`${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(token)}&vsn=1.0.0`);
-    } catch {
-      this.statusCb?.("CHANNEL_ERROR");
-      this.scheduleReconnect();
-      return;
-    }
-
-    this.ws.onopen = () => {
-      if (this.dead) { this.ws?.close(); return; }
-      this.retryCount = 0; // Reset retry count on successful connection
-      this.send({ event: "phx_join", topic: this.topic, payload: {}, ref: String(++this.ref) });
-      this.ping = setInterval(() => {
-        this.send({ event: "heartbeat", topic: "phoenix", payload: {}, ref: String(++this.ref) });
-      }, 25_000);
-    };
-
-    this.ws.onmessage = (ev: MessageEvent) => {
-      try {
-        const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
-        const event = msg.event as string;
-        const payload = msg.payload as Record<string, unknown>;
-
-        if (event === "phx_reply" && (payload?.status as string) === "ok") {
-          this.statusCb?.("SUBSCRIBED");
-          return;
-        }
-
-        // Server broadcasts payload with type field
-        if (payload?.type && (payload.type === "INSERT" || payload.type === "UPDATE" || payload.type === "DELETE")) {
-          this.dispatch({
-            eventType: payload.type as RealtimeEvent,
-            new: (payload.record ?? {}) as Record<string, unknown>,
-            old: (payload.old_record ?? {}) as Record<string, unknown>,
-            table: (payload.table as string) ?? "",
-            schema: "public",
-          });
-          return;
-        }
-
-        if (event === "postgres_changes" || event === "INSERT" || event === "UPDATE" || event === "DELETE") {
-          this.dispatch(payload as RealtimePayload);
-        }
-      } catch { /* ignore */ }
-    };
-
-    this.ws.onerror = () => { this.statusCb?.("CHANNEL_ERROR"); };
-    this.ws.onclose = () => {
-      if (this.ping) clearInterval(this.ping);
-      if (!this.dead) { this.statusCb?.("CLOSED"); this.scheduleReconnect(); }
-    };
-  }
-
-  private dispatch(rec: RealtimePayload): void {
-    for (const { filter, cb } of this.listeners) {
-      if ((filter.event === "*" || filter.event === rec.eventType) &&
-          (!filter.table || filter.table === rec.table)) {
-        cb(rec);
-      }
-    }
-  }
-
-  private send(msg: Record<string, unknown>): void {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
-  }
-
-  private scheduleReconnect(): void {
-    if (this.dead) return;
-    if (this.retryCount >= this.MAX_RETRIES) {
-      // Stop reconnecting after max retries to prevent connection storm
-      this.statusCb?.("CHANNEL_ERROR");
-      return;
-    }
-    // Exponential backoff: 3s, 6s, 12s, 24s, 48s (max ~60s)
-    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), 60_000);
-    this.retryCount++;
-    this.reconnect = setTimeout(() => { if (!this.dead) this.connect(); }, delay);
   }
 
   unsubscribe(): void {
     this.dead = true;
-    if (this.ping) clearInterval(this.ping);
-    if (this.reconnect) clearTimeout(this.reconnect);
-    if (this.ws) {
-      try { this.send({ event: "phx_leave", topic: this.topic, payload: {}, ref: String(++this.ref) }); this.ws.close(); } catch { /* ignore */ }
-      this.ws = null;
-    }
+    sharedWS.unregister(this);
   }
 }
 

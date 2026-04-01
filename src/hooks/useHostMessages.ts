@@ -190,8 +190,8 @@ export const useHostMessages = ({
         .insert({
           conversation_id: conversationId,
           content: { text: message },
-          role: 'assistant',
-          name: 'Facilitator'
+          role: 'admin',
+          name: 'Host'
         });
 
       if (error) {

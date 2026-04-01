@@ -139,7 +139,7 @@ const ChatInput = ({
           <Button
             onClick={handleSendClick}
             size="icon"
-            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} bg-amber-500 hover:bg-amber-600`}
+            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} bg-indigo-600 hover:bg-indigo-700`}
             disabled={!inputMessage.trim() || disabled}
           >
             <Send className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />

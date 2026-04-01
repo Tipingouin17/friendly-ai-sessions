@@ -102,10 +102,10 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   const displayCount = participantCount || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50/50 to-white flex items-center justify-center py-6 sm:py-12 px-4">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-        <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 rounded-full flex items-center justify-center">
-          <Clock className="h-8 w-8 text-amber-500" />
+        <div className="w-16 h-16 mx-auto mb-6 bg-indigo-100 rounded-full flex items-center justify-center">
+          <Clock className="h-8 w-8 text-indigo-500" />
         </div>
         
         <h2 className="text-xl sm:text-2xl font-bold mb-2">Waiting for Session to Begin</h2>
@@ -116,9 +116,9 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
             : 'You have successfully joined the session'}
         </p>
         
-        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 mb-6">
-          <p className="text-amber-800 mb-2 font-medium">The admin will start the session soon</p>
-          <p className="text-amber-700 text-sm">Please stay on this page. The session will begin automatically.</p>
+        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-6">
+          <p className="text-indigo-800 mb-2 font-medium">The admin will start the session soon</p>
+          <p className="text-indigo-700 text-sm">Please stay on this page. The session will begin automatically.</p>
         </div>
         
         <div className="inline-flex items-center gap-2 bg-gray-50 rounded-full px-4 py-2 border">

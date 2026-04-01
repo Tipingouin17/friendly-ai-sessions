@@ -32,7 +32,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   // Determine engagement level based on message count
   const getEngagementColor = () => {
     if (messageCount === 0) return "bg-gray-300";
-    if (messageCount < 3) return "bg-amber-400";
+    if (messageCount < 3) return "bg-indigo-400";
     if (messageCount < 7) return "bg-blue-400";
     return "bg-green-400";
   };
@@ -41,7 +41,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   const getActivityColor = () => {
     if (!minutesSinceActive) return "bg-gray-300";
     if (minutesSinceActive < 2) return "bg-green-400";
-    if (minutesSinceActive < 5) return "bg-amber-400";
+    if (minutesSinceActive < 5) return "bg-indigo-400";
     if (minutesSinceActive < 15) return "bg-orange-400";
     return "bg-gray-400";
   };
@@ -97,7 +97,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
                 <span className="text-sm font-medium text-gray-900 truncate">
                   {displayName}
                   {participant.isHost && (
-                    <span className="ml-1 text-xs text-amber-600">(Host)</span>
+                    <span className="ml-1 text-xs text-indigo-600">(Host)</span>
                   )}
                 </span>
               </TooltipTrigger>

@@ -948,6 +948,7 @@ def edge_function(func_name):
         max_tokens_cfg = None
         randomness_cfg = None
         avatar_url = ""
+        facilitator_language = None  # primary language for AI responses
 
         if conv_id:
             try:
@@ -956,7 +957,7 @@ def edge_function(func_name):
                     "SELECT c.id, s.title, s.facilitator, s.objective, s.prompt, "
                     "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
                     "f.title as facilitator_name, f.details as facilitator_details, "
-                    "f.profile_picture "
+                    "f.profile_picture, f.languages as facilitator_languages "
                     "FROM conversations c "
                     "LEFT JOIN sessions s ON c.sessions_id = s.id "
                     "LEFT JOIN facilitators f ON s.facilitator = f.id "
@@ -977,6 +978,12 @@ def edge_function(func_name):
                     pp = row.get('profile_picture') or ""
                     if pp:
                         avatar_url = f"/storage/v1/object/public/facilitator-avatars/{pp}"
+                    # Extract primary language from languages array
+                    langs = row.get('facilitator_languages')
+                    if langs and isinstance(langs, list) and len(langs) > 0:
+                        facilitator_language = langs[0]  # use first language as primary
+                    elif langs and isinstance(langs, str) and langs.strip():
+                        facilitator_language = langs.strip()
                 conn.close()
             except Exception as e:
                 print(f"Error fetching session context: {e}")
@@ -1007,6 +1014,15 @@ def edge_function(func_name):
         system_parts.append(f"Session objective: {objective}")
         if session_scope:
             system_parts.append(f"Session scope: {session_scope}")
+        language_instruction = ""
+        if facilitator_language:
+            language_instruction = (
+                f"\n\nLANGUAGE REQUIREMENT (MANDATORY):\n"
+                f"You MUST respond exclusively in {facilitator_language}. "
+                f"Every single message you send — including greetings, questions, summaries, and reports — "
+                f"must be written entirely in {facilitator_language}. "
+                f"Do NOT use any other language, even if participants write in a different language. "
+                f"If a participant writes in another language, still respond in {facilitator_language}.")
         system_parts.append(
             f"Your name is {facilitator_name}. Always introduce yourself using this exact name.\n\n"
             "IMPORTANT RULES:\n"
@@ -1015,7 +1031,8 @@ def edge_function(func_name):
             "- Address participants warmly and reference their specific contributions when responding to answers.\n"
             "- Use a professional yet approachable tone.\n"
             "- Do NOT use markdown headers (##) in chat messages.\n"
-            "- Do NOT use placeholder text like [Your Name] - always use your actual name.")
+            "- Do NOT use placeholder text like [Your Name] - always use your actual name."
+            + language_instruction)
 
         # ── Inject host instruction if provided ──
         if host_instruction:

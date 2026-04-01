@@ -17,7 +17,7 @@ const WorkshopMetrics: React.FC<WorkshopMetricsProps> = ({
 }) => {
   const getEngagementColor = (score: number) => {
     if (score >= 4) return 'text-green-600';
-    if (score >= 2.5) return 'text-amber-600';
+    if (score >= 2.5) return 'text-indigo-600';
     return 'text-red-600';
   };
 

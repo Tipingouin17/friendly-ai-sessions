@@ -32,8 +32,8 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 w-full max-w-md text-center">
           <div className="mb-5 flex justify-center">
-            <div className="p-4 bg-amber-50 rounded-full">
-              <Clock className="h-10 w-10 text-amber-500" />
+            <div className="p-4 bg-indigo-50 rounded-full">
+              <Clock className="h-10 w-10 text-indigo-500" />
             </div>
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Session Has Ended</h2>

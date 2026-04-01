@@ -130,7 +130,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
                   });
                 }
               }}
-              className="w-full bg-amber-400 hover:bg-amber-500 text-black"
+              className="w-full bg-indigo-400 hover:bg-indigo-500 text-black"
               disabled={connectionAttempts > 5 && Date.now() - lastAttemptTime < 10000}
             >
               <RefreshCw className="w-4 h-4 mr-2" />

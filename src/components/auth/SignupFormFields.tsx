@@ -152,7 +152,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
       </div>
 
       {attempts >= 3 && (
-        <p className="text-amber-600 text-xs text-center">
+        <p className="text-indigo-600 text-xs text-center">
           Too many attempts. Please wait a few minutes before trying again.
         </p>
       )}

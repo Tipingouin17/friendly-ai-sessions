@@ -211,7 +211,7 @@ export const SessionProviderErrorFallback = ({
         )}
         
         {isCircuitBreakerOpen && (
-          <p className="text-sm text-amber-600">
+          <p className="text-sm text-indigo-600">
             Too many retry attempts. Circuit breaker is active for 30 seconds.
           </p>
         )}

@@ -25,7 +25,7 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center py-6 sm:py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50/50 to-white flex items-center justify-center py-6 sm:py-12 px-4">
       <div className="bg-white p-4 sm:p-8 rounded-lg shadow-lg max-w-md w-full">
         <h2 className="text-xl sm:text-2xl font-bold mb-2 text-center">Join This Session</h2>
         <p className="text-gray-600 mb-4 sm:mb-6 text-center text-sm sm:text-base">
@@ -44,7 +44,7 @@ const QRCodeView: React.FC<QRCodeViewProps> = ({
           
           <Button 
             onClick={handleStartClick}
-            className="mt-4 sm:mt-6 w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
+            className="mt-4 sm:mt-6 w-full bg-indigo-600 hover:bg-indigo-700 text-black"
           >
             Start Session
           </Button>

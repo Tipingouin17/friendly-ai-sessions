@@ -61,13 +61,13 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
   const getAlertContent = () => {
     let title = "";
     let description = "";
-    let alertClass = "border-amber-500 bg-amber-50 text-amber-900";
+    let alertClass = "border-indigo-500 bg-indigo-50 text-indigo-900";
     
     switch (type) {
       case 'full':
         title = "Session Full";
         description = message || "This session is full and cannot accept more participants.";
-        alertClass = "border-amber-500 bg-amber-50 text-amber-900";
+        alertClass = "border-indigo-500 bg-indigo-50 text-indigo-900";
         break;
       case 'not-found':
         title = "Session Not Found";
@@ -102,7 +102,7 @@ const SessionFullAlert: React.FC<SessionFullAlertProps> = ({
         <div className="text-center mt-4">
           <Button 
             onClick={handleRetry} 
-            className="bg-[#FFC107] hover:bg-[#F5B800] text-black mb-2 w-full"
+            className="bg-indigo-600 hover:bg-indigo-700 text-black mb-2 w-full"
           >
             Retry Connection
           </Button>

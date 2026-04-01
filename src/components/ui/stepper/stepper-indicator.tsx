@@ -37,7 +37,7 @@ const StepperIndicator = React.forwardRef<HTMLDivElement, StepperIndicatorProps>
             {isLoading && (
               <span className="absolute transition-all">
                 <LoaderCircle
-                  className="animate-spin h-3.5 w-3.5 text-amber-500"
+                  className="animate-spin h-3.5 w-3.5 text-indigo-500"
                   aria-hidden="true"
                 />
               </span>

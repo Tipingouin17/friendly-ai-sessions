@@ -4,7 +4,10 @@ import { useParticipantPersistence } from "./useParticipantPersistence";
 import { LocationStateType } from "./useConversationId";
 
 /**
- * Hook to enhance location state with persisted participant data if available
+ * Hook to enhance location state with persisted participant data if available.
+ * Only injects persisted participant identity when the stored conversationId
+ * matches the conversation ID in the current URL, to prevent cross-session
+ * identity contamination.
  */
 export function useEnhancedLocationState(
   originalState: any
@@ -22,15 +25,22 @@ export function useEnhancedLocationState(
     isAdmin?: boolean;
   } | null;
   
-  // If we have persisted data but no participant ID in location state, use the persisted data
+  // Only use persisted data if it belongs to the current conversation
   if (!locationState?.participantId && persistedParticipantData) {
-    locationState = {
-      ...locationState,
-      participantId: persistedParticipantData.participantId,
-      isGuest: true,
-      participantName: persistedParticipantData.name,
-      isAdmin: persistedParticipantData.isAdmin
-    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlConversationId = parseInt(urlParams.get('id') || '0', 10);
+    const persistedMatchesCurrent = urlConversationId > 0 &&
+      persistedParticipantData.conversationId === urlConversationId;
+
+    if (persistedMatchesCurrent) {
+      locationState = {
+        ...locationState,
+        participantId: persistedParticipantData.participantId,
+        isGuest: true,
+        participantName: persistedParticipantData.name,
+        isAdmin: persistedParticipantData.isAdmin
+      };
+    }
   }
   
   return locationState;

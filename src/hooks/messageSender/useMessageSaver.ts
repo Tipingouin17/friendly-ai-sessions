@@ -26,11 +26,16 @@ export const useMessageSaver = () => {
       throw new Error("No conversation ID provided");
     }
 
-    const currentParticipantKey = `P${currentParticipant}`;
+    // If currentParticipant is 0 (not yet resolved from async state), fall back to URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlParticipantId = urlParams.get('participantId');
+    const effectiveParticipantId = currentParticipant || (urlParticipantId ? parseInt(urlParticipantId, 10) : 0);
+
+    const currentParticipantKey = `P${effectiveParticipantId}`;
 
     // Resolve participant name: use participantInfo, then URL name param, then fallback
-    const urlName = new URLSearchParams(window.location.search).get('name') || undefined;
-    const resolvedName = participantInfo?.name || urlName || `Participant ${currentParticipant}`;
+    const urlName = urlParams.get('name') || undefined;
+    const resolvedName = participantInfo?.name || urlName || `Participant ${effectiveParticipantId}`;
 
     // Create message for UI
     const messageId = nanoid();
@@ -48,10 +53,10 @@ export const useMessageSaver = () => {
     // Save to database with participant_id column for privacy
     const { data, error } = await supabase.from('messages').insert({
       conversation_id: currentConversationId,
-      participant_id: currentParticipant,
+      participant_id: effectiveParticipantId,
       content: {
         text: message,
-        participant_id: currentParticipant,
+        participant_id: effectiveParticipantId,
         name: resolvedName,
         is_anonymous: isAnonymous
       },

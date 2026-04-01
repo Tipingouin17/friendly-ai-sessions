@@ -1,7 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Zap, ArrowRight } from "lucide-react";
 
 interface PlanLimitAlertProps {
   hasReachedSessionLimit: boolean;
@@ -27,21 +26,29 @@ export const PlanLimitAlert = ({
     return null;
   }
 
+  const message = hasReachedSessionLimit
+    ? `You've used all ${maxSessions} sessions available in your current plan.`
+    : "You've reached your facilitator limit in your current plan.";
+
   return (
-    <Alert variant="destructive" className="mb-6">
-      <AlertCircle className="h-4 w-4" />
-      <AlertTitle className="text-left">Plan Limit Reached</AlertTitle>
-      <AlertDescription className="flex justify-between items-center">
-        <span>
-          {hasReachedSessionLimit 
-            ? `You've used ${currentSessionCount} out of ${maxSessions} sessions available in your plan.` 
-            : "You've reached your facilitator limit in your current plan."
-          }
-        </span>
-        <Button onClick={onUpgrade} size="sm">
-          Upgrade Plan
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100">
+          <Zap className="h-4 w-4 text-indigo-600" />
+        </div>
+        <div>
+          <p className="font-semibold text-indigo-900">Plan Limit Reached</p>
+          <p className="text-sm text-indigo-700 mt-0.5">{message}</p>
+        </div>
+      </div>
+      <Button
+        onClick={onUpgrade}
+        size="sm"
+        className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-500/20 gap-1.5"
+      >
+        Upgrade Plan
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 };

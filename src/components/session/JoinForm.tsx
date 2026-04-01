@@ -56,7 +56,7 @@ const JoinForm: React.FC<JoinFormProps> = ({
 
       <Button 
         onClick={onJoinSession} 
-        className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm shadow-indigo-500/20"
         disabled={isJoining || isFull || !participantName.trim()}
       >
         {isJoining ? (

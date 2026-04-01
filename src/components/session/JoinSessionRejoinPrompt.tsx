@@ -22,7 +22,7 @@ const JoinSessionRejoinPrompt: React.FC<JoinSessionRejoinPromptProps> = ({
   onJoinAsNew
 }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFC107]/5 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50/50 to-white flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
@@ -37,7 +37,7 @@ const JoinSessionRejoinPrompt: React.FC<JoinSessionRejoinPromptProps> = ({
         <div className="space-y-4">
           <Button 
             onClick={onRejoin} 
-            className="w-full bg-[#FFC107] hover:bg-[#F5B800] text-black"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-black"
           >
             Rejoin as {existingSessionData.name}
           </Button>

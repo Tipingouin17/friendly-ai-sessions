@@ -45,13 +45,13 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
     // Determine color based on usage
     const getColor = () => {
         if (percentage >= 100) return "text-red-600";
-        if (percentage >= 70) return "text-amber-600";
+        if (percentage >= 70) return "text-indigo-600";
         return "text-green-600";
     };
 
     const getProgressColor = () => {
         if (percentage >= 100) return "bg-red-600";
-        if (percentage >= 70) return "bg-amber-500";
+        if (percentage >= 70) return "bg-indigo-500";
         return "bg-green-600";
     };
 
@@ -111,7 +111,7 @@ export const UsageMeter = ({ currentUsage, limit, planName, featureName }: Usage
 
                     {shouldShowUpgradeNudge && (
                         <a href="/pricing">
-                            <button className="bg-amber-400 hover:bg-amber-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-full whitespace-nowrap transition-colors">
+                            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2 rounded-full whitespace-nowrap transition-colors shadow-sm shadow-indigo-500/20">
                                 Upgrade Plan
                             </button>
                         </a>

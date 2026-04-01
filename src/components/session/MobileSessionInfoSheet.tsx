@@ -42,7 +42,7 @@ const MobileSessionInfoSheet: React.FC<MobileSessionInfoSheetProps> = ({
       <SheetContent side="bottom" className="h-[70vh]">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-amber-600" />
+            <Target className="h-5 w-5 text-indigo-600" />
             Session Information
           </SheetTitle>
           <SheetDescription>
@@ -76,7 +76,7 @@ const MobileSessionInfoSheet: React.FC<MobileSessionInfoSheetProps> = ({
                     src={facilitatorInfo.profile_picture} 
                     alt={facilitatorInfo.title}
                   />
-                  <AvatarFallback className="bg-amber-100 text-amber-700">
+                  <AvatarFallback className="bg-indigo-100 text-indigo-700">
                     {facilitatorInfo.title?.charAt(0) || 'F'}
                   </AvatarFallback>
                 </Avatar>

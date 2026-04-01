@@ -90,6 +90,10 @@ export const StandardPlanCard = ({
   const planFeatures = getFeatureList();
   const isFree = Number(plan.price) === 0;
 
+  // Determine badge to show — priority: current plan > popular
+  const showCurrentBadge = isCurrentPlan;
+  const showPopularBadge = isPlanPopular && !isCurrentPlan;
+
   return (
     <div
       className={`
@@ -98,30 +102,30 @@ export const StandardPlanCard = ({
         hover:-translate-y-1 hover:shadow-xl
         animate-fade-in-up
         ${isPlanPopular
-          ? 'bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-xl shadow-indigo-500/30 ring-0'
+          ? 'bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-xl shadow-indigo-500/30'
           : 'bg-white border border-gray-100 shadow-sm hover:border-indigo-100'
         }
         ${isCurrentPlan && !isPlanPopular ? 'ring-2 ring-indigo-500' : ''}
       `}
       style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
     >
-      {/* Badges */}
-      {isPlanPopular && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-          <span className="bg-white text-indigo-700 px-4 py-1 rounded-full text-sm font-semibold shadow-lg border border-indigo-100">
-            ⭐ Most Popular
-          </span>
-        </div>
-      )}
-      {isCurrentPlan && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-          <span className="bg-emerald-500 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
-            ✓ Current Plan
-          </span>
+      {/* Single badge — positioned above card, centered */}
+      {(showCurrentBadge || showPopularBadge) && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
+          {showCurrentBadge ? (
+            <span className="inline-flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg tracking-wide uppercase">
+              <Check className="h-3 w-3" />
+              Current Plan
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 bg-white text-indigo-700 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg border border-indigo-100 tracking-wide uppercase">
+              ⭐ Most Popular
+            </span>
+          )}
         </div>
       )}
 
-      <div className="p-8 flex flex-col flex-1">
+      <div className={`p-8 flex flex-col flex-1 ${showCurrentBadge || showPopularBadge ? 'pt-10' : ''}`}>
         {/* Plan name */}
         <div className="mb-6">
           <h3 className={`text-xl font-bold mb-1 ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
@@ -172,19 +176,31 @@ export const StandardPlanCard = ({
         </ul>
 
         {/* CTA */}
-        <Button
-          className={`w-full mt-8 py-5 font-semibold rounded-xl transition-all ${
-            isPlanPopular
-              ? 'bg-white text-indigo-700 hover:bg-indigo-50 shadow-lg'
-              : isCurrentPlan
-              ? 'border-2 border-indigo-200 text-indigo-600 bg-transparent hover:bg-indigo-50'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-500/20'
-          }`}
-          variant={isCurrentPlan && !isPlanPopular ? "outline" : "default"}
-          onClick={handleGetStarted}
-        >
-          {isCurrentPlan ? "Manage Plan" : isFree ? "Get Started Free" : "Get Started"}
-        </Button>
+        <div className="mt-8">
+          {isCurrentPlan ? (
+            <Button
+              className="w-full py-5 font-semibold rounded-xl border-2 border-emerald-400 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all"
+              variant="outline"
+              onClick={handleGetStarted}
+            >
+              ✓ Current Plan — Manage
+            </Button>
+          ) : isPlanPopular ? (
+            <Button
+              className="w-full py-5 font-semibold rounded-xl bg-white text-indigo-700 hover:bg-indigo-50 shadow-lg transition-all"
+              onClick={handleGetStarted}
+            >
+              {isFree ? 'Get Started Free' : 'Get Started'}
+            </Button>
+          ) : (
+            <Button
+              className="w-full py-5 font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-500/20 transition-all"
+              onClick={handleGetStarted}
+            >
+              {isFree ? 'Get Started Free' : 'Get Started'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

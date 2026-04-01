@@ -26,7 +26,7 @@ const LoadingStateActions: React.FC<LoadingStateActionsProps> = ({
     <div className="mt-4">
       <Button 
         onClick={onRefresh}
-        className="bg-amber-500 hover:bg-amber-600 text-white"
+        className="bg-indigo-600 hover:bg-indigo-700 text-white"
       >
         <RefreshCw className="w-4 h-4 mr-2" />
         Retry Connection

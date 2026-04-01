@@ -73,16 +73,16 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
   if (isFacilitator) {
     return (
       <Card className={`mb-3 border-l-4 shadow-sm animate-fade-in`} 
-        style={{ borderLeftColor: '#FFC107' }}>
+        style={{ borderLeftColor: '#4F46E5' }}>
         <CardContent className="p-0">
-          <div className="p-3 bg-amber-50 rounded-tr-lg flex justify-between items-center">
+          <div className="p-3 bg-indigo-50 rounded-tr-lg flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-amber-700" />
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                <MessageCircle className="w-4 h-4 text-indigo-700" />
               </div>
               <div>
-                <p className="font-medium text-amber-800">Facilitator</p>
-                <p className="text-xs text-amber-700/70 flex items-center gap-1">
+                <p className="font-medium text-indigo-800">Facilitator</p>
+                <p className="text-xs text-indigo-700/70 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {messageTime}
                 </p>
@@ -92,7 +92,7 @@ const AdminMessageCard: React.FC<AdminMessageCardProps> = ({
             <Collapsible defaultOpen={isExpanded}>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" onClick={toggleExpand}
-                  className="h-7 w-7 p-0 rounded-full text-amber-700">
+                  className="h-7 w-7 p-0 rounded-full text-indigo-700">
                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
               </CollapsibleTrigger>

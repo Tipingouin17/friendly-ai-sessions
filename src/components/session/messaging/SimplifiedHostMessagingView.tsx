@@ -227,10 +227,10 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
             )}
 
             {/* Host Instruction Panel - Always visible during active session */}
-            <Card className="border-amber-200 bg-amber-50/50">
+            <Card className="border-indigo-200 bg-indigo-50/50">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-amber-800">
+                  <CardTitle className="flex items-center gap-2 text-indigo-800">
                     <Wand2 className="h-5 w-5" />
                     Instruct AI Facilitator
                   </CardTitle>
@@ -238,12 +238,12 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsInstructionExpanded(!isInstructionExpanded)}
-                    className="text-amber-700 hover:text-amber-900"
+                    className="text-indigo-700 hover:text-indigo-900"
                   >
                     {isInstructionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </div>
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="text-xs text-indigo-600 mt-1">
                   Guide the AI's next response. Participants will not see your instruction.
                 </p>
               </CardHeader>
@@ -257,7 +257,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                         key={qi.label}
                         variant="outline"
                         size="sm"
-                        className="text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                        className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-100"
                         onClick={() => setHostInstruction(qi.instruction)}
                       >
                         {qi.label}
@@ -269,11 +269,11 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     value={hostInstruction}
                     onChange={(e) => setHostInstruction(e.target.value)}
                     placeholder="Type your instruction for the AI facilitator... (e.g., 'Wrap up the session', 'Ask about implementation challenges', 'Focus on team collaboration')"
-                    className="min-h-[80px] resize-none bg-white border-amber-200 focus:border-amber-400"
+                    className="min-h-[80px] resize-none bg-white border-indigo-200 focus:border-indigo-400"
                   />
                   
                   <div className="flex items-center justify-between mt-3">
-                    <span className="text-xs text-amber-600">
+                    <span className="text-xs text-indigo-600">
                       {hostInstruction.trim() 
                         ? 'Click "Send with Instruction" to generate AI response with your guidance'
                         : 'Or click "Continue" above to let the AI respond naturally'}
@@ -282,7 +282,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       onClick={handleSendWithInstruction}
                       size="sm"
                       disabled={!hostInstruction.trim() || isSending}
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
                       {isSending ? (
                         <span className="flex items-center gap-2">

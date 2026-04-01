@@ -51,8 +51,8 @@ export const FacilitatorCard = ({
       >
         {/* Lock overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/70 z-10">
-          <Lock className="h-6 w-6 text-amber-500 mb-1" />
-          <span className="text-xs font-semibold text-amber-600 text-center leading-tight px-1">Upgrade to unlock</span>
+          <Lock className="h-6 w-6 text-indigo-500 mb-1" />
+          <span className="text-xs font-semibold text-indigo-600 text-center leading-tight px-1">Upgrade to unlock</span>
         </div>
 
         <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full grayscale">

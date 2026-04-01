@@ -95,7 +95,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-[#FFC107]/10">
+    <div className="min-h-screen pt-24 pb-16 bg-indigo-600/10">
       <PageHead title="Log In" description="Sign in to your MyFacilitator account" />
       <div className="max-w-md mx-auto px-4">
         <div className="bg-white rounded-3xl shadow-lg p-8">

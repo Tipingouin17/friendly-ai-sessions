@@ -46,10 +46,10 @@ const LoadingStateContent: React.FC<LoadingStateContentProps> = ({
   return (
     <div className="text-center max-w-md">
       {!isVeryLongWait && !error ? (
-        <div className="w-10 h-10 border-t-2 border-amber-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="w-10 h-10 border-t-2 border-indigo-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
       ) : (
-        error ? <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" /> : 
-               <WifiOff className="w-10 h-10 text-amber-500 mx-auto mb-4" />
+        error ? <AlertCircle className="w-10 h-10 text-indigo-500 mx-auto mb-4" /> : 
+               <WifiOff className="w-10 h-10 text-indigo-500 mx-auto mb-4" />
       )}
       
       <p className="text-gray-600 mb-2 text-lg font-medium">

@@ -119,7 +119,7 @@ const Profile = () => {
             <Card className="overflow-hidden">
               <CardHeader className="border-b pb-6">
                 <div className="flex items-center gap-2">
-                  <User className="h-6 w-6 text-amber-400" />
+                  <User className="h-6 w-6 text-indigo-400" />
                   <CardTitle className="text-2xl">Account Information</CardTitle>
                 </div>
                 <CardDescription className="text-base mt-1 text-left">Your personal information and account details</CardDescription>
@@ -191,7 +191,7 @@ const Profile = () => {
             <Card className="overflow-hidden">
               <CardHeader className="border-b pb-6">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-amber-400" />
+                  <Shield className="h-6 w-6 text-indigo-400" />
                   <CardTitle className="text-2xl">Security Settings</CardTitle>
                 </div>
                 <CardDescription className="text-base mt-1 text-left">Manage your account security preferences</CardDescription>

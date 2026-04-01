@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
-import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
+
 
 interface UseParticipantRealtimeProps {
   conversationId: number | null;
@@ -110,9 +110,9 @@ export function useParticipantRealtime({
           }
         })
         .subscribe((status) => {
-          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+          if (status === 'SUBSCRIBED') {
             setIsLoading(false);
-          } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
+          } else if (status === 'CHANNEL_ERROR') {
             console.error("Error subscribing to participant updates");
             setIsLoading(false);
           }
@@ -180,9 +180,9 @@ export function useParticipantRealtime({
           }
         })
         .subscribe((status) => {
-          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+          if (status === 'SUBSCRIBED') {
             setIsLoading(false);
-          } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
+          } else if (status === 'CHANNEL_ERROR') {
             console.error("Error subscribing to participant events");
             setIsLoading(false);
           }

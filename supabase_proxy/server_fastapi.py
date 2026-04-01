@@ -244,29 +244,57 @@ TABLE_PK: Dict[str, str] = {
 }
 
 
+def _split_top_level(s: str, sep: str = ",") -> List[str]:
+    """Split string on sep only at depth 0 (not inside parentheses)."""
+    parts, depth, current = [], 0, []
+    for ch in s:
+        if ch == '(':
+            depth += 1
+            current.append(ch)
+        elif ch == ')':
+            depth -= 1
+            current.append(ch)
+        elif ch == sep and depth == 0:
+            parts.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(ch)
+    if current:
+        parts.append(''.join(current).strip())
+    return [p for p in parts if p]
+
+
 def _parse_select(select_str: str):
-    """Parse PostgREST select param into (columns, joins)."""
+    """Parse PostgREST select param into (columns, joins).
+    Handles: simple cols, alias:col, table(cols), table!fkey(cols), alias:table!fkey(cols).
+    """
     if not select_str or select_str == "*":
         return ["*"], []
     cols, joins = [], []
-    for part in select_str.split(","):
-        part = part.strip()
+    for part in _split_top_level(select_str):
         if "(" in part:
             joins.append(part)
         else:
             cols.append(part.split(":")[0].strip())
-    return cols, joins
+    return cols or ["*"], joins
 
 
 def _parse_join(join_str: str):
-    """Parse a single join expression like 'sessions(title,objective)'."""
-    m = re.match(r"(\w+)(?::(\w+))?\((.+)\)", join_str)
+    """Parse a single join expression.
+    Handles:
+      - sessions(col1,col2)
+      - sessions!fkey(col1,col2)
+      - alias:sessions!fkey(col1,col2)
+      - facilitator_details:facilitators!sessions_facilitator_fkey(col1,col2)
+    """
+    join_str = join_str.strip()
+    # Pattern: [alias:]table[!constraint](cols)
+    m = re.match(r'^(?:(\w+):)?([\w]+)(?:![\w]+)?\((.+)\)$', join_str, re.DOTALL)
     if not m:
         return None
-    table, alias, cols_str = m.group(1), m.group(2), m.group(3)
+    alias, table, cols_str = m.group(1), m.group(2), m.group(3)
     sub_cols, sub_joins = [], []
-    for part in cols_str.split(","):
-        part = part.strip()
+    for part in _split_top_level(cols_str):
         if "(" in part:
             sub_joins.append(part)
         else:

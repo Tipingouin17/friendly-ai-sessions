@@ -507,6 +507,8 @@ class RealtimeChannelImpl implements RealtimeChannel {
   private reconnect: ReturnType<typeof setTimeout> | null = null;
   private dead = false;
   private ref = 0;
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 5;
 
   constructor(topic: string) { this.topic = topic; }
 
@@ -539,6 +541,7 @@ class RealtimeChannelImpl implements RealtimeChannel {
 
     this.ws.onopen = () => {
       if (this.dead) { this.ws?.close(); return; }
+      this.retryCount = 0; // Reset retry count on successful connection
       this.send({ event: "phx_join", topic: this.topic, payload: {}, ref: String(++this.ref) });
       this.ping = setInterval(() => {
         this.send({ event: "heartbeat", topic: "phoenix", payload: {}, ref: String(++this.ref) });
@@ -596,7 +599,15 @@ class RealtimeChannelImpl implements RealtimeChannel {
 
   private scheduleReconnect(): void {
     if (this.dead) return;
-    this.reconnect = setTimeout(() => { if (!this.dead) this.connect(); }, 3_000);
+    if (this.retryCount >= this.MAX_RETRIES) {
+      // Stop reconnecting after max retries to prevent connection storm
+      this.statusCb?.("CHANNEL_ERROR");
+      return;
+    }
+    // Exponential backoff: 3s, 6s, 12s, 24s, 48s (max ~60s)
+    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), 60_000);
+    this.retryCount++;
+    this.reconnect = setTimeout(() => { if (!this.dead) this.connect(); }, delay);
   }
 
   unsubscribe(): void {

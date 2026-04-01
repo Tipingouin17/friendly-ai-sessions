@@ -9,3 +9,4 @@ pillow>=10.0.0
 werkzeug>=3.0.0
 gunicorn>=21.0.0
 Flask-Limiter>=3.5.0
+stripe>=7.0.0

@@ -61,6 +61,14 @@ export const useMessageProcessor = ({
     // For participant mode, RLS policies now handle filtering at database level
     // But we still apply client-side filtering as a backup layer
     if (viewMode === "participant") {
+      // If currentParticipant is 0, we don't yet know who the current user is.
+      // In that case, show all messages (assistant + all user) to avoid a blank screen
+      // while participant identity is being resolved asynchronously.
+      if (currentParticipant === 0) {
+        debugLog('all', `currentParticipant is 0 (unknown), showing all messages`);
+        return processedMessages;
+      }
+
       const participantKey = String(currentParticipant);
       debugLog('all', `Applying backup client-side filtering for participant key: ${participantKey}`);
       

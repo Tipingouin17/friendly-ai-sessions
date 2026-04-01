@@ -67,11 +67,11 @@ export const validateSecureEnvironment = (): { isSecure: boolean; warnings: stri
   const warnings: string[] = [];
   
   // Check for required environment variables
-  if (!import.meta.env.VITE_SUPABASE_URL) {
+  if (!import.meta.env.VITE_API_URL) {
     warnings.push('Supabase URL not configured');
   }
   
-  if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  if (!import.meta.env.VITE_API_ANON_KEY) {
     warnings.push('Supabase anonymous key not configured');
   }
   
@@ -81,7 +81,7 @@ export const validateSecureEnvironment = (): { isSecure: boolean; warnings: stri
   }
   
   // Validate URL protocols
-  if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.startsWith('https://')) {
+  if (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.startsWith('https://')) {
     warnings.push('Supabase URL should use HTTPS');
   }
   

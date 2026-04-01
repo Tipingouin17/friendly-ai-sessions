@@ -1,7 +1,7 @@
 
-import { User } from '@supabase/supabase-js';
+import { ApiUser } from '@/lib/api';
 
-export const getUserName = (user: User | null): string => {
+export const getUserName = (user: ApiApiUser | null): string => {
   if (!user) return '';
   
   // Try different places where the name might be stored
@@ -14,7 +14,7 @@ export const getUserName = (user: User | null): string => {
   return name;
 };
 
-export const getUserDisplayName = (user: User | null): string => {
+export const getUserDisplayName = (user: ApiApiUser | null): string => {
   const name = getUserName(user);
   return name === 'User' && user?.email ? user.email.split('@')[0] : name;
 };

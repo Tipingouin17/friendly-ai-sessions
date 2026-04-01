@@ -1,12 +1,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { ApiUser, ApiSession } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: ApiUser | null;
+  session: ApiSession | null;
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -26,8 +26,8 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [session, setSession] = useState<ApiSession | null>(null);
   const [loading, setLoading] = useState(true);
   const { logAuthAttempt, logSecurityViolation } = useSecurityAudit();
 
@@ -42,10 +42,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Log authentication events
         if (event === 'SIGNED_IN') {
           logAuthAttempt(true, 'email');
-        } else if (event === 'SIGNED_OUT') {
-          // Clear any sensitive data on logout
-          localStorage.removeItem('supabase.auth.token');
-          sessionStorage.clear();
         }
       }
     );
@@ -124,17 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      // Clear sensitive data before logout
-      const keysToRemove = Object.keys(localStorage).filter(key =>
-        key.includes('session') || key.includes('participant') || key.includes('auth')
-      );
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-      sessionStorage.clear();
-
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-    } catch (error) {
-      logSecurityViolation('logout_failed', { error: error.message });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Logout failed';
+      logSecurityViolation('logout_failed', { error: msg });
       throw error;
     }
   };
@@ -149,8 +139,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         redirectTo: `${window.location.origin}/reset-password`
       });
       if (error) throw error;
-    } catch (error) {
-      logSecurityViolation('password_reset_failed', { error: error.message });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Reset failed';
+      logSecurityViolation('password_reset_failed', { error: msg });
       throw error;
     }
   };

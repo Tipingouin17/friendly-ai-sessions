@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User } from '@supabase/supabase-js';
+import { ApiUser } from '@/lib/api';
 
 interface EditProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
-    user: User | null;
+    user: ApiUser | null;
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, user }) => {

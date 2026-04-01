@@ -95,7 +95,7 @@ export function useParticipantDatabase(conversationId: number | null) {
           if (missingParticipants.length > 0) {
             const { error: insertError } = await supabase
               .from('session_participants')
-              .insert(
+              .upsert(
                 missingParticipants.map(p => ({
                   conversation_id: conversationId,
                   participant_id: p.participant_id,
@@ -103,11 +103,12 @@ export function useParticipantDatabase(conversationId: number | null) {
                   avatar_seed: p.avatar_seed,
                   is_anonymous: p.is_anonymous,
                   is_host: p.is_host
-                }))
+                })),
+                { onConflict: 'conversation_id,participant_id', ignoreDuplicates: true }
               );
 
             if (insertError) {
-              console.error('Error inserting missing participants:', insertError);
+              console.error('Error upserting missing participants:', insertError);
             } else { /* no-op */ }
           }
         }

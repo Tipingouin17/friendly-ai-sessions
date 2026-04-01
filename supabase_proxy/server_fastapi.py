@@ -983,12 +983,12 @@ async def edge_function(func_name: str, request: Request):
         generate_report = data.get("generateReport", False)
         host_instruction = (data.get("hostInstruction") or "").strip()
 
-        # Idempotency guard: prevent duplicate AI responses within 8 seconds
+        # Idempotency guard: prevent duplicate AI responses within 10 seconds
         if conv_id and not generate_report:
             _now = time.time()
-            _lock_key = f"ai_lock_{conv_id}_{is_session_start}"
+            _lock_key = f"ai_lock_{conv_id}"
             _last = _ai_response_locks.get(_lock_key, 0)
-            if _now - _last < 8:
+            if _now - _last < 10:
                 return {"success": True, "skipped": True, "reason": "duplicate_prevention"}
             _ai_response_locks[_lock_key] = _now
 

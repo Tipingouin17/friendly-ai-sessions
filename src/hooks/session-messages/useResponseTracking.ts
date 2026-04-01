@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 interface UseResponseTrackingProps {
   currentUserParticipantId: number | null;
@@ -8,16 +8,12 @@ interface UseResponseTrackingProps {
 export const useResponseTracking = ({
   currentUserParticipantId
 }: UseResponseTrackingProps) => {
-  const [currentParticipant, setCurrentParticipant] = useState<number>(0);
   const [hasAnswered, setHasAnswered] = useState<boolean>(false);
   const [totalResponses, setTotalResponses] = useState<number>(0);
   
-  // Set up the current participant
-  useEffect(() => {
-    if (currentUserParticipantId) {
-      setCurrentParticipant(currentUserParticipantId);
-    }
-  }, [currentUserParticipantId]);
+  // Use currentUserParticipantId directly to avoid timing issues where
+  // a separate state starts at 0 and hasn't been updated yet when a message is sent
+  const currentParticipant = currentUserParticipantId ?? 0;
   
   // Record response for a participant
   const recordResponse = useCallback((participantId: number, hasResponded: boolean) => {

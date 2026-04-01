@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Mic, Send, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,37 +23,68 @@ const ChatInput = ({
   onSendMessage,
   isRecording = false,
   setIsRecording = () => { /* no-op */ },
-  placeholder = "Type a message", // Updated to consistent placeholder
+  placeholder = "Type your message...",
   disabled = false,
   isMobile = false
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Track the text that existed before recording started so we can append the transcript to it
+  const preRecordingTextRef = useRef<string>('');
+  const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognitionAPI) {
+        setSpeechSupported(true);
+        recognitionRef.current = new SpeechRecognitionAPI();
         recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
 
         recognitionRef.current.onresult = (event) => {
+          // Build the full transcript from all results
           const transcript = Array.from(event.results)
             .map(result => result[0].transcript)
             .join('');
-          setInputMessage(transcript);
+          // Append the live transcript to whatever text existed before recording started
+          const combined = preRecordingTextRef.current
+            ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
+            : transcript;
+          setInputMessage(combined);
         };
 
         recognitionRef.current.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
           setIsRecording(false);
-          toast({
-            title: "Error",
-            description: "There was an error with speech recognition. Please try again.",
-            variant: "destructive",
-          });
+          if (event.error === 'not-allowed') {
+            toast({
+              title: "Microphone Access Denied",
+              description: "Please allow microphone access in your browser settings to use voice input.",
+              variant: "destructive",
+            });
+          } else if (event.error === 'no-speech') {
+            toast({
+              title: "No Speech Detected",
+              description: "No speech was detected. Please try again.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Voice Input Error",
+              description: "There was an error with voice input. Please try again.",
+              variant: "destructive",
+            });
+          }
         };
+
+        recognitionRef.current.onend = () => {
+          // Auto-stop recording state when recognition ends
+          setIsRecording(false);
+        };
+      } else {
+        setSpeechSupported(false);
       }
     }
 
@@ -65,19 +96,32 @@ const ChatInput = ({
   }, [setInputMessage, setIsRecording]);
 
   const handleStartRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.start();
-      setIsRecording(true);
+    if (!speechSupported) {
       toast({
-        title: "Recording started",
-        description: "Your voice is being recorded...",
-      });
-    } else {
-      toast({
-        title: "Speech Recognition Not Available",
-        description: "Your browser doesn't support speech recognition.",
+        title: "Voice Input Not Supported",
+        description: "Your browser doesn't support voice input. Try Chrome or Edge.",
         variant: "destructive",
       });
+      return;
+    }
+    if (recognitionRef.current) {
+      // Save current text so we can append the transcript to it
+      preRecordingTextRef.current = inputMessage;
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+        toast({
+          title: "Listening...",
+          description: "Speak now. Click the stop button when done.",
+        });
+      } catch (err) {
+        console.error('Failed to start speech recognition:', err);
+        toast({
+          title: "Could Not Start Voice Input",
+          description: "Please check your microphone permissions and try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -86,18 +130,16 @@ const ChatInput = ({
       recognitionRef.current.stop();
     }
     setIsRecording(false);
-    toast({
-      title: "Recording stopped",
-      description: "Processing your message...",
-    });
   };
 
   const handleSendClick = () => {
-    
     if (!inputMessage.trim() || disabled) {
       return;
     }
-    
+    // Stop recording if active before sending
+    if (isRecording) {
+      handleStopRecording();
+    }
     onSendMessage();
   };
 
@@ -127,8 +169,21 @@ const ChatInput = ({
             variant="ghost"
             size="icon"
             onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} ${isRecording ? "text-red-600" : "text-gray-500 hover:text-gray-700"}`}
+            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} ${
+              isRecording
+                ? "text-red-600 animate-pulse"
+                : speechSupported === false
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:text-indigo-600"
+            }`}
             disabled={disabled}
+            title={
+              isRecording
+                ? "Stop recording"
+                : speechSupported === false
+                  ? "Voice input not supported in this browser"
+                  : "Start voice input"
+            }
           >
             {isRecording ? (
               <StopCircle className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
@@ -146,6 +201,12 @@ const ChatInput = ({
           </Button>
         </div>
       </div>
+      {isRecording && (
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
+          <span className="inline-block h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+          <span>Listening… speak now, then click stop or press Enter to send.</span>
+        </div>
+      )}
     </div>
   );
 };

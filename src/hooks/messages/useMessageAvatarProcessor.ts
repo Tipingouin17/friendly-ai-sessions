@@ -21,7 +21,8 @@ export const useMessageAvatarProcessor = () => {
     // Handle participant name display
     let displayName = isAnonymous ? "Anonymous participant" : 
                      participantInfo?.name || 
-                     (typeof message.participant === 'string' ? message.participant : "Participant");
+                     message.name ||  // Use name from message content if available
+                     (typeof message.participant === 'string' && message.participant !== '0' ? `Participant ${message.participant}` : "Participant");
     
     // Don't show "Participant X" if we have a real name
     if (displayName.startsWith("Participant") && participantInfo?.name) {

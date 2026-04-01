@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Explicitly ensure PyJWT is installed (handles import as 'jwt')
 RUN pip install --no-cache-dir PyJWT==2.8.0
 
-# Copy application code
-COPY server.py .
+# Copy application code (FastAPI server replaces Flask server)
+COPY server_fastapi.py ./server.py
 
 # Copy facilitator avatar images and any other storage assets into the image
 # This ensures avatars are available in production without needing a volume mount
@@ -34,8 +34,9 @@ USER appuser
 EXPOSE 3333
 
 # Health check so Railway/Docker can verify the service is alive
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:3333/health')" || exit 1
 
-# Run the application with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:3333", "--workers", "2", "--timeout", "120", "server:app"]
+# Run FastAPI with uvicorn (async, native WebSocket support)
+# Single worker — WebSocket connection state is in-process
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "3333", "--workers", "1", "--loop", "asyncio"]

@@ -1,0 +1,1626 @@
+"""
+FastAPI-based Supabase-compatible proxy server.
+Replaces the Flask server with full async support and native WebSocket realtime.
+Emulates PostgREST, GoTrue Auth, Edge Functions, Storage, and Realtime WebSocket.
+"""
+from __future__ import annotations
+
+import os
+import re
+import json
+import uuid
+import time
+import hashlib
+import traceback
+import asyncio
+from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import jwt
+import psycopg2
+import psycopg2.extras
+import stripe as stripe_lib
+from fastapi import (
+    FastAPI, Request, Response, WebSocket, WebSocketDisconnect,
+    HTTPException, Depends, Header, Path, Query
+)
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from openai import OpenAI
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# ============================================================
+# OpenAI client
+# ============================================================
+openai_client = OpenAI()
+
+# ============================================================
+# App & rate limiter
+# ============================================================
+limiter = Limiter(key_func=get_remote_address)
+app = FastAPI(title="MyFacilitator Proxy", version="3.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ============================================================
+# CORS
+# ============================================================
+_cors_env = os.environ.get("ALLOWED_ORIGINS", "")
+ALLOWED_CORS_ORIGINS = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "https://friendly-ai-sessions.vercel.app",
+    ]
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=[
+        "authorization", "x-client-info", "apikey", "content-type", "prefer",
+        "range", "x-supabase-api-version", "x-upsert", "x-profile-id",
+        "cache-control", "pragma", "content-profile", "accept-profile",
+        "accept", "origin", "x-forwarded-for", "x-request-id", "x-real-ip",
+        "baggage", "sentry-trace",
+    ],
+    expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"],
+)
+
+# ============================================================
+# Database configuration
+# ============================================================
+DB_URL = os.environ.get("DATABASE_URL")
+DB_NAME = os.environ.get("PGDATABASE") or os.environ.get("DB_NAME", "ai_facilitator")
+DB_USER = os.environ.get("PGUSER") or os.environ.get("DB_USER", "postgres")
+DB_HOST = os.environ.get("PGHOST") or os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", "5432"))
+DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
+STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
+
+# ============================================================
+# Stripe configuration
+# ============================================================
+_stripe_env = os.environ.get("STRIPE_ENV", "test").lower()
+if _stripe_env == "live":
+    stripe_lib.api_key = os.environ.get("STRIPE_SECRET_KEY_LIVE", "")
+    STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_LIVE", "")
+else:
+    stripe_lib.api_key = os.environ.get("STRIPE_SECRET_KEY_TEST", "")
+    STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "")
+STRIPE_CONFIGURED = bool(stripe_lib.api_key)
+
+# ============================================================
+# AI model mapping
+# ============================================================
+GPT_MODEL_MAP = {
+    "gpt-4": "gpt-4.1-mini",
+    "gpt-4o": "gpt-4.1-mini",
+    "gpt-4-turbo": "gpt-4.1-mini",
+    "gpt-3.5-turbo": "gpt-4.1-nano",
+    "gpt-3.5": "gpt-4.1-nano",
+}
+DEFAULT_AI_MODEL = "gpt-4.1-mini"
+
+# ============================================================
+# In-memory user store (pre-registered users)
+# ============================================================
+USERS: Dict[str, Dict] = {}
+SESSIONS_AUTH: Dict[str, Dict] = {}
+
+USERS["admin@myfacilitator.com"] = {
+    "id": "4c34d445-307a-4bf6-810e-1e06325cd2fc",
+    "email": "admin@myfacilitator.com",
+    "password": hashlib.sha256("admin123".encode()).hexdigest(),
+    "created_at": "2025-02-28T03:15:56Z",
+    "email_confirmed_at": "2025-02-28T03:15:56Z",
+}
+USERS["test@myfacilitator.com"] = {
+    "id": "5efc6527-0252-4494-97ba-4649e6dc1059",
+    "email": "test@myfacilitator.com",
+    "password": hashlib.sha256("test123".encode()).hexdigest(),
+    "created_at": "2025-02-28T03:15:56Z",
+    "email_confirmed_at": "2025-02-28T03:15:56Z",
+}
+
+# ============================================================
+# Allowed RPC functions (security whitelist)
+# ============================================================
+ALLOWED_RPC_FUNCTIONS = {
+    "is_session_host", "is_system_admin", "get_user_plan_limits",
+    "get_session_stats", "increment_session_count",
+}
+
+# ============================================================
+# Database helpers
+# ============================================================
+def get_db() -> psycopg2.extensions.connection:
+    """Open a synchronous psycopg2 connection."""
+    if DB_URL:
+        conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, host=DB_HOST,
+            port=DB_PORT, password=DB_PASSWORD,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
+    conn.autocommit = False
+    return conn
+
+
+def serialize_row(row: dict) -> dict:
+    """Convert psycopg2 row to JSON-serialisable dict."""
+    result = {}
+    for k, v in row.items():
+        if isinstance(v, datetime):
+            result[k] = v.isoformat()
+        elif isinstance(v, Decimal):
+            result[k] = float(v)
+        elif isinstance(v, (bytes, bytearray)):
+            result[k] = v.decode("utf-8", errors="replace")
+        else:
+            result[k] = v
+    return result
+
+
+# ============================================================
+# Auth helpers
+# ============================================================
+def _make_token(user_id: str, email: str, role: str = "authenticated") -> str:
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "role": role,
+        "iss": "supabase",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 86400 * 30,
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def _make_user_response(user: dict, token: str) -> dict:
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 86400 * 30,
+        "refresh_token": str(uuid.uuid4()),
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "role": "authenticated",
+            "email_confirmed_at": user.get("email_confirmed_at", datetime.utcnow().isoformat()),
+            "created_at": user.get("created_at", datetime.utcnow().isoformat()),
+            "updated_at": datetime.utcnow().isoformat(),
+            "app_metadata": {"provider": "email"},
+            "user_metadata": {},
+            "aud": "authenticated",
+        },
+    }
+
+
+def get_current_user(request: Request) -> Optional[dict]:
+    """Decode JWT from Authorization header. Returns None if missing/invalid."""
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except Exception:
+        return None
+
+
+# ============================================================
+# PostgREST query helpers
+# ============================================================
+FK_MAP: Dict[str, tuple] = {
+    # constraint_name: (table, fk_col, foreign_table, foreign_col)
+    "conversations_sessions_id_fkey": ("conversations", "sessions_id", "sessions", "id"),
+    "conversations_user_id_fkey": ("conversations", "user_id", "profiles", "id"),
+    "sessions_facilitator_fkey": ("sessions", "facilitator", "facilitators", "id"),
+    "sessions_user_id_fkey": ("sessions", "user_id", "profiles", "id"),
+    "messages_conversation_id_fkey": ("messages", "conversation_id", "conversations", "id"),
+    "session_participants_conversation_id_fkey": ("session_participants", "conversation_id", "conversations", "id"),
+    "session_events_conversation_id_fkey": ("session_events", "conversation_id", "conversations", "id"),
+    "session_reports_conversation_id_fkey": ("session_reports", "conversation_id", "conversations", "id"),
+    "profiles_current_plan_id_fkey": ("profiles", "current_plan_id", "plans", "id"),
+    "facilitators_user_id_fkey": ("facilitators", "user_id", "profiles", "id"),
+}
+
+TABLE_PK: Dict[str, str] = {
+    "conversations": "id", "sessions": "id", "messages": "id",
+    "profiles": "id", "facilitators": "id", "plans": "id",
+    "session_participants": "id", "session_events": "id",
+    "session_reports": "id", "faqs": "id",
+}
+
+
+def _parse_select(select_str: str):
+    """Parse PostgREST select param into (columns, joins)."""
+    if not select_str or select_str == "*":
+        return ["*"], []
+    cols, joins = [], []
+    for part in select_str.split(","):
+        part = part.strip()
+        if "(" in part:
+            joins.append(part)
+        else:
+            cols.append(part.split(":")[0].strip())
+    return cols, joins
+
+
+def _parse_join(join_str: str):
+    """Parse a single join expression like 'sessions(title,objective)'."""
+    m = re.match(r"(\w+)(?::(\w+))?\((.+)\)", join_str)
+    if not m:
+        return None
+    table, alias, cols_str = m.group(1), m.group(2), m.group(3)
+    sub_cols, sub_joins = [], []
+    for part in cols_str.split(","):
+        part = part.strip()
+        if "(" in part:
+            sub_joins.append(part)
+        else:
+            sub_cols.append(part.split(":")[0].strip())
+    return {
+        "table": table,
+        "alias": alias or table,
+        "columns": sub_cols,
+        "sub_joins": sub_joins,
+        "constraint": None,
+    }
+
+
+def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
+    """Resolve a single foreign-key join and attach results to parent_rows."""
+    if isinstance(join_spec, str):
+        join_spec = _parse_join(join_spec)
+    if not join_spec:
+        return
+    join_table = join_spec["table"]
+    key_name = join_spec.get("alias") or join_table
+    base_cols = join_spec.get("columns") or ["*"]
+    sub_joins = join_spec.get("sub_joins") or []
+
+    # Determine join direction from FK_MAP
+    direction = None
+    fk_col = parent_col = None
+    for constraint, (tbl, fc, ftbl, fpc) in FK_MAP.items():
+        if tbl == parent_table and ftbl == join_table:
+            direction, fk_col, parent_col = "child_to_parent", fc, fpc
+            break
+        if tbl == join_table and ftbl == parent_table:
+            direction, fk_col, parent_col = "parent_to_child", fc, fpc
+            break
+
+    if not direction:
+        for row in parent_rows:
+            row[key_name] = None
+        return
+
+    extra_join_cols: list = []
+    for sj in sub_joins:
+        sj_parsed = _parse_join(sj) if isinstance(sj, str) else sj
+        if sj_parsed:
+            sjt = sj_parsed["table"]
+            sjc = sj_parsed.get("constraint")
+            if sjc and sjc in FK_MAP:
+                sj_tbl, sj_col, sj_ftbl, sj_fcol = FK_MAP[sjc]
+                if sj_tbl == join_table and sj_ftbl == sjt and sj_col not in base_cols and sj_col not in extra_join_cols:
+                    extra_join_cols.append(sj_col)
+                elif sj_tbl == sjt and sj_ftbl == join_table and sj_fcol not in base_cols and sj_fcol not in extra_join_cols:
+                    extra_join_cols.append(sj_fcol)
+
+    all_sub_cols = base_cols + extra_join_cols
+    col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_sub_cols]) if all_sub_cols else "*"
+    cur = conn.cursor()
+
+    if direction == "child_to_parent":
+        fk_values = list(set(r.get(fk_col) for r in parent_rows if r.get(fk_col) is not None))
+        if not fk_values:
+            for r in parent_rows:
+                r[key_name] = None
+            return
+        ph = ",".join(["%s"] * len(fk_values))
+        cur.execute(f'SELECT {col_str} FROM public."{join_table}" WHERE "{parent_col}" IN ({ph})', fk_values)
+        jrows = [serialize_row(dict(r)) for r in cur.fetchall()]
+        for sj in sub_joins:
+            resolve_join(join_table, sj, jrows, conn)
+        jmap = {jr.get(parent_col): jr for jr in jrows}
+        for row in parent_rows:
+            matched = jmap.get(row.get(fk_col))
+            if matched and extra_join_cols:
+                matched = {k: v for k, v in matched.items() if k not in extra_join_cols}
+            row[key_name] = matched
+
+    elif direction == "parent_to_child":
+        pids = list(set(r.get(parent_col) for r in parent_rows if r.get(parent_col) is not None))
+        if not pids:
+            for r in parent_rows:
+                r[key_name] = []
+            return
+        ph = ",".join(["%s"] * len(pids))
+        cur.execute(f'SELECT {col_str} FROM public."{join_table}" WHERE "{fk_col}" IN ({ph})', pids)
+        jrows = [serialize_row(dict(r)) for r in cur.fetchall()]
+        for sj in sub_joins:
+            resolve_join(join_table, sj, jrows, conn)
+        groups: Dict[Any, list] = {}
+        for jr in jrows:
+            groups.setdefault(jr.get(fk_col), []).append(jr)
+        for row in parent_rows:
+            items = groups.get(row.get(parent_col), [])
+            if extra_join_cols:
+                items = [{k: v for k, v in it.items() if k not in extra_join_cols} for it in items]
+            row[key_name] = items
+
+
+def build_where(params: dict):
+    wc, wv = [], []
+    for key, value in params.items():
+        if key in ("select", "order", "limit", "offset", "on_conflict", "columns", "count"):
+            continue
+        if value.startswith("eq."):
+            wc.append(f'"{key}" = %s'); wv.append(value[3:])
+        elif value.startswith("neq."):
+            wc.append(f'"{key}" != %s'); wv.append(value[4:])
+        elif value.startswith("gt."):
+            wc.append(f'"{key}" > %s'); wv.append(value[3:])
+        elif value.startswith("gte."):
+            wc.append(f'"{key}" >= %s'); wv.append(value[4:])
+        elif value.startswith("lt."):
+            wc.append(f'"{key}" < %s'); wv.append(value[3:])
+        elif value.startswith("lte."):
+            wc.append(f'"{key}" <= %s'); wv.append(value[4:])
+        elif value.startswith("like."):
+            wc.append(f'"{key}" LIKE %s'); wv.append(value[5:])
+        elif value.startswith("ilike."):
+            wc.append(f'"{key}" ILIKE %s'); wv.append(value[6:])
+        elif value.startswith("is."):
+            v = value[3:]
+            if v == "null":
+                wc.append(f'"{key}" IS NULL')
+            elif v == "true":
+                wc.append(f'"{key}" = true')
+            elif v == "false":
+                wc.append(f'"{key}" = false')
+        elif value.startswith("in."):
+            items = [i.strip().strip('"').strip("'") for i in value[3:].strip("()").split(",")]
+            wc.append(f'"{key}" IN ({",".join(["%s"] * len(items))})')
+            wv.extend(items)
+        elif value.startswith("not."):
+            rest = value[4:]
+            if rest.startswith("eq."):
+                wc.append(f'"{key}" != %s'); wv.append(rest[3:])
+            elif rest.startswith("is.null"):
+                wc.append(f'"{key}" IS NOT NULL')
+        else:
+            wc.append(f'"{key}" = %s'); wv.append(value)
+    return wc, wv
+
+
+def build_order(order_str: str) -> str:
+    if not order_str:
+        return ""
+    parts = []
+    for o in order_str.split(","):
+        o = o.strip()
+        if ".desc" in o:
+            col = o.replace(".desc", "").replace(".nullslast", "").replace(".nullsfirst", "")
+            parts.append(f'"{col}" DESC')
+        elif ".asc" in o:
+            col = o.replace(".asc", "").replace(".nullslast", "").replace(".nullsfirst", "")
+            parts.append(f'"{col}" ASC')
+        else:
+            parts.append(f'"{o}" ASC')
+    return "ORDER BY " + ", ".join(parts)
+
+
+# ============================================================
+# WebSocket connection manager (realtime)
+# ============================================================
+class ConnectionManager:
+    """Manages active WebSocket connections grouped by conversation_id."""
+
+    def __init__(self):
+        # conversation_id -> list of WebSocket
+        self._rooms: Dict[str, List[WebSocket]] = {}
+        self._lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket, conversation_id: str):
+        await ws.accept()
+        async with self._lock:
+            self._rooms.setdefault(conversation_id, []).append(ws)
+
+    async def disconnect(self, ws: WebSocket, conversation_id: str):
+        async with self._lock:
+            room = self._rooms.get(conversation_id, [])
+            if ws in room:
+                room.remove(ws)
+            if not room:
+                self._rooms.pop(conversation_id, None)
+
+    async def broadcast(self, conversation_id: str, payload: dict):
+        """Send a message to all connections in a room."""
+        room = list(self._rooms.get(conversation_id, []))
+        dead = []
+        for ws in room:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            await self.disconnect(ws, conversation_id)
+
+    async def broadcast_all(self, payload: dict):
+        """Broadcast to every connected client."""
+        for conv_id in list(self._rooms.keys()):
+            await self.broadcast(conv_id, payload)
+
+
+manager = ConnectionManager()
+
+
+# ============================================================
+# Health
+# ============================================================
+@app.get("/")
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "myfacilitator-proxy", "version": "3.0.0"}
+
+
+@app.get("/rest/v1/")
+async def rest_root():
+    return {"swagger": "2.0", "info": {"title": "PostgREST API", "version": "11.0.0"}}
+
+
+# ============================================================
+# Auth endpoints
+# ============================================================
+@app.post("/auth/v1/signup")
+async def auth_signup(request: Request):
+    data = await request.json()
+    email = (data.get("email") or "").lower().strip()
+    password = data.get("password", "")
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+
+    # Check if user already exists in memory
+    if email in USERS:
+        raise HTTPException(400, detail={"code": "user_already_exists", "message": "User already registered"})
+
+    # Create in DB
+    user_id = str(uuid.uuid4())
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO profiles (id, email, full_name, role, created_at, updated_at) "
+            "VALUES (%s, %s, %s, 'user', NOW(), NOW()) ON CONFLICT (id) DO NOTHING",
+            (user_id, email, data.get("options", {}).get("data", {}).get("full_name", "")),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Signup DB error: {e}")
+
+    USERS[email] = {
+        "id": user_id,
+        "email": email,
+        "password": pw_hash,
+        "created_at": datetime.utcnow().isoformat(),
+        "email_confirmed_at": datetime.utcnow().isoformat(),
+    }
+    token = _make_token(user_id, email)
+    return _make_user_response(USERS[email], token)
+
+
+@app.post("/auth/v1/token")
+async def auth_token(request: Request, grant_type: str = Query(default="password")):
+    data = await request.json()
+    email = (data.get("email") or "").lower().strip()
+    password = data.get("password", "")
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    # Check in-memory store first
+    user = USERS.get(email)
+    if not user:
+        # Try DB lookup
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT id, email FROM profiles WHERE email = %s", (email,))
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                user = {
+                    "id": str(row["id"]),
+                    "email": row["email"],
+                    "password": pw_hash,  # accept any password for DB users
+                    "created_at": datetime.utcnow().isoformat(),
+                    "email_confirmed_at": datetime.utcnow().isoformat(),
+                }
+                USERS[email] = user
+        except Exception as e:
+            print(f"Auth DB lookup error: {e}")
+
+    if not user or user.get("password") != pw_hash:
+        raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
+
+    token = _make_token(user["id"], user["email"])
+    return _make_user_response(user, token)
+
+
+@app.get("/auth/v1/user")
+@app.put("/auth/v1/user")
+async def auth_user(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    if request.method == "PUT":
+        data = await request.json()
+        # Update profile in DB
+        user_id = user.get("sub") or user.get("id")
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            updates = {}
+            if "data" in data:
+                meta = data["data"]
+                if "full_name" in meta:
+                    updates["full_name"] = meta["full_name"]
+                if "avatar_url" in meta:
+                    updates["avatar_url"] = meta["avatar_url"]
+            if updates:
+                set_clause = ", ".join([f'"{k}" = %s' for k in updates.keys()])
+                cur.execute(
+                    f'UPDATE profiles SET {set_clause}, updated_at = NOW() WHERE id = %s',
+                    list(updates.values()) + [user_id],
+                )
+                conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Update user error: {e}")
+    return {
+        "id": user.get("sub") or user.get("id"),
+        "email": user.get("email", ""),
+        "role": "authenticated",
+        "email_confirmed_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        "app_metadata": {"provider": "email"},
+        "user_metadata": {},
+        "aud": "authenticated",
+    }
+
+
+@app.post("/auth/v1/logout")
+async def auth_logout():
+    return Response(status_code=204)
+
+
+# Stub endpoints for Supabase auth compatibility
+@app.post("/auth/v1/recover")
+@app.get("/auth/v1/callback")
+@app.post("/auth/v1/callback")
+@app.post("/auth/v1/resend")
+@app.post("/auth/v1/verify")
+@app.post("/auth/v1/otp")
+@app.get("/auth/v1/authorize")
+@app.post("/auth/v1/sso")
+async def auth_stub():
+    return {}
+
+
+@app.get("/auth/v1/mfa/factors")
+async def auth_mfa_factors():
+    return {"totp": [], "phone": []}
+
+
+@app.post("/auth/v1/mfa/enroll")
+async def auth_mfa_enroll():
+    return {"id": str(uuid.uuid4()), "type": "totp", "totp": {"qr_code": "", "secret": "", "uri": ""}}
+
+
+@app.post("/auth/v1/mfa/challenge")
+async def auth_mfa_challenge():
+    return {"id": str(uuid.uuid4())}
+
+
+@app.post("/auth/v1/mfa/verify")
+async def auth_mfa_verify():
+    return {"success": True}
+
+
+# ============================================================
+# PostgREST RPC
+# ============================================================
+@app.post("/rest/v1/rpc/{func_name}")
+async def rpc_call(func_name: str, request: Request):
+    if func_name not in ALLOWED_RPC_FUNCTIONS:
+        raise HTTPException(403, f"RPC function '{func_name}' is not allowed")
+    data = await request.json()
+    user = get_current_user(request)
+    user_id = (user.get("sub") or user.get("id")) if user else None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        if func_name == "is_session_host":
+            conversation_id = data.get("conversation_id")
+            if not user_id or not conversation_id:
+                conn.close()
+                return False
+            cur.execute(
+                "SELECT EXISTS(SELECT 1 FROM public.conversations WHERE id = %s AND user_id = %s::uuid)",
+                (conversation_id, user_id),
+            )
+            result = cur.fetchone()
+            conn.close()
+            val = list(result.values())[0] if isinstance(result, dict) else result[0]
+            return bool(val)
+        if func_name == "is_system_admin":
+            if not user_id:
+                conn.close()
+                return False
+            cur.execute(
+                "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = %s::uuid AND role = 'admin')",
+                (user_id,),
+            )
+            result = cur.fetchone()
+            conn.close()
+            val = list(result.values())[0] if isinstance(result, dict) else result[0]
+            return bool(val)
+        # Generic RPC
+        if data:
+            param_names = ", ".join([f"{k} := %s" for k in data.keys()])
+            cur.execute(f"SELECT * FROM public.{func_name}({param_names})", list(data.values()))
+        else:
+            cur.execute(f"SELECT * FROM public.{func_name}()")
+        result = cur.fetchone()
+        conn.close()
+        if result and len(result) == 1:
+            val = list(result.values())[0] if isinstance(result, dict) else result[0]
+            if isinstance(val, Decimal):
+                val = float(val)
+            return val
+        elif result:
+            return serialize_row(dict(result))
+        return None
+    except Exception as e:
+        print(f"RPC error {func_name}: {e}")
+        traceback.print_exc()
+        raise HTTPException(400, str(e))
+
+
+# ============================================================
+# PostgREST REST table CRUD
+# ============================================================
+@app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
+async def rest_table(table: str, request: Request):
+    params = dict(request.query_params)
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        if request.method in ("GET", "HEAD"):
+            select_str = params.get("select", "*")
+            base_cols, joins = _parse_select(select_str)
+            # Detect extra FK cols needed for joins
+            extra_fk_cols: list = []
+            for j in joins:
+                jp = _parse_join(j) if isinstance(j, str) else j
+                if not jp:
+                    continue
+                jt = jp["table"]
+                for constraint, (tbl, fc, ftbl, fpc) in FK_MAP.items():
+                    needed_col = None
+                    if tbl == table and ftbl == jt:
+                        needed_col = fc
+                    elif tbl == jt and ftbl == table:
+                        needed_col = fpc
+                    if needed_col and needed_col not in base_cols and needed_col not in extra_fk_cols:
+                        extra_fk_cols.append(needed_col)
+            all_cols = base_cols + extra_fk_cols
+            col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_cols]) if all_cols else "*"
+            wc, wv = build_where(params)
+            oc = build_order(params.get("order", ""))
+            lim = params.get("limit", "")
+            off = params.get("offset", "")
+            sql = f'SELECT {col_str} FROM public."{table}"'
+            if wc:
+                sql += " WHERE " + " AND ".join(wc)
+            if oc:
+                sql += " " + oc
+            if lim:
+                sql += f" LIMIT {int(lim)}"
+            if off:
+                sql += f" OFFSET {int(off)}"
+            cur.execute(sql, wv)
+            rows = [serialize_row(dict(r)) for r in cur.fetchall()]
+            for j in joins:
+                resolve_join(table, j, rows, conn)
+            if extra_fk_cols:
+                for row in rows:
+                    for ec in extra_fk_cols:
+                        row.pop(ec, None)
+            prefer = request.headers.get("prefer", "")
+            accept = request.headers.get("accept", "")
+            content_range = f"0-{len(rows)-1}/{len(rows)}" if rows else "*/0"
+            if "vnd.pgrst.object" in accept and rows:
+                body = rows[0]
+            elif "return=representation" in prefer and len(rows) == 1:
+                body = rows[0]
+            else:
+                body = rows
+            conn.close()
+            return JSONResponse(content=body, headers={"Content-Range": content_range})
+
+        if request.method == "POST":
+            data = await request.json()
+            if not data:
+                conn.close()
+                raise HTTPException(400, "No data")
+
+            def _adapt(d):
+                return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
+
+            if isinstance(data, list):
+                results = []
+                for item in data:
+                    cols = ", ".join([f'"{k}"' for k in item.keys()])
+                    vals = ", ".join(["%s"] * len(item))
+                    cur.execute(f'INSERT INTO public."{table}" ({cols}) VALUES ({vals}) RETURNING *', _adapt(item))
+                    row = cur.fetchone()
+                    if row:
+                        results.append(serialize_row(dict(row)))
+                conn.commit()
+                conn.close()
+                # Broadcast new message to WebSocket clients
+                if table == "messages" and results:
+                    conv_id = str(results[0].get("conversation_id", ""))
+                    asyncio.create_task(manager.broadcast(conv_id, {
+                        "event": "INSERT", "table": "messages", "new": results[0]
+                    }))
+                return JSONResponse(content=results, status_code=201)
+            else:
+                cols = ", ".join([f'"{k}"' for k in data.keys()])
+                vals = ", ".join(["%s"] * len(data))
+                oc = params.get("on_conflict", "")
+                sql = f'INSERT INTO public."{table}" ({cols}) VALUES ({vals})'
+                if oc:
+                    uc = ", ".join([f'"{k}" = EXCLUDED."{k}"' for k in data.keys() if k != oc])
+                    sql += (
+                        f' ON CONFLICT ("{oc}") DO UPDATE SET {uc}'
+                        if uc
+                        else f' ON CONFLICT ("{oc}") DO NOTHING'
+                    )
+                sql += " RETURNING *"
+                cur.execute(sql, _adapt(data))
+                row = cur.fetchone()
+                conn.commit()
+                conn.close()
+                result = serialize_row(dict(row)) if row else {}
+                # Broadcast new message
+                if table == "messages" and result:
+                    conv_id = str(result.get("conversation_id", ""))
+                    asyncio.create_task(manager.broadcast(conv_id, {
+                        "event": "INSERT", "table": "messages", "new": result
+                    }))
+                return JSONResponse(content=result, status_code=201)
+
+        if request.method == "PATCH":
+            data = await request.json()
+            if not data:
+                conn.close()
+                raise HTTPException(400, "No data")
+            wc, wv = build_where(params)
+            sc = ", ".join([f'"{k}" = %s' for k in data.keys()])
+            values = list(data.values()) + wv
+            sql = f'UPDATE public."{table}" SET {sc}'
+            if wc:
+                sql += " WHERE " + " AND ".join(wc)
+            sql += " RETURNING *"
+            cur.execute(sql, values)
+            rows = cur.fetchall()
+            conn.commit()
+            conn.close()
+            result = [serialize_row(dict(r)) for r in rows]
+            # Broadcast updates for conversations/session_participants
+            if table in ("conversations", "session_participants") and result:
+                conv_id = str(result[0].get("id") or result[0].get("conversation_id", ""))
+                asyncio.create_task(manager.broadcast(conv_id, {
+                    "event": "UPDATE", "table": table, "new": result[0]
+                }))
+            return result[0] if len(result) == 1 else result
+
+        if request.method == "DELETE":
+            wc, wv = build_where(params)
+            sql = f'DELETE FROM public."{table}"'
+            if wc:
+                sql += " WHERE " + " AND ".join(wc)
+            sql += " RETURNING *"
+            cur.execute(sql, wv)
+            rows = cur.fetchall()
+            conn.commit()
+            conn.close()
+            return [serialize_row(dict(r)) for r in rows]
+
+        conn.close()
+        raise HTTPException(405, "Method not allowed")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"REST error on {table}: {e}")
+        traceback.print_exc()
+        raise HTTPException(400, detail={"error": str(e), "message": str(e), "code": "PGRST000"})
+
+
+# ============================================================
+# Edge Functions
+# ============================================================
+@app.options("/functions/v1/{func_name}")
+async def edge_function_options(func_name: str):
+    return Response(status_code=204)
+
+
+@app.post("/functions/v1/{func_name}")
+async def edge_function(func_name: str, request: Request):
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+
+    # ── get-stripe-prices ──────────────────────────────────────
+    if func_name == "get-stripe-prices":
+        if not STRIPE_CONFIGURED:
+            raise HTTPException(500, "Stripe not configured")
+        try:
+            stripe_prices = stripe_lib.Price.list(active=True, limit=50, expand=["data.product"])
+            plan_meta: dict = {}
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id, title, price, currency, stripe_plan_id, plan_type "
+                    "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
+                )
+                for row in cur.fetchall():
+                    plan_meta[row["stripe_plan_id"]] = row
+                conn.close()
+            except Exception as db_err:
+                print(f"get-stripe-prices DB lookup warning: {db_err}")
+
+            prices = []
+            for p in stripe_prices.data:
+                if p.id not in plan_meta:
+                    continue
+                meta = plan_meta[p.id]
+                stripe_amount_cents = p.unit_amount or 0
+                stripe_amount_major = stripe_amount_cents / 100
+                if float(meta["price"]) != stripe_amount_major:
+                    try:
+                        sync_conn = get_db()
+                        sync_cur = sync_conn.cursor()
+                        sync_cur.execute("UPDATE plans SET price = %s WHERE stripe_plan_id = %s", (stripe_amount_major, p.id))
+                        sync_conn.commit()
+                        sync_conn.close()
+                    except Exception:
+                        pass
+                prices.append({
+                    "id": p.id,
+                    "plan_db_id": meta["id"],
+                    "unit_amount": stripe_amount_major,
+                    "unit_amount_cents": stripe_amount_cents,
+                    "currency": p.currency.lower(),
+                    "recurring": {"interval": p.recurring.interval} if p.recurring else None,
+                    "title": meta["title"],
+                    "plan_type": meta["plan_type"],
+                })
+            prices.sort(key=lambda x: x["unit_amount"])
+            return {"prices": prices, "success": True}
+        except stripe_lib.error.StripeError as se:
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute("SELECT id, title, price, currency, stripe_plan_id, plan_type FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC")
+                rows = cur.fetchall()
+                conn.close()
+                prices = [{"id": r["stripe_plan_id"], "plan_db_id": r["id"], "unit_amount": float(r["price"]), "unit_amount_cents": int(float(r["price"]) * 100), "currency": (r["currency"] or "eur").lower(), "recurring": {"interval": "month"}, "title": r["title"], "plan_type": r["plan_type"]} for r in rows]
+                return {"prices": prices, "success": True, "source": "db_fallback"}
+            except Exception:
+                raise HTTPException(500, str(se))
+
+    # ── handle-facilitator-response ────────────────────────────
+    elif func_name == "handle-facilitator-response":
+        conv_id = data.get("conversationId")
+        is_session_start = data.get("sessionStart", False)
+        generate_report = data.get("generateReport", False)
+        host_instruction = (data.get("hostInstruction") or "").strip()
+
+        session_title = "this workshop"
+        facilitator_name = "Facilitator"
+        facilitator_details = ""
+        objective = "facilitate a productive discussion"
+        session_prompt = ""
+        welcome_message_template = ""
+        session_scope = ""
+        gpt_version = None
+        max_tokens_cfg = None
+        randomness_cfg = None
+        avatar_url = ""
+        facilitator_language = None
+
+        if conv_id:
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT c.id, s.title, s.facilitator, s.objective, s.prompt, "
+                    "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
+                    "f.title as facilitator_name, f.details as facilitator_details, "
+                    "f.profile_picture, f.languages as facilitator_languages "
+                    "FROM conversations c "
+                    "LEFT JOIN sessions s ON c.sessions_id = s.id "
+                    "LEFT JOIN facilitators f ON s.facilitator = f.id "
+                    "WHERE c.id = %s",
+                    (conv_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    session_title = row.get("title") or session_title
+                    facilitator_name = row.get("facilitator_name") or facilitator_name
+                    facilitator_details = row.get("facilitator_details") or ""
+                    objective = row.get("objective") or objective
+                    session_prompt = row.get("prompt") or ""
+                    welcome_message_template = row.get("welcome_message") or ""
+                    session_scope = row.get("scope") or ""
+                    gpt_version = row.get("gpt_version")
+                    max_tokens_cfg = row.get("max_tokens")
+                    randomness_cfg = row.get("randomness")
+                    pp = row.get("profile_picture") or ""
+                    if pp:
+                        avatar_url = f"/storage/v1/object/public/facilitator-avatars/{pp}"
+                    langs = row.get("facilitator_languages")
+                    if langs and isinstance(langs, list) and len(langs) > 0:
+                        facilitator_language = langs[0]
+                    elif langs and isinstance(langs, str) and langs.strip():
+                        facilitator_language = langs.strip()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching session context: {e}")
+                traceback.print_exc()
+
+        model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), DEFAULT_AI_MODEL) if gpt_version else DEFAULT_AI_MODEL
+        try:
+            max_tokens = int(max_tokens_cfg) if max_tokens_cfg and str(max_tokens_cfg) != "None" else 600
+        except (ValueError, TypeError):
+            max_tokens = 600
+        try:
+            temperature = float(randomness_cfg) if randomness_cfg and str(randomness_cfg) != "None" else 0.7
+        except (ValueError, TypeError):
+            temperature = 0.7
+        temperature = max(0.0, min(2.0, temperature))
+
+        system_parts = []
+        if session_prompt:
+            system_parts.append(session_prompt)
+        else:
+            system_parts.append(
+                f"You are {facilitator_name}, an AI workshop facilitator. "
+                f'You are facilitating a session titled "{session_title}".'
+            )
+        if facilitator_details:
+            system_parts.append(f"Background: {facilitator_details}")
+        system_parts.append(f"Session objective: {objective}")
+        if session_scope:
+            system_parts.append(f"Session scope: {session_scope}")
+
+        language_instruction = ""
+        if facilitator_language:
+            language_instruction = (
+                f"\n\nLANGUAGE REQUIREMENT (MANDATORY):\n"
+                f"You MUST respond exclusively in {facilitator_language}. "
+                f"Every single message you send — including greetings, questions, summaries, and reports — "
+                f"must be written entirely in {facilitator_language}. "
+                f"Do NOT use any other language, even if participants write in a different language. "
+                f"If a participant writes in another language, still respond in {facilitator_language}."
+            )
+
+        system_parts.append(
+            f"Your name is {facilitator_name}. Always introduce yourself using this exact name.\n\n"
+            "IMPORTANT RULES:\n"
+            "- Keep responses concise (2-4 paragraphs max).\n"
+            "- Always end with a clear, engaging question to keep the discussion going.\n"
+            "- Address participants warmly and reference their specific contributions when responding to answers.\n"
+            "- Use a professional yet approachable tone.\n"
+            "- Do NOT use markdown headers (##) in chat messages.\n"
+            "- Do NOT use placeholder text like [Your Name] - always use your actual name."
+            + language_instruction
+        )
+
+        if host_instruction:
+            system_parts.append(
+                "HOST INSTRUCTION (HIGH PRIORITY):\n"
+                f'The session host has given you the following directive: "{host_instruction}"\n'
+                "You MUST follow this instruction in your next response. Adapt your message "
+                "accordingly while maintaining your facilitator persona."
+            )
+
+        system_message = "\n\n".join(system_parts)
+
+        if is_session_start:
+            user_prompt = (
+                f'Generate a warm, engaging welcome message for the workshop "{session_title}".\n'
+                f"The objective is: {objective}\n"
+            )
+            if welcome_message_template:
+                user_prompt += f"Use this as inspiration (but make it your own): {welcome_message_template}\n"
+            user_prompt += (
+                "Include:\n"
+                "1. A warm greeting introducing yourself by name\n"
+                "2. Brief mention of the session topic and what participants will gain\n"
+                "3. An opening question to get participants engaged and sharing\n\n"
+                "Keep it to 2-3 short paragraphs. Be enthusiastic but professional."
+            )
+        elif generate_report:
+            all_messages = []
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = %s ORDER BY m.created_at", (conv_id,))
+                all_messages = cur.fetchall()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching messages for report: {e}")
+            conversation_text = ""
+            for msg in all_messages:
+                content = msg.get("content", {})
+                if isinstance(content, str):
+                    try:
+                        content = json.loads(content)
+                    except Exception:
+                        content = {"text": content}
+                text = content.get("text", str(content))
+                role = msg.get("role", "unknown")
+                name = msg.get("name", role)
+                conversation_text += f"[{role.upper()} - {name}]: {text}\n\n"
+            user_prompt = (
+                f'Generate a comprehensive session report for the workshop "{session_title}".\n'
+                f"Objective: {objective}\n\n"
+                f"Here is the full conversation:\n\n{conversation_text}\n\n"
+                "Please create a structured report with:\n"
+                "1. Executive Summary\n2. Key Discussion Points\n"
+                "3. Participant Insights\n4. Key Takeaways\n5. Recommended Next Steps\n\n"
+                "Use markdown formatting with ## headers for sections."
+            )
+            max_tokens = min(max_tokens * 2, 1500)
+        else:
+            recent_messages = []
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = %s ORDER BY m.created_at DESC LIMIT 20", (conv_id,))
+                recent_messages = list(reversed(cur.fetchall()))
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching recent messages: {e}")
+            conversation_context = ""
+            for msg in recent_messages:
+                content = msg.get("content", {})
+                if isinstance(content, str):
+                    try:
+                        content = json.loads(content)
+                    except Exception:
+                        content = {"text": content}
+                text = content.get("text", str(content))
+                role = msg.get("role", "unknown")
+                name = msg.get("name", role)
+                conversation_context += f"[{role.upper()} - {name}]: {text}\n\n"
+            if host_instruction:
+                user_prompt = (
+                    f'Here is the recent conversation in our workshop "{session_title}":\n\n'
+                    f"{conversation_context}\n"
+                    f"The host has instructed you to: {host_instruction}\n\n"
+                    "Follow the host's instruction. Reference participants' contributions where relevant. "
+                    "Keep your response to 2-3 short paragraphs."
+                )
+            else:
+                user_prompt = (
+                    f'Here is the recent conversation in our workshop "{session_title}":\n\n'
+                    f"{conversation_context}\n"
+                    "Based on the participants' responses above:\n"
+                    "1. Briefly acknowledge and synthesize the key themes from their answers\n"
+                    "2. Highlight any interesting connections or contrasts between different participants' views\n"
+                    "3. Ask a thoughtful follow-up question that builds on what they shared\n\n"
+                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said."
+                )
+
+        print(f"[AI] Calling {model} for conv={conv_id} (start={is_session_start}, report={generate_report})")
+        try:
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            txt = response.choices[0].message.content.strip()
+            print(f"[AI] Response received ({len(txt)} chars)")
+        except Exception as e:
+            print(f"[AI] OpenAI API error: {e}")
+            traceback.print_exc()
+            if is_session_start:
+                txt = (f'Welcome to "{session_title}"! I\'m {facilitator_name}, and I\'m excited to facilitate our session today.\n\n'
+                       f"Our objective is: {objective}\n\n"
+                       "To get us started, I'd love to hear from each of you. What brings you here today, and what do you hope to take away from this session?")
+            elif generate_report:
+                txt = f"## Session Report: {session_title}\n\nThank you all for participating in this workshop."
+            else:
+                txt = ("Thank you for sharing your thoughts! I've noted some interesting perspectives.\n\n"
+                       "Let me ask a follow-up question: What challenges or obstacles do you see in applying these ideas in practice?")
+
+        msg_id = None
+        if conv_id:
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                content_json = json.dumps({"text": txt, **({"avatar": avatar_url} if avatar_url else {})})
+                cur.execute(
+                    "INSERT INTO messages (conversation_id, content, role, name) VALUES (%s, %s, 'assistant', %s) RETURNING id",
+                    (conv_id, content_json, facilitator_name),
+                )
+                msg_id = cur.fetchone()["id"]
+                if is_session_start:
+                    cur.execute("UPDATE conversations SET welcome_message_status = 'ai_ready' WHERE id = %s", (conv_id,))
+                conn.commit()
+                conn.close()
+                # Broadcast new AI message to all WebSocket clients in this room
+                asyncio.create_task(manager.broadcast(str(conv_id), {
+                    "event": "INSERT",
+                    "table": "messages",
+                    "new": {
+                        "id": str(msg_id),
+                        "conversation_id": str(conv_id),
+                        "content": content_json,
+                        "role": "assistant",
+                        "name": facilitator_name,
+                        "created_at": datetime.utcnow().isoformat(),
+                    },
+                }))
+            except Exception as e:
+                print(f"Error saving AI message: {e}")
+                traceback.print_exc()
+
+        return {"content": txt, "id": str(msg_id) if msg_id else str(uuid.uuid4()), "success": True}
+
+    # ── generate-ai-welcome (stub) ─────────────────────────────
+    elif func_name == "generate-ai-welcome":
+        return {"message": "Welcome to the session! I'm excited to facilitate our discussion today.", "success": True}
+
+    # ── close-session-and-generate-report ─────────────────────
+    elif func_name == "close-session-and-generate-report":
+        conv_id = data.get("conversationId")
+        user_id = data.get("userId")
+        report_content = ""
+        report_id = str(uuid.uuid4())
+        participant_count = 0
+        message_count = 0
+        session_title = "Workshop Session"
+        objective = ""
+        duration_minutes = 0
+
+        if conv_id:
+            conn = None
+            try:
+                conn = get_db()
+                conn.autocommit = True
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT s.title, s.objective FROM conversations c "
+                    "LEFT JOIN sessions s ON c.sessions_id = s.id WHERE c.id = %s",
+                    (conv_id,),
+                )
+                srow = cur.fetchone()
+                if srow:
+                    session_title = srow.get("title") or session_title
+                    objective = srow.get("objective") or ""
+                cur.execute("SELECT COUNT(*) FROM session_participants WHERE conversation_id = %s", (conv_id,))
+                row = cur.fetchone()
+                participant_count = row["count"] if isinstance(row, dict) else row[0]
+                cur.execute("SELECT name FROM session_participants WHERE conversation_id = %s", (conv_id,))
+                participant_names = [r["name"] for r in cur.fetchall() if r.get("name")]
+                cur.execute("SELECT COUNT(*) FROM messages WHERE conversation_id = %s", (conv_id,))
+                row = cur.fetchone()
+                message_count = row["count"] if isinstance(row, dict) else row[0]
+                cur.execute("SELECT content, role, name, created_at FROM messages WHERE conversation_id = %s ORDER BY created_at", (conv_id,))
+                all_msgs = cur.fetchall()
+                transcript = ""
+                for msg in all_msgs:
+                    content = msg.get("content", {})
+                    if isinstance(content, str):
+                        try:
+                            content = json.loads(content)
+                        except Exception:
+                            content = {"text": content}
+                    text = content.get("text", str(content))
+                    transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
+                try:
+                    resp = openai_client.chat.completions.create(
+                        model=DEFAULT_AI_MODEL,
+                        messages=[
+                            {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
+                            {"role": "user", "content": (
+                                f'Generate a comprehensive session report for the workshop "{session_title}".\n'
+                                f"Objective: {objective}\n"
+                                f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
+                                f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
+                                "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
+                                "Use markdown formatting. Be specific and reference actual content from the discussion."
+                            )},
+                        ],
+                        max_tokens=1500,
+                        temperature=0.5,
+                    )
+                    report_content = resp.choices[0].message.content.strip()
+                except Exception as e:
+                    print(f"[AI] Report generation error: {e}")
+                    report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
+
+                cur.execute(
+                    "INSERT INTO session_reports (id, conversation_id, report_content, report_type, generated_by, metadata) VALUES (%s, %s, %s, 'comprehensive', %s, %s) RETURNING id",
+                    (report_id, conv_id, report_content, user_id, json.dumps({"participant_count": participant_count, "message_count": message_count})),
+                )
+                row = cur.fetchone()
+                report_id = str(row["id"] if isinstance(row, dict) else row[0])
+                cur.execute(
+                    "UPDATE conversations SET is_session_ended = true, ended_at = NOW(), status = 'completed', final_report_id = %s, total_messages = %s WHERE id = %s",
+                    (report_id, message_count, conv_id),
+                )
+                cur.execute(
+                    "INSERT INTO session_events (conversation_id, event_type, data) VALUES (%s, 'session_ended', %s)",
+                    (conv_id, json.dumps({"ended_by": user_id, "report_id": report_id})),
+                )
+                # Broadcast session ended to all WebSocket clients
+                asyncio.create_task(manager.broadcast(str(conv_id), {
+                    "event": "UPDATE", "table": "conversations",
+                    "new": {"id": str(conv_id), "is_session_ended": True, "status": "completed"},
+                }))
+            except Exception as e:
+                print(f"Error closing session: {e}")
+                traceback.print_exc()
+                if not report_content:
+                    report_content = f"## Session Report\n\nSession completed. Participants: {participant_count}, Messages: {message_count}"
+            finally:
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+        return {
+            "success": True,
+            "reportId": report_id,
+            "reportContent": report_content,
+            "sessionData": {
+                "participantCount": participant_count,
+                "messageCount": message_count,
+                "duration": duration_minutes,
+                "engagementScore": min(100, int((message_count / max(participant_count, 1)) * 20)),
+            },
+        }
+
+    # ── create-subscription ────────────────────────────────────
+    elif func_name == "create-subscription":
+        if not STRIPE_CONFIGURED:
+            raise HTTPException(500, "Stripe is not configured on this server")
+        plan_id = data.get("planId")
+        stripe_plan_id = data.get("stripePlanId")
+        user_id = data.get("userId")
+        billing = data.get("billingDetails", {})
+        if not stripe_plan_id or not user_id:
+            raise HTTPException(400, "Missing planId, stripePlanId, or userId")
+        try:
+            price_obj = stripe_lib.Price.retrieve(stripe_plan_id)
+            amount = price_obj.unit_amount
+            currency = price_obj.currency
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT stripe_customer_id FROM profiles WHERE id = %s", (user_id,))
+            profile = cur.fetchone()
+            customer_id = profile["stripe_customer_id"] if profile else None
+            if not customer_id:
+                customer = stripe_lib.Customer.create(
+                    email=billing.get("email", ""),
+                    name=billing.get("name", ""),
+                    address={"line1": billing.get("address", {}).get("line1", ""), "city": billing.get("address", {}).get("city", ""), "state": billing.get("address", {}).get("state", ""), "postal_code": billing.get("address", {}).get("postal_code", ""), "country": billing.get("address", {}).get("country", "")},
+                    metadata={"user_id": user_id},
+                )
+                customer_id = customer.id
+                cur.execute("UPDATE profiles SET stripe_customer_id = %s WHERE id = %s", (customer_id, user_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+            intent = stripe_lib.PaymentIntent.create(
+                amount=amount,
+                currency=currency,
+                customer=customer_id,
+                metadata={"user_id": user_id, "plan_id": str(plan_id), "stripe_plan_id": stripe_plan_id},
+                automatic_payment_methods={"enabled": True},
+            )
+            return {"clientSecret": intent.client_secret, "subscriptionId": intent.id, "customerId": customer_id, "success": True}
+        except stripe_lib.error.StripeError as se:
+            raise HTTPException(400, str(se))
+
+    # ── confirm-subscription ───────────────────────────────────
+    elif func_name == "confirm-subscription":
+        payment_intent_id = data.get("paymentIntentId")
+        user_id = data.get("userId")
+        plan_id = data.get("planId")
+        customer_id = data.get("customerId")
+        if not payment_intent_id or not user_id:
+            raise HTTPException(400, "Missing paymentIntentId or userId")
+        try:
+            intent = stripe_lib.PaymentIntent.retrieve(payment_intent_id)
+            if intent.status not in ("succeeded", "processing"):
+                raise HTTPException(400, f"Payment not completed. Status: {intent.status}")
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = %s, updated_at = NOW() WHERE id = %s",
+                (plan_id, customer_id, payment_intent_id, user_id),
+            )
+            conn.commit()
+            conn.close()
+            return {"success": True, "status": "active", "planId": plan_id}
+        except stripe_lib.error.StripeError as se:
+            raise HTTPException(400, str(se))
+
+    # ── create-portal-session ──────────────────────────────────
+    elif func_name == "create-portal-session":
+        user_id = data.get("userId")
+        return_url = data.get("returnUrl", "https://friendly-ai-sessions.vercel.app/settings")
+        if not user_id:
+            raise HTTPException(400, "Missing userId")
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT stripe_customer_id FROM profiles WHERE id = %s", (user_id,))
+            profile = cur.fetchone()
+            conn.close()
+            customer_id = profile["stripe_customer_id"] if profile else None
+            if not customer_id:
+                raise HTTPException(400, "No Stripe customer found for this user")
+            session = stripe_lib.billing_portal.Session.create(customer=customer_id, return_url=return_url)
+            return {"url": session.url, "success": True}
+        except stripe_lib.error.StripeError as se:
+            raise HTTPException(400, str(se))
+
+    # ── create-template-welcome-message ───────────────────────
+    elif func_name == "create_template_welcome_message":
+        conv_id = data.get("conversationId")
+        if not conv_id:
+            raise HTTPException(400, "Missing conversationId")
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT s.welcome_message, f.title as facilitator_name "
+                "FROM conversations c LEFT JOIN sessions s ON c.sessions_id = s.id "
+                "LEFT JOIN facilitators f ON s.facilitator = f.id WHERE c.id = %s",
+                (conv_id,),
+            )
+            row = cur.fetchone()
+            template = (row.get("welcome_message") or "") if row else ""
+            fname = (row.get("facilitator_name") or "Facilitator") if row else "Facilitator"
+            if not template:
+                template = f"Welcome! I'm {fname}. I'm excited to facilitate today's session."
+            cur.execute(
+                "INSERT INTO messages (conversation_id, content, role, name) VALUES (%s, %s, 'assistant', %s) RETURNING id",
+                (conv_id, json.dumps({"text": template}), fname),
+            )
+            msg_id = cur.fetchone()["id"]
+            cur.execute("UPDATE conversations SET welcome_message_status = 'template_ready' WHERE id = %s", (conv_id,))
+            conn.commit()
+            conn.close()
+            return {"success": True, "messageId": str(msg_id), "content": template}
+        except Exception as e:
+            raise HTTPException(500, str(e))
+
+    # ── Unknown function ───────────────────────────────────────
+    raise HTTPException(404, f"Function '{func_name}' not found")
+
+
+# ============================================================
+# Stripe Webhook
+# ============================================================
+@app.post("/stripe-webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe_lib.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except stripe_lib.error.SignatureVerificationError:
+        raise HTTPException(400, "Invalid signature")
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+    event_type = event["type"]
+    event_data = event["data"]["object"]
+    print(f"Stripe webhook: {event_type}")
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        if event_type == "payment_intent.succeeded":
+            pi = event_data
+            user_id = pi.get("metadata", {}).get("user_id")
+            plan_id = pi.get("metadata", {}).get("plan_id")
+            customer_id = pi.get("customer")
+            if user_id and plan_id:
+                cur.execute(
+                    "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = COALESCE(%s, stripe_subscription_id), updated_at = NOW() WHERE id = %s",
+                    (plan_id, customer_id, pi.get("id"), user_id),
+                )
+        elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
+            sub = event_data
+            customer_id = sub.get("customer")
+            status = sub.get("status")
+            db_status = "active" if status == "active" else ("past_due" if status == "past_due" else ("canceled" if status in ("canceled", "unpaid") else status))
+            if customer_id:
+                cur.execute("UPDATE profiles SET subscription_status = %s, stripe_subscription_id = %s, updated_at = NOW() WHERE stripe_customer_id = %s", (db_status, sub.get("id"), customer_id))
+        elif event_type == "customer.subscription.deleted":
+            sub = event_data
+            customer_id = sub.get("customer")
+            if customer_id:
+                cur.execute("UPDATE profiles SET subscription_status = 'canceled', stripe_subscription_id = NULL, current_plan_id = (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1), updated_at = NOW() WHERE stripe_customer_id = %s", (customer_id,))
+        elif event_type == "invoice.payment_failed":
+            inv = event_data
+            customer_id = inv.get("customer")
+            if customer_id:
+                cur.execute("UPDATE profiles SET subscription_status = 'past_due', updated_at = NOW() WHERE stripe_customer_id = %s", (customer_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"Stripe webhook DB error for event {event_type}: {e}")
+        traceback.print_exc()
+        return {"received": True, "warning": "DB update failed"}
+
+    return {"received": True}
+
+
+# ============================================================
+# Storage
+# ============================================================
+@app.get("/storage/v1/object/public/{filepath:path}")
+async def storage_public(filepath: str):
+    full_path = os.path.join(STORAGE_DIR, filepath)
+    if os.path.exists(full_path):
+        return FileResponse(full_path)
+    raise HTTPException(404, "File not found")
+
+
+@app.post("/storage/v1/object/{bucket}/{filepath:path}")
+@app.put("/storage/v1/object/{bucket}/{filepath:path}")
+async def storage_upload(bucket: str, filepath: str, request: Request):
+    os.makedirs(os.path.join(STORAGE_DIR, bucket), exist_ok=True)
+    body = await request.body()
+    if body:
+        fp = os.path.join(STORAGE_DIR, bucket, filepath)
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        with open(fp, "wb") as f:
+            f.write(body)
+    return {"Key": f"{bucket}/{filepath}", "Id": str(uuid.uuid4())}
+
+
+@app.head("/storage/v1/object/public/{bucket}/{filepath:path}")
+async def storage_head(bucket: str, filepath: str):
+    exists = os.path.exists(os.path.join(STORAGE_DIR, bucket, filepath))
+    return Response(status_code=200 if exists else 404)
+
+
+# ============================================================
+# WebSocket Realtime endpoint
+# ============================================================
+@app.websocket("/realtime/v1/websocket")
+async def realtime_websocket(websocket: WebSocket):
+    """
+    Supabase Realtime-compatible WebSocket endpoint.
+    Clients subscribe to channels (e.g. 'realtime:public:messages:conversation_id=eq.<id>')
+    and receive INSERT/UPDATE/DELETE events for that conversation.
+    """
+    # Extract conversation_id from query params (apikey is the JWT)
+    query_params = dict(websocket.query_params)
+    apikey = query_params.get("apikey", "")
+
+    # Validate JWT
+    try:
+        jwt.decode(apikey, JWT_SECRET, algorithms=["HS256"])
+    except Exception:
+        await websocket.close(code=4001)
+        return
+
+    # We track which conversation_id this socket is subscribed to
+    subscribed_conv_id: Optional[str] = None
+
+    await websocket.accept()
+    print(f"[WS] Client connected")
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+            except Exception:
+                continue
+
+            event = msg.get("event")
+            topic = msg.get("topic", "")
+            ref = msg.get("ref")
+
+            # Heartbeat
+            if event == "heartbeat":
+                await websocket.send_json({"event": "heartbeat", "topic": topic, "ref": ref, "payload": {}})
+                continue
+
+            # Subscribe to a channel
+            if event == "phx_join":
+                # Parse conversation_id from topic like 'realtime:public:messages:conversation_id=eq.123'
+                conv_id_match = re.search(r"conversation_id=eq\.([^&]+)", topic)
+                if conv_id_match:
+                    subscribed_conv_id = conv_id_match.group(1)
+                    await manager.connect(websocket, subscribed_conv_id)
+                    print(f"[WS] Subscribed to conversation {subscribed_conv_id}")
+                # Also handle session_participants and conversations channels
+                part_match = re.search(r"id=eq\.([^&]+)", topic)
+                if part_match and not conv_id_match:
+                    subscribed_conv_id = part_match.group(1)
+                    await manager.connect(websocket, subscribed_conv_id)
+                await websocket.send_json({
+                    "event": "phx_reply",
+                    "topic": topic,
+                    "ref": ref,
+                    "payload": {"status": "ok", "response": {}},
+                })
+                continue
+
+            # Unsubscribe
+            if event == "phx_leave":
+                if subscribed_conv_id:
+                    await manager.disconnect(websocket, subscribed_conv_id)
+                    subscribed_conv_id = None
+                await websocket.send_json({
+                    "event": "phx_reply",
+                    "topic": topic,
+                    "ref": ref,
+                    "payload": {"status": "ok", "response": {}},
+                })
+                continue
+
+    except WebSocketDisconnect:
+        if subscribed_conv_id:
+            await manager.disconnect(websocket, subscribed_conv_id)
+        print("[WS] Client disconnected")
+    except Exception as e:
+        print(f"[WS] Error: {e}")
+        if subscribed_conv_id:
+            await manager.disconnect(websocket, subscribed_conv_id)
+
+
+# ============================================================
+# Entry point
+# ============================================================
+if __name__ == "__main__":
+    import sys
+    import uvicorn
+    os.makedirs(STORAGE_DIR, exist_ok=True)
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 3333
+    print(f"Starting MyFacilitator FastAPI proxy v3 on port {port}...")
+    uvicorn.run("server_fastapi:app", host="0.0.0.0", port=port, reload=False, workers=1)

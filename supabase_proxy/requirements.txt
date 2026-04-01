@@ -1,12 +1,22 @@
-flask>=2.3.0
-flask-cors>=4.0.0
+# FastAPI server (replaces Flask)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Database
 psycopg2-binary>=2.9.0
+
+# Auth & security
 PyJWT>=2.8.0
+slowapi>=0.1.9
+
+# AI
 openai>=1.0.0
+
+# Payments
+stripe>=7.0.0
+
+# Utilities
 requests>=2.31.0
 python-dotenv>=1.0.0
 pillow>=10.0.0
-werkzeug>=3.0.0
-gunicorn>=21.0.0
-Flask-Limiter>=3.5.0
-stripe>=7.0.0

@@ -27,7 +27,14 @@ export const getCurrentParticipantId = (
   if (locationState?.isGuest && locationState?.participantId) {
     return locationState.participantId;
   }
-  
+
+  // Also check URL params directly (for direct navigation without React Router state)
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlParticipantId = urlParams.get('participantId');
+  if (urlParticipantId) {
+    return parseInt(urlParticipantId, 10);
+  }
+
   // For host users, assume they're participant 1
   return 1;
 };

@@ -64,7 +64,7 @@ export const useSessionMessages = ({
     
     // Record response for tracking
     if (message.sender === 'user' && message.participant) {
-      const participantId = parseInt(message.participant.replace('P', ''));
+      const participantId = parseInt(message.participant, 10);
       recordResponse(participantId, true);
     }
   };

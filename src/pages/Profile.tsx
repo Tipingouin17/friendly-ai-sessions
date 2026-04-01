@@ -199,7 +199,7 @@ const Profile = () => {
               <CardContent className="pt-6">
                 <div className="space-y-8">
                   <div>
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                       <div>
                         <h3 className="text-xl font-semibold mb-1 text-left">Two-Factor Authentication</h3>
                         <p className="text-gray-500">Add an extra layer of security to your account</p>
@@ -207,7 +207,7 @@ const Profile = () => {
                       <Button
                         variant="outline"
                         size="lg"
-                        className="rounded-full px-6"
+                        className="rounded-full px-6 w-full sm:w-auto flex-shrink-0"
                         onClick={() => setIsTwoFactorModalOpen(true)}
                       >
                         Set Up
@@ -218,7 +218,7 @@ const Profile = () => {
                   <Separator />
 
                   <div>
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                       <div>
                         <h3 className="text-xl font-semibold mb-1 text-left">Recent Login Activity</h3>
                         <p className="text-gray-500">View your recent login history</p>
@@ -226,7 +226,7 @@ const Profile = () => {
                       <Button
                         variant="outline"
                         size="lg"
-                        className="rounded-full px-6"
+                        className="rounded-full px-6 w-full sm:w-auto flex-shrink-0"
                         onClick={() => setIsLoginActivityModalOpen(true)}
                       >
                         View Activity
@@ -237,7 +237,7 @@ const Profile = () => {
                   <Separator />
 
                   <div>
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                       <div>
                         <h3 className="text-xl font-semibold mb-1 text-left">Session Management</h3>
                         <p className="text-gray-500">Manage active sessions across all your devices</p>
@@ -245,7 +245,7 @@ const Profile = () => {
                       <Button
                         variant="outline"
                         size="lg"
-                        className="rounded-full px-6"
+                        className="rounded-full px-6 w-full sm:w-auto flex-shrink-0"
                         onClick={() => setIsSessionManagementModalOpen(true)}
                       >
                         Manage Sessions

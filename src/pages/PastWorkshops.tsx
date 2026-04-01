@@ -152,10 +152,10 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
               <CardTitle className="text-lg font-semibold mb-2">
                 {title}
               </CardTitle>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center text-gray-500 text-sm">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  {format(new Date(workshop.created_at), 'PPP')}
+                  <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span>{format(new Date(workshop.created_at), 'PPP')}</span>
                 </div>
                 <FacilitatorInfo
                   facilitatorName={workshop.sessions?.facilitators?.title}
@@ -192,7 +192,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
             engagementScore={workshop.participant_engagement_score || 0}
           />
 
-          <div className="flex justify-between items-center mt-4">
+          <div className="flex flex-wrap justify-between items-center mt-4 gap-2">
             <div className="text-sm text-gray-500">
               {workshop.ended_at ? (
                 <span>Completed {format(new Date(workshop.ended_at), 'PP')}</span>
@@ -409,15 +409,15 @@ const PastWorkshops = () => {
     <div className="min-h-screen pt-12 pb-16">
       <PageHead title="Host Dashboard" description="Manage and view all your workshop sessions" />
       <div className="max-w-4xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-bold flex items-center gap-2">
-              <LayoutDashboard className="h-8 w-8" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2">
+              <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8" />
               Host Dashboard
             </h1>
-            <p className="text-gray-500 mt-2">Manage and view all your session data</p>
+            <p className="text-gray-500 mt-2 text-sm sm:text-base">Manage and view all your session data</p>
           </div>
-          <Button onClick={handleCreateNew} className="flex items-center gap-2">
+          <Button onClick={handleCreateNew} className="flex items-center gap-2 w-full sm:w-auto">
             <PlusCircle className="h-4 w-4" />
             Create New Session
           </Button>

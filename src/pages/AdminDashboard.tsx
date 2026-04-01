@@ -43,10 +43,10 @@ const AdminDashboard = () => {
                                 <Shield className="h-8 w-8 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                                     Platform Administration
                                 </h1>
-                                <p className="text-gray-600 mt-1">
+                                <p className="text-gray-600 mt-1 text-sm sm:text-base">
                                     Manage facilitators, users, sessions, and platform settings
                                 </p>
                             </div>
@@ -55,7 +55,8 @@ const AdminDashboard = () => {
 
                     {/* Main Content */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                        <TabsList className="grid w-full grid-cols-9 lg:w-auto lg:inline-grid bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-md">
+                        <div className="overflow-x-auto pb-1">
+                        <TabsList className="flex w-max min-w-full sm:grid sm:w-full sm:grid-cols-9 bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-md">
                             <TabsTrigger
                                 value="analytics"
                                 className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
@@ -120,6 +121,7 @@ const AdminDashboard = () => {
                                 <span className="hidden sm:inline">Settings</span>
                             </TabsTrigger>
                         </TabsList>
+                        </div>
 
                         <TabsContent value="analytics" className="space-y-4">
                             <AnalyticsDashboard />

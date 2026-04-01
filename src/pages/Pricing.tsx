@@ -133,6 +133,7 @@ const Pricing = () => {
   return (
     <div className="min-h-screen bg-white pt-24 pb-16">
       <PageHead title="Pricing | MyFacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
+
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pb-12 px-4">
         <div className="container mx-auto">
@@ -140,18 +141,21 @@ const Pricing = () => {
             <span className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
               Simple, transparent pricing
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">Choose the right plan for your team</h1>
-            <p className="text-lg text-gray-500">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
+              Choose the right plan for your team
+            </h1>
+            <p className="text-base md:text-lg text-gray-500">
               Start free, scale as you grow. No hidden fees, cancel anytime.
             </p>
           </div>
         </div>
       </div>
+
       <div className="container mx-auto px-4">
 
         {/* Only show limited time offer for Free and Starter plans */}
         {currentPlanId && currentPlanId < 3 && (
-          <div className="max-w-4xl mx-auto mb-12">
+          <div className="max-w-4xl mx-auto mb-10 md:mb-12">
             <UpgradePrompt
               variant="banner"
               title="Limited Time Offer"
@@ -162,7 +166,8 @@ const Pricing = () => {
         )}
 
         {/* Standard plan cards: Free, Starter, Premium */}
-        <div className="grid md:grid-cols-3 gap-8 mb-8">
+        {/* mt-8 provides space for the "Most Popular" badge that floats above the card */}
+        <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-8 mt-8 items-stretch">
           {standardPlans.map((plan, index) => (
             <StandardPlanCard
               key={plan.id}
@@ -175,7 +180,7 @@ const Pricing = () => {
 
         {/* Enterprise plan card */}
         {enterprisePlan && (
-          <div className="max-w-4xl mx-auto mb-16">
+          <div className="max-w-4xl mx-auto mb-12 md:mb-16">
             <EnterprisePlanCard
               onContactClick={() => navigate('/contact')}
             />
@@ -183,14 +188,14 @@ const Pricing = () => {
         )}
 
         {/* Testimonials */}
-        <div className="mb-16">
+        <div className="mb-12 md:mb-16">
           <h2 className="text-2xl font-bold text-center mb-8">Trusted by Facilitators Worldwide</h2>
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid sm:grid-cols-2 gap-5 md:gap-6 max-w-4xl mx-auto">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <Quote className="h-8 w-8 text-blue-200 mb-4" />
-              <p className="text-gray-700 mb-4 italic">"This tool has completely transformed how I run my workshops. The AI insights are incredibly valuable."</p>
+              <p className="text-gray-700 mb-4 italic text-sm md:text-base">"This tool has completely transformed how I run my workshops. The AI insights are incredibly valuable."</p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">SJ</div>
+                <div className="w-10 h-10 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">SJ</div>
                 <div>
                   <p className="font-semibold text-sm">Sarah Jenkins</p>
                   <p className="text-xs text-gray-500">Senior Facilitator</p>
@@ -199,9 +204,9 @@ const Pricing = () => {
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <Quote className="h-8 w-8 text-purple-200 mb-4" />
-              <p className="text-gray-700 mb-4 italic">"The premium features are worth every penny. Being able to export detailed reports saves me hours of work."</p>
+              <p className="text-gray-700 mb-4 italic text-sm md:text-base">"The premium features are worth every penny. Being able to export detailed reports saves me hours of work."</p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">MR</div>
+                <div className="w-10 h-10 flex-shrink-0 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold text-sm">MR</div>
                 <div>
                   <p className="font-semibold text-sm">Mike Ross</p>
                   <p className="text-xs text-gray-500">Agile Coach</p>

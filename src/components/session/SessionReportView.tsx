@@ -274,28 +274,28 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" onClick={handleBack}>
+        <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <Button variant="ghost" size="icon" onClick={handleBack} className="flex-shrink-0">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Session Report</h1>
-                <p className="text-gray-600">{conversation.sessions?.title || 'Untitled Session'}</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">Session Report</h1>
+                <p className="text-gray-600 text-sm truncate max-w-[200px] sm:max-w-none">{conversation.sessions?.title || 'Untitled Session'}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 pl-11 sm:pl-0">
               {canDownloadPDF && (
-                <Button onClick={handleDownloadPDF} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
+                <Button onClick={handleDownloadPDF} variant="outline" size="sm" className="h-8 sm:h-9">
+                  <Download className="h-4 w-4 mr-1.5" />
+                  <span className="hidden xs:inline">Download </span>PDF
                 </Button>
               )}
               {!canDownloadPDF && (
-                <Button onClick={handleDownloadPDF} variant="outline" className="opacity-60">
-                  <Download className="h-4 w-4 mr-2" />
-                  PDF (Premium)
+                <Button onClick={handleDownloadPDF} variant="outline" size="sm" className="opacity-60 h-8 sm:h-9">
+                  <Download className="h-4 w-4 mr-1.5" />
+                  <span className="hidden xs:inline">PDF </span>(Premium)
                 </Button>
               )}
             </div>

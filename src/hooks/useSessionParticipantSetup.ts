@@ -150,8 +150,42 @@ export const useSessionParticipantSetup = ({
       if (!participantId) {
         const urlParams = new URLSearchParams(window.location.search);
         const urlParticipantId = urlParams.get('participantId');
+        const urlName = urlParams.get('name');
         if (urlParticipantId) {
-          participantId = parseInt(urlParticipantId, 10);
+          const parsedId = parseInt(urlParticipantId, 10);
+          // Check if this participant already exists in the list
+          const existingParticipant = participantInfos.find(p => p.id === parsedId);
+          if (existingParticipant) {
+            participantId = parsedId;
+          } else if (urlName && conversationId) {
+            // Auto-register participant if they have a name but aren't registered yet
+            try {
+              const avatarSeed = `${urlName}-${Date.now()}`;
+              const { error: regError } = await supabase
+                .from('session_participants')
+                .insert({
+                  conversation_id: conversationId,
+                  participant_id: parsedId,
+                  name: urlName,
+                  avatar_seed: avatarSeed,
+                  is_anonymous: false,
+                  is_host: false
+                });
+              if (!regError) {
+                participantId = parsedId;
+                // Reload participants after registration
+                requestDeduplicator.clear(`participants-${conversationId}`);
+              } else {
+                // If insert fails (e.g. duplicate), still use the ID
+                participantId = parsedId;
+              }
+            } catch (regErr) {
+              // If registration fails, still use the URL participant ID
+              participantId = parsedId;
+            }
+          } else {
+            participantId = parsedId;
+          }
         }
       }
       

@@ -27,7 +27,11 @@ export const useMessageSaver = () => {
     }
 
     const currentParticipantKey = `P${currentParticipant}`;
-    
+
+    // Resolve participant name: use participantInfo, then URL name param, then fallback
+    const urlName = new URLSearchParams(window.location.search).get('name') || undefined;
+    const resolvedName = participantInfo?.name || urlName || `Participant ${currentParticipant}`;
+
     // Create message for UI
     const messageId = nanoid();
     const newMessage: Message = {
@@ -44,15 +48,15 @@ export const useMessageSaver = () => {
     // Save to database with participant_id column for privacy
     const { data, error } = await supabase.from('messages').insert({
       conversation_id: currentConversationId,
-      participant_id: currentParticipant, // Add participant_id column
+      participant_id: currentParticipant,
       content: {
         text: message,
         participant_id: currentParticipant,
-        name: participantInfo?.name || `Participant ${currentParticipant}`,
+        name: resolvedName,
         is_anonymous: isAnonymous
       },
       role: 'user',
-      name: participantInfo?.name || `Participant ${currentParticipant}`
+      name: resolvedName
     }).select();
 
     if (error) {

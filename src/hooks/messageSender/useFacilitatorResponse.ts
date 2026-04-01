@@ -38,7 +38,9 @@ export const useFacilitatorResponse = () => {
       // Resolve the avatar URL using our utility
       const avatarUrl = await resolveFacilitatorAvatar(response.data, conversation);
 
-      // Create AI response message
+      // Create AI response message for the UI
+      // NOTE: The server (handle-facilitator-response) already saves the AI message to the DB.
+      // We must NOT save it again here to avoid duplicate messages.
       const aiResponse: Message = {
         id: response.data.id || nanoid(),
         content: response.data.content,
@@ -46,17 +48,6 @@ export const useFacilitatorResponse = () => {
         timestamp: new Date(),
         avatar: avatarUrl
       };
-      
-      // Save AI response to database
-      await supabase.from('messages').insert({
-        conversation_id: conversationId,
-        content: {
-          text: aiResponse.content,
-          avatar: avatarUrl
-        },
-        role: 'assistant',
-        user_id: null
-      });
       
       return aiResponse;
     } catch (error) {

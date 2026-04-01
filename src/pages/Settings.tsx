@@ -68,8 +68,8 @@ const Settings = () => {
       <PageHead title="Settings" description="Manage your account settings and preferences" />
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center gap-3 mb-8">
-          <SettingsIcon className="h-8 w-8 text-gray-700" />
-          <h1 className="text-4xl font-bold">Settings</h1>
+          <SettingsIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-700" />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Settings</h1>
         </div>
 
         <div className="space-y-6">
@@ -79,7 +79,7 @@ const Settings = () => {
               <h2 className="text-2xl font-semibold">Notifications</h2>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="email-notifications" className="font-medium">Email Notifications</Label>
                   <p className="text-sm text-gray-500">Receive email updates about your account</p>
@@ -90,7 +90,7 @@ const Settings = () => {
                   onCheckedChange={(checked) => updateSetting('emailNotifications', checked)}
                 />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="workshop-reminders" className="font-medium">Workshop Reminders</Label>
                   <p className="text-sm text-gray-500">Get notified before upcoming sessions</p>
@@ -110,7 +110,7 @@ const Settings = () => {
               <h2 className="text-2xl font-semibold">Privacy</h2>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="public-profile" className="font-medium">Public Profile</Label>
                   <p className="text-sm text-gray-500">Allow others to see your profile</p>
@@ -121,7 +121,7 @@ const Settings = () => {
                   onCheckedChange={(checked) => updateSetting('publicProfile', checked)}
                 />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="show-activity" className="font-medium">Show Activity Status</Label>
                   <p className="text-sm text-gray-500">Display when you are online</p>

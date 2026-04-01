@@ -15,51 +15,98 @@ import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { Quote } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 
+/**
+ * Pricing page — prices are fetched LIVE from Stripe via the proxy.
+ * Any price change made in the Stripe Dashboard is reflected here
+ * automatically on the next page load (no code or DB changes needed).
+ *
+ * The proxy's get-stripe-prices endpoint:
+ *   1. Calls Stripe API for the latest active prices
+ *   2. Joins with the local plans table for metadata (title, plan_type, etc.)
+ *   3. Auto-syncs the DB price column if Stripe has a different value
+ *   4. Falls back to DB prices if Stripe API is unreachable
+ */
 const Pricing = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { currentPlanId, isLoading: isUserPlanLoading } = useUserPlan();
 
-  const { data: plans, isLoading, error } = useQuery({
-    queryKey: ['plans'],
+  // Step 1: Fetch live prices from Stripe via the proxy
+  const {
+    data: stripePrices,
+    isLoading: isStripePricesLoading,
+    error: stripePricesError,
+  } = useQuery({
+    queryKey: ['stripe-live-prices'],
     queryFn: async () => {
-      // Fetch plans with all their restrictions
+      const { data, error } = await supabase.functions.invoke('get-stripe-prices', {
+        body: {}
+      });
+      if (error) throw error;
+      return data?.prices as Array<{
+        id: string;
+        plan_db_id: number;
+        unit_amount: number;
+        unit_amount_cents: number;
+        currency: string;
+        recurring: { interval: string } | null;
+        title: string;
+        plan_type: string;
+      }>;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes — Stripe prices don't change every second
+    retry: 2,
+    retryDelay: 1000,
+  });
+
+  // Step 2: Fetch plan metadata (restrictions, is_popular, etc.) from DB
+  const {
+    data: planMeta,
+    isLoading: isPlanMetaLoading,
+    error: planMetaError,
+  } = useQuery({
+    queryKey: ['plan-meta'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
         .select('*, plan_restrictions(*)')
         .order('id', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching plans:', error);
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error('No plans data returned');
-      }
-
-      const processedData = data.map(plan => {
-        const currency = plan.currency || 'USD';
-        const price = typeof plan.price === 'string' ? parseFloat(plan.price) : (plan.price || 0);
-        const restrictions = plan.plan_restrictions?.[0] || { /* no-op */ };
-
-        return {
-          id: plan.id,
-          title: plan.title,
-          price: price,
-          plan_type: plan.plan_type,
-          plan_table_details: restrictions,
-          is_popular: plan.is_popular,
-          stripe_plan_id: plan.stripe_plan_id,
-          currency
-        };
-      });
-
-      return processedData as Plan[];
+      if (error) throw error;
+      return data;
     },
     retry: 2,
     retryDelay: 1000,
   });
+
+  // Merge live Stripe prices with DB metadata
+  const plans: Plan[] | undefined = React.useMemo(() => {
+    if (!stripePrices || !planMeta) return undefined;
+
+    // Build a map of plan_db_id -> DB metadata
+    const metaMap = new Map(planMeta.map(m => [m.id, m]));
+
+    return stripePrices
+      .map(sp => {
+        const meta = metaMap.get(sp.plan_db_id);
+        if (!meta) return null;
+        const restrictions = meta.plan_restrictions?.[0] || {};
+        return {
+          id: sp.plan_db_id,
+          title: sp.title,
+          // Use the LIVE Stripe price — this is the source of truth
+          price: sp.unit_amount,
+          plan_type: sp.plan_type,
+          plan_table_details: restrictions,
+          is_popular: meta.is_popular,
+          stripe_plan_id: sp.id,
+          currency: sp.currency.toUpperCase(),
+        } as Plan;
+      })
+      .filter(Boolean) as Plan[];
+  }, [stripePrices, planMeta]);
+
+  const isLoading = isStripePricesLoading || isPlanMetaLoading || isUserPlanLoading;
+  const error = stripePricesError || planMetaError;
 
   useEffect(() => {
     if (error) {
@@ -71,7 +118,7 @@ const Pricing = () => {
     }
   }, [error, toast]);
 
-  if (isLoading || isUserPlanLoading) {
+  if (isLoading) {
     return <LoadingState />;
   }
 

@@ -834,46 +834,100 @@ def edge_function(func_name):
     data = request.json or {}
 
     if func_name == "get-stripe-prices":
-        # Return live Stripe prices from the DB plans table, falling back to Stripe API
+        # Fetch prices LIVE from Stripe API so any price change in the Stripe Dashboard
+        # is immediately reflected in the app without any DB or code changes.
+        # We join with the local plans table to enrich each price with plan metadata.
+        if not STRIPE_CONFIGURED:
+            return jsonify({"error": "Stripe not configured"}), 500
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT id, title, price, currency, stripe_plan_id, plan_type "
-                "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
-            )
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
-            prices = []
-            for row in rows:
-                prices.append({
-                    "id": row["stripe_plan_id"],
-                    "plan_db_id": row["id"],
-                    "unit_amount": row["price"],
-                    "currency": (row["currency"] or "eur").lower(),
-                    "recurring": {"interval": "month"},
-                    "title": row["title"],
-                    "plan_type": row["plan_type"],
-                })
-            return jsonify({"prices": prices, "success": True})
-        except Exception as e:
-            print(f"get-stripe-prices DB error: {e}")
-            # Fallback: query Stripe API directly if DB fails
-            if not STRIPE_CONFIGURED:
-                return jsonify({"error": "Stripe not configured"}), 500
+            # 1. Fetch all active prices with their products expanded from Stripe
+            stripe_prices = stripe_lib.Price.list(active=True, limit=50, expand=["data.product"])
+
+            # 2. Load the plans table to map stripe_plan_id -> plan metadata
+            plan_meta = {}  # stripe_plan_id -> {id, title, plan_type, currency}
             try:
-                stripe_prices = stripe_lib.Price.list(active=True, limit=20)
-                prices = []
-                for p in stripe_prices.data:
-                    prices.append({
-                        "id": p.id,
-                        "unit_amount": p.unit_amount,
-                        "currency": p.currency,
-                        "recurring": {"interval": p.recurring.interval} if p.recurring else None,
-                    })
-                return jsonify({"prices": prices, "success": True})
-            except stripe_lib.error.StripeError as se:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id, title, price, currency, stripe_plan_id, plan_type "
+                    "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
+                )
+                for row in cur.fetchall():
+                    plan_meta[row["stripe_plan_id"]] = row
+                cur.close()
+                conn.close()
+            except Exception as db_err:
+                print(f"get-stripe-prices DB lookup warning: {db_err}")
+
+            prices = []
+            for p in stripe_prices.data:
+                # Only include prices that are linked to a plan in our DB
+                if p.id not in plan_meta:
+                    continue
+                meta = plan_meta[p.id]
+                # Convert Stripe unit_amount (cents) to major currency units for display
+                stripe_amount_cents = p.unit_amount or 0
+                stripe_amount_major = stripe_amount_cents / 100
+
+                # Sync the DB price if Stripe has a different value
+                if float(meta["price"]) != stripe_amount_major:
+                    try:
+                        sync_conn = get_db()
+                        sync_cur = sync_conn.cursor()
+                        sync_cur.execute(
+                            "UPDATE plans SET price = %s WHERE stripe_plan_id = %s",
+                            (stripe_amount_major, p.id)
+                        )
+                        sync_conn.commit()
+                        sync_cur.close()
+                        sync_conn.close()
+                        print(f"Price sync: {p.id} updated to {stripe_amount_major} {p.currency}")
+                    except Exception as sync_err:
+                        print(f"Price sync DB write warning: {sync_err}")
+
+                prices.append({
+                    "id": p.id,
+                    "plan_db_id": meta["id"],
+                    "unit_amount": stripe_amount_major,
+                    "unit_amount_cents": stripe_amount_cents,
+                    "currency": p.currency.lower(),
+                    "recurring": {"interval": p.recurring.interval} if p.recurring else None,
+                    "title": meta["title"],
+                    "plan_type": meta["plan_type"],
+                })
+
+            # Sort by unit_amount ascending (Free first)
+            prices.sort(key=lambda x: x["unit_amount"])
+            return jsonify({"prices": prices, "success": True})
+
+        except stripe_lib.error.StripeError as se:
+            print(f"get-stripe-prices Stripe error: {se}")
+            # Graceful fallback: return DB prices if Stripe API is unreachable
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id, title, price, currency, stripe_plan_id, plan_type "
+                    "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
+                )
+                rows = cur.fetchall()
+                cur.close()
+                conn.close()
+                prices = [
+                    {
+                        "id": row["stripe_plan_id"],
+                        "plan_db_id": row["id"],
+                        "unit_amount": float(row["price"]),
+                        "unit_amount_cents": int(float(row["price"]) * 100),
+                        "currency": (row["currency"] or "eur").lower(),
+                        "recurring": {"interval": "month"},
+                        "title": row["title"],
+                        "plan_type": row["plan_type"],
+                    }
+                    for row in rows
+                ]
+                return jsonify({"prices": prices, "success": True, "source": "db_fallback"})
+            except Exception as db_err:
                 return jsonify({"error": str(se)}), 500
 
     elif func_name == "handle-facilitator-response":

@@ -272,6 +272,9 @@ def _parse_select(select_str: str):
         return ["*"], []
     # Normalize whitespace (template literals may have newlines/spaces)
     select_str = re.sub(r'\s+', ' ', select_str).strip()
+    # Remove spaces around parentheses (e.g. 'table ( col )' -> 'table(col)')
+    select_str = re.sub(r'\s*\(\s*', '(', select_str)
+    select_str = re.sub(r'\s*\)\s*', ')', select_str)
     cols, joins = [], []
     for part in _split_top_level(select_str):
         if "(" in part:

@@ -290,7 +290,10 @@ class QueryBuilder<T = Record<string, unknown>> {
   private url(method: "GET" | "HEAD"): string {
     const p = new URLSearchParams();
     // Normalize whitespace in select string (template literals may have newlines/spaces)
-    const normalizedCols = this.s.cols.replace(/\s+/g, " ").trim();
+    const normalizedCols = this.s.cols
+      .replace(/\s+/g, " ").trim()        // collapse all whitespace to single spaces
+      .replace(/\s*\(\s*/g, "(")          // remove spaces around (
+      .replace(/\s*\)\s*/g, ")");         // remove spaces around )
     if (method === "GET") p.set("select", normalizedCols);
     this.s.filters.forEach(([col, val]) => p.append(col, val));
     if (this.s.order.length) p.set("order", this.s.order.join(","));

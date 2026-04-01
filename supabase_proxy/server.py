@@ -21,6 +21,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from openai import OpenAI
+import stripe as stripe_lib
 
 # OpenAI client – uses OPENAI_API_KEY and OPENAI_BASE_URL env vars automatically
 openai_client = OpenAI()
@@ -65,6 +66,21 @@ DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", "5432"))
 DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
+
+# ============================================================
+# Stripe configuration
+# STRIPE_ENV: 'live' uses live keys, anything else uses test keys.
+# Set STRIPE_SECRET_KEY_TEST / STRIPE_SECRET_KEY_LIVE in Railway env vars.
+# STRIPE_WEBHOOK_SECRET_TEST / STRIPE_WEBHOOK_SECRET_LIVE for webhook verification.
+# ============================================================
+_stripe_env = os.environ.get("STRIPE_ENV", "test").lower()
+if _stripe_env == "live":
+    stripe_lib.api_key = os.environ.get("STRIPE_SECRET_KEY_LIVE", "")
+    STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_LIVE", "")
+else:
+    stripe_lib.api_key = os.environ.get("STRIPE_SECRET_KEY_TEST", "")
+    STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "")
+STRIPE_CONFIGURED = bool(stripe_lib.api_key)
 
 # Map session gpt_version values to available models
 # The proxy supports: gpt-4.1-mini, gpt-4.1-nano, gemini-2.5-flash
@@ -818,11 +834,47 @@ def edge_function(func_name):
     data = request.json or {}
 
     if func_name == "get-stripe-prices":
-        return jsonify({"prices": [
-            {"id": "price_starter", "unit_amount": 2900, "currency": "eur", "recurring": {"interval": "month"}},
-            {"id": "price_premium", "unit_amount": 4900, "currency": "eur", "recurring": {"interval": "month"}},
-            {"id": "price_enterprise", "unit_amount": 9900, "currency": "eur", "recurring": {"interval": "month"}},
-        ], "success": True})
+        # Return live Stripe prices from the DB plans table, falling back to Stripe API
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, title, price, currency, stripe_plan_id, plan_type "
+                "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            prices = []
+            for row in rows:
+                prices.append({
+                    "id": row["stripe_plan_id"],
+                    "plan_db_id": row["id"],
+                    "unit_amount": row["price"],
+                    "currency": (row["currency"] or "eur").lower(),
+                    "recurring": {"interval": "month"},
+                    "title": row["title"],
+                    "plan_type": row["plan_type"],
+                })
+            return jsonify({"prices": prices, "success": True})
+        except Exception as e:
+            print(f"get-stripe-prices DB error: {e}")
+            # Fallback: query Stripe API directly if DB fails
+            if not STRIPE_CONFIGURED:
+                return jsonify({"error": "Stripe not configured"}), 500
+            try:
+                stripe_prices = stripe_lib.Price.list(active=True, limit=20)
+                prices = []
+                for p in stripe_prices.data:
+                    prices.append({
+                        "id": p.id,
+                        "unit_amount": p.unit_amount,
+                        "currency": p.currency,
+                        "recurring": {"interval": p.recurring.interval} if p.recurring else None,
+                    })
+                return jsonify({"prices": prices, "success": True})
+            except stripe_lib.error.StripeError as se:
+                return jsonify({"error": str(se)}), 500
 
     elif func_name == "handle-facilitator-response":
         conv_id = data.get("conversationId")
@@ -1227,18 +1279,285 @@ def edge_function(func_name):
         })
 
     elif func_name == "create-subscription":
-        return jsonify({"url": "/mock-checkout", "sessionId": str(uuid.uuid4()), "success": True})
+        # Create a real Stripe PaymentIntent for subscription payment
+        if not STRIPE_CONFIGURED:
+            return jsonify({"error": "Stripe is not configured on this server"}), 500
+        plan_id = data.get("planId")
+        stripe_plan_id = data.get("stripePlanId")
+        user_id = data.get("userId")
+        billing = data.get("billingDetails", {})
+        if not stripe_plan_id or not user_id:
+            return jsonify({"error": "Missing planId, stripePlanId, or userId"}), 400
+        try:
+            # Resolve the price amount from Stripe to avoid client-side tampering
+            price_obj = stripe_lib.Price.retrieve(stripe_plan_id)
+            amount = price_obj.unit_amount  # in smallest currency unit (cents)
+            currency = price_obj.currency
+            # Look up or create a Stripe customer for this user
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT stripe_customer_id FROM profiles WHERE id = %s",
+                (user_id,)
+            )
+            profile = cur.fetchone()
+            customer_id = profile["stripe_customer_id"] if profile else None
+            if not customer_id:
+                # Create a new Stripe customer
+                customer = stripe_lib.Customer.create(
+                    email=billing.get("email", ""),
+                    name=billing.get("name", ""),
+                    address={
+                        "line1": billing.get("address", {}).get("line1", ""),
+                        "city": billing.get("address", {}).get("city", ""),
+                        "state": billing.get("address", {}).get("state", ""),
+                        "postal_code": billing.get("address", {}).get("postal_code", ""),
+                        "country": billing.get("address", {}).get("country", ""),
+                    },
+                    metadata={"user_id": user_id},
+                )
+                customer_id = customer.id
+                # Persist the new customer ID immediately
+                cur.execute(
+                    "UPDATE profiles SET stripe_customer_id = %s WHERE id = %s",
+                    (customer_id, user_id)
+                )
+            cur.close()
+            conn.close()
+            # Create a PaymentIntent for the subscription amount
+            intent = stripe_lib.PaymentIntent.create(
+                amount=amount,
+                currency=currency,
+                customer=customer_id,
+                payment_method_types=["card"],
+                metadata={
+                    "user_id": user_id,
+                    "plan_id": str(plan_id),
+                    "stripe_plan_id": stripe_plan_id,
+                },
+                description=f"MyFacilitator subscription - plan {plan_id}",
+            )
+            return jsonify({
+                "clientSecret": intent.client_secret,
+                "subscriptionId": intent.id,  # use PaymentIntent ID as subscription reference
+                "customerId": customer_id,
+                "success": True,
+            })
+        except stripe_lib.error.StripeError as e:
+            print(f"Stripe create-subscription error: {e}")
+            return jsonify({"error": str(e.user_message if hasattr(e, 'user_message') else e)}), 400
+        except Exception as e:
+            print(f"create-subscription error: {e}")
+            traceback.print_exc()
+            return jsonify({"error": "Internal server error"}), 500
 
     elif func_name == "create-portal-session":
-        return jsonify({"url": "/mock-portal", "success": True})
+        # Create a real Stripe Billing Portal session for subscription management
+        if not STRIPE_CONFIGURED:
+            return jsonify({"error": "Stripe is not configured on this server"}), 500
+        user_id = data.get("userId")
+        return_url = data.get("returnUrl", "https://friendly-ai-sessions.vercel.app/profile")
+        if not user_id:
+            return jsonify({"error": "Missing userId"}), 400
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT stripe_customer_id FROM profiles WHERE id = %s",
+                (user_id,)
+            )
+            profile = cur.fetchone()
+            cur.close()
+            conn.close()
+            customer_id = profile["stripe_customer_id"] if profile else None
+            if not customer_id:
+                return jsonify({"error": "No Stripe customer found for this user"}), 404
+            portal_session = stripe_lib.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url,
+            )
+            return jsonify({"url": portal_session.url, "success": True})
+        except stripe_lib.error.StripeError as e:
+            print(f"Stripe create-portal-session error: {e}")
+            return jsonify({"error": str(e.user_message if hasattr(e, 'user_message') else e)}), 400
+        except Exception as e:
+            print(f"create-portal-session error: {e}")
+            traceback.print_exc()
+            return jsonify({"error": "Internal server error"}), 500
 
     elif func_name == "confirm-subscription":
-        return jsonify({"success": True})
+        # Verify payment and update the user's subscription in the database
+        subscription_id = data.get("subscriptionId")  # PaymentIntent ID
+        customer_id = data.get("customerId")
+        user_id = data.get("userId")
+        plan_id = data.get("planId")
+        payment_intent_id = data.get("paymentIntentId") or subscription_id
+        if not user_id or not plan_id:
+            return jsonify({"error": "Missing userId or planId"}), 400
+        # If Stripe is configured, verify the PaymentIntent status
+        if STRIPE_CONFIGURED and payment_intent_id:
+            try:
+                pi = stripe_lib.PaymentIntent.retrieve(payment_intent_id)
+                if pi.status not in ("succeeded", "processing"):
+                    return jsonify({
+                        "error": f"Payment not completed. Status: {pi.status}"
+                    }), 402
+            except stripe_lib.error.StripeError as e:
+                print(f"Stripe confirm-subscription verify error: {e}")
+                return jsonify({"error": str(e.user_message if hasattr(e, 'user_message') else e)}), 400
+        # Update the profiles table with the new subscription details
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE profiles SET "
+                "current_plan_id = %s, "
+                "subscription_status = 'active', "
+                "stripe_customer_id = COALESCE(%s, stripe_customer_id), "
+                "stripe_subscription_id = COALESCE(%s, stripe_subscription_id), "
+                "updated_at = NOW() "
+                "WHERE id = %s",
+                (plan_id, customer_id, subscription_id, user_id)
+            )
+            cur.close()
+            conn.close()
+            return jsonify({"success": True})
+        except Exception as e:
+            print(f"confirm-subscription DB error: {e}")
+            traceback.print_exc()
+            return jsonify({"error": "Failed to update subscription in database"}), 500
 
     elif func_name == "recover-stuck-welcome-messages":
         return jsonify({"recovered": 0, "success": True})
 
     return jsonify({"error": f"Unknown function: {func_name}"}), 404
+
+
+# ============================================================
+# Stripe Webhook
+# Handles subscription lifecycle events from Stripe.
+# Set STRIPE_WEBHOOK_SECRET_TEST / STRIPE_WEBHOOK_SECRET_LIVE in Railway env vars.
+# Register this endpoint in the Stripe Dashboard:
+#   https://dashboard.stripe.com/webhooks
+#   URL: https://<railway-domain>/stripe-webhook
+# ============================================================
+@app.route("/stripe-webhook", methods=["POST"])
+def stripe_webhook():
+    payload = request.get_data(as_text=False)
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    if not STRIPE_CONFIGURED:
+        return jsonify({"error": "Stripe not configured"}), 500
+
+    # Verify webhook signature when a secret is configured
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe_lib.Webhook.construct_event(
+                payload, sig_header, STRIPE_WEBHOOK_SECRET
+            )
+        except stripe_lib.error.SignatureVerificationError as e:
+            print(f"Stripe webhook signature verification failed: {e}")
+            return jsonify({"error": "Invalid signature"}), 400
+        except Exception as e:
+            print(f"Stripe webhook parse error: {e}")
+            return jsonify({"error": "Invalid payload"}), 400
+    else:
+        # No webhook secret configured – parse without verification (dev only)
+        try:
+            event = stripe_lib.Event.construct_from(
+                json.loads(payload), stripe_lib.api_key
+            )
+        except Exception as e:
+            print(f"Stripe webhook parse error (no secret): {e}")
+            return jsonify({"error": "Invalid payload"}), 400
+
+    event_type = event["type"]
+    event_data = event["data"]["object"]
+    print(f"Stripe webhook received: {event_type}")
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        if event_type == "payment_intent.succeeded":
+            # PaymentIntent succeeded: mark subscription active
+            pi = event_data
+            user_id = pi.get("metadata", {}).get("user_id")
+            plan_id = pi.get("metadata", {}).get("plan_id")
+            customer_id = pi.get("customer")
+            if user_id and plan_id:
+                cur.execute(
+                    "UPDATE profiles SET "
+                    "current_plan_id = %s, "
+                    "subscription_status = 'active', "
+                    "stripe_customer_id = COALESCE(%s, stripe_customer_id), "
+                    "stripe_subscription_id = COALESCE(%s, stripe_subscription_id), "
+                    "updated_at = NOW() "
+                    "WHERE id = %s",
+                    (plan_id, customer_id, pi.get("id"), user_id)
+                )
+                print(f"Webhook: activated plan {plan_id} for user {user_id}")
+
+        elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
+            sub = event_data
+            customer_id = sub.get("customer")
+            status = sub.get("status")  # active, past_due, canceled, etc.
+            # Map Stripe status to our subscription_status values
+            db_status = "active" if status == "active" else (
+                "past_due" if status == "past_due" else (
+                    "canceled" if status in ("canceled", "unpaid") else status
+                )
+            )
+            # Identify user by stripe_customer_id
+            if customer_id:
+                cur.execute(
+                    "UPDATE profiles SET "
+                    "subscription_status = %s, "
+                    "stripe_subscription_id = %s, "
+                    "updated_at = NOW() "
+                    "WHERE stripe_customer_id = %s",
+                    (db_status, sub.get("id"), customer_id)
+                )
+                print(f"Webhook: updated subscription status to '{db_status}' for customer {customer_id}")
+
+        elif event_type == "customer.subscription.deleted":
+            sub = event_data
+            customer_id = sub.get("customer")
+            if customer_id:
+                # Revert to free plan (plan_id 1 assumed to be Free)
+                cur.execute(
+                    "UPDATE profiles SET "
+                    "subscription_status = 'canceled', "
+                    "stripe_subscription_id = NULL, "
+                    "current_plan_id = (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1), "
+                    "updated_at = NOW() "
+                    "WHERE stripe_customer_id = %s",
+                    (customer_id,)
+                )
+                print(f"Webhook: canceled subscription for customer {customer_id}")
+
+        elif event_type == "invoice.payment_failed":
+            inv = event_data
+            customer_id = inv.get("customer")
+            if customer_id:
+                cur.execute(
+                    "UPDATE profiles SET "
+                    "subscription_status = 'past_due', "
+                    "updated_at = NOW() "
+                    "WHERE stripe_customer_id = %s",
+                    (customer_id,)
+                )
+                print(f"Webhook: marked past_due for customer {customer_id}")
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"Stripe webhook DB error for event {event_type}: {e}")
+        traceback.print_exc()
+        # Return 200 to prevent Stripe from retrying on DB errors
+        return jsonify({"received": True, "warning": "DB update failed"}), 200
+
+    return jsonify({"received": True}), 200
 
 
 # ============================================================

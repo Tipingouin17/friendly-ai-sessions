@@ -44,7 +44,7 @@ export const useMessageProcessor = ({
       
       const { processedAvatar, isAnonymous, displayName } = processMessageAvatar(
         message,
-        message.participant ? participantMap[parseInt(message.participant.slice(1))] : null,
+        message.participant ? participantMap[parseInt(message.participant, 10)] : null,
         currentParticipant
       );
 

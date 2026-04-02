@@ -140,8 +140,8 @@ export const StandardPlanCard = ({
         <div className="mb-8">
           {isFree ? (
             <div className="text-center">
-              <div className={`text-5xl font-extrabold ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>Free</div>
-              <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>forever</div>
+              <div className={`text-5xl font-extrabold text-center ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>Free</div>
+              <div className={`text-sm mt-1 text-center ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>forever</div>
             </div>
           ) : (
             <div className="text-center">
@@ -153,7 +153,7 @@ export const StandardPlanCard = ({
                   {getCurrencySymbol(plan.currency || 'USD')}
                 </span>
               </div>
-              <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>/month</div>
+              <div className={`text-sm mt-1 text-center ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>/month</div>
             </div>
           )}
         </div>

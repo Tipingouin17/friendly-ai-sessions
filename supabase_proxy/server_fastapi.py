@@ -934,9 +934,14 @@ async def rest_table(table: str, request: Request):
                 )
                 wv.append(requesting_user_id)
             elif requesting_user_id and table in SECURE_DIRECT_TABLES:
-                # conversations / sessions / facilitators: direct user_id
-                wc.append('"user_id" = %s::uuid')
-                wv.append(requesting_user_id)
+                if table == 'facilitators':
+                    # Return system facilitators (user_id IS NULL) + user's own custom facilitators
+                    wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
+                    wv.append(requesting_user_id)
+                else:
+                    # conversations / sessions: direct user_id filter
+                    wc.append('"user_id" = %s::uuid')
+                    wv.append(requesting_user_id)
             elif join_token_header and not requesting_user_id:
                 # Participant path: validate join token against the
                 # conversation_id present in the query parameters.

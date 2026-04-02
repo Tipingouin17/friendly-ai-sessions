@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /session
+Disallow: /session/report
+Disallow: /admin
+Disallow: /checkout
+Disallow: /profile
+Disallow: /settings
+Disallow: /past-workshops
+Disallow: /my-facilitators
+Disallow: /referrals
+
+Sitemap: https://aifacilitator.vercel.app/sitemap.xml

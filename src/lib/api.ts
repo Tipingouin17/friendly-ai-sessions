@@ -1,6 +1,6 @@
 /**
  * Railway API Client
- * Zero-dependency HTTP + WebSocket client for the MyFacilitator FastAPI backend.
+ * Zero-dependency HTTP + WebSocket client for the AIfacilitator FastAPI backend.
  * Replaces @supabase/supabase-js entirely.
  */
 

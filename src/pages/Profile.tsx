@@ -64,7 +64,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-primary/10 to-white">
-      <PageHead title="Profile" description="Manage your MyFacilitator profile" />
+      <PageHead title="Profile" description="Manage your AIfacilitator profile" />
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
 

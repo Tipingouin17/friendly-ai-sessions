@@ -13,7 +13,7 @@ interface WelcomeModalProps {
 
 const steps = [
     {
-        title: "Welcome to MyFacilitator! 👋",
+        title: "Welcome to AIfacilitator! 👋",
         description: "Your AI-powered facilitation platform for engaging workshops and sessions.",
         icon: "🎯",
     },

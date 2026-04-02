@@ -12,7 +12,7 @@ interface PageHeadProps {
  */
 export const PageHead = ({ title, description }: PageHeadProps) => {
   useEffect(() => {
-    const baseTitle = 'MyFacilitator';
+    const baseTitle = 'AIfacilitator';
     document.title = title ? `${title} | ${baseTitle}` : baseTitle;
 
     if (description) {

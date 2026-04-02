@@ -277,7 +277,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="icon" onClick={handleBack} className="flex-shrink-0">
+              <Button variant="ghost" size="icon" aria-label="Go back" onClick={handleBack} className="flex-shrink-0">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="min-w-0">

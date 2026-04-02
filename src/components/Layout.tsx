@@ -26,8 +26,12 @@ export const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen flex flex-col text-left">
+      {/* Skip to main content — visible only on keyboard focus for screen readers */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
       {shouldShowMainNav && (needsMobileSessionNav ? <SessionMobileNav /> : <Navigation />)}
-      <main className={`flex-grow ${isSessionPage && !isAdminPage ? 'pt-0' : shouldShowMainNav ? 'pt-16' : 'pt-0'}`}>
+      <main id="main-content" className={`flex-grow ${isSessionPage && !isAdminPage ? 'pt-0' : shouldShowMainNav ? 'pt-16' : 'pt-0'}`}>
         {children}
       </main>
       {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}

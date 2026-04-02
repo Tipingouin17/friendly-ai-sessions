@@ -21,7 +21,7 @@ const Signup = () => {
 
   return (
     <SignupContainer>
-      <PageHead title="Sign Up" description="Create your MyFacilitator account" />
+      <PageHead title="Sign Up" description="Create your AIfacilitator account" />
       <SignupForm />
       <SignupFooter />
     </SignupContainer>

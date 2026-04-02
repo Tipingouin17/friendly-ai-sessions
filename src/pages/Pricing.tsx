@@ -132,7 +132,7 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-16">
-      <PageHead title="Pricing | MyFacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
+      <PageHead title="Pricing | AIfacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
 
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pb-12 px-4">

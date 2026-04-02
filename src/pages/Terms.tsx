@@ -4,20 +4,20 @@ import { PageHead } from "@/components/PageHead";
 const Terms = () => {
   return (
     <div className="min-h-screen pt-24 pb-16 bg-white">
-      <PageHead title="Terms of Service" description="Terms of Service for MyFacilitator" />
+      <PageHead title="Terms of Service" description="Terms of Service for AIfacilitator" />
       <div className="max-w-3xl mx-auto px-4 prose prose-gray">
         <h1>Terms of Service</h1>
         <p className="text-gray-500 text-sm">Last updated: March 2026</p>
 
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing and using MyFacilitator ("the Service"), you agree to be bound by these Terms of Service.
+          By accessing and using AIfacilitator ("the Service"), you agree to be bound by these Terms of Service.
           If you do not agree to these terms, please do not use the Service.
         </p>
 
         <h2>2. Description of Service</h2>
         <p>
-          MyFacilitator provides AI-powered workshop facilitation tools that enable users to create,
+          AIfacilitator provides AI-powered workshop facilitation tools that enable users to create,
           manage, and participate in interactive sessions. The Service includes AI facilitators,
           session management, reporting, and collaboration features.
         </p>
@@ -46,7 +46,7 @@ const Terms = () => {
         <h2>6. Intellectual Property</h2>
         <p>
           Content generated during your sessions belongs to you. The Service, including its software,
-          design, and branding, remains the intellectual property of MyFacilitator.
+          design, and branding, remains the intellectual property of AIfacilitator.
         </p>
 
         <h2>7. Privacy</h2>
@@ -57,7 +57,7 @@ const Terms = () => {
 
         <h2>8. Limitation of Liability</h2>
         <p>
-          The Service is provided "as is" without warranties of any kind. MyFacilitator shall not
+          The Service is provided "as is" without warranties of any kind. AIfacilitator shall not
           be liable for any indirect, incidental, or consequential damages arising from your use
           of the Service.
         </p>

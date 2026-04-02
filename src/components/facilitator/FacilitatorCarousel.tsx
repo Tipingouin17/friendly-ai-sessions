@@ -85,6 +85,7 @@ export const FacilitatorCarousel = ({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Previous facilitators"
           className="absolute left-0 z-10 -translate-x-1/2"
           onClick={handlePrevious}
           disabled={startIndex === 0}
@@ -128,6 +129,7 @@ export const FacilitatorCarousel = ({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Next facilitators"
           className="absolute right-0 z-10 translate-x-1/2"
           onClick={handleNext}
           disabled={startIndex >= facilitators.length - itemsToShow}

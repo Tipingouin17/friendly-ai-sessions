@@ -17,7 +17,7 @@ const SessionMobileNav = () => {
       
       <Sheet>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-10 w-10 p-0">
+          <Button variant="ghost" size="icon" className="h-10 w-10 p-0" aria-label="Open navigation">
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>

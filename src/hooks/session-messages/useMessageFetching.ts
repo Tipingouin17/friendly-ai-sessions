@@ -284,7 +284,6 @@ export const useMessageFetching = ({
       // Include host instruction if provided
       if (hostInstruction && hostInstruction.trim()) {
         body.hostInstruction = hostInstruction.trim();
-        console.log('[HOST] Sending instruction to AI:', hostInstruction.trim());
       }
 
       const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {

@@ -15,6 +15,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [resetEmail, setResetEmail] = useState('');
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -38,11 +39,23 @@ const Login = () => {
     if (!email.trim() || !password.trim()) return;
 
     setIsLoading(true);
+    setLoginError(null);
     try {
       await login(email.trim(), password);
       navigate(from, { replace: true });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Please check your credentials and try again";
+      let errorMessage = "Please check your credentials and try again";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        const msg = (error as { message: string }).message;
+        if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network')) {
+          errorMessage = 'Unable to connect. Please check your internet connection and try again.';
+        } else {
+          errorMessage = msg;
+        }
+      }
+      setLoginError(errorMessage);
       toast({
         title: "Login failed",
         description: errorMessage,
@@ -104,6 +117,11 @@ const Login = () => {
             Sign in to continue to your account
           </p>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {loginError && (
+              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700" role="alert">
+                {loginError}
+              </div>
+            )}
             <div>
               <Label htmlFor="email" className="block text-sm font-medium mb-2 text-left">
                 Email

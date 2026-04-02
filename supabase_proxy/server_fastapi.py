@@ -274,6 +274,7 @@ FK_MAP: Dict[str, tuple] = {
     "session_reports_conversation_id_fkey": ("session_reports", "conversation_id", "conversations", "id"),
     "profiles_current_plan_id_fkey": ("profiles", "current_plan_id", "plans", "id"),
     "facilitators_user_id_fkey": ("facilitators", "user_id", "profiles", "id"),
+    "plan_restrictions_plan_id_fkey": ("plan_restrictions", "plan_id", "plans", "id"),
 }
 
 TABLE_PK: Dict[str, str] = {
@@ -281,6 +282,7 @@ TABLE_PK: Dict[str, str] = {
     "profiles": "id", "facilitators": "id", "plans": "id",
     "session_participants": "id", "session_events": "id",
     "session_reports": "id", "faqs": "id",
+    "plan_restrictions": "id",
 }
 
 

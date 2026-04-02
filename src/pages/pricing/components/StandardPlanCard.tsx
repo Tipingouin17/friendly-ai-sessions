@@ -127,24 +127,24 @@ export const StandardPlanCard = ({
 
       <div className={`p-8 flex flex-col flex-1 ${showCurrentBadge || showPopularBadge ? 'pt-10' : ''}`}>
         {/* Plan name */}
-        <div className="mb-6 text-center">
-          <h3 className={`text-xl font-bold mb-1 ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
+        <div className="mb-6">
+          <h3 className={`text-xl font-bold mb-1 text-center ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
             {plan.title}
           </h3>
-          <p className={`text-sm ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>
+          <p className={`text-sm text-center ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>
             {isFree ? 'Perfect to get started' : isPlanPopular ? 'Best for growing teams' : 'For power users'}
           </p>
         </div>
 
         {/* Price */}
-        <div className="mb-8 text-center">
+        <div className="mb-8">
           {isFree ? (
-            <div>
+            <div className="text-center">
               <div className={`text-5xl font-extrabold ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>Free</div>
               <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>forever</div>
             </div>
           ) : (
-            <div>
+            <div className="text-center">
               <div className="flex items-end justify-center gap-1">
                 <span className={`text-5xl font-extrabold leading-none ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
                   {formatDisplayPrice(plan.price)}

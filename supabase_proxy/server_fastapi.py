@@ -938,8 +938,11 @@ async def rest_table(table: str, request: Request):
                     # Return system facilitators (user_id IS NULL) + user's own custom facilitators
                     wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
                     wv.append(requesting_user_id)
+                elif table == 'sessions':
+                    # sessions = workshop templates, no user_id column; accessible to all authenticated users
+                    pass
                 else:
-                    # conversations / sessions: direct user_id filter
+                    # conversations: direct user_id filter
                     wc.append('"user_id" = %s::uuid')
                     wv.append(requesting_user_id)
             elif join_token_header and not requesting_user_id:

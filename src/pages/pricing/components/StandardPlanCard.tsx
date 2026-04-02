@@ -127,7 +127,7 @@ export const StandardPlanCard = ({
 
       <div className={`p-8 flex flex-col flex-1 ${showCurrentBadge || showPopularBadge ? 'pt-10' : ''}`}>
         {/* Plan name */}
-        <div className="mb-6">
+        <div className="mb-6 text-center">
           <h3 className={`text-xl font-bold mb-1 ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
             {plan.title}
           </h3>
@@ -137,7 +137,7 @@ export const StandardPlanCard = ({
         </div>
 
         {/* Price */}
-        <div className="mb-8">
+        <div className="mb-8 text-center">
           {isFree ? (
             <div>
               <div className={`text-5xl font-extrabold ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>Free</div>
@@ -145,12 +145,12 @@ export const StandardPlanCard = ({
             </div>
           ) : (
             <div>
-              <div className="flex items-end gap-1">
-                <span className={`text-2xl font-bold ${isPlanPopular ? 'text-indigo-200' : 'text-gray-500'}`}>
-                  {getCurrencySymbol(plan.currency || 'USD')}
-                </span>
+              <div className="flex items-end justify-center gap-1">
                 <span className={`text-5xl font-extrabold leading-none ${isPlanPopular ? 'text-white' : 'text-gray-900'}`}>
                   {formatDisplayPrice(plan.price)}
+                </span>
+                <span className={`text-2xl font-bold mb-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-500'}`}>
+                  {getCurrencySymbol(plan.currency || 'USD')}
                 </span>
               </div>
               <div className={`text-sm mt-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>/month</div>

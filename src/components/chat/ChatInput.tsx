@@ -194,6 +194,7 @@ const ChatInput = ({
           <Button
             onClick={handleSendClick}
             size="icon"
+            aria-label="Send message"
             className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} bg-indigo-600 hover:bg-indigo-700`}
             disabled={!inputMessage.trim() || disabled}
           >

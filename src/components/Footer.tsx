@@ -15,7 +15,7 @@ export const Footer = () => {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600">
                 <Zap className="h-4 w-4 text-white" />
               </div>
-              <span className="text-lg font-bold text-white">MyFacilitator</span>
+              <span className="text-lg font-bold text-white">AIfacilitator</span>
             </Link>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
               AI-powered facilitation for workshops, brainstorming sessions, and team discussions. Run better meetings, every time.
@@ -56,7 +56,7 @@ export const Footer = () => {
 
         <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p className="text-xs text-gray-600">
-            &copy; {currentYear} MyFacilitator. All Rights Reserved.
+            &copy; {currentYear} AIfacilitator. All Rights Reserved.
           </p>
           <p className="text-xs text-gray-600">
             Built with AI &nbsp;·&nbsp; Powered by innovation

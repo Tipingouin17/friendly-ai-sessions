@@ -45,7 +45,7 @@ export const Features = () => {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">Features and Benefits</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto text-center">
-              MyFacilitator© is a state-of-the-art AI facilitator designed to meet the unique needs and preferences of every user.
+              AIfacilitator© is a state-of-the-art AI facilitator designed to meet the unique needs and preferences of every user.
             </p>
           </div>
           
@@ -70,7 +70,7 @@ export const Features = () => {
             Experience the Future of Facilitation
           </h2>
           <p className="text-lg text-muted-foreground mb-12 text-center">
-            At MyFacilitator, we believe that the future of facilitation lies in the power of AI.
+            At AIfacilitator, we believe that the future of facilitation lies in the power of AI.
             Our platform revolutionizes how sessions are conducted, empowering businesses and individuals to achieve greater outcomes.
           </p>
           <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>

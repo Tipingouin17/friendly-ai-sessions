@@ -12,7 +12,7 @@ const Index = () => {
     return (
         <div className="min-h-screen bg-white">
             <PageHead
-                title="MyFacilitator - AI-Powered Workshop Facilitation"
+                title="AIfacilitator - AI-Powered Workshop Facilitation"
                 description="Transform your meetings into engaging, productive sessions with AI-powered workshop facilitation."
             />
 
@@ -193,7 +193,7 @@ const Index = () => {
                         <span className="inline-block mb-3 text-sm font-semibold text-indigo-600 uppercase tracking-widest">Why teams love us</span>
                         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">Built for teams that value results</h2>
                         <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto text-center px-2">
-                            MyFacilitator replaces expensive, inconsistent external facilitators with a scalable, always-available AI alternative.
+                            AIfacilitator replaces expensive, inconsistent external facilitators with a scalable, always-available AI alternative.
                         </p>
                     </div>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
@@ -262,7 +262,7 @@ const Index = () => {
                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5 md:gap-6">
                         {[
                             {
-                                quote: "MyFacilitator transformed how we run retrospectives. Our team is more engaged and we leave every session with clear action items.",
+                                quote: "AIfacilitator transformed how we run retrospectives. Our team is more engaged and we leave every session with clear action items.",
                                 author: "Sarah K.",
                                 role: "Head of Product, TechCorp",
                             },
@@ -299,7 +299,7 @@ const Index = () => {
                 <div className="container mx-auto max-w-3xl text-center">
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 text-center">Ready to transform your workshops?</h2>
                     <p className="text-base md:text-lg text-indigo-200 mb-10 max-w-xl mx-auto text-center px-2">
-                        Join thousands of teams already running more effective, engaging sessions with MyFacilitator.
+                        Join thousands of teams already running more effective, engaging sessions with AIfacilitator.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 px-4 sm:px-0">
                         <Link to="/signup" className="w-full sm:w-auto">

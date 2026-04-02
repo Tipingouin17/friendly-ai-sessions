@@ -51,7 +51,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
             <div className="p-2 bg-indigo-600 rounded-xl">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">MyFacilitator</span>
+            <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
           </div>
         </div>
 
@@ -130,7 +130,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          Powered by MyFacilitator · AI-driven workshop facilitation
+          Powered by AIfacilitator · AI-driven workshop facilitation
         </p>
       </div>
     </div>

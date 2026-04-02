@@ -60,7 +60,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <PageHead title="Contact Us | MyFacilitator" description="Get in touch with the MyFacilitator team" />
+      <PageHead title="Contact Us | AIfacilitator" description="Get in touch with the AIfacilitator team" />
 
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pt-28 pb-16 px-4">
@@ -92,7 +92,7 @@ const Contact = () => {
                     icon: <Mail className="h-5 w-5 text-indigo-600" />,
                     bg: 'bg-indigo-50',
                     title: 'Email us',
-                    content: 'support@myfacilitator.ai',
+                    content: 'support@aifacilitator.app',
                     sub: 'We reply within 24 hours',
                   },
                   {
@@ -131,7 +131,7 @@ const Contact = () => {
                 Custom pricing, dedicated support, and white-label options for large organisations.
               </p>
               <a
-                href="mailto:enterprise@myfacilitator.ai"
+                href="mailto:enterprise@aifacilitator.app"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-indigo-200 transition-colors"
               >
                 Talk to our team <ArrowRight className="h-4 w-4" />

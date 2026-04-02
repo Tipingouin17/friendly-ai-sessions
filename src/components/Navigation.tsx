@@ -40,13 +40,13 @@ export const Navigation = () => {
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600">
               <Zap className="h-4 w-4 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">MyFacilitator</span>
+            <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
           </Link>
 
           {isMobile ? (
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 p-0">
+                <Button variant="ghost" size="icon" className="h-10 w-10 p-0" aria-label="Open menu">
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>

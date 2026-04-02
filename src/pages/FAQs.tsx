@@ -25,8 +25,8 @@ const FALLBACK_FAQS: FAQ[] = [
   {
     id: 1,
     category: 'Getting Started',
-    title: 'What is MyFacilitator?',
-    description: 'MyFacilitator is an AI-powered workshop facilitation platform. It provides expert AI facilitators that guide your team through structured conversations, decisions, and workshops — replacing the need for expensive external facilitators while delivering consistent, high-quality outcomes every time.',
+    title: 'What is AIfacilitator?',
+    description: 'AIfacilitator is an AI-powered workshop facilitation platform. It provides expert AI facilitators that guide your team through structured conversations, decisions, and workshops — replacing the need for expensive external facilitators while delivering consistent, high-quality outcomes every time.',
     status: true,
   },
   {
@@ -68,7 +68,7 @@ const FALLBACK_FAQS: FAQ[] = [
     id: 7,
     category: 'Sessions & Facilitation',
     title: 'What types of workshops can I run?',
-    description: 'MyFacilitator supports a wide range of workshop types including retrospectives, strategic planning, brainstorming, decision-making, team alignment, design thinking, and more. Each AI facilitator is trained in specific methodologies to match your workshop goals.',
+    description: 'AIfacilitator supports a wide range of workshop types including retrospectives, strategic planning, brainstorming, decision-making, team alignment, design thinking, and more. Each AI facilitator is trained in specific methodologies to match your workshop goals.',
     status: true,
   },
   {
@@ -173,7 +173,7 @@ const FAQs = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <PageHead title="FAQs | MyFacilitator" description="Find answers to common questions about MyFacilitator" />
+      <PageHead title="FAQs | AIfacilitator" description="Find answers to common questions about AIfacilitator" />
 
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pt-28 pb-16 px-4">
@@ -186,7 +186,7 @@ const FAQs = () => {
             Frequently Asked Questions
           </h1>
           <p className="text-lg text-gray-500 text-center">
-            Everything you need to know about MyFacilitator. Can't find the answer you're looking for?{' '}
+            Everything you need to know about AIfacilitator. Can't find the answer you're looking for?{' '}
             <Link to="/contact" className="text-indigo-600 hover:underline font-medium">
               Contact our team
             </Link>

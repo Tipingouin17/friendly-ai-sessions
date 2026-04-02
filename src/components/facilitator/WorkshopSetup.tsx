@@ -60,11 +60,11 @@ export const WorkshopSetup = ({
           {!isLoading && <span className="text-muted-foreground ml-1">(Max: {maxParticipants === Infinity ? 'Unlimited' : maxParticipants})</span>}
         </label>
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={handleDecrement} disabled={participantCount <= 1}>
+          <Button variant="outline" size="icon" aria-label="Decrease participant count" onClick={handleDecrement} disabled={participantCount <= 1}>
             -
           </Button>
           <span className="text-xl font-semibold">{participantCount}</span>
-          <Button variant="outline" size="icon" onClick={handleIncrement} disabled={limitReached}>
+          <Button variant="outline" size="icon" aria-label="Increase participant count" onClick={handleIncrement} disabled={limitReached}>
             +
           </Button>
         </div>

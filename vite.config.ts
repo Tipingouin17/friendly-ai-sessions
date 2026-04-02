@@ -34,4 +34,25 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React runtime — always needed on first paint
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Radix UI + utility libraries — shared across most pages
+          'vendor-ui': [
+            'lucide-react',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+          ],
+          // Chart/analytics — only on report and dashboard pages
+          'vendor-charts': ['recharts'],
+        },
+      },
+    },
+    // Warn when a chunk exceeds 600 kB
+    chunkSizeWarningLimit: 600,
+  },
 }));

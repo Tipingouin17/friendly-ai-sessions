@@ -314,8 +314,7 @@ const Index = () => {
                         <Link to="/pricing" className="w-full sm:w-auto">
                             <Button
                                 size="lg"
-                                variant="outline"
-                                className="w-full sm:w-auto text-base font-semibold px-10 py-6 border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 transition-colors rounded-xl"
+                                className="w-full sm:w-auto text-base font-semibold px-10 py-6 bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 transition-colors rounded-xl"
                             >
                                 See Pricing
                             </Button>

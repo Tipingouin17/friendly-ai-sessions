@@ -58,6 +58,7 @@ ALLOWED_CORS_ORIGINS = (
         "http://localhost:3000",
         "http://localhost:8080",
         "https://friendly-ai-sessions.vercel.app",
+        "https://aifacilitator.vercel.app",
     ]
 )
 app.add_middleware(
@@ -1700,7 +1701,7 @@ async def edge_function(func_name: str, request: Request):
     # ── create-portal-session ──────────────────────────────────
     elif func_name == "create-portal-session":
         user_id = data.get("userId")
-        return_url = data.get("returnUrl", "https://friendly-ai-sessions.vercel.app/settings")
+        return_url = data.get("returnUrl", "https://aifacilitator.vercel.app/settings")
         if not user_id:
             raise HTTPException(400, "Missing userId")
         try:

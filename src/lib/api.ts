@@ -144,13 +144,17 @@ async function apiFetch<T>(
 
     if (!res.ok) {
       const err = body as Record<string, unknown>;
+      // FastAPI wraps errors as { detail: { message, code } } or { detail: "string" }
+      const detail = err?.detail as Record<string, unknown> | string | undefined;
+      const detailObj = detail && typeof detail === 'object' ? detail as Record<string, unknown> : null;
+      const detailStr = detail && typeof detail === 'string' ? detail : null;
       return {
         data: null,
         error: {
-          message: (err?.message as string) || (err?.error_description as string) || `HTTP ${res.status}`,
-          code: (err?.code as string) || String(res.status),
-          details: err?.details as string | undefined,
-          hint: err?.hint as string | undefined,
+          message: (detailObj?.message as string) || (err?.message as string) || (err?.error_description as string) || detailStr || `HTTP ${res.status}`,
+          code: (detailObj?.code as string) || (err?.code as string) || String(res.status),
+          details: ((detailObj?.details ?? err?.details) as string | undefined),
+          hint: ((detailObj?.hint ?? err?.hint) as string | undefined),
           status: res.status,
         },
         count,

@@ -992,9 +992,13 @@ async def rest_table(table: str, request: Request):
             rows = [serialize_row(dict(r)) for r in cur.fetchall()]
             for j in joins:
                 resolve_join(table, j, rows, conn)
-            if extra_fk_cols:
+            # Only strip extra FK cols that were not already covered by SELECT *.
+            # When base_cols is ['*'], all columns are already in the result, so
+            # stripping extra_fk_cols would remove columns the client expects.
+            cols_to_strip = extra_fk_cols if "*" not in base_cols else []
+            if cols_to_strip:
                 for row in rows:
-                    for ec in extra_fk_cols:
+                    for ec in cols_to_strip:
                         row.pop(ec, None)
             prefer = request.headers.get("prefer", "")
             accept = request.headers.get("accept", "")

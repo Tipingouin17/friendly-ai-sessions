@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +16,7 @@ interface FacilitatorFormProps {
   maxFacilitators: number | typeof Infinity;
   isLoading: boolean;
   onCancel: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: () => void;
 }
 
 export const FacilitatorForm = ({
@@ -39,7 +38,7 @@ export const FacilitatorForm = ({
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <Label htmlFor="facilitator-limit">Facilitator Usage</Label>
@@ -51,29 +50,27 @@ export const FacilitatorForm = ({
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
+        <Label htmlFor="fac-title">Title</Label>
         <Input
-          id="title"
+          id="fac-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Enter facilitator title"
-          required
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="details">Details</Label>
+        <Label htmlFor="fac-details">Details</Label>
         <Textarea
-          id="details"
+          id="fac-details"
           value={details}
           onChange={(e) => setDetails(e.target.value)}
           placeholder="Enter facilitator details"
-          required
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="profilePicture">Profile Picture URL</Label>
+        <Label htmlFor="fac-picture">Profile Picture URL</Label>
         <Input
-          id="profilePicture"
+          id="fac-picture"
           value={profilePicture}
           onChange={(e) => setProfilePicture(e.target.value)}
           placeholder="Enter profile picture URL"
@@ -87,10 +84,10 @@ export const FacilitatorForm = ({
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={isLoading}>
-          Create Facilitator
+        <Button type="button" onClick={onSubmit} disabled={isLoading}>
+          {isLoading ? "Creating..." : "Create Facilitator"}
         </Button>
       </div>
-    </form>
+    </div>
   );
 };

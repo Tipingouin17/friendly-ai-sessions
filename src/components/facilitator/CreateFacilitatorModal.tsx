@@ -38,8 +38,8 @@ export const CreateFacilitatorModal = ({
     createFacilitator
   } = useFacilitatorCreation(onSuccess);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    const success = await createFacilitator(e, hasReachedFacilitatorLimit, canCreateCustomFacilitators);
+  const handleCreate = async () => {
+    const success = await createFacilitator(hasReachedFacilitatorLimit, canCreateCustomFacilitators);
     if (success) {
       onOpenChange(false);
     }
@@ -88,7 +88,7 @@ export const CreateFacilitatorModal = ({
             maxFacilitators={maxFacilitators}
             isLoading={isLoading}
             onCancel={() => onOpenChange(false)}
-            onSubmit={handleSubmit}
+            onSubmit={handleCreate}
           />
         )}
       </DialogContent>

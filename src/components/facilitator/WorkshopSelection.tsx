@@ -94,7 +94,7 @@ export const WorkshopSelection = ({
               <div 
                 key="add-new"
                 className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
-                onClick={onAddNewWorkshop}
+                onClick={() => { console.log('Add New Workshop clicked!'); onAddNewWorkshop(); }}
               >
                 <Plus className="mb-2 h-12 w-12 text-gray-400" />
                 <span className="text-center text-sm text-gray-600">Add New Workshop</span>

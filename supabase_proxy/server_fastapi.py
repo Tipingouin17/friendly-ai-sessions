@@ -557,33 +557,53 @@ def build_order(order_str: str) -> str:
 # WebSocket connection manager (realtime)
 # ============================================================
 class ConnectionManager:
-    """Manages active WebSocket connections grouped by conversation_id."""
+    """Manages active WebSocket connections grouped by conversation_id.
+
+    Each entry in _rooms maps a conversation_id to a list of (WebSocket, topic)
+    tuples.  Storing the topic allows broadcast() to include the correct topic
+    field in every outgoing message so the frontend's channel map lookup
+    (channels.get(topic)) succeeds.
+    """
 
     def __init__(self):
-        # conversation_id -> list of WebSocket
-        self._rooms: Dict[str, List[WebSocket]] = {}
+        # conversation_id -> list of (WebSocket, topic)
+        self._rooms: Dict[str, List[tuple]] = {}
         self._lock = asyncio.Lock()
 
-    async def connect(self, ws: WebSocket, conversation_id: str):
-        await ws.accept()
+    async def connect(self, ws: WebSocket, conversation_id: str, topic: str = ""):
+        """Register a WebSocket in the room for conversation_id.
+
+        The WebSocket is accepted here only if it has not already been accepted
+        by the endpoint handler (double-accept raises an error).
+        """
+        try:
+            await ws.accept()
+        except Exception:
+            pass  # Already accepted by the endpoint handler
         async with self._lock:
-            self._rooms.setdefault(conversation_id, []).append(ws)
+            self._rooms.setdefault(conversation_id, []).append((ws, topic))
 
     async def disconnect(self, ws: WebSocket, conversation_id: str):
         async with self._lock:
             room = self._rooms.get(conversation_id, [])
-            if ws in room:
-                room.remove(ws)
-            if not room:
+            self._rooms[conversation_id] = [(w, t) for w, t in room if w is not ws]
+            if not self._rooms[conversation_id]:
                 self._rooms.pop(conversation_id, None)
 
     async def broadcast(self, conversation_id: str, payload: dict):
-        """Send a message to all connections in a room."""
+        """Send a message to all connections in a room.
+
+        Each message is augmented with the subscriber's topic so the frontend
+        Supabase shim can route it to the correct RealtimeChannelImpl.
+        """
         room = list(self._rooms.get(conversation_id, []))
         dead = []
-        for ws in room:
+        for ws, topic in room:
             try:
-                await ws.send_json(payload)
+                msg = dict(payload)
+                if topic:
+                    msg["topic"] = topic
+                await ws.send_json(msg)
             except Exception:
                 dead.append(ws)
         for ws in dead:
@@ -1157,11 +1177,11 @@ async def rest_table(table: str, request: Request):
                         results.append(serialize_row(dict(row)))
                 conn.commit()
                 conn.close()
-                # Broadcast new message to WebSocket clients
-                if table == "messages" and results:
+                # Broadcast INSERT events for messages and session_participants
+                if table in ("messages", "session_participants") and results:
                     conv_id = str(results[0].get("conversation_id", ""))
                     asyncio.create_task(manager.broadcast(conv_id, {
-                        "event": "INSERT", "table": "messages", "new": results[0]
+                        "event": "INSERT", "table": table, "new": results[0]
                     }))
                 return JSONResponse(content=results, status_code=201)
             else:
@@ -1182,11 +1202,20 @@ async def rest_table(table: str, request: Request):
                 conn.commit()
                 conn.close()
                 result = serialize_row(dict(row)) if row else {}
-                # Broadcast new message
-                if table == "messages" and result:
+                # Broadcast INSERT events for messages and session_participants.
+                # The payload must match the RealtimePayload shape expected by the
+                # frontend Supabase shim (api.ts onmessage handler).
+                if table in ("messages", "session_participants") and result:
                     conv_id = str(result.get("conversation_id", ""))
                     asyncio.create_task(manager.broadcast(conv_id, {
-                        "event": "INSERT", "table": "messages", "new": result
+                        "event": "INSERT",
+                        "payload": {
+                            "eventType": "INSERT",
+                            "new": result,
+                            "old": {},
+                            "table": table,
+                            "schema": "public",
+                        },
                     }))
                 return JSONResponse(content=result, status_code=201)
 
@@ -1207,11 +1236,18 @@ async def rest_table(table: str, request: Request):
             conn.commit()
             conn.close()
             result = [serialize_row(dict(r)) for r in rows]
-            # Broadcast updates for conversations/session_participants
+            # Broadcast updates for conversations/session_participants.
             if table in ("conversations", "session_participants") and result:
                 conv_id = str(result[0].get("id") or result[0].get("conversation_id", ""))
                 asyncio.create_task(manager.broadcast(conv_id, {
-                    "event": "UPDATE", "table": table, "new": result[0]
+                    "event": "UPDATE",
+                    "payload": {
+                        "eventType": "UPDATE",
+                        "new": result[0],
+                        "old": {},
+                        "table": table,
+                        "schema": "public",
+                    },
                 }))
             return result[0] if len(result) == 1 else result
 
@@ -1580,17 +1616,22 @@ async def edge_function(func_name: str, request: Request):
                     cur.execute("UPDATE conversations SET welcome_message_status = 'ai_ready' WHERE id = %s", (conv_id,))
                 conn.commit()
                 conn.close()
-                # Broadcast new AI message to all WebSocket clients in this room
+                # Broadcast new AI message to all WebSocket clients in this room.
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "INSERT",
-                    "table": "messages",
-                    "new": {
-                        "id": str(msg_id),
-                        "conversation_id": str(conv_id),
-                        "content": content_json,
-                        "role": "assistant",
-                        "name": facilitator_name,
-                        "created_at": datetime.utcnow().isoformat(),
+                    "payload": {
+                        "eventType": "INSERT",
+                        "new": {
+                            "id": str(msg_id),
+                            "conversation_id": str(conv_id),
+                            "content": content_json,
+                            "role": "assistant",
+                            "name": facilitator_name,
+                            "created_at": datetime.utcnow().isoformat(),
+                        },
+                        "old": {},
+                        "table": "messages",
+                        "schema": "public",
                     },
                 }))
             except Exception as e:
@@ -1734,10 +1775,16 @@ async def edge_function(func_name: str, request: Request):
                     "INSERT INTO session_events (conversation_id, event_type, data) VALUES (%s, 'session_ended', %s)",
                     (conv_id, json.dumps({"ended_by": user_id, "report_id": report_id})),
                 )
-                # Broadcast session ended to all WebSocket clients
+                # Broadcast session ended to all WebSocket clients.
                 asyncio.create_task(manager.broadcast(str(conv_id), {
-                    "event": "UPDATE", "table": "conversations",
-                    "new": {"id": str(conv_id), "is_session_ended": True, "status": "completed"},
+                    "event": "UPDATE",
+                    "payload": {
+                        "eventType": "UPDATE",
+                        "new": {"id": str(conv_id), "is_session_ended": True, "status": "completed"},
+                        "old": {},
+                        "table": "conversations",
+                        "schema": "public",
+                    },
                 }))
             except Exception as e:
                 print(f"Error closing session: {e}")
@@ -2085,17 +2132,38 @@ async def realtime_websocket(websocket: WebSocket):
 
             # Subscribe to a channel
             if event == "phx_join":
-                # Parse conversation_id from topic like 'realtime:public:messages:conversation_id=eq.123'
-                conv_id_match = re.search(r"conversation_id=eq\.([^&]+)", topic)
-                if conv_id_match:
-                    subscribed_conv_id = conv_id_match.group(1)
-                    await manager.connect(websocket, subscribed_conv_id)
-                    print(f"[WS] Subscribed to conversation {subscribed_conv_id}")
-                # Also handle session_participants and conversations channels
-                part_match = re.search(r"id=eq\.([^&]+)", topic)
-                if part_match and not conv_id_match:
-                    subscribed_conv_id = part_match.group(1)
-                    await manager.connect(websocket, subscribed_conv_id)
+                # Strategy: extract the numeric conversation_id from the topic string.
+                # The frontend uses channel names like:
+                #   - 'conversation-{id}', 'messages-{id}', 'participants-{id}'
+                #   - 'enhanced-host-{id}-{timestamp}', 'admin-session-participants-{id}'
+                #   - 'realtime:public:messages:conversation_id=eq.{id}' (legacy)
+                # We try patterns in order of specificity.
+                conv_id: Optional[str] = None
+                # 1. Explicit filter: conversation_id=eq.{id}
+                m = re.search(r"conversation_id=eq\.([^&:]+)", topic)
+                if m:
+                    conv_id = m.group(1)
+                # 2. Explicit filter: id=eq.{id}
+                if not conv_id:
+                    m = re.search(r"(?:^|[^a-z])id=eq\.([^&:]+)", topic)
+                    if m:
+                        conv_id = m.group(1)
+                # 3. Named channel patterns: {prefix}-{numeric_id} or {prefix}-{numeric_id}-{suffix}
+                if not conv_id:
+                    m = re.search(r"-([0-9]+)(?:-|$)", topic)
+                    if m:
+                        conv_id = m.group(1)
+                # 4. Trailing numeric id: {prefix}-{numeric_id} (no suffix)
+                if not conv_id:
+                    m = re.search(r"-([0-9]+)$", topic)
+                    if m:
+                        conv_id = m.group(1)
+                if conv_id:
+                    subscribed_conv_id = conv_id
+                    await manager.connect(websocket, conv_id, topic)
+                    print(f"[WS] Subscribed topic={topic!r} → conv={conv_id}")
+                else:
+                    print(f"[WS] phx_join: could not extract conv_id from topic={topic!r}")
                 await websocket.send_json({
                     "event": "phx_reply",
                     "topic": topic,

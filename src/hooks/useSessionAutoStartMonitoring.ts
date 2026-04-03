@@ -1,3 +1,8 @@
+/**
+ * use Session Auto Start Monitoring
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useCallback, useRef } from 'react';
 import { Message } from '@/types/chat';
@@ -51,7 +56,7 @@ export const useSessionAutoStartMonitoring = ({
         }
         
       } catch (error) {
-        console.error(`❌ [${isHost ? 'HOST' : 'PARTICIPANT'}] Error during session auto-start:`, error);
+        console.error(`[${isHost ? 'HOST' : 'PARTICIPANT'}] Error during session auto-start:`, error);
       } finally {
         // Reset processing flag after a delay
         setTimeout(() => {

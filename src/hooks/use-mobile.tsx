@@ -1,3 +1,8 @@
+/**
+ * use mobile
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import * as React from "react"
 

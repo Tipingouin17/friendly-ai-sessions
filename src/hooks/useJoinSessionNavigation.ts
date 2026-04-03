@@ -1,3 +1,8 @@
+/**
+ * use Join Session Navigation
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -1,3 +1,8 @@
+/**
+ * Plan Features
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Check } from 'lucide-react';

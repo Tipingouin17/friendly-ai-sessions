@@ -1,3 +1,8 @@
+/**
+ * Avatar Upload Modal
+ *
+ * Profile component for the AIfacilitator application.
+ */
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

@@ -1,3 +1,8 @@
+/**
+ * use Realtime Connection
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { isInCrossOriginContext } from "@/utils/crossOriginUtils";

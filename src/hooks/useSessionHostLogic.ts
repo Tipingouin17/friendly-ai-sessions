@@ -1,3 +1,8 @@
+/**
+ * use Session Host Logic
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useConversationId } from "@/hooks/useConversationId";

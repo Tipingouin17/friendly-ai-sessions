@@ -1,3 +1,8 @@
+/**
+ * Create Facilitator Modal
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePlanLimits } from "@/hooks/usePlanLimits";

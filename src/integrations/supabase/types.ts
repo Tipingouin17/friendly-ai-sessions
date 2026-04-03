@@ -1,3 +1,8 @@
+/**
+ * types
+ *
+ * Integration for the AIfacilitator application.
+ */
 export type Json =
   | string
   | number

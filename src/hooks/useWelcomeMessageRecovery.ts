@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message Recovery
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,7 +94,7 @@ export const useWelcomeMessageRecovery = ({
       });
 
       if (error) {
-        console.error('❌ Recovery attempt failed:', error);
+        console.error('Recovery attempt failed:', error);
       } else {
         setRecoveryAttempts(0); // Reset on success
         if (onRecoverySuccess) {
@@ -97,7 +102,7 @@ export const useWelcomeMessageRecovery = ({
         }
       }
     } catch (error) {
-      console.error('💥 Exception during recovery:', error);
+      console.error('Exception during recovery:', error);
     } finally {
       setIsRecovering(false);
     }
@@ -131,7 +136,7 @@ export const useWelcomeMessageRecovery = ({
       });
 
       if (error) {
-        console.error('❌ Force recovery failed:', error);
+        console.error('Force recovery failed:', error);
       } else {
         setRecoveryAttempts(0);
         if (onRecoverySuccess) {
@@ -139,7 +144,7 @@ export const useWelcomeMessageRecovery = ({
         }
       }
     } catch (error) {
-      console.error('💥 Exception during force recovery:', error);
+      console.error('Exception during force recovery:', error);
     } finally {
       setIsRecovering(false);
     }

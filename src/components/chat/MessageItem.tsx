@@ -1,3 +1,8 @@
+/**
+ * Message Item
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { cn } from '@/lib/utils';

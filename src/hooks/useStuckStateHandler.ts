@@ -1,3 +1,8 @@
+/**
+ * use Stuck State Handler
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useEffect, useRef } from "react";
 import { ConversationWithSession } from "@/types/database";
 

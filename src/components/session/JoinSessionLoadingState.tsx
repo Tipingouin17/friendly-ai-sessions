@@ -1,3 +1,8 @@
+/**
+ * Join Session Loading State
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { useLoadingStateTimer } from '@/hooks/useLoadingStateTimer';

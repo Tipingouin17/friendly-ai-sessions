@@ -1,3 +1,8 @@
+/**
+ * use Session Joiner
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";

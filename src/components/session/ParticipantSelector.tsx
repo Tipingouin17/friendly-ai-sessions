@@ -1,3 +1,8 @@
+/**
+ * Participant Selector
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";

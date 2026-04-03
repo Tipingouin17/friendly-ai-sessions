@@ -1,3 +1,8 @@
+/**
+ * use Loading State Timer
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from 'react';
 

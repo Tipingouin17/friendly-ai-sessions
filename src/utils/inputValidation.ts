@@ -1,3 +1,8 @@
+/**
+ * input Validation
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import DOMPurify from 'dompurify';
 import { z } from 'zod';

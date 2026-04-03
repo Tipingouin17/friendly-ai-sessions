@@ -1,3 +1,8 @@
+/**
+ * session
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";

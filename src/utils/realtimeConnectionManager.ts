@@ -1,3 +1,8 @@
+/**
+ * realtime Connection Manager
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel, createUniqueChannelName, createReliableChannel } from "./realtimeHelpers";

@@ -1,3 +1,8 @@
+/**
+ * use View Mode
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useState } from 'react';
 

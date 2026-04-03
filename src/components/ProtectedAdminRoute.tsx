@@ -1,3 +1,8 @@
+/**
+ * Protected Admin Route
+ *
+ * Component for the AIfacilitator application.
+ */
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";

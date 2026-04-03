@@ -1,3 +1,8 @@
+/**
+ * Session Closure Dialog
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import {

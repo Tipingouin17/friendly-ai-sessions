@@ -1,3 +1,8 @@
+/**
+ * use Session Cross Origin
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";

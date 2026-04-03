@@ -1,3 +1,8 @@
+/**
+ * use Session Error Handler
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from "react";
 

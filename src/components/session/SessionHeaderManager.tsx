@@ -1,3 +1,8 @@
+/**
+ * Session Header Manager
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import AdminHeader from './admin/AdminHeader';

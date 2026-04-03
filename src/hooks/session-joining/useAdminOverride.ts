@@ -1,3 +1,8 @@
+/**
+ * use Admin Override
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 import { useToast } from "@/components/ui/use-toast";
 import { registerParticipant } from "./useParticipantRegistration";

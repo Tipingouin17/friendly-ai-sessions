@@ -1,3 +1,8 @@
+/**
+ * use Session Provider Error Handler
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useCallback, useEffect } from "react";
 

@@ -1,3 +1,8 @@
+/**
+ * Host Dashboard
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import HostHeader from "./HostHeader";

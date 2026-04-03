@@ -1,3 +1,8 @@
+/**
+ * Error Boundary
+ *
+ * Component for the AIfacilitator application.
+ */
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';

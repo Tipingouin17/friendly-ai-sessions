@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message Gate
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,7 +47,7 @@ export const useWelcomeMessageGate = ({
         .limit(1);
 
       if (error) {
-        console.error('❌ [WelcomeMessageGate] Error checking messages:', error);
+        console.error('[WelcomeMessageGate] Error checking messages:', error);
         return false;
       }
 
@@ -50,7 +55,7 @@ export const useWelcomeMessageGate = ({
 
       return hasMessage;
     } catch (error) {
-      console.error('💥 [WelcomeMessageGate] Exception checking welcome message:', error);
+      console.error('[WelcomeMessageGate] Exception checking welcome message:', error);
       return false;
     }
   }, [conversationId]);
@@ -92,10 +97,10 @@ export const useWelcomeMessageGate = ({
         }));
         return true;
       } else if (conversation?.welcome_message_status === 'ai_generating') { /* no-op */ } else if (conversation?.welcome_message_status === 'failed') {
-        console.error('❌ [AI-TRACKING] Welcome message generation failed');
+        console.error('[AI-TRACKING] Welcome message generation failed');
       }
     } catch (error) {
-      console.error('❌ [WelcomeMessageGate] [AI-TRACKING] Error checking conversation status:', error);
+      console.error('[WelcomeMessageGate] [AI-TRACKING] Error checking conversation status:', error);
     }
 
     // Set up timeout (15 seconds for database trigger generation)
@@ -150,7 +155,7 @@ export const useWelcomeMessageGate = ({
             messageReady: true 
           }));
         } else if (newStatus === 'failed') {
-          console.error('❌ [AI-TRACKING] Welcome message generation failed via status update');
+          console.error('[AI-TRACKING] Welcome message generation failed via status update');
           setState(prev => ({ 
             ...prev, 
             error: 'AI generation failed',

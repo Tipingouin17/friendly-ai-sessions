@@ -1,3 +1,8 @@
+/**
+ * use Session Context
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from "react";
 import { ConversationWithSession } from "@/types/database";

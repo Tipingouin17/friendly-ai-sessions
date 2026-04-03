@@ -1,3 +1,8 @@
+/**
+ * Referrals
+ *
+ * Page for the AIfacilitator application.
+ */
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Gift, Mail, Share2, Check, Users, TrendingUp } from "lucide-react";

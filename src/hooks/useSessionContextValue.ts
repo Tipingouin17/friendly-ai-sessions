@@ -1,3 +1,8 @@
+/**
+ * use Session Context Value
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useMemo } from "react";
 import { SessionContextProps } from "@/types/session";

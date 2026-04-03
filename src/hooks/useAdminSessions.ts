@@ -1,3 +1,8 @@
+/**
+ * use Admin Sessions
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

@@ -1,3 +1,8 @@
+/**
+ * Input Footer
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";

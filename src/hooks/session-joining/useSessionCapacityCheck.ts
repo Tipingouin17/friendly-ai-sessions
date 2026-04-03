@@ -1,3 +1,8 @@
+/**
+ * use Session Capacity Check
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";

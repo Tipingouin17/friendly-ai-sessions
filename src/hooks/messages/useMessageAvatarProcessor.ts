@@ -1,3 +1,8 @@
+/**
+ * use Message Avatar Processor
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { Message, ParticipantInfo } from "@/types/chat";
 import { isImageUrl } from "@/utils/facilitatorUtils";

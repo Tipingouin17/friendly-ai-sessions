@@ -1,3 +1,8 @@
+/**
+ * user Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { ApiUser } from '@/lib/api';
 

@@ -1,3 +1,8 @@
+/**
+ * use Simplified Participant Monitoring
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';

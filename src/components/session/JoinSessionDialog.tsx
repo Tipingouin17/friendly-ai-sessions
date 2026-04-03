@@ -1,3 +1,8 @@
+/**
+ * Join Session Dialog
+ *
+ * Session component for the AIfacilitator application.
+ */
 import React, { useEffect, useState } from 'react';
 import { QrCode, Copy, X } from "lucide-react";
 import { 

@@ -1,3 +1,8 @@
+/**
+ * Step Navigation
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";

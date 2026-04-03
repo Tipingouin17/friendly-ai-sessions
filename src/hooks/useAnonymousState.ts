@@ -1,3 +1,8 @@
+/**
+ * use Anonymous State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";

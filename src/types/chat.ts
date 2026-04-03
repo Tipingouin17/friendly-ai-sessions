@@ -1,3 +1,8 @@
+/**
+ * chat
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 export interface Message {
   id: string;
   content: string;

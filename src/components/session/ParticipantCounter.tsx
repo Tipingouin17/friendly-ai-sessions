@@ -1,3 +1,8 @@
+/**
+ * Participant Counter
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from 'react';
 import { Users } from "lucide-react";

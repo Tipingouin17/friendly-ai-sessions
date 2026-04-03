@@ -1,3 +1,8 @@
+/**
+ * use Session Recovery
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

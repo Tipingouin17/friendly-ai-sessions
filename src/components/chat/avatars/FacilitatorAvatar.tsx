@@ -1,3 +1,8 @@
+/**
+ * Facilitator Avatar
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -85,11 +90,11 @@ const FacilitatorAvatar = ({
   if (normalizedUrl && normalizedUrl !== '/placeholder.svg' && isImageUrl(normalizedUrl) && !imageError) {
     debugLog('all', `Displaying facilitator avatar with URL: ${normalizedUrl}`);
     
-    // Check if URL needs crossOrigin attribute
+    // Check if URL needs crossOrigin attribute (includes legacy pre-migration storage URLs)
     const needsCrossOrigin = 
       isInCrossOriginContext() || 
       normalizedUrl.includes('crossorigin=anonymous') ||
-      normalizedUrl.includes('supabase.co');
+      normalizedUrl.includes('supabase.co'); // Legacy: backward compat with pre-migration data
     
     return (
       <Avatar className={`${dimensions[size]} avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>

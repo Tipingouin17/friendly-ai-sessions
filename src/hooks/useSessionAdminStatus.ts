@@ -1,3 +1,8 @@
+/**
+ * use Session Admin Status
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";

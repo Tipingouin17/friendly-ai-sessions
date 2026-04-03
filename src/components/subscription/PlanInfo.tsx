@@ -1,3 +1,8 @@
+/**
+ * Plan Info
+ *
+ * Subscription component for the AIfacilitator application.
+ */
 import React from 'react';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';

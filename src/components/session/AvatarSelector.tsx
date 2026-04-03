@@ -1,3 +1,8 @@
+/**
+ * Avatar Selector
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import BoringAvatar from 'boring-avatars';

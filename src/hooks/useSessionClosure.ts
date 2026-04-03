@@ -1,3 +1,8 @@
+/**
+ * use Session Closure
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -67,7 +72,7 @@ export const useSessionClosure = () => {
 
       return true;
     } catch (error) {
-      console.error('💥 Error in closeSessionAndGenerateReport:', error);
+      console.error('Error in closeSessionAndGenerateReport:', error);
       
       let errorMessage = "Failed to close session and generate report";
       if (error instanceof Error) {

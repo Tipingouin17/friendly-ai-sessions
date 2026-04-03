@@ -1,3 +1,8 @@
+/**
+ * Session Full Alert
+ *
+ * Session component for the AIfacilitator application.
+ */
 import React, { useEffect } from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";

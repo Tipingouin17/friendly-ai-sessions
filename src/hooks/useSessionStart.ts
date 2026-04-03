@@ -1,3 +1,8 @@
+/**
+ * use Session Start
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';

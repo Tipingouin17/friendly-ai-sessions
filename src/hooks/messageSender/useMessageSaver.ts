@@ -1,3 +1,8 @@
+/**
+ * use Message Saver
+ *
+ * Message sender hook for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/types/chat";

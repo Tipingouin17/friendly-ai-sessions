@@ -1,3 +1,8 @@
+/**
+ * use Admin Messages
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message, ParticipantInfo } from '@/types/chat';

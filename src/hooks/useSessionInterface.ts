@@ -1,3 +1,8 @@
+/**
+ * use Session Interface
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -35,7 +40,7 @@ export function useSessionInterface(conversationId: number | null) {
             .maybeSingle();
             
           if (error) {
-            console.error("❌ [useSessionInterface] Error checking session_started:", error);
+            console.error("[useSessionInterface] Error checking session_started:", error);
           } else if (data && data.session_started) {
             setIsSessionStarted(true);
             setShowQrCodeView(false);
@@ -46,7 +51,7 @@ export function useSessionInterface(conversationId: number | null) {
             lastSessionStarted.current = false;
           }
         } catch (err) {
-          console.error("💥 [useSessionInterface] Exception checking session_started:", err);
+          console.error("[useSessionInterface] Exception checking session_started:", err);
         }
       };
       
@@ -120,7 +125,7 @@ export function useSessionInterface(conversationId: number | null) {
   const handleStartSession = async () => {
     
     if (!conversationId) {
-      console.error("❌ [useSessionInterface] Cannot start session: No conversation ID provided");
+      console.error("[useSessionInterface] Cannot start session: No conversation ID provided");
       toast({
         title: "Error starting session",
         description: "No conversation ID found. Please try again.",
@@ -142,7 +147,7 @@ export function useSessionInterface(conversationId: number | null) {
         .eq('id', conversationId);
         
       if (error) {
-        console.error("❌ [useSessionInterface] Error updating session_started:", error);
+        console.error("[useSessionInterface] Error updating session_started:", error);
         toast({
           title: "Error starting session",
           description: "There was a problem starting the session. Please try again.",
@@ -164,7 +169,7 @@ export function useSessionInterface(conversationId: number | null) {
         await navigateToHostSession(conversationId);
       }
     } catch (err) {
-      console.error("💥 [useSessionInterface] Exception updating session_started:", err);
+      console.error("[useSessionInterface] Exception updating session_started:", err);
       toast({
         title: "Error starting session",
         description: "There was a problem starting the session. Please try again.",

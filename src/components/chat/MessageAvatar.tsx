@@ -1,3 +1,8 @@
+/**
+ * Message Avatar
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import AnonymousAvatar from './avatars/AnonymousAvatar';

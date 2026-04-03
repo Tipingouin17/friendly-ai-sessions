@@ -1,3 +1,8 @@
+/**
+ * Protected Host Route
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';

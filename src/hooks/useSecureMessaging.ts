@@ -1,3 +1,8 @@
+/**
+ * use Secure Messaging
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef } from 'react';
 import { useSecurityAudit } from './useSecurityAudit';

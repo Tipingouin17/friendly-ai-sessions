@@ -1,3 +1,8 @@
+/**
+ * Facilitator Form
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

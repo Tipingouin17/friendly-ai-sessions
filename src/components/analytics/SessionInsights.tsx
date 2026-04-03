@@ -1,3 +1,8 @@
+/**
+ * Session Insights
+ *
+ * Analytics component for the AIfacilitator application.
+ */
 import { motion } from "framer-motion";
 import {
     LineChart,

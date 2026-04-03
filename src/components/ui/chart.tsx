@@ -1,3 +1,8 @@
+/**
+ * chart
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 

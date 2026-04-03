@@ -1,3 +1,8 @@
+/**
+ * toaster
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 import {
   Toast,

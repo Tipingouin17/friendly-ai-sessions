@@ -1,3 +1,8 @@
+/**
+ * use Participant Responses
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect } from 'react';
 import { Message } from '@/types/chat';

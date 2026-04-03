@@ -1,3 +1,8 @@
+/**
+ * avatar Processing
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { isInCrossOriginContext } from '@/utils/crossOriginUtils';
 import { debugLog } from '@/utils/debugLogger';

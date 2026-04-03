@@ -1,3 +1,8 @@
+/**
+ * Waiting For Responses Indicator
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Users, Clock } from 'lucide-react';

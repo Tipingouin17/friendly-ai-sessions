@@ -1,3 +1,8 @@
+/**
+ * Checkout Error State
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';

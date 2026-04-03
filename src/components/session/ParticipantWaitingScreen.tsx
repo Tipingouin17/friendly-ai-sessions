@@ -1,3 +1,8 @@
+/**
+ * Participant Waiting Screen
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect } from 'react';
 import { Clock, Users } from 'lucide-react';

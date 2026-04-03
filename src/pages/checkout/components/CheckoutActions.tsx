@@ -1,3 +1,8 @@
+/**
+ * Checkout Actions
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Button } from '@/components/ui/button';

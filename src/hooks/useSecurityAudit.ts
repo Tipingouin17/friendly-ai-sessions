@@ -1,3 +1,8 @@
+/**
+ * use Security Audit
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';

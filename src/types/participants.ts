@@ -1,3 +1,8 @@
+/**
+ * participants
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 
 export interface SessionParticipant {
   id: number;

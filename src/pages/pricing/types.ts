@@ -1,3 +1,8 @@
+/**
+ * types
+ *
+ * Page for the AIfacilitator application.
+ */
 
 
 export interface Plan {

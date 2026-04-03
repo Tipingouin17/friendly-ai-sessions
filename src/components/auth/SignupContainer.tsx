@@ -1,3 +1,8 @@
+/**
+ * Signup Container
+ *
+ * Auth component for the AIfacilitator application.
+ */
 
 import React from 'react';
 

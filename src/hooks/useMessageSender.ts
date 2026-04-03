@@ -1,3 +1,8 @@
+/**
+ * use Message Sender
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
@@ -75,7 +80,7 @@ export const useMessageSender = ({
     
     // Check for conversation ID
     if (!currentConversationId) {
-      console.error("❌ No conversation ID available");
+      console.error("No conversation ID available");
       setError("Session not properly initialized. Please refresh the page.");
       toast({
         title: "Session Error",
@@ -188,7 +193,7 @@ export const useMessageSender = ({
             return newMessages;
           });
         } catch (aiError) {
-          console.error("❌ AI Response Error:", aiError);
+          console.error("AI Response Error:", aiError);
           setError("Failed to get facilitator response. Please try again.");
           toast({
             title: "AI Response Error",
@@ -201,7 +206,7 @@ export const useMessageSender = ({
       } else { /* no-op */ }
       
     } catch (error) {
-      console.error("❌ Error sending message:", error);
+      console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
       toast({
         title: "Error sending message",

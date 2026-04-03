@@ -1,3 +1,8 @@
+/**
+ * security Enhanced
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { validateSessionAccess, validateParticipantId, createSecureSessionId } from './securityHelpers';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';

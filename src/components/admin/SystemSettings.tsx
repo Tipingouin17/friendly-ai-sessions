@@ -1,3 +1,8 @@
+/**
+ * System Settings
+ *
+ * Admin component for the AIfacilitator application.
+ */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";

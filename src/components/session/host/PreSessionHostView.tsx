@@ -1,3 +1,8 @@
+/**
+ * Pre Session Host View
+ *
+ * Session component for the AIfacilitator application.
+ */
 import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

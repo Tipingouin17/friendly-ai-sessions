@@ -1,3 +1,8 @@
+/**
+ * use Join Session State
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useParticipantPersistence } from './useParticipantPersistence';

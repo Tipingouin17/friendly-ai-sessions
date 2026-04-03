@@ -1,3 +1,8 @@
+/**
+ * use Message Formatting
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useCallback } from 'react';
 import { Message } from '@/types/chat';

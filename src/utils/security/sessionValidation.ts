@@ -14,7 +14,7 @@ export const validateSessionAccess = async (
 
     // Validate conversation ID
     if (!conversationId || !Number.isInteger(conversationId) || conversationId <= 0) {
-      console.error("❌ Invalid conversation ID:", conversationId);
+      console.error("Invalid conversation ID:", conversationId);
       return false;
     }
 
@@ -27,23 +27,23 @@ export const validateSessionAccess = async (
       .single();
 
     if (fetchError) {
-      console.error("❌ Error fetching conversation:", fetchError);
+      console.error("Error fetching conversation:", fetchError);
       return false;
     }
 
     if (!conversation) {
-      console.error("❌ Conversation not found");
+      console.error("Conversation not found");
       return false;
     }
 
     // Check if session is in valid state
     if (conversation.status !== 'active') {
-      console.error("❌ Session status is not active:", conversation.status);
+      console.error("Session status is not active:", conversation.status);
       return false;
     }
 
     if (conversation.is_session_ended) {
-      console.error("❌ Session has ended");
+      console.error("Session has ended");
       return false;
     }
 
@@ -58,7 +58,7 @@ export const validateSessionAccess = async (
     return true;
 
   } catch (error) {
-    console.error('❌ Error validating session access:', error);
+    console.error('Error validating session access:', error);
     return false;
   }
 };

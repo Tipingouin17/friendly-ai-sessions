@@ -1,3 +1,8 @@
+/**
+ * Step Indicator
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 type Step = 1 | 2 | 3;
 

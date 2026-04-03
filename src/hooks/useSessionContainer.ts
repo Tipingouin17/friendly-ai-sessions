@@ -1,3 +1,8 @@
+/**
+ * use Session Container
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

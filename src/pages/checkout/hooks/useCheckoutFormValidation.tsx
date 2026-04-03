@@ -1,3 +1,8 @@
+/**
+ * use Checkout Form Validation
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from 'react';
 import { CardElement } from '@stripe/react-stripe-js';

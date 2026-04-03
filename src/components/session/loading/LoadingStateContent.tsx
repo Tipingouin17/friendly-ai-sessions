@@ -1,3 +1,8 @@
+/**
+ * Loading State Content
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { AlertCircle, WifiOff, Clock } from 'lucide-react';

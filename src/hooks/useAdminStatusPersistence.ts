@@ -1,3 +1,8 @@
+/**
+ * use Admin Status Persistence
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from "react";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";

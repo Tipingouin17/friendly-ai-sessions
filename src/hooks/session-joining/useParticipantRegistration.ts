@@ -1,3 +1,8 @@
+/**
+ * use Participant Registration
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -49,7 +54,7 @@ export const registerParticipant = async ({
       .insert(insertData);
 
     if (insertError) {
-      console.error('❌ Error inserting participant:', insertError);
+      console.error('Error inserting participant:', insertError);
       console.error('Error details:', {
         message: insertError.message,
         details: insertError.details,
@@ -67,7 +72,7 @@ export const registerParticipant = async ({
       .eq('conversation_id', conversationId);
 
     if (countError) {
-      console.error('⚠️ Error getting participant count:', countError);
+      console.error('Error getting participant count:', countError);
     } else {
       const actualCount = participantCount?.length || 0;
 
@@ -77,13 +82,13 @@ export const registerParticipant = async ({
         .eq('id', conversationId);
 
       if (updateError) {
-        console.error('⚠️ Error updating participant count:', updateError);
+        console.error('Error updating participant count:', updateError);
       } else { /* no-op */ }
     }
 
     return { success: true };
   } catch (error) {
-    console.error('❌ Failed to register participant:', error);
+    console.error('Failed to register participant:', error);
     throw error;
   }
 };

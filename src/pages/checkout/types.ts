@@ -1,3 +1,8 @@
+/**
+ * types
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { Plan } from '../pricing/types';
 

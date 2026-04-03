@@ -1,3 +1,8 @@
+/**
+ * participant Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { ParticipantInfo } from "@/types/chat";
 import { SessionParticipant } from "@/types/participants";

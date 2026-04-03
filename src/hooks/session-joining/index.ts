@@ -1,3 +1,8 @@
+/**
+ * index
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 export { useSessionJoiner } from './useSessionJoiner';
 export { useNavigateToSession } from './useNavigateToSession';

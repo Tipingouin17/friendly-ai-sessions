@@ -1,3 +1,8 @@
+/**
+ * use Session Closure Execution
+ *
+ * Session closure hook for the AIfacilitator application.
+ */
 
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
@@ -36,7 +41,7 @@ export const useSessionClosureExecution = () => {
     });
 
     if (error) {
-      console.error("❌ Edge function error:", error);
+      console.error("Edge function error:", error);
       logSecurityViolation('edge_function_failure', { 
         conversationId, 
         error: error.message 
@@ -45,7 +50,7 @@ export const useSessionClosureExecution = () => {
     }
 
     if (!data || !data.success) {
-      console.error("❌ Edge function returned unsuccessful result:", data);
+      console.error("Edge function returned unsuccessful result:", data);
       throw new Error(data?.error || 'Failed to process session closure');
     }
 

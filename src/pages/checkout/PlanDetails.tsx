@@ -1,3 +1,8 @@
+/**
+ * Plan Details
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Package, DollarSign, Euro, PoundSterling } from 'lucide-react';

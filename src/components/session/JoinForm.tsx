@@ -1,3 +1,8 @@
+/**
+ * Join Form
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Input } from "@/components/ui/input";

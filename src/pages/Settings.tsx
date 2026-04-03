@@ -1,3 +1,8 @@
+/**
+ * Settings
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";

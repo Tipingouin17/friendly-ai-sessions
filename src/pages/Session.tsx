@@ -1,3 +1,8 @@
+/**
+ * Session
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from "react";
 import { useSessionPageState } from "@/hooks/useSessionPageState";

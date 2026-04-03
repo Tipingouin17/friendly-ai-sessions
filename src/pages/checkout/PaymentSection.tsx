@@ -1,3 +1,8 @@
+/**
+ * Payment Section
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React, { useState } from 'react';
 import { CreditCard } from 'lucide-react';

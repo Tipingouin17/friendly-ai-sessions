@@ -1,3 +1,8 @@
+/**
+ * use Auto Start Session
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';

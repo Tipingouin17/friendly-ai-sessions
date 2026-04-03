@@ -1,3 +1,8 @@
+/**
+ * Create Facilitator Button
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Plus, Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

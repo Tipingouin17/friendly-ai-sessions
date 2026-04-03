@@ -1,3 +1,8 @@
+/**
+ * View Mode Selector
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import ViewModeToggle from "./ViewModeToggle";

@@ -1,3 +1,8 @@
+/**
+ * Session State Renderer
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect } from 'react';
 import { SessionContextProps } from "@/types/session";
@@ -31,24 +36,8 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   const { toast } = useToast();
   
   useEffect(() => {
-    /* console.log("SessionStateRenderer state:", {
-      isLoading,
-      hasError: !!error || !!props.error,
-      errorMessage: error || props.error,
-      effectiveAdmin,
-      propsAdmin: props.isAdmin,
-      connectionAttempts,
-      hasConversation: !!props.conversation,
-      hasConversationId: !!props.currentConversationId,
-      isSessionStarted: props.isSessionStartedInDB,
-      sessionStarted,
-      pathname: window.location.pathname
-    }); */
+    // State tracking effect — intentionally empty, dependencies listed for future debugging
   }, [props, isLoading, error, effectiveAdmin, connectionAttempts, sessionStarted]);
-  
-  useEffect(() => {
-    if (effectiveAdmin && !props.isAdmin) { /* no-op */ }
-  }, [effectiveAdmin, props.isAdmin]);
 
   const isOnAdminRoute = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminRoute;

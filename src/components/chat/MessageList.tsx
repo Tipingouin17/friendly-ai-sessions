@@ -1,3 +1,8 @@
+/**
+ * Message List
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React, { useMemo, useEffect, useCallback, useRef } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';

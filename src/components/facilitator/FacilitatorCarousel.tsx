@@ -1,3 +1,8 @@
+/**
+ * Facilitator Carousel
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";

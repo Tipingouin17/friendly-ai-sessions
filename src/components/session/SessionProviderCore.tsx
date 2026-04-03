@@ -1,3 +1,8 @@
+/**
+ * Session Provider Core
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";

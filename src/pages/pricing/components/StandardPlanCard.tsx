@@ -1,3 +1,8 @@
+/**
+ * Standard Plan Card
+ *
+ * Page for the AIfacilitator application.
+ */
 import { Check, Users, Calendar, UserPlus, MessageSquare, Wand2, Save, BarChart3, Download, Headphones, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Plan } from "../types";

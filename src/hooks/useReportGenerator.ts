@@ -1,3 +1,8 @@
+/**
+ * use Report Generator
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';

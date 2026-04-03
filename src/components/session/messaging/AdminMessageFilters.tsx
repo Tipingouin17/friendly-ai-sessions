@@ -1,3 +1,8 @@
+/**
+ * Admin Message Filters
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Search, Filter, EyeOff, Eye, SlidersHorizontal } from 'lucide-react';

@@ -1,3 +1,8 @@
+/**
+ * Session Layout
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';

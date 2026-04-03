@@ -1,3 +1,8 @@
+/**
+ * Qr Dialog Manager
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import JoinSessionDialog from "./JoinSessionDialog";

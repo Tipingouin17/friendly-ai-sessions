@@ -1,3 +1,8 @@
+/**
+ * collapsible
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 import * as React from "react"
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"

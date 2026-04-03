@@ -14,18 +14,16 @@ MyFacilitator is an AI-powered workshop facilitation platform that enables hosts
 - **State Management**: React Query (TanStack Query) for server state, React hooks for local state
 - **Routing**: React Router v6
 
-### Backend (Supabase Proxy)
+### Backend (Railway API)
 - **Server**: Python Flask (server.py in `/supabase_proxy/`)
 - **Database**: PostgreSQL (direct connection via psycopg2)
 - **AI**: OpenAI API (GPT-4.1-mini) for facilitator responses
-- **Auth**: JWT-based authentication with mock user system
+- **Auth**: JWT-based authentication
 
-### Deployment (Railway)
-- **Platform**: Railway
-- **Frontend**: React SPA built with Vite, served via Nginx
-- **Backend Proxy**: Python Flask server acting as a Supabase proxy and AI integration layer
-- **Database**: PostgreSQL database (managed by Railway)
-- **Environment Variables**: `DATABASE_URL`, `OPENAI_API_KEY`, `JWT_SECRET`
+### Deployment
+- **Frontend**: Vercel (React SPA built with Vite)
+- **Backend**: Railway (Python Flask + PostgreSQL)
+- **Environment Variables**: `DATABASE_URL`, `OPENAI_API_KEY`, `JWT_SECRET`, `VITE_API_URL`, `VITE_API_ANON_KEY`
 
 ---
 
@@ -164,7 +162,7 @@ MyFacilitator is an AI-powered workshop facilitation platform that enables hosts
 # 1. Start PostgreSQL
 sudo service postgresql start
 
-# 2. Start the proxy server
+# 2. Start the backend server
 cd supabase_proxy && python3 server.py 3333 &
 
 # 3. Build the frontend

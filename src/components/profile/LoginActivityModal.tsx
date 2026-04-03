@@ -1,3 +1,8 @@
+/**
+ * Login Activity Modal
+ *
+ * Profile component for the AIfacilitator application.
+ */
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';

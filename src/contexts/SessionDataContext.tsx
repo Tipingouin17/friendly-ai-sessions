@@ -1,3 +1,8 @@
+/**
+ * Session Data Context
+ *
+ * Context for the AIfacilitator application.
+ */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ConversationWithSession } from "@/types/database";

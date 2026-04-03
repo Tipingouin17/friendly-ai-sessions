@@ -1,3 +1,8 @@
+/**
+ * Session Provider Core Error
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import { SessionContextProps } from "@/types/session";

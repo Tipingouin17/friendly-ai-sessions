@@ -1,3 +1,8 @@
+/**
+ * Navigation
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";

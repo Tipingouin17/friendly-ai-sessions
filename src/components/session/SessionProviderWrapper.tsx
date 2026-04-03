@@ -1,3 +1,8 @@
+/**
+ * Session Provider Wrapper
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect, useRef } from "react";
 import { SessionProvider } from "./SessionProvider";

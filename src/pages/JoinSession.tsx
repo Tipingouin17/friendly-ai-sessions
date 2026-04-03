@@ -1,3 +1,8 @@
+/**
+ * Join Session
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import JoinSessionContainer from "@/components/session/JoinSessionContainer";
 import PageHead from "@/components/PageHead";

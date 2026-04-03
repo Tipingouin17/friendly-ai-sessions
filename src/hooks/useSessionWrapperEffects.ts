@@ -1,3 +1,8 @@
+/**
+ * use Session Wrapper Effects
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from "react";
 import { SessionContextProps } from "@/types/session";

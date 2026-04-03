@@ -1,3 +1,8 @@
+/**
+ * use Effective Admin Status
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -17,7 +22,6 @@ export function useEffectiveAdminStatus({
   persistedParticipantData
 }: UseEffectiveAdminStatusProps): boolean {
   useEffect(() => {
-    //console.log("useEffectiveAdminStatus running...");
   }, []);
 
   const location = useLocation();

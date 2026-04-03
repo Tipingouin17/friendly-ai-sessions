@@ -1,3 +1,8 @@
+/**
+ * use Conversation
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +46,7 @@ const fetchConversation = async (id: number | null) => {
       .maybeSingle();
 
     if (error) {
-      console.error('❌ Error fetching conversation:', error);
+      console.error('Error fetching conversation:', error);
       throw new Error(error.message || "Could not load session data");
     }
     
@@ -52,7 +57,7 @@ const fetchConversation = async (id: number | null) => {
 
     return data as ConversationWithSession;
   } catch (error) {
-    console.error('💥 Exception in fetchConversation:', error);
+    console.error('Exception in fetchConversation:', error);
     throw error;
   }
 };
@@ -104,7 +109,7 @@ export const useConversation = (conversationId: number | null) => {
                 });
                 
               } catch (error) {
-                console.error('❌ Error processing facilitator avatar:', error);
+                console.error('Error processing facilitator avatar:', error);
                 facilitator.profile_picture = '/placeholder.svg';
               }
             }

@@ -1,3 +1,8 @@
+/**
+ * popover
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 

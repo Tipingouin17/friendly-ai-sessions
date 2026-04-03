@@ -1,3 +1,8 @@
+/**
+ * Admin Message Loading State
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 

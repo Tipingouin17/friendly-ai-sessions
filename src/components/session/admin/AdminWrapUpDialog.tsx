@@ -1,3 +1,8 @@
+/**
+ * Admin Wrap Up Dialog
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState } from "react";
 import {

@@ -1,3 +1,8 @@
+/**
+ * use Session Provider Admin
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";

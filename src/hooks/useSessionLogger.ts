@@ -1,3 +1,8 @@
+/**
+ * use Session Logger
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from "react";
 import { ConversationWithSession } from "@/types/database";

@@ -1,3 +1,8 @@
+/**
+ * textarea
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

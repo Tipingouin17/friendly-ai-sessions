@@ -1,3 +1,8 @@
+/**
+ * use Session Status
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";

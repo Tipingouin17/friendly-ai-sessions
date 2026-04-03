@@ -1,3 +1,8 @@
+/**
+ * use Session Host Status
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';

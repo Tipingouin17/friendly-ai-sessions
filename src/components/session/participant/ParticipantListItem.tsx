@@ -1,3 +1,8 @@
+/**
+ * Participant List Item
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { ParticipantInfo } from "@/types/chat";

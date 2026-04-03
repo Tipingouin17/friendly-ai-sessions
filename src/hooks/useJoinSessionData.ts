@@ -1,3 +1,8 @@
+/**
+ * use Join Session Data
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";

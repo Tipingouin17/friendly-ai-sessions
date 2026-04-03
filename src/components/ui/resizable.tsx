@@ -1,3 +1,8 @@
+/**
+ * resizable
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import { GripVertical } from "lucide-react"
 import * as ResizablePrimitive from "react-resizable-panels"
 

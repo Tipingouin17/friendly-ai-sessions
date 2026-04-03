@@ -1,5 +1,9 @@
 
-// This file needs to be updated to make the function return a Promise
+/**
+ * @file useParticipantManagement.ts
+ * @description Hook for managing participant state within a session conversation.
+ * Tracks participant list, current user's participant ID, and loading state.
+ */
 import { useState, useEffect, useCallback } from "react";
 import { ParticipantInfo } from "@/types/chat";
 import { LocationStateType } from "@/hooks/useConversationId";

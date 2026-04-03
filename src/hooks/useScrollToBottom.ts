@@ -1,3 +1,8 @@
+/**
+ * use Scroll To Bottom
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from 'react';
 

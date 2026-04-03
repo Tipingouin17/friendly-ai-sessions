@@ -1,3 +1,8 @@
+/**
+ * Session Header
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from 'react';
 import ChatHeader from "@/components/chat/ChatHeader";
@@ -98,10 +103,10 @@ const SessionHeader = ({
     return () => { isMounted = false; };
   }, [facilitator]);
 
-  // Determine if cross-origin handling is needed
+  // Determine if cross-origin handling is needed (includes legacy pre-migration storage URLs)
   const needsCrossOrigin = isInCrossOriginContext() || 
     profilePicture.includes('crossorigin=anonymous') ||
-    profilePicture.includes('supabase.co');
+    profilePicture.includes('supabase.co'); // Legacy: backward compat with pre-migration data
 
   return (
     <ChatHeader 

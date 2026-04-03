@@ -1,3 +1,8 @@
+/**
+ * use Host Participant State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { ParticipantInfo } from "@/types/chat";

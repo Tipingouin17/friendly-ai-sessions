@@ -1,3 +1,8 @@
+/**
+ * use Session State Transition
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";

@@ -1,3 +1,8 @@
+/**
+ * Simplified Admin Messaging View
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Message } from '@/types/chat';

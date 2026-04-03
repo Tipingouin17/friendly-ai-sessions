@@ -1,3 +1,8 @@
+/**
+ * Session Content
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import SessionErrorBoundary from "@/components/session/SessionErrorBoundary";

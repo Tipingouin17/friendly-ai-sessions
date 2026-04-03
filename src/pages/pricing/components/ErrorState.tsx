@@ -1,3 +1,8 @@
+/**
+ * Error State
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { Card } from "@/components/ui/card";
 

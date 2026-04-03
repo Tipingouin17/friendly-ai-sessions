@@ -1,3 +1,8 @@
+/**
+ * Simplified Host Messaging View
+ *
+ * Session component for the AIfacilitator application.
+ */
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

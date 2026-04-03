@@ -1,3 +1,8 @@
+/**
+ * Session Provider Error Fallback
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";

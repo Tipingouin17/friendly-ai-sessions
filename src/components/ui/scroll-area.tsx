@@ -1,3 +1,8 @@
+/**
+ * scroll area
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 

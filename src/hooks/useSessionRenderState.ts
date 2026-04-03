@@ -1,3 +1,8 @@
+/**
+ * use Session Render State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from "react";
 import { SessionContextProps } from "@/types/session";

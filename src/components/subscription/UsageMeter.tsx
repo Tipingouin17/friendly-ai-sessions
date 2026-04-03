@@ -1,3 +1,8 @@
+/**
+ * Usage Meter
+ *
+ * Subscription component for the AIfacilitator application.
+ */
 import { motion } from "framer-motion";
 import { TrendingUp, Infinity as InfinityIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";

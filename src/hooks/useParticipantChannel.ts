@@ -1,3 +1,8 @@
+/**
+ * use Participant Channel
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSimplifiedParticipantMonitoring } from "./useSimplifiedParticipantMonitoring";

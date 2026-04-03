@@ -1,3 +1,8 @@
+/**
+ * Payment Method Input
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { CardElement } from '@stripe/react-stripe-js';

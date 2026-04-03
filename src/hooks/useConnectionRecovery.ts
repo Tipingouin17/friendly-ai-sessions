@@ -1,3 +1,8 @@
+/**
+ * use Connection Recovery
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef, useEffect } from "react";
 
@@ -32,7 +37,6 @@ export function useConnectionRecovery({
   // Reset connection state when conversation ID changes
   useEffect(() => {
     if (conversationId) {
-      //console.log(`Connection recovery setup for conversation ID: ${conversationId}`);
       // Reset state for new conversation
       if (lastConnectionTime === 0) {
         setLastConnectionTime(Date.now());
@@ -45,7 +49,6 @@ export function useConnectionRecovery({
     if (!mountedRef.current) return;
 
     if (connectionAttempts < 5 && conversationId) {
-      //console.log(`Attempting reconnection (attempt ${connectionAttempts + 1}/5) for ID:`, conversationId);
       setConnectionAttempts(prev => prev + 1);
       
       // Clear any existing timers
@@ -56,11 +59,9 @@ export function useConnectionRecovery({
       
       // Use exponential backoff for retries
       const backoffTime = Math.min(1000 * Math.pow(2, connectionAttempts), 10000);
-      //console.log(`Using backoff time of ${backoffTime}ms`);
       
       reconnectTimerRef.current = setTimeout(() => {
         if (mountedRef.current) {
-          //console.log(`Executing reconnection attempt ${connectionAttempts + 1}`);
           refetch();
           setLastConnectionTime(Date.now());
         }
@@ -72,7 +73,6 @@ export function useConnectionRecovery({
   const handleConnectionEstablished = useCallback(() => {
     if (!mountedRef.current) return;
     
-    //console.log("Connection established successfully");
     setConnectionAttempts(0);
     setLastConnectionTime(Date.now());
   }, []);

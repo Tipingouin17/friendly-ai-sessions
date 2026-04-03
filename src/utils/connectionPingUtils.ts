@@ -1,3 +1,8 @@
+/**
+ * connection Ping Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { removeChannel } from "@/utils/realtimeHelpers";
@@ -8,7 +13,6 @@ import { removeChannel } from "@/utils/realtimeHelpers";
  * @returns A promise that resolves to true if connection is successful
  */
 export const createPingChannel = async (conversationId: number): Promise<boolean> => {
-  //console.log("Creating ping channel to test connection...");
   
   // Create a lightweight ping channel
   const channelName = `ping-${conversationId}-${Date.now()}`;
@@ -105,7 +109,6 @@ export const performDatabasePing = async (conversationId: number): Promise<boole
     } 
     
     if (data) {
-      //console.log("Database ping successful:", data);
       return true;
     }
     

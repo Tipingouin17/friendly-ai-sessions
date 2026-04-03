@@ -1,3 +1,8 @@
+/**
+ * use Connection Monitor
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";

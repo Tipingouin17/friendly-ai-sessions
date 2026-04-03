@@ -1,3 +1,8 @@
+/**
+ * Host Session Content
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";

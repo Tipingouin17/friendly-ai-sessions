@@ -1,3 +1,8 @@
+/**
+ * Thinking Indicator
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Bot } from 'lucide-react';

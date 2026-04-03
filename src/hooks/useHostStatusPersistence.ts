@@ -1,3 +1,8 @@
+/**
+ * use Host Status Persistence
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from 'react';
 import { useSessionHostStatus } from './useSessionHostStatus';

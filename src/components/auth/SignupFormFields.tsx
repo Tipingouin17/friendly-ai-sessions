@@ -1,3 +1,8 @@
+/**
+ * Signup Form Fields
+ *
+ * Auth component for the AIfacilitator application.
+ */
 
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';

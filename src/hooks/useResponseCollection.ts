@@ -1,3 +1,8 @@
+/**
+ * use Response Collection
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect } from 'react';
 

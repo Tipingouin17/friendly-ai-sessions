@@ -1,3 +1,8 @@
+/**
+ * use Conversation Id
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useLocation } from "react-router-dom";
 import { useParticipantPersistence } from "./useParticipantPersistence";
@@ -52,7 +57,6 @@ export const useConversationId = () => {
 
     // First check if ID is in URL params
     if (idFromParams) {
-      //console.log("Found conversation ID in URL params:", idFromParams);
       currentConversationId = parseInt(idFromParams, 10);
 
       // Check if we have persisted data for this conversation ID
@@ -61,12 +65,10 @@ export const useConversationId = () => {
       // Update the last accessed time for this session
       if (persistedSessionData) {
         updateSessionAccessTime(currentConversationId);
-        //console.log("Found persisted data for conversation ID:", currentConversationId, persistedSessionData);
       }
     }
     // Then check location state.conversationId
     else if (locationState?.conversationId) {
-      //console.log("Found conversation ID in state.conversationId:", locationState.conversationId);
       currentConversationId = locationState.conversationId;
     }
     // Also check location state.newConversationId which might be used
@@ -75,12 +77,10 @@ export const useConversationId = () => {
     }
     // Finally, check persisted data
     else if (persistedParticipantData?.conversationId) {
-      //console.log("Found conversation ID in persisted data:", persistedParticipantData.conversationId);
       currentConversationId = persistedParticipantData.conversationId;
       persistedSessionData = persistedParticipantData;
     }
 
-    //console.log("useConversationId determined ID:", currentConversationId);
 
     // If we have persisted data, enhance the location state with it
     let enhancedLocationState = locationState;
@@ -93,7 +93,6 @@ export const useConversationId = () => {
         avatarSeed: persistedSessionData.avatarSeed,
         isAdmin: persistedSessionData.isAdmin
       };
-      //console.log("Enhanced location state with persisted data:", enhancedLocationState);
     }
 
     // Store the processed data for future reference

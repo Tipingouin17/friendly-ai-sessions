@@ -1,3 +1,8 @@
+/**
+ * use Session Participant Setup
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";

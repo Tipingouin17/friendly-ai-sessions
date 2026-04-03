@@ -1,3 +1,8 @@
+/**
+ * Join Session Container
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import { useEffect, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";

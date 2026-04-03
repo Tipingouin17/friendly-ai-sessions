@@ -1,3 +1,8 @@
+/**
+ * use Participant Persistence
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useCallback } from "react";
 

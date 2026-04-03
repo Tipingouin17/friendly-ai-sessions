@@ -1,3 +1,8 @@
+/**
+ * Participant Messaging View
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';

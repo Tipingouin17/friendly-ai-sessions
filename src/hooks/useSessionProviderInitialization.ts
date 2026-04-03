@@ -1,3 +1,8 @@
+/**
+ * use Session Provider Initialization
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useRef, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";

@@ -1,3 +1,8 @@
+/**
+ * use Admin Participant State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { useCurrentParticipant } from "@/hooks/useCurrentParticipant";

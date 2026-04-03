@@ -1,3 +1,8 @@
+/**
+ * Comparison Table
+ *
+ * Page for the AIfacilitator application.
+ */
 import { Plan, FEATURE_LABELS, allFeatures } from "../types";
 import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";

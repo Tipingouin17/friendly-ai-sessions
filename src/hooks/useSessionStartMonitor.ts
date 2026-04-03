@@ -1,3 +1,8 @@
+/**
+ * use Session Start Monitor
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useEffect } from "react";
 import { ConversationWithSession } from "@/types/database";
 

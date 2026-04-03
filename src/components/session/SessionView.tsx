@@ -1,3 +1,8 @@
+/**
+ * Session View
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect } from "react";
 import SessionContainer from "./SessionContainer";

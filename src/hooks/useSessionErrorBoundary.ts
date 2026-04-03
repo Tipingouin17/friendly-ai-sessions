@@ -1,3 +1,8 @@
+/**
+ * use Session Error Boundary
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect } from "react";
 

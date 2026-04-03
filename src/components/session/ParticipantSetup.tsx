@@ -1,3 +1,8 @@
+/**
+ * Participant Setup
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState } from 'react';
 import { ParticipantInfo } from '@/types/chat';

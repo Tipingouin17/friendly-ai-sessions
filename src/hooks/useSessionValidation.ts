@@ -1,3 +1,8 @@
+/**
+ * use Session Validation
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -1,3 +1,8 @@
+/**
+ * use Guest Participant
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";

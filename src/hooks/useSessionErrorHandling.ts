@@ -1,3 +1,8 @@
+/**
+ * use Session Error Handling
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";

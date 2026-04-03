@@ -1,3 +1,8 @@
+/**
+ * Loading State Actions
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { RefreshCw } from 'lucide-react';

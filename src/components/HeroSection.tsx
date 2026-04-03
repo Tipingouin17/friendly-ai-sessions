@@ -1,3 +1,8 @@
+/**
+ * Hero Section
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -30,3 +30,6 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Legacy Supabase directory (functions now on Railway)
+supabase/

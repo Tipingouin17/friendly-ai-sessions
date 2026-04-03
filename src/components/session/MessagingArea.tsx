@@ -1,3 +1,8 @@
+/**
+ * Messaging Area
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";

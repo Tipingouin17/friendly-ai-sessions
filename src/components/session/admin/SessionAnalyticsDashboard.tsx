@@ -1,3 +1,8 @@
+/**
+ * Session Analytics Dashboard
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

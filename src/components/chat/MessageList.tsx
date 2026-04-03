@@ -1,17 +1,20 @@
 /**
  * Message List
  *
- * Chat component for the AIfacilitator application.
+ * Renders the ordered list of chat messages with smart auto-scroll.
+ * Auto-scroll only activates when the user is already near the bottom;
+ * if the user has scrolled up to read history, it is suppressed and a
+ * "↓ New messages" button is shown instead.
  */
 
-import React, { useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
 import MessageItem from './MessageItem';
 import ThinkingIndicator from './ThinkingIndicator';
 import WaitingForResponsesIndicator from './WaitingForResponsesIndicator';
 import { useScrollToBottom } from '@/hooks/useScrollToBottom';
-import { MessagesSquare } from 'lucide-react';
+import { MessagesSquare, ArrowDown } from 'lucide-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -28,7 +31,7 @@ interface MessageListProps {
 
 const MessageList = ({ 
   messages, 
-  participantColors = { /* no-op */ },
+  participantColors = {},
   currentParticipant,
   isWaitingForResponse = false,
   isWaitingForResponses = false,
@@ -38,19 +41,17 @@ const MessageList = ({
   isMobile = false,
   conversationData
 }: MessageListProps) => {
-  const { ref, scrollToBottom } = useScrollToBottom<HTMLDivElement>([messages, isWaitingForResponse, isWaitingForResponses]);
-  
-  // Additional effect to scroll when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages.length, scrollToBottom]);
-  
+  // Smart auto-scroll: only fires when the user is near the bottom.
+  // isNearBottom is used to show/hide the "New messages" jump button.
+  const { ref, scrollToBottom, isNearBottom } = useScrollToBottom<HTMLDivElement>(
+    [messages, isWaitingForResponse, isWaitingForResponses]
+  );
+
   // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
     
     return messages.map((message, index) => {
-      // Skip processing if message is invalid
       if (!message) return null;
       
       const isFirstMessageOfGroup = index === 0 || 
@@ -61,47 +62,39 @@ const MessageList = ({
         messages[index + 1]?.sender !== message.sender || 
         messages[index + 1]?.participant !== message.participant;
 
-      // Ensure message has a color if it's a user message
+      // Assign participant colour for user messages
       let messageColor = message.color;
-      if (message.sender === "user" && message.participant && !messageColor) {
+      if (message.sender === 'user' && message.participant && !messageColor) {
         messageColor = participantColors[message.participant] || getParticipantColor(message.participant);
-      } else if (message.sender === "assistant" && !messageColor) {
-        messageColor = "#FFFFFF";
+      } else if (message.sender === 'assistant' && !messageColor) {
+        messageColor = '#FFFFFF';
       }
 
-      // Set facilitator avatar from conversation data - FIXED
+      // Use the facilitator's profile picture for assistant messages
       let messageAvatar = message.avatar;
-      if (message.sender === "assistant") {
-        // Always use facilitator profile picture from conversation data if available
+      if (message.sender === 'assistant') {
         if (conversationData?.sessions?.facilitator_details?.profile_picture) {
           messageAvatar = conversationData.sessions.facilitator_details.profile_picture;
         } else if (!messageAvatar || messageAvatar === '/api/avatar?name=Facilitator&variant=beam&palette=2') {
-          // Fallback to default facilitator avatar
           messageAvatar = '/api/avatar?name=Facilitator&variant=beam&palette=2';
         }
       }
 
-      // Get participant info if this is a user message
+      // Resolve participant info for user messages
       let participantInfo = null;
-      if (message.sender === "user" && message.participant) {
-        // participant is now a plain numeric string ID (e.g. "1", "2")
+      if (message.sender === 'user' && message.participant) {
         const participantNumber = parseInt(message.participant, 10);
         if (!isNaN(participantNumber)) {
-          participantInfo = participants.find(p => p.id === participantNumber);
-          
-          // If we couldn't find participant info, create a basic placeholder
-          if (!participantInfo && participantNumber > 0) {
-            participantInfo = {
-              id: participantNumber,
-              name: `Participant ${participantNumber}`,
-              avatar: null
-            };
-          }
+          participantInfo = participants.find(p => p.id === participantNumber) ?? (
+            participantNumber > 0
+              ? { id: participantNumber, name: `Participant ${participantNumber}`, avatar: null }
+              : null
+          );
         }
       }
 
       return {
-        message: {...message, color: messageColor, avatar: messageAvatar},
+        message: { ...message, color: messageColor, avatar: messageAvatar },
         isFirstMessageOfGroup,
         isLastMessageOfGroup,
         participantInfo
@@ -109,7 +102,7 @@ const MessageList = ({
     }).filter(Boolean);
   }, [messages, participantColors, participants, conversationData]);
 
-  // Empty state for no messages
+  // Empty state
   if (processedMessages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
@@ -117,49 +110,61 @@ const MessageList = ({
           <MessagesSquare className="w-6 h-6 text-gray-400" />
         </div>
         <p className="text-base font-medium mb-1">No messages yet</p>
-        <p className="text-sm">
-          When the session begins, messages will appear here.
-        </p>
+        <p className="text-sm">When the session begins, messages will appear here.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain pb-20">
-      {/* Reduced padding for better spacing */}
-      <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
-        {processedMessages.map(({message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo}, index) => (
-          <MessageItem
-            key={`${message.id || index}-${index}`}
-            message={message}
-            isFirstMessageOfGroup={true}
-            isLastMessageOfGroup={isLastMessageOfGroup}
-            currentParticipant={currentParticipant}
-            participantInfo={participantInfo}
-            isMobile={isMobile}
-          />
-        ))}
-        
-        {/* Show waiting for responses indicator when collecting responses */}
-        {isWaitingForResponses && totalParticipants > 1 && (
-          <div className="py-1">
-            <WaitingForResponsesIndicator 
-              currentResponses={responseCount}
-              totalParticipants={totalParticipants}
+    <div className="relative h-full">
+      <div className="h-full overflow-y-auto overscroll-contain pb-20">
+        <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
+          {processedMessages.map(({ message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo }, index) => (
+            <MessageItem
+              key={`${message.id || index}-${index}`}
+              message={message}
+              isFirstMessageOfGroup={true}
+              isLastMessageOfGroup={isLastMessageOfGroup}
+              currentParticipant={currentParticipant}
+              participantInfo={participantInfo}
               isMobile={isMobile}
             />
-          </div>
-        )}
-        
-        {/* Show thinking indicator when AI is processing */}
-        {isWaitingForResponse && (
-          <div className="py-1">
-            <ThinkingIndicator />
-          </div>
-        )}
-        
-        <div ref={ref} className="h-4" />
+          ))}
+
+          {/* Waiting for participant responses */}
+          {isWaitingForResponses && totalParticipants > 1 && (
+            <div className="py-1">
+              <WaitingForResponsesIndicator 
+                currentResponses={responseCount}
+                totalParticipants={totalParticipants}
+                isMobile={isMobile}
+              />
+            </div>
+          )}
+
+          {/* AI thinking indicator */}
+          {isWaitingForResponse && (
+            <div className="py-1">
+              <ThinkingIndicator />
+            </div>
+          )}
+
+          {/* Sentinel element — the scroll hook attaches its ref here */}
+          <div ref={ref} className="h-4" />
+        </div>
       </div>
+
+      {/* "New messages" jump button — only visible when the user has scrolled up */}
+      {!isNearBottom && (
+        <button
+          onClick={scrollToBottom}
+          aria-label="Scroll to latest messages"
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-indigo-700 transition-colors z-10"
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+          New messages
+        </button>
+      )}
     </div>
   );
 };

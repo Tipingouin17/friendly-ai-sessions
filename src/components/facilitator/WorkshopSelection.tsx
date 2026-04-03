@@ -1,9 +1,7 @@
-
 import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Workshop } from "@/types/facilitator";
-import { CreateWorkshopModal } from "./CreateWorkshopModal";
 
 interface WorkshopSelectionProps {
   workshops: Workshop[];
@@ -11,7 +9,7 @@ interface WorkshopSelectionProps {
   onSelect: (id: number) => void;
   isLoading?: boolean;
   selectedFacilitatorId?: number | null;
-  onAddNewWorkshop?: () => void;
+  onAddNewWorkshop: () => void;
 }
 
 const iconMap = {
@@ -27,20 +25,10 @@ export const WorkshopSelection = ({
   selectedWorkshop, 
   onSelect,
   isLoading = false,
-  selectedFacilitatorId,
   onAddNewWorkshop
 }: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const itemsToShow = 4;
-
-  const handleAddNewWorkshop = () => {
-    if (onAddNewWorkshop) {
-      onAddNewWorkshop();
-    } else {
-      setIsCreateModalOpen(true);
-    }
-  };
 
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
@@ -89,7 +77,7 @@ export const WorkshopSelection = ({
           ))}
           <div 
             className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
-            onClick={handleAddNewWorkshop}
+            onClick={onAddNewWorkshop}
           >
             <Plus className="mb-2 h-12 w-12 text-gray-400" />
             <span className="text-center text-sm text-gray-600">Add New Workshop</span>
@@ -106,6 +94,7 @@ export const WorkshopSelection = ({
           <ChevronRight className="h-6 w-6" />
         </Button>
       </div>
+
       {selectedWorkshop && (
         <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <h3 className="mb-2 text-lg font-semibold">
@@ -127,15 +116,6 @@ export const WorkshopSelection = ({
           </div>
         </div>
       )}
-
-      <CreateWorkshopModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        facilitatorId={selectedFacilitatorId || 0}
-        onSuccess={() => {
-          window.location.reload();
-        }}
-      />
     </div>
   );
 };

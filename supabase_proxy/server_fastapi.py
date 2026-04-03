@@ -821,6 +821,19 @@ def _validate_join_token(token: str, conversation_id: str | int | None, conn) ->
         return False
 
 # ============================================================
+# Public endpoint to re-run safe startup migrations (all idempotent)
+# ============================================================
+@app.post("/admin/apply-migrations")
+async def apply_migrations_endpoint():
+    """Re-run all idempotent startup migrations. Safe to call multiple times."""
+    try:
+        run_startup_migrations()
+        return {"success": True, "message": "Migrations applied"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ============================================================
 # Admin migration endpoint (protected by MIGRATION_SECRET env var)
 # ============================================================
 @app.post("/admin/run-migration")

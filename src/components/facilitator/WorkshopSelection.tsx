@@ -75,12 +75,12 @@ export const WorkshopSelection = ({
           <ChevronLeft className="h-6 w-6" />
         </Button>
 
-        <div className="mx-12 flex gap-4 overflow-hidden">
-          {visibleItems.map((item, idx) => 
+        <div className="mx-12 grid grid-cols-4 gap-4 w-full">
+          {visibleItems.map((item) => 
             item.type === 'workshop' && item.workshop ? (
               <div
                 key={item.workshop.id}
-                className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
+                className={`flex cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
                   selectedWorkshop === item.workshop.id ? 'border-primary' : 'border-gray-200'
                 }`}
                 onClick={() => onSelect(item.workshop!.id)}
@@ -93,7 +93,7 @@ export const WorkshopSelection = ({
             ) : (
               <div 
                 key="add-new"
-                className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
                 onClick={onAddNewWorkshop}
               >
                 <Plus className="mb-2 h-12 w-12 text-gray-400" />

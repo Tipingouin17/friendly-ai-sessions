@@ -49,11 +49,14 @@ export const usePlanLimits = (): PlanLimits => {
         throw facilitatorError;
       }
 
-      // Get session count
+      // Get session count for the current calendar month
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const { count: sessionCount, error: sessionError } = await supabase
         .from('conversations')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .gte('created_at', startOfMonth);
 
       if (sessionError) {
         toast({

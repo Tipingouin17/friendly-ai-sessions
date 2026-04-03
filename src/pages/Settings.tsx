@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Settings as SettingsIcon, Bell, Shield, Trash2 } from "lucide-react";
 import PageHead from "@/components/PageHead";
 import {
@@ -27,8 +28,6 @@ interface UserSettings {
   showActivity: boolean;
 }
 
-const SETTINGS_KEY = "user_settings";
-
 const defaultSettings: UserSettings = {
   emailNotifications: true,
   workshopReminders: true,
@@ -40,27 +39,68 @@ const Settings = () => {
   const { toast } = useToast();
   const { user, logout } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  // Load settings from localStorage on mount
+  // Use a per-user localStorage key so settings don't bleed between accounts
+  const settingsKey = user?.id ? `user_settings_${user.id}` : null;
+
+  // Load settings from localStorage on mount (keyed by user ID)
   useEffect(() => {
+    if (!settingsKey) return;
     try {
-      const stored = localStorage.getItem(SETTINGS_KEY);
+      const stored = localStorage.getItem(settingsKey);
       if (stored) {
         setSettings(JSON.parse(stored));
       }
     } catch {
       // Use defaults
     }
-  }, []);
+  }, [settingsKey]);
 
   const updateSetting = (key: keyof UserSettings, value: boolean) => {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+    if (settingsKey) {
+      localStorage.setItem(settingsKey, JSON.stringify(updated));
+    }
     toast({
       title: "Setting updated",
       description: "Your preference has been saved.",
     });
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeletingAccount(true);
+    try {
+      // Sign the user out first, then delete their profile row.
+      // Full account deletion (auth user) requires a server-side admin call;
+      // we remove the profile and log out so the account is effectively disabled.
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // Clear per-user settings from localStorage
+      if (settingsKey) localStorage.removeItem(settingsKey);
+
+      await logout();
+      toast({
+        title: "Account deleted",
+        description: "Your account data has been removed. You have been signed out.",
+      });
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast({
+        title: "Error",
+        description: "Could not delete your account. Please contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -145,7 +185,7 @@ const Settings = () => {
             </p>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
+                <Button variant="destructive" size="sm" disabled={isDeletingAccount}>
                   Delete Account
                 </Button>
               </AlertDialogTrigger>
@@ -161,14 +201,10 @@ const Settings = () => {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-red-600 hover:bg-red-700"
-                    onClick={() => {
-                      toast({
-                        title: "Account deletion requested",
-                        description: "Please contact support to complete account deletion.",
-                      });
-                    }}
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount}
                   >
-                    Delete Account
+                    {isDeletingAccount ? "Deleting..." : "Delete Account"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

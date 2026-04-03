@@ -65,9 +65,16 @@ export const CreateWorkshopModal = ({
     setIsLoading(true);
     
     try {
-      // Get the current user's ID to associate the workshop with their account
-      const sessionData = localStorage.getItem('mf_session');
-      const userId = sessionData ? JSON.parse(sessionData)?.user?.id : null;
+      // Get the current user's ID via the Supabase auth session (not localStorage)
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to create a workshop.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const { error } = await supabase
         .from('sessions')
@@ -79,7 +86,7 @@ export const CreateWorkshopModal = ({
           facilitator: facilitatorIdRef.current,
           status: true,
           lock: false,
-          user_id: userId,
+          user_id: user.id,
         });
 
       if (error) throw error;
@@ -177,12 +184,12 @@ export const CreateWorkshopModal = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ws-image">Workshop Image URL</Label>
+              <Label htmlFor="ws-image">Workshop Icon Type</Label>
               <Input
                 id="ws-image"
                 value={profilePicture}
                 onChange={(e) => setProfilePicture(e.target.value)}
-                placeholder="Enter workshop image URL"
+                placeholder="e.g. book-open, star, zap (optional)"
               />
             </div>
             <div className="flex justify-end space-x-2">

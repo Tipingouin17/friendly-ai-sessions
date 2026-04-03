@@ -176,7 +176,7 @@ def run_startup_migrations() -> None:
         # 2026-04-03: Add user_id to sessions so custom workshops are user-specific
         """
         ALTER TABLE sessions
-            ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+            ADD COLUMN IF NOT EXISTS user_id UUID;
         """,
     ]
     try:

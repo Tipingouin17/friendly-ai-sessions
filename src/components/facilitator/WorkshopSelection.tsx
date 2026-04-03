@@ -35,7 +35,8 @@ export const WorkshopSelection = ({
   };
 
   const handleNext = () => {
-    setStartIndex(Math.min(workshops.length - itemsToShow, startIndex + 1));
+    // +1 to account for the "Add New Workshop" card at the end
+    setStartIndex(Math.min(workshops.length - itemsToShow + 1, startIndex + 1));
   };
 
   const getIcon = (iconType: string = 'book-open') => {
@@ -89,7 +90,7 @@ export const WorkshopSelection = ({
           size="icon"
           className="absolute right-0 z-10 translate-x-1/2"
           onClick={handleNext}
-          disabled={startIndex >= workshops.length - itemsToShow}
+          disabled={startIndex >= workshops.length - itemsToShow + 1}
         >
           <ChevronRight className="h-6 w-6" />
         </Button>

@@ -14,7 +14,7 @@ interface CheckoutErrorStateProps {
 
 export const CheckoutErrorState = ({ onBackToPricing }: CheckoutErrorStateProps) => {
   return (
-    <div className="min-h-screen pt-24 pb-16">
+    <div className="min-h-screen pb-16">
       <div className="container max-w-6xl mx-auto px-4">
         <Card>
           <CardHeader>

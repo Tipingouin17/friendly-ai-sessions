@@ -136,13 +136,13 @@ const Pricing = () => {
   const enterprisePlan = plans.find(plan => plan.title === 'Enterprise');
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-16">
+    <div className="min-h-screen bg-white pb-16">
       <PageHead title="Pricing | AIfacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
 
       {/* Hero */}
-      <div className="bg-gradient-to-b from-indigo-50 to-white pb-12 px-4">
+      <div className="bg-gradient-to-b from-indigo-50 to-white pb-6 md:pb-12 px-4">
         <div className="container mx-auto">
-          <div className="text-center max-w-3xl mx-auto pt-8">
+          <div className="text-center max-w-3xl mx-auto pt-4 md:pt-8">
             <span className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
               Simple, transparent pricing
             </span>
@@ -172,7 +172,7 @@ const Pricing = () => {
 
         {/* Standard plan cards: Free, Starter, Premium */}
         {/* mt-8 provides space for the "Most Popular" badge that floats above the card */}
-        <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-8 mt-8 items-stretch">
+        <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-8 mt-4 md:mt-8 items-stretch">
           {standardPlans.map((plan, index) => (
             <StandardPlanCard
               key={plan.id}

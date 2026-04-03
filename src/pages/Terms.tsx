@@ -8,7 +8,7 @@ import { PageHead } from "@/components/PageHead";
 
 const Terms = () => {
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-white">
+    <div className="min-h-screen pb-16 bg-white">
       <PageHead title="Terms of Service" description="Terms of Service for AIfacilitator" />
       <div className="max-w-3xl mx-auto px-4 prose prose-gray">
         <h1>Terms of Service</h1>

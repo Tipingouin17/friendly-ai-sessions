@@ -173,6 +173,11 @@ def run_startup_migrations() -> None:
         ALTER TABLE conversations
             ADD COLUMN IF NOT EXISTS join_token UUID NOT NULL DEFAULT gen_random_uuid();
         """,
+        # 2026-04-03: Add user_id to sessions so custom workshops are user-specific
+        """
+        ALTER TABLE sessions
+            ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+        """,
     ]
     try:
         conn = get_db()
@@ -939,8 +944,9 @@ async def rest_table(table: str, request: Request):
                     wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
                     wv.append(requesting_user_id)
                 elif table == 'sessions':
-                    # sessions = workshop templates, no user_id column; accessible to all authenticated users
-                    pass
+                    # Return system workshops (user_id IS NULL) + user's own custom workshops
+                    wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
+                    wv.append(requesting_user_id)
                 else:
                     # conversations: direct user_id filter
                     wc.append('"user_id" = %s::uuid')

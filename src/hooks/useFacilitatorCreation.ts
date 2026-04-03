@@ -12,8 +12,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
   const { toast } = useToast();
   const { plan } = useUserPlan();
 
-  const createFacilitator = async (e: React.FormEvent, hasReachedFacilitatorLimit: boolean, canCreateCustomFacilitators: boolean) => {
-    e.preventDefault();
+  const createFacilitator = async (hasReachedFacilitatorLimit: boolean, canCreateCustomFacilitators: boolean) => {
     
     if (hasReachedFacilitatorLimit || !canCreateCustomFacilitators) {
       toast({

@@ -38,9 +38,16 @@ export const CreateWorkshopModal = ({
     isLoading: limitsLoading
   } = usePlanLimits();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleCreate = async () => {
+    if (!title.trim() || !scope.trim() || !objective.trim()) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in the title, scope, and objective.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!canCreateCustomSessions) {
       toast({
         title: "Feature Not Available",
@@ -53,16 +60,21 @@ export const CreateWorkshopModal = ({
     setIsLoading(true);
     
     try {
+      // Get the current user's ID to associate the workshop with their account
+      const sessionData = localStorage.getItem('mf_session');
+      const userId = sessionData ? JSON.parse(sessionData)?.user?.id : null;
+
       const { error } = await supabase
         .from('sessions')
         .insert({
-          title,
-          scope,
-          objective,
-          profile_picture: profilePicture || undefined,
+          title: title.trim(),
+          scope: scope.trim(),
+          objective: objective.trim(),
+          profile_picture: profilePicture.trim() || undefined,
           facilitator: facilitatorId,
           status: true,
-          lock: false
+          lock: false,
+          user_id: userId,
         });
 
       if (error) throw error;
@@ -72,13 +84,19 @@ export const CreateWorkshopModal = ({
         description: "Workshop created successfully",
       });
       
+      // Reset form
+      setTitle("");
+      setScope("");
+      setObjective("");
+      setProfilePicture("");
+
       onSuccess();
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating workshop:', error);
       toast({
         title: "Error",
-        description: "Failed to create workshop",
+        description: "Failed to create workshop. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -125,41 +143,38 @@ export const CreateWorkshopModal = ({
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="ws-title">Title</Label>
               <Input
-                id="title"
+                id="ws-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter workshop title"
-                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="scope">Scope</Label>
+              <Label htmlFor="ws-scope">Scope</Label>
               <Textarea
-                id="scope"
+                id="ws-scope"
                 value={scope}
                 onChange={(e) => setScope(e.target.value)}
                 placeholder="Enter workshop scope"
-                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="objective">Objective</Label>
+              <Label htmlFor="ws-objective">Objective</Label>
               <Textarea
-                id="objective"
+                id="ws-objective"
                 value={objective}
                 onChange={(e) => setObjective(e.target.value)}
                 placeholder="Enter workshop objective"
-                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profilePicture">Workshop Image URL</Label>
+              <Label htmlFor="ws-image">Workshop Image URL</Label>
               <Input
-                id="profilePicture"
+                id="ws-image"
                 value={profilePicture}
                 onChange={(e) => setProfilePicture(e.target.value)}
                 placeholder="Enter workshop image URL"
@@ -170,14 +185,19 @@ export const CreateWorkshopModal = ({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isLoading}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                Create Workshop
+              <Button
+                type="button"
+                onClick={handleCreate}
+                disabled={isLoading}
+              >
+                {isLoading ? "Creating..." : "Create Workshop"}
               </Button>
             </div>
-          </form>
+          </div>
         )}
       </DialogContent>
     </Dialog>

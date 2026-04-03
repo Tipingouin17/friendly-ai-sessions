@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import { Calendar, PlusCircle, LayoutDashboard, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, PlusCircle, LayoutDashboard, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import WorkshopMetrics from "@/components/session/WorkshopMetrics";
 import FacilitatorInfo from "@/components/session/FacilitatorInfo";
 import WorkshopTags from "@/components/session/WorkshopTags";
 import PageHead from "@/components/PageHead";
+import { useToast } from "@/components/ui/use-toast";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -109,15 +110,19 @@ const fetchActiveWorkshops = async () => {
   return data as Workshop[];
 };
 
-const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
+const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions, reportData, onSaveToggle }: {
   workshop: Workshop,
   isActive: boolean,
   canGenerateReports: boolean,
-  reportData?: Record<string, unknown>
+  canSaveSessions: boolean,
+  reportData?: Record<string, unknown>,
+  onSaveToggle?: (workshopId: number, isSaved: boolean) => void
 }) => {
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   const handleHostView = async () => {
     if (isActive) {
@@ -128,6 +133,33 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
   const handleDownloadReport = () => {
     if (reportData) {
       setShowReportDialog(true);
+    }
+  };
+
+  const handleSaveToggle = async () => {
+    if (!canSaveSessions) {
+      toast({
+        title: "Upgrade required",
+        description: "Save Sessions is available on Starter and Premium plans.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSaving(true);
+    const newSavedState = !workshop.is_saved;
+    const { error } = await supabase
+      .from('conversations')
+      .update({ is_saved: newSavedState })
+      .eq('id', workshop.id);
+    setIsSaving(false);
+    if (error) {
+      toast({ title: "Error", description: "Failed to update saved status.", variant: "destructive" });
+    } else {
+      toast({
+        title: newSavedState ? "Session saved" : "Session unsaved",
+        description: newSavedState ? "Session has been saved to your library." : "Session removed from saved library.",
+      });
+      onSaveToggle?.(workshop.id, newSavedState);
     }
   };
 
@@ -149,9 +181,30 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, reportData }: {
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <CardTitle className="text-lg font-semibold mb-2">
-                {title}
-              </CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-lg font-semibold mb-2">
+                  {title}
+                </CardTitle>
+                {!isActive && (
+                  <button
+                    onClick={handleSaveToggle}
+                    disabled={isSaving}
+                    title={canSaveSessions ? (workshop.is_saved ? "Unsave session" : "Save session") : "Upgrade to save sessions"}
+                    className={`flex-shrink-0 p-1 rounded transition-colors ${
+                      canSaveSessions
+                        ? workshop.is_saved
+                          ? "text-primary hover:text-primary/70"
+                          : "text-gray-400 hover:text-primary"
+                        : "text-gray-300 cursor-not-allowed"
+                    }`}
+                  >
+                    {workshop.is_saved
+                      ? <BookmarkCheck className="w-5 h-5" />
+                      : <Bookmark className="w-5 h-5" />
+                    }
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center text-gray-500 text-sm">
                   <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
@@ -282,14 +335,14 @@ const ErrorState = ({ error }: { error: Error }) => (
   </Card>
 );
 
-const EmptyState = ({ isActive = false }) => (
+const EmptyState = ({ isActive = false, isSavedFilter = false }) => (
   <Card className="p-6">
     <div className="text-center space-y-2">
       <p className="text-gray-500 font-medium">
-        {isActive ? "No active sessions found" : "No past workshops found"}
+        {isActive ? "No active sessions found" : isSavedFilter ? "No saved sessions found" : "No past workshops found"}
       </p>
       <p className="text-gray-400 text-sm">
-        {isActive ? "Start a new session to see it here" : "Completed workshops will appear here"}
+        {isActive ? "Start a new session to see it here" : isSavedFilter ? "Save sessions using the bookmark icon" : "Completed workshops will appear here"}
       </p>
     </div>
   </Card>
@@ -299,11 +352,13 @@ const EmptyState = ({ isActive = false }) => (
  * Pagination component for workshop lists.
  */
 const Pagination = ({ currentPage, totalPages, onPageChange }: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
+  currentPage: number,
+  totalPages: number,
+  onPageChange: (page: number) => void
 }) => {
   if (totalPages <= 1) return null;
+
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
     <div className="flex items-center justify-center gap-2 mt-6">
@@ -315,8 +370,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: {
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      
-      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+
+      {pages.map((page) => (
         <Button
           key={page}
           variant={page === currentPage ? "default" : "outline"}
@@ -327,7 +382,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: {
           {page}
         </Button>
       ))}
-      
+
       <Button
         variant="outline"
         size="sm"
@@ -346,6 +401,7 @@ const PastWorkshops = () => {
   const queryClient = useQueryClient();
   const { planRestrictions } = useUserPlan();
   const [pastPage, setPastPage] = useState(1);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
     queryKey: ['past-workshops'],
@@ -357,18 +413,31 @@ const PastWorkshops = () => {
     queryFn: fetchActiveWorkshops,
   });
 
+  // Check plan features
+  const canGenerateReports = !!planRestrictions?.session_reports;
+  const canSaveSessions = !!planRestrictions?.saved_sessions;
+
+  // Filter past workshops based on saved filter
+  const filteredPastWorkshops = showSavedOnly
+    ? (pastWorkshops || []).filter(w => w.is_saved)
+    : (pastWorkshops || []);
+
   // Get conversation IDs for fetching reports (only for current page)
-  const totalPastPages = Math.ceil((pastWorkshops?.length || 0) / ITEMS_PER_PAGE);
-  const paginatedPastWorkshops = pastWorkshops?.slice(
+  const totalPastPages = Math.ceil(filteredPastWorkshops.length / ITEMS_PER_PAGE);
+  const paginatedPastWorkshops = filteredPastWorkshops.slice(
     (pastPage - 1) * ITEMS_PER_PAGE,
     pastPage * ITEMS_PER_PAGE
-  ) || [];
-
+  );
   const pastWorkshopIds = paginatedPastWorkshops.map(w => w.id);
   const { data: reportsData = { /* no-op */ } } = useWorkshopReports(pastWorkshopIds);
 
-  // Check if user can generate reports
-  const canGenerateReports = !!planRestrictions?.session_reports;
+  // Handle save toggle - update local cache optimistically
+  const handleSaveToggle = (workshopId: number, isSaved: boolean) => {
+    queryClient.setQueryData(['past-workshops'], (old: Workshop[] | undefined) => {
+      if (!old) return old;
+      return old.map(w => w.id === workshopId ? { ...w, is_saved: isSaved } : w);
+    });
+  };
 
   // Set up real-time listener for workshop status changes
   useEffect(() => {
@@ -383,7 +452,6 @@ const PastWorkshops = () => {
         queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
       })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
@@ -397,7 +465,6 @@ const PastWorkshops = () => {
         await navigateToHostSession(mostRecentSession.id);
       }
     };
-
     handleAutoNavigation();
   }, [activeWorkshops, navigateToHostSession]);
 
@@ -438,6 +505,7 @@ const PastWorkshops = () => {
                 workshop={workshop}
                 isActive={true}
                 canGenerateReports={canGenerateReports}
+                canSaveSessions={canSaveSessions}
               />
             ))}
           </div>
@@ -445,18 +513,32 @@ const PastWorkshops = () => {
 
         <div className="flex items-center justify-between mt-12 mb-4">
           <h2 className="text-2xl font-semibold">Past Workshops</h2>
-          {pastWorkshops && pastWorkshops.length > 0 && (
-            <span className="text-sm text-gray-500">
-              {pastWorkshops.length} workshop{pastWorkshops.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {pastWorkshops && pastWorkshops.length > 0 && (
+              <span className="text-sm text-gray-500">
+                {filteredPastWorkshops.length} workshop{filteredPastWorkshops.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {canSaveSessions && (
+              <Button
+                variant={showSavedOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => { setShowSavedOnly(!showSavedOnly); setPastPage(1); }}
+                className="flex items-center gap-1.5"
+              >
+                <BookmarkCheck className="w-4 h-4" />
+                {showSavedOnly ? "Show All" : "Saved Only"}
+              </Button>
+            )}
+          </div>
         </div>
+
         {isPastLoading ? (
           <LoadingState />
         ) : pastError ? (
           <ErrorState error={pastError as Error} />
-        ) : !pastWorkshops?.length ? (
-          <EmptyState />
+        ) : !filteredPastWorkshops.length ? (
+          <EmptyState isSavedFilter={showSavedOnly} />
         ) : (
           <>
             <div className="space-y-4">
@@ -466,7 +548,9 @@ const PastWorkshops = () => {
                   workshop={workshop}
                   isActive={false}
                   canGenerateReports={canGenerateReports}
+                  canSaveSessions={canSaveSessions}
                   reportData={reportsData[workshop.id]}
+                  onSaveToggle={handleSaveToggle}
                 />
               ))}
             </div>

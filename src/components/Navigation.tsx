@@ -1,7 +1,11 @@
 /**
  * Navigation
  *
- * Component for the AIfacilitator application.
+ * Top navigation bar for the AIfacilitator application.
+ * On mobile the nav is rendered as a slide-in Sheet (drawer).
+ * Every link inside the mobile Sheet closes the drawer AND scrolls
+ * the new page to the top, so the user always starts at the top of
+ * the destination page regardless of their scroll position.
  */
 
 import { Link, useLocation } from "react-router-dom";
@@ -12,11 +16,14 @@ import { UserCircle, Settings, BookOpen, ChevronDown, Menu, Zap } from "lucide-r
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getUserDisplayName } from "@/utils/userUtils";
+import { useState, useCallback } from "react";
 
 export const Navigation = () => {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
   const isMobile = useIsMobile();
+  // Controls the mobile Sheet open/close state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isSessionPage = location.pathname.includes('/session');
   const isAdminPage = location.pathname.includes('admin');
@@ -36,6 +43,31 @@ export const Navigation = () => {
         : 'text-gray-600 hover:text-indigo-600'
     }`;
 
+  /**
+   * Called by every mobile nav link/button.
+   * Closes the Sheet and scrolls the page to the top so the user
+   * always lands at the beginning of the destination page.
+   */
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  /** Wraps a Link so it closes the menu and scrolls to top on click. */
+  const MobileLink = ({
+    to,
+    className,
+    children,
+  }: {
+    to: string;
+    className?: string;
+    children: React.ReactNode;
+  }) => (
+    <Link to={to} className={className} onClick={closeMobileMenu}>
+      {children}
+    </Link>
+  );
+
   return (
     <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage ? 'hidden md:flex' : 'flex'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
@@ -49,7 +81,7 @@ export const Navigation = () => {
           </Link>
 
           {isMobile ? (
-            <Sheet>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-10 w-10 p-0" aria-label="Open menu">
                   <Menu className="h-6 w-6" />
@@ -58,60 +90,72 @@ export const Navigation = () => {
               <SheetContent className="flex flex-col">
                 <div className="flex flex-col space-y-6 mt-8">
                   {isAuthenticated && (
-                    <Link to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
+                    <MobileLink to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
                       My Facilitators
-                    </Link>
+                    </MobileLink>
                   )}
-                  <Link to="/" className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
+                  <MobileLink
+                    to="/"
+                    className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
+                  >
                     Home
-                  </Link>
-                  <Link to="/pricing" className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
+                  </MobileLink>
+                  <MobileLink
+                    to="/pricing"
+                    className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
+                  >
                     Pricing
-                  </Link>
-                  <Link to="/faqs" className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
+                  </MobileLink>
+                  <MobileLink
+                    to="/faqs"
+                    className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
+                  >
                     FAQs
-                  </Link>
-                  <Link to="/contact" className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>
+                  </MobileLink>
+                  <MobileLink
+                    to="/contact"
+                    className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
+                  >
                     Contact Us
-                  </Link>
+                  </MobileLink>
                 </div>
 
                 <div className="mt-auto mb-8">
                   {!isAuthenticated ? (
                     <div className="flex flex-col space-y-3">
-                      <Link to="/login" className="w-full">
+                      <MobileLink to="/login" className="w-full">
                         <Button variant="outline" className="w-full text-center rounded-xl">
                           Log in
                         </Button>
-                      </Link>
-                      <Link to="/signup" className="w-full">
+                      </MobileLink>
+                      <MobileLink to="/signup" className="w-full">
                         <Button className="w-full text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">
                           Get Started Free
                         </Button>
-                      </Link>
+                      </MobileLink>
                     </div>
                   ) : (
                     <div className="flex flex-col space-y-3">
                       <div className="text-sm text-gray-600 mb-2">Hi, {userDisplayName}</div>
-                      <Link to="/profile" className="w-full">
+                      <MobileLink to="/profile" className="w-full">
                         <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <UserCircle className="h-4 w-4" /> Profile
                         </Button>
-                      </Link>
-                      <Link to="/settings" className="w-full">
+                      </MobileLink>
+                      <MobileLink to="/settings" className="w-full">
                         <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <Settings className="h-4 w-4" /> Settings
                         </Button>
-                      </Link>
-                      <Link to="/past-workshops" className="w-full">
+                      </MobileLink>
+                      <MobileLink to="/past-workshops" className="w-full">
                         <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
                           <BookOpen className="h-4 w-4" /> Past Workshops
                         </Button>
-                      </Link>
+                      </MobileLink>
                       <Button
                         variant="outline"
                         className="w-full text-center rounded-xl"
-                        onClick={logout}
+                        onClick={() => { closeMobileMenu(); logout(); }}
                       >
                         Log out
                       </Button>

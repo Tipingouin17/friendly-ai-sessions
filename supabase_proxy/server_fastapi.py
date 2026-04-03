@@ -1763,6 +1763,53 @@ async def edge_function(func_name: str, request: Request):
             },
         }
 
+    # ── validate-coupon ────────────────────────────────────────
+    # Validates a Stripe coupon/promotion code and returns the discount details.
+    # The frontend uses this to show a live discounted price before checkout.
+    elif func_name == "validate-coupon":
+        if not STRIPE_CONFIGURED:
+            raise HTTPException(500, "Stripe is not configured on this server")
+        coupon_code = (data.get("couponCode") or "").strip().upper()
+        if not coupon_code:
+            raise HTTPException(400, "Missing couponCode")
+        try:
+            # First try to find a promotion code (customer-facing code)
+            promo_codes = stripe_lib.PromotionCode.list(code=coupon_code, active=True, limit=1)
+            if promo_codes.data:
+                promo = promo_codes.data[0]
+                coupon = promo.coupon
+                return {
+                    "valid": True,
+                    "couponId": coupon.id,
+                    "promoCodeId": promo.id,
+                    "percentOff": coupon.percent_off,
+                    "amountOff": coupon.amount_off,
+                    "currency": coupon.currency,
+                    "duration": coupon.duration,
+                    "durationInMonths": coupon.duration_in_months,
+                    "name": coupon.name or coupon_code,
+                }
+            # Fall back to looking up the coupon directly by ID
+            try:
+                coupon = stripe_lib.Coupon.retrieve(coupon_code)
+                if coupon and coupon.valid:
+                    return {
+                        "valid": True,
+                        "couponId": coupon.id,
+                        "promoCodeId": None,
+                        "percentOff": coupon.percent_off,
+                        "amountOff": coupon.amount_off,
+                        "currency": coupon.currency,
+                        "duration": coupon.duration,
+                        "durationInMonths": coupon.duration_in_months,
+                        "name": coupon.name or coupon_code,
+                    }
+            except stripe_lib.error.InvalidRequestError:
+                pass
+            return {"valid": False, "error": "Invalid or expired promo code"}
+        except stripe_lib.error.StripeError as se:
+            raise HTTPException(400, str(se))
+
     # ── create-subscription ────────────────────────────────────
     elif func_name == "create-subscription":
         if not STRIPE_CONFIGURED:
@@ -1773,10 +1820,26 @@ async def edge_function(func_name: str, request: Request):
         billing = data.get("billingDetails", {})
         if not stripe_plan_id or not user_id:
             raise HTTPException(400, "Missing planId, stripePlanId, or userId")
+        # Optional coupon/promo code — validated by validate-coupon before reaching here
+        coupon_id = data.get("couponId")  # Stripe coupon ID (not the human-readable code)
         try:
             price_obj = stripe_lib.Price.retrieve(stripe_plan_id)
             amount = price_obj.unit_amount
             currency = price_obj.currency
+
+            # Apply percentage or fixed discount to the PaymentIntent amount
+            if coupon_id:
+                try:
+                    coupon = stripe_lib.Coupon.retrieve(coupon_id)
+                    if coupon.valid:
+                        if coupon.percent_off:
+                            discount = int(amount * coupon.percent_off / 100)
+                            amount = max(50, amount - discount)  # Stripe minimum is 50 cents
+                        elif coupon.amount_off:
+                            amount = max(50, amount - coupon.amount_off)
+                except stripe_lib.error.InvalidRequestError:
+                    coupon_id = None  # Ignore invalid coupon silently
+
             conn = get_db()
             cur = conn.cursor()
             cur.execute("SELECT stripe_customer_id FROM profiles WHERE id = %s", (user_id,))
@@ -1794,14 +1857,17 @@ async def edge_function(func_name: str, request: Request):
             conn.commit()
             cur.close()
             conn.close()
+            intent_meta = {"user_id": user_id, "plan_id": str(plan_id), "stripe_plan_id": stripe_plan_id}
+            if coupon_id:
+                intent_meta["coupon_id"] = coupon_id
             intent = stripe_lib.PaymentIntent.create(
                 amount=amount,
                 currency=currency,
                 customer=customer_id,
-                metadata={"user_id": user_id, "plan_id": str(plan_id), "stripe_plan_id": stripe_plan_id},
+                metadata=intent_meta,
                 automatic_payment_methods={"enabled": True},
             )
-            return {"clientSecret": intent.client_secret, "subscriptionId": intent.id, "customerId": customer_id, "success": True}
+            return {"clientSecret": intent.client_secret, "subscriptionId": intent.id, "customerId": customer_id, "discountedAmount": amount, "success": True}
         except stripe_lib.error.StripeError as se:
             raise HTTPException(400, str(se))
 

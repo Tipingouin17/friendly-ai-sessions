@@ -22,6 +22,8 @@ import { Loader2 } from 'lucide-react';
 interface ExtendedCheckoutFormProps extends CheckoutFormProps {
   isStripeLoading?: boolean;
   onStripeLoaded?: () => void;
+  /** Validated Stripe coupon ID to apply to this payment. */
+  couponId?: string | null;
 }
 
 export const CheckoutForm = ({ 
@@ -29,7 +31,8 @@ export const CheckoutForm = ({
   billingDetails,
   onCancel,
   isStripeLoading = false,
-  onStripeLoaded 
+  onStripeLoaded,
+  couponId,
 }: ExtendedCheckoutFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -104,11 +107,12 @@ export const CheckoutForm = ({
 
       const returnUrl = createSafeUrl('/profile');
       
-      // Create the subscription
+      // Create the subscription (couponId is passed so the backend applies the discount)
       const { clientSecret, subscriptionId, customerId } = await createSubscription(
         plan,
         user.id,
-        billingDetails
+        billingDetails,
+        couponId ?? undefined
       );
 
       // Confirm the payment

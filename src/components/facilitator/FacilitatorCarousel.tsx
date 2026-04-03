@@ -43,18 +43,22 @@ export const FacilitatorCarousel = ({
 
   const itemsToShow = windowWidth < 480 ? 2 : windowWidth < 768 ? 3 : 4;
 
+  // Total items includes the CreateFacilitatorButton as one extra slot
+  const totalItems = facilitators.length + 1;
+  const maxStartIndex = Math.max(0, totalItems - itemsToShow);
+
   useEffect(() => {
-    if (startIndex > 0 && startIndex >= facilitators.length - itemsToShow) {
-      setStartIndex(Math.max(0, facilitators.length - itemsToShow));
+    if (startIndex > maxStartIndex) {
+      setStartIndex(maxStartIndex);
     }
-  }, [facilitators, startIndex, itemsToShow]);
+  }, [facilitators, startIndex, maxStartIndex]);
 
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
   };
 
   const handleNext = () => {
-    setStartIndex(Math.min(Math.max(0, facilitators.length - itemsToShow), startIndex + 1));
+    setStartIndex(Math.min(maxStartIndex, startIndex + 1));
   };
 
   const getAvatarUrl = (facilitator: Facilitator) => {
@@ -77,7 +81,15 @@ export const FacilitatorCarousel = ({
     return facilitator.plan_id > userPlanId;
   };
 
-  const visibleFacilitators = facilitators.slice(startIndex, startIndex + itemsToShow);
+  // Build the visible items for this page, including the CreateFacilitatorButton slot
+  const visibleItems: Array<{ type: 'facilitator'; facilitator: Facilitator } | { type: 'create' }> = [];
+  for (let i = startIndex; i < startIndex + itemsToShow && i < totalItems; i++) {
+    if (i < facilitators.length) {
+      visibleItems.push({ type: 'facilitator', facilitator: facilitators[i] });
+    } else {
+      visibleItems.push({ type: 'create' });
+    }
+  }
 
   return (
     <div className="relative mb-8">
@@ -93,14 +105,25 @@ export const FacilitatorCarousel = ({
           <ChevronLeft className="h-6 w-6" />
         </Button>
 
-        <div className="mx-12 flex gap-4 overflow-hidden">
-          {visibleFacilitators.map((facilitator) => {
+        <div className="mx-12 grid grid-cols-4 gap-4 w-full">
+          {visibleItems.map((item, idx) => {
+            if (item.type === 'create') {
+              return (
+                <CreateFacilitatorButton
+                  key="create-facilitator"
+                  hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
+                  canCreateCustomFacilitators={canCreateCustomFacilitators}
+                  maxFacilitators={maxFacilitators}
+                  onClick={onCreateNew}
+                />
+              );
+            }
+            const { facilitator } = item;
             const avatarUrl = getAvatarUrl(facilitator);
             const locked = isFacilitatorLocked(facilitator);
-
             return (
               <FacilitatorCard
-                key={facilitator.id}
+                key={facilitator.id ?? idx}
                 facilitator={facilitator}
                 isSelected={!locked && selectedFacilitator === facilitator.id}
                 avatarUrl={avatarUrl}
@@ -117,13 +140,6 @@ export const FacilitatorCarousel = ({
               />
             );
           })}
-          
-          <CreateFacilitatorButton
-            hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}
-            canCreateCustomFacilitators={canCreateCustomFacilitators}
-            maxFacilitators={maxFacilitators}
-            onClick={onCreateNew}
-          />
         </div>
 
         <Button
@@ -132,7 +148,7 @@ export const FacilitatorCarousel = ({
           aria-label="Next facilitators"
           className="absolute right-0 z-10 translate-x-1/2"
           onClick={handleNext}
-          disabled={startIndex >= facilitators.length - itemsToShow}
+          disabled={startIndex >= maxStartIndex}
         >
           <ChevronRight className="h-6 w-6" />
         </Button>

@@ -1,7 +1,8 @@
 /**
  * Facilitator Card
  *
- * Facilitator component for the AIfacilitator application.
+ * Displays a single facilitator avatar and name in the selection carousel.
+ * Handles locked (plan-gated) facilitators with an overlay.
  */
 
 import { Facilitator } from "@/types/facilitator";
@@ -32,18 +33,17 @@ export const FacilitatorCard = ({
   const [imageLoading, setImageLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   
-  // Hydration-safe client detection
+  // Hydration-safe: only render images on the client to avoid SSR mismatches
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Display a placeholder if the URL is empty or we're on server
+  // Fall back to placeholder when no URL is available or during SSR
   const displayUrl = (isClient && avatarUrl) ? avatarUrl : '/placeholder.svg';
   
-  // Add debugging to see what URLs we're getting (only on client)
   useEffect(() => {
     if (isClient) {
-      debugLog('all', `FacilitatorCard - Displaying avatar for ${facilitator.title}: ${displayUrl}`);
+      debugLog('all', `FacilitatorCard — avatar for "${facilitator.title}": ${displayUrl}`);
     }
   }, [displayUrl, facilitator.title, isClient]);
   
@@ -61,22 +61,23 @@ export const FacilitatorCard = ({
         </div>
 
         <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full grayscale">
-          {isClient && (
+          {isClient ? (
             <Avatar className="h-full w-full">
+              {/* NOTE: crossOrigin is intentionally omitted — adding it triggers a CORS
+                  preflight for same-origin Railway storage images, which causes them to
+                  be blocked when the browser's CORS check fails. */}
               <AvatarImage 
                 src={displayUrl} 
                 alt={facilitator.title || 'Facilitator'} 
                 onError={handleAvatarError}
                 onLoad={() => setImageLoading(false)}
                 className="h-full w-full object-cover"
-                crossOrigin="anonymous"
               />
               <AvatarFallback delayMs={600}>
                 {facilitator.title?.charAt(0) || 'F'}
               </AvatarFallback>
             </Avatar>
-          )}
-          {!isClient && (
+          ) : (
             <div className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-600 text-xl font-medium">
               {facilitator.title?.charAt(0) || 'F'}
             </div>
@@ -95,28 +96,29 @@ export const FacilitatorCard = ({
       onClick={onClick}
     >
       <div className="relative mb-4 h-20 w-20 overflow-hidden rounded-full">
-        {(isLoading || imageLoading || !isClient) ? (
+        {/* Show skeleton while image is loading */}
+        {(isLoading || imageLoading || !isClient) && (
           <Skeleton className="absolute inset-0 h-full w-full rounded-full" />
-        ) : null}
+        )}
         
-        {isClient && (
+        {isClient ? (
           <Avatar className="h-full w-full">
+            {/* NOTE: crossOrigin is intentionally omitted — adding it triggers a CORS
+                preflight for same-origin Railway storage images, which causes them to
+                be blocked when the browser's CORS check fails. */}
             <AvatarImage 
               src={displayUrl} 
               alt={facilitator.title || 'Facilitator'} 
               onError={handleAvatarError}
               onLoad={() => setImageLoading(false)}
               className="h-full w-full object-cover"
-              crossOrigin="anonymous"
             />
             <AvatarFallback delayMs={600}>
               {facilitator.title?.charAt(0) || 'F'}
             </AvatarFallback>
           </Avatar>
-        )}
-        
-        {/* Server-side rendering fallback */}
-        {!isClient && (
+        ) : (
+          /* Server-side rendering fallback — initials only */
           <div className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-600 text-xl font-medium">
             {facilitator.title?.charAt(0) || 'F'}
           </div>

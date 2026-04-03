@@ -96,11 +96,9 @@ const ParticipantAvatar = ({
     );
   }
 
-  // Check if URL needs crossOrigin attribute (includes legacy pre-migration storage URLs)
-  const needsCrossOrigin = 
-    isInCrossOriginContext() || 
-    normalizedUrl.includes('crossorigin=anonymous') ||
-    normalizedUrl.includes('supabase.co'); // Legacy: backward compat with pre-migration data
+  // Only set crossOrigin="anonymous" when embedded in a cross-origin iframe.
+  // Omitting it for normal page loads avoids an unnecessary CORS preflight.
+  const needsCrossOrigin = isInCrossOriginContext();
 
   // Use provided avatar URL
   return (

@@ -66,16 +66,26 @@ export const FacilitatorCarousel = ({
     setStartIndex(Math.min(maxStartIndex, startIndex + 1));
   };
 
-  const getAvatarUrl = (facilitator: Facilitator) => {
+  const getAvatarUrl = (facilitator: Facilitator): string => {
     if (!facilitator.id) return '/placeholder.svg';
-    
-    if (facilitator.profile_picture && (facilitator.profile_picture.startsWith('/avatars/') || facilitator.profile_picture.startsWith('http'))) {
-      return facilitator.profile_picture;
+
+    const pic = facilitator.profile_picture;
+
+    if (pic) {
+      // Full URL (http/https) or public asset path — use as-is
+      if (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/')) {
+        return pic;
+      }
+      // Plain filename stored in DB (e.g. "52.jpg") — build the Railway storage URL.
+      // The async facilitatorImages map may not be ready yet on first render, so we
+      // construct the URL directly here to avoid a flash of the placeholder.
+      const apiUrl = (import.meta.env.VITE_API_URL as string) || '';
+      return `${apiUrl}/storage/v1/object/public/facilitator-avatars/${pic}`;
     }
-    
-    return facilitator.id && facilitatorImages[facilitator.id] 
-      ? facilitatorImages[facilitator.id] 
-      : '/placeholder.svg';
+
+    // Fall back to the async-loaded image map (covers user-uploaded avatars
+    // that were stored with a full path rather than a plain filename)
+    return facilitatorImages[facilitator.id] ?? '/placeholder.svg';
   };
 
   // Determine if a facilitator is locked for the current user's plan

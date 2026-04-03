@@ -90,11 +90,10 @@ const FacilitatorAvatar = ({
   if (normalizedUrl && normalizedUrl !== '/placeholder.svg' && isImageUrl(normalizedUrl) && !imageError) {
     debugLog('all', `Displaying facilitator avatar with URL: ${normalizedUrl}`);
     
-    // Check if URL needs crossOrigin attribute (includes legacy pre-migration storage URLs)
-    const needsCrossOrigin = 
-      isInCrossOriginContext() || 
-      normalizedUrl.includes('crossorigin=anonymous') ||
-      normalizedUrl.includes('supabase.co'); // Legacy: backward compat with pre-migration data
+    // Only set crossOrigin="anonymous" when the page is embedded in a cross-origin
+    // iframe (e.g. participant join link). For normal page loads, omitting it avoids
+    // an unnecessary CORS preflight that can block Railway storage images.
+    const needsCrossOrigin = isInCrossOriginContext();
     
     return (
       <Avatar className={`${dimensions[size]} avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>

@@ -103,10 +103,9 @@ const SessionHeader = ({
     return () => { isMounted = false; };
   }, [facilitator]);
 
-  // Determine if cross-origin handling is needed (includes legacy pre-migration storage URLs)
-  const needsCrossOrigin = isInCrossOriginContext() || 
-    profilePicture.includes('crossorigin=anonymous') ||
-    profilePicture.includes('supabase.co'); // Legacy: backward compat with pre-migration data
+  // Only set crossOrigin="anonymous" when embedded in a cross-origin iframe.
+  // Omitting it for normal page loads avoids an unnecessary CORS preflight.
+  const needsCrossOrigin = isInCrossOriginContext();
 
   return (
     <ChatHeader 

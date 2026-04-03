@@ -50,7 +50,7 @@ export const FacilitatorCard = ({
   if (isLocked) {
     return (
       <div
-        className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border border-gray-200 p-4 transition-all relative opacity-60 hover:opacity-80"
+        className="flex cursor-pointer flex-col items-center rounded-xl border border-gray-200 p-3 transition-all relative opacity-60 hover:opacity-80 w-full"
         onClick={onClick}
         title="Upgrade your plan to access this facilitator"
       >
@@ -89,7 +89,7 @@ export const FacilitatorCard = ({
 
   return (
     <div
-      className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-4 transition-all ${
+      className={`flex cursor-pointer flex-col items-center rounded-xl border p-3 transition-all w-full ${
         isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
       }`}
       onClick={onClick}

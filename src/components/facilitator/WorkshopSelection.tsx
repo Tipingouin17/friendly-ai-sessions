@@ -4,7 +4,7 @@
  * Facilitator component for the AIfacilitator application.
  */
 import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Workshop } from "@/types/facilitator";
 
@@ -33,7 +33,16 @@ export const WorkshopSelection = ({
   onAddNewWorkshop
 }: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
-  const itemsToShow = 4;
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Responsive: 2 items on xs (<480px), 3 on sm, 4 on md+
+  const itemsToShow = windowWidth < 480 ? 2 : windowWidth < 768 ? 3 : 4;
 
   // Total items = workshops + 1 "Add New Workshop" card
   const totalItems = workshops.length + 1;
@@ -68,54 +77,59 @@ export const WorkshopSelection = ({
   }
 
   return (
-    <div className="relative">
-      <div className="flex items-center">
+    <div>
+      <div className="flex items-center gap-1">
+        {/* Prev button — stays inside the card boundary on all screen sizes */}
         <Button
           variant="ghost"
           size="icon"
-          className="absolute left-0 z-10 -translate-x-1/2"
+          className="shrink-0 h-8 w-8"
           onClick={handlePrevious}
           disabled={startIndex === 0}
+          aria-label="Previous workshops"
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className="h-5 w-5" />
         </Button>
 
-        <div className="mx-12 grid grid-cols-4 gap-4 w-full">
+        {/* Responsive grid: 2 cols on xs, 3 on sm, 4 on md+ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 flex-1">
           {visibleItems.map((item) => 
             item.type === 'workshop' && item.workshop ? (
               <div
                 key={item.workshop.id}
-                className={`flex cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
-                  selectedWorkshop === item.workshop.id ? 'border-primary' : 'border-gray-200'
+                className={`flex cursor-pointer flex-col items-center rounded-xl border p-4 transition-all ${
+                  selectedWorkshop === item.workshop.id ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
                 }`}
                 onClick={() => onSelect(item.workshop!.id)}
               >
-                <div className="mb-4">
+                <div className="mb-3">
                   {getIcon(item.workshop.icon_type)}
                 </div>
-                <h3 className="text-center text-lg font-semibold leading-tight">{item.workshop.title}</h3>
+                <h3 className="text-center text-sm font-semibold leading-tight">{item.workshop.title}</h3>
               </div>
             ) : (
               <div 
                 key="add-new"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all min-h-[100px]"
                 onClick={onAddNewWorkshop}
               >
-                <Plus className="mb-2 h-12 w-12 text-gray-400" />
-                <span className="text-center text-sm text-gray-600">Add New Workshop</span>
+                <Plus className="mb-2 h-8 w-8 text-gray-400" />
+                <span className="text-center text-xs text-gray-600">Add New Workshop</span>
               </div>
             )
           )}
         </div>
 
+        {/* Next button — stays inside the card boundary on all screen sizes */}
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-0 z-10 translate-x-1/2"
+          className="shrink-0 h-8 w-8"
           onClick={handleNext}
           disabled={startIndex >= maxStartIndex}
+          aria-label="Next workshops"
         >
-          <ChevronRight className="h-6 w-6" />
+          <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
 

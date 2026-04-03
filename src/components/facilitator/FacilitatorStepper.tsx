@@ -21,45 +21,42 @@ export const FacilitatorStepper = ({
   setCurrentStep,
   isStep1Disabled,
   isStep2Disabled,
-  isStep3Disabled
+  isStep3Disabled,
 }: FacilitatorStepperProps) => {
+  const steps = [
+    { value: "1", label: "Choose Facilitator", shortLabel: "Facilitator",   disabled: isStep1Disabled },
+    { value: "2", label: "Select Workshop",    shortLabel: "Workshop",       disabled: isStep2Disabled },
+    { value: "3", label: "Setup Participants", shortLabel: "Participants",   disabled: isStep3Disabled },
+  ];
+
   return (
-    <Stepper 
-      value={currentStep.toString()} 
-      onValueChange={value => setCurrentStep(parseInt(value) as Step)} 
-      className="mb-4"
+    <Stepper
+      value={currentStep.toString()}
+      onValueChange={value => setCurrentStep(parseInt(value) as Step)}
+      className="mb-6"
     >
-      <div className="flex items-center gap-2 w-full">
-        <StepperItem value="1" disabled={isStep1Disabled}>
-          <StepperTrigger className="flex flex-col items-center gap-2">
-            <StepperIndicator>
-              {isStep1Disabled && <Lock className="h-3 w-3" />}
-            </StepperIndicator>
-            <div className="text-sm font-medium">Choose Facilitator</div>
-          </StepperTrigger>
-        </StepperItem>
-        
-        <StepperSeparator />
-        
-        <StepperItem value="2" disabled={isStep2Disabled}>
-          <StepperTrigger className="flex flex-col items-center gap-2">
-            <StepperIndicator>
-              {isStep2Disabled && <Lock className="h-3 w-3" />}
-            </StepperIndicator>
-            <div className="text-sm font-medium">Select Workshop</div>
-          </StepperTrigger>
-        </StepperItem>
-        
-        <StepperSeparator />
-        
-        <StepperItem value="3" disabled={isStep3Disabled}>
-          <StepperTrigger className="flex flex-col items-center gap-2">
-            <StepperIndicator>
-              {isStep3Disabled && <Lock className="h-3 w-3" />}
-            </StepperIndicator>
-            <div className="text-sm font-medium">Setup Participants</div>
-          </StepperTrigger>
-        </StepperItem>
+      {/* Full-width flex row — shrinks gracefully on mobile */}
+      <div className="flex items-center w-full">
+        {steps.map((step, idx) => (
+          <div key={step.value} className="flex items-center flex-1 min-w-0">
+            <StepperItem value={step.value} disabled={step.disabled} className="flex-1 min-w-0">
+              <StepperTrigger className="flex flex-col items-center gap-1.5 w-full px-1">
+                <StepperIndicator>
+                  {step.disabled && <Lock className="h-3 w-3" />}
+                </StepperIndicator>
+                {/* Full label on md+, abbreviated on mobile */}
+                <span className="hidden md:block text-sm font-medium text-center leading-tight">
+                  {step.label}
+                </span>
+                <span className="md:hidden text-xs font-medium text-center leading-tight">
+                  {step.shortLabel}
+                </span>
+              </StepperTrigger>
+            </StepperItem>
+            {/* Separator between steps only */}
+            {idx < steps.length - 1 && <StepperSeparator className="flex-1" />}
+          </div>
+        ))}
       </div>
     </Stepper>
   );

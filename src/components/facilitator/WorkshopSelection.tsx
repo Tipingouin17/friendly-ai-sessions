@@ -11,6 +11,7 @@ interface WorkshopSelectionProps {
   onSelect: (id: number) => void;
   isLoading?: boolean;
   selectedFacilitatorId?: number | null;
+  onAddNewWorkshop?: () => void;
 }
 
 const iconMap = {
@@ -26,11 +27,20 @@ export const WorkshopSelection = ({
   selectedWorkshop, 
   onSelect,
   isLoading = false,
-  selectedFacilitatorId
+  selectedFacilitatorId,
+  onAddNewWorkshop
 }: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const itemsToShow = 4;
+
+  const handleAddNewWorkshop = () => {
+    if (onAddNewWorkshop) {
+      onAddNewWorkshop();
+    } else {
+      setIsCreateModalOpen(true);
+    }
+  };
 
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
@@ -79,7 +89,7 @@ export const WorkshopSelection = ({
           ))}
           <div 
             className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={handleAddNewWorkshop}
           >
             <Plus className="mb-2 h-12 w-12 text-gray-400" />
             <span className="text-center text-sm text-gray-600">Add New Workshop</span>

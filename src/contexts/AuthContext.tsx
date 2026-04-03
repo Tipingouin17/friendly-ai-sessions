@@ -108,10 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email.trim().toLowerCase(),
         password,
         options: {
-          data: {
-            name: name.trim(),
-          },
-          emailRedirectTo: `${window.location.origin}/login`
+          // Send the display name so the backend can store it in profiles.full_name.
+          // The backend accepts both 'name' and 'full_name' inside options.data.
+          data: { name: name.trim() },
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
@@ -119,6 +119,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logAuthAttempt(false, 'signup');
         throw error;
       }
+      // Log the successful signup attempt
+      logAuthAttempt(true, 'signup');
     } catch (error) {
       logAuthAttempt(false, 'signup');
       throw error;

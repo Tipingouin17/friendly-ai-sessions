@@ -31,6 +31,8 @@ const Login = () => {
   const { toast } = useToast();
 
   const from = (location.state as { from: string })?.from || '/';
+  // Show a success banner when the user has just completed signup
+  const signupSuccess = (location.state as { signupSuccess?: boolean })?.signupSuccess === true;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -122,6 +124,11 @@ const Login = () => {
             Sign in to continue to your account
           </p>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {signupSuccess && (
+              <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800" role="status">
+                Account created successfully! Please log in with your new credentials.
+              </div>
+            )}
             {loginError && (
               <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700" role="alert">
                 {loginError}

@@ -79,21 +79,18 @@ export const SignupForm: React.FC = () => {
     setIsLoading(true);
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
-      toast({
-        title: "Account created",
-        description: "Please check your email to verify your account."
-      });
+      // Navigate to login with a success flag so the login page can display
+      // a confirmation banner. The user must log in explicitly after signup.
       navigate('/login', {
-        state: {
-          message: 'Please check your email to verify your account.'
-        }
+        state: { signupSuccess: true },
+        replace: true,
       });
-    } catch (error: any) {
-      console.error('Signup error:', error);
+    } catch (error: unknown) {
       setAttempts(prev => prev + 1);
+      const message = error instanceof Error ? error.message : "An error occurred during signup";
       toast({
         title: "Signup failed",
-        description: error.message || "An error occurred during signup",
+        description: message,
         variant: "destructive"
       });
     } finally {

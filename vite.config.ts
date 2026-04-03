@@ -37,18 +37,19 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks(id) {
           // Core React runtime — always needed on first paint
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor-react';
+          }
           // Radix UI + utility libraries — shared across most pages
-          'vendor-ui': [
-            'lucide-react',
-            'class-variance-authority',
-            'clsx',
-            'tailwind-merge',
-          ],
+          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/class-variance-authority') || id.includes('node_modules/clsx') || id.includes('node_modules/tailwind-merge')) {
+            return 'vendor-ui';
+          }
           // Chart/analytics — only on report and dashboard pages
-          'vendor-charts': ['recharts'],
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-charts';
+          }
         },
       },
     },

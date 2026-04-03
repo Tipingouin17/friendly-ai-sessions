@@ -141,6 +141,7 @@ const AIfacilitators = () => {
                 selectedWorkshop={selectedWorkshop}
                 onSelect={setSelectedWorkshop}
                 isLoading={isWorkshopsLoading}
+                selectedFacilitatorId={selectedFacilitator}
               />
             </div>
 

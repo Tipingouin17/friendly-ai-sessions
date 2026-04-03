@@ -1,3 +1,8 @@
+/**
+ * Signup
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React, { useEffect } from 'react';
 import { SignupContainer } from '@/components/auth/SignupContainer';

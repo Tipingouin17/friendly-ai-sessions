@@ -1,3 +1,8 @@
+/**
+ * Admin Dashboard
+ *
+ * Page for the AIfacilitator application.
+ */
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Settings, Users, FileText, BarChart3, TrendingUp, DollarSign, Bell, MessageSquare, ArrowLeft } from "lucide-react";

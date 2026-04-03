@@ -1,3 +1,8 @@
+/**
+ * Session State Provider
+ *
+ * Context for the AIfacilitator application.
+ */
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { SessionContextProps } from "@/types/session";

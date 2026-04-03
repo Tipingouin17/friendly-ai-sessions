@@ -1,3 +1,8 @@
+/**
+ * Chat Input
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Mic, Send, StopCircle } from "lucide-react";

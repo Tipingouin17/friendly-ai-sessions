@@ -1,3 +1,8 @@
+/**
+ * Session State Handler
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect } from "react";
 import { SessionContextProps } from "@/types/session";

@@ -1,3 +1,8 @@
+/**
+ * Admin Message Input
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';

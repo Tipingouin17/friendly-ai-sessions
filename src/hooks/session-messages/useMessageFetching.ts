@@ -1,3 +1,8 @@
+/**
+ * use Message Fetching
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message } from '@/types/chat';

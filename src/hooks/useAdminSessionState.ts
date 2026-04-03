@@ -1,3 +1,8 @@
+/**
+ * use Admin Session State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';

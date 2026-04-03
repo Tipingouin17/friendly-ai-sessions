@@ -1,3 +1,8 @@
+/**
+ * use Admin Session Initialization
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";

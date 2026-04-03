@@ -1,3 +1,8 @@
+/**
+ * use Session Tracking
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';

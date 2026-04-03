@@ -1,3 +1,8 @@
+/**
+ * Host Wrap Up Dialog
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import { Button } from "@/components/ui/button";

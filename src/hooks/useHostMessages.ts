@@ -1,3 +1,8 @@
+/**
+ * use Host Messages
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -195,10 +200,10 @@ export const useHostMessages = ({
         });
 
       if (error) {
-        console.error('❌ [HOST] Error sending message:', error);
+        console.error('[HOST] Error sending message:', error);
       }
     } catch (e) {
-      console.error('💥 [HOST] Exception sending message:', e);
+      console.error('[HOST] Exception sending message:', e);
     }
   }, [conversationId]);
 
@@ -206,7 +211,7 @@ export const useHostMessages = ({
     try {
       await generateAggregatedResponse(hostInstruction);
     } catch (error) {
-      console.error('❌ [HOST] Error generating facilitator response:', error);
+      console.error('[HOST] Error generating facilitator response:', error);
     }
   }, [generateAggregatedResponse]);
 

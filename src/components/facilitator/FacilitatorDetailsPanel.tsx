@@ -1,3 +1,8 @@
+/**
+ * Facilitator Details Panel
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Facilitator } from "@/types/facilitator";
 

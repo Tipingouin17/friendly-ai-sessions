@@ -1,3 +1,8 @@
+/**
+ * Admin Message Group
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState } from 'react';
 import { MessageGroup } from '@/hooks/messages/useMessageGrouping';

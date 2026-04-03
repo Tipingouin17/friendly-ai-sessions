@@ -1,3 +1,8 @@
+/**
+ * accordion
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { ChevronDown } from "lucide-react"

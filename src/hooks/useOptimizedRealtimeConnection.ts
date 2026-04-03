@@ -1,3 +1,8 @@
+/**
+ * use Optimized Realtime Connection
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,7 +93,7 @@ export const useOptimizedRealtimeConnection = ({
       const setupTime = performance.now() - startTime;
 
     } catch (error) {
-      console.error(`❌ [${isHost ? 'HOST' : 'PARTICIPANT'}] Error setting up realtime connection:`, error);
+      console.error(`[${isHost ? 'HOST' : 'PARTICIPANT'}] Error setting up realtime connection:`, error);
     }
   }, [conversationId, onConversationUpdate, onParticipantChange, onSessionEvent, isHost]);
 

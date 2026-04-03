@@ -1,3 +1,8 @@
+/**
+ * Checkout Loading State
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Loader2 } from 'lucide-react';

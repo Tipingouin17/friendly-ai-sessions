@@ -1,3 +1,8 @@
+/**
+ * Join Session Error State
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { AlertCircle, Clock, Link2Off, WifiOff } from "lucide-react";

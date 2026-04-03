@@ -1,3 +1,8 @@
+/**
+ * Anonymous Avatar
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

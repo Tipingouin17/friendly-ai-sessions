@@ -1,3 +1,8 @@
+/**
+ * use Secure Navigation
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';

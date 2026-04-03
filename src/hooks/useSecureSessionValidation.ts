@@ -1,3 +1,8 @@
+/**
+ * use Secure Session Validation
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useCallback } from 'react';
 import { validateSessionAccess, validateParticipantId } from '@/utils/security/sessionValidation';
 import { validateConversationId } from '@/utils/security/inputValidation';

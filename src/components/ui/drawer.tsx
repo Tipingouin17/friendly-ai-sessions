@@ -1,3 +1,8 @@
+/**
+ * drawer
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 

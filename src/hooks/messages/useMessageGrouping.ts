@@ -1,3 +1,8 @@
+/**
+ * use Message Grouping
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { Message } from "@/types/chat";
 

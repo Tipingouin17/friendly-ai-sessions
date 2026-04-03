@@ -1,3 +1,8 @@
+/**
+ * Facilitator Selection
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { Facilitator } from "@/types/facilitator";

@@ -1,3 +1,8 @@
+/**
+ * use Session Initialization
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from "react";
 import { SessionContextProps } from "@/types/session";

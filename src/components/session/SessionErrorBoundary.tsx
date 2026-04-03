@@ -1,3 +1,8 @@
+/**
+ * Session Error Boundary
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";

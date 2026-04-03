@@ -1,3 +1,8 @@
+/**
+ * use Secure Auth
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';

@@ -1,3 +1,8 @@
+/**
+ * navigation menu
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"
 import { cva } from "class-variance-authority"

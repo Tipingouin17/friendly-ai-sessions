@@ -1,3 +1,8 @@
+/**
+ * Admin Session Content
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import SimplifiedAdminMessagingView from "@/components/session/messaging/SimplifiedAdminMessagingView";

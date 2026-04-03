@@ -1,3 +1,8 @@
+/**
+ * auth
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 
 export interface User {
   id: string;

@@ -1,3 +1,8 @@
+/**
+ * use Enhanced Session Logger
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';

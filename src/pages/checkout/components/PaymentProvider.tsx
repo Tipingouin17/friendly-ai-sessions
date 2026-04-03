@@ -1,3 +1,8 @@
+/**
+ * Payment Provider
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React, { useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';

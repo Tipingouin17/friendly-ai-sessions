@@ -1,3 +1,8 @@
+/**
+ * use Navigate To Session
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
 export function useNavigateToSession() {

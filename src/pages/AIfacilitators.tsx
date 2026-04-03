@@ -1,3 +1,8 @@
+/**
+ * AIfacilitators
+ *
+ * Page for the AIfacilitator application.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";

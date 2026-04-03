@@ -1,3 +1,8 @@
+/**
+ * Past Workshops
+ *
+ * Page for the AIfacilitator application.
+ */
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Calendar, PlusCircle, LayoutDashboard, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";

@@ -1,3 +1,8 @@
+/**
+ * Admin Dashboard
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from "react";
 import AdminHeader from "./AdminHeader";

@@ -1,3 +1,8 @@
+/**
+ * use Message Processor
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";

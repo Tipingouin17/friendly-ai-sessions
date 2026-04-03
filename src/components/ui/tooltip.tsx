@@ -1,3 +1,8 @@
+/**
+ * tooltip
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 import * as React from "react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"

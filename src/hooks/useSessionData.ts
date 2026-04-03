@@ -1,3 +1,8 @@
+/**
+ * use Session Data
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";

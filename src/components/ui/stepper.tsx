@@ -1,3 +1,8 @@
+/**
+ * stepper
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 export {
   Stepper,

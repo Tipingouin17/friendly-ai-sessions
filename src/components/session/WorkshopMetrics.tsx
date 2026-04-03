@@ -1,3 +1,8 @@
+/**
+ * Workshop Metrics
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Users, MessageSquare, Clock, TrendingUp } from 'lucide-react';

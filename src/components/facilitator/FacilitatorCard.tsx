@@ -1,3 +1,8 @@
+/**
+ * Facilitator Card
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Facilitator } from "@/types/facilitator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";

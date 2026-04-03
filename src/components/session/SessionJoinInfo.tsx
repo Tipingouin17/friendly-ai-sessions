@@ -1,3 +1,8 @@
+/**
+ * Session Join Info
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from 'react';
 import { QrCode, Share2, Copy, Users } from 'lucide-react';

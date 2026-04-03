@@ -1,3 +1,8 @@
+/**
+ * use Connection Checker
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createPingChannel, performDatabasePing } from "@/utils/connectionPingUtils";
@@ -77,7 +82,7 @@ export function useConnectionChecker({
       const shouldMarkAsLost = newFailureCount >= 3 && timeSinceLastSuccess > 30000; // 30 seconds
 
       if (shouldMarkAsLost) {
-        console.error("❌ Connection marked as lost after multiple failures");
+        console.error("Connection marked as lost after multiple failures");
         setError("Connection to server lost");
       } else { /* no-op */ }
 
@@ -89,7 +94,7 @@ export function useConnectionChecker({
       const newFailureCount = consecutiveFailures + 1;
       setConsecutiveFailures(newFailureCount);
 
-      console.error("💥 Error in performConnectionCheck:", err, {
+      console.error("Error in performConnectionCheck:", err, {
         consecutiveFailures: newFailureCount
       });
 

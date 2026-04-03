@@ -1,3 +1,8 @@
+/**
+ * Profile
+ *
+ * Page for the AIfacilitator application.
+ */
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHead } from '@/components/PageHead';

@@ -1,3 +1,8 @@
+/**
+ * Billing Section
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { User } from 'lucide-react';

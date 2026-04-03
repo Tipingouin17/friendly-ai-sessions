@@ -1,3 +1,8 @@
+/**
+ * use Session Closure Validation
+ *
+ * Session closure hook for the AIfacilitator application.
+ */
 
 import { supabase } from '@/integrations/supabase/client';
 import { validateSecureSessionOperation } from '@/utils/securityEnhanced';
@@ -8,7 +13,7 @@ export const useSessionClosureValidation = () => {
 
   const validateSessionClosure = async (conversationId: number) => {
     if (!conversationId) {
-      console.error("❌ No conversation ID provided to closeSessionAndGenerateReport");
+      console.error("No conversation ID provided to closeSessionAndGenerateReport");
       logSecurityViolation('invalid_session_closure_attempt', { conversationId });
       throw new Error('No conversation ID provided');
     }
@@ -16,12 +21,12 @@ export const useSessionClosureValidation = () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
-      console.error("❌ User authentication error:", userError);
+      console.error("User authentication error:", userError);
       throw new Error(`Authentication failed: ${userError.message}`);
     }
     
     if (!user) {
-      console.error("❌ No authenticated user found");
+      console.error("No authenticated user found");
       logSecurityViolation('unauthenticated_session_closure_attempt', { conversationId });
       throw new Error('User not authenticated');
     }
@@ -33,7 +38,7 @@ export const useSessionClosureValidation = () => {
     );
     
     if (!securityValidation.isValid) {
-      console.error("❌ Security validation failed:", securityValidation.error);
+      console.error("Security validation failed:", securityValidation.error);
       logSecurityViolation('unauthorized_session_closure', { 
         conversationId, 
         userId: user.id,
@@ -49,17 +54,17 @@ export const useSessionClosureValidation = () => {
       .single();
 
     if (convError) {
-      console.error("❌ Error fetching conversation:", convError);
+      console.error("Error fetching conversation:", convError);
       throw new Error(`Failed to fetch conversation: ${convError.message}`);
     }
 
     if (!conversation) {
-      console.error("❌ Conversation not found");
+      console.error("Conversation not found");
       throw new Error('Conversation not found');
     }
 
     if (conversation.user_id !== user.id) {
-      console.error("❌ User does not own this conversation");
+      console.error("User does not own this conversation");
       logSecurityViolation('unauthorized_session_access', { 
         conversationId, 
         userId: user.id,
@@ -69,7 +74,7 @@ export const useSessionClosureValidation = () => {
     }
 
     if (conversation.is_session_ended) {
-      console.error("❌ Session is already ended");
+      console.error("Session is already ended");
       throw new Error('Session is already ended');
     }
 

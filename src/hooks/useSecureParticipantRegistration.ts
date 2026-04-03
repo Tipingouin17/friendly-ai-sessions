@@ -1,3 +1,8 @@
+/**
+ * use Secure Participant Registration
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from './useSecurityAudit';

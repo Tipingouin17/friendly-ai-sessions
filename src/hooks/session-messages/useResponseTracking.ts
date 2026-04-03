@@ -1,3 +1,8 @@
+/**
+ * use Response Tracking
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from 'react';
 

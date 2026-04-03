@@ -1,3 +1,8 @@
+/**
+ * context menu
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"

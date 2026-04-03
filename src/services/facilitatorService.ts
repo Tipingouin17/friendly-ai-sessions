@@ -1,3 +1,8 @@
+/**
+ * facilitator Service
+ *
+ * Service for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 

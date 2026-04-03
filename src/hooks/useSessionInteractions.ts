@@ -1,3 +1,8 @@
+/**
+ * use Session Interactions
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useMessageSender } from "./useMessageSender";
 

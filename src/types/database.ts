@@ -1,3 +1,8 @@
+/**
+ * database
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 
 import { Database } from "@/integrations/supabase/types";
 

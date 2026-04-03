@@ -1,3 +1,8 @@
+/**
+ * use Session Page
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useState } from "react";
 import { useSessionCrossOrigin } from "./useSessionCrossOrigin";

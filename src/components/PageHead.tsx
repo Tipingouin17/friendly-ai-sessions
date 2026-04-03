@@ -1,3 +1,8 @@
+/**
+ * Page Head
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { useEffect } from 'react';
 

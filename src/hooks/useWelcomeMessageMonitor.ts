@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message Monitor
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +46,7 @@ export const useWelcomeMessageMonitor = ({
         .limit(3); // Get first few messages to check their type
 
       if (error) {
-        console.error('❌ Error checking for welcome message:', error);
+        console.error('Error checking for welcome message:', error);
         return false;
       }
 
@@ -69,7 +74,7 @@ export const useWelcomeMessageMonitor = ({
 
       return hasWelcomeMessage;
     } catch (error) {
-      console.error('💥 Exception checking for welcome message:', error);
+      console.error('Exception checking for welcome message:', error);
       return false;
     }
   }, [conversationId]);
@@ -85,13 +90,13 @@ export const useWelcomeMessageMonitor = ({
         .single();
 
       if (error || !conversation) {
-        console.error('❌ Error checking welcome message status:', error);
+        console.error('Error checking welcome message status:', error);
         return null;
       }
 
       return conversation.welcome_message_status;
     } catch (error) {
-      console.error('💥 Exception checking welcome message status:', error);
+      console.error('Exception checking welcome message status:', error);
       return null;
     }
   }, [conversationId]);
@@ -104,13 +109,13 @@ export const useWelcomeMessageMonitor = ({
       const { error } = await supabase.functions.invoke('recover-stuck-welcome-messages');
       
       if (error) {
-        console.error('❌ Error calling recovery function:', error);
+        console.error('Error calling recovery function:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('💥 Exception calling recovery function:', error);
+      console.error('Exception calling recovery function:', error);
       return false;
     }
   }, [conversationId]);
@@ -126,7 +131,7 @@ export const useWelcomeMessageMonitor = ({
       });
 
       if (error) {
-        console.error('❌ Error creating template fallback message:', error);
+        console.error('Error creating template fallback message:', error);
         return false;
       }
 
@@ -136,13 +141,13 @@ export const useWelcomeMessageMonitor = ({
       // Verify message is actually readable
       const verificationResult = await checkForWelcomeMessage();
       if (!verificationResult) {
-        console.error('❌ Created message not readable from database');
+        console.error('Created message not readable from database');
         return false;
       }
       
       return true;
     } catch (error) {
-      console.error('💥 Exception creating template fallback message:', error);
+      console.error('Exception creating template fallback message:', error);
       return false;
     }
   }, [conversationId, checkForWelcomeMessage]);
@@ -207,7 +212,7 @@ export const useWelcomeMessageMonitor = ({
           const duration = Date.now() - startTime;
           
           if (error) {
-            console.error('❌ [useWelcomeMessageMonitor] AI generation failed:', {
+            console.error('[useWelcomeMessageMonitor] AI generation failed:', {
               error,
               duration,
               conversationId,
@@ -215,7 +220,7 @@ export const useWelcomeMessageMonitor = ({
             });
           } else { /* no-op */ }
         } catch (error) {
-          console.error('💥 [useWelcomeMessageMonitor] Exception triggering AI generation:', {
+          console.error('[useWelcomeMessageMonitor] Exception triggering AI generation:', {
             error: error.message,
             conversationId,
             attempt,

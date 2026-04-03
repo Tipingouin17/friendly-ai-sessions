@@ -1,3 +1,8 @@
+/**
+ * use toast
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import * as React from "react";
 import {

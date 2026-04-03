@@ -1,3 +1,8 @@
+/**
+ * skeleton
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import { cn } from "@/lib/utils"
 
 function Skeleton({

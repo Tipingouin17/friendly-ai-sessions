@@ -1,3 +1,8 @@
+/**
+ * Session Host
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React, { useMemo } from "react";
 import HostDashboard from "@/components/session/host/HostDashboard";

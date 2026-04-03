@@ -1,3 +1,8 @@
+/**
+ * Session Report View
+ *
+ * Session component for the AIfacilitator application.
+ */
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -62,12 +67,12 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         .maybeSingle();
 
       if (convError) {
-        console.error('❌ Error fetching conversation:', convError);
+        console.error('Error fetching conversation:', convError);
         throw new Error(`Failed to fetch conversation: ${convError.message}`);
       }
 
       if (!conversation) {
-        console.error('❌ Conversation not found for ID:', reportConversationId);
+        console.error('Conversation not found for ID:', reportConversationId);
         throw new Error('Conversation not found');
       }
 
@@ -95,12 +100,12 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         .maybeSingle();
 
       if (reportError) {
-        console.error('❌ Error fetching report:', reportError);
+        console.error('Error fetching report:', reportError);
         throw new Error(`Failed to fetch report: ${reportError.message}`);
       }
 
       if (!report) {
-        console.error('❌ No report found for conversation:', reportConversationId);
+        console.error('No report found for conversation:', reportConversationId);
         throw new Error('Session report not found. The session may not have been closed yet.');
       }
 
@@ -112,7 +117,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         .order('created_at', { ascending: true });
 
       if (msgError) {
-        console.error('❌ Error fetching messages:', msgError);
+        console.error('Error fetching messages:', msgError);
         // Don't throw here, messages might be empty
       }
 
@@ -123,7 +128,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
         .eq('conversation_id', reportConversationId);
 
       if (partError) {
-        console.error('❌ Error fetching participants:', partError);
+        console.error('Error fetching participants:', partError);
         // Don't throw here, continue with empty participants
       }
 

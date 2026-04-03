@@ -1,3 +1,8 @@
+/**
+ * use Session End Listener
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";

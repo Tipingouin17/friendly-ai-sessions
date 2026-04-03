@@ -1,3 +1,8 @@
+/**
+ * Validation Errors
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';

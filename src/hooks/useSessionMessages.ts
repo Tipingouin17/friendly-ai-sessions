@@ -1,3 +1,8 @@
+/**
+ * use Session Messages
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from 'react';
 import { Message } from '@/types/chat';

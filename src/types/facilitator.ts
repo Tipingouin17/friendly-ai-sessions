@@ -1,3 +1,8 @@
+/**
+ * facilitator
+ *
+ * Type definitions for the AIfacilitator application.
+ */
 
 export type Step = 1 | 2 | 3;
 

@@ -1,3 +1,8 @@
+/**
+ * Signup Form
+ *
+ * Auth component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';

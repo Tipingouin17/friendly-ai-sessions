@@ -1,3 +1,8 @@
+/**
+ * Not Found
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";

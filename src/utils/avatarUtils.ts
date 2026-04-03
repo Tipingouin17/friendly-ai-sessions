@@ -1,3 +1,8 @@
+/**
+ * avatar Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 

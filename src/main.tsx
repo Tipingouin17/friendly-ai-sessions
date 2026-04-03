@@ -1,3 +1,8 @@
+/**
+ * main
+ *
+ * Module for the AIfacilitator application.
+ */
 
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'

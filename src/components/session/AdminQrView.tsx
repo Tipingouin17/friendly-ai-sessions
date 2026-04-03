@@ -1,3 +1,8 @@
+/**
+ * Admin Qr View
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';

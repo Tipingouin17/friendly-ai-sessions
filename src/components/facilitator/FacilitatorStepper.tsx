@@ -1,3 +1,8 @@
+/**
+ * Facilitator Stepper
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Step } from "@/types/facilitator";
 import { Stepper, StepperItem, StepperTrigger, StepperIndicator, StepperSeparator } from "@/components/ui/stepper";

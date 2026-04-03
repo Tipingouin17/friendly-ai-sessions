@@ -1,3 +1,8 @@
+/**
+ * use Session Monitoring
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSessionRoomState } from "@/hooks/useSessionRoomState";

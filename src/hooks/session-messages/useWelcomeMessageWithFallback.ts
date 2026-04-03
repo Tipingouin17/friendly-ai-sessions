@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message With Fallback
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback, useMemo } from 'react';
 import { Message } from '@/types/chat';
@@ -47,7 +52,7 @@ export const useWelcomeMessageWithFallback = ({
       const storageKey = `${WELCOME_MESSAGE_STORAGE_KEY}${conversationId}`;
       localStorage.removeItem(storageKey);
     } catch (e) {
-      console.error('💥 Error clearing cached welcome message:', e);
+      console.error('Error clearing cached welcome message:', e);
     }
   }, [conversationId]);
 
@@ -206,12 +211,12 @@ export const useWelcomeMessageWithFallback = ({
       const aiDuration = performance.now() - aiStart;
 
       if (error) {
-        console.error('❌ AI generation attempt', attempt, 'failed with error:', error);
+        console.error('AI generation attempt', attempt, 'failed with error:', error);
         throw new Error(`AI generation failed: ${error.message}`);
       }
 
       if (!aiResponse?.content) {
-        console.error('⚠️ AI response empty on attempt', attempt, '- response:', aiResponse);
+        console.error('AI response empty on attempt', attempt, '- response:', aiResponse);
         throw new Error('AI response is empty');
       }
 
@@ -234,7 +239,7 @@ export const useWelcomeMessageWithFallback = ({
       const aiDuration = performance.now() - aiStart;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      console.error('💥 AI generation attempt', attempt, 'failed for session', conversationId, ':', {
+      console.error('AI generation attempt', attempt, 'failed for session', conversationId, ':', {
         error: errorMessage,
         duration: aiDuration.toFixed(2) + 'ms',
         attempt,
@@ -277,7 +282,7 @@ export const useWelcomeMessageWithFallback = ({
       }
       return null;
     } catch (e) {
-      console.error('💥 Error retrieving cached welcome message for session', conversationId, ':', e);
+      console.error('Error retrieving cached welcome message for session', conversationId, ':', e);
       return null;
     }
   }, [conversationId, logger]);
@@ -295,7 +300,7 @@ export const useWelcomeMessageWithFallback = ({
       };
       localStorage.setItem(storageKey, JSON.stringify(messageWithContext));
     } catch (e) {
-      console.error('💥 Error caching welcome message for session', conversationId, ':', e);
+      console.error('Error caching welcome message for session', conversationId, ':', e);
     }
   }, [conversationId, logger]);
 
@@ -348,11 +353,11 @@ export const useWelcomeMessageWithFallback = ({
       }
 
       // Ultimate fallback
-      console.error('💥 All welcome message generation methods failed for session', conversationId);
+      console.error('All welcome message generation methods failed for session', conversationId);
       return null;
 
     } catch (error) {
-      console.error('💥 Exception in welcome message creation for session', conversationId, ':', error);
+      console.error('Exception in welcome message creation for session', conversationId, ':', error);
       setLastError(error instanceof Error ? error.message : 'Unknown error');
       return null;
 

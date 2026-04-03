@@ -1,3 +1,8 @@
+/**
+ * Workshop Selection
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";

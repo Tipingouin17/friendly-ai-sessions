@@ -1,3 +1,8 @@
+/**
+ * Plan Limit Alert
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Button } from "@/components/ui/button";
 import { Zap, ArrowRight } from "lucide-react";

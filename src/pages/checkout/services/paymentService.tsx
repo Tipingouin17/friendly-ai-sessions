@@ -1,3 +1,8 @@
+/**
+ * payment Service
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { supabase, EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
 import { BillingDetails } from '../types';

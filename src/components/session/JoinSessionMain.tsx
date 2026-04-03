@@ -1,3 +1,8 @@
+/**
+ * Join Session Main
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { AlertCircle, Users, Zap } from "lucide-react";

@@ -1,3 +1,8 @@
+/**
+ * use Participant Removal
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +67,7 @@ export const useParticipantRemoval = ({
         .select();
         
       if (removeError) {
-        console.error("❌ Error removing participant:", removeError);
+        console.error("Error removing participant:", removeError);
         
         // Revert optimistic update
         setParticipantsList(originalParticipants);
@@ -100,7 +105,7 @@ export const useParticipantRemoval = ({
         .eq('id', conversationId);
         
       if (updateError) {
-        console.error("⚠️ Error updating participant count:", updateError);
+        console.error("Error updating participant count:", updateError);
         toast({
           title: "Warning", 
           description: "Participant removed but count may be inconsistent",
@@ -126,7 +131,7 @@ export const useParticipantRemoval = ({
         });
       
       if (eventError) {
-        console.error("⚠️ Error creating removal event:", eventError);
+        console.error("Error creating removal event:", eventError);
         // Don't show error to user as the removal was successful
       }
       
@@ -136,7 +141,7 @@ export const useParticipantRemoval = ({
       });
       
     } catch (err) {
-      console.error("💥 Exception removing participant:", err);
+      console.error("Exception removing participant:", err);
       
       // Revert optimistic update
       setParticipantsList(originalParticipants);

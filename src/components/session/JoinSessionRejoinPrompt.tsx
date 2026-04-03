@@ -1,3 +1,8 @@
+/**
+ * Join Session Rejoin Prompt
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { UserCheck } from "lucide-react";

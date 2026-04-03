@@ -1,3 +1,8 @@
+/**
+ * Create Workshop Modal
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

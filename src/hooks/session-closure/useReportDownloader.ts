@@ -1,3 +1,8 @@
+/**
+ * use Report Downloader
+ *
+ * Session closure hook for the AIfacilitator application.
+ */
 
 import { useToast } from '@/hooks/use-toast';
 

@@ -1,3 +1,8 @@
+/**
+ * use Enhanced Participant Monitoring
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 

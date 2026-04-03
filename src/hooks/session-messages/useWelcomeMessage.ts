@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useState, useCallback } from 'react';
 import { Message } from '@/types/chat';

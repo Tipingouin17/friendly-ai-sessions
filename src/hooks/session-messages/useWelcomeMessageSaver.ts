@@ -1,3 +1,8 @@
+/**
+ * use Welcome Message Saver
+ *
+ * Session message hook for the AIfacilitator application.
+ */
 
 import { useCallback } from 'react';
 import { Message } from '@/types/chat';
@@ -44,10 +49,10 @@ export const useWelcomeMessageSaver = ({
         .select();
         
       if (error) {
-        console.error('❌ Error saving welcome message to database:', error);
+        console.error('Error saving welcome message to database:', error);
       } else { /* no-op */ }
     } catch (err) {
-      console.error('💥 Exception saving welcome message:', err);
+      console.error('Exception saving welcome message:', err);
     }
   }, [conversationId, isAdmin]);
 

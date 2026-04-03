@@ -1,3 +1,8 @@
+/**
+ * use Session Loading State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from "react";
 

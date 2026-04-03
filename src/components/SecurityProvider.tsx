@@ -1,3 +1,8 @@
+/**
+ * Security Provider
+ *
+ * Component for the AIfacilitator application.
+ */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 import { validateEnvironmentSecurity } from '@/utils/security/environmentSecurity';

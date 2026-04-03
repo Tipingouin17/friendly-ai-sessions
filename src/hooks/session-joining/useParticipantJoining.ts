@@ -1,3 +1,8 @@
+/**
+ * use Participant Joining
+ *
+ * Session joining hook for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -73,11 +78,11 @@ export function useParticipantJoining() {
     try {
       const hasAccess = await validateSessionAccess(conversationId);
       if (!hasAccess) {
-        console.error("❌ Session access validation failed");
+        console.error("Session access validation failed");
         throw new Error("This session is not available or has ended");
       }
     } catch (accessError) {
-      console.error("❌ Error during session access validation:", accessError);
+      console.error("Error during session access validation:", accessError);
       throw accessError;
     }
 
@@ -86,13 +91,13 @@ export function useParticipantJoining() {
     try {
       capacityResult = await checkCapacityAndUpdate(conversationId, isAdmin);
     } catch (capacityError) {
-      console.error("❌ Error during capacity check:", capacityError);
+      console.error("Error during capacity check:", capacityError);
       throw capacityError;
     }
 
     // If the session is full and we're not an admin, block joining
     if (!capacityResult.canJoin && !isAdmin) {
-      console.error("❌ Join blocked - session at capacity:", capacityResult.error);
+      console.error("Join blocked - session at capacity:", capacityResult.error);
       throw new Error(capacityResult.error || "This session is full and cannot accept more participants.");
     }
 
@@ -110,7 +115,7 @@ export function useParticipantJoining() {
         isAdmin
       });
     } catch (registerError) {
-      console.error("❌ Error registering participant:", registerError);
+      console.error("Error registering participant:", registerError);
       throw registerError;
     }
 
@@ -131,7 +136,7 @@ export function useParticipantJoining() {
           }
         });
     } catch (eventError) {
-      console.error("⚠️ Error logging participant join event:", eventError);
+      console.error("Error logging participant join event:", eventError);
       // Don't block the join process if event logging fails
     }
 

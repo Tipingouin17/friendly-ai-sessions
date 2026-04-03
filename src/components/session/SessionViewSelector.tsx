@@ -1,3 +1,8 @@
+/**
+ * Session View Selector
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useRef } from "react";
 import LoadingState from "./LoadingState";

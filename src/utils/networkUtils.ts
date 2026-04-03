@@ -1,3 +1,8 @@
+/**
+ * network Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 interface RetryConfig {
   maxAttempts: number;

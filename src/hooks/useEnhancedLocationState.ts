@@ -1,3 +1,8 @@
+/**
+ * use Enhanced Location State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from "react";
 import { useParticipantPersistence } from "./useParticipantPersistence";

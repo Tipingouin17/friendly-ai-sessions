@@ -1,3 +1,8 @@
+/**
+ * use Session Participants
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useState, useEffect, useRef } from "react";
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";

@@ -1,3 +1,8 @@
+/**
+ * use Session Page State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";

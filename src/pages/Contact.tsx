@@ -1,3 +1,8 @@
+/**
+ * Contact
+ *
+ * Page for the AIfacilitator application.
+ */
 import { Mail, MapPin, Clock, ArrowRight, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

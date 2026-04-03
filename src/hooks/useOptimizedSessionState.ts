@@ -1,3 +1,8 @@
+/**
+ * use Optimized Session State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";

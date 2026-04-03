@@ -1,3 +1,10 @@
+/**
+ * AuthContext
+ *
+ * Provides authentication state and actions to the entire application.
+ * Uses the Railway API client (via the \ shim) for all auth operations.
+ * Exposed via the \ hook — must be consumed inside <AuthProvider>.
+ */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { ApiUser, ApiSession } from '@/lib/api';

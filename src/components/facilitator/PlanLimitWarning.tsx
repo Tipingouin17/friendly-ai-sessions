@@ -1,3 +1,8 @@
+/**
+ * Plan Limit Warning
+ *
+ * Facilitator component for the AIfacilitator application.
+ */
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";

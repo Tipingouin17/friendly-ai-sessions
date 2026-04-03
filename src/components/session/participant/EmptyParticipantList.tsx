@@ -1,3 +1,8 @@
+/**
+ * Empty Participant List
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 

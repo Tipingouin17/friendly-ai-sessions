@@ -1,3 +1,8 @@
+/**
+ * Chat Header
+ *
+ * Chat component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { ChevronLeft, UserRound, MessageSquare, Bot, BookOpen, ArrowUpDown, Users, BarChart2 } from 'lucide-react';

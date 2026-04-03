@@ -1,3 +1,8 @@
+/**
+ * use Session Room State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useMemo } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -5,7 +10,6 @@ import { ConversationWithSession } from "@/types/database";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
-import { logDependencyChanges } from "@/utils/debugUtils";
 
 interface UseSessionRoomStateProps {
   conversationId: number | null;
@@ -24,9 +28,6 @@ export const useSessionRoomState = ({
   welcomeMessage,
   isAdmin
 }: UseSessionRoomStateProps) => {
-  // Log initialization once
-  useEffect(() => { /* no-op */ }, []);
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -41,7 +42,6 @@ export const useSessionRoomState = ({
   // Get session messages
   const {
     messages: sessionMessages,
-    setMessages: setSessionMessages,
     currentParticipant,
     recordResponse,
     totalResponses,
@@ -103,12 +103,6 @@ export const useSessionRoomState = ({
     viewMode,
     safeViewMode
   ]);
-  
-  // Log changes to dependencies
-  logDependencyChanges(
-    [messages, inputMessage, currentParticipant, viewMode, isAdmin, sessionMessages],
-    "useSessionRoomState"
-  );
   
   // Set up session interactions with memoized session state
   const {

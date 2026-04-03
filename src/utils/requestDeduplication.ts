@@ -1,3 +1,8 @@
+/**
+ * request Deduplication
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 interface PendingRequest<T> {
   promise: Promise<T>;

@@ -1,3 +1,8 @@
+/**
+ * Session Management Modal
+ *
+ * Profile component for the AIfacilitator application.
+ */
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

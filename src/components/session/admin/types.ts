@@ -1,3 +1,8 @@
+/**
+ * types
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 export interface AdminHeaderProps {
   conversation: any;

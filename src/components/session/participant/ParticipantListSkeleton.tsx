@@ -1,3 +1,8 @@
+/**
+ * Participant List Skeleton
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { Skeleton } from "@/components/ui/skeleton";

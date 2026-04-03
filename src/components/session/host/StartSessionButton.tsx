@@ -1,3 +1,8 @@
+/**
+ * Start Session Button
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";

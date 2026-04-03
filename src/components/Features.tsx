@@ -1,3 +1,8 @@
+/**
+ * Features
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { Brain, Globe, LineChart } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";

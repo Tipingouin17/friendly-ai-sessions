@@ -1,3 +1,8 @@
+/**
+ * Admin Notification Manager
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React from 'react';
 import AdminNotification from "./AdminNotification";

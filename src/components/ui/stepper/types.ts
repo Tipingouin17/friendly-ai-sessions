@@ -1,3 +1,8 @@
+/**
+ * types
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 export type StepperContextValue = {
   activeStep: number;

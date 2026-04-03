@@ -1,3 +1,8 @@
+/**
+ * price Format Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { Euro, PoundSterling, DollarSign } from 'lucide-react';
 

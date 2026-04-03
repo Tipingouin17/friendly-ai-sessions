@@ -1,3 +1,8 @@
+/**
+ * separator
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 
 "use client"
 

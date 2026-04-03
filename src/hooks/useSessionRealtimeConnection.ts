@@ -1,3 +1,8 @@
+/**
+ * use Session Realtime Connection
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from "react";
 import { useRealtimeConnectionHandler } from "@/hooks/useRealtimeConnectionHandler";

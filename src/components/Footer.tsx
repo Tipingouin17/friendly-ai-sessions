@@ -1,3 +1,8 @@
+/**
+ * Footer
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { Link } from "react-router-dom";
 import { Zap, Twitter, Linkedin, Github } from "lucide-react";

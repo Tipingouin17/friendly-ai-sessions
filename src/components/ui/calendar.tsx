@@ -1,3 +1,8 @@
+/**
+ * calendar
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";

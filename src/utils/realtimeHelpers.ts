@@ -1,3 +1,8 @@
+/**
+ * realtime Helpers
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 

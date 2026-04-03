@@ -1,3 +1,8 @@
+/**
+ * facilitator Utils
+ *
+ * Utility for the AIfacilitator application.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { debugLog } from "@/utils/debugLogger";
@@ -116,7 +121,7 @@ export const isImageUrl = (url: string): boolean => {
   // Normalize URL before checking
   const normalizedUrl = url.replace(/([^:])\/\//g, '$1/');
 
-  // Supabase storage URLs
+  // Legacy storage URLs (kept for backward compatibility with any pre-migration data)
   if (normalizedUrl.includes('supabase.co/storage/v1/object/public/')) return true;
 
   // Common image extensions

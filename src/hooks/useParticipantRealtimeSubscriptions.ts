@@ -1,3 +1,8 @@
+/**
+ * use Participant Realtime Subscriptions
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef } from 'react';
 import { ParticipantInfo } from '@/types/chat';

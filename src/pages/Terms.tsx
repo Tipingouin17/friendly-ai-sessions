@@ -1,3 +1,8 @@
+/**
+ * Terms
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { PageHead } from "@/components/PageHead";
 

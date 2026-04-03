@@ -1,3 +1,8 @@
+/**
+ * Welcome Modal
+ *
+ * Component for the AIfacilitator application.
+ */
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, Check } from "lucide-react";

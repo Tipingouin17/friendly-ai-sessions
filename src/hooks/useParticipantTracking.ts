@@ -1,3 +1,8 @@
+/**
+ * use Participant Tracking
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect, useRef } from 'react';
 import { ParticipantInfo } from '@/types/chat';

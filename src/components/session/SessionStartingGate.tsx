@@ -1,3 +1,8 @@
+/**
+ * Session Starting Gate
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,14 +63,14 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
       });
       
       if (error) {
-        console.error('❌ [SessionStartingGate] Retry failed:', error);
+        console.error('[SessionStartingGate] Retry failed:', error);
       } else {
         // Reset retry state on success
         setRetryCount(0);
         setShowRetryOption(false);
       }
     } catch (error) {
-      console.error('💥 [SessionStartingGate] Exception during retry:', error);
+      console.error('[SessionStartingGate] Exception during retry:', error);
     } finally {
       setIsRetrying(false);
     }

@@ -1,3 +1,8 @@
+/**
+ * session Helpers
+ *
+ * Utility for the AIfacilitator application.
+ */
 const colorPalette = [
   "#FCA5A5", // red
   "#FDBA74", // orange

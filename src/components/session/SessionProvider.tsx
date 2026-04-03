@@ -1,3 +1,8 @@
+/**
+ * Session Provider
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useEffect } from "react";
 import { SessionContextProps } from "@/types/session";

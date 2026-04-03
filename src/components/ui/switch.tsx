@@ -1,3 +1,8 @@
+/**
+ * switch
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import * as React from "react"
 import * as SwitchPrimitives from "@radix-ui/react-switch"
 

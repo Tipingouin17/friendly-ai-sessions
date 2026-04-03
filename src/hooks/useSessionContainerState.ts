@@ -1,3 +1,8 @@
+/**
+ * use Session Container State
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState } from 'react';
 import { useSessionContainer } from "@/hooks/useSessionContainer";

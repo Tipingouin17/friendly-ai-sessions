@@ -1,3 +1,8 @@
+/**
+ * Feature Card
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { LucideIcon } from "lucide-react";
 

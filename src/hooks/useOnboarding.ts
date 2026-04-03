@@ -1,3 +1,8 @@
+/**
+ * use Onboarding
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 

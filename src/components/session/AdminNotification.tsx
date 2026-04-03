@@ -1,3 +1,8 @@
+/**
+ * Admin Notification
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useState, useEffect } from 'react';
 import {

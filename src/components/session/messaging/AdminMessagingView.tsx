@@ -1,3 +1,8 @@
+/**
+ * Admin Messaging View
+ *
+ * Session component for the AIfacilitator application.
+ */
 
 import React, { useMemo, useState } from 'react';
 import { Message } from '@/types/chat';

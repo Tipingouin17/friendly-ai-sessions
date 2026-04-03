@@ -1,3 +1,8 @@
+/**
+ * Layout
+ *
+ * Component for the AIfacilitator application.
+ */
 
 import { Navigation } from "./Navigation";
 import { Footer } from "./Footer";

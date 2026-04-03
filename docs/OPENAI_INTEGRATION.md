@@ -6,7 +6,7 @@ The AI facilitator system uses the OpenAI API to generate contextual, intelligen
 
 ## Architecture
 
-The OpenAI integration lives in `supabase_proxy/server.py` and is invoked through two edge function endpoints:
+The OpenAI integration lives in `supabase_proxy/server.py` (the Railway backend) and is invoked through two API endpoints:
 
 | Endpoint | Purpose | When Called |
 |----------|---------|-------------|

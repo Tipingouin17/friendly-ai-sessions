@@ -1,3 +1,8 @@
+/**
+ * Checkout Container
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';

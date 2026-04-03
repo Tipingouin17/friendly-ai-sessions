@@ -1,3 +1,8 @@
+/**
+ * use Messages Channel
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";

@@ -1,3 +1,8 @@
+/**
+ * use Loading Error Handling
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useState, useEffect } from 'react';
 

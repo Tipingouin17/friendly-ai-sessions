@@ -1,3 +1,8 @@
+/**
+ * use Admin Session Loader
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useLocation } from "react-router-dom";

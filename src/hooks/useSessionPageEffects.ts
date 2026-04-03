@@ -1,3 +1,8 @@
+/**
+ * use Session Page Effects
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";

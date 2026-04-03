@@ -1,3 +1,8 @@
+/**
+ * Pricing Feature Value
+ *
+ * Page for the AIfacilitator application.
+ */
 
 import { Check, X, Minus, Infinity } from "lucide-react";
 

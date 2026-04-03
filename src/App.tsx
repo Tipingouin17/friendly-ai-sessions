@@ -1,3 +1,8 @@
+/**
+ * App
+ *
+ * Module for the AIfacilitator application.
+ */
 
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";

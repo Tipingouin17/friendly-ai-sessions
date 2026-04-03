@@ -1,3 +1,8 @@
+/**
+ * sonner
+ *
+ * UI primitive for the AIfacilitator application.
+ */
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 

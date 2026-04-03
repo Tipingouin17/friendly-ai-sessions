@@ -1,3 +1,8 @@
+/**
+ * use Stable Realtime Connection
+ *
+ * Hook for the AIfacilitator application.
+ */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { removeChannel } from '@/utils/realtimeHelpers';
@@ -156,7 +161,7 @@ export function useStableRealtimeConnection({
       channelRef.current = channel;
 
     } catch (error) {
-      console.error(`❌ Error creating stable realtime connection for conversation ${conversationId}:`, error);
+      console.error(`Error creating stable realtime connection for conversation ${conversationId}:`, error);
       setIsConnected(false);
 
       if (connectionAttemptsRef.current < maxReconnectAttempts) {

@@ -1,3 +1,8 @@
+/**
+ * use Loading State Actions
+ *
+ * Hook for the AIfacilitator application.
+ */
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';

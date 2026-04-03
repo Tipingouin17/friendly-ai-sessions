@@ -43,6 +43,8 @@ export const createSubscription = async (
   plan: { id: number; stripe_plan_id?: string; title: string },
   userId: string,
   billingDetails: BillingDetails,
+  /** Validated Stripe coupon ID — applied server-side to reduce the PaymentIntent amount. */
+  couponId?: string,
 ) => {
   // Validate inputs
   const validationError = validateBillingDetails(billingDetails);
@@ -77,6 +79,8 @@ export const createSubscription = async (
       userId: userId,
       billingDetails,
       returnUrl: returnUrl,
+      // Only include couponId when a validated coupon has been applied
+      ...(couponId ? { couponId } : {}),
     }),
   });
 

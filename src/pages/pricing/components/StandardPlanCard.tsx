@@ -102,7 +102,7 @@ export const StandardPlanCard = ({
   return (
     <div
       className={`
-        relative rounded-2xl flex flex-col min-h-[680px]
+        relative rounded-2xl flex flex-col md:min-h-[680px]
         transition-all duration-300 ease-out
         hover:-translate-y-1 hover:shadow-xl
         animate-fade-in-up

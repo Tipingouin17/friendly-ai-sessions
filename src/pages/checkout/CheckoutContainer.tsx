@@ -29,7 +29,8 @@ export const CheckoutContainer = ({
   handleBillingDetailsChange,
   onBackToPricing
 }: CheckoutContainerProps) => {
-  const [promoCode, setPromoCode] = React.useState('');
+  // Validated Stripe coupon ID — set by OrderSummary, consumed by PaymentSection
+  const [appliedCouponId, setAppliedCouponId] = React.useState<string | null>(null);
 
   return (
     <div className="min-h-screen pt-16 pb-16 bg-gray-50">
@@ -75,6 +76,7 @@ export const CheckoutContainer = ({
                     plan={plan}
                     billingDetails={billingDetails}
                     onCancel={onBackToPricing}
+                    couponId={appliedCouponId}
                   />
                 </div>
               </CardContent>
@@ -85,8 +87,7 @@ export const CheckoutContainer = ({
           <div className="lg:col-span-1">
             <OrderSummary
               plan={plan}
-              promoCode={promoCode}
-              setPromoCode={setPromoCode}
+              onCouponApplied={setAppliedCouponId}
             />
           </div>
         </div>

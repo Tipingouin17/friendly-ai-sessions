@@ -10,12 +10,13 @@ import { CheckoutForm } from './CheckoutForm';
 import { PaymentProvider } from './components/PaymentProvider';
 import { CheckoutFormProps } from './types';
 
-type PaymentSectionProps = CheckoutFormProps;
+type PaymentSectionProps = CheckoutFormProps & { couponId?: string | null };
 
 export const PaymentSection = ({
   plan,
   billingDetails,
-  onCancel
+  onCancel,
+  couponId,
 }: PaymentSectionProps) => {
   const [isStripeLoading, setIsStripeLoading] = useState(true);
 
@@ -39,6 +40,7 @@ export const PaymentSection = ({
           onCancel={onCancel}
           onStripeLoaded={handleStripeLoaded}
           isStripeLoading={isStripeLoading}
+          couponId={couponId}
         />
       </PaymentProvider>
     </div>

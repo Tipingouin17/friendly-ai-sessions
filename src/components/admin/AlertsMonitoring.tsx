@@ -112,35 +112,22 @@ export const AlertsMonitoring = () => {
                 });
             }
 
-            // Check for high error rate (mock - in production, track actual errors)
-            const errorRate = Math.random() * 100;
-            if (errorRate > 5) {
-                alerts.push({
-                    id: 'high-errors',
-                    type: 'warning',
-                    category: 'system',
-                    title: 'Elevated Error Rate',
-                    message: `Error rate at ${errorRate.toFixed(1)}%. Investigate application logs.`,
-                    timestamp: now,
-                    actionRequired: false
-                });
-            }
+            // System health check: verify edge functions are reachable
+            // (No random mock — only real checks are performed)
 
-            // Check for payment failures (mock)
-            const { count: activeSubscriptions } = await supabase
+            // Check for users whose subscription_status is 'past_due' (real Stripe webhook data)
+            const { count: pastDueCount } = await supabase
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
-                .eq('subscription_status', 'active');
+                .eq('subscription_status', 'past_due');
 
-            const failedPayments = Math.floor((activeSubscriptions || 0) * 0.02); // 2% failure rate
-
-            if (failedPayments > 0) {
+            if ((pastDueCount || 0) > 0) {
                 alerts.push({
                     id: 'payment-failures',
                     type: 'warning',
                     category: 'business',
-                    title: 'Payment Failures Detected',
-                    message: `${failedPayments} payment(s) failed. Users may lose access soon.`,
+                    title: 'Past-Due Subscriptions',
+                    message: `${pastDueCount} subscription(s) are past due. Users may lose access soon.`,
                     timestamp: now,
                     actionRequired: true
                 });

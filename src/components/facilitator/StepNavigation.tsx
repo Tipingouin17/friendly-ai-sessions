@@ -28,31 +28,39 @@ export const StepNavigation = ({
   hasReachedSessionLimit
 }: StepNavigationProps) => {
   return (
-    <div className="flex justify-between mt-8">
-      {currentStep !== 1 && (
-        <Button variant="outline" onClick={onPrevious}>
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Previous
-        </Button>
-      )}
-      
-      {/* Add an empty div when on step 1 to maintain the justify-between layout */}
-      {currentStep === 1 && <div></div>}
-
-      {currentStep < 3 ? (
-        <Button 
-          onClick={onNext} 
-          disabled={isNextDisabled}
-        >
-          Next
-          <ChevronRight className="w-4 h-4 ml-2" />
+    <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100 gap-3">
+      {/* Back button — hidden on step 1, shown from step 2 onward */}
+      {currentStep !== 1 ? (
+        <Button variant="outline" onClick={onPrevious} className="shrink-0">
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Back
         </Button>
       ) : (
-        <Button 
-          onClick={onSubmit} 
-          disabled={isSubmitDisabled}
+        <div aria-hidden="true" />
+      )}
+
+      {currentStep < 3 ? (
+        <Button
+          onClick={onNext}
+          disabled={isNextDisabled}
+          className="shrink-0"
         >
-          {hasReachedSessionLimit ? "Upgrade to Start Session" : "Start Session"}
+          Next
+          <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      ) : (
+        <Button
+          onClick={onSubmit}
+          disabled={isSubmitDisabled}
+          className="shrink-0 text-sm"
+        >
+          {/* Abbreviated label on xs screens to avoid overflow */}
+          <span className="sm:hidden">
+            {hasReachedSessionLimit ? "Upgrade Plan" : "Start Session"}
+          </span>
+          <span className="hidden sm:inline">
+            {hasReachedSessionLimit ? "Upgrade to Start Session" : "Start Session"}
+          </span>
         </Button>
       )}
     </div>

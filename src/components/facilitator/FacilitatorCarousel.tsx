@@ -97,20 +97,22 @@ export const FacilitatorCarousel = ({
   }
 
   return (
-    <div className="relative mb-8">
-      <div className="flex items-center">
+    <div className="mb-8">
+      <div className="flex items-center gap-1">
+        {/* Prev button — stays inside the card boundary on all screen sizes */}
         <Button
           variant="ghost"
           size="icon"
           aria-label="Previous facilitators"
-          className="absolute left-0 z-10 -translate-x-1/2"
+          className="shrink-0 h-8 w-8"
           onClick={handlePrevious}
           disabled={startIndex === 0}
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className="h-5 w-5" />
         </Button>
 
-        <div className="mx-12 grid grid-cols-4 gap-4 w-full">
+        {/* Responsive grid: 2 cols on xs (<480px), 3 on sm, 4 on md+ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 flex-1">
           {visibleItems.map((item, idx) => {
             if (item.type === 'create') {
               return (
@@ -134,7 +136,6 @@ export const FacilitatorCarousel = ({
                 avatarUrl={avatarUrl}
                 onClick={() => {
                   if (locked) {
-                    // Redirect to pricing page when clicking a locked facilitator
                     navigate('/pricing');
                   } else if (facilitator.id) {
                     onSelect(facilitator.id);
@@ -147,15 +148,16 @@ export const FacilitatorCarousel = ({
           })}
         </div>
 
+        {/* Next button — stays inside the card boundary on all screen sizes */}
         <Button
           variant="ghost"
           size="icon"
           aria-label="Next facilitators"
-          className="absolute right-0 z-10 translate-x-1/2"
+          className="shrink-0 h-8 w-8"
           onClick={handleNext}
           disabled={startIndex >= maxStartIndex}
         >
-          <ChevronRight className="h-6 w-6" />
+          <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
     </div>

@@ -96,15 +96,17 @@ const AIfacilitators = () => {
       />
 
       {/* CreateWorkshopModal managed at page level to always have the correct facilitatorId */}
-      <CreateWorkshopModal
-        open={isCreateWorkshopModalOpen}
-        onOpenChange={setIsCreateWorkshopModalOpen}
-        facilitatorId={selectedFacilitator || 0}
-        onSuccess={() => {
-          setIsCreateWorkshopModalOpen(false);
-          refetchWorkshops();
-        }}
-      />
+      {selectedFacilitator !== null && (
+        <CreateWorkshopModal
+          open={isCreateWorkshopModalOpen}
+          onOpenChange={setIsCreateWorkshopModalOpen}
+          facilitatorId={selectedFacilitator}
+          onSuccess={() => {
+            setIsCreateWorkshopModalOpen(false);
+            refetchWorkshops();
+          }}
+        />
+      )}
 
       <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
         {planDataReady && (

@@ -107,7 +107,7 @@ export const CommunicationCenter = () => {
             return [
                 {
                     id: 't1',
-                    user_email: 'user@example.com',
+                    user_email: 'user@domain.com',
                     subject: 'Cannot access premium features',
                     message: 'I upgraded yesterday but still see free plan limits.',
                     status: 'open',
@@ -117,7 +117,7 @@ export const CommunicationCenter = () => {
                 },
                 {
                     id: 't2',
-                    user_email: 'facilitator@test.com',
+                    user_email: 'facilitator@domain.com',
                     subject: 'Feature request',
                     message: 'Can we have custom branding?',
                     status: 'in_progress',

@@ -142,7 +142,7 @@ export const RevenueDashboard = () => {
                     const plan = plans?.find(p => p.id === profile.current_plan_id);
                     return {
                         id: `txn_${index}`,
-                        user_email: `user_${profile.id.substring(0, 8)}@example.com`,
+                        user_email: `user_${profile.id.substring(0, 8)}`,
                         plan: plan?.title || 'Unknown',
                         amount: plan?.price || 0,
                         date: profile.created_at,

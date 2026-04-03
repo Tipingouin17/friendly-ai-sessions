@@ -178,6 +178,14 @@ def run_startup_migrations() -> None:
         ALTER TABLE sessions
             ADD COLUMN IF NOT EXISTS user_id UUID;
         """,
+        # 2026-04-03: Persist credentials to DB so logins survive container restarts.
+        # password_hash stores SHA-256 of the user's password.
+        # email_verified tracks whether the user has confirmed their email address.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS password_hash TEXT,
+            ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+        """,
     ]
     try:
         conn = get_db()
@@ -195,9 +203,50 @@ def run_startup_migrations() -> None:
         print(f"[migration] ERROR running startup migrations: {e}")
 
 
+def load_users_from_db() -> None:
+    """Populate the in-memory USERS dict from the profiles table on startup.
+
+    This ensures that users who registered before the current process started
+    (e.g., after a container restart) can still log in.  Only rows that have
+    a password_hash stored are loaded; legacy rows without a hash are skipped.
+    """
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, email, password_hash, created_at FROM profiles "
+            "WHERE password_hash IS NOT NULL"
+        )
+        rows = cur.fetchall()
+        conn.close()
+        for row in rows:
+            email = row["email"]
+            if email not in USERS:
+                USERS[email] = {
+                    "id": str(row["id"]),
+                    "email": email,
+                    "password": row["password_hash"],
+                    "created_at": (
+                        row["created_at"].isoformat()
+                        if isinstance(row["created_at"], datetime)
+                        else str(row["created_at"])
+                    ),
+                    "email_confirmed_at": datetime.utcnow().isoformat(),
+                }
+        print(f"[auth] Loaded {len(rows)} user(s) from DB into memory.")
+    except Exception as e:
+        print(f"[auth] WARNING: Could not load users from DB: {e}")
+
+
 # Run migrations immediately on import (before any request is served)
 try:
     run_startup_migrations()
+except Exception:
+    pass
+
+# Populate in-memory user store from DB (so logins survive container restarts)
+try:
+    load_users_from_db()
 except Exception:
     pass
 
@@ -568,31 +617,51 @@ async def rest_root():
 # ============================================================
 @app.post("/auth/v1/signup")
 async def auth_signup(request: Request):
+    """Register a new user account.
+
+    Persists credentials (password_hash) to the DB so that logins survive
+    container restarts.  The frontend sends the user's display name under
+    options.data.name (or options.data.full_name); both are accepted.
+    """
     data = await request.json()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password", "")
     if not email or not password:
         raise HTTPException(400, "Email and password required")
 
-    # Check if user already exists in memory
+    # Reject duplicate registrations (check memory first, then DB)
     if email in USERS:
         raise HTTPException(400, detail={"code": "user_already_exists", "message": "User already registered"})
 
-    # Create in DB
+    # Accept display name sent as 'name' or 'full_name' inside options.data
+    user_meta = data.get("options", {}).get("data") or data.get("data") or {}
+    full_name = user_meta.get("full_name") or user_meta.get("name") or ""
+
     user_id = str(uuid.uuid4())
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    # Persist to DB — password_hash is stored so the account survives restarts
     try:
         conn = get_db()
         cur = conn.cursor()
+        # First check if the email is already in the DB (duplicate guard)
+        cur.execute("SELECT id FROM profiles WHERE email = %s", (email,))
+        if cur.fetchone():
+            conn.close()
+            raise HTTPException(400, detail={"code": "user_already_exists", "message": "User already registered"})
         cur.execute(
-            "INSERT INTO profiles (id, email, full_name, role, created_at, updated_at) "
-            "VALUES (%s, %s, %s, 'user', NOW(), NOW()) ON CONFLICT (id) DO NOTHING",
-            (user_id, email, data.get("options", {}).get("data", {}).get("full_name", "")),
+            "INSERT INTO profiles "
+            "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
+            "VALUES (%s, %s, %s, 'user', %s, FALSE, NOW(), NOW())",
+            (user_id, email, full_name, pw_hash),
         )
         conn.commit()
         conn.close()
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Signup DB error: {e}")
+        print(f"[signup] DB error: {e}")
+        # Continue even if DB write fails — the in-memory store is the fallback
 
     USERS[email] = {
         "id": user_id,
@@ -607,32 +676,48 @@ async def auth_signup(request: Request):
 
 @app.post("/auth/v1/token")
 async def auth_token(request: Request, grant_type: str = Query(default="password")):
+    """Authenticate a user with email and password.
+
+    Checks the in-memory USERS dict first (fast path).  If the user is not
+    found in memory (e.g., after a container restart), falls back to the DB
+    and loads the stored password_hash for comparison.  Accepts any password
+    ONLY for the legacy hardcoded seed accounts that have no DB row.
+    """
     data = await request.json()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password", "")
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    # Check in-memory store first
+    # Fast path: check in-memory store
     user = USERS.get(email)
     if not user:
-        # Try DB lookup
+        # Slow path: look up credentials in the DB
         try:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("SELECT id, email FROM profiles WHERE email = %s", (email,))
+            cur.execute(
+                "SELECT id, email, password_hash, created_at FROM profiles "
+                "WHERE email = %s",
+                (email,),
+            )
             row = cur.fetchone()
             conn.close()
-            if row:
+            if row and row["password_hash"]:
+                # Populate memory cache for subsequent requests
                 user = {
                     "id": str(row["id"]),
                     "email": row["email"],
-                    "password": pw_hash,  # accept any password for DB users
-                    "created_at": datetime.utcnow().isoformat(),
+                    "password": row["password_hash"],
+                    "created_at": (
+                        row["created_at"].isoformat()
+                        if isinstance(row["created_at"], datetime)
+                        else str(row["created_at"])
+                    ),
                     "email_confirmed_at": datetime.utcnow().isoformat(),
                 }
                 USERS[email] = user
         except Exception as e:
-            print(f"Auth DB lookup error: {e}")
+            print(f"[login] DB lookup error: {e}")
 
     if not user or user.get("password") != pw_hash:
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
@@ -644,23 +729,36 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
 @app.get("/auth/v1/user")
 @app.put("/auth/v1/user")
 async def auth_user(request: Request):
+    """Get or update the currently authenticated user's profile.
+
+    PUT supports updating full_name, avatar_url, and password.
+    Password changes are persisted to the DB so they survive restarts.
+    """
     user = get_current_user(request)
     if not user:
         raise HTTPException(401, "Unauthorized")
     if request.method == "PUT":
         data = await request.json()
-        # Update profile in DB
         user_id = user.get("sub") or user.get("id")
+        email = user.get("email", "")
         try:
             conn = get_db()
             cur = conn.cursor()
-            updates = {}
+            updates: dict = {}
+            # Profile metadata updates
             if "data" in data:
                 meta = data["data"]
                 if "full_name" in meta:
                     updates["full_name"] = meta["full_name"]
                 if "avatar_url" in meta:
                     updates["avatar_url"] = meta["avatar_url"]
+            # Password update — persist new hash to DB and refresh memory cache
+            if "password" in data and data["password"]:
+                new_pw_hash = hashlib.sha256(data["password"].encode()).hexdigest()
+                updates["password_hash"] = new_pw_hash
+                # Refresh in-memory entry so subsequent logins work immediately
+                if email in USERS:
+                    USERS[email]["password"] = new_pw_hash
             if updates:
                 set_clause = ", ".join([f'"{k}" = %s' for k in updates.keys()])
                 cur.execute(
@@ -670,7 +768,7 @@ async def auth_user(request: Request):
                 conn.commit()
             conn.close()
         except Exception as e:
-            print(f"Update user error: {e}")
+            print(f"[update_user] error: {e}")
     return {
         "id": user.get("sub") or user.get("id"),
         "email": user.get("email", ""),

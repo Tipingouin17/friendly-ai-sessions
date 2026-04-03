@@ -30,13 +30,16 @@ export const WorkshopSelection = ({
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 4;
 
+  // Total items = workshops + 1 "Add New Workshop" card
+  const totalItems = workshops.length + 1;
+  const maxStartIndex = Math.max(0, totalItems - itemsToShow);
+
   const handlePrevious = () => {
     setStartIndex(Math.max(0, startIndex - 1));
   };
 
   const handleNext = () => {
-    // +1 to account for the "Add New Workshop" card at the end
-    setStartIndex(Math.min(workshops.length - itemsToShow + 1, startIndex + 1));
+    setStartIndex(Math.min(maxStartIndex, startIndex + 1));
   };
 
   const getIcon = (iconType: string = 'book-open') => {
@@ -46,6 +49,17 @@ export const WorkshopSelection = ({
 
   if (isLoading) {
     return <div>Loading workshops...</div>;
+  }
+
+  // Build the list of items to display: workshops + Add New Workshop card
+  // We treat "Add New Workshop" as item at index workshops.length
+  const visibleItems = [];
+  for (let i = startIndex; i < startIndex + itemsToShow && i < totalItems; i++) {
+    if (i < workshops.length) {
+      visibleItems.push({ type: 'workshop' as const, workshop: workshops[i] });
+    } else {
+      visibleItems.push({ type: 'add-new' as const, workshop: null });
+    }
   }
 
   return (
@@ -62,27 +76,31 @@ export const WorkshopSelection = ({
         </Button>
 
         <div className="mx-12 flex gap-4 overflow-hidden">
-          {workshops.slice(startIndex, startIndex + itemsToShow).map((workshop) => (
-            <div
-              key={workshop.id}
-              className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
-                selectedWorkshop === workshop.id ? 'border-primary' : 'border-gray-200'
-              }`}
-              onClick={() => onSelect(workshop.id)}
-            >
-              <div className="mb-4">
-                {getIcon(workshop.icon_type)}
+          {visibleItems.map((item, idx) => 
+            item.type === 'workshop' && item.workshop ? (
+              <div
+                key={item.workshop.id}
+                className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center rounded-xl border p-6 transition-all ${
+                  selectedWorkshop === item.workshop.id ? 'border-primary' : 'border-gray-200'
+                }`}
+                onClick={() => onSelect(item.workshop!.id)}
+              >
+                <div className="mb-4">
+                  {getIcon(item.workshop.icon_type)}
+                </div>
+                <h3 className="text-center text-lg font-semibold leading-tight">{item.workshop.title}</h3>
               </div>
-              <h3 className="text-center text-lg font-semibold leading-tight">{workshop.title}</h3>
-            </div>
-          ))}
-          <div 
-            className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
-            onClick={onAddNewWorkshop}
-          >
-            <Plus className="mb-2 h-12 w-12 text-gray-400" />
-            <span className="text-center text-sm text-gray-600">Add New Workshop</span>
-          </div>
+            ) : (
+              <div 
+                key="add-new"
+                className="flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all"
+                onClick={onAddNewWorkshop}
+              >
+                <Plus className="mb-2 h-12 w-12 text-gray-400" />
+                <span className="text-center text-sm text-gray-600">Add New Workshop</span>
+              </div>
+            )
+          )}
         </div>
 
         <Button
@@ -90,7 +108,7 @@ export const WorkshopSelection = ({
           size="icon"
           className="absolute right-0 z-10 translate-x-1/2"
           onClick={handleNext}
-          disabled={startIndex >= workshops.length - itemsToShow + 1}
+          disabled={startIndex >= maxStartIndex}
         >
           <ChevronRight className="h-6 w-6" />
         </Button>

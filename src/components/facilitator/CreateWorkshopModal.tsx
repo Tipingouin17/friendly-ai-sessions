@@ -70,7 +70,7 @@ export const CreateWorkshopModal = ({
           title: title.trim(),
           scope: scope.trim(),
           objective: objective.trim(),
-          profile_picture: profilePicture.trim() || undefined,
+          icon_type: profilePicture.trim() || 'book-open',
           facilitator: facilitatorId,
           status: true,
           lock: false,
@@ -112,7 +112,7 @@ export const CreateWorkshopModal = ({
   if (limitsLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Loading...</DialogTitle>
           </DialogHeader>
@@ -123,7 +123,7 @@ export const CreateWorkshopModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Workshop</DialogTitle>
         </DialogHeader>

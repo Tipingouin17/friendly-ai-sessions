@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,11 @@ export const CreateWorkshopModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Use a ref to always have the latest facilitatorId value in handleCreate
+  const facilitatorIdRef = useRef(facilitatorId);
+  useEffect(() => {
+    facilitatorIdRef.current = facilitatorId;
+  }, [facilitatorId]);
   
   const { 
     canCreateCustomSessions,
@@ -71,7 +76,7 @@ export const CreateWorkshopModal = ({
           scope: scope.trim(),
           objective: objective.trim(),
           icon_type: profilePicture.trim() || 'book-open',
-          facilitator: facilitatorId,
+          facilitator: facilitatorIdRef.current,
           status: true,
           lock: false,
           user_id: userId,

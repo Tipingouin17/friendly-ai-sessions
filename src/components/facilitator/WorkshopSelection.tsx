@@ -10,6 +10,7 @@ interface WorkshopSelectionProps {
   selectedWorkshop: number | null;
   onSelect: (id: number) => void;
   isLoading?: boolean;
+  selectedFacilitatorId?: number | null;
 }
 
 const iconMap = {
@@ -24,7 +25,8 @@ export const WorkshopSelection = ({
   workshops, 
   selectedWorkshop, 
   onSelect,
-  isLoading = false 
+  isLoading = false,
+  selectedFacilitatorId
 }: WorkshopSelectionProps) => {
   const [startIndex, setStartIndex] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -119,7 +121,7 @@ export const WorkshopSelection = ({
       <CreateWorkshopModal
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
-        facilitatorId={workshops[0]?.facilitator || 0}
+        facilitatorId={selectedFacilitatorId || 0}
         onSuccess={() => {
           window.location.reload();
         }}

@@ -146,6 +146,7 @@ ALLOWED_RPC_FUNCTIONS = {
     "is_session_host", "is_system_admin",
     "calculate_session_analytics", "get_plan_restrictions",
     "increment_conversation_participants",
+    "create_template_welcome_message",
 }
 
 # FK map: constraint_name -> (table, column, foreign_table, foreign_column)

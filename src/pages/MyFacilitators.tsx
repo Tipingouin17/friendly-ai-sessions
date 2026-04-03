@@ -9,6 +9,7 @@ import { WorkshopSelection } from "@/components/facilitator/WorkshopSelection";
 import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { PlanLimitAlert } from "@/components/facilitator/PlanLimitAlert";
 import { StepNavigation } from "@/components/facilitator/StepNavigation";
+import { CreateWorkshopModal } from "@/components/facilitator/CreateWorkshopModal";
 import { useState, useEffect } from "react";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { UsageMeter } from "@/components/subscription/UsageMeter";
@@ -17,6 +18,7 @@ import PageHead from "@/components/PageHead";
 
 const AIfacilitators = () => {
   const [isClient, setIsClient] = useState(false);
+  const [isCreateWorkshopModalOpen, setIsCreateWorkshopModalOpen] = useState(false);
 
   // Hydration-safe client detection
   useEffect(() => {
@@ -68,7 +70,8 @@ const AIfacilitators = () => {
 
   const {
     data: workshops = [],
-    isLoading: isWorkshopsLoading
+    isLoading: isWorkshopsLoading,
+    refetch: refetchWorkshops
   } = useQuery({
     queryKey: ['workshops', selectedFacilitator],
     queryFn: () => fetchWorkshops(selectedFacilitator),
@@ -90,6 +93,17 @@ const AIfacilitators = () => {
       <WelcomeModal
         isOpen={!hasSeenWelcome}
         onClose={() => setHasSeenWelcome(true)}
+      />
+
+      {/* CreateWorkshopModal managed at page level to always have the correct facilitatorId */}
+      <CreateWorkshopModal
+        open={isCreateWorkshopModalOpen}
+        onOpenChange={setIsCreateWorkshopModalOpen}
+        facilitatorId={selectedFacilitator || 0}
+        onSuccess={() => {
+          setIsCreateWorkshopModalOpen(false);
+          refetchWorkshops();
+        }}
       />
 
       <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
@@ -142,6 +156,7 @@ const AIfacilitators = () => {
                 onSelect={setSelectedWorkshop}
                 isLoading={isWorkshopsLoading}
                 selectedFacilitatorId={selectedFacilitator}
+                onAddNewWorkshop={() => setIsCreateWorkshopModalOpen(true)}
               />
             </div>
 

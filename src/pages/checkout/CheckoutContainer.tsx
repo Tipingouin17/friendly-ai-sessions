@@ -33,7 +33,7 @@ export const CheckoutContainer = ({
   const [appliedCouponId, setAppliedCouponId] = React.useState<string | null>(null);
 
   return (
-    <div className="min-h-screen pt-16 pb-16 bg-gray-50">
+    <div className="min-h-screen pb-16 bg-gray-50">
       <div className="container max-w-6xl mx-auto px-4">
         <Button
           variant="ghost"

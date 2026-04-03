@@ -109,7 +109,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
+    <div className="min-h-screen pb-16">
       <PageHead title="Settings" description="Manage your account settings and preferences" />
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center gap-3 mb-8">

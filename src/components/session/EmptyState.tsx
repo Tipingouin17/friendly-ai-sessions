@@ -29,7 +29,7 @@ const EmptyState = () => {
   };
   
   return (
-    <div className="min-h-screen pt-16 bg-indigo-600/10">
+    <div className="min-h-screen bg-indigo-600/10">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-3xl shadow-lg p-8">
           <div className="text-center">

@@ -186,6 +186,15 @@ def run_startup_migrations() -> None:
             ADD COLUMN IF NOT EXISTS password_hash TEXT,
             ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
         """,
+        # 2026-04-04: Add language column to conversations so the host's chosen
+        # language (ISO 639-1 code, e.g. 'fr', 'es', 'de') is persisted and used
+        # by the AI facilitator to respond in the correct language.
+        # Also add participant_description in case it was missing from older DBs.
+        """
+        ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en',
+            ADD COLUMN IF NOT EXISTS participant_description TEXT;
+        """,
     ]
     try:
         conn = get_db()
@@ -1971,7 +1980,7 @@ async def edge_function(func_name: str, request: Request):
             conn = get_db()
             cur = conn.cursor()
             cur.execute(
-                "SELECT s.welcome_message, f.title as facilitator_name "
+                "SELECT s.welcome_message, f.title as facilitator_name, c.language as conv_lang "
                 "FROM conversations c LEFT JOIN sessions s ON c.sessions_id = s.id "
                 "LEFT JOIN facilitators f ON s.facilitator = f.id WHERE c.id = %s",
                 (conv_id,),
@@ -1979,8 +1988,42 @@ async def edge_function(func_name: str, request: Request):
             row = cur.fetchone()
             template = (row.get("welcome_message") or "") if row else ""
             fname = (row.get("facilitator_name") or "Facilitator") if row else "Facilitator"
+            conv_lang_code = (row.get("conv_lang") or "en").strip().lower() if row else "en"
+            # Map ISO code to full language name for the AI instruction
+            lang_map = {
+                "en": "English", "fr": "French", "es": "Spanish", "de": "German",
+                "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "pl": "Polish",
+                "ru": "Russian", "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
+                "ar": "Arabic", "hi": "Hindi", "tr": "Turkish",
+            }
+            lang_name = lang_map.get(conv_lang_code, conv_lang_code.capitalize())
             if not template:
                 template = f"Welcome! I'm {fname}. I'm excited to facilitate today's session."
+            # If a non-English language is selected, generate the welcome message via AI
+            # so it is in the correct language rather than using the English template.
+            if conv_lang_code != "en":
+                try:
+                    from openai import OpenAI as _OAI
+                    _client = _OAI()
+                    _resp = _client.chat.completions.create(
+                        model=DEFAULT_AI_MODEL,
+                        messages=[
+                            {"role": "system", "content": (
+                                f"You are {fname}, an AI workshop facilitator. "
+                                f"You MUST respond exclusively in {lang_name}. "
+                                f"Every word must be in {lang_name}."
+                            )},
+                            {"role": "user", "content": (
+                                f"Generate a warm welcome message based on this template: {template}. "
+                                f"Write it entirely in {lang_name}."
+                            )},
+                        ],
+                        max_tokens=300,
+                        temperature=0.7,
+                    )
+                    template = _resp.choices[0].message.content.strip()
+                except Exception as ai_err:
+                    print(f"[template-welcome] AI translation failed, using original: {ai_err}")
             cur.execute(
                 "INSERT INTO messages (conversation_id, content, role, name) VALUES (%s, %s, 'assistant', %s) RETURNING id",
                 (conv_id, json.dumps({"text": template}), fname),

@@ -1,12 +1,18 @@
 /**
- * Message Bubble
+ * MessageBubble — World-class responsive redesign
  *
- * Chat component for the AIfacilitator application.
+ * Design principles:
+ * - Facilitator: clean white card with indigo left accent, generous padding, readable typography
+ * - Current user: rich indigo fill, white text, right-aligned
+ * - Other participants: soft neutral card with subtle color tint, left-aligned
+ * - Admin announcement: centered pill with blue accent
+ * - All bubbles: max-w responsive (wider on desktop, narrower on mobile)
+ * - No isMobile prop — pure CSS responsive
  */
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, Sparkles } from 'lucide-react';
 
 interface MessageBubbleProps {
   content: string;
@@ -16,7 +22,7 @@ interface MessageBubbleProps {
   backgroundColor?: string;
   isFirstMessageOfGroup: boolean;
   isAnonymous?: boolean;
-  isMobile?: boolean;
+  isMobile?: boolean;      // kept for API compat, not used
   isCurrentUser?: boolean;
 }
 
@@ -28,28 +34,36 @@ const MessageBubble = ({
   backgroundColor,
   isFirstMessageOfGroup,
   isAnonymous = false,
-  isMobile = false,
   isCurrentUser = false,
 }: MessageBubbleProps) => {
-  const padding = isMobile ? "px-3.5 py-2.5" : "px-4 py-3";
-  const fontSize = isMobile ? "text-sm leading-relaxed" : "text-[15px] leading-relaxed";
-  const nameSize = "text-[11px] font-semibold tracking-wide uppercase";
 
-  // ─── Host announcement (admin) ─────────────────────────────────────────────
-  // Rendered as a centered pill — not a chat bubble
+  // ─── Admin announcement ────────────────────────────────────────────────────
   if (sender === "admin") {
     return (
-      <div className="flex justify-center w-full my-1">
+      <div className="flex justify-center w-full my-2">
+        <div className="inline-flex items-start gap-2 rounded-2xl px-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-800 max-w-[90%] sm:max-w-[70%]">
+          <span className="text-blue-500 shrink-0 text-sm mt-0.5">📣</span>
+          <span className="text-sm leading-relaxed break-words" style={{ wordBreak: "break-word" }}>
+            {content}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Session report ────────────────────────────────────────────────────────
+  if (sender === "assistant" && isReport) {
+    return (
+      <div className="w-full rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-200 bg-emerald-100/60">
+          <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span className="text-sm font-semibold text-emerald-800">Session Report</span>
+        </div>
         <div
-          className={cn(
-            "inline-flex items-start gap-2 rounded-full px-4 py-2",
-            "bg-blue-50 border border-blue-200 text-blue-800",
-            isMobile ? "max-w-[92%]" : "max-w-[70%]"
-          )}
+          className="px-4 py-4 text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words"
           style={{ wordBreak: "break-word" }}
         >
-          <span className="text-blue-400 mt-0.5 shrink-0 text-xs font-bold">📣</span>
-          <span className={cn("text-sm leading-relaxed", isMobile && "text-xs")}>{content}</span>
+          {content}
         </div>
       </div>
     );
@@ -57,101 +71,74 @@ const MessageBubble = ({
 
   // ─── Facilitator (assistant) ───────────────────────────────────────────────
   if (sender === "assistant") {
-    if (isReport) {
-      return (
-        <div
-          className={cn(
-            "rounded-2xl shadow-sm w-full",
-            padding,
-            "bg-emerald-50 border border-emerald-200 text-gray-800"
-          )}
-          style={{ wordBreak: "break-word" }}
-        >
-          <div className="font-semibold mb-2 text-emerald-700 text-sm">Session Report</div>
-          <div className={cn("whitespace-pre-wrap break-words text-gray-800", fontSize)} dir="auto">
-            {content}
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div
-        className={cn(
-          "rounded-2xl rounded-tl-sm shadow-sm",
-          isMobile ? "max-w-[88%]" : "max-w-[76%]",
-          padding,
-          // Soft lavender background with a left accent border
-          "bg-slate-50 border border-slate-200 border-l-4 border-l-indigo-400 text-gray-800"
-        )}
-        style={{ wordBreak: "break-word", direction: "ltr", textAlign: "left" }}
+        className="max-w-[88%] sm:max-w-[78%] rounded-2xl rounded-tl-none bg-white border border-slate-200 shadow-sm overflow-hidden"
+        style={{ wordBreak: "break-word" }}
       >
-        {/* Facilitator label — shown only on first message of group */}
         {isFirstMessageOfGroup && (
-          <div className={cn(nameSize, "mb-2 text-indigo-500 flex items-center gap-1")}>
-            Facilitator
+          <div className="flex items-center gap-1.5 px-4 pt-3 pb-0">
+            <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+            <span className="text-[11px] font-semibold tracking-widest uppercase text-indigo-500 select-none">
+              Facilitator
+            </span>
           </div>
         )}
-        <div className={cn("whitespace-pre-wrap break-words text-gray-800", fontSize)} dir="auto">
+        <div className="px-4 py-3 text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
           {content}
         </div>
+        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-violet-400 to-transparent" />
       </div>
     );
   }
 
-  // ─── Participant (user) ────────────────────────────────────────────────────
-  // Current user: right-aligned indigo fill
-  // Other participants: left-aligned neutral grey
+  // ─── Current user ──────────────────────────────────────────────────────────
   if (isCurrentUser) {
     return (
       <div
-        className={cn(
-          "rounded-2xl rounded-tr-sm shadow-sm",
-          isMobile ? "max-w-[85%]" : "max-w-[72%]",
-          padding,
-          "bg-indigo-600 text-white"
-        )}
-        style={{ wordBreak: "break-word", direction: "ltr", textAlign: "left" }}
+        className="max-w-[85%] sm:max-w-[72%] rounded-2xl rounded-tr-none bg-indigo-600 shadow-sm px-4 py-3"
+        style={{ wordBreak: "break-word" }}
       >
-        {isAnonymous && isFirstMessageOfGroup && (
-          <div className={cn(nameSize, "mb-1.5 flex items-center gap-1 text-indigo-200")}>
-            <EyeOff className="h-3 w-3" />
-            Anonymous
+        {isFirstMessageOfGroup && isAnonymous && (
+          <div className="flex items-center gap-1 mb-1.5">
+            <EyeOff className="h-3 w-3 text-indigo-300" />
+            <span className="text-[11px] font-semibold tracking-widest uppercase text-indigo-300">
+              Anonymous
+            </span>
           </div>
         )}
-        <div className={cn("whitespace-pre-wrap break-words", fontSize)} dir="auto">
+        <div className="text-[15px] leading-relaxed text-white whitespace-pre-wrap break-words">
           {content}
         </div>
       </div>
     );
   }
 
-  // Other participant
+  // ─── Other participant ─────────────────────────────────────────────────────
+  // Use the assigned color as a very light tint (10% opacity) for the background
+  // so text always remains readable regardless of the participant color
+  const tintColor = backgroundColor || "#6366f1";
+  const nameColor = backgroundColor || "#475569";
+
   return (
     <div
-      className={cn(
-        "rounded-2xl rounded-tl-sm shadow-sm",
-        isMobile ? "max-w-[85%]" : "max-w-[72%]",
-        padding,
-        "text-gray-900"
-      )}
+      className="max-w-[85%] sm:max-w-[72%] rounded-2xl rounded-tl-none bg-white border border-slate-200 shadow-sm px-4 py-3"
       style={{
-        backgroundColor: backgroundColor || "#F1F5F9",
         wordBreak: "break-word",
-        direction: "ltr",
-        textAlign: "left"
+        borderLeftColor: tintColor,
+        borderLeftWidth: "3px",
       }}
     >
       {participantName && isFirstMessageOfGroup && (
         <div
-          className={cn(nameSize, "mb-1.5 flex items-center gap-1", isAnonymous && "italic")}
-          style={{ color: "#475569" }}
+          className="text-[11px] font-semibold tracking-widest uppercase mb-1.5 flex items-center gap-1"
+          style={{ color: nameColor }}
         >
           {participantName}
           {isAnonymous && <EyeOff className="h-3 w-3 opacity-70" />}
         </div>
       )}
-      <div className={cn("whitespace-pre-wrap break-words", fontSize)} dir="auto">
+      <div className="text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
         {content}
       </div>
     </div>

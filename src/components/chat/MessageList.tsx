@@ -1,10 +1,11 @@
 /**
- * Message List
+ * MessageList — Responsive redesign
  *
- * Renders the ordered list of chat messages with smart auto-scroll.
- * Auto-scroll only activates when the user is already near the bottom;
- * if the user has scrolled up to read history, it is suppressed and a
- * "↓ New messages" button is shown instead.
+ * Key fixes:
+ * - Scroll container fills the full available height via flex layout (no overflow-hidden parent)
+ * - Auto-scroll only when user is near the bottom
+ * - "New messages" jump button when user has scrolled up
+ * - No isMobile branching — pure CSS responsive
  */
 
 import React, { useMemo } from 'react';
@@ -29,8 +30,8 @@ interface MessageListProps {
   conversationData?: any;
 }
 
-const MessageList = ({ 
-  messages, 
+const MessageList = ({
+  messages,
   participantColors = {},
   currentParticipant,
   isWaitingForResponse = false,
@@ -38,31 +39,26 @@ const MessageList = ({
   responseCount = 0,
   totalParticipants = 1,
   participants = [],
-  isMobile = false,
   conversationData
 }: MessageListProps) => {
-  // Smart auto-scroll: only fires when the user is near the bottom.
-  // isNearBottom is used to show/hide the "New messages" jump button.
   const { ref, scrollToBottom, isNearBottom } = useScrollToBottom<HTMLDivElement>(
     [messages, isWaitingForResponse, isWaitingForResponses]
   );
 
-  // Memoize processed messages to avoid unnecessary re-renders
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
-    
+
     return messages.map((message, index) => {
       if (!message) return null;
-      
-      const isFirstMessageOfGroup = index === 0 || 
-        messages[index - 1]?.sender !== message.sender || 
+
+      const isFirstMessageOfGroup = index === 0 ||
+        messages[index - 1]?.sender !== message.sender ||
         messages[index - 1]?.participant !== message.participant;
-      
-      const isLastMessageOfGroup = index === messages.length - 1 || 
-        messages[index + 1]?.sender !== message.sender || 
+
+      const isLastMessageOfGroup = index === messages.length - 1 ||
+        messages[index + 1]?.sender !== message.sender ||
         messages[index + 1]?.participant !== message.participant;
 
-      // Assign participant colour for user messages
       let messageColor = message.color;
       if (message.sender === 'user' && message.participant && !messageColor) {
         messageColor = participantColors[message.participant] || getParticipantColor(message.participant);
@@ -70,7 +66,6 @@ const MessageList = ({
         messageColor = '#FFFFFF';
       }
 
-      // Use the facilitator's profile picture for assistant messages
       let messageAvatar = message.avatar;
       if (message.sender === 'assistant') {
         if (conversationData?.sessions?.facilitator_details?.profile_picture) {
@@ -80,7 +75,6 @@ const MessageList = ({
         }
       }
 
-      // Resolve participant info for user messages
       let participantInfo = null;
       if (message.sender === 'user' && message.participant) {
         const participantNumber = parseInt(message.participant, 10);
@@ -105,61 +99,62 @@ const MessageList = ({
   // Empty state
   if (processedMessages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
-        <div className="mb-3 p-3 bg-gray-50 rounded-full">
-          <MessagesSquare className="w-6 h-6 text-gray-400" />
+      <div className="flex flex-col items-center justify-center h-full text-center p-6">
+        <div className="mb-4 w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center">
+          <MessagesSquare className="w-7 h-7 text-indigo-400" />
         </div>
-        <p className="text-base font-medium mb-1">No messages yet</p>
-        <p className="text-sm">When the session begins, messages will appear here.</p>
+        <p className="text-base font-semibold text-slate-700 mb-1">No messages yet</p>
+        <p className="text-sm text-slate-400 max-w-xs">
+          When the session begins, the facilitator's messages will appear here.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="relative h-full">
-      <div className="h-full overflow-y-auto overscroll-contain pb-20">
-        <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-1 sm:space-y-2">
+      {/* Scrollable message area — fills full height */}
+      <div className="h-full overflow-y-auto overscroll-contain scroll-smooth">
+        <div className="px-4 py-5 sm:px-6 space-y-1">
           {processedMessages.map(({ message, isFirstMessageOfGroup, isLastMessageOfGroup, participantInfo }, index) => (
             <MessageItem
               key={`${message.id || index}-${index}`}
               message={message}
-              isFirstMessageOfGroup={true}
+              isFirstMessageOfGroup={isFirstMessageOfGroup}
               isLastMessageOfGroup={isLastMessageOfGroup}
               currentParticipant={currentParticipant}
               participantInfo={participantInfo}
-              isMobile={isMobile}
             />
           ))}
 
           {/* Waiting for participant responses */}
           {isWaitingForResponses && totalParticipants > 1 && (
-            <div className="py-1">
-              <WaitingForResponsesIndicator 
+            <div className="pt-2">
+              <WaitingForResponsesIndicator
                 currentResponses={responseCount}
                 totalParticipants={totalParticipants}
-                isMobile={isMobile}
               />
             </div>
           )}
 
           {/* AI thinking indicator */}
           {isWaitingForResponse && (
-            <div className="py-1">
+            <div className="pt-2">
               <ThinkingIndicator />
             </div>
           )}
 
-          {/* Sentinel element — the scroll hook attaches its ref here */}
-          <div ref={ref} className="h-4" />
+          {/* Scroll sentinel */}
+          <div ref={ref} className="h-2" />
         </div>
       </div>
 
-      {/* "New messages" jump button — only visible when the user has scrolled up */}
+      {/* "New messages" jump button */}
       {!isNearBottom && (
         <button
           onClick={scrollToBottom}
           aria-label="Scroll to latest messages"
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-indigo-700 transition-colors z-10"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-indigo-700 active:scale-95 transition-all z-10"
         >
           <ArrowDown className="h-3.5 w-3.5" />
           New messages

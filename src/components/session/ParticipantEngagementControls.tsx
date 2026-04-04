@@ -1,16 +1,14 @@
 /**
- * ParticipantEngagementControls
+ * ParticipantEngagementControls — Responsive redesign
  *
- * Renders three action buttons above the participant chat input:
- *   - Skip question
- *   - Pause / Resume
- *   - Message host (expands an inline composer)
- *
- * Also shows status banners when the participant is paused or has skipped.
+ * - No isMobile branching — pure CSS responsive
+ * - Consistent pill-style action buttons
+ * - Clean status banners for paused/skipped states
+ * - Inline host message composer
  */
 
 import React, { useState } from 'react';
-import { SkipForward, PauseCircle, PlayCircle, MessageSquareDot, Send, CheckCircle2 } from 'lucide-react';
+import { SkipForward, PauseCircle, PlayCircle, MessageSquareDot, Send, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EngagementStatus } from '@/hooks/useParticipantEngagement';
 
@@ -21,9 +19,8 @@ interface ParticipantEngagementControlsProps {
   onSendHostMessage: (message: string) => Promise<void>;
   isSendingHostMessage: boolean;
   hostMessageSent: boolean;
-  /** Hide skip button when participant has already answered the current question */
   hasAnswered?: boolean;
-  isMobile?: boolean;
+  isMobile?: boolean; // kept for API compat
 }
 
 const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps> = ({
@@ -34,7 +31,6 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
   isSendingHostMessage,
   hostMessageSent,
   hasAnswered = false,
-  isMobile = false,
 }) => {
   const [showHostComposer, setShowHostComposer] = useState(false);
   const [hostMessage, setHostMessage] = useState('');
@@ -50,81 +46,85 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
   };
 
   return (
-    <div className="w-full">
-      {/* ── Status banners ─────────────────────────────────────────────── */}
+    <div className="w-full border-t border-slate-100 bg-white">
+
+      {/* ── Paused banner ──────────────────────────────────────────────────── */}
       {isPaused && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-700 text-sm">
-          <PauseCircle className="h-4 w-4 shrink-0" />
-          <span className="flex-1">You are on a break — the facilitator won't wait for your response.</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border-b border-amber-200">
+          <PauseCircle className="h-4 w-4 text-amber-500 shrink-0" />
+          <p className="flex-1 text-sm text-amber-700">
+            You're on a break — the facilitator won't wait for your response.
+          </p>
           <button
             onClick={onTogglePause}
-            className="text-xs font-semibold underline hover:text-amber-900"
+            className="shrink-0 text-xs font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2"
           >
             Resume
           </button>
         </div>
       )}
+
+      {/* ── Skipped banner ─────────────────────────────────────────────────── */}
       {isSkipped && !isPaused && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-200 text-slate-600 text-sm">
-          <SkipForward className="h-4 w-4 shrink-0" />
-          <span className="flex-1">You skipped this question — the session will continue without your response.</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+          <SkipForward className="h-4 w-4 text-slate-400 shrink-0" />
+          <p className="flex-1 text-sm text-slate-500">
+            You skipped this question — the session will continue without your response.
+          </p>
         </div>
       )}
 
-      {/* ── Host message composer ───────────────────────────────────────── */}
+      {/* ── Host message sent confirmation ─────────────────────────────────── */}
+      {hostMessageSent && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border-b border-emerald-200">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+          <span className="text-xs text-emerald-700 font-medium">Message sent to host</span>
+        </div>
+      )}
+
+      {/* ── Host message composer ───────────────────────────────────────────── */}
       {showHostComposer && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-t border-blue-200">
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border-b border-blue-200">
           <input
             type="text"
             value={hostMessage}
             onChange={e => setHostMessage(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendHostMessage(); } }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendHostMessage(); }
+              if (e.key === 'Escape') { setShowHostComposer(false); setHostMessage(''); }
+            }}
             placeholder="Private message to host…"
-            className="flex-1 text-sm bg-white border border-blue-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-300 placeholder:text-blue-300"
             autoFocus
+            className="flex-1 text-sm bg-white border border-blue-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-300 placeholder:text-blue-300"
           />
           <button
             onClick={handleSendHostMessage}
             disabled={!hostMessage.trim() || isSendingHostMessage}
-            className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-40 transition-colors shrink-0"
           >
-            <Send className="h-3.5 w-3.5" />
+            <Send className="h-4 w-4" />
           </button>
           <button
             onClick={() => { setShowHostComposer(false); setHostMessage(''); }}
-            className="text-xs text-blue-500 hover:text-blue-700 px-1"
+            className="h-9 w-9 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center hover:bg-blue-200 transition-colors shrink-0"
           >
-            Cancel
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* ── Host message sent confirmation ─────────────────────────────── */}
-      {hostMessageSent && (
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-green-50 border-t border-green-200 text-green-700 text-xs">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Message sent to host
-        </div>
-      )}
+      {/* ── Action buttons ──────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-1 px-3 py-2">
 
-      {/* ── Action buttons ──────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          "flex items-center gap-1 px-3 py-1.5 border-t border-gray-100 bg-white/80",
-          isMobile ? "justify-between" : "justify-end"
-        )}
-      >
         {/* Skip */}
         {!hasAnswered && !isSkipped && !isPaused && (
           <button
             onClick={onSkip}
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1 transition-colors",
-              "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-            )}
+            className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <SkipForward className="h-3.5 w-3.5" />
-            {isMobile ? 'Skip' : 'Skip question'}
+            <span className="hidden xs:inline">Skip question</span>
+            <span className="xs:hidden">Skip</span>
           </button>
         )}
 
@@ -132,15 +132,15 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
         <button
           onClick={onTogglePause}
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1 transition-colors",
+            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 transition-colors",
             isPaused
               ? "text-amber-600 hover:text-amber-800 hover:bg-amber-50"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
           )}
         >
           {isPaused
-            ? <><PlayCircle className="h-3.5 w-3.5" />{isMobile ? 'Resume' : 'Resume session'}</>
-            : <><PauseCircle className="h-3.5 w-3.5" />{isMobile ? 'Pause' : 'Take a break'}</>
+            ? <><PlayCircle className="h-3.5 w-3.5" /><span className="hidden xs:inline">Resume session</span><span className="xs:hidden">Resume</span></>
+            : <><PauseCircle className="h-3.5 w-3.5" /><span className="hidden xs:inline">Take a break</span><span className="xs:hidden">Pause</span></>
           }
         </button>
 
@@ -148,14 +148,15 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
         <button
           onClick={() => setShowHostComposer(v => !v)}
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1 transition-colors",
+            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 transition-colors",
             showHostComposer
               ? "text-blue-600 bg-blue-50"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
           )}
         >
           <MessageSquareDot className="h-3.5 w-3.5" />
-          {isMobile ? 'Host' : 'Message host'}
+          <span className="hidden xs:inline">Message host</span>
+          <span className="xs:hidden">Host</span>
         </button>
       </div>
     </div>

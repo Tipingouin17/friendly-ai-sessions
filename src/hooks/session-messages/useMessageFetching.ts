@@ -14,6 +14,8 @@ interface UseMessageFetchingProps {
   isAdmin: boolean;
   conversation?: any;
   totalParticipants: number;
+  /** Participant IDs currently paused or skipped — excluded from response counting and auto-advance */
+  excludedParticipantIds?: Set<number>;
 }
 
 // Polling interval in milliseconds
@@ -23,7 +25,8 @@ export const useMessageFetching = ({
   conversationId,
   isAdmin,
   conversation,
-  totalParticipants
+  totalParticipants,
+  excludedParticipantIds = new Set(),
 }: UseMessageFetchingProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGeneratingWelcome, setIsGeneratingWelcome] = useState(false);
@@ -238,9 +241,15 @@ export const useMessageFetching = ({
       // Count ONLY participant (user) responses after the last assistant message.
       // Admin/host messages must NOT be counted as participant responses and must
       // NOT trigger the auto-advance that generates a new AI facilitator reply.
-      const responses = messages.slice(lastAssistantIndex + 1).filter(m => m.sender === 'user');
+      // Paused and skipped participants are excluded from the waiting count.
+      const responses = messages.slice(lastAssistantIndex + 1).filter(m => {
+        if (m.sender !== 'user') return false;
+        // Exclude paused/skipped participants
+        if (m.participant && excludedParticipantIds.has(Number(m.participant))) return false;
+        return true;
+      });
 
-      // Count unique participants
+      // Count unique participants (excluding paused/skipped)
       const uniqueRespondents = new Set(responses.map(r => r.participant || r.name)).size;
       setResponseCount(uniqueRespondents);
 
@@ -324,10 +333,13 @@ export const useMessageFetching = ({
     }
 
     // Check if we should auto-advance
+    // Effective participant count excludes paused/skipped participants
+    const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedParticipantIds.size);
+
     if (
       isWaitingForResponses &&
-      totalParticipants > 0 &&
-      responseCount >= totalParticipants &&
+      effectiveTotalParticipants > 0 &&
+      responseCount >= effectiveTotalParticipants &&
       !isGeneratingResponse &&
       !autoAdvanceTriggeredRef.current
     ) {

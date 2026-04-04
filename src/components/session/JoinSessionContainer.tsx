@@ -15,6 +15,7 @@ import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import JoinSessionErrorState from "./JoinSessionErrorState";
 import JoinSessionRejoinPrompt from "./JoinSessionRejoinPrompt";
 import JoinSessionMain from "./JoinSessionMain";
+import SessionFullPage from "./SessionFullPage";
 
 /** Shared page shell so every full-page state looks identical */
 const PageShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -273,12 +274,28 @@ const JoinSessionContainer = () => {
     );
   }
 
+  // ── Session full ─────────────────────────────────────────────────────────
+  if (isFull) {
+    return (
+      <SessionFullPage
+        conversation={conversation}
+        currentParticipantCount={currentParticipantCount}
+        effectiveMaxParticipants={effectiveMaxParticipants}
+        onSpotOpened={() => {
+          // A spot opened — trigger a refetch so isFull recalculates
+          handleRetry();
+        }}
+        onRefresh={handleRetry}
+      />
+    );
+  }
+
   // ── Main join form ───────────────────────────────────────────────────────
   return (
     <JoinSessionMain
       conversation={conversation}
       error={error}
-      isFull={isFull}
+      isFull={false}
       participantName={participantName}
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}

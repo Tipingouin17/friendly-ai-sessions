@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useParticipantPersistence } from './useParticipantPersistence';
 import { useJoinSessionNavigation } from './useJoinSessionNavigation';
-import { setJoinToken, clearJoinToken } from '@/lib/api';
+import { setJoinToken } from '@/lib/api';
 
 // ─── Synchronous join-token bootstrap ────────────────────────────────────────
 // Read the join token from the URL *immediately* (before any React render)
@@ -47,11 +47,18 @@ export const useJoinSessionState = () => {
   // The initial value is already set synchronously above before first render.
   useEffect(() => {
     if (joinTokenParam) {
+      // Token is present in the URL — use it immediately.
       setJoinToken(joinTokenParam);
-    } else {
-      // No token in URL — clear any stale token from a previous session
-      clearJoinToken();
     }
+    // Do NOT clear the token when it is absent from the URL.  The token will
+    // be set from the conversation response by useSessionParticipants as soon
+    // as the backend returns the conversation data.  This covers:
+    //   • Legacy / plain URLs (?id=X, no token)
+    //   • Returning participants whose URL no longer contains the token
+    //   • Private/incognito users who lost localStorage
+    // Clearing here would race against the conversation fetch and break those
+    // flows.  The token is a stable UUID per conversation so there is no
+    // security risk in keeping a previously-set token.
     // Do NOT clear on unmount: the token must persist while the participant
     // is in the session.  It will be cleared when they navigate away.
   }, [joinTokenParam]);

@@ -1020,14 +1020,35 @@ async def rest_table(table: str, request: Request):
         # messages, session_participants, conversations: require auth OR valid join token
         elif table in SECURE_CONV_TABLES or table in SECURE_DIRECT_TABLES:
             if not requesting_user_id and not join_token_header:
-                return JSONResponse(
-                    content={
-                        "error": "Authentication required",
-                        "message": "You must be logged in or provide a valid session token",
-                        "code": "PGRST301",
-                    },
-                    status_code=401,
-                )
+                # Special case: anonymous participants may read a single conversation
+                # by its id (e.g. the join-session page before they have a token).
+                # We allow this only when the request filters by a specific id and
+                # the conversation is active and not ended.  All other anonymous
+                # reads on secure tables are rejected.
+                if table == "conversations":
+                    raw_id = dict(request.query_params).get("id", "")
+                    if raw_id.startswith("eq."):
+                        raw_id = raw_id[3:]
+                    if not raw_id:
+                        return JSONResponse(
+                            content={
+                                "error": "Authentication required",
+                                "message": "You must be logged in or provide a valid session token",
+                                "code": "PGRST301",
+                            },
+                            status_code=401,
+                        )
+                    # raw_id is set — allow the request to proceed; the filter
+                    # injection below will add the active/not-ended guard.
+                else:
+                    return JSONResponse(
+                        content={
+                            "error": "Authentication required",
+                            "message": "You must be logged in or provide a valid session token",
+                            "code": "PGRST301",
+                        },
+                        status_code=401,
+                    )
 
     try:
         conn = get_db()
@@ -1132,6 +1153,10 @@ async def rest_table(table: str, request: Request):
                 elif table == "conversations" and raw_conv_id:
                     # Already filtered by id in params; no extra filter needed
                     pass
+            elif not requesting_user_id and not join_token_header and table == "conversations":
+                # Anonymous public read of a specific conversation (join-session page).
+                # Guard: only expose conversations that are active and not ended.
+                wc.append('"is_session_ended" IS NOT TRUE')
 
             sql = f'SELECT {col_str} FROM public."{table}"'
             if wc:

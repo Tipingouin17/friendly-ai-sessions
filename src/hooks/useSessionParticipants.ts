@@ -10,6 +10,7 @@ import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { useParticipantCounts } from "@/hooks/useParticipantCounts";
 import { useParticipantChannel } from "@/hooks/useParticipantChannel";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
+import { setJoinToken } from "@/lib/api";
 
 export function useSessionParticipants(conversationId: number | null) {
   const [stateError, setStateError] = useState<string | null>(null);
@@ -23,6 +24,32 @@ export function useSessionParticipants(conversationId: number | null) {
     refetch,
     isLoading
   } = useConversation(conversationId);
+
+  // ── Join-token bootstrap from conversation payload ──────────────────────────
+  // The conversation row contains a stable `join_token` UUID.  As soon as the
+  // conversation loads we store it so that ALL subsequent API calls (capacity
+  // check, session_participants reads, messages, etc.) automatically carry the
+  // X-Join-Token header — regardless of whether the token was present in the
+  // original URL.
+  //
+  // This covers three important cases:
+  //   1. First visit via a full URL (?id=X&token=UUID) — token already set by
+  //      the bootstrap IIFE in useJoinSessionState; this is a no-op.
+  //   2. Legacy / plain URL (?id=X, no token) — token is set here once the
+  //      backend returns the conversation (allowed by the anonymous-read fix).
+  //   3. Returning participant in a normal browser — localStorage has their
+  //      participantId/name but the token is refreshed from the server so all
+  //      subsequent requests succeed.
+  //
+  // Private/incognito users lose localStorage on close, so they must re-enter
+  // their name, but they still get the token from the conversation response.
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    const token = (conversation as any)?.join_token;
+    if (token) {
+      setJoinToken(token);
+    }
+  }, [conversation]);
 
   // Handle fetch errors
   useEffect(() => {

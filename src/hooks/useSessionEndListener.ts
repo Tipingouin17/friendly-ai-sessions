@@ -40,24 +40,15 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
         if (!mountedRef.current) return;
         
         if (payload.new && payload.new.event_type === 'session_ended') {
+          // Show a toast but keep the participant on the page so they can
+          // read the full chat transcript. The ParticipantMessagingView will
+          // render an ended banner with a "Return Home" button.
           toast({
             title: "Session Ended",
             description: "This session has been closed by the facilitator. Thank you for participating!",
             duration: 5000,
           });
-          
-          // Clear session storage and navigate to home after a delay
-          setTimeout(() => {
-            if (mountedRef.current) {
-              try {
-                localStorage.removeItem('participant_session');
-                sessionStorage.removeItem('isAdminSession');
-              } catch (err) {
-                console.error("Error clearing session storage:", err);
-              }
-              navigate('/');
-            }
-          }, 3000);
+          // No automatic redirect — participant chooses when to leave.
         }
       })
       .subscribe((status) => { /* no-op */ });

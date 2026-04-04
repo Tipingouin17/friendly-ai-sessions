@@ -92,7 +92,11 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   }
 
   // IMPROVED ERROR DETECTION: Check for common error conditions that indicate session problems
-  const hasError = error || noSessionFound;
+  // An ended-session message is NOT a real error — the participant should stay
+  // on the page and see the transcript with the ended banner.
+  const isEndedSessionMessage = error?.includes("has ended") || error?.includes("no longer available");
+
+  const hasError = (error && !isEndedSessionMessage) || noSessionFound;
   const waitedTooLong = connectionAttempts > 3 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 10000);
   
   if (hasError || waitedTooLong) {

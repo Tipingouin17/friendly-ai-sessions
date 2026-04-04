@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface SignupFormFieldsProps {
   name: string;
@@ -17,6 +17,7 @@ interface SignupFormFieldsProps {
   isLoading: boolean;
   attempts: number;
   errors: Record<string, string>;
+  serverError?: string | null;
   onNameChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
@@ -31,6 +32,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
   isLoading,
   attempts,
   errors,
+  serverError,
   onNameChange,
   onEmailChange,
   onPasswordChange,
@@ -43,6 +45,12 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
 
   return (
     <div className="space-y-4">
+      {serverError && (
+        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{serverError}</span>
+        </div>
+      )}
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-2 text-left">
           Full Name

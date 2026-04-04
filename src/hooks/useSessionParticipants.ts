@@ -60,13 +60,9 @@ export function useSessionParticipants(conversationId: number | null) {
     }
   }, [fetchError]);
 
-  // Check if session has ended
+  // Track initialization — ended sessions are valid read-only states, not errors
   useEffect(() => {
     if (!mountedRef.current) return;
-
-    if (conversation?.is_session_ended) {
-      setStateError("This session has ended and is no longer available");
-    }
 
     if (conversation && !isInitialized) {
       setIsInitialized(true);

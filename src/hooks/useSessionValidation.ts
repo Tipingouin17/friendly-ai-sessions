@@ -51,16 +51,21 @@ export const useSessionValidation = ({ conversationId, isAdmin = false }: UseSes
           return;
         }
 
-        // Check if session is ended
-        if (data.is_session_ended || data.status !== 'active') {
+        // Check if session is ended.
+        // For participants we allow them to stay on the page and see the transcript
+        // in read-only mode — the ParticipantMessagingView renders an ended banner.
+        // Only redirect hosts/admins away (they are handled by their own hooks).
+        if ((data.is_session_ended || data.status !== 'active') && isAdmin) {
           setIsValid(false);
-          
-          toast({
-            title: "Session Ended",
-            description: "This session has been closed and moved to past workshops.",
-          });
-          
           navigate('/past-workshops', { replace: true });
+          return;
+        }
+
+        // Participants: mark valid so the session page stays mounted
+        if (data.is_session_ended || data.status !== 'active') {
+          // Still mark as valid so the page renders; the ended banner handles UX
+          setIsValid(true);
+          setIsValidating(false);
           return;
         }
 

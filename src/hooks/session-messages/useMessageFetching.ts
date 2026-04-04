@@ -14,8 +14,10 @@ interface UseMessageFetchingProps {
   isAdmin: boolean;
   conversation?: any;
   totalParticipants: number;
-  /** Participant IDs currently paused or skipped — excluded from response counting and auto-advance */
+  /** Participant IDs currently paused — excluded from response counting entirely */
   excludedParticipantIds?: Set<number>;
+  /** Participant IDs who skipped the current question — counted as responded */
+  skippedParticipantIds?: Set<number>;
 }
 
 // Polling interval in milliseconds
@@ -27,6 +29,7 @@ export const useMessageFetching = ({
   conversation,
   totalParticipants,
   excludedParticipantIds = new Set(),
+  skippedParticipantIds = new Set(),
 }: UseMessageFetchingProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGeneratingWelcome, setIsGeneratingWelcome] = useState(false);
@@ -40,6 +43,12 @@ export const useMessageFetching = ({
   const messagesRef = useRef<Message[]>([]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const conversationIdRef = useRef<number | null>(null);
+
+  // Keep refs to the latest Sets so useEffects always see fresh values
+  const excludedParticipantIdsRef = useRef(excludedParticipantIds);
+  const skippedParticipantIdsRef = useRef(skippedParticipantIds);
+  useEffect(() => { excludedParticipantIdsRef.current = excludedParticipantIds; }, [excludedParticipantIds]);
+  useEffect(() => { skippedParticipantIdsRef.current = skippedParticipantIds; }, [skippedParticipantIds]);
 
   // Keep messagesRef in sync
   useEffect(() => {
@@ -244,14 +253,16 @@ export const useMessageFetching = ({
       // Paused and skipped participants are excluded from the waiting count.
       const responses = messages.slice(lastAssistantIndex + 1).filter(m => {
         if (m.sender !== 'user') return false;
-        // Exclude paused/skipped participants
-        if (m.participant && excludedParticipantIds.has(Number(m.participant))) return false;
+        // Exclude paused participants (use ref for latest value)
+        if (m.participant && excludedParticipantIdsRef.current.has(Number(m.participant))) return false;
         return true;
       });
 
-      // Count unique participants (excluding paused/skipped)
+      // Count unique participants who actually responded (excluding paused)
       const uniqueRespondents = new Set(responses.map(r => r.participant || r.name)).size;
-      setResponseCount(uniqueRespondents);
+      // Add skipped participants — they count as having responded for auto-advance purposes
+      const effectiveResponseCount = uniqueRespondents + skippedParticipantIdsRef.current.size;
+      setResponseCount(effectiveResponseCount);
 
       // Only enter waiting-for-responses state when there are actual participant responses
       // (or when we are still waiting for them). If the only messages after the last
@@ -323,26 +334,39 @@ export const useMessageFetching = ({
     }
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
-  // Auto-advance logic: Trigger response when all participants have answered
+  // Auto-advance logic: Trigger response when all participants have answered or skipped
   const autoAdvanceTriggeredRef = useRef(false);
 
   useEffect(() => {
+    // Use refs for latest Set values (Sets don't trigger re-renders by reference change)
+    const skipped = skippedParticipantIdsRef.current;
+    const excluded = excludedParticipantIdsRef.current;
+
     // Reset trigger flag when response count resets (new round)
-    if (responseCount === 0) {
+    if (responseCount === 0 && skipped.size === 0) {
       autoAdvanceTriggeredRef.current = false;
     }
 
-    // Check if we should auto-advance
-    // Effective participant count excludes paused/skipped participants
-    const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedParticipantIds.size);
+    // Effective participant count excludes only paused participants
+    const effectiveTotalParticipants = Math.max(1, totalParticipants - excluded.size);
 
-    if (
-      isWaitingForResponses &&
-      effectiveTotalParticipants > 0 &&
-      responseCount >= effectiveTotalParticipants &&
+    // All-skipped case: even if no messages were sent, if every active participant skipped,
+    // we should still advance. isWaitingForResponses may be false here so we check separately.
+    const allSkipped =
+      skipped.size >= effectiveTotalParticipants &&
+      effectiveTotalParticipants > 0;
+
+    const shouldAdvance =
       !isGeneratingResponse &&
-      !autoAdvanceTriggeredRef.current
-    ) {
+      !autoAdvanceTriggeredRef.current &&
+      (
+        // Normal case: waiting for responses and enough have come in (including skips)
+        (isWaitingForResponses && responseCount >= effectiveTotalParticipants && effectiveTotalParticipants > 0) ||
+        // All-skipped case: everyone skipped, no messages at all
+        allSkipped
+      );
+
+    if (shouldAdvance) {
       autoAdvanceTriggeredRef.current = true;
       generateAggregatedResponse();
     }

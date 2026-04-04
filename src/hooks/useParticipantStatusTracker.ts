@@ -94,12 +94,22 @@ export const useParticipantStatusTracker = ({
     };
   }, [conversationId, fetchStatuses, pollingIntervalMs]);
 
-  // Build the excluded set (paused + skipped)
-  const excludedParticipantIds = new Set<number>(
+  // Paused participants: excluded from response counting AND don't count as responded
+  const pausedParticipantIds = new Set<number>(
     Array.from(statusMap.entries())
-      .filter(([, status]) => status === 'paused' || status === 'skipped')
+      .filter(([, status]) => status === 'paused')
       .map(([id]) => id)
   );
 
-  return { statusMap, excludedParticipantIds };
+  // Skipped participants: NOT excluded from counting — they count AS responded
+  const skippedParticipantIds = new Set<number>(
+    Array.from(statusMap.entries())
+      .filter(([, status]) => status === 'skipped')
+      .map(([id]) => id)
+  );
+
+  // Combined excluded set for backward compat (only paused now)
+  const excludedParticipantIds = pausedParticipantIds;
+
+  return { statusMap, excludedParticipantIds, pausedParticipantIds, skippedParticipantIds };
 };

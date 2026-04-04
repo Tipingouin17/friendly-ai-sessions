@@ -283,7 +283,7 @@ const JoinSessionContainer = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={!hasJoinedBefore && !checkNavigationState() && isTokenReady ? handleJoin : undefined}
+      onJoinSession={handleJoin}
       isTokenReady={isTokenReady}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}

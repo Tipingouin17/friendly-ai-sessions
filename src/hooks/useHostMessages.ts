@@ -10,7 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMessageFetching } from "./session-messages/useMessageFetching";
 import { useResponseAggregation } from "./session-messages/useResponseAggregation";
 import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
-import { useSessionAutoStartMonitoring } from "./useSessionAutoStartMonitoring";
+import { useSessionAutoStartMonitoring } from './useSessionAutoStartMonitoring';
+import { useParticipantStatusTracker } from './useParticipantStatusTracker';
 
 interface UseHostMessagesProps {
   conversationId: number | null;
@@ -41,6 +42,11 @@ export const useHostMessages = ({
     }
   }, [conversationData]);
 
+  // Track paused/skipped participants so they are excluded from response counting
+  const { excludedParticipantIds } = useParticipantStatusTracker({
+    conversationId,
+  });
+
   const {
     messages: fetchedMessages,
     fetchMessages,
@@ -55,7 +61,8 @@ export const useHostMessages = ({
     conversationId,
     isAdmin: true,
     conversation: conversationState,
-    totalParticipants: participants.length
+    totalParticipants: participants.length,
+    excludedParticipantIds,
   });
 
   // Sync messages from useMessageFetching back to the parent's state

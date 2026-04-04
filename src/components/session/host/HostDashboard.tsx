@@ -8,6 +8,7 @@ import React from "react";
 import HostHeader from "./HostHeader";
 import HostSessionContent from "./HostSessionContent";
 import WaitingParticipantsBanner from "./WaitingParticipantsBanner";
+import { EngagementStatsPanel } from "./EngagementStatsPanel";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 
@@ -73,6 +74,16 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
       {/* Waiting participants notification banner */}
       {currentConversationId && (
         <WaitingParticipantsBanner conversationId={currentConversationId} />
+      )}
+
+      {/* Live engagement stats (skip / pause / message-host events) */}
+      {currentConversationId && isSessionStarted && (
+        <div className="px-4 pt-2">
+          <EngagementStatsPanel
+            conversationId={currentConversationId}
+            participants={participants.map(p => ({ id: Number(p.id), name: p.name }))}
+          />
+        </div>
       )}
       
       <HostSessionContent

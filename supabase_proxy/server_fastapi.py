@@ -722,11 +722,12 @@ async def auth_signup(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[signup] DB error: {e}")
+        err_msg = str(e)
+        print(f"[signup] DB error: {err_msg}")
         # Surface DB errors to the caller so they know the account was NOT saved.
         raise HTTPException(
             500,
-            detail={"code": "db_error", "message": "Account could not be created. Please try again."},
+            detail={"code": "db_error", "message": f"Account could not be created: {err_msg}"},
         )
 
     # --- Memory cache (fast path for subsequent requests in the same process) ---

@@ -50,7 +50,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
       <div className="w-full max-w-md">
         {/* Brand header */}
         <div className="text-center mb-6">
@@ -89,12 +89,14 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
             {/* Session title */}
             <div className="mb-5">
               <h1 className="text-xl font-bold text-gray-900 mb-1">{sessionTitle}</h1>
-              {effectiveMaxParticipants > 0 && (
-                <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <div className="flex items-center gap-1.5 text-sm text-gray-500">
                   <Users className="h-3.5 w-3.5" />
-                  <span>{currentParticipantCount} / {effectiveMaxParticipants} participants joined</span>
+                  {effectiveMaxParticipants > 0 ? (
+                    <span>{currentParticipantCount} / {effectiveMaxParticipants} participants joined</span>
+                  ) : (
+                    <span>{currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} joined</span>
+                  )}
                 </div>
-              )}
             </div>
 
             {/* Error state */}

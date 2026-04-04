@@ -42,7 +42,7 @@ const JoinSessionLoadingState: React.FC<JoinSessionLoadingStateProps> = ({
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50/50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
       <LoadingStateContent
         isVeryLongWait={isVeryLongWait}
         error={error}

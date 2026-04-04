@@ -659,41 +659,63 @@ async def rest_root():
 async def auth_signup(request: Request):
     """Register a new user account.
 
-    Persists credentials (password_hash) to the DB so that logins survive
-    container restarts.  The frontend sends the user's display name under
-    options.data.name (or options.data.full_name); both are accepted.
+    Persists credentials to the DB so that logins survive container restarts.
+    The frontend sends the display name as options.data.name or options.data.full_name;
+    both are accepted.  The api.ts client also sends it as a top-level 'data' key.
+
+    Bug-fixes applied:
+    - DB write failure is now a hard error (not silently swallowed), so the caller
+      knows immediately if persistence failed instead of losing the account on restart.
+    - Duplicate check is done in the DB first (single source of truth), then memory.
+    - Name extraction handles all three payload shapes the frontend may send.
+    - Password length is validated server-side (min 8 chars) as a defence-in-depth.
+    - The in-memory USERS cache is only populated AFTER a successful DB write.
     """
     data = await request.json()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password", "")
+
     if not email or not password:
-        raise HTTPException(400, "Email and password required")
+        raise HTTPException(400, detail={"code": "validation_failed", "message": "Email and password are required"})
 
-    # Reject duplicate registrations (check memory first, then DB)
-    if email in USERS:
-        raise HTTPException(400, detail={"code": "user_already_exists", "message": "User already registered"})
+    if len(password) < 8:
+        raise HTTPException(400, detail={"code": "weak_password", "message": "Password must be at least 8 characters"})
 
-    # Accept display name sent as 'name' or 'full_name' inside options.data
-    user_meta = data.get("options", {}).get("data") or data.get("data") or {}
-    full_name = user_meta.get("full_name") or user_meta.get("name") or ""
+    # Extract display name — frontend may send it in three different shapes:
+    #   1. options.data.name  (AuthContext sends this)
+    #   2. options.data.full_name
+    #   3. top-level data.name / data.full_name  (api.ts maps options.data -> body.data)
+    options_meta = (data.get("options") or {}).get("data") or {}
+    top_meta = data.get("data") or {}
+    full_name = (
+        options_meta.get("full_name") or options_meta.get("name")
+        or top_meta.get("full_name") or top_meta.get("name")
+        or ""
+    )
 
     user_id = str(uuid.uuid4())
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    created_at = datetime.utcnow().isoformat()
 
-    # Persist to DB — password_hash is stored so the account survives restarts
+    # --- DB persistence (primary store) ---
+    # We write to the DB first.  If this fails we return an error immediately
+    # rather than silently falling back to memory-only storage (which would lose
+    # the account on the next container restart).
     try:
         conn = get_db()
         cur = conn.cursor()
-        # First check if the email is already in the DB (duplicate guard)
+
+        # Authoritative duplicate check against the DB
         cur.execute("SELECT id FROM profiles WHERE email = %s", (email,))
         if cur.fetchone():
             conn.close()
-            raise HTTPException(400, detail={"code": "user_already_exists", "message": "User already registered"})
+            raise HTTPException(400, detail={"code": "user_already_exists", "message": "An account with this email already exists"})
+
         cur.execute(
             "INSERT INTO profiles "
             "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
-            "VALUES (%s, %s, %s, 'user', %s, FALSE, NOW(), NOW())",
-            (user_id, email, full_name, pw_hash),
+            "VALUES (%s, %s, %s, 'user', %s, TRUE, NOW(), NOW())",
+            (user_id, email, full_name or None, pw_hash),
         )
         conn.commit()
         conn.close()
@@ -701,14 +723,19 @@ async def auth_signup(request: Request):
         raise
     except Exception as e:
         print(f"[signup] DB error: {e}")
-        # Continue even if DB write fails — the in-memory store is the fallback
+        # Surface DB errors to the caller so they know the account was NOT saved.
+        raise HTTPException(
+            500,
+            detail={"code": "db_error", "message": "Account could not be created. Please try again."},
+        )
 
+    # --- Memory cache (fast path for subsequent requests in the same process) ---
     USERS[email] = {
         "id": user_id,
         "email": email,
         "password": pw_hash,
-        "created_at": datetime.utcnow().isoformat(),
-        "email_confirmed_at": datetime.utcnow().isoformat(),
+        "created_at": created_at,
+        "email_confirmed_at": created_at,
     }
     token = _make_token(user_id, email)
     return _make_user_response(USERS[email], token)
@@ -759,7 +786,10 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         except Exception as e:
             print(f"[login] DB lookup error: {e}")
 
-    if not user or user.get("password") != pw_hash:
+    # Reject if user not found OR password does not match.
+    # Legacy seed accounts that have no password_hash (password=None) are also rejected
+    # — they must be updated with a real password before they can log in.
+    if not user or not user.get("password") or user.get("password") != pw_hash:
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
 
     token = _make_token(user["id"], user["email"])

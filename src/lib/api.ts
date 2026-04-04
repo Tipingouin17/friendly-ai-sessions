@@ -213,7 +213,8 @@ export const auth = {
     options?: { data?: Record<string, unknown>; emailRedirectTo?: string };
   }): Promise<{ data: { session: ApiSession | null; user: ApiUser | null }; error: ApiError | null }> {
     const body: Record<string, unknown> = { email: params.email, password: params.password };
-    // Pass user metadata (name, etc.) at the top level so the backend can read it
+    // Pass user metadata (name, etc.) at the top level so the backend can read it.
+    // The backend accepts both options.data and top-level data shapes.
     if (params.options?.data) body.data = params.options.data;
     const res = await apiFetch<ApiSession>("/auth/v1/signup", {
       method: "POST",
@@ -221,10 +222,11 @@ export const auth = {
       headers: {},
     });
     if (res.error || !res.data) return { data: { session: null, user: null }, error: res.error };
-    // Do NOT save the session or fire SIGNED_IN here.
-    // The user must log in explicitly after account creation.
-    // This prevents automatic access to the app immediately after signup.
-    return { data: { session: null, user: res.data.user }, error: null };
+    // Save the session and fire SIGNED_IN so the user is authenticated immediately
+    // after signup — no separate login step required.
+    saveSession(res.data);
+    notifyAuth("SIGNED_IN", res.data);
+    return { data: { session: res.data, user: res.data.user }, error: null };
   },
 
   async signOut(): Promise<{ error: ApiError | null }> {

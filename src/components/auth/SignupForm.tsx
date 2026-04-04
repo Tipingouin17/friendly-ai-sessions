@@ -79,12 +79,9 @@ export const SignupForm: React.FC = () => {
     setIsLoading(true);
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
-      // Navigate to login with a success flag so the login page can display
-      // a confirmation banner. The user must log in explicitly after signup.
-      navigate('/login', {
-        state: { signupSuccess: true },
-        replace: true,
-      });
+      // The backend now returns a session immediately after signup, so the user
+      // is already authenticated. Redirect straight to the dashboard.
+      navigate('/', { replace: true });
     } catch (error: unknown) {
       setAttempts(prev => prev + 1);
       const message = error instanceof Error ? error.message : "An error occurred during signup";

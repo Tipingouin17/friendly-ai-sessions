@@ -130,6 +130,12 @@ export const useMessageFetching = ({
 
     if (!conversationId) return;
 
+    // Do not start polling for ended sessions — one-time fetch is enough
+    if (conversation?.is_session_ended) {
+      fetchMessagesFromDB();
+      return;
+    }
+
     // Reset state for new conversation
     setMessages([]);
     setWelcomeMessageStatus('pending');
@@ -156,9 +162,20 @@ export const useMessageFetching = ({
     };
   }, [conversationId, fetchMessagesFromDB]);
 
+  // Stop polling when the session becomes ended mid-flight
+  const isSessionEnded = conversation?.is_session_ended ?? false;
+  useEffect(() => {
+    if (isSessionEnded && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, [isSessionEnded]);
+
   // Monitor conversation status for welcome message generation
   useEffect(() => {
     if (!conversationId || !conversation) return;
+    // Never generate a welcome message for an already-ended session
+    if (conversation?.is_session_ended) return;
 
     const currentStatus = conversation.welcome_message_status || 'pending';
     setWelcomeMessageStatus(currentStatus);
@@ -303,6 +320,8 @@ export const useMessageFetching = ({
   // Generate aggregated response - accepts optional host instruction
   const generateAggregatedResponse = useCallback(async (hostInstruction?: string) => {
     if (!conversationIdRef.current || isGeneratingResponse) return;
+    // Never invoke the edge function for an ended session
+    if (conversation?.is_session_ended) return;
 
     setIsGeneratingResponse(true);
 
@@ -359,7 +378,8 @@ export const useMessageFetching = ({
       !autoAdvanceTriggeredRef.current &&
       effectiveTotalParticipants > 0 &&
       isWaitingForResponses &&
-      responseCount >= effectiveTotalParticipants;
+      responseCount >= effectiveTotalParticipants &&
+      !conversation?.is_session_ended;
 
     if (shouldAdvance) {
       autoAdvanceTriggeredRef.current = true;

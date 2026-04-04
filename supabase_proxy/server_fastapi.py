@@ -714,7 +714,7 @@ async def auth_signup(request: Request):
         cur.execute(
             "INSERT INTO profiles "
             "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
-            "VALUES (%s, %s, %s, 'user', %s, TRUE, NOW(), NOW())",
+            "VALUES (%s, %s, %s, 'free', %s, TRUE, NOW(), NOW())",
             (user_id, email, full_name or None, pw_hash),
         )
         conn.commit()

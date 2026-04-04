@@ -5,11 +5,11 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { setJoinToken } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { registerParticipant } from "./useParticipantRegistration";
 import { useSessionCapacityCheck } from "./useSessionCapacityCheck";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
-import { validateSessionAccess } from "@/utils/security/sessionValidation";
 
 interface JoinParticipantParams {
   conversationId: number;
@@ -18,6 +18,9 @@ interface JoinParticipantParams {
   currentParticipantCount: number;
   isAnonymous?: boolean;
   isAdmin?: boolean;
+  /** The already-loaded conversation object — used to validate session state
+   *  without making a redundant authenticated API call. */
+  conversation?: { join_token?: string; is_session_ended?: boolean; status?: string } | null;
 }
 
 export function useParticipantJoining() {
@@ -37,13 +40,6 @@ export function useParticipantJoining() {
     const sessionData = getSessionByConversationId(conversationId);
 
     if (sessionData) {
-
-      // For existing participants, validate session access (anonymous access allowed)
-      const hasAccess = await validateSessionAccess(conversationId);
-      if (!hasAccess) {
-        throw new Error("This session is no longer available");
-      }
-
       // Update the last accessed time
       updateSessionAccessTime(conversationId);
 
@@ -71,19 +67,29 @@ export function useParticipantJoining() {
     avatarSeed,
     currentParticipantCount,
     isAnonymous = false,
-    isAdmin = false
+    isAdmin = false,
+    conversation
   }: JoinParticipantParams) => {
 
-    // Validate session access first (anonymous access allowed for active sessions)
-    try {
-      const hasAccess = await validateSessionAccess(conversationId);
-      if (!hasAccess) {
-        console.error("Session access validation failed");
-        throw new Error("This session is not available or has ended");
+    // ── Session state validation ─────────────────────────────────────────────
+    // Use the already-loaded conversation object instead of making a second
+    // unauthenticated API call (which would fail on mobile without a token).
+    // The form is only rendered after the conversation loads, so these checks
+    // are always against fresh data.
+    if (conversation) {
+      if (conversation.is_session_ended) {
+        throw new Error("This session has ended");
       }
-    } catch (accessError) {
-      console.error("Error during session access validation:", accessError);
-      throw accessError;
+      if (conversation.status && conversation.status !== 'active') {
+        throw new Error("This session is not currently active");
+      }
+      // Ensure the join token is set before any subsequent API calls.
+      // On mobile with a plain ?id=X URL, sessionStorage may be empty.
+      // The token is in the conversation response — set it now so that
+      // checkCapacityAndUpdate and registerParticipant carry the header.
+      if (conversation.join_token) {
+        setJoinToken(conversation.join_token);
+      }
     }
 
     // FIXED: Check capacity without updating count - count will be updated after successful registration

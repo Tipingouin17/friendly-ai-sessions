@@ -157,8 +157,30 @@ export const useWelcomeMessageMonitor = ({
 
     setState(prev => ({ ...prev, isWaiting: true, error: null }));
 
-    const maxRetries = 15; // Increased for better recovery
+    const maxRetries = 15;
     let attempt = 0;
+    let aiGenerationTriggered = false;
+
+    // ── Trigger AI generation immediately (fire-and-forget) ──────────────────
+    // We kick off the AI welcome message generation right away so it runs in
+    // parallel with the first poll.  This means the message is typically ready
+    // within 5-10 seconds instead of waiting 24+ seconds for the old 40%-of-
+    // retries threshold to be reached.
+    try {
+      aiGenerationTriggered = true;
+      supabase.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          sessionStart: true,
+          generateReport: false
+        }
+      }).catch((err: unknown) => {
+        console.error('[useWelcomeMessageMonitor] Immediate AI generation failed:', err);
+      });
+    } catch (err) {
+      console.error('[useWelcomeMessageMonitor] Exception triggering immediate AI generation:', err);
+    }
 
     while (attempt < maxRetries) {
       attempt++;
@@ -174,8 +196,9 @@ export const useWelcomeMessageMonitor = ({
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
-      // For first half of attempts, only accept AI-generated messages
-      const onlyAcceptAI = attempt <= Math.floor(maxRetries * 0.4); // First 40% of attempts
+      // For the first 6 attempts (~24s) only accept a proper AI message;
+      // after that accept any message so we don't block forever.
+      const onlyAcceptAI = attempt <= 6;
       const hasMessage = await checkForWelcomeMessage(onlyAcceptAI);
       
       if (hasMessage) {
@@ -188,44 +211,30 @@ export const useWelcomeMessageMonitor = ({
         return true;
       }
 
-      // If we're past 40% of attempts and no AI message found, trigger AI generation
-      // But first check if ANY message already exists (even non-AI) to avoid double-triggering
+      // If any message exists but isn't AI-quality yet, just wait for it
       const anyMessageExists = await checkForWelcomeMessage(false);
       if (anyMessageExists) {
-        // A message exists but isn't AI-quality yet — just wait for it
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
         continue;
       }
-      if (attempt === Math.floor(maxRetries * 0.4) + 1) {
-        
+
+      // If AI generation hasn't been triggered yet (shouldn't happen) or if
+      // we've been waiting a long time with no message, try again once.
+      if (!aiGenerationTriggered || attempt === 8) {
+        aiGenerationTriggered = true;
         try {
-          const startTime = Date.now();
-          const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+          supabase.functions.invoke('handle-facilitator-response', {
             body: {
               messages: [],
               conversationId,
               sessionStart: true,
               generateReport: false
             }
+          }).catch((err: unknown) => {
+            console.error('[useWelcomeMessageMonitor] Retry AI generation failed:', err);
           });
-          
-          const duration = Date.now() - startTime;
-          
-          if (error) {
-            console.error('[useWelcomeMessageMonitor] AI generation failed:', {
-              error,
-              duration,
-              conversationId,
-              attempt
-            });
-          } else { /* no-op */ }
-        } catch (error) {
-          console.error('[useWelcomeMessageMonitor] Exception triggering AI generation:', {
-            error: error.message,
-            conversationId,
-            attempt,
-            stack: error.stack
-          });
+        } catch (err) {
+          console.error('[useWelcomeMessageMonitor] Exception on retry AI generation:', err);
         }
       }
 

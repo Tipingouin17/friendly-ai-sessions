@@ -278,6 +278,7 @@ interface QState {
   single: boolean;
   maybeSingle: boolean;
   count: "exact" | "planned" | "estimated" | null;
+  signal?: AbortSignal;
 }
 
 class QueryBuilder<T = Record<string, unknown>> {
@@ -311,6 +312,10 @@ class QueryBuilder<T = Record<string, unknown>> {
   range(from: number, to: number): this { this.s.offsetVal = from; this.s.limitVal = to - from + 1; return this; }
   single(): this { this.s.single = true; return this; }
   maybeSingle(): this { this.s.maybeSingle = true; return this; }
+  // React Query v5 calls .abortSignal(signal) to enable query cancellation.
+  // We store the signal and pass it to fetch() so in-flight requests are
+  // properly cancelled when a component unmounts or a query is deduplicated.
+  abortSignal(signal: AbortSignal): this { this.s.signal = signal; return this; }
 
   private url(method: "GET" | "HEAD"): string {
     const p = new URLSearchParams();
@@ -345,7 +350,7 @@ class QueryBuilder<T = Record<string, unknown>> {
     if (token) headers["Authorization"] = `Bearer ${token}`;
     if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     try {
-      const res = await fetch(`${API_URL}${this.url("GET")}`, { headers });
+      const res = await fetch(`${API_URL}${this.url("GET")}`, { headers, signal: this.s.signal });
       let count: number | null = null;
       const cr = res.headers.get("Content-Range");
       if (cr) { const m = cr.match(/\/(\d+)$/); if (m) count = parseInt(m[1], 10); }
@@ -422,6 +427,7 @@ class MutationBuilder<T = Record<string, unknown>> {
   private selectCols = "*";
   private singleFlag = false;
   private maybeSingleFlag = false;
+  private abortSignalRef?: AbortSignal;
 
   constructor(
     table: string,
@@ -440,6 +446,7 @@ class MutationBuilder<T = Record<string, unknown>> {
   select(cols = "*"): this { this.selectCols = cols; return this; }
   single(): this { this.singleFlag = true; return this; }
   maybeSingle(): this { this.maybeSingleFlag = true; return this; }
+  abortSignal(signal: AbortSignal): this { this.abortSignalRef = signal; return this; }
 
   // Filter methods (same as QueryBuilder) — needed for .update().eq(...) patterns
   eq(col: string, val: unknown): this { this.filters.push([col, `eq.${val}`]); return this; }

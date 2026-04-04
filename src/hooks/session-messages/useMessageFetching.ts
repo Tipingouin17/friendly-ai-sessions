@@ -44,11 +44,16 @@ export const useMessageFetching = ({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const conversationIdRef = useRef<number | null>(null);
 
-  // Keep refs to the latest Sets so useEffects always see fresh values
+  // Keep refs to the latest Sets so callbacks always see fresh values
   const excludedParticipantIdsRef = useRef(excludedParticipantIds);
   const skippedParticipantIdsRef = useRef(skippedParticipantIds);
   useEffect(() => { excludedParticipantIdsRef.current = excludedParticipantIds; }, [excludedParticipantIds]);
   useEffect(() => { skippedParticipantIdsRef.current = skippedParticipantIds; }, [skippedParticipantIds]);
+
+  // Expose skip/pause counts as plain numbers so useEffects can depend on them reactively.
+  // Sets are objects — React won't detect internal changes by reference, so we derive numbers.
+  const skippedCount = skippedParticipantIds.size;
+  const excludedCount = excludedParticipantIds.size;
 
   // Keep messagesRef in sync
   useEffect(() => {
@@ -229,7 +234,9 @@ export const useMessageFetching = ({
     }
   }, [conversationId, conversation, isGeneratingWelcome, attemptRecovery, fetchMessagesFromDB]);
 
-  // Update response collection status based on messages
+  // Update response collection status based on messages AND skip/pause counts.
+  // NOTE: skippedCount and excludedCount are included as dependencies so this re-runs
+  // immediately when a participant skips — even before any new message arrives.
   useEffect(() => {
     if (messages.length === 0) {
       setIsWaitingForResponses(false);
@@ -250,7 +257,7 @@ export const useMessageFetching = ({
       // Count ONLY participant (user) responses after the last assistant message.
       // Admin/host messages must NOT be counted as participant responses and must
       // NOT trigger the auto-advance that generates a new AI facilitator reply.
-      // Paused and skipped participants are excluded from the waiting count.
+      // Paused participants are excluded from the waiting count.
       const responses = messages.slice(lastAssistantIndex + 1).filter(m => {
         if (m.sender !== 'user') return false;
         // Exclude paused participants (use ref for latest value)
@@ -264,15 +271,15 @@ export const useMessageFetching = ({
       const effectiveResponseCount = uniqueRespondents + skippedParticipantIdsRef.current.size;
       setResponseCount(effectiveResponseCount);
 
-      // Only enter waiting-for-responses state when there are actual participant responses
-      // (or when we are still waiting for them). If the only messages after the last
-      // assistant message are admin broadcasts, do NOT set waiting state.
+      // Mark as waiting for responses once the AI has asked a question.
+      // This is true even if no one has responded yet (e.g. all skipped).
       setIsWaitingForResponses(true);
     } else {
       setIsWaitingForResponses(false);
       setResponseCount(0);
     }
-  }, [messages]);
+  // skippedCount and excludedCount make this effect re-run reactively when skip/pause state changes
+  }, [messages, skippedCount, excludedCount]);
 
   // Process new messages from realtime (kept for compatibility)
   const processNewMessage = useCallback((message: Message) => {
@@ -334,43 +341,31 @@ export const useMessageFetching = ({
     }
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
-  // Auto-advance logic: Trigger response when all participants have answered or skipped
+  // Auto-advance logic: Trigger response when all participants have answered or skipped.
+  // Depends on skippedCount and excludedCount (numbers) so it fires reactively when skip/pause changes.
   const autoAdvanceTriggeredRef = useRef(false);
 
   useEffect(() => {
-    // Use refs for latest Set values (Sets don't trigger re-renders by reference change)
-    const skipped = skippedParticipantIdsRef.current;
-    const excluded = excludedParticipantIdsRef.current;
-
-    // Reset trigger flag when response count resets (new round)
-    if (responseCount === 0 && skipped.size === 0) {
+    // Reset trigger flag when both response count and skip count are zero (new round)
+    if (responseCount === 0 && skippedCount === 0) {
       autoAdvanceTriggeredRef.current = false;
     }
 
     // Effective participant count excludes only paused participants
-    const effectiveTotalParticipants = Math.max(1, totalParticipants - excluded.size);
-
-    // All-skipped case: even if no messages were sent, if every active participant skipped,
-    // we should still advance. isWaitingForResponses may be false here so we check separately.
-    const allSkipped =
-      skipped.size >= effectiveTotalParticipants &&
-      effectiveTotalParticipants > 0;
+    const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedCount);
 
     const shouldAdvance =
       !isGeneratingResponse &&
       !autoAdvanceTriggeredRef.current &&
-      (
-        // Normal case: waiting for responses and enough have come in (including skips)
-        (isWaitingForResponses && responseCount >= effectiveTotalParticipants && effectiveTotalParticipants > 0) ||
-        // All-skipped case: everyone skipped, no messages at all
-        allSkipped
-      );
+      effectiveTotalParticipants > 0 &&
+      isWaitingForResponses &&
+      responseCount >= effectiveTotalParticipants;
 
     if (shouldAdvance) {
       autoAdvanceTriggeredRef.current = true;
       generateAggregatedResponse();
     }
-  }, [isWaitingForResponses, responseCount, totalParticipants, isGeneratingResponse, generateAggregatedResponse]);
+  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse]);
 
   return {
     messages,

@@ -67,10 +67,10 @@ const MessageItem = ({
         isFirstMessageOfGroup && groupSpacing
       )}
     >
-      <div className="flex items-end gap-1.5 max-w-full">
+      <div className="flex items-start gap-1.5 max-w-full">
         {/* Show avatar for facilitator and admin messages */}
         {(message.sender === "assistant" || message.sender === "admin") && (
-          <div className="mb-1">
+          <div className="mt-1">
             <MessageAvatar 
               avatarUrl={message.avatar} 
               name={message.sender === "admin" ? "Admin" : "Facilitator"} 
@@ -95,7 +95,7 @@ const MessageItem = ({
         
         {/* Show avatar for user messages (not anonymous) */}
         {message.sender === "user" && !isAnonymous && (
-          <div className="mb-1">
+          <div className="mt-1">
             <MessageAvatar 
               avatarUrl={participantInfo?.avatar} 
               name={participantInfo?.name || displayParticipantName} 
@@ -106,7 +106,7 @@ const MessageItem = ({
         
         {/* Show anonymized avatar */}
         {message.sender === "user" && isAnonymous && (
-          <div className="mb-1">
+          <div className="mt-1">
             <MessageAvatar 
               anonymized={true}
               name="Anonymous"

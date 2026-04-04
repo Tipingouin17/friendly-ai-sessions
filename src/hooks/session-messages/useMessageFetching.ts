@@ -72,7 +72,7 @@ export const useMessageFetching = ({
       const formattedMessages: Message[] = (messagesData || []).map(msg => ({
         id: msg.id.toString(),
         content: typeof msg.content === 'string' ? msg.content : (msg.content && typeof msg.content === 'object' && 'text' in msg.content ? String(msg.content.text) : ''),
-        sender: msg.role === 'assistant' ? 'assistant' : 'user',
+        sender: msg.role === 'assistant' ? 'assistant' : msg.role === 'admin' ? 'admin' : 'user',
         timestamp: new Date(msg.created_at),
         participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
         name: msg.name || undefined,
@@ -235,15 +235,19 @@ export const useMessageFetching = ({
     }
 
     if (lastAssistantIndex !== -1) {
-      // We are in a response collection phase
-      setIsWaitingForResponses(true);
-
-      // Count user responses AFTER the last assistant message
+      // Count ONLY participant (user) responses after the last assistant message.
+      // Admin/host messages must NOT be counted as participant responses and must
+      // NOT trigger the auto-advance that generates a new AI facilitator reply.
       const responses = messages.slice(lastAssistantIndex + 1).filter(m => m.sender === 'user');
 
       // Count unique participants
       const uniqueRespondents = new Set(responses.map(r => r.participant || r.name)).size;
       setResponseCount(uniqueRespondents);
+
+      // Only enter waiting-for-responses state when there are actual participant responses
+      // (or when we are still waiting for them). If the only messages after the last
+      // assistant message are admin broadcasts, do NOT set waiting state.
+      setIsWaitingForResponses(true);
     } else {
       setIsWaitingForResponses(false);
       setResponseCount(0);

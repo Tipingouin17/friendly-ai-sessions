@@ -7,6 +7,7 @@
 import React from "react";
 import HostHeader from "./HostHeader";
 import HostSessionContent from "./HostSessionContent";
+import WaitingParticipantsBanner from "./WaitingParticipantsBanner";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 
@@ -68,6 +69,11 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
       />
+
+      {/* Waiting participants notification banner */}
+      {currentConversationId && (
+        <WaitingParticipantsBanner conversationId={currentConversationId} />
+      )}
       
       <HostSessionContent
         sessionMessages={sessionMessages}

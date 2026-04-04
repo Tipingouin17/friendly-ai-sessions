@@ -34,6 +34,7 @@ export const CreateWorkshopModal = ({
   const [scope, setScope] = useState("");
   const [objective, setObjective] = useState("");
   const [profilePicture, setProfilePicture] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState<number | "">("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -92,6 +93,7 @@ export const CreateWorkshopModal = ({
           status: true,
           lock: false,
           user_id: user.id,
+          ...(durationMinutes !== "" ? { duration_minutes: Number(durationMinutes) } : {}),
         });
 
       if (error) throw error;
@@ -106,6 +108,7 @@ export const CreateWorkshopModal = ({
       setScope("");
       setObjective("");
       setProfilePicture("");
+      setDurationMinutes("");
 
       onSuccess();
       onOpenChange(false);
@@ -187,6 +190,19 @@ export const CreateWorkshopModal = ({
                 onChange={(e) => setObjective(e.target.value)}
                 placeholder="Enter workshop objective"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ws-duration">Session Duration (minutes)</Label>
+              <Input
+                id="ws-duration"
+                type="number"
+                min={5}
+                max={480}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="e.g. 60 (optional)"
+              />
+              <p className="text-xs text-muted-foreground">The AI facilitator will start wrapping up 10 minutes before the end.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="ws-image">Workshop Icon Type</Label>

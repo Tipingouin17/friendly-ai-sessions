@@ -45,6 +45,8 @@ const AIfacilitators = () => {
     setLanguage,
     agreed,
     setAgreed,
+    durationMinutes,
+    setDurationMinutes,
     handleNext,
     handlePrevious,
     handleSubmit,
@@ -178,6 +180,9 @@ const AIfacilitators = () => {
                 setLanguage={setLanguage}
                 agreed={agreed}
                 setAgreed={setAgreed}
+                durationMinutes={durationMinutes}
+                setDurationMinutes={setDurationMinutes}
+                defaultDurationMinutes={workshops.find(w => w.id === selectedWorkshop)?.duration_minutes ?? null}
               />
             </div>
           </div>

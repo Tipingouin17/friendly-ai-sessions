@@ -9,6 +9,7 @@ import ChatHeader from "@/components/chat/ChatHeader";
 import { getFacilitatorAvatarUrl, handleAvatarError } from "@/utils/facilitatorUtils";
 import { debugLog } from "@/utils/debugLogger";
 import { isInCrossOriginContext } from "@/utils/crossOriginUtils";
+import { SessionTimerState } from "@/hooks/useSessionTimer";
 
 interface SessionHeaderProps {
   facilitator: {
@@ -23,6 +24,7 @@ interface SessionHeaderProps {
   canGenerateReports: boolean;
   messagesCount: number;
   viewMode: "participant" | "admin";
+  timer?: SessionTimerState | null;
 }
 
 const SessionHeader = ({
@@ -33,7 +35,8 @@ const SessionHeader = ({
   isGeneratingReport,
   canGenerateReports,
   messagesCount,
-  viewMode
+  viewMode,
+  timer = null,
 }: SessionHeaderProps) => {
   const [profilePicture, setProfilePicture] = useState<string>('/placeholder.svg');
   const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +123,7 @@ const SessionHeader = ({
       onImageError={handleAvatarError}
       isLoading={isLoading}
       needsCrossOrigin={needsCrossOrigin}
+      timer={timer}
     />
   );
 };

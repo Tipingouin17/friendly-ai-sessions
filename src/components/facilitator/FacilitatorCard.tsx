@@ -9,6 +9,7 @@ import { Facilitator } from "@/types/facilitator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { handleAvatarError } from "@/utils/facilitatorUtils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { debugLog } from "@/utils/debugLogger";
@@ -125,6 +126,20 @@ export const FacilitatorCard = ({
         )}
       </div>
       <h3 className="text-center text-sm font-medium">{facilitator.title}</h3>
+      {facilitator.expertise_level && (
+        <span className="mt-1 text-[10px] font-medium text-indigo-600 capitalize text-center">
+          {facilitator.expertise_level}
+        </span>
+      )}
+      {facilitator.specialties && facilitator.specialties.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+          {facilitator.specialties.slice(0, 2).map((s) => (
+            <Badge key={s} variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+              {s}
+            </Badge>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

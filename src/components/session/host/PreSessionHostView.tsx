@@ -76,7 +76,8 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   const sessionInfo = useMemo(() => ({
     facilitatorTitle: conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator',
     sessionTitle: conversationData?.sessions?.title || 'Untitled Session',
-    objective: conversationData?.sessions?.objective || 'No objective specified'
+    objective: conversationData?.sessions?.objective || 'No objective specified',
+    durationMinutes: conversationData?.session_duration_minutes ?? conversationData?.sessions?.duration_minutes ?? null
   }), [conversationData]);
 
   // Memoize participant progress calculation
@@ -182,7 +183,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                   <h3 className="text-lg md:text-xl font-semibold text-gray-900">{sessionInfo.sessionTitle}</h3>
                   <div className="flex items-center gap-1 text-gray-600 flex-shrink-0">
                     <Clock className="h-4 w-4" />
-                    <span className="text-sm font-medium">~30-60 min</span>
+                    <span className="text-sm font-medium">
+                      {sessionInfo.durationMinutes ? `${sessionInfo.durationMinutes} min` : 'Duration TBD'}
+                    </span>
                   </div>
                 </div>
               </div>

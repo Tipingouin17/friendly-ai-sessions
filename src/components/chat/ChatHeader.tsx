@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import SessionTimerBadge from '@/components/session/SessionTimerBadge';
+import { SessionTimerState } from '@/hooks/useSessionTimer';
 
 interface ChatHeaderProps {
   title: string;
@@ -25,6 +27,7 @@ interface ChatHeaderProps {
   onImageError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
   isLoading?: boolean;
   needsCrossOrigin?: boolean;
+  timer?: SessionTimerState | null;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({ 
@@ -38,7 +41,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   viewMode = "participant",
   onImageError,
   isLoading = false,
-  needsCrossOrigin = false
+  needsCrossOrigin = false,
+  timer = null,
 }) => {
   return (
     <div className="w-full relative px-4 py-3 flex items-center gap-3 border-b bg-white">
@@ -83,6 +87,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
       
       <div className="ml-auto flex items-center gap-2">
+        {/* Session timer */}
+        {timer && <SessionTimerBadge timer={timer} showAddTime={false} />}
+
         {/* Participant count */}
         <TooltipProvider>
           <Tooltip>

@@ -38,6 +38,7 @@ export const createConversation = async (params: {
   workshopId: number;
   agreed: boolean;
   userId: string;
+  durationMinutes?: number;
 }) => {
   const { data, error } = await supabase
     .from('conversations')
@@ -49,7 +50,8 @@ export const createConversation = async (params: {
       accept_terms_and_conditions: params.agreed,
       is_saved: false,
       is_session_ended: false,
-      user_id: params.userId
+      user_id: params.userId,
+      ...(params.durationMinutes ? { session_duration_minutes: params.durationMinutes } : {})
     })
     .select('id')
     .single();

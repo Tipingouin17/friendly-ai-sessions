@@ -1,14 +1,15 @@
 /**
- * Chat Input
+ * ChatInput — World-class responsive redesign
  *
- * Chat component for the AIfacilitator application.
+ * - No isMobile branching — pure CSS responsive
+ * - Auto-growing textarea (min 2 lines, max 6 lines)
+ * - Prominent send button
+ * - Clean voice recording state
  */
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Mic, Send, StopCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { SpeechRecognition } from "@/types/chat";
 
 interface ChatInputProps {
@@ -19,7 +20,7 @@ interface ChatInputProps {
   setIsRecording?: (isRecording: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
-  isMobile?: boolean;
+  isMobile?: boolean; // kept for API compat
 }
 
 const ChatInput = ({
@@ -28,191 +29,148 @@ const ChatInput = ({
   onSendMessage,
   isRecording = false,
   setIsRecording = () => { /* no-op */ },
-  placeholder = "Type your message...",
+  placeholder = "Type your response…",
   disabled = false,
-  isMobile = false
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  // Track the text that existed before recording started so we can append the transcript to it
   const preRecordingTextRef = useRef<string>('');
   const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
 
+  // Auto-resize textarea
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognitionAPI) {
-        setSpeechSupported(true);
-        recognitionRef.current = new SpeechRecognitionAPI();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'en-US';
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const lineHeight = 24;
+    const minHeight = lineHeight * 2;
+    const maxHeight = lineHeight * 6;
+    el.style.height = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight) + 'px';
+  }, [inputMessage]);
 
-        recognitionRef.current.onresult = (event) => {
-          // Build the full transcript from all results
-          const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join('');
-          // Append the live transcript to whatever text existed before recording started
-          const combined = preRecordingTextRef.current
-            ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
-            : transcript;
-          setInputMessage(combined);
-        };
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) { setSpeechSupported(false); return; }
 
-        recognitionRef.current.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          setIsRecording(false);
-          if (event.error === 'not-allowed') {
-            toast({
-              title: "Microphone Access Denied",
-              description: "Please allow microphone access in your browser settings to use voice input.",
-              variant: "destructive",
-            });
-          } else if (event.error === 'no-speech') {
-            toast({
-              title: "No Speech Detected",
-              description: "No speech was detected. Please try again.",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Voice Input Error",
-              description: "There was an error with voice input. Please try again.",
-              variant: "destructive",
-            });
-          }
-        };
+    setSpeechSupported(true);
+    recognitionRef.current = new SpeechRecognitionAPI();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
 
-        recognitionRef.current.onend = () => {
-          // Auto-stop recording state when recognition ends
-          setIsRecording(false);
-        };
-      } else {
-        setSpeechSupported(false);
-      }
-    }
+    recognitionRef.current.onresult = (event) => {
+      const transcript = Array.from(event.results).map(r => r[0].transcript).join('');
+      const combined = preRecordingTextRef.current
+        ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
+        : transcript;
+      setInputMessage(combined);
+    };
 
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+    recognitionRef.current.onerror = (event) => {
+      setIsRecording(false);
+      if (event.error === 'not-allowed') {
+        toast.error("Microphone access denied — please allow it in your browser settings.");
+      } else if (event.error !== 'no-speech') {
+        toast.error("Voice input error — please try again.");
       }
     };
+
+    recognitionRef.current.onend = () => setIsRecording(false);
+
+    return () => { recognitionRef.current?.stop(); };
   }, [setInputMessage, setIsRecording]);
 
   const handleStartRecording = () => {
     if (!speechSupported) {
-      toast({
-        title: "Voice Input Not Supported",
-        description: "Your browser doesn't support voice input. Try Chrome or Edge.",
-        variant: "destructive",
-      });
+      toast.error("Voice input is not supported in this browser. Try Chrome or Edge.");
       return;
     }
     if (recognitionRef.current) {
-      // Save current text so we can append the transcript to it
       preRecordingTextRef.current = inputMessage;
       try {
         recognitionRef.current.start();
         setIsRecording(true);
-        toast({
-          title: "Listening...",
-          description: "Speak now. Click the stop button when done.",
-        });
-      } catch (err) {
-        console.error('Failed to start speech recognition:', err);
-        toast({
-          title: "Could Not Start Voice Input",
-          description: "Please check your microphone permissions and try again.",
-          variant: "destructive",
-        });
+        toast.info("Listening… speak now, then press Stop or Enter to send.");
+      } catch {
+        toast.error("Could not start voice input — check your microphone permissions.");
       }
     }
   };
 
   const handleStopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+    recognitionRef.current?.stop();
     setIsRecording(false);
   };
 
-  const handleSendClick = () => {
-    if (!inputMessage.trim() || disabled) {
-      return;
-    }
-    // Stop recording if active before sending
-    if (isRecording) {
-      handleStopRecording();
-    }
+  const handleSend = () => {
+    if (!inputMessage.trim() || disabled) return;
+    if (isRecording) handleStopRecording();
     onSendMessage();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !disabled) {
       e.preventDefault();
-      handleSendClick();
+      handleSend();
     }
   };
 
   return (
-    <div className={`${isMobile ? 'p-3' : 'p-4'} border-t border-gray-200 bg-white`}>
-      <div className="relative flex items-center">
-        <Textarea
-          ref={textareaRef}
-          value={inputMessage}
-          onChange={(e) => {
-            setInputMessage(e.target.value);
-          }}
-          placeholder={disabled ? "You have already answered this question" : placeholder}
-          className={`${isMobile ? 'min-h-[45px] py-2 text-sm' : 'min-h-[60px]'} pr-16 rounded-md border-gray-200 resize-none`}
-          disabled={disabled}
-          onKeyDown={handleKeyDown}
-        />
-        <div className="absolute right-2 flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} ${
-              isRecording
-                ? "text-red-600 animate-pulse"
-                : speechSupported === false
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:text-indigo-600"
-            }`}
+    <div className="px-3 py-3 sm:px-4 sm:py-3.5 bg-white border-t border-slate-200">
+      <div className="flex items-end gap-2">
+        {/* Textarea */}
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={disabled ? "Waiting for the next question…" : placeholder}
             disabled={disabled}
-            title={
-              isRecording
-                ? "Stop recording"
-                : speechSupported === false
-                  ? "Voice input not supported in this browser"
-                  : "Start voice input"
-            }
-          >
-            {isRecording ? (
-              <StopCircle className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
-            ) : (
-              <Mic className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
-            )}
-          </Button>
-          <Button
-            onClick={handleSendClick}
-            size="icon"
-            aria-label="Send message"
-            className={`${isMobile ? 'h-7 w-7' : 'h-8 w-8'} bg-indigo-600 hover:bg-indigo-700`}
-            disabled={!inputMessage.trim() || disabled}
-          >
-            <Send className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
-          </Button>
+            rows={2}
+            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow"
+            style={{ minHeight: '48px', maxHeight: '144px', overflowY: 'auto' }}
+          />
+          {isRecording && (
+            <div className="absolute bottom-2 left-3 flex items-center gap-1.5 text-xs text-red-500 font-medium pointer-events-none">
+              <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              Listening…
+            </div>
+          )}
         </div>
+
+        {/* Voice button */}
+        <button
+          type="button"
+          onClick={isRecording ? handleStopRecording : handleStartRecording}
+          disabled={disabled}
+          title={isRecording ? "Stop recording" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
+          className={`shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
+            isRecording
+              ? "bg-red-100 text-red-600 animate-pulse"
+              : speechSupported === false
+                ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                : "bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+          } disabled:opacity-40`}
+        >
+          {isRecording
+            ? <StopCircle className="h-5 w-5" />
+            : <Mic className="h-5 w-5" />
+          }
+        </button>
+
+        {/* Send button */}
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={!inputMessage.trim() || disabled}
+          aria-label="Send message"
+          className="shrink-0 h-11 w-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <Send className="h-5 w-5" />
+        </button>
       </div>
-      {isRecording && (
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
-          <span className="inline-block h-2 w-2 rounded-full bg-red-600 animate-pulse" />
-          <span>Listening… speak now, then click stop or press Enter to send.</span>
-        </div>
-      )}
     </div>
   );
 };

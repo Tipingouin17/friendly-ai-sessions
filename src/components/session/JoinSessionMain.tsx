@@ -131,7 +131,6 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                 onAvatarChange={onAvatarChange}
                 onJoinSession={handleJoinClick}
                 isJoining={isJoining}
-                isDisabled={!isTokenReady}
                 currentParticipantCount={currentParticipantCount}
                 effectiveMaxParticipants={effectiveMaxParticipants}
               />

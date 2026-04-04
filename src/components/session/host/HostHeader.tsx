@@ -9,7 +9,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, FileText, BarChart3, Lock, ChevronLeft } from "lucide-react";
+import { LayoutDashboard, FileText, BarChart3, Lock, ChevronLeft, Square } from "lucide-react";
 import HostQrDialog from "./HostQrDialog";
 import SessionStatusBadge from "./SessionStatusBadge";
 import SessionAnalyticsDashboard from "./SessionAnalyticsDashboard";
@@ -43,8 +43,11 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   const { activeSessions, isLoading, refreshSessions } = useHostSessions();
   const {
     isClosing,
+    isStopping,
+    closureProgress,
     closureResult,
     closeSessionAndGenerateReport,
+    stopSessionWithoutReport,
     downloadReport
   } = useSessionClosure();
   const { canGenerateReports } = usePlanLimits();
@@ -62,33 +65,30 @@ const HostHeader: React.FC<HostHeaderProps> = ({
     }
   };
 
-  const handleCloseSession = async () => {
+  /** Host chose "Stop Session" — end without report */
+  const handleStop = async () => {
+    if (!conversation?.id) return;
+    const success = await stopSessionWithoutReport(conversation.id);
+    if (success) {
+      setShowClosureDialog(false);
+    }
+  };
+
+  /** Host chose "Close & Report" — end and generate AI report */
+  const handleCloseAndReport = async () => {
     if (!conversation?.id) return;
     const success = await closeSessionAndGenerateReport(conversation.id);
     if (success) {
       setShowClosureDialog(false);
       if (canGenerateReports) {
         setShowReportDialog(true);
-      } else {
-        toast({
-          title: "Session Closed",
-          description: "Your session has been closed. Upgrade your plan to access session reports.",
-        });
       }
     }
   };
 
-  const handleCloseAndGetReport = () => {
+  /** Opens the unified end-session dialog */
+  const handleOpenEndDialog = () => {
     if (!conversation?.id || conversation.is_session_ended) return;
-    if (!canGenerateReports) {
-      toast({
-        title: "Reports Locked",
-        description: "Session reports are not available on your current plan. Upgrade to access this feature.",
-        variant: "destructive",
-      });
-      navigate('/pricing');
-      return;
-    }
     setShowClosureDialog(true);
   };
 
@@ -100,6 +100,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   const facilitatorInfo = conversation?.sessions?.facilitator_details ?? null;
   const isSessionEnded = conversation?.is_session_ended || false;
   const isSessionStarted = conversation?.session_started || false;
+  const isBusy = isClosing || isStopping;
 
   return (
     <>
@@ -187,8 +188,50 @@ const HostHeader: React.FC<HostHeaderProps> = ({
               />
             )}
 
-            {/* Report */}
-            {!canGenerateReports ? (
+            {/* End Session button — opens the unified dialog */}
+            {!isSessionEnded && isSessionStarted && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-xs gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                onClick={handleOpenEndDialog}
+                disabled={isBusy}
+              >
+                <Square className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline whitespace-nowrap">
+                  {isBusy ? 'Ending…' : 'End Session'}
+                </span>
+              </Button>
+            )}
+
+            {/* Locked / ended state placeholder */}
+            {isSessionEnded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2.5 text-xs gap-1.5 text-slate-400 cursor-default"
+                disabled
+              >
+                <Square className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline whitespace-nowrap">Ended</span>
+              </Button>
+            )}
+
+            {/* Reports button (only shown after session has ended and plan allows) */}
+            {isSessionEnded && canGenerateReports && closureResult && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2.5 text-xs gap-1.5 text-slate-600 hover:text-slate-900"
+                onClick={() => setShowReportDialog(true)}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline whitespace-nowrap">Report</span>
+              </Button>
+            )}
+
+            {/* Upgrade prompt when plan doesn't allow reports */}
+            {!canGenerateReports && !isSessionEnded && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -196,7 +239,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                       variant="ghost"
                       size="sm"
                       className="h-8 px-2.5 text-xs gap-1.5 text-slate-400 cursor-not-allowed"
-                      disabled={isClosing}
+                      disabled
                     >
                       <Lock className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline whitespace-nowrap">Reports</span>
@@ -207,19 +250,6 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            ) : (
-              <Button
-                variant={isSessionEnded ? "ghost" : "default"}
-                size="sm"
-                className="h-8 px-2.5 text-xs gap-1.5"
-                onClick={handleCloseAndGetReport}
-                disabled={isClosing || isSessionEnded}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline whitespace-nowrap">
-                  {isClosing ? 'Closing…' : isSessionEnded ? 'Ended' : 'Close & Report'}
-                </span>
-              </Button>
             )}
           </div>
         </div>
@@ -237,15 +267,21 @@ const HostHeader: React.FC<HostHeaderProps> = ({
         )}
       </div>
 
+      {/* Unified end-session dialog */}
       <SessionClosureDialog
         isOpen={showClosureDialog}
         onClose={() => setShowClosureDialog(false)}
-        onConfirm={handleCloseSession}
+        onStop={handleStop}
+        onCloseAndReport={handleCloseAndReport}
         isClosing={isClosing}
+        isStopping={isStopping}
+        canGenerateReports={canGenerateReports}
         participantCount={conversation?.current_participants || 0}
         sessionTitle={getSessionTitle()}
+        closureProgress={closureProgress}
       />
 
+      {/* Report download dialog (shown after Close & Report) */}
       <ReportDownloadDialog
         isOpen={showReportDialog}
         onClose={() => setShowReportDialog(false)}

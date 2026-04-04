@@ -82,7 +82,11 @@ export const SignupForm: React.FC = () => {
       navigate('/', { replace: true });
     } catch (error: unknown) {
       setAttempts(prev => prev + 1);
-      const rawMessage = error instanceof Error ? error.message : "An error occurred during signup";
+      // Handle both Error instances and Supabase/API error objects with a message property
+      const rawMessage =
+        error instanceof Error
+          ? error.message
+          : (error as { message?: string })?.message ?? "An error occurred during signup";
 
       // Map backend error codes to user-friendly messages
       let friendlyMessage = rawMessage;

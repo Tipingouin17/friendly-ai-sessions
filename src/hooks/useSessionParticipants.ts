@@ -15,10 +15,6 @@ import { setJoinToken, getJoinToken } from "@/lib/api";
 export function useSessionParticipants(conversationId: number | null) {
   const [stateError, setStateError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  // isTokenReady: true once a valid X-Join-Token is confirmed in sessionStorage.
-  // This gates the Join button so capacity-check GET requests never fire without
-  // the token (which would cause a 401 for QR-code / no-token-in-URL flows).
-  const [isTokenReady, setIsTokenReady] = useState(() => !!getJoinToken());
   const { toast } = useToast();
   const mountedRef = useRef(true);
 
@@ -30,31 +26,29 @@ export function useSessionParticipants(conversationId: number | null) {
   } = useConversation(conversationId);
 
   // ── Join-token bootstrap from conversation payload ──────────────────────────
-  // The conversation row contains a stable `join_token` UUID.  As soon as the
-  // conversation loads we store it so that ALL subsequent API calls (capacity
-  // check, session_participants reads, messages, etc.) automatically carry the
-  // X-Join-Token header — regardless of whether the token was present in the
-  // original URL.
-  //
-  // This covers three important cases:
-  //   1. First visit via a full URL (?id=X&token=UUID) — token already set by
-  //      the bootstrap IIFE in useJoinSessionState; this is a no-op.
-  //   2. Legacy / plain URL (?id=X, no token) — token is set here once the
-  //      backend returns the conversation (allowed by the anonymous-read fix).
-  //   3. Returning participant in a normal browser — localStorage has their
-  //      participantId/name but the token is refreshed from the server so all
-  //      subsequent requests succeed.
-  //
-  // Private/incognito users lose localStorage on close, so they must re-enter
-  // their name, but they still get the token from the conversation response.
+  // Side-effect only: persist the token to sessionStorage so that all
+  // subsequent API calls carry the X-Join-Token header.
+  // isTokenReady is derived synchronously below — no useEffect lag.
   useEffect(() => {
     if (!mountedRef.current) return;
     const token = (conversation as any)?.join_token;
     if (token) {
       setJoinToken(token);
-      setIsTokenReady(true);
     }
   }, [conversation]);
+
+  // ── isTokenReady — derived synchronously, no useState lag ──────────────────
+  // A token is "ready" when EITHER:
+  //   a) sessionStorage already has one (set by the IIFE in useJoinSessionState
+  //      when the URL contained ?token=UUID), OR
+  //   b) the conversation has loaded and contains a join_token (covers plain
+  //      ?id=X URLs, returning participants, and private/incognito users).
+  //
+  // By deriving this on every render instead of via useState+useEffect we
+  // eliminate the one-render lag that kept the Join button disabled on mobile
+  // even after the conversation data had already arrived.
+  const conversationToken = (conversation as any)?.join_token;
+  const isTokenReady = !!getJoinToken() || !!conversationToken;
 
   // Handle fetch errors
   useEffect(() => {
@@ -73,8 +67,6 @@ export function useSessionParticipants(conversationId: number | null) {
     if (conversation?.is_session_ended) {
       setStateError("This session has ended and is no longer available");
     }
-
-    // We don't clear error here anymore to avoid conflicts
 
     if (conversation && !isInitialized) {
       setIsInitialized(true);
@@ -121,10 +113,9 @@ export function useSessionParticipants(conversationId: number | null) {
   useSessionStatus(conversationId, refetch);
 
   // Derive final error from all sources
-  // This avoids the infinite loop caused by syncing different error states via useEffect
   const finalError = stateError || connectionError || participantChannelResult.error;
 
-  // Force periodic refresh to ensure data consistency - reduce interval for more up-to-date data
+  // Force periodic refresh to ensure data consistency
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
 
@@ -135,7 +126,7 @@ export function useSessionParticipants(conversationId: number | null) {
       if (mountedRef.current) {
         refetch();
       }
-    }, 5000); // Reduced from 15000 to 5000 ms for more frequent updates
+    }, 5000);
 
     return () => {
       clearInterval(intervalId);

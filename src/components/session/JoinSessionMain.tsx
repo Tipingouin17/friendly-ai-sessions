@@ -46,7 +46,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   const sessionTitle = conversation?.sessions?.title || "Workshop Session";
 
   const handleJoinClick = async () => {
-    await onJoinSession();
+    if (onJoinSession) await onJoinSession();
   };
 
   return (

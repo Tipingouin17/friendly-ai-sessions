@@ -42,8 +42,8 @@ export const useHostMessages = ({
     }
   }, [conversationData]);
 
-  // Track paused/skipped participants so they are excluded from response counting
-  const { excludedParticipantIds } = useParticipantStatusTracker({
+  // Track paused/skipped participants for response counting
+  const { excludedParticipantIds, skippedParticipantIds } = useParticipantStatusTracker({
     conversationId,
   });
 
@@ -63,6 +63,7 @@ export const useHostMessages = ({
     conversation: conversationState,
     totalParticipants: participants.length,
     excludedParticipantIds,
+    skippedParticipantIds,
   });
 
   // Sync messages from useMessageFetching back to the parent's state

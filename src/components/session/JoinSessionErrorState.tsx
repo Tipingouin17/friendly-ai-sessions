@@ -34,7 +34,7 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
   // ─── Session Ended ────────────────────────────────────────────────────────
   if (isSessionEnded) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 w-full max-w-md text-center">
           <div className="mb-5 flex justify-center">
             <div className="p-4 bg-indigo-50 rounded-full">
@@ -59,7 +59,7 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
   // ─── Session Full ─────────────────────────────────────────────────────────
   if (isSessionFull) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 w-full max-w-md text-center">
           <div className="mb-5 flex justify-center">
             <div className="p-4 bg-orange-50 rounded-full">
@@ -84,7 +84,7 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
   // ─── Invalid Link ─────────────────────────────────────────────────────────
   if (invalidRequest) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 w-full max-w-md text-center">
           <div className="mb-5 flex justify-center">
             <div className="p-4 bg-red-50 rounded-full">
@@ -108,7 +108,7 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
 
   // ─── Network / Generic Error ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 w-full max-w-md text-center">
         <div className="mb-5 flex justify-center">
           <div className={`p-4 rounded-full ${isNetworkError ? 'bg-yellow-50' : 'bg-red-50'}`}>

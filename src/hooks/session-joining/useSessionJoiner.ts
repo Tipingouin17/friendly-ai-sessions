@@ -104,7 +104,8 @@ export function useSessionJoiner() {
           avatarSeed: validatedData.avatarSeed,
           currentParticipantCount,
           isAnonymous,
-          isAdmin: effectiveIsAdmin
+          isAdmin: effectiveIsAdmin,
+          conversation: conversation as any
         });
         
         // Clear any existing "session full" errors since we've successfully joined

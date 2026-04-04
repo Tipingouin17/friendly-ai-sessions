@@ -17,6 +17,8 @@ interface JoinFormProps {
   onAvatarChange: () => void;
   onJoinSession: () => void;
   isJoining: boolean;
+  /** Extra disabled flag (e.g. token not ready yet) — disables without showing spinner */
+  isDisabled?: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
 }
@@ -28,6 +30,7 @@ const JoinForm: React.FC<JoinFormProps> = ({
   onAvatarChange,
   onJoinSession,
   isJoining,
+  isDisabled = false,
   currentParticipantCount,
   effectiveMaxParticipants
 }) => {
@@ -62,7 +65,7 @@ const JoinForm: React.FC<JoinFormProps> = ({
       <Button 
         onClick={onJoinSession} 
         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm shadow-indigo-500/20"
-        disabled={isJoining || isFull || !participantName.trim()}
+        disabled={isJoining || isDisabled || isFull || !participantName.trim()}
       >
         {isJoining ? (
           <span className="flex items-center justify-center">

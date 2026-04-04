@@ -988,6 +988,98 @@ async def run_migration(request: Request):
 
 
 # ============================================================
+# Background AI welcome-message helper
+# ============================================================
+async def _maybe_generate_welcome_message(conv_id: int) -> None:
+    """Fire-and-forget: generate the AI welcome message for a session.
+
+    Called as an asyncio background task the moment a participant joins.
+    Checks whether a message already exists to avoid double-generation,
+    then calls the handle-facilitator-response edge function with
+    sessionStart=True so the AI produces a personalised welcome message.
+    """
+    try:
+        # Check if a welcome message already exists for this conversation
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM messages WHERE conversation_id = %s",
+            (conv_id,)
+        )
+        row = cur.fetchone()
+        msg_count = (row["count"] if isinstance(row, dict) else row[0]) if row else 0
+        conn.close()
+
+        if msg_count > 0:
+            # Message already exists — nothing to do
+            return
+
+        # Idempotency guard: skip if AI generation is already in progress
+        _now = time.time()
+        _lock_key = f"ai_lock_{conv_id}"
+        _last = _ai_response_locks.get(_lock_key, 0)
+        if _now - _last < 10:
+            return
+        _ai_response_locks[_lock_key] = _now
+
+        # Fetch conversation + session + facilitator details needed by the AI
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT c.id, c.user_id, c.language, "
+            "s.title, s.objective, s.welcome_message, s.scope, "
+            "s.gpt_version, s.max_tokens, s.randomness, "
+            "f.title as facilitator_name, f.description as facilitator_details, "
+            "f.avatar_url, f.language as facilitator_language "
+            "FROM conversations c "
+            "LEFT JOIN sessions s ON s.id = c.session_id "
+            "LEFT JOIN facilitators f ON f.id = s.facilitator_id "
+            "WHERE c.id = %s",
+            (conv_id,)
+        )
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            print(f"[welcome-bg] Conversation {conv_id} not found, skipping.")
+            return
+
+        row = dict(row)
+        print(f"[welcome-bg] Triggering AI welcome message for conv={conv_id}")
+
+        # Use stdlib urllib to make an internal HTTP call to the edge function.
+        # This avoids adding httpx/aiohttp as a dependency.  The call is made
+        # in a thread executor so it doesn't block the event loop.
+        import urllib.request as _urllib_req
+        base_url = os.environ.get("INTERNAL_BASE_URL", "http://localhost:3333")
+        payload = json.dumps({
+            "conversationId": conv_id,
+            "sessionStart": True,
+            "generateReport": False,
+            "messages": [],
+        }).encode()
+        def _do_post():
+            req = _urllib_req.Request(
+                f"{base_url}/functions/v1/handle-facilitator-response",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with _urllib_req.urlopen(req, timeout=90) as resp:
+                    resp.read()
+            except Exception as e:
+                print(f"[welcome-bg] HTTP call failed for conv={conv_id}: {e}")
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _do_post)
+        except Exception as http_err:
+            print(f"[welcome-bg] Executor error for conv={conv_id}: {http_err}")
+    except Exception as e:
+        print(f"[welcome-bg] Error generating welcome message for conv={conv_id}: {e}")
+
+
+# ============================================================
 # PostgREST REST table CRUD
 # ============================================================
 @app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
@@ -1251,6 +1343,15 @@ async def rest_table(table: str, request: Request):
                             "schema": "public",
                         },
                     }))
+                    # ── Auto-trigger AI welcome message on first participant join ──────
+                    # When a participant joins a session we immediately kick off AI
+                    # welcome message generation as a background task.  The frontend
+                    # polls for the message while showing a 'Preparing your session'
+                    # spinner, so the message is ready by the time they land on the
+                    # session page.  The helper checks whether a message already
+                    # exists to avoid double-generation.
+                    if table == "session_participants" and conv_id:
+                        asyncio.create_task(_maybe_generate_welcome_message(int(conv_id)))
                 return JSONResponse(content=result, status_code=201)
 
         if request.method == "PATCH":

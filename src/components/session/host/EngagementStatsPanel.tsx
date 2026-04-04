@@ -115,7 +115,7 @@ export const EngagementStatsPanel: React.FC<EngagementStatsPanelProps> = ({
           <TrendingUp className="w-4 h-4 text-indigo-500" />
           Engagement
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 justify-end">
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5 text-green-500" />
             {activeCount} active

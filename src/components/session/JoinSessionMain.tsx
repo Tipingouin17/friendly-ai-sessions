@@ -86,17 +86,17 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
           )}
 
           <div className="p-6">
-            {/* Session title */}
+            {/* Session title + participant count */}
             <div className="mb-5">
               <h1 className="text-xl font-bold text-gray-900 mb-1">{sessionTitle}</h1>
               <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                  <Users className="h-3.5 w-3.5" />
-                  {effectiveMaxParticipants > 0 ? (
-                    <span>{currentParticipantCount} / {effectiveMaxParticipants} participants joined</span>
-                  ) : (
-                    <span>{currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} joined</span>
-                  )}
-                </div>
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                {effectiveMaxParticipants > 0 ? (
+                  <span>{currentParticipantCount} / {effectiveMaxParticipants} participants joined</span>
+                ) : (
+                  <span>{currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} joined</span>
+                )}
+              </div>
             </div>
 
             {/* Error state */}

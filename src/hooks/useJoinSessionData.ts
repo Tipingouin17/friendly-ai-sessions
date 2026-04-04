@@ -57,7 +57,8 @@ export function useJoinSessionData(
     conversation,
     error: participantsError,
     refetch,
-    isLoading: isParticipantsLoading
+    isLoading: isParticipantsLoading,
+    isTokenReady
   } = useSessionParticipants(conversationId);
 
   const {
@@ -153,6 +154,7 @@ export function useJoinSessionData(
     isLoading: isParticipantsLoading || (!conversation && !error),
     error,
     handleJoinSession,
-    existingSessionData
+    existingSessionData,
+    isTokenReady
   };
 }

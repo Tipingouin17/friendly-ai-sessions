@@ -70,25 +70,25 @@ const ParticipantPanelContent: React.FC<{
 }) => (
   <div className="flex flex-col h-full">
     {/* Header */}
-    <div className="p-4 border-b bg-gray-50">
+    <div className="px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-          <Users className="h-5 w-5" />
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <Users className="h-4 w-4 text-indigo-400" />
           {title}
         </h3>
-        <Badge variant="outline" className="bg-white">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
           {actualParticipantCount}/{maxParticipants || "∞"}
-        </Badge>
+        </span>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
         <Input
-          placeholder="Search participants..."
+          placeholder="Search participants…"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 h-9 text-sm"
+          className="pl-8 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white"
         />
       </div>
     </div>
@@ -255,7 +255,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
       </Sheet>
 
       {/* ── Desktop: fixed sidebar ── */}
-      <div className="w-80 border-l border-gray-200 bg-white flex-col h-full hidden md:flex">
+      <div className="w-72 bg-white m-3 rounded-r-2xl border border-slate-200 shadow-sm flex-col h-[calc(100%-1.5rem)] hidden md:flex overflow-hidden">
         <ParticipantPanelContent {...panelProps} />
       </div>
     </>

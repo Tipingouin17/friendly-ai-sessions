@@ -19,11 +19,12 @@ interface JoinSessionMainProps {
   onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   avatarSeed: string;
   onAvatarChange: () => void;
-  onJoinSession: () => Promise<any>;
+  onJoinSession?: () => Promise<any>;
   isJoining: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
   onRetry: () => void;
+  isTokenReady?: boolean;
 }
 
 const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
@@ -38,7 +39,8 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   isJoining,
   currentParticipantCount,
   effectiveMaxParticipants,
-  onRetry
+  onRetry,
+  isTokenReady = true
 }) => {
   const facilitatorDetails = conversation?.sessions?.facilitator_details;
   const sessionTitle = conversation?.sessions?.title || "Workshop Session";
@@ -125,8 +127,8 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                 onNameChange={onNameChange}
                 avatarSeed={avatarSeed}
                 onAvatarChange={onAvatarChange}
-                onJoinSession={handleJoinClick}
-                isJoining={isJoining}
+                onJoinSession={isTokenReady && onJoinSession ? handleJoinClick : undefined}
+                isJoining={isJoining || !isTokenReady}
                 currentParticipantCount={currentParticipantCount}
                 effectiveMaxParticipants={effectiveMaxParticipants}
               />

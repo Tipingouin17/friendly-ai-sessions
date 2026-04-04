@@ -62,9 +62,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const actualParticipantCount = participants.length;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-gray-50">
-      {/* Host monitoring view - full height */}
-      <div className="flex-1 overflow-hidden bg-white m-4 mr-0 rounded-l-lg border border-r-0">
+    <div className="flex-1 flex overflow-hidden bg-slate-100">
+      {/* Main intelligence panel */}
+      <div className="flex-1 overflow-hidden bg-white m-3 mr-0 rounded-l-2xl border border-slate-200 shadow-sm">
         <SimplifiedHostMessagingView
           messages={sessionMessages || []}
           participantColors={participantColors}

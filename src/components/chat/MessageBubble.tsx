@@ -86,7 +86,7 @@ const MessageBubble = ({
         {isFirstMessageOfGroup && (
           <div className={cn(nameSize, "font-semibold mb-1.5 flex items-center gap-1 text-blue-700")}>
             <UserCog className="h-3 w-3" />
-            Admin
+            Host
           </div>
         )}
         <div className={cn("whitespace-pre-wrap break-words", fontSize)} dir="auto">

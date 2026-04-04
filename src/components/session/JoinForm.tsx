@@ -54,7 +54,7 @@ const JoinForm: React.FC<JoinFormProps> = ({
           value={participantName}
           onChange={onNameChange}
           className="w-full"
-          autoFocus
+          autoComplete="name"
         />
       </div>
 

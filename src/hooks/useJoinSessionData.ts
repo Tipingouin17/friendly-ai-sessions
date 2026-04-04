@@ -5,7 +5,9 @@
  */
 
 import { useState, useEffect } from "react";
-import { usePlanLimits } from "@/hooks/usePlanLimits";
+// usePlanLimits is intentionally NOT used on the join page.
+// Participants are unauthenticated — plan limits are irrelevant here.
+// The only source of truth for max participants is conversation.participants.
 import { useSessionParticipants } from "@/hooks/useSessionParticipants";
 import { useSessionJoiner } from "@/hooks/session-joining";
 import { ConversationWithSession } from "@/types/database";
@@ -47,8 +49,8 @@ export function useJoinSessionData(
   // Debug logging
   useEffect(() => { /* no-op */ }, [conversationId, isAdmin, effectiveIsAdmin, isOnAdminPath, existingSessionData]);
 
-  // Fetch plan limits as fallback
-  const { maxParticipants: planMaxParticipants } = usePlanLimits();
+  // No plan-limit fallback on the join page — use only conversation.participants.
+  // If the host didn't set a limit (null/0), the session has unlimited capacity.
 
   // Use our hooks
   const {
@@ -86,9 +88,8 @@ export function useJoinSessionData(
     // Force a refetch before joining to ensure we have the latest counts
     await refetch();
 
-    // Use session-specific max or fall back to plan limit
-    const effectiveMaxParticipants = maxParticipantsForSession > 0 ?
-      maxParticipantsForSession : planMaxParticipants;
+    // Use only the session-specific max. 0 means no limit.
+    const effectiveMaxParticipants = maxParticipantsForSession;
 
     if (!participantName.trim()) {
       toast({
@@ -130,9 +131,8 @@ export function useJoinSessionData(
     return result;
   };
 
-  // Calculate effective max participants
-  const effectiveMaxParticipants = maxParticipantsForSession > 0 ?
-    maxParticipantsForSession : planMaxParticipants;
+  // Use only the session-specific max. 0 means no limit.
+  const effectiveMaxParticipants = maxParticipantsForSession;
 
   // Only consider session full if effectiveMaxParticipants is greater than 0
   // And we're not an admin

@@ -23,7 +23,7 @@ export const CreateFacilitatorButton = ({
   if (canCreateCustomFacilitators) {
     return (
       <div 
-        className={`flex w-1/4 shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all ${
+        className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 hover:border-primary transition-all ${
           hasReachedFacilitatorLimit ? 'opacity-50 cursor-not-allowed' : ''
         }`}
         onClick={() => !hasReachedFacilitatorLimit && onClick()}
@@ -42,7 +42,7 @@ export const CreateFacilitatorButton = ({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex w-1/4 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 p-6 opacity-50 cursor-not-allowed">
+          <div className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 p-6 opacity-50 cursor-not-allowed">
             <div className="relative">
               <Plus className="mb-2 h-12 w-12 text-gray-400" />
               <Lock className="absolute top-0 right-0 h-6 w-6 text-gray-500 transform translate-x-1/4 -translate-y-1/4" />

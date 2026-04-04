@@ -9,6 +9,23 @@ import { useParticipantPersistence } from './useParticipantPersistence';
 import { useJoinSessionNavigation } from './useJoinSessionNavigation';
 import { setJoinToken, clearJoinToken } from '@/lib/api';
 
+// ─── Synchronous join-token bootstrap ────────────────────────────────────────
+// Read the join token from the URL *immediately* (before any React render)
+// so that the very first API call made by useConversation already carries the
+// X-Join-Token header.  The useEffect below keeps the token in sync if the
+// URL ever changes, but the critical first-render case is handled here.
+(function bootstrapJoinToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setJoinToken(token);
+    }
+  } catch {
+    // Silently ignore — SSR or environments without window
+  }
+})();
+
 export const useJoinSessionState = () => {
   const [searchParams] = useSearchParams();
   const [invalidRequest, setInvalidRequest] = useState(false);
@@ -25,6 +42,9 @@ export const useJoinSessionState = () => {
   // Extract and store the join token from the URL so that subsequent
   // API requests automatically include it in the X-Join-Token header.
   const joinTokenParam = searchParams.get("token");
+
+  // Keep the token in sync whenever the URL changes (e.g. React Router navigation).
+  // The initial value is already set synchronously above before first render.
   useEffect(() => {
     if (joinTokenParam) {
       setJoinToken(joinTokenParam);

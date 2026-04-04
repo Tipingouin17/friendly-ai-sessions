@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSessionClosureValidation } from './session-closure/useSessionClosureValidation';
 import { useSessionClosureExecution } from './session-closure/useSessionClosureExecution';
 import { useReportDownloader } from './session-closure/useReportDownloader';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SessionClosureResult {
   reportId: string;
@@ -25,6 +26,7 @@ interface SessionClosureResult {
 
 export const useSessionClosure = () => {
   const [isClosing, setIsClosing] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [closureProgress, setClosureProgress] = useState<string>('');
   const [closureResult, setClosureResult] = useState<SessionClosureResult | null>(null);
   const { toast } = useToast();
@@ -35,6 +37,7 @@ export const useSessionClosure = () => {
   const { executeSessionClosure } = useSessionClosureExecution();
   const { downloadReport: downloadReportFile } = useReportDownloader();
 
+  /** Close session AND generate AI report (existing behaviour). */
   const closeSessionAndGenerateReport = async (conversationId: number) => {
     setIsClosing(true);
     setClosureProgress('Initializing session closure...');
@@ -93,15 +96,86 @@ export const useSessionClosure = () => {
     }
   };
 
+  /**
+   * Stop session immediately WITHOUT generating a report.
+   * Marks the conversation as ended in the DB and redirects to the dashboard.
+   */
+  const stopSessionWithoutReport = async (conversationId: number) => {
+    setIsStopping(true);
+    setClosureProgress('Stopping session...');
+
+    try {
+      // Reuse the same validation (ownership + not-already-ended checks)
+      await validateSessionClosure(conversationId);
+
+      // Mark the conversation as ended directly — no report edge function
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('conversations')
+        .update({
+          is_session_ended: true,
+          ended_at: now,
+        })
+        .eq('id', conversationId);
+
+      if (error) {
+        throw new Error(`Failed to stop session: ${error.message}`);
+      }
+
+      setClosureProgress('Session stopped.');
+
+      // Invalidate all relevant queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-sessions'] }),
+        queryClient.invalidateQueries({ queryKey: ['active-workshops'] }),
+        queryClient.invalidateQueries({ queryKey: ['past-workshops'] }),
+        queryClient.invalidateQueries({ queryKey: ['session-participants', conversationId] }),
+      ]);
+
+      toast({
+        title: "Session Stopped",
+        description: "The session has been ended. No report was generated.",
+      });
+
+      setTimeout(() => {
+        navigate('/past-workshops', { replace: true });
+      }, 800);
+
+      return true;
+    } catch (error) {
+      console.error('Error in stopSessionWithoutReport:', error);
+
+      let errorMessage = "Failed to stop session";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      setClosureProgress('');
+
+      toast({
+        title: "Error Stopping Session",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsStopping(false);
+      setTimeout(() => setClosureProgress(''), 3000);
+    }
+  };
+
   const downloadReport = (format: 'json' | 'text' = 'text') => {
     downloadReportFile(closureResult, format);
   };
 
   return {
     isClosing,
+    isStopping,
     closureProgress,
     closureResult,
     closeSessionAndGenerateReport,
+    stopSessionWithoutReport,
     downloadReport
   };
 };

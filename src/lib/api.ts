@@ -106,7 +106,7 @@ export function clearJoinToken(): void {
   sessionStorage.removeItem(JOIN_TOKEN_KEY);
 }
 
-function getJoinToken(): string | null {
+export function getJoinToken(): string | null {
   return sessionStorage.getItem(JOIN_TOKEN_KEY);
 }
 

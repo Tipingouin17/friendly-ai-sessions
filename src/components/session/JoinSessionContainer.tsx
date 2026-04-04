@@ -79,7 +79,8 @@ const JoinSessionContainer = () => {
     conversation,
     isLoading,
     error,
-    handleJoinSession
+    handleJoinSession,
+    isTokenReady
   } = useJoinSessionData(conversationId, {
     defaultParticipantName,
     defaultAvatarSeed
@@ -261,7 +262,8 @@ const JoinSessionContainer = () => {
       onNameChange={(e) => setParticipantName(e.target.value)}
       avatarSeed={avatarSeed}
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
-      onJoinSession={!hasJoinedBefore && !checkNavigationState() ? handleJoin : undefined}
+      onJoinSession={!hasJoinedBefore && !checkNavigationState() && isTokenReady ? handleJoin : undefined}
+      isTokenReady={isTokenReady}
       isJoining={isJoining}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}

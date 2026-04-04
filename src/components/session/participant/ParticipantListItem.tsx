@@ -1,13 +1,14 @@
 /**
- * Participant List Item
+ * Participant List Item — Redesigned
  *
- * Session component for the AIfacilitator application.
+ * Shows per-participant engagement: message count badge,
+ * activity status dot, and remove control on hover.
  */
 
 import React from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import { X, Crown, Loader2 } from "lucide-react";
+import { X, Crown, Loader2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,125 +29,103 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   isRemoving = false
 }) => {
   const participantColor = getParticipantColor(String(participant.id));
-  
-  // Calculate time since last active in minutes
-  const minutesSinceActive = lastActiveTime 
+
+  const minutesSinceActive = lastActiveTime
     ? Math.round((new Date().getTime() - lastActiveTime.getTime()) / (1000 * 60))
     : null;
-  
-  // Determine engagement level based on message count
-  const getEngagementColor = () => {
-    if (messageCount === 0) return "bg-gray-300";
-    if (messageCount < 3) return "bg-indigo-400";
-    if (messageCount < 7) return "bg-blue-400";
-    return "bg-green-400";
-  };
-  
-  // Activity indicator color
-  const getActivityColor = () => {
-    if (!minutesSinceActive) return "bg-gray-300";
-    if (minutesSinceActive < 2) return "bg-green-400";
-    if (minutesSinceActive < 5) return "bg-indigo-400";
-    if (minutesSinceActive < 15) return "bg-orange-400";
-    return "bg-gray-400";
-  };
-  
-  // Always display the participant's actual name from the database
+
+  // Activity dot: green = just active, amber = few mins, slate = idle
+  const activityDotClass = (() => {
+    if (minutesSinceActive === null) return 'bg-slate-300';
+    if (minutesSinceActive < 2) return 'bg-emerald-400';
+    if (minutesSinceActive < 10) return 'bg-amber-400';
+    return 'bg-slate-300';
+  })();
+
+  const activityLabel = (() => {
+    if (minutesSinceActive === null) return 'No activity yet';
+    if (minutesSinceActive < 1) return 'Active now';
+    if (minutesSinceActive < 60) return `${minutesSinceActive}m ago`;
+    return `${Math.round(minutesSinceActive / 60)}h ago`;
+  })();
+
+  // Engagement level colour for message count badge
+  const engagementBadgeClass = (() => {
+    if (messageCount === 0) return 'bg-slate-100 text-slate-400';
+    if (messageCount < 3) return 'bg-indigo-100 text-indigo-600';
+    if (messageCount < 7) return 'bg-violet-100 text-violet-600';
+    return 'bg-emerald-100 text-emerald-700';
+  })();
+
   const displayName = participant.name || `Participant ${participant.id}`;
 
-  const handleRemove = () => {
-    if (!isRemoving) {
-      onRemove(participant.id);
-    }
-  };
-
   return (
-    <div className="group flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 transition-colors">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        {/* Avatar with engagement indicator */}
-        <div className="relative">
-          <Avatar className="h-9 w-9 border-2" style={{ borderColor: `${participantColor}30` }}>
-            <AvatarImage src={participant.avatar} alt={displayName} />
-            <AvatarFallback 
-              className="text-white font-medium text-sm"
-              style={{ backgroundColor: participantColor }}
-            >
-              {participant.isHost ? (
-                <Crown className="h-4 w-4" />
-              ) : (
-                displayName.charAt(0).toUpperCase()
-              )}
-            </AvatarFallback>
-          </Avatar>
-          
-          {/* Engagement indicator - small dot */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${getEngagementColor()}`}
-                ></div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>{messageCount} messages</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        
-        {/* Participant Info */}
-        <div className="flex flex-col flex-1 min-w-0">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  {displayName}
-                  {participant.isHost && (
-                    <span className="ml-1 text-xs text-indigo-600">(Host)</span>
-                  )}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>{displayName}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          {/* Activity indicator */}
-          {minutesSinceActive !== null && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
-              <div className={`w-1.5 h-1.5 rounded-full ${getActivityColor()}`}></div>
-              <span>
-                {minutesSinceActive < 1 ? 'Active now' : 
-                 minutesSinceActive < 60 ? `${minutesSinceActive}m ago` : 
-                 `${Math.round(minutesSinceActive / 60)}h ago`}
-              </span>
-            </div>
+    <div className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+      {/* Avatar */}
+      <div className="relative shrink-0">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={participant.avatar} alt={displayName} />
+          <AvatarFallback
+            className="text-white text-xs font-semibold"
+            style={{ backgroundColor: participantColor }}
+          >
+            {participant.isHost ? <Crown className="h-3.5 w-3.5" /> : displayName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        {/* Activity dot */}
+        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${activityDotClass}`} />
+      </div>
+
+      {/* Name + activity */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold text-slate-800 truncate">
+            {displayName}
+          </span>
+          {participant.isHost && (
+            <span className="text-[10px] text-indigo-500 font-medium shrink-0">(Host)</span>
           )}
         </div>
+        <span className="text-[10px] text-slate-400">{activityLabel}</span>
       </div>
-      
-      {/* Remove button - only show for non-host participants */}
+
+      {/* Message count badge */}
+      {messageCount > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${engagementBadgeClass}`}>
+                <MessageSquare className="h-2.5 w-2.5" />
+                {messageCount}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>{messageCount} message{messageCount !== 1 ? 's' : ''} sent</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      {/* Remove button */}
       {!participant.isHost && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 rounded-full hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleRemove}
+                className="h-6 w-6 p-0 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                onClick={() => !isRemoving && onRemove(participant.id)}
                 disabled={isRemoving}
               >
-                {isRemoving ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <X className="h-3 w-3" />
-                )}
+                {isRemoving
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <X className="h-3 w-3" />
+                }
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>{isRemoving ? 'Removing...' : 'Remove participant'}</p>
+              <p>{isRemoving ? 'Removing…' : 'Remove participant'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

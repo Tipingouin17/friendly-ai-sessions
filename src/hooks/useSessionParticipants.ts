@@ -10,11 +10,15 @@ import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";
 import { useParticipantCounts } from "@/hooks/useParticipantCounts";
 import { useParticipantChannel } from "@/hooks/useParticipantChannel";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
-import { setJoinToken } from "@/lib/api";
+import { setJoinToken, getJoinToken } from "@/lib/api";
 
 export function useSessionParticipants(conversationId: number | null) {
   const [stateError, setStateError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  // isTokenReady: true once a valid X-Join-Token is confirmed in sessionStorage.
+  // This gates the Join button so capacity-check GET requests never fire without
+  // the token (which would cause a 401 for QR-code / no-token-in-URL flows).
+  const [isTokenReady, setIsTokenReady] = useState(() => !!getJoinToken());
   const { toast } = useToast();
   const mountedRef = useRef(true);
 
@@ -48,6 +52,7 @@ export function useSessionParticipants(conversationId: number | null) {
     const token = (conversation as any)?.join_token;
     if (token) {
       setJoinToken(token);
+      setIsTokenReady(true);
     }
   }, [conversation]);
 
@@ -147,6 +152,7 @@ export function useSessionParticipants(conversationId: number | null) {
     isConnected,
     isConnecting,
     connectionAttempts,
-    isInitialized
+    isInitialized,
+    isTokenReady
   };
 }

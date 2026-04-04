@@ -15,6 +15,7 @@ import { useAutoStartSession } from "@/hooks/useAutoStartSession";
 import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useSessionTimer } from "@/hooks/useSessionTimer";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -143,7 +144,37 @@ export function useSessionHostLogic() {
         }
     }, [isLoading, currentConversationId, locationState, navigate]);
 
-    // 7. Session Start Handler
+    // 7. Timer & AI Wrap-up
+    const timer = useSessionTimer(conversationData ?? null, true);
+    const wrapUpFiredRef = useRef<{ tenMin: boolean; twoMin: boolean }>({
+        tenMin: false,
+        twoMin: false,
+    });
+
+    useEffect(() => {
+        const { timeRemaining, isExpired } = timer;
+        if (timeRemaining === null) return;
+        const isStarted = isManagerSessionStarted || conversationData?.session_started;
+        if (!isStarted || isExpired) return;
+
+        // 10-minute warning
+        if (timeRemaining <= 600 && !wrapUpFiredRef.current.tenMin) {
+            wrapUpFiredRef.current.tenMin = true;
+            triggerFacilitatorResponse(
+                "[SYSTEM] The session will end in 10 minutes. Please start wrapping up the discussion, summarise key insights so far, and let participants know time is running short."
+            );
+        }
+
+        // 2-minute warning
+        if (timeRemaining <= 120 && !wrapUpFiredRef.current.twoMin) {
+            wrapUpFiredRef.current.twoMin = true;
+            triggerFacilitatorResponse(
+                "[SYSTEM] The session ends in 2 minutes. Please deliver a concise final summary and thank the participants."
+            );
+        }
+    }, [timer.timeRemaining]);
+
+    // 8. Session Start Handler
     const handleSessionStarted = useCallback(async () => {
         try {
             await handleStartSession();
@@ -187,6 +218,9 @@ export function useSessionHostLogic() {
         handleSendHostMessage,
         triggerFacilitatorResponse,
         handleSessionStarted,
-        refresh
+        refresh,
+
+        // Timer
+        timer,
     };
 }

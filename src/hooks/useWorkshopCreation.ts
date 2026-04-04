@@ -19,6 +19,7 @@ export const useWorkshopCreation = () => {
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState<number | "">("");
   const { toast } = useToast();
 
   // Secure navigation for host session page
@@ -76,7 +77,8 @@ export const useWorkshopCreation = () => {
         participantCount,
         workshopId: selectedWorkshop,
         agreed,
-        userId: user.id
+        userId: user.id,
+        durationMinutes: durationMinutes !== "" ? Number(durationMinutes) : undefined,
       });
 
       if (data?.id) {
@@ -118,6 +120,8 @@ export const useWorkshopCreation = () => {
     setLanguage,
     agreed,
     setAgreed,
+    durationMinutes,
+    setDurationMinutes,
     handleNext,
     handlePrevious,
     handleSubmit,

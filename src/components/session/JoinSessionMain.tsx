@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { AlertCircle, Users, Zap } from "lucide-react";
+import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import JoinForm from "./JoinForm";
 import SessionFullAlert from "./SessionFullAlert";
@@ -44,6 +44,17 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
 }) => {
   const facilitatorDetails = conversation?.sessions?.facilitator_details;
   const sessionTitle = conversation?.sessions?.title || "Workshop Session";
+  const durationMinutes: number | null = (conversation?.sessions as any)?.duration_minutes ?? null;
+  const difficultyLevel: string | null = (conversation?.sessions as any)?.difficulty_level ?? null;
+  const sessionType: string | null = (conversation?.sessions as any)?.session_type ?? null;
+  const language: string | null = conversation?.language ?? null;
+
+  const LANGUAGE_NAMES: Record<string, string> = {
+    en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+    it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+    ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+  };
+  const languageLabel = language ? (LANGUAGE_NAMES[language.toLowerCase()] ?? language) : null;
 
   const handleJoinClick = async () => {
     if (onJoinSession) await onJoinSession();
@@ -97,6 +108,36 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                   <span>{currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} joined</span>
                 )}
               </div>
+
+              {/* Session metadata chips */}
+              {(durationMinutes || difficultyLevel || sessionType || languageLabel) && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {durationMinutes && (
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+                      <Clock className="h-3 w-3 text-indigo-400" />
+                      {durationMinutes} min
+                    </span>
+                  )}
+                  {difficultyLevel && (
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1 capitalize">
+                      <BarChart2 className="h-3 w-3 text-violet-400" />
+                      {difficultyLevel}
+                    </span>
+                  )}
+                  {sessionType && (
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1 capitalize">
+                      <Tag className="h-3 w-3 text-emerald-400" />
+                      {sessionType}
+                    </span>
+                  )}
+                  {languageLabel && (
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+                      <Globe className="h-3 w-3 text-sky-400" />
+                      {languageLabel}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Error state */}

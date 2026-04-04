@@ -11,6 +11,9 @@ export interface Facilitator {
   title: string;
   profile_picture: string;
   details: string;
+  specialties?: string[] | null;
+  expertise_level?: string | null;
+  languages?: string[] | null;
   lock?: boolean;
   order?: number;
   is_promoted?: boolean;

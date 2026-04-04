@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/components/ui/use-toast";
+import { useSessionTimer } from "@/hooks/useSessionTimer";
+import SessionTimerBadge from "../SessionTimerBadge";
 
 interface HostHeaderProps {
   conversation: ConversationWithSession | null;
@@ -48,6 +50,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   const { canGenerateReports } = usePlanLimits();
 
   const [showClosureDialog, setShowClosureDialog] = useState(false);
+  const timer = useSessionTimer(conversation, true);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
@@ -128,6 +131,9 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                   isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
                   sessionStarted={isSessionStarted}
                 />
+                {isSessionStarted && !isSessionEnded && (
+                  <SessionTimerBadge timer={timer} showAddTime />
+                )}
               </div>
               {facilitatorInfo && (
                 <div className="flex items-center gap-1.5 mt-0.5">

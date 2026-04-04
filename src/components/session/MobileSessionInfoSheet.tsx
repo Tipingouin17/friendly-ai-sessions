@@ -19,6 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Info, Users, Clock, Target, User } from 'lucide-react';
 import { ParticipantInfo } from '@/types/chat';
+import { useSessionTimer } from '@/hooks/useSessionTimer';
+import SessionTimerBadge from './SessionTimerBadge';
 
 interface MobileSessionInfoSheetProps {
   conversationData: any;
@@ -36,6 +38,8 @@ const MobileSessionInfoSheet: React.FC<MobileSessionInfoSheetProps> = ({
   const facilitatorInfo = conversationData?.sessions?.facilitator_details;
   const sessionTitle = conversationData?.sessions?.title || "Workshop Session";
   const sessionObjective = conversationData?.sessions?.objective || conversationData?.sessions?.welcome_message;
+  const hasDuration = !!(conversationData?.session_duration_minutes || conversationData?.sessions?.duration_minutes);
+  const timer = useSessionTimer(conversationData ?? null, false);
   
   return (
     <Sheet>
@@ -100,6 +104,19 @@ const MobileSessionInfoSheet: React.FC<MobileSessionInfoSheetProps> = ({
           )}
 
           <Separator />
+
+          {/* Live Timer */}
+          {timer && hasDuration && (
+            <div>
+              <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Time Remaining
+              </h4>
+              <SessionTimerBadge timer={timer} showAddTime={false} />
+            </div>
+          )}
+
+          {timer && hasDuration && <Separator />}
 
           {/* Session Stats */}
           <div className="space-y-4">

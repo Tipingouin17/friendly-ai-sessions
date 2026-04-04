@@ -5,6 +5,7 @@
  */
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +24,9 @@ interface WorkshopSetupProps {
   setLanguage: (language: string) => void;
   agreed: boolean;
   setAgreed: (agreed: boolean) => void;
+  durationMinutes: number | "";
+  setDurationMinutes: (v: number | "") => void;
+  defaultDurationMinutes?: number | null;
 }
 
 export const WorkshopSetup = ({
@@ -33,7 +37,10 @@ export const WorkshopSetup = ({
   language,
   setLanguage,
   agreed,
-  setAgreed
+  setAgreed,
+  durationMinutes,
+  setDurationMinutes,
+  defaultDurationMinutes,
 }: WorkshopSetupProps) => {
   const navigate = useNavigate();
   const {
@@ -127,6 +134,23 @@ export const WorkshopSetup = ({
             <SelectItem value="ar">Arabic</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2 text-left">
+          Session Duration (minutes)
+        </label>
+        <Input
+          type="number"
+          min={5}
+          max={480}
+          value={durationMinutes}
+          onChange={(e) => setDurationMinutes(e.target.value === "" ? "" : Number(e.target.value))}
+          placeholder={defaultDurationMinutes ? `Default: ${defaultDurationMinutes} min` : "e.g. 60 (optional)"}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          The AI facilitator will begin wrapping up 10 minutes before the session ends.
+        </p>
       </div>
 
       <div className="flex items-center gap-2">

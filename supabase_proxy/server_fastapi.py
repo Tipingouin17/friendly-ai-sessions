@@ -186,6 +186,17 @@ def run_startup_migrations() -> None:
             ADD COLUMN IF NOT EXISTS password_hash TEXT,
             ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
         """,
+        # 2026-04-04: Add email column to profiles so credentials can be looked up
+        # by email on container restart (load_users_from_db relies on this).
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS email TEXT;
+        """,
+        # 2026-04-04: Add full_name column to profiles if missing from older DBs.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS full_name TEXT;
+        """,
         # 2026-04-04: Add language column to conversations so the host's chosen
         # language (ISO 639-1 code, e.g. 'fr', 'es', 'de') is persisted and used
         # by the AI facilitator to respond in the correct language.

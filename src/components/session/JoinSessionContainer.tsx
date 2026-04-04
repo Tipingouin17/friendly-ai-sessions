@@ -129,7 +129,7 @@ const JoinSessionContainer = () => {
   // Handle successful join - wait for welcome message before redirecting
   const handleJoin = useCallback(async () => {
     // CRITICAL: Check navigation state first
-    if (checkNavigationState() || hasJoinedBefore || isJoining) {
+    if (checkNavigationState() || isJoining) {
       return;
     }
 
@@ -157,7 +157,7 @@ const JoinSessionContainer = () => {
       resetNavigationFlags();
       setJoinResult(null);
     }
-  }, [handleJoinSession, conversationId, navigateToSession, hasJoinedBefore, isJoining, checkNavigationState, resetNavigationFlags, waitForWelcomeMessage]);
+  }, [handleJoinSession, conversationId, navigateToSession, isJoining, checkNavigationState, resetNavigationFlags, waitForWelcomeMessage]);
 
   const handleRetry = useCallback(() => {
     if (conversationId && !checkNavigationState()) {

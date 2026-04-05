@@ -129,18 +129,9 @@ export const CreateWorkshopModal = ({
     navigate('/pricing');
   };
 
-  if (limitsLoading) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Loading...</DialogTitle>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
+  // Don't show a separate loading dialog — render the modal immediately
+  // with the form disabled while limits are loading. This prevents the
+  // jarring "Loading..." → form transition.
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
@@ -148,7 +139,14 @@ export const CreateWorkshopModal = ({
           <DialogTitle>Create New Workshop</DialogTitle>
         </DialogHeader>
         
-        {!canCreateCustomSessions ? (
+        {limitsLoading ? (
+          <div className="space-y-3 py-4">
+            <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
+            <div className="h-10 bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2" />
+            <div className="h-20 bg-gray-100 rounded animate-pulse" />
+          </div>
+        ) : !canCreateCustomSessions ? (
           <div className="space-y-4">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -231,7 +229,7 @@ export const CreateWorkshopModal = ({
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

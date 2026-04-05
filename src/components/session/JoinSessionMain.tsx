@@ -21,6 +21,10 @@ interface JoinSessionMainProps {
   onAvatarChange: () => void;
   onJoinSession?: () => Promise<any>;
   isJoining: boolean;
+  /** True while the initial conversation data is still loading — shows a skeleton */
+  isLoading?: boolean;
+  /** True while the AI facilitator is generating the welcome message after join */
+  isPreparingSession?: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
   onRetry: () => void;
@@ -37,6 +41,8 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   onAvatarChange,
   onJoinSession,
   isJoining,
+  isLoading = false,
+  isPreparingSession = false,
   currentParticipantCount,
   effectiveMaxParticipants,
   onRetry,
@@ -59,6 +65,46 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   const handleJoinClick = async () => {
     if (onJoinSession) await onJoinSession();
   };
+
+  // ── Skeleton while conversation data loads ────────────────────────────
+  if (isLoading && !conversation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 mb-4">
+              <div className="p-2 bg-indigo-600 rounded-xl">
+                <Zap className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            {/* Skeleton facilitator banner */}
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
+              <div className="space-y-1.5 flex-1">
+                <div className="h-2.5 bg-white/30 rounded animate-pulse w-1/3" />
+                <div className="h-3.5 bg-white/40 rounded animate-pulse w-1/2" />
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <div className="h-6 bg-gray-100 rounded animate-pulse w-3/4" />
+                <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2" />
+              </div>
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-11 bg-indigo-100 rounded-xl animate-pulse" />
+            </div>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Powered by AIfacilitator · AI-driven workshop facilitation
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
@@ -157,6 +203,22 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                       Try Again
                     </Button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inline preparing-session status — shown after join while AI generates welcome */}
+            {isPreparingSession && (
+              <div className="mb-4 flex items-center gap-3 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                <div className="shrink-0">
+                  <svg className="w-5 h-5 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-indigo-800">Preparing your session…</p>
+                  <p className="text-xs text-indigo-500 mt-0.5">The AI facilitator is getting ready</p>
                 </div>
               </div>
             )}

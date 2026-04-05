@@ -50,10 +50,11 @@ const fetchConversation = async (id: number | null) => {
       throw new Error(error.message || "Could not load session data");
     }
     
-    if (!data) {
-      console.warn('⚠️ No conversation data found for ID:', id);
-      return null;
-    }
+        if (!data) {
+          console.warn('⚠️ No conversation data found for ID:', id);
+          // Return null — the queryFn will convert this to a descriptive error.
+          return null;
+        }
 
     return data as ConversationWithSession;
   } catch (error) {
@@ -78,7 +79,13 @@ export const useConversation = (conversationId: number | null) => {
         const data = await fetchConversation(conversationId);
         
         if (!data) {
-          throw new Error("Session not found or no longer available");
+          // This can happen when:
+          //  1. The join token is missing from the URL (QR code without token)
+          //  2. The session ID is invalid
+          //  3. A transient network/auth issue
+          // Use a message that does NOT contain 'no longer available' to avoid
+          // the JoinSessionErrorState falsely classifying this as 'session ended'.
+          throw new Error("Session not found. Please use the join link provided by the host.");
         }
         
         // Note: We return data even for completed sessions

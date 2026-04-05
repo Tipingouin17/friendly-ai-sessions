@@ -113,7 +113,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
     <div className="flex items-center gap-1 shrink-0">
       {/* QR Code */}
       {!isSessionEnded && (
-        <HostQrDialog conversationId={conversation?.id || null} />
+        <HostQrDialog conversationId={conversation?.id || null} joinToken={(conversation as any)?.join_token || null} />
       )}
 
       {/* Analytics */}

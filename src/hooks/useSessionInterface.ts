@@ -28,27 +28,38 @@ export function useSessionInterface(conversationId: number | null) {
   useEffect(() => {
     if (conversationId) {
       const baseUrl = window.location.origin;
-      setSessionLink(`${baseUrl}/join-session?id=${conversationId}`);
+      // Note: join_token is fetched below and the link is updated once available.
+      // We set a placeholder without token first, then update it.
       
       // Check if session is already marked as started in the database
       const checkSessionStarted = async () => {
         try {
           const { data, error } = await supabase
             .from('conversations')
-            .select('session_started')
+            .select('session_started, join_token')
             .eq('id', conversationId)
             .maybeSingle();
             
           if (error) {
             console.error("[useSessionInterface] Error checking session_started:", error);
-          } else if (data && data.session_started) {
-            setIsSessionStarted(true);
-            setShowQrCodeView(false);
-            lastSessionStarted.current = true;
-          } else {
-            setShowQrCodeView(true);
-            setIsSessionStarted(false);
-            lastSessionStarted.current = false;
+          } else if (data) {
+            // Build the session link with the join token for secure sharing.
+            const token = (data as any).join_token;
+            const baseUrl = window.location.origin;
+            const link = token
+              ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
+              : `${baseUrl}/join-session?id=${conversationId}`;
+            setSessionLink(link);
+
+            if (data.session_started) {
+              setIsSessionStarted(true);
+              setShowQrCodeView(false);
+              lastSessionStarted.current = true;
+            } else {
+              setShowQrCodeView(true);
+              setIsSessionStarted(false);
+              lastSessionStarted.current = false;
+            }
           }
         } catch (err) {
           console.error("[useSessionInterface] Exception checking session_started:", err);

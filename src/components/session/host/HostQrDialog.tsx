@@ -19,14 +19,17 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface HostQrDialogProps {
   conversationId: number | null;
+  joinToken?: string | null;
 }
 
-const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId }) => {
+const HostQrDialog: React.FC<HostQrDialogProps> = ({ conversationId, joinToken }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const sessionLink = conversationId 
-    ? `${window.location.origin}/join-session?id=${conversationId}`
+  const sessionLink = conversationId
+    ? joinToken
+      ? `${window.location.origin}/join-session?id=${conversationId}&token=${encodeURIComponent(joinToken)}`
+      : `${window.location.origin}/join-session?id=${conversationId}`
     : '';
 
   const handleCopyLink = async () => {

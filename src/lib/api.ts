@@ -125,7 +125,11 @@ async function apiFetch<T>(
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
+    // Always send the join token when present — even for authenticated users.
+    // An authenticated participant joining someone else's session must send the
+    // join token so the backend can apply the participant-path access rules
+    // instead of the ownership filter (which would return 403 for non-owners).
+    if (joinToken) headers["X-Join-Token"] = joinToken;
 
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
@@ -350,7 +354,8 @@ class QueryBuilder<T = Record<string, unknown>> {
       ...this.xHeaders(),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
+    // Always send the join token when present — even for authenticated users.
+    if (joinToken) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("GET")}`, { headers, signal: this.s.signal });
       let count: number | null = null;
@@ -401,7 +406,8 @@ class QueryBuilder<T = Record<string, unknown>> {
     const joinToken = getJoinToken();
     const headers: Record<string, string> = { apikey: ANON_KEY, ...this.xHeaders() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
+    // Always send the join token when present — even for authenticated users.
+    if (joinToken) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("HEAD")}`, { method: "HEAD", headers });
       let count: number | null = null;

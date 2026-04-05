@@ -42,7 +42,7 @@ const Session = () => {
   const showMobileNav = isClient && isMobile;
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-[100dvh]">
       {/* Mobile navigation container - always present for consistent DOM structure */}
       <div className={`${showMobileNav ? 'block' : 'hidden'}`}>
         <SessionMobileNav />

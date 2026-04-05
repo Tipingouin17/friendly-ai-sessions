@@ -9,15 +9,20 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
+import { Menu, Sparkles } from "lucide-react";
 
 const SessionMobileNav = () => {
   const { isAuthenticated, user, logout } = useAuth();
   
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-white p-4 flex items-center justify-between border-b border-gray-100 h-16">
-      <Link to="/" className="text-xl font-bold text-yellow-500">
-        AI Facilitator
+    <div className="fixed top-0 left-0 right-0 z-50 bg-white p-4 flex items-center justify-between border-b border-slate-100 shadow-sm h-16">
+      <Link to="/" className="flex items-center gap-2">
+        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+          <Sparkles className="h-3.5 w-3.5 text-white" />
+        </div>
+        <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+          AI Facilitator
+        </span>
       </Link>
       
       <Sheet>
@@ -28,16 +33,16 @@ const SessionMobileNav = () => {
         </SheetTrigger>
         <SheetContent className="flex flex-col">
           <div className="flex flex-col space-y-6 mt-8">
-            <Link to="/" className="text-gray-800 hover:text-yellow-500 font-medium text-lg">
+            <Link to="/" className="text-slate-800 hover:text-indigo-600 font-medium text-lg transition-colors">
               Home
             </Link>
-            <Link to="/pricing" className="text-gray-600 hover:text-yellow-500 text-lg">
+            <Link to="/pricing" className="text-slate-600 hover:text-indigo-600 text-lg transition-colors">
               Pricing
             </Link>
-            <Link to="/faqs" className="text-gray-600 hover:text-yellow-500 text-lg">
+            <Link to="/faqs" className="text-slate-600 hover:text-indigo-600 text-lg transition-colors">
               FAQs
             </Link>
-            <Link to="/contact" className="text-gray-600 hover:text-yellow-500 text-lg">
+            <Link to="/contact" className="text-slate-600 hover:text-indigo-600 text-lg transition-colors">
               Contact Us
             </Link>
           </div>
@@ -46,12 +51,12 @@ const SessionMobileNav = () => {
             {!isAuthenticated ? (
               <div className="flex flex-col space-y-3">
                 <Link to="/login" className="w-full">
-                  <Button variant="outline" className="w-full text-center rounded-full">
+                  <Button variant="outline" className="w-full text-center rounded-full border-indigo-200 text-indigo-700 hover:bg-indigo-50">
                     Log in
                   </Button>
                 </Link>
                 <Link to="/signup" className="w-full">
-                  <Button className="w-full text-center bg-yellow-500 hover:bg-yellow-600 rounded-full">
+                  <Button className="w-full text-center bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 rounded-full text-white">
                     Sign up
                   </Button>
                 </Link>

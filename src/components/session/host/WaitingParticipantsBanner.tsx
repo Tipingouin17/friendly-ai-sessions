@@ -19,7 +19,7 @@ interface WaitingParticipantsBannerProps {
 interface WaitingEvent {
   id: number;
   created_at: string;
-  event_data: {
+  data: {
     name?: string;
     message?: string;
   } | null;
@@ -40,7 +40,7 @@ const WaitingParticipantsBanner: React.FC<WaitingParticipantsBannerProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("session_events")
-        .select("id, created_at, event_data")
+        .select("id, created_at, data")
         .eq("conversation_id", conversationId!)
         .eq("event_type", "participant_waiting")
         .order("created_at", { ascending: false });
@@ -99,8 +99,8 @@ const WaitingParticipantsBanner: React.FC<WaitingParticipantsBannerProps> = ({
       {expanded && (
         <div className="border-t border-amber-200 divide-y divide-amber-100">
           {visible.map((event) => {
-            const name = event.event_data?.name || "Anonymous";
-            const message = event.event_data?.message;
+            const name = event.data?.name || "Anonymous";
+            const message = event.data?.message;
             const time = new Date(event.created_at).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",

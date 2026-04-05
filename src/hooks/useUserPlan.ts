@@ -107,9 +107,16 @@ export const useUserPlan = (): UserPlanDetails => {
           .from('plans')
           .select('*')
           .eq('title', 'Free')
-          .single();
+          .maybeSingle();
           
-        if (planError) throw planError;
+        if (planError || !freePlan) {
+          // Cannot find Free plan — return safe defaults so the page still loads
+          return {
+            currentPlanId: null,
+            plan: null,
+            planRestrictions: DEFAULT_FREE_RESTRICTIONS,
+          };
+        }
         planId = freePlan.id;
       }
       
@@ -118,19 +125,25 @@ export const useUserPlan = (): UserPlanDetails => {
         .from('plans')
         .select('*')
         .eq('id', planId)
-        .single();
+        .maybeSingle();
       
-      if (planError) throw planError;
+      if (planError || !planData) {
+        return {
+          currentPlanId: planId,
+          plan: null,
+          planRestrictions: DEFAULT_FREE_RESTRICTIONS,
+        };
+      }
       
       // Get plan restrictions
       const { data: planRestrictions, error: restrictionsError } = await supabase
         .from('plan_restrictions')
         .select('*')
         .eq('plan_id', planData.id)
-        .single();
+        .maybeSingle();
       
-      if (restrictionsError) {
-        console.error("Error fetching plan restrictions:", restrictionsError);
+      if (restrictionsError || !planRestrictions) {
+        console.error("Error fetching plan restrictions or no restrictions found:", restrictionsError);
         return {
           currentPlanId: planId,
           plan: mapPlanForUI(planData as Record<string, unknown>),

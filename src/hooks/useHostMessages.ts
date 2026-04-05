@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 import { useMessageFetching } from "./session-messages/useMessageFetching";
 import { useResponseAggregation } from "./session-messages/useResponseAggregation";
 import { useOptimizedRealtimeConnection } from "./useOptimizedRealtimeConnection";
@@ -31,6 +32,7 @@ export const useHostMessages = ({
   const [isSessionPaused, setIsSessionPaused] = useState(false);
   const [conversationState, setConversationState] = useState(conversationData);
   const sessionStateRef = useRef(conversationData);
+  const { toast } = useToast();
   const welcomeGeneratedRef = useRef<boolean>(false);
   const autoStartHandledRef = useRef<boolean>(false);
 
@@ -197,23 +199,47 @@ export const useHostMessages = ({
   const handleSendHostMessage = useCallback(async (message: string, isPinned = false, recipientId?: string) => {
     if (!conversationId || !message.trim()) return;
 
+    // Optimistically add to local state so the host sees it immediately
+    const optimisticMsg: Message = {
+      id: `host-${Date.now()}`,
+      content: message,
+      sender: 'admin',
+      timestamp: new Date(),
+      isPinned,
+      recipientId,
+      isAdminMessage: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     try {
       const { error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
-          content: { text: message },
+          content: { text: message, isPinned, recipientId },
           role: 'admin',
-          name: 'Host'
+          name: 'Host',
         });
 
       if (error) {
         console.error('[HOST] Error sending message:', error);
+        toast({ title: 'Error', description: 'Failed to send message.', variant: 'destructive' });
+        // Roll back optimistic update
+        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      } else {
+        toast({
+          title: 'Message sent',
+          description: recipientId
+            ? 'Your message has been sent to the selected participant'
+            : 'Your message has been sent to all participants',
+        });
       }
     } catch (e) {
       console.error('[HOST] Exception sending message:', e);
+      toast({ title: 'Error', description: 'Failed to send message.', variant: 'destructive' });
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
     }
-  }, [conversationId]);
+  }, [conversationId, setMessages, toast]);
 
   const triggerFacilitatorResponse = useCallback(async (hostInstruction?: string) => {
     try {

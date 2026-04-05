@@ -127,7 +127,7 @@ const InputFooter = ({
         </div>
       )}
 
-      <div className="w-full border-t border-gray-100 bg-white/90 backdrop-blur-sm">
+      <div className="w-full border-t border-gray-100 bg-white/90 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {/* Question limit reached */}
         {isParticipantContext && hasReachedQuestionLimit ? (
           <div className="p-3 sm:p-4 flex flex-col items-center justify-center">

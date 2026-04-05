@@ -33,8 +33,7 @@
         @apply bg-background text-foreground font-['Inter'] text-left;
         /* Force the body to be at least viewport height */
         min-height: 100vh;
-        /* Prevent content from being hidden behind sticky footers */
-        padding-bottom: env(safe-area-inset-bottom, 0);
+        /* Safe-area padding is applied per-component (e.g. InputFooter) not globally */
     }
 
     p,

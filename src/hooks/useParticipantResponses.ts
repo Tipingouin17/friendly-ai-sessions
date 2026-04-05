@@ -132,9 +132,26 @@ export const useParticipantResponses = ({
     }
   }, [messages, currentUserParticipantId]);
   
-  // Calculate if current participant has answered - memoized to avoid recalculations
-  const hasAnswered = currentUserParticipantId ? 
-    !!participantResponded[currentUserParticipantId] : false;
+  // Compute hasAnswered directly from the messages array:
+  // true only if the participant has sent a message AFTER the last assistant message.
+  // This is more reliable than the localStorage-persisted state, which can get stuck
+  // across rounds if the reset effect fires before the new facilitator message arrives.
+  const hasAnswered = (() => {
+    if (!currentUserParticipantId) return false;
+    // Find the index of the last assistant message
+    let lastAssistantIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === 'assistant') {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx === -1) return false; // No facilitator message yet
+    // Check if the participant has responded after that facilitator message
+    return messages.slice(lastAssistantIdx + 1).some(
+      m => m.sender === 'user' && m.participant === String(currentUserParticipantId)
+    );
+  })();
   
   // Count unique participants who have responded
   const totalResponses = messages.reduce((uniqueParticipants, message) => {

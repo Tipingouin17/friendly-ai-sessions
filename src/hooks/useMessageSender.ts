@@ -48,8 +48,10 @@ export const useMessageSender = ({
   const { requestFacilitatorResponse } = useFacilitatorResponse();
   const { logMessageSent, logAIResponse, logPerformanceMetric } = useEnhancedSessionLogger();
   
-  // Add response collection logic
-  const totalParticipants = conversation?.participants ?? 1;
+  // Use the live participant array length for accurate multi-participant counting.
+  // conversation.participants is a static DB column set at session creation and may be stale.
+  // participants.length reflects the actual number of people who have joined.
+  const totalParticipants = participants.length > 0 ? participants.length : (conversation?.participants ?? 1);
   const {
     responseCount,
     isWaitingForResponses,
@@ -153,45 +155,30 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
-      // For single participant sessions, ALWAYS trigger AI response immediately
-      // For multi-participant sessions, wait until all have responded
-      const shouldTriggerAIResponse = totalParticipants <= 1 || (responseCount + 1) >= totalParticipants;
-      
-      if (shouldTriggerAIResponse) {
-        setIsWaitingForResponse(true);
-        stopWaitingForResponses(); // Stop the waiting state
-        const aiStartTime = performance.now();
+      // For multi-participant sessions (totalParticipants > 1), the host-side
+      // useMessageFetching auto-advance is the ONLY mechanism that should invoke the AI.
+      // The participant-side must only save the message and show a waiting indicator.
+      // Invoking AI from the participant side would cause premature responses before
+      // all participants have answered.
+      //
+      // For single-participant sessions, invoke AI directly from the participant side
+      // since there is no one else to wait for.
+      const isMultiParticipant = totalParticipants > 1;
 
+      if (!isMultiParticipant) {
+        // Single-participant: invoke AI directly
+        setIsWaitingForResponse(true);
+        const aiStartTime = performance.now();
         try {
-          // Get facilitator response with updated messages including the new participant message
           const updatedMessages = [...sessionState.messages, newMessage];
-          
           const aiResponse = await requestFacilitatorResponse(
-            currentConversationId, 
+            currentConversationId,
             updatedMessages,
             conversation
           );
-          
-          const aiEndTime = performance.now();
-          const aiResponseTime = aiEndTime - aiStartTime;
-          
-          // Log AI response metrics
-          logAIResponse(
-            currentConversationId,
-            aiResponseTime,
-            'ai',
-            undefined
-          );
-          
-          // Add AI response to UI and start new response collection
-          sessionState.setMessages(prev => {
-            const newMessages = [...prev, aiResponse];
-            // Start collecting responses for the new question
-            if (totalParticipants > 1 && !aiResponse.isReport) {
-              setTimeout(() => startResponseCollection(aiResponse.id), 100);
-            }
-            return newMessages;
-          });
+          const aiResponseTime = performance.now() - aiStartTime;
+          logAIResponse(currentConversationId, aiResponseTime, 'ai', undefined);
+          sessionState.setMessages(prev => [...prev, aiResponse]);
         } catch (aiError) {
           console.error("AI Response Error:", aiError);
           setError("Failed to get facilitator response. Please try again.");
@@ -203,7 +190,14 @@ export const useMessageSender = ({
         } finally {
           setIsWaitingForResponse(false);
         }
-      } else { /* no-op */ }
+      } else {
+        // Multi-participant: just show the waiting indicator.
+        // The host-side useMessageFetching will detect when all participants have
+        // responded and invoke the AI via generateAggregatedResponse.
+        // isWaitingForResponse stays false here — the ThinkingIndicator is shown
+        // via isWaitingForFirstMessage / the host-side isWaitingForResponses state.
+        // No direct AI call from the participant side.
+      }
       
     } catch (error) {
       console.error("Error sending message:", error);

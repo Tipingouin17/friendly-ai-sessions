@@ -97,11 +97,40 @@ export function useSessionContextValue({
   // treat it as "waiting for the AI" so MessageList shows the ThinkingIndicator
   // immediately instead of the generic "No messages yet" empty state.
   const isWaitingForFirstMessage = useMemo(() => {
-    if (isAdmin || effectiveAdmin) return false; // Host/admin never shows this
+    if (isAdmin || effectiveAdmin) return false;
     const msgs: any[] = safeRoomState.messages || [];
     const isActive = conversation && !conversation.is_session_ended && conversation.status === 'active';
     return isActive && msgs.length === 0;
   }, [isAdmin, effectiveAdmin, safeRoomState.messages, conversation]);
+
+  // In multi-participant sessions, after a participant sends their answer, show the
+  // ThinkingIndicator while waiting for all other participants to respond and the AI
+  // to generate its aggregated reply. The participant-side no longer invokes AI directly,
+  // so isWaitingForResponse from useMessageSender stays false. We derive this state
+  // from the messages: if the last message is from a user (not assistant), the participant
+  // is waiting for the AI to respond.
+  const isWaitingForOtherParticipants = useMemo(() => {
+    if (isAdmin || effectiveAdmin) return false;
+    if (!currentUserParticipantId) return false;
+    const msgs: any[] = safeRoomState.messages || [];
+    if (msgs.length === 0) return false;
+    const isActive = conversation && !conversation.is_session_ended && conversation.status === 'active';
+    if (!isActive) return false;
+    // Find the last assistant message index
+    let lastAssistantIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].sender === 'assistant') { lastAssistantIdx = i; break; }
+    }
+    if (lastAssistantIdx === -1) return false;
+    // Check if the current participant has answered after the last assistant message
+    const hasAnsweredThisRound = msgs.slice(lastAssistantIdx + 1).some(
+      (m: any) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
+    );
+    // If the participant has answered but the last message is not from the assistant,
+    // they are waiting for other participants and/or the AI response.
+    const lastMsg = msgs[msgs.length - 1];
+    return hasAnsweredThisRound && lastMsg.sender !== 'assistant';
+  }, [isAdmin, effectiveAdmin, currentUserParticipantId, safeRoomState.messages, conversation]);
 
   // Create the session context value with safe defaults and proper memoization
   return useMemo<SessionContextProps>(() => ({
@@ -111,7 +140,7 @@ export function useSessionContextValue({
     sessionState,
     participants: participants || [],
     participantColors,
-    isWaitingForResponse: safeRoomState.isWaitingForResponse || isWaitingForFirstMessage || false,
+    isWaitingForResponse: safeRoomState.isWaitingForResponse || isWaitingForFirstMessage || isWaitingForOtherParticipants || false,
     handleStartSession: handleStartSession || (() => { /* no-op */ }),
     handleSendMessage: safeRoomState.handleSendMessage || (async () => Promise.resolve()),
     showQrCodeView: showQrCodeView || false,
@@ -130,6 +159,7 @@ export function useSessionContextValue({
     participants,
     safeRoomState.isWaitingForResponse,
     isWaitingForFirstMessage,
+    isWaitingForOtherParticipants,
     handleStartSession,
     safeRoomState.handleSendMessage,
     showQrCodeView,

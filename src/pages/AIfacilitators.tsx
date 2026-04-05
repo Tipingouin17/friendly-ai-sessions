@@ -27,6 +27,9 @@ const AIfacilitators = () => {
   // Delay showing the welcome modal so it never flashes on top of a loading page
   const [showWelcome, setShowWelcome] = useState(false);
 
+  // Must be declared before the useEffect that uses it to avoid TDZ error
+  const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
+
   // Hydration-safe client detection
   useEffect(() => {
     setIsClient(true);
@@ -74,8 +77,6 @@ const AIfacilitators = () => {
 
   // Don't render plan-dependent UI until data is loaded
   const planDataReady = !limitsLoading && maxSessions > 0;
-
-  const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
 
   const {
     data: facilitators = [],

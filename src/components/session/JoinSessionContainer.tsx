@@ -2,6 +2,11 @@
  * Join Session Container
  *
  * Session component for the AIfacilitator application.
+ *
+ * UX principle: never swap to a full-page loading screen during the normal
+ * join flow.  The join form is shown immediately (with a skeleton while data
+ * loads) and all status transitions (loading, preparing, waiting) are shown
+ * inline inside the card — no jarring full-page swaps.
  */
 
 import { useEffect, useCallback, useState } from "react";
@@ -11,9 +16,7 @@ import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import { useJoinSessionNavigation } from "@/hooks/useJoinSessionNavigation";
 import { useJoinSessionState } from "@/hooks/useJoinSessionState";
 import { useWelcomeMessageMonitor } from "@/hooks/useWelcomeMessageMonitor";
-import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import JoinSessionErrorState from "./JoinSessionErrorState";
-import JoinSessionRejoinPrompt from "./JoinSessionRejoinPrompt";
 import JoinSessionMain from "./JoinSessionMain";
 import SessionFullPage from "./SessionFullPage";
 
@@ -147,7 +150,7 @@ const JoinSessionContainer = () => {
         });
 
         // Wait for welcome message before navigating
-        const messageReady = await waitForWelcomeMessage();
+        await waitForWelcomeMessage();
 
         navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
         return;
@@ -189,41 +192,22 @@ const JoinSessionContainer = () => {
   }, [checkNavigationState, setShowRejoinPrompt]);
 
   // Auto-redirect if session exists (but NOT if session is completed)
+  // Suppress the rejoin prompt flash: if auto-redirect will fire, skip the prompt entirely
   useEffect(() => {
     if (existingSessionData && conversationId && !checkNavigationState()) {
       // Don't auto-redirect to a completed session
       if (conversation && (conversation.status === 'completed' || conversation.is_session_ended)) {
         return;
       }
+      // Immediately hide the rejoin prompt and navigate — no flash
+      setShowRejoinPrompt(false);
       handleRejoin();
     }
-  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin, conversation]);
+  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin, conversation, setShowRejoinPrompt]);
 
   // CRITICAL: Check navigation state again before any rendering
   if (checkNavigationState()) {
     return null;
-  }
-
-  // ── Loading / preparing session ──────────────────────────────────────────
-  if ((isLoading && !invalidRequest) || isWaitingForMessage) {
-    return (
-      <PageShell>
-        <div className="flex justify-center mb-4">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600">
-            <svg className="w-7 h-7 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          </div>
-        </div>
-        <p className="text-gray-900 font-semibold text-lg mb-1">
-          {isWaitingForMessage ? 'Preparing your session…' : 'Loading session…'}
-        </p>
-        <p className="text-gray-400 text-sm">
-          {isWaitingForMessage ? 'The AI facilitator is getting ready' : 'Please wait a moment'}
-        </p>
-      </PageShell>
-    );
   }
 
   // ── Session ended ────────────────────────────────────────────────────────
@@ -263,19 +247,8 @@ const JoinSessionContainer = () => {
     );
   }
 
-  // ── Rejoin prompt ────────────────────────────────────────────────────────
-  if (showRejoinPrompt && existingSessionData) {
-    return (
-      <JoinSessionRejoinPrompt
-        existingSessionData={existingSessionData}
-        onRejoin={handleRejoin}
-        onJoinAsNew={handleJoinAsNew}
-      />
-    );
-  }
-
   // ── Session full ─────────────────────────────────────────────────────────
-  if (isFull) {
+  if (isFull && !isLoading) {
     return (
       <SessionFullPage
         conversation={conversation}
@@ -290,7 +263,10 @@ const JoinSessionContainer = () => {
     );
   }
 
-  // ── Main join form ───────────────────────────────────────────────────────
+  // ── Main join form (shown immediately, even while loading) ───────────────
+  // The form renders with a skeleton while conversation data is loading.
+  // After joining, the button shows an inline "Preparing session…" state
+  // instead of swapping to a full-page spinner.
   return (
     <JoinSessionMain
       conversation={conversation}
@@ -302,7 +278,9 @@ const JoinSessionContainer = () => {
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
       onJoinSession={handleJoin}
       isTokenReady={isTokenReady}
-      isJoining={isJoining}
+      isJoining={isJoining || isWaitingForMessage}
+      isLoading={isLoading}
+      isPreparingSession={isWaitingForMessage}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}
       onRetry={handleRetry}

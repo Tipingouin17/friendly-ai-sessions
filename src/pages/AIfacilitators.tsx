@@ -24,11 +24,21 @@ import PageHead from "@/components/PageHead";
 const AIfacilitators = () => {
   const [isClient, setIsClient] = useState(false);
   const [isCreateWorkshopModalOpen, setIsCreateWorkshopModalOpen] = useState(false);
+  // Delay showing the welcome modal so it never flashes on top of a loading page
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Hydration-safe client detection
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Defer welcome modal by 600 ms so the page renders first
+  useEffect(() => {
+    if (!hasSeenWelcome) {
+      const t = setTimeout(() => setShowWelcome(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [hasSeenWelcome]);
 
   const {
     currentStep,
@@ -98,8 +108,8 @@ const AIfacilitators = () => {
     <div className="min-h-screen bg-gray-50">
       <PageHead title="My Facilitators" description="Choose your AI facilitator and create workshops" />
       <WelcomeModal
-        isOpen={!hasSeenWelcome}
-        onClose={() => setHasSeenWelcome(true)}
+        isOpen={showWelcome && !hasSeenWelcome}
+        onClose={() => { setHasSeenWelcome(true); setShowWelcome(false); }}
       />
 
       {/* CreateWorkshopModal managed at page level to always have the correct facilitatorId */}
@@ -116,18 +126,21 @@ const AIfacilitators = () => {
       )}
 
       <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        {planDataReady && (
-          <div className="mb-6">
+        {/* Always render usage meter — shows skeleton while loading */}
+        <div className="mb-6">
+          {limitsLoading ? (
+            <div className="h-20 rounded-2xl bg-gray-100 animate-pulse" />
+          ) : (
             <UsageMeter
               currentUsage={currentSessionCount}
               limit={maxSessions}
               planName={planName}
               featureName="Sessions"
             />
-          </div>
-        )}
+          )}
+        </div>
 
-        {planDataReady && (
+        {!limitsLoading && (
           <PlanLimitAlert
             hasReachedSessionLimit={hasReachedSessionLimit}
             hasReachedFacilitatorLimit={hasReachedFacilitatorLimit}

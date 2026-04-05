@@ -53,7 +53,8 @@ export const useSessionMessages = ({
     totalResponses,
     recordResponse
   } = useResponseTracking({
-    currentUserParticipantId
+    currentUserParticipantId,
+    messages
   });
   
   const {

@@ -86,16 +86,22 @@ export const useMessageFetching = ({
         return;
       }
 
-      const formattedMessages: Message[] = (messagesData || []).map(msg => ({
-        id: msg.id.toString(),
-        content: typeof msg.content === 'string' ? msg.content : (msg.content && typeof msg.content === 'object' && 'text' in msg.content ? String(msg.content.text) : ''),
-        sender: msg.role === 'assistant' ? 'assistant' : msg.role === 'admin' ? 'admin' : 'user',
-        timestamp: new Date(msg.created_at),
-        participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
-        name: msg.name || undefined,
-        avatar: typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content) && 'avatar' in msg.content ? String(msg.content.avatar) : undefined,
-        role: msg.role || 'user'
-      }));
+      const formattedMessages: Message[] = (messagesData || []).map(msg => {
+        const contentObj = typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content) ? msg.content as Record<string, unknown> : null;
+        const textContent = typeof msg.content === 'string' ? msg.content : (contentObj && 'text' in contentObj ? String(contentObj.text) : '');
+        const isPrivateToHost = contentObj ? Boolean(contentObj.private_to_host) : false;
+        return {
+          id: msg.id.toString(),
+          content: textContent,
+          sender: msg.role === 'assistant' ? 'assistant' : msg.role === 'admin' ? 'admin' : 'user',
+          timestamp: new Date(msg.created_at),
+          participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
+          name: msg.name || undefined,
+          avatar: contentObj && 'avatar' in contentObj ? String(contentObj.avatar) : undefined,
+          role: msg.role || 'user',
+          isPrivateToHost,
+        };
+      });
 
       // Only update state if messages actually changed
       const currentIds = messagesRef.current.map(m => m.id).join(',');
@@ -327,10 +333,14 @@ export const useMessageFetching = ({
 
     try {
       const body: any = {
-        messages: messagesRef.current.map(msg => ({
-          role: msg.sender === 'assistant' ? 'assistant' : 'user',
-          content: msg.content
-        })),
+        // Exclude private host notes from the AI context — they are internal annotations
+        // and must not influence the facilitator's responses.
+        messages: messagesRef.current
+          .filter(msg => !msg.isPrivateToHost)
+          .map(msg => ({
+            role: msg.sender === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+          })),
         conversationId: conversationIdRef.current,
         sessionStart: false,
         generateReport: false

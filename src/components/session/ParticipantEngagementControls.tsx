@@ -69,8 +69,14 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
         <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
           <SkipForward className="h-4 w-4 text-slate-400 shrink-0" />
           <p className="flex-1 text-sm text-slate-500">
-            You skipped this question — the session will continue without your response.
+            You skipped this question — waiting for the facilitator's next message…
           </p>
+          {/* Animated dots to signal the facilitator is about to respond */}
+          <span className="flex items-center gap-1 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '160ms', animationDuration: '1s' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '320ms', animationDuration: '1s' }} />
+          </span>
         </div>
       )}
 

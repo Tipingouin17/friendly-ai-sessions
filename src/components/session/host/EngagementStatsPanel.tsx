@@ -49,7 +49,7 @@ export const EngagementStatsPanel: React.FC<EngagementStatsPanelProps> = ({
         'participant_skipped',
         'participant_paused',
         'participant_resumed',
-        'participant_message_host',
+        'participant_message_to_host',
       ])
       .order('created_at', { ascending: true });
 
@@ -91,7 +91,7 @@ export const EngagementStatsPanel: React.FC<EngagementStatsPanelProps> = ({
     if (ev.event_type === 'participant_skipped') entry.skipCount += 1;
     if (ev.event_type === 'participant_paused') entry.isPaused = true;
     if (ev.event_type === 'participant_resumed') entry.isPaused = false;
-    if (ev.event_type === 'participant_message_host') entry.messageCount += 1;
+    if (ev.event_type === 'participant_message_to_host') entry.messageCount += 1;
     entry.lastActivity = ev.created_at;
     engagementMap.set(pid, entry);
   }

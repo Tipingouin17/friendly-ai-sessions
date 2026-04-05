@@ -81,13 +81,26 @@ const fetchPastWorkshops = async () => {
           title,
           profile_picture
         )
-      )
+      ),
+      messages!messages_conversation_id_fkey (id, role)
     `)
     .eq('is_session_ended', true)
     .order('ended_at', { ascending: false });
 
   if (error) throw error;
-  return data as Workshop[];
+
+  // Enrich each workshop with live message count if the stored value is stale (0)
+  const enriched = (data || []).map((w: Workshop & { messages?: { id: number; role: string }[] }) => {
+    const liveMessageCount = w.messages?.length ?? 0;
+    const storedCount = w.total_messages ?? 0;
+    return {
+      ...w,
+      total_messages: storedCount > 0 ? storedCount : liveMessageCount,
+      messages: undefined, // strip raw messages from the object
+    };
+  });
+
+  return enriched as Workshop[];
 };
 
 const fetchActiveWorkshops = async () => {

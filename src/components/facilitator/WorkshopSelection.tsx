@@ -3,9 +3,11 @@
  *
  * Facilitator component for the AIfacilitator application.
  */
-import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Workshop } from "@/types/facilitator";
 
 interface WorkshopSelectionProps {
@@ -32,6 +34,7 @@ export const WorkshopSelection = ({
   isLoading = false,
   onAddNewWorkshop
 }: WorkshopSelectionProps) => {
+  const { canCreateCustomSessions } = usePlanLimits();
   const [startIndex, setStartIndex] = useState(0);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
@@ -110,9 +113,17 @@ export const WorkshopSelection = ({
             ) : (
               <div 
                 key="add-new"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all min-h-[100px]"
+                className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all min-h-[100px]"
                 onClick={onAddNewWorkshop}
               >
+                {!canCreateCustomSessions && (
+                  <Badge
+                    className="absolute -top-2 -right-2 flex items-center gap-0.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] px-1.5 py-0.5 shadow-sm border-0"
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Pro
+                  </Badge>
+                )}
                 <Plus className="mb-2 h-8 w-8 text-gray-400" />
                 <span className="text-center text-xs text-gray-600">Add New Workshop</span>
               </div>

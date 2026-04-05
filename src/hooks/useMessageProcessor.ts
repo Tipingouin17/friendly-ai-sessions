@@ -80,7 +80,8 @@ export const useMessageProcessor = ({
       const filteredMessages = processedMessages.filter(message => {
         const isAssistantMessage = message.sender === "assistant";
         const isCurrentParticipantMessage = message.sender === "user" && message.participant === participantKey;
-        const isAdminMessage = message.sender === "admin";
+        // Private host notes (participant-to-host messages) must never be shown to participants
+        const isAdminMessage = message.sender === "admin" && !message.isPrivateToHost;
         
         debugLog('all', `Message ${message.id}: sender=${message.sender}, participant=${message.participant}, include=${isAssistantMessage || isCurrentParticipantMessage || isAdminMessage}`);
         

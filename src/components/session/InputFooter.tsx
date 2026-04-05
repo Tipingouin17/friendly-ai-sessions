@@ -87,8 +87,7 @@ const InputFooter = ({
   }, [messages]);
   React.useEffect(() => {
     engagement.resetSkip();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastAssistantMessageId]);
+  }, [lastAssistantMessageId, engagement.resetSkip]);
 
   // Safely determine if this is a new session with just a welcome message
   const isNewSession = Array.isArray(messages) && messages.length <= 1 &&

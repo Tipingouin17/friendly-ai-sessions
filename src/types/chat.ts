@@ -22,6 +22,7 @@ export interface Message {
   isFallback?: boolean;
   isAIGenerated?: boolean;
   isEnhanced?: boolean;
+  isPrivateToHost?: boolean;
 }
 
 export interface ParticipantInfo {

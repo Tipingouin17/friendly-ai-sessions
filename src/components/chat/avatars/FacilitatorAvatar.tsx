@@ -96,15 +96,16 @@ const FacilitatorAvatar = ({
     const needsCrossOrigin = isInCrossOriginContext();
     
     return (
-      <Avatar className={`${dimensions[size]} avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>
+      // rounded-xl matches the MessageBubble's rounded-tl-none flat corner for visual alignment
+      <Avatar className={`${dimensions[size]} !rounded-xl avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>
         <AvatarImage 
           src={normalizedUrl} 
           alt={name} 
           onError={handleImageError}
-          className="object-cover"
+          className="object-cover rounded-xl"
           crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
         />
-        <AvatarFallback className="bg-blue-100 text-blue-500">
+        <AvatarFallback className="bg-blue-100 text-blue-500 rounded-xl">
           <Bot className="h-4 w-4" />
         </AvatarFallback>
       </Avatar>
@@ -113,8 +114,9 @@ const FacilitatorAvatar = ({
   
   // Fallback for facilitator with no avatar
   return (
-    <Avatar className={`${dimensions[size]} bg-blue-100 avatar-container`}>
-      <AvatarFallback className="bg-blue-100 text-blue-500">
+    // rounded-xl matches the MessageBubble's rounded-tl-none flat corner for visual alignment
+    <Avatar className={`${dimensions[size]} !rounded-xl bg-blue-100 avatar-container`}>
+      <AvatarFallback className="bg-blue-100 text-blue-500 rounded-xl">
         <Bot className="h-4 w-4" />
       </AvatarFallback>
     </Avatar>

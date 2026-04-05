@@ -9,7 +9,7 @@
  * All state changes are written to session_events so they appear in analytics.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export type EngagementStatus = 'active' | 'paused' | 'skipped';
@@ -28,6 +28,10 @@ export const useParticipantEngagement = ({
   const [status, setStatus] = useState<EngagementStatus>('active');
   const [isSendingHostMessage, setIsSendingHostMessage] = useState(false);
   const [hostMessageSent, setHostMessageSent] = useState(false);
+
+  // Keep a ref to the latest status so resetSkip never has a stale closure
+  const statusRef = useRef<EngagementStatus>('active');
+  statusRef.current = status;
 
   // ─── Write a session_event ────────────────────────────────────────────────
   const writeEvent = useCallback(
@@ -57,10 +61,11 @@ export const useParticipantEngagement = ({
     await writeEvent('participant_skipped');
   }, [writeEvent]);
 
-  // Reset skip status when a new facilitator message arrives
+  // Reset skip status when a new facilitator message arrives.
+  // Uses a ref so the callback is always stable and never captures a stale status.
   const resetSkip = useCallback(() => {
-    if (status === 'skipped') setStatus('active');
-  }, [status]);
+    if (statusRef.current === 'skipped') setStatus('active');
+  }, []); // stable — reads from ref, not from closure
 
   // ─── Pause / resume ───────────────────────────────────────────────────────
   const togglePause = useCallback(async () => {
@@ -76,17 +81,35 @@ export const useParticipantEngagement = ({
   // ─── Message host ─────────────────────────────────────────────────────────
   const sendMessageToHost = useCallback(
     async (message: string) => {
-      if (!message.trim()) return;
+      if (!message.trim() || !conversationId) return;
       setIsSendingHostMessage(true);
       try {
+        // 1. Log the event for analytics
         await writeEvent('participant_message_to_host', { message: message.trim() });
+
+        // 2. Insert a messages row so the host sees it in their message list.
+        //    role: 'admin' ensures it renders as a centred admin announcement.
+        //    private_to_host: true marks it as a private participant note.
+        await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          content: {
+            text: `🔒 Private message from ${participantName}: ${message.trim()}`,
+            private_to_host: true,
+            participant_id: participantId,
+            participant_name: participantName,
+          },
+          role: 'admin',
+          name: 'Host Note',
+          participant_id: participantId,
+        });
+
         setHostMessageSent(true);
         setTimeout(() => setHostMessageSent(false), 4000);
       } finally {
         setIsSendingHostMessage(false);
       }
     },
-    [writeEvent]
+    [writeEvent, conversationId, participantId, participantName]
   );
 
   return {

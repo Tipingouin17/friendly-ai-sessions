@@ -93,6 +93,16 @@ export function useSessionContextValue({
     connectionAttempts: connection?.connectionAttempts || 0
   }), [connection]);
 
+  // When a participant first arrives at an active session with no messages yet,
+  // treat it as "waiting for the AI" so MessageList shows the ThinkingIndicator
+  // immediately instead of the generic "No messages yet" empty state.
+  const isWaitingForFirstMessage = useMemo(() => {
+    if (isAdmin || effectiveAdmin) return false; // Host/admin never shows this
+    const msgs: any[] = safeRoomState.messages || [];
+    const isActive = conversation && !conversation.is_session_ended && conversation.status === 'active';
+    return isActive && msgs.length === 0;
+  }, [isAdmin, effectiveAdmin, safeRoomState.messages, conversation]);
+
   // Create the session context value with safe defaults and proper memoization
   return useMemo<SessionContextProps>(() => ({
     isLoading: effectiveAdmin ? false : isLoading,
@@ -101,7 +111,7 @@ export function useSessionContextValue({
     sessionState,
     participants: participants || [],
     participantColors,
-    isWaitingForResponse: safeRoomState.isWaitingForResponse || false,
+    isWaitingForResponse: safeRoomState.isWaitingForResponse || isWaitingForFirstMessage || false,
     handleStartSession: handleStartSession || (() => { /* no-op */ }),
     handleSendMessage: safeRoomState.handleSendMessage || (async () => Promise.resolve()),
     showQrCodeView: showQrCodeView || false,
@@ -119,6 +129,7 @@ export function useSessionContextValue({
     sessionState,
     participants,
     safeRoomState.isWaitingForResponse,
+    isWaitingForFirstMessage,
     handleStartSession,
     safeRoomState.handleSendMessage,
     showQrCodeView,

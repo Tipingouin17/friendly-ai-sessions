@@ -96,8 +96,18 @@ const MessageList = ({
     }).filter(Boolean);
   }, [messages, participantColors, participants, conversationData]);
 
-  // Empty state
+  // Empty state — but if the AI is already thinking, show the thinking
+  // indicator so participants never see a blank screen after joining.
   if (processedMessages.length === 0) {
+    if (isWaitingForResponse) {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="px-4 py-5 sm:px-6">
+            <ThinkingIndicator />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-6">
         <div className="mb-4 w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center">

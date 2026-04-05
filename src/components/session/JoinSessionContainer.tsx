@@ -130,7 +130,8 @@ const JoinSessionContainer = () => {
     isEnabled: !!joinResult
   });
 
-  // Handle successful join - wait for welcome message before redirecting
+  // Handle successful join - navigate immediately and let the session page
+  // show the thinking indicator while the AI generates the welcome message.
   const handleJoin = useCallback(async () => {
     // CRITICAL: Check navigation state first
     if (checkNavigationState() || isJoining) {
@@ -141,17 +142,22 @@ const JoinSessionContainer = () => {
       const result = await handleJoinSession();
       if (result && conversationId) {
 
-        // Store join result to start message monitoring
+        // Fire-and-forget: trigger AI welcome message generation in the background.
+        // The session page will show the ThinkingIndicator while it generates.
         setJoinResult({
           conversationId,
           participantId: result.participantId,
           name: result.name,
           avatarSeed: result.avatarSeed
         });
+        // Kick off generation without awaiting — participant sees the chat
+        // screen immediately with the thinking indicator.
+        waitForWelcomeMessage().catch((err: unknown) => {
+          console.error('[JoinSessionContainer] Background welcome message generation failed:', err);
+        });
 
-        // Wait for welcome message before navigating
-        await waitForWelcomeMessage();
-
+        // Navigate immediately so the participant sees the conversation screen
+        // with the ThinkingIndicator rather than a blank join form.
         navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
         return;
       }

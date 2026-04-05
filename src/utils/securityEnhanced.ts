@@ -24,19 +24,23 @@ export const validateSecureSessionOperation = async (
 
     // Additional validation based on operation type
     switch (operation) {
-      case 'close_session':
+      case 'close_session': {
         // Only session owner can close sessions
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data: conversation } = await supabase
+        const { data: conversation, error: convErr } = await supabase
           .from('conversations')
           .select('user_id')
           .eq('id', conversationId)
           .single();
         
-        if (conversation?.user_id !== userId) {
+        if (convErr || !conversation) {
+          return { isValid: false, error: 'Session not found or access denied' };
+        }
+        if (conversation.user_id !== userId) {
           return { isValid: false, error: 'Only session owner can close the session' };
         }
         break;
+      }
       
       case 'admin_action':
         // Additional admin validation could go here

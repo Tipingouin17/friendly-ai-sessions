@@ -145,6 +145,10 @@ export const useSessionClosure = () => {
         ? Math.max(1, Math.round((new Date(now).getTime() - new Date(sessionStart).getTime()) / 60000))
         : 0;
 
+      // The DB has a CHECK (participants >= 1) constraint, so we clamp to minimum 1.
+      // A session with 0 registered participants is still valid (host ran it alone).
+      const participantsForDb = Math.max(1, activeParticipants);
+
       // Mark the conversation as ended with all stats
       const { error } = await supabase
         .from('conversations')
@@ -152,7 +156,7 @@ export const useSessionClosure = () => {
           is_session_ended: true,
           ended_at: now,
           total_messages: totalMessages,
-          participants: activeParticipants,
+          participants: participantsForDb,
           participant_engagement_score: engagementScore,
           session_duration_minutes: durationMinutes,
         })

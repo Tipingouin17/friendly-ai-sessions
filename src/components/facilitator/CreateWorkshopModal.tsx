@@ -229,7 +229,7 @@ export const CreateWorkshopModal = ({
               </Button>
             </div>
           </div>
-        ) : null}
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1214,10 +1214,17 @@ async def rest_table(table: str, request: Request):
             off = params.get("offset", "")
 
             # ── Ownership / token filter injection ────────────────
-            # Authenticated hosts: inject user_id ownership filter.
-            # Participants with a join token: validate the token and
-            # restrict the query to that specific conversation.
-            if requesting_user_id and table in SECURE_REPORT_TABLES:
+            # Priority order:
+            # 1. Join token present → participant path (even if authenticated).
+            #    An authenticated user joining someone else's session must be
+            #    allowed through via the join token, not blocked by ownership.
+            # 2. Authenticated host with no join token → ownership filter.
+            # 3. Anonymous with no token → public guard (active sessions only).
+            if join_token_header and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES):
+                # Participant path (authenticated or not): validate join token.
+                # Fall through to the token validation block below.
+                pass
+            elif requesting_user_id and table in SECURE_REPORT_TABLES:
                 # session_reports: ownership via conversation's user_id
                 wc.append(
                     '"conversation_id" IN ('
@@ -1246,7 +1253,7 @@ async def rest_table(table: str, request: Request):
                     # conversations: direct user_id filter
                     wc.append('"user_id" = %s::uuid')
                     wv.append(requesting_user_id)
-            elif join_token_header and not requesting_user_id:
+            if join_token_header and (not requesting_user_id or table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES)):
                 # Participant path: validate join token against the
                 # conversation_id present in the query parameters.
                 # Extract conversation_id from the WHERE params.

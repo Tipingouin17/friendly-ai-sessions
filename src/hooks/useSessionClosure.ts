@@ -108,13 +108,53 @@ export const useSessionClosure = () => {
       // Reuse the same validation (ownership + not-already-ended checks)
       await validateSessionClosure(conversationId);
 
-      // Mark the conversation as ended directly — no report edge function
+      // --- Compute session stats before closing ---
+      // 1. Fetch the conversation to get created_at for duration calculation
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('created_at')
+        .eq('id', conversationId)
+        .single();
+
+      // 2. Count all messages in this conversation
+      const { data: allMessages } = await supabase
+        .from('messages')
+        .select('id, role, user_id')
+        .eq('conversation_id', conversationId);
+
+      const totalMessages = allMessages?.length ?? 0;
+      const userMessages = allMessages?.filter(m => m.role === 'user') ?? [];
+      const uniqueRespondents = new Set(userMessages.map(m => m.user_id).filter(Boolean)).size;
+
+      // 3. Count participants
+      const { count: participantCount } = await supabase
+        .from('session_participants')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId);
+
+      // 4. Compute engagement score: ratio of participants who sent at least one message
+      const activeParticipants = participantCount ?? 0;
+      const engagementScore = activeParticipants > 0
+        ? Math.round((uniqueRespondents / activeParticipants) * 100) / 100
+        : 0;
+
+      // 5. Compute duration in minutes from session start (created_at) to now
+      const sessionStart = convData?.created_at;
       const now = new Date().toISOString();
+      const durationMinutes = sessionStart
+        ? Math.max(1, Math.round((new Date(now).getTime() - new Date(sessionStart).getTime()) / 60000))
+        : 0;
+
+      // Mark the conversation as ended with all stats
       const { error } = await supabase
         .from('conversations')
         .update({
           is_session_ended: true,
           ended_at: now,
+          total_messages: totalMessages,
+          participants: activeParticipants,
+          participant_engagement_score: engagementScore,
+          session_duration_minutes: durationMinutes,
         })
         .eq('id', conversationId);
 

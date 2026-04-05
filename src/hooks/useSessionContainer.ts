@@ -13,21 +13,24 @@ interface UseSessionContainerProps {
   canGenerateReports: boolean;
   onGenerateReport?: () => void;
   conversationId: number | null;
+  joinToken?: string | null;
 }
 
 export const useSessionContainer = ({
   canGenerateReports,
   onGenerateReport,
-  conversationId
+  conversationId,
+  joinToken
 }: UseSessionContainerProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   
-  // Generate join URL
+  // Generate join URL (include join token to prevent enumeration attacks)
   const baseUrl = window.location.origin;
-  // Update to use the correct join-session path
-  const joinUrl = `${baseUrl}/join-session?id=${conversationId}`;
+  const joinUrl = joinToken
+    ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(joinToken)}`
+    : `${baseUrl}/join-session?id=${conversationId}`;
   
   // Check if we're on a mobile device
   const isMobile = window.innerWidth < 768;

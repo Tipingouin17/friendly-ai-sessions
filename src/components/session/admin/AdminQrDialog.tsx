@@ -18,10 +18,12 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface AdminQrDialogProps {
   conversationId: number | null;
+  joinToken?: string | null;
 }
 
 const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
-  conversationId
+  conversationId,
+  joinToken
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [joinUrl, setJoinUrl] = useState("");
@@ -30,9 +32,12 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
   useEffect(() => {
     if (conversationId) {
       const baseUrl = window.location.origin;
-      setJoinUrl(`${baseUrl}/join-session?id=${conversationId}`);
+      const url = joinToken
+        ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(joinToken)}`
+        : `${baseUrl}/join-session?id=${conversationId}`;
+      setJoinUrl(url);
     }
-  }, [conversationId]);
+  }, [conversationId, joinToken]);
 
   const onCopyLink = () => {
     if (joinUrl) {

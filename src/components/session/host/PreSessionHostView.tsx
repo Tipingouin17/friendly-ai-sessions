@@ -43,9 +43,14 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   }, [participantCount]);
 
   // Memoize session link to prevent unnecessary recalculations
+  // Always include the join token so QR code / copied links work on mobile.
   const sessionLink = useMemo(() => {
-    return conversationId ? `${window.location.origin}/join-session?id=${conversationId}` : '';
-  }, [conversationId]);
+    if (!conversationId) return '';
+    const token = (conversationData as any)?.join_token;
+    return token
+      ? `${window.location.origin}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
+      : `${window.location.origin}/join-session?id=${conversationId}`;
+  }, [conversationId, conversationData]);
 
   // Stable copy handler
   const handleCopyLink = useCallback(async () => {

@@ -21,10 +21,12 @@ const JoinSessionErrorState: React.FC<JoinSessionErrorStateProps> = ({
   const errorText = error?.toLowerCase() || '';
 
   // Determine error type for specific messaging
+  // Only classify as 'session ended' when the error explicitly says the session ended.
+  // Generic fetch errors like 'no longer available' or 'not found' should NOT be
+  // classified as ended — they may be transient auth/token failures.
   const isSessionEnded = errorText.includes('session has ended') ||
-    errorText.includes('no longer available') ||
     errorText.includes('session is closed') ||
-    errorText.includes('completed');
+    errorText.includes('is_session_ended');
 
   const isSessionFull = errorText.includes('full') || errorText.includes('capacity');
 

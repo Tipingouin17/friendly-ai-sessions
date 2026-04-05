@@ -81,17 +81,18 @@ const HostHeader: React.FC<HostHeaderProps> = ({
 
   const handleStop = async () => {
     if (!conversation?.id) return;
-    const success = await stopSessionWithoutReport(conversation.id);
-    if (success) setShowClosureDialog(false);
+    await stopSessionWithoutReport(conversation.id);
+    // Always close the dialog after the attempt (success or failure)
+    // On failure, the error toast is shown by stopSessionWithoutReport
+    setShowClosureDialog(false);
   };
 
   const handleCloseAndReport = async () => {
     if (!conversation?.id) return;
     const success = await closeSessionAndGenerateReport(conversation.id);
-    if (success) {
-      setShowClosureDialog(false);
-      if (canGenerateReports) setShowReportDialog(true);
-    }
+    // Always close the dialog after the attempt
+    setShowClosureDialog(false);
+    if (success && canGenerateReports) setShowReportDialog(true);
   };
 
   const handleOpenEndDialog = () => {

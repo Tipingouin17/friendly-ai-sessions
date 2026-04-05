@@ -364,6 +364,19 @@ class QueryBuilder<T = Record<string, unknown>> {
         const err = body as Record<string, unknown>;
         return { data: null, error: { message: (err?.message as string) || `HTTP ${res.status}`, code: String(res.status), status: res.status }, count };
       }
+      // PostgREST behaviour: .single() with no rows → PGRST116 error (not an empty array)
+      if ((this.s.single || this.s.maybeSingle) && Array.isArray(body)) {
+        if (body.length === 0) {
+          if (this.s.maybeSingle) {
+            // maybeSingle returns null data (no error) when no rows found
+            return { data: null, error: null, count };
+          }
+          // single() returns an error when no rows found
+          return { data: null, error: { message: 'JSON object requested, multiple (or no) rows returned', code: 'PGRST116', status: 406 }, count };
+        }
+        // single() with multiple rows: return first row (matches PostgREST behaviour)
+        return { data: body[0] as T, error: null, count };
+      }
       return { data: body as T | T[], error: null, count };
     } catch (e: unknown) {
       return { data: null, error: { message: e instanceof Error ? e.message : "Network error" }, count: null };

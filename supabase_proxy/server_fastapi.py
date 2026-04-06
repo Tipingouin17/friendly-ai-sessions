@@ -1224,9 +1224,15 @@ async def rest_table(table: str, request: Request):
             # 2. Authenticated host with no join token → ownership filter.
             # 3. Anonymous with no token → public guard (active sessions only).
             if join_token_header and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES):
-                # Participant path (authenticated or not): validate join token.
-                # Fall through to the token validation block below.
-                pass
+                # Participant path: only use join-token auth when the request is
+                # NOT an authenticated host listing their own conversations.
+                # If the user is authenticated AND the query is a list (no specific
+                # conversation_id / id filter), treat it as a host dashboard request
+                # and ignore the stale join token — apply ownership filter instead.
+                _is_list_query = not (params.get('id', '') or params.get('conversation_id', ''))
+                if requesting_user_id and _is_list_query and table in ("conversations", *SECURE_CONV_TABLES):
+                    # Host dashboard path: ignore join token, apply ownership filter below.
+                    join_token_header = ""
             elif requesting_user_id and table in SECURE_REPORT_TABLES:
                 # session_reports: ownership via conversation's user_id
                 wc.append(

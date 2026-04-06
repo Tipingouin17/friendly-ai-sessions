@@ -1710,10 +1710,20 @@ async def edge_function(func_name: str, request: Request):
                         content = json.loads(content)
                     except Exception:
                         content = {"text": content}
-                text = content.get("text", str(content))
+                # Skip private participant-to-host notes — they must never appear in AI context
+                if isinstance(content, dict) and content.get("private_to_host"):
+                    continue
+                text = content.get("text", str(content)) if isinstance(content, dict) else str(content)
                 role = msg.get("role", "unknown")
                 name = msg.get("name", role)
-                conversation_text += f"[{role.upper()} - {name}]: {text}\n\n"
+                # Label host broadcasts clearly so the AI understands who is speaking
+                if role == "admin" and name == "Host":
+                    label = "HOST"
+                elif role == "admin":
+                    label = "ADMIN"
+                else:
+                    label = role.upper()
+                conversation_text += f"[{label} - {name}]: {text}\n\n"
             user_prompt = (
                 f'Generate a comprehensive session report for the workshop "{session_title}".\n'
                 f"Objective: {objective}\n\n"
@@ -1742,10 +1752,20 @@ async def edge_function(func_name: str, request: Request):
                         content = json.loads(content)
                     except Exception:
                         content = {"text": content}
-                text = content.get("text", str(content))
+                # Skip private participant-to-host notes — they must never appear in AI context
+                if isinstance(content, dict) and content.get("private_to_host"):
+                    continue
+                text = content.get("text", str(content)) if isinstance(content, dict) else str(content)
                 role = msg.get("role", "unknown")
                 name = msg.get("name", role)
-                conversation_context += f"[{role.upper()} - {name}]: {text}\n\n"
+                # Label host broadcasts clearly so the AI understands who is speaking
+                if role == "admin" and name == "Host":
+                    label = "HOST"
+                elif role == "admin":
+                    label = "ADMIN"
+                else:
+                    label = role.upper()
+                conversation_context += f"[{label} - {name}]: {text}\n\n"
             if host_instruction:
                 user_prompt = (
                     f'Here is the recent conversation in our workshop "{session_title}":\n\n'

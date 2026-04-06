@@ -491,7 +491,7 @@ const PastWorkshops = () => {
   };
 
   return (
-    <div className="min-h-screen pt-12 pb-16">
+    <div className="min-h-screen pt-24 pb-16">
       <PageHead title="Host Dashboard" description="Manage and view all your workshop sessions" />
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">

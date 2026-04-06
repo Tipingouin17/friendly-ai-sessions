@@ -10,7 +10,7 @@ const Terms = () => {
   return (
     <div className="min-h-screen pb-16 bg-white">
       <PageHead title="Terms of Service" description="Terms of Service for AIfacilitator" />
-      <div className="max-w-3xl mx-auto px-4 prose prose-gray">
+      <div className="max-w-3xl mx-auto px-4 pt-28 pb-8 prose prose-gray">
         <h1>Terms of Service</h1>
         <p className="text-gray-500 text-sm">Last updated: March 2026</p>
 

@@ -1071,11 +1071,11 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             "SELECT c.id, c.user_id, c.language, "
             "s.title, s.objective, s.welcome_message, s.scope, "
             "s.gpt_version, s.max_tokens, s.randomness, "
-            "f.title as facilitator_name, f.description as facilitator_details, "
-            "f.avatar_url, f.language as facilitator_language "
+            "f.title as facilitator_name, f.details as facilitator_details, "
+            "f.profile_picture, f.languages as facilitator_language "
             "FROM conversations c "
-            "LEFT JOIN sessions s ON s.id = c.session_id "
-            "LEFT JOIN facilitators f ON f.id = s.facilitator_id "
+            "LEFT JOIN sessions s ON s.id = c.sessions_id "
+            "LEFT JOIN facilitators f ON f.id = s.facilitator "
             "WHERE c.id = %s",
             (conv_id,)
         )

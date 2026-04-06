@@ -1057,12 +1057,15 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             return
 
         # Idempotency guard: skip if AI generation is already in progress
+        # NOTE: Do NOT set the lock here — handle-facilitator-response will set it.
+        # Setting it here would cause handle-facilitator-response to see the lock
+        # and skip the generation (double-lock bug).
         _now = time.time()
         _lock_key = f"ai_lock_{conv_id}"
         _last = _ai_response_locks.get(_lock_key, 0)
         if _now - _last < 10:
             return
-        _ai_response_locks[_lock_key] = _now
+        # Do NOT set _ai_response_locks[_lock_key] here — let handle-facilitator-response do it
 
         # Fetch conversation + session + facilitator details needed by the AI
         conn = get_db()

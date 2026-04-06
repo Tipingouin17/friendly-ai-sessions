@@ -1,54 +1,52 @@
 /**
- * Session Monitoring
- *
- * Admin component for the AIfacilitator application.
+ * Session Monitoring — Admin Component
+ * View all conversations, read transcripts, force-close sessions, export transcripts, flag content.
+ * Uses the real `conversations` table schema.
  */
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
-    Loader2,
-    Search,
-    AlertTriangle,
-    Eye,
-    Users,
-    MessageSquare,
-    Clock,
-    Flag
-} from "lucide-react";
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { format } from "date-fns";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Loader2, Search, AlertTriangle, Eye, Users, MessageSquare, Clock,
+    Flag, XCircle, Download, RefreshCw, ChevronLeft, ChevronRight,
+    Activity, Filter, Bot,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
 interface Conversation {
     id: number;
-    created_at: string;
-    session_started: boolean;
-    is_session_ended: boolean;
-    current_participants: number;
-    participants: number;
-    total_messages: number;
-    participant_description: string;
-    sessions: {
-        title: string;
-    } | null;
+    created_at: string | null;
+    session_started: boolean | null;
+    is_session_ended: boolean | null;
+    current_participants: number | null;
+    participants: number | null;
+    total_messages: number | null;
+    participant_description: string | null;
+    user_id: string;
+    sessions_id: number | null;
+    status: string | null;
+    ended_at: string | null;
+    session_duration_minutes: number | null;
+    language: string | null;
+    sessions: { title: string } | null;
 }
 
 interface Message {
@@ -59,274 +57,414 @@ interface Message {
     participant_name: string | null;
 }
 
-// Content moderation keywords
 const FLAGGED_TERMS = [
-    // Discrimination
-    'racist', 'racism', 'sexist', 'sexism', 'homophobic', 'transphobic',
-    'xenophobic', 'discrimination', 'discriminate', 'bigot', 'prejudice',
-    // Hate speech
-    'hate', 'hatred', 'supremacy', 'supremacist',
-    // Violence
-    'violence', 'violent', 'attack', 'threat', 'threaten',
-    // Harassment
-    'harass', 'harassment', 'bully', 'bullying', 'abuse', 'abusive'
+    "racist", "racism", "sexist", "sexism", "homophobic", "transphobic",
+    "xenophobic", "discrimination", "bigot", "prejudice", "hate", "hatred",
+    "supremacy", "supremacist", "violence", "violent", "attack", "threat",
+    "harass", "harassment", "bully", "bullying", "abuse", "abusive",
 ];
 
-const checkForFlaggedContent = (text: string): boolean => {
-    const lowerText = text.toLowerCase();
-    return FLAGGED_TERMS.some(term => lowerText.includes(term));
+const checkFlagged = (text: string): boolean => {
+    const lower = text.toLowerCase();
+    return FLAGGED_TERMS.some(t => lower.includes(t));
 };
 
-export const SessionMonitoring = () => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedSession, setSelectedSession] = useState<number | null>(null);
+const PAGE_SIZE = 20;
 
-    // Fetch all conversations
-    const { data: conversations, isLoading } = useQuery({
-        queryKey: ['admin-conversations', searchTerm],
+export const SessionMonitoring = () => {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [page, setPage] = useState(0);
+    const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+    const [forceCloseId, setForceCloseId] = useState<number | null>(null);
+
+    const { data: conversations, isLoading, refetch } = useQuery({
+        queryKey: ["admin-conversations", statusFilter, page],
         queryFn: async () => {
-            const query = supabase
-                .from('conversations')
+            let query = supabase
+                .from("conversations")
                 .select(`
-          id,
-          created_at,
-          session_started,
-          is_session_ended,
-          current_participants,
-          participants,
-          total_messages,
-          participant_description,
-          sessions (
-            title
-          )
-        `)
-                .order('created_at', { ascending: false })
-                .limit(100);
+                    id, created_at, session_started, is_session_ended,
+                    current_participants, participants, total_messages,
+                    participant_description, user_id, sessions_id, status,
+                    ended_at, session_duration_minutes, language,
+                    sessions:sessions_id ( title )
+                `)
+                .order("created_at", { ascending: false })
+                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+            if (statusFilter === "active") query = query.eq("is_session_ended", false).eq("session_started", true);
+            if (statusFilter === "ended") query = query.eq("is_session_ended", true);
+            if (statusFilter === "pending") query = query.eq("session_started", false);
 
             const { data, error } = await query;
             if (error) throw error;
-            return data as Conversation[];
-        }
+            return data as unknown as Conversation[];
+        },
     });
 
-    // Fetch messages for selected session
-    const { data: messages, isLoading: isLoadingMessages } = useQuery({
-        queryKey: ['admin-messages', selectedSession],
+    const { data: messages, isLoading: messagesLoading } = useQuery({
+        queryKey: ["admin-messages", selectedConversation?.id],
+        enabled: !!selectedConversation,
         queryFn: async () => {
-            if (!selectedSession) return [];
-
             const { data, error } = await supabase
-                .from('messages')
-                .select(`
-          id,
-          content,
-          sender,
-          created_at,
-          participant_name
-        `)
-                .eq('conversation_id', selectedSession)
-                .order('created_at', { ascending: true });
-
+                .from("messages")
+                .select("id, content, sender, created_at, participant_name")
+                .eq("conversation_id", selectedConversation!.id)
+                .order("created_at", { ascending: true });
             if (error) throw error;
             return data as Message[];
         },
-        enabled: !!selectedSession
     });
 
-    const flaggedMessages = messages?.filter(msg => checkForFlaggedContent(msg.content)) || [];
-    const selectedConversation = conversations?.find(c => c.id === selectedSession);
+    const forceCloseMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { error } = await supabase
+                .from("conversations")
+                .update({ is_session_ended: true, status: "force_closed", ended_at: new Date().toISOString() })
+                .eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-conversations"] });
+            toast({ title: "Session force-closed", description: "The session has been terminated." });
+            setForceCloseId(null);
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
 
-    if (isLoading) {
+    const exportTranscript = () => {
+        if (!messages || !selectedConversation) return;
+        const lines = [
+            `Session Transcript — Conversation #${selectedConversation.id}`,
+            `Session: ${selectedConversation.sessions?.title ?? "Unknown"}`,
+            `Date: ${selectedConversation.created_at ? format(new Date(selectedConversation.created_at), "MMMM d, yyyy HH:mm") : "Unknown"}`,
+            `Participants: ${selectedConversation.participants ?? 0}`,
+            `Total Messages: ${selectedConversation.total_messages ?? 0}`,
+            "",
+            "─".repeat(60),
+            "",
+            ...messages.map(m =>
+                `[${format(new Date(m.created_at), "HH:mm:ss")}] ${m.sender === "ai" ? "AI Facilitator" : (m.participant_name ?? m.sender)}: ${m.content}`
+            ),
+        ];
+        const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `transcript-${selectedConversation.id}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Transcript exported" });
+    };
+
+    const statusBadge = (conv: Conversation) => {
+        if (conv.status === "force_closed") return <Badge className="bg-red-100 text-red-700 border border-red-200">Force Closed</Badge>;
+        if (conv.is_session_ended) return <Badge className="bg-gray-100 text-gray-700 border border-gray-200">Ended</Badge>;
+        if (conv.session_started) return <Badge className="bg-green-100 text-green-700 border border-green-200"><Activity className="h-3 w-3 mr-1" />Active</Badge>;
+        return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending</Badge>;
+    };
+
+    const filteredConversations = conversations?.filter(c => {
+        if (!searchTerm) return true;
+        const q = searchTerm.toLowerCase();
         return (
-            <div className="flex items-center justify-center p-12">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-            </div>
+            c.id.toString().includes(q) ||
+            (c.sessions?.title ?? "").toLowerCase().includes(q) ||
+            (c.participant_description ?? "").toLowerCase().includes(q)
         );
-    }
+    });
+
+    const hasFlaggedMessages = messages?.some(m => checkFlagged(m.content ?? ""));
 
     return (
         <div className="space-y-6">
             <Card className="border-purple-200 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
-                    <div className="flex items-center gap-2">
-                        <Eye className="h-6 w-6 text-purple-600" />
-                        <CardTitle className="text-2xl">Session Monitoring</CardTitle>
+                <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-100 rounded-lg">
+                                <Activity className="h-6 w-6 text-purple-600" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl">Session Monitoring</CardTitle>
+                                <CardDescription>View all conversations, transcripts, and moderate content</CardDescription>
+                            </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => refetch()}>
+                            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                        </Button>
                     </div>
-                    <CardDescription>
-                        Monitor all sessions and flag inappropriate content
-                    </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                    {/* Search */}
-                    <div className="flex items-center gap-2">
+
+                <CardContent className="pt-5">
+                    <div className="flex flex-col sm:flex-row gap-3 mb-5">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="Search sessions..."
+                                placeholder="Search by session title or ID..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="pl-9"
                             />
                         </div>
+                        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(0); }}>
+                            <SelectTrigger className="w-full sm:w-44">
+                                <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Sessions</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="ended">Ended</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
-                    {/* Sessions Table */}
-                    <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-gray-50">
-                                    <TableHead>Session</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Participants</TableHead>
-                                    <TableHead>Messages</TableHead>
-                                    <TableHead>Created</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {conversations?.map((conversation) => (
-                                    <TableRow key={conversation.id}>
-                                        <TableCell>
-                                            <div>
-                                                <div className="font-medium">
-                                                    {conversation.sessions?.title || 'Untitled Session'}
-                                                </div>
-                                                {conversation.participant_description && (
-                                                    <div className="text-xs text-gray-500 mt-1">
-                                                        {conversation.participant_description.substring(0, 50)}...
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {conversation.is_session_ended ? (
-                                                <Badge variant="outline">Ended</Badge>
-                                            ) : conversation.session_started ? (
-                                                <Badge className="bg-green-100 text-green-800">Active</Badge>
-                                            ) : (
-                                                <Badge variant="secondary">Waiting</Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1">
-                                                <Users className="h-4 w-4 text-gray-400" />
-                                                <span>{conversation.current_participants}/{conversation.participants}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1">
-                                                <MessageSquare className="h-4 w-4 text-gray-400" />
-                                                <span>{conversation.total_messages || 0}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1 text-sm text-gray-600">
-                                                <Clock className="h-3 w-3" />
-                                                {format(new Date(conversation.created_at), 'MMM d, HH:mm')}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => setSelectedSession(conversation.id)}
-                                            >
-                                                <Eye className="h-4 w-4 mr-1" />
-                                                View
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    {conversations?.length === 0 && (
-                        <div className="text-center py-12 text-gray-500">
-                            No sessions found
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
                         </div>
+                    ) : filteredConversations?.length === 0 ? (
+                        <div className="text-center py-16 text-gray-500">
+                            <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                            <p className="font-medium">No sessions found</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="rounded-xl border overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-gray-50">
+                                            <TableHead>ID</TableHead>
+                                            <TableHead>Session</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Participants</TableHead>
+                                            <TableHead>Messages</TableHead>
+                                            <TableHead>Duration</TableHead>
+                                            <TableHead>Started</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredConversations?.map(conv => (
+                                            <TableRow key={conv.id} className="hover:bg-purple-50/30 transition-colors">
+                                                <TableCell className="font-mono text-xs text-gray-500">#{conv.id}</TableCell>
+                                                <TableCell>
+                                                    <p className="font-medium text-sm text-gray-900 max-w-[160px] truncate">
+                                                        {conv.sessions?.title ?? "Unknown Session"}
+                                                    </p>
+                                                    {conv.language && (
+                                                        <p className="text-xs text-gray-400">{conv.language}</p>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>{statusBadge(conv)}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-1.5 text-sm">
+                                                        <Users className="h-3.5 w-3.5 text-gray-400" />
+                                                        {conv.current_participants ?? 0}/{conv.participants ?? 0}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-1.5 text-sm">
+                                                        <MessageSquare className="h-3.5 w-3.5 text-gray-400" />
+                                                        {conv.total_messages ?? 0}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-sm text-gray-500">
+                                                    {conv.session_duration_minutes
+                                                        ? `${conv.session_duration_minutes}m`
+                                                        : "—"}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-gray-500">
+                                                    {conv.created_at
+                                                        ? formatDistanceToNow(new Date(conv.created_at), { addSuffix: true })
+                                                        : "—"}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 text-xs"
+                                                            onClick={() => setSelectedConversation(conv)}
+                                                        >
+                                                            <Eye className="h-3 w-3 mr-1" /> View
+                                                        </Button>
+                                                        {!conv.is_session_ended && conv.session_started && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                                                                onClick={() => setForceCloseId(conv.id)}
+                                                            >
+                                                                <XCircle className="h-3 w-3" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="flex items-center justify-between mt-4">
+                                <p className="text-sm text-gray-500">Page {page + 1}</p>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => Math.max(0, p - 1))}
+                                        disabled={page === 0}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => p + 1)}
+                                        disabled={(filteredConversations?.length ?? 0) < PAGE_SIZE}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
 
-            {/* Message Viewer Dialog */}
-            <Dialog open={!!selectedSession} onOpenChange={() => setSelectedSession(null)}>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            {/* Transcript Viewer Dialog */}
+            <Dialog open={!!selectedConversation} onOpenChange={open => !open && setSelectedConversation(null)}>
+                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            {selectedConversation?.sessions?.title || 'Session Messages'}
-                            {flaggedMessages.length > 0 && (
-                                <Badge variant="destructive" className="ml-2">
-                                    <Flag className="h-3 w-3 mr-1" />
-                                    {flaggedMessages.length} Flagged
+                            <MessageSquare className="h-5 w-5 text-purple-600" />
+                            Conversation #{selectedConversation?.id} — {selectedConversation?.sessions?.title ?? "Unknown Session"}
+                        </DialogTitle>
+                        <DialogDescription className="flex items-center gap-4 flex-wrap">
+                            <span className="flex items-center gap-1">
+                                <Users className="h-3.5 w-3.5" />
+                                {selectedConversation?.participants ?? 0} participants
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                {selectedConversation?.total_messages ?? 0} messages
+                            </span>
+                            {selectedConversation?.created_at && (
+                                <span className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {format(new Date(selectedConversation.created_at), "MMM d, yyyy · HH:mm")}
+                                </span>
+                            )}
+                            {hasFlaggedMessages && (
+                                <Badge className="bg-red-100 text-red-700 border border-red-200">
+                                    <AlertTriangle className="h-3 w-3 mr-1" /> Flagged Content
                                 </Badge>
                             )}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Review all messages from this session
                         </DialogDescription>
                     </DialogHeader>
 
-                    {isLoadingMessages ? (
-                        <div className="flex items-center justify-center p-8">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                        </div>
-                    ) : (
-                        <div className="space-y-4 mt-4">
-                            {flaggedMessages.length > 0 && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 text-red-800 font-semibold mb-2">
-                                        <AlertTriangle className="h-5 w-5" />
-                                        Flagged Content Detected
-                                    </div>
-                                    <p className="text-sm text-red-700">
-                                        {flaggedMessages.length} message(s) contain potentially inappropriate content
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className="space-y-3">
-                                {messages?.map((message) => {
-                                    const isFlagged = checkForFlaggedContent(message.content);
-                                    return (
-                                        <div
-                                            key={message.id}
-                                            className={`p-4 rounded-lg border ${isFlagged
-                                                    ? 'bg-red-50 border-red-300'
-                                                    : 'bg-gray-50 border-gray-200'
-                                                }`}
-                                        >
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant={message.sender === 'assistant' ? 'default' : 'outline'}>
-                                                        {message.sender === 'assistant' ? 'AI' : message.participant_name || 'Participant'}
-                                                    </Badge>
-                                                    {isFlagged && (
-                                                        <Badge variant="destructive">
-                                                            <Flag className="h-3 w-3 mr-1" />
-                                                            Flagged
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <span className="text-xs text-gray-500">
-                                                    {format(new Date(message.created_at), 'HH:mm:ss')}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                        </div>
-                                    );
-                                })}
+                    <div className="flex-1 overflow-y-auto space-y-3 py-2 min-h-0">
+                        {messagesLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
                             </div>
+                        ) : messages?.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500">
+                                <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                <p>No messages in this conversation</p>
+                            </div>
+                        ) : (
+                            messages?.map(msg => {
+                                const isAI = msg.sender === "ai";
+                                const isFlagged = checkFlagged(msg.content ?? "");
+                                return (
+                                    <div
+                                        key={msg.id}
+                                        className={`flex gap-3 ${isAI ? "flex-row" : "flex-row-reverse"}`}
+                                    >
+                                        <div className={`p-2 rounded-full h-8 w-8 flex items-center justify-center shrink-0 ${isAI ? "bg-purple-100" : "bg-blue-100"}`}>
+                                            {isAI ? <Bot className="h-4 w-4 text-purple-600" /> : <Users className="h-4 w-4 text-blue-600" />}
+                                        </div>
+                                        <div className={`max-w-[75%] ${isAI ? "" : "items-end flex flex-col"}`}>
+                                            <p className={`text-xs text-gray-400 mb-1 ${isAI ? "" : "text-right"}`}>
+                                                {isAI ? "AI Facilitator" : (msg.participant_name ?? msg.sender)}
+                                                {" · "}
+                                                {format(new Date(msg.created_at), "HH:mm")}
+                                            </p>
+                                            <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                                                isFlagged
+                                                    ? "bg-red-50 border border-red-200 text-red-900"
+                                                    : isAI
+                                                        ? "bg-purple-50 border border-purple-100 text-gray-800"
+                                                        : "bg-blue-50 border border-blue-100 text-gray-800"
+                                            }`}>
+                                                {isFlagged && (
+                                                    <div className="flex items-center gap-1 text-red-600 text-xs mb-1.5 font-medium">
+                                                        <Flag className="h-3 w-3" /> Flagged content
+                                                    </div>
+                                                )}
+                                                {msg.content}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
 
-                            {messages?.length === 0 && (
-                                <div className="text-center py-8 text-gray-500">
-                                    No messages in this session yet
-                                </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <div className="flex gap-2">
+                            {selectedConversation && !selectedConversation.is_session_ended && selectedConversation.session_started && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                    onClick={() => { setForceCloseId(selectedConversation.id); setSelectedConversation(null); }}
+                                >
+                                    <XCircle className="h-4 w-4 mr-1.5" /> Force Close
+                                </Button>
                             )}
                         </div>
-                    )}
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={exportTranscript} disabled={!messages?.length}>
+                                <Download className="h-4 w-4 mr-1.5" /> Export
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedConversation(null)}>
+                                Close
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Force Close Confirmation */}
+            <AlertDialog open={!!forceCloseId} onOpenChange={open => !open && setForceCloseId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Force Close Session</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will immediately terminate conversation #{forceCloseId}. All participants will be disconnected. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => forceCloseId && forceCloseMutation.mutate(forceCloseId)}
+                            disabled={forceCloseMutation.isPending}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {forceCloseMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            Force Close
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

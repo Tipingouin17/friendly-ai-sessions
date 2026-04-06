@@ -1,32 +1,403 @@
 /**
- * System Settings
- *
- * Admin component for the AIfacilitator application.
+ * System Settings — Admin Component
+ * Manages the single-row `configurations` table:
+ * default_gpt_token, default_currency, google_capcha_key,
+ * secret_message, free_plan_message_limit, languages.
  */
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff,
+} from "lucide-react";
+
+interface Config {
+    id: number;
+    default_gpt_token: string | null;
+    default_currency: string;
+    google_capcha_key: string | null;
+    secret_message: string | null;
+    free_plan_message_limit: number | null;
+    languages: Record<string, boolean> | null;
+}
+
+const CURRENCIES = [
+    { value: "USD", label: "USD — US Dollar" },
+    { value: "EUR", label: "EUR — Euro" },
+    { value: "GBP", label: "GBP — British Pound" },
+    { value: "CAD", label: "CAD — Canadian Dollar" },
+    { value: "AUD", label: "AUD — Australian Dollar" },
+    { value: "CHF", label: "CHF — Swiss Franc" },
+    { value: "JPY", label: "JPY — Japanese Yen" },
+];
+
+const SUPPORTED_LANGUAGES = [
+    { code: "en", label: "English" },
+    { code: "fr", label: "French" },
+    { code: "es", label: "Spanish" },
+    { code: "de", label: "German" },
+    { code: "it", label: "Italian" },
+    { code: "pt", label: "Portuguese" },
+    { code: "nl", label: "Dutch" },
+    { code: "ar", label: "Arabic" },
+    { code: "zh", label: "Chinese" },
+    { code: "ja", label: "Japanese" },
+];
+
+const SECTIONS = [
+    { id: "ai", label: "AI Configuration", icon: Bot, color: "purple" },
+    { id: "platform", label: "Platform", icon: Globe, color: "blue" },
+    { id: "security", label: "Security", icon: Shield, color: "red" },
+    { id: "messaging", label: "Messaging", icon: MessageSquare, color: "green" },
+];
 
 export const SystemSettings = () => {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [activeSection, setActiveSection] = useState("ai");
+    const [isDirty, setIsDirty] = useState(false);
+    const [showToken, setShowToken] = useState(false);
+    const [showCaptcha, setShowCaptcha] = useState(false);
+
+    const [form, setForm] = useState<Partial<Config>>({
+        default_gpt_token: "",
+        default_currency: "USD",
+        google_capcha_key: "",
+        secret_message: "",
+        free_plan_message_limit: 20,
+        languages: { en: true },
+    });
+
+    const { data: config, isLoading, refetch } = useQuery({
+        queryKey: ["admin-system-config"],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("configurations")
+                .select("*")
+                .limit(1)
+                .single();
+            if (error) throw error;
+            return data as Config;
+        },
+    });
+
+    useEffect(() => {
+        if (config) {
+            setForm({
+                default_gpt_token: config.default_gpt_token ?? "",
+                default_currency: config.default_currency ?? "USD",
+                google_capcha_key: config.google_capcha_key ?? "",
+                secret_message: config.secret_message ?? "",
+                free_plan_message_limit: config.free_plan_message_limit ?? 20,
+                languages: (config.languages as Record<string, boolean>) ?? { en: true },
+            });
+            setIsDirty(false);
+        }
+    }, [config]);
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            if (!config) throw new Error("No configuration record found.");
+            const { error } = await supabase
+                .from("configurations")
+                .update({
+                    default_gpt_token: form.default_gpt_token || null,
+                    default_currency: form.default_currency ?? "USD",
+                    google_capcha_key: form.google_capcha_key || null,
+                    secret_message: form.secret_message || null,
+                    free_plan_message_limit: form.free_plan_message_limit ?? 20,
+                    languages: form.languages ?? { en: true },
+                })
+                .eq("id", config.id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-system-config"] });
+            toast({ title: "Settings saved", description: "Configuration updated successfully." });
+            setIsDirty(false);
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const handleChange = (key: keyof Config, value: unknown) => {
+        setForm(f => ({ ...f, [key]: value }));
+        setIsDirty(true);
+    };
+
+    const toggleLanguage = (code: string) => {
+        const current = (form.languages ?? {}) as Record<string, boolean>;
+        const updated = { ...current, [code]: !current[code] };
+        handleChange("languages", updated);
+    };
+
+    const colorMap: Record<string, string> = {
+        purple: "bg-purple-100 text-purple-600",
+        blue: "bg-blue-100 text-blue-600",
+        red: "bg-red-100 text-red-600",
+        green: "bg-green-100 text-green-600",
+    };
+
     return (
         <div className="space-y-6">
             <Card className="border-purple-200 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
-                    <div className="flex items-center gap-2">
-                        <Settings className="h-6 w-6 text-purple-600" />
-                        <CardTitle className="text-2xl">System Settings</CardTitle>
+                <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-100 rounded-lg">
+                                <Settings className="h-6 w-6 text-purple-600" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl">System Settings</CardTitle>
+                                <CardDescription>Configure AI tokens, currency, security keys, and language support</CardDescription>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                            <Button variant="outline" size="sm" onClick={() => refetch()}>
+                                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                            </Button>
+                            {isDirty && (
+                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                                    Unsaved changes
+                                </Badge>
+                            )}
+                        </div>
                     </div>
-                    <CardDescription>
-                        Configure platform-wide settings and configurations
-                    </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <Alert>
-                        <AlertDescription>
-                            System settings configuration coming soon. This will include email templates,
-                            platform branding, API configurations, and more.
-                        </AlertDescription>
-                    </Alert>
+
+                <CardContent className="pt-5">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            {/* Sidebar */}
+                            <div className="lg:w-52 shrink-0">
+                                <nav className="space-y-1">
+                                    {SECTIONS.map(s => {
+                                        const Icon = s.icon;
+                                        const isActive = activeSection === s.id;
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => setActiveSection(s.id)}
+                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                                                    isActive
+                                                        ? "bg-purple-100 text-purple-800 shadow-sm"
+                                                        : "text-gray-600 hover:bg-gray-100"
+                                                }`}
+                                            >
+                                                <div className={`p-1.5 rounded-md ${isActive ? colorMap[s.color] : "bg-gray-100 text-gray-500"}`}>
+                                                    <Icon className="h-3.5 w-3.5" />
+                                                </div>
+                                                {s.label}
+                                            </button>
+                                        );
+                                    })}
+                                </nav>
+                            </div>
+
+                            <Separator orientation="vertical" className="hidden lg:block" />
+
+                            {/* Fields */}
+                            <div className="flex-1 space-y-5">
+                                {/* AI Configuration */}
+                                {activeSection === "ai" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.purple}`}>
+                                                <Bot className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">AI Configuration</h3>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Default OpenAI API Token</Label>
+                                            <p className="text-xs text-gray-500">Used as the fallback API key for all AI sessions</p>
+                                            <div className="relative">
+                                                <Input
+                                                    type={showToken ? "text" : "password"}
+                                                    value={form.default_gpt_token ?? ""}
+                                                    onChange={e => handleChange("default_gpt_token", e.target.value)}
+                                                    placeholder="sk-..."
+                                                    className="pr-10 font-mono text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowToken(v => !v)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Platform */}
+                                {activeSection === "platform" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.blue}`}>
+                                                <Globe className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Platform Settings</h3>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Default Currency</Label>
+                                            <p className="text-xs text-gray-500">Currency used for plan pricing and billing</p>
+                                            <Select
+                                                value={form.default_currency ?? "USD"}
+                                                onValueChange={v => handleChange("default_currency", v)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {CURRENCIES.map(c => (
+                                                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-2">
+                                            <Label className="font-semibold">Supported Languages</Label>
+                                            <p className="text-xs text-gray-500">Languages available in the platform interface</p>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {SUPPORTED_LANGUAGES.map(lang => {
+                                                    const enabled = (form.languages as Record<string, boolean>)?.[lang.code] ?? false;
+                                                    return (
+                                                        <button
+                                                            key={lang.code}
+                                                            type="button"
+                                                            onClick={() => toggleLanguage(lang.code)}
+                                                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                                                enabled
+                                                                    ? "bg-purple-100 text-purple-800 border-purple-300"
+                                                                    : "bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300"
+                                                            }`}
+                                                        >
+                                                            {lang.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Security */}
+                                {activeSection === "security" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.red}`}>
+                                                <Shield className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Security Keys</h3>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Google reCAPTCHA Site Key</Label>
+                                            <p className="text-xs text-gray-500">Used to protect sign-up and contact forms from bots</p>
+                                            <div className="relative">
+                                                <Input
+                                                    type={showCaptcha ? "text" : "password"}
+                                                    value={form.google_capcha_key ?? ""}
+                                                    onChange={e => handleChange("google_capcha_key", e.target.value)}
+                                                    placeholder="6Le..."
+                                                    className="pr-10 font-mono text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCaptcha(v => !v)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showCaptcha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Messaging */}
+                                {activeSection === "messaging" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.green}`}>
+                                                <MessageSquare className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Messaging Limits</h3>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Free Plan Message Limit</Label>
+                                            <p className="text-xs text-gray-500">Maximum number of messages a free-plan user can send per session</p>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={500}
+                                                value={form.free_plan_message_limit ?? 20}
+                                                onChange={e => handleChange("free_plan_message_limit", parseInt(e.target.value) || 20)}
+                                            />
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Secret / Maintenance Message</Label>
+                                            <p className="text-xs text-gray-500">Internal note or message shown during maintenance (not visible to users)</p>
+                                            <Textarea
+                                                value={form.secret_message ?? ""}
+                                                onChange={e => handleChange("secret_message", e.target.value)}
+                                                rows={3}
+                                                placeholder="Internal notes, maintenance messages..."
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                <Separator />
+                                <div className="flex justify-end gap-3 pt-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (config) {
+                                                setForm({
+                                                    default_gpt_token: config.default_gpt_token ?? "",
+                                                    default_currency: config.default_currency ?? "USD",
+                                                    google_capcha_key: config.google_capcha_key ?? "",
+                                                    secret_message: config.secret_message ?? "",
+                                                    free_plan_message_limit: config.free_plan_message_limit ?? 20,
+                                                    languages: (config.languages as Record<string, boolean>) ?? { en: true },
+                                                });
+                                                setIsDirty(false);
+                                            }
+                                        }}
+                                        disabled={!isDirty}
+                                    >
+                                        Reset
+                                    </Button>
+                                    <Button
+                                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                                        onClick={() => saveMutation.mutate()}
+                                        disabled={saveMutation.isPending || !isDirty}
+                                    >
+                                        {saveMutation.isPending
+                                            ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                                            : <><Save className="h-4 w-4 mr-2" /> Save Settings</>
+                                        }
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

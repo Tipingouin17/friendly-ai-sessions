@@ -93,8 +93,16 @@ export const ComparisonTable = ({
       <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8">Compare Plans</h2>
 
       {/* Scroll hint on mobile */}
-      <p className="text-xs text-gray-400 text-center mb-3 md:hidden">Scroll right to compare all plans →</p>
+      <div className="flex items-center justify-center gap-2 mb-3 md:hidden">
+        <div className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-medium px-3 py-1.5 rounded-full">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          Swipe to compare all plans
+        </div>
+      </div>
 
+      <div className="relative">
+      {/* Right fade shadow to indicate scrollable content */}
+      <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none md:hidden rounded-r-lg" />
       <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm -mx-4 sm:mx-0">
         <table className="border-collapse bg-white" style={{ minWidth: '600px', width: '100%' }}>
           <thead>
@@ -192,6 +200,7 @@ export const ComparisonTable = ({
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

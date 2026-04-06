@@ -794,15 +794,23 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
 
     # Look up the user's profile role so admins get the correct JWT claim
+    # Also backfill email if it's null (for users created before email column was added)
     profile_role = "free"
     try:
         conn_role = get_db()
         cur_role = conn_role.cursor()
-        cur_role.execute("SELECT role FROM profiles WHERE id = %s::uuid", (user["id"],))
+        cur_role.execute("SELECT id, role, email FROM profiles WHERE id = %s::uuid", (user["id"],))
         role_row = cur_role.fetchone()
-        conn_role.close()
         if role_row:
-            profile_role = role_row["role"]
+            profile_role = role_row["role"] or "free"
+            # Backfill email if missing
+            if not role_row["email"] and email:
+                cur_role.execute(
+                    "UPDATE profiles SET email = %s, updated_at = NOW() WHERE id = %s::uuid",
+                    (email, user["id"])
+                )
+                conn_role.commit()
+        conn_role.close()
     except Exception as e:
         print(f"[login] Role lookup error: {e}")
 

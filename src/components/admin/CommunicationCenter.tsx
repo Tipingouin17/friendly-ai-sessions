@@ -1,7 +1,7 @@
 /**
- * Communication Center
- *
- * Admin component for the AIfacilitator application.
+ * Communication Center — Admin Component
+ * Manage contact form messages and FAQ content.
+ * Uses real `contact_form` and `faqs` tables from the database.
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,350 +11,556 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
-    Loader2,
-    Send,
-    Mail,
-    Bell,
-    MessageSquare,
-    Users,
-    CheckCircle,
-    Clock,
-    Filter
-} from "lucide-react";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import {
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+    Loader2, Mail, MessageSquare, HelpCircle, CheckCircle,
+    RefreshCw, Plus, Pencil, Trash2, Search, Filter, Eye,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
-interface Announcement {
-    id: string;
-    title: string;
-    content: string;
-    type: 'email' | 'in_app' | 'banner';
-    target_audience: 'all' | 'free' | 'premium' | 'active' | 'inactive';
-    status: 'draft' | 'scheduled' | 'sent';
-    scheduled_for: string | null;
-    created_at: string;
-    sent_at: string | null;
-    sent_count: number;
+interface ContactMessage {
+    id: number;
+    fname: string | null;
+    lname: string | null;
+    email: string | null;
+    message: string | null;
+    user_id: number | null;
+    responded: boolean | null;
+    created_at: string | null;
 }
 
-interface SupportTicket {
-    id: string;
-    user_email: string;
-    subject: string;
-    message: string;
-    status: 'open' | 'in_progress' | 'resolved' | 'closed';
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    created_at: string;
-    updated_at: string;
+interface FAQ {
+    id: number;
+    title: string | null;
+    description: string | null;
+    status: boolean | null;
+    created_at: string | null;
+    category: string | null;
 }
+
+const FAQ_CATEGORIES = ["General", "Billing", "Sessions", "Facilitators", "Technical", "Account"];
 
 export const CommunicationCenter = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState("announcements");
-    const [newAnnouncement, setNewAnnouncement] = useState({
-        title: "",
-        content: "",
-        type: "in_app",
-        target_audience: "all"
-    });
 
-    // Fetch announcements (mock for now, would need a real table)
-    const { data: announcements, isLoading: isLoadingAnnouncements } = useQuery({
-        queryKey: ['admin-announcements'],
+    const [activeTab, setActiveTab] = useState("messages");
+    const [searchMessages, setSearchMessages] = useState("");
+    const [messageFilter, setMessageFilter] = useState("all");
+    const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
+
+    const [faqSearch, setFaqSearch] = useState("");
+    const [faqCategoryFilter, setFaqCategoryFilter] = useState("all");
+    const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
+    const [deletingFaqId, setDeletingFaqId] = useState<number | null>(null);
+    const [isCreatingFaq, setIsCreatingFaq] = useState(false);
+    const [faqForm, setFaqForm] = useState({ title: "", description: "", category: "General", status: true });
+
+    const { data: messages, isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
+        queryKey: ["admin-contact-messages", messageFilter],
         queryFn: async () => {
-            // In a real app, fetch from 'announcements' table
-            // For now, return mock data
-            return [
-                {
-                    id: '1',
-                    title: 'New Feature: AI Facilitator 2.0',
-                    content: 'We have updated our AI models to provide better facilitation.',
-                    type: 'in_app',
-                    target_audience: 'all',
-                    status: 'sent',
-                    scheduled_for: null,
-                    created_at: new Date(Date.now() - 86400000).toISOString(),
-                    sent_at: new Date(Date.now() - 80000000).toISOString(),
-                    sent_count: 1250
-                },
-                {
-                    id: '2',
-                    title: 'Maintenance Scheduled',
-                    content: 'Platform will be down for 30 mins on Sunday.',
-                    type: 'banner',
-                    target_audience: 'all',
-                    status: 'scheduled',
-                    scheduled_for: new Date(Date.now() + 86400000).toISOString(),
-                    created_at: new Date().toISOString(),
-                    sent_at: null,
-                    sent_count: 0
-                }
-            ] as Announcement[];
-        }
+            let query = supabase
+                .from("contact_form")
+                .select("*")
+                .order("created_at", { ascending: false });
+            if (messageFilter === "unread") query = query.eq("responded", false);
+            if (messageFilter === "responded") query = query.eq("responded", true);
+            const { data, error } = await query;
+            if (error) throw error;
+            return data as ContactMessage[];
+        },
     });
 
-    // Fetch support tickets (mock for now)
-    const { data: tickets, isLoading: isLoadingTickets } = useQuery({
-        queryKey: ['admin-tickets'],
+    const { data: faqs, isLoading: faqsLoading } = useQuery({
+        queryKey: ["admin-faqs", faqCategoryFilter],
         queryFn: async () => {
-            // In a real app, fetch from 'support_tickets' table
-            return [
-                {
-                    id: 't1',
-                    user_email: 'user@domain.com',
-                    subject: 'Cannot access premium features',
-                    message: 'I upgraded yesterday but still see free plan limits.',
-                    status: 'open',
-                    priority: 'high',
-                    created_at: new Date(Date.now() - 3600000).toISOString(),
-                    updated_at: new Date(Date.now() - 3600000).toISOString()
-                },
-                {
-                    id: 't2',
-                    user_email: 'facilitator@domain.com',
-                    subject: 'Feature request',
-                    message: 'Can we have custom branding?',
-                    status: 'in_progress',
-                    priority: 'low',
-                    created_at: new Date(Date.now() - 172800000).toISOString(),
-                    updated_at: new Date(Date.now() - 86400000).toISOString()
-                }
-            ] as SupportTicket[];
-        }
+            let query = supabase
+                .from("faqs")
+                .select("*")
+                .order("created_at", { ascending: false });
+            if (faqCategoryFilter !== "all") query = query.eq("category", faqCategoryFilter);
+            const { data, error } = await query;
+            if (error) throw error;
+            return data as FAQ[];
+        },
     });
 
-    const handleCreateAnnouncement = () => {
-        toast({
-            title: "Announcement Created",
-            description: "Your announcement has been scheduled successfully.",
-        });
-        setNewAnnouncement({
-            title: "",
-            content: "",
-            type: "in_app",
-            target_audience: "all"
+    const markRespondedMutation = useMutation({
+        mutationFn: async ({ id, responded }: { id: number; responded: boolean }) => {
+            const { error } = await supabase
+                .from("contact_form")
+                .update({ responded })
+                .eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-contact-messages"] });
+            toast({ title: "Updated", description: "Message status updated." });
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const saveFaqMutation = useMutation({
+        mutationFn: async (faq: { id?: number; title: string; description: string; category: string; status: boolean }) => {
+            if (faq.id) {
+                const { error } = await supabase
+                    .from("faqs")
+                    .update({ title: faq.title, description: faq.description, category: faq.category, status: faq.status })
+                    .eq("id", faq.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from("faqs")
+                    .insert({ title: faq.title, description: faq.description, category: faq.category, status: faq.status } as any);
+                if (error) throw error;
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+            toast({ title: "FAQ saved" });
+            setEditingFaq(null);
+            setIsCreatingFaq(false);
+            setFaqForm({ title: "", description: "", category: "General", status: true });
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const deleteFaqMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { error } = await supabase.from("faqs").delete().eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+            toast({ title: "FAQ deleted" });
+            setDeletingFaqId(null);
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const toggleFaqStatus = useMutation({
+        mutationFn: async ({ id, status }: { id: number; status: boolean }) => {
+            const { error } = await supabase.from("faqs").update({ status }).eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-faqs"] }),
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const openEditFaq = (faq: FAQ) => {
+        setEditingFaq(faq);
+        setFaqForm({
+            title: faq.title ?? "",
+            description: faq.description ?? "",
+            category: faq.category ?? "General",
+            status: faq.status ?? true,
         });
     };
 
+    const filteredMessages = messages?.filter(m => {
+        if (!searchMessages) return true;
+        const q = searchMessages.toLowerCase();
+        return (
+            (m.fname ?? "").toLowerCase().includes(q) ||
+            (m.lname ?? "").toLowerCase().includes(q) ||
+            (m.email ?? "").toLowerCase().includes(q) ||
+            (m.message ?? "").toLowerCase().includes(q)
+        );
+    });
+
+    const filteredFaqs = faqs?.filter(f => {
+        if (!faqSearch) return true;
+        const q = faqSearch.toLowerCase();
+        return (
+            (f.title ?? "").toLowerCase().includes(q) ||
+            (f.description ?? "").toLowerCase().includes(q)
+        );
+    });
+
+    const unreadCount = messages?.filter(m => !m.responded).length ?? 0;
+
     return (
         <div className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="announcements" className="flex items-center gap-2">
-                        <Bell className="h-4 w-4" />
-                        Announcements & Campaigns
-                    </TabsTrigger>
-                    <TabsTrigger value="support" className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Support Tickets
-                    </TabsTrigger>
-                </TabsList>
+            <Card className="border-purple-200 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                            <MessageSquare className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-xl">Communication Center</CardTitle>
+                            <CardDescription>Manage contact messages and FAQ content</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
 
-                {/* Announcements Tab */}
-                <TabsContent value="announcements" className="space-y-6 mt-6">
-                    <div className="grid md:grid-cols-3 gap-6">
-                        {/* Create Announcement */}
-                        <Card className="md:col-span-1 border-purple-200 shadow-md h-fit">
-                            <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
-                                <div className="flex items-center gap-2">
-                                    <Send className="h-5 w-5 text-purple-600" />
-                                    <CardTitle className="text-lg">New Campaign</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-6 space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="type">Campaign Type</Label>
-                                    <Select
-                                        value={newAnnouncement.type}
-                                        onValueChange={(val) => setNewAnnouncement({ ...newAnnouncement, type: val })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="email">
-                                                <div className="flex items-center gap-2">
-                                                    <Mail className="h-4 w-4" /> Email Blast
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="in_app">
-                                                <div className="flex items-center gap-2">
-                                                    <Bell className="h-4 w-4" /> In-App Notification
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="banner">
-                                                <div className="flex items-center gap-2">
-                                                    <MessageSquare className="h-4 w-4" /> Global Banner
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                <CardContent className="pt-5">
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList className="bg-gray-100 p-1 rounded-lg mb-6">
+                            <TabsTrigger value="messages" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <Mail className="h-4 w-4" />
+                                Messages
+                                {unreadCount > 0 && (
+                                    <Badge className="bg-red-500 text-white text-xs h-4 min-w-4 px-1 ml-1">{unreadCount}</Badge>
+                                )}
+                            </TabsTrigger>
+                            <TabsTrigger value="faqs" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <HelpCircle className="h-4 w-4" />
+                                FAQ Management
+                            </TabsTrigger>
+                        </TabsList>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="audience">Target Audience</Label>
-                                    <Select
-                                        value={newAnnouncement.target_audience}
-                                        onValueChange={(val) => setNewAnnouncement({ ...newAnnouncement, target_audience: val })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select audience" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Users</SelectItem>
-                                            <SelectItem value="free">Free Plan Users</SelectItem>
-                                            <SelectItem value="premium">Premium Users</SelectItem>
-                                            <SelectItem value="inactive">Inactive Users (30d+)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Title / Subject</Label>
+                        {/* Messages Tab */}
+                        <TabsContent value="messages" className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                                     <Input
-                                        id="title"
-                                        placeholder="Enter title..."
-                                        value={newAnnouncement.title}
-                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                                        placeholder="Search messages..."
+                                        value={searchMessages}
+                                        onChange={e => setSearchMessages(e.target.value)}
+                                        className="pl-9"
                                     />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="content">Message Content</Label>
-                                    <Textarea
-                                        id="content"
-                                        placeholder="Enter your message..."
-                                        rows={5}
-                                        value={newAnnouncement.content}
-                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
-                                    />
-                                </div>
-
-                                <Button
-                                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600"
-                                    onClick={handleCreateAnnouncement}
-                                >
-                                    <Send className="h-4 w-4 mr-2" />
-                                    Send / Schedule
+                                <Select value={messageFilter} onValueChange={setMessageFilter}>
+                                    <SelectTrigger className="w-full sm:w-44">
+                                        <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Messages</SelectItem>
+                                        <SelectItem value="unread">Unread</SelectItem>
+                                        <SelectItem value="responded">Responded</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Button variant="outline" size="sm" onClick={() => refetchMessages()}>
+                                    <RefreshCw className="h-4 w-4" />
                                 </Button>
-                            </CardContent>
-                        </Card>
+                            </div>
 
-                        {/* History */}
-                        <Card className="md:col-span-2 border-gray-200 shadow-md">
-                            <CardHeader>
-                                <CardTitle>Campaign History</CardTitle>
-                                <CardDescription>Recent announcements and their performance</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {announcements?.map((item) => (
-                                        <div key={item.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="font-semibold">{item.title}</h4>
-                                                    <Badge variant={item.status === 'sent' ? 'default' : 'secondary'}>
-                                                        {item.status}
-                                                    </Badge>
-                                                    <Badge variant="outline" className="capitalize">
-                                                        {item.type.replace('_', ' ')}
-                                                    </Badge>
+                            {messagesLoading ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                                </div>
+                            ) : filteredMessages?.length === 0 ? (
+                                <div className="text-center py-16 text-gray-500">
+                                    <Mail className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                                    <p className="font-medium">No messages found</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredMessages?.map(msg => (
+                                        <div
+                                            key={msg.id}
+                                            className={`p-4 rounded-xl border transition-all ${
+                                                !msg.responded
+                                                    ? "bg-blue-50 border-blue-200"
+                                                    : "bg-gray-50 border-gray-100"
+                                            }`}
+                                        >
+                                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`p-2 rounded-full shrink-0 ${!msg.responded ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                                        <Mail className="h-4 w-4" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="font-semibold text-gray-900 text-sm">
+                                                                {[msg.fname, msg.lname].filter(Boolean).join(" ") || "Anonymous"}
+                                                            </p>
+                                                            {!msg.responded && (
+                                                                <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs">New</Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">{msg.email}</p>
+                                                        <p className="text-sm text-gray-700 mt-1.5 line-clamp-2">{msg.message}</p>
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            {msg.created_at && formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm text-gray-600 line-clamp-1">{item.content}</p>
-                                                <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                                                    <span className="flex items-center gap-1">
-                                                        <Users className="h-3 w-3" />
-                                                        Target: {item.target_audience}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <CheckCircle className="h-3 w-3" />
-                                                        Sent: {item.sent_count}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" />
-                                                        {item.sent_at
-                                                            ? format(new Date(item.sent_at), 'MMM d, HH:mm')
-                                                            : `Scheduled: ${format(new Date(item.scheduled_for!), 'MMM d, HH:mm')}`
-                                                        }
-                                                    </span>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => setSelectedMessage(msg)}
+                                                    >
+                                                        <Eye className="h-3 w-3 mr-1" /> View
+                                                    </Button>
+                                                    <Button
+                                                        variant={msg.responded ? "outline" : "default"}
+                                                        size="sm"
+                                                        className={`h-7 text-xs ${!msg.responded ? "bg-green-600 hover:bg-green-700" : ""}`}
+                                                        onClick={() => markRespondedMutation.mutate({ id: msg.id, responded: !msg.responded })}
+                                                        disabled={markRespondedMutation.isPending}
+                                                    >
+                                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                                        {msg.responded ? "Mark Unread" : "Mark Responded"}
+                                                    </Button>
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
+                            )}
+                        </TabsContent>
 
-                {/* Support Tickets Tab */}
-                <TabsContent value="support" className="space-y-6 mt-6">
-                    <Card className="border-gray-200 shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle>Support Tickets</CardTitle>
-                                <CardDescription>Manage user inquiries and issues</CardDescription>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm">
-                                    <Filter className="h-4 w-4 mr-2" />
-                                    Filter
+                        {/* FAQ Tab */}
+                        <TabsContent value="faqs" className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <Input
+                                        placeholder="Search FAQs..."
+                                        value={faqSearch}
+                                        onChange={e => setFaqSearch(e.target.value)}
+                                        className="pl-9"
+                                    />
+                                </div>
+                                <Select value={faqCategoryFilter} onValueChange={setFaqCategoryFilter}>
+                                    <SelectTrigger className="w-full sm:w-44">
+                                        <SelectValue placeholder="Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Categories</SelectItem>
+                                        {FAQ_CATEGORIES.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                                    onClick={() => {
+                                        setIsCreatingFaq(true);
+                                        setFaqForm({ title: "", description: "", category: "General", status: true });
+                                    }}
+                                >
+                                    <Plus className="h-4 w-4 mr-1" /> New FAQ
                                 </Button>
-                                <Button variant="outline" size="sm">
-                                    Export CSV
-                                </Button>
                             </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {tickets?.map((ticket) => (
-                                    <div key={ticket.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                                        <div className="flex gap-4">
-                                            <div className={`mt-1 p-2 rounded-full ${ticket.priority === 'high' || ticket.priority === 'urgent'
-                                                    ? 'bg-red-100 text-red-600'
-                                                    : 'bg-blue-100 text-blue-600'
-                                                }`}>
-                                                <MessageSquare className="h-4 w-4" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="font-semibold">{ticket.subject}</h4>
-                                                    <Badge className={`${ticket.status === 'open' ? 'bg-green-500' :
-                                                            ticket.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-500'
-                                                        }`}>
-                                                        {ticket.status.replace('_', ' ')}
-                                                    </Badge>
-                                                    <Badge variant="outline" className={`${ticket.priority === 'high' ? 'text-red-600 border-red-200' : ''
-                                                        }`}>
-                                                        {ticket.priority}
-                                                    </Badge>
-                                                </div>
-                                                <p className="text-sm text-gray-600">{ticket.message}</p>
-                                                <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                                                    <span>From: {ticket.user_email}</span>
-                                                    <span>Created: {format(new Date(ticket.created_at), 'MMM d, HH:mm')}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <Button variant="ghost" size="sm">View Details</Button>
-                                    </div>
-                                ))}
+
+                            {faqsLoading ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                                </div>
+                            ) : filteredFaqs?.length === 0 ? (
+                                <div className="text-center py-16 text-gray-500">
+                                    <HelpCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                                    <p className="font-medium">No FAQs found</p>
+                                    <Button variant="outline" className="mt-4" onClick={() => setIsCreatingFaq(true)}>
+                                        <Plus className="h-4 w-4 mr-1" /> Create your first FAQ
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-gray-50">
+                                                <TableHead>Question</TableHead>
+                                                <TableHead>Category</TableHead>
+                                                <TableHead>Published</TableHead>
+                                                <TableHead>Created</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredFaqs?.map(faq => (
+                                                <TableRow key={faq.id} className="hover:bg-purple-50/30 transition-colors">
+                                                    <TableCell>
+                                                        <div>
+                                                            <p className="font-medium text-gray-900 text-sm">{faq.title}</p>
+                                                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{faq.description}</p>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="text-xs">{faq.category ?? "General"}</Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Switch
+                                                            checked={faq.status ?? false}
+                                                            onCheckedChange={v => toggleFaqStatus.mutate({ id: faq.id, status: v })}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-gray-500">
+                                                        {faq.created_at && format(new Date(faq.created_at), "MMM d, yyyy")}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 text-xs"
+                                                                onClick={() => openEditFaq(faq)}
+                                                            >
+                                                                <Pencil className="h-3 w-3 mr-1" /> Edit
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                                                                onClick={() => setDeletingFaqId(faq.id)}
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </TabsContent>
+                    </Tabs>
+                </CardContent>
+            </Card>
+
+            {/* Message Viewer Dialog */}
+            <Dialog open={!!selectedMessage} onOpenChange={open => !open && setSelectedMessage(null)}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Mail className="h-5 w-5 text-purple-600" />
+                            Message from {[selectedMessage?.fname, selectedMessage?.lname].filter(Boolean).join(" ") || "Anonymous"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {selectedMessage?.email}
+                            {selectedMessage?.created_at && ` · ${format(new Date(selectedMessage.created_at), "MMMM d, yyyy · HH:mm")}`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed min-h-[80px]">
+                        {selectedMessage?.message}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSelectedMessage(null)}>Close</Button>
+                        {selectedMessage && !selectedMessage.responded && (
+                            <Button
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => {
+                                    markRespondedMutation.mutate({ id: selectedMessage.id, responded: true });
+                                    setSelectedMessage(null);
+                                }}
+                            >
+                                <CheckCircle className="h-4 w-4 mr-2" /> Mark as Responded
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* FAQ Create / Edit Dialog */}
+            <Dialog
+                open={isCreatingFaq || !!editingFaq}
+                onOpenChange={open => { if (!open) { setIsCreatingFaq(false); setEditingFaq(null); } }}
+            >
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{editingFaq ? "Edit FAQ" : "Create New FAQ"}</DialogTitle>
+                        <DialogDescription>
+                            {editingFaq ? "Update the question and answer." : "Add a new FAQ entry to the help center."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="faq-title" className="font-semibold">Question</Label>
+                            <Input
+                                id="faq-title"
+                                value={faqForm.title}
+                                onChange={e => setFaqForm(f => ({ ...f, title: e.target.value }))}
+                                placeholder="e.g. How do I reset my password?"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="faq-desc" className="font-semibold">Answer</Label>
+                            <Textarea
+                                id="faq-desc"
+                                value={faqForm.description}
+                                onChange={e => setFaqForm(f => ({ ...f, description: e.target.value }))}
+                                rows={4}
+                                placeholder="Provide a clear and helpful answer..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="font-semibold">Category</Label>
+                                <Select value={faqForm.category} onValueChange={v => setFaqForm(f => ({ ...f, category: v }))}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {FAQ_CATEGORIES.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                            <div className="space-y-1.5">
+                                <Label className="font-semibold">Published</Label>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <Switch
+                                        checked={faqForm.status}
+                                        onCheckedChange={v => setFaqForm(f => ({ ...f, status: v }))}
+                                    />
+                                    <span className="text-sm text-gray-600">{faqForm.status ? "Visible" : "Hidden"}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setIsCreatingFaq(false); setEditingFaq(null); }}>
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                            onClick={() => saveFaqMutation.mutate({ ...faqForm, id: editingFaq?.id })}
+                            disabled={saveFaqMutation.isPending || !faqForm.title.trim()}
+                        >
+                            {saveFaqMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            {editingFaq ? "Save Changes" : "Create FAQ"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete FAQ Confirmation */}
+            <AlertDialog open={!!deletingFaqId} onOpenChange={open => !open && setDeletingFaqId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete FAQ</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This FAQ will be permanently deleted and removed from the help center. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => deletingFaqId && deleteFaqMutation.mutate(deletingFaqId)}
+                            disabled={deleteFaqMutation.isPending}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deleteFaqMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

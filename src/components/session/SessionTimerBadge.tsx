@@ -10,7 +10,7 @@
  */
 
 import React from "react";
-import { Clock, Plus } from "lucide-react";
+import { Clock, Plus, Infinity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -30,7 +30,53 @@ const SessionTimerBadge: React.FC<SessionTimerBadgeProps> = ({
   timer,
   showAddTime = false,
 }) => {
-  const { formattedTime, isExpired, isWarning, isUrgent, addTime, isAddingTime } = timer;
+  const { formattedTime, isExpired, isWarning, isUrgent, hasNoDuration, addTime, isAddingTime } = timer;
+
+  // When no duration is set, show "No limit" badge with optional add-time buttons for the host
+  if (hasNoDuration) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-mono font-semibold bg-slate-50 text-slate-500 border-slate-200">
+          <Infinity className="h-3 w-3 text-slate-400" />
+          No limit
+        </div>
+        {showAddTime && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-xs text-slate-500 hover:text-indigo-700 hover:bg-indigo-50"
+                  disabled={isAddingTime}
+                  onClick={() => addTime(30)}
+                >
+                  <Plus className="h-3 w-3" />
+                  30m
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Set a 30-minute session limit</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-xs text-slate-500 hover:text-indigo-700 hover:bg-indigo-50"
+                  disabled={isAddingTime}
+                  onClick={() => addTime(60)}
+                >
+                  <Plus className="h-3 w-3" />
+                  60m
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Set a 60-minute session limit</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  }
 
   if (formattedTime === null) return null;
 

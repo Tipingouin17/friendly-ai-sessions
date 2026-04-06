@@ -35,9 +35,13 @@ const Referrals = () => {
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            if (error) throw error;
-            return data;
+            if (error) {
+                console.warn('Referrals query error:', error);
+                return [];
+            }
+            return data ?? [];
         },
+        retry: false,
     });
 
     // Invite mutation
@@ -109,7 +113,7 @@ const Referrals = () => {
 
     return (
         <motion.div
-            className="container mx-auto px-4 py-8 max-w-5xl"
+            className="container mx-auto px-4 pt-24 pb-8 max-w-5xl"
             variants={pageVariants}
             initial="initial"
             animate="animate"

@@ -142,7 +142,7 @@ const Pricing = () => {
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pb-6 md:pb-12 px-4">
         <div className="container mx-auto">
-          <div className="text-center max-w-3xl mx-auto pt-4 md:pt-8">
+          <div className="text-center max-w-3xl mx-auto pt-24 md:pt-28">
             <span className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
               Simple, transparent pricing
             </span>

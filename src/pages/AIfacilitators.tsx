@@ -126,7 +126,7 @@ const AIfacilitators = () => {
         />
       )}
 
-      <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
+      <div className="max-w-4xl mx-auto px-4 pt-24 pb-6">
         {/* Always render usage meter — shows skeleton while loading */}
         <div className="mb-6">
           {limitsLoading ? (

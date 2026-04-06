@@ -111,7 +111,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen pb-16">
       <PageHead title="Settings" description="Manage your account settings and preferences" />
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4 pt-24">
         <div className="flex items-center gap-3 mb-8">
           <SettingsIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-700" />
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Settings</h1>

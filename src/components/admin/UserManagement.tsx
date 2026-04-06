@@ -99,8 +99,8 @@ export const UserManagement = () => {
         queryKey: ["admin-users", searchTerm, roleFilter, statusFilter, sortBy, sortOrder, page],
         queryFn: async () => {
             let query = supabase
-                .from("admin_profiles_view" as any)
-                .select("id, email, role, plan_id, created_at, updated_at, banned");
+                .from("profiles" as any)
+                .select("id, email, role, plan_id, current_plan_id, created_at, updated_at, banned, subscription_status");
 
             if (searchTerm) query = query.ilike("email", `%${searchTerm}%`);
             if (roleFilter === "admin") query = query.eq("role", "admin");
@@ -138,7 +138,7 @@ export const UserManagement = () => {
             const { count } = await supabase
                 .from("conversations")
                 .select("*", { count: "exact", head: true })
-                .eq("host_id", drawerUser!.id);
+                .eq("user_id", drawerUser!.id);
             return count ?? 0;
         },
     });

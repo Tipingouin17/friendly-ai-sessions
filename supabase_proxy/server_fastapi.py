@@ -793,7 +793,20 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     if not user or not user.get("password") or user.get("password") != pw_hash:
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
 
-    token = _make_token(user["id"], user["email"])
+    # Look up the user's profile role so admins get the correct JWT claim
+    profile_role = "free"
+    try:
+        conn_role = get_db()
+        cur_role = conn_role.cursor()
+        cur_role.execute("SELECT role FROM profiles WHERE id = %s::uuid", (user["id"],))
+        role_row = cur_role.fetchone()
+        conn_role.close()
+        if role_row:
+            profile_role = role_row["role"]
+    except Exception as e:
+        print(f"[login] Role lookup error: {e}")
+
+    token = _make_token(user["id"], user["email"], profile_role)
     return _make_user_response(user, token)
 
 
@@ -1140,6 +1153,9 @@ async def rest_table(table: str, request: Request):
     requesting_user_id = (
         requesting_user.get("sub") or requesting_user.get("id")
     ) if requesting_user else None
+    # Admin bypass: users with role='admin' in their JWT skip all ownership filters
+    requesting_user_role = requesting_user.get("role", "") if requesting_user else ""
+    is_admin_user = requesting_user_role == "admin"
     join_token_header = request.headers.get("x-join-token", "").strip()
 
     if request.method in ("GET", "HEAD"):
@@ -1232,8 +1248,10 @@ async def rest_table(table: str, request: Request):
                 _is_list_query = not (params.get('id', '') or params.get('conversation_id', ''))
                 if requesting_user_id and _is_list_query and table in ("conversations", *SECURE_CONV_TABLES):
                     # Host dashboard path: ignore join token, apply ownership filter below.
-                    join_token_header = ""
-            elif requesting_user_id and table in SECURE_REPORT_TABLES:
+                    # Admin users bypass ownership filter entirely — they see all data.
+                    if not is_admin_user:
+                        join_token_header = ""
+            elif requesting_user_id and not is_admin_user and table in SECURE_REPORT_TABLES:
                 # session_reports: ownership via conversation's user_id
                 wc.append(
                     '"conversation_id" IN ('
@@ -1241,7 +1259,7 @@ async def rest_table(table: str, request: Request):
                     'WHERE "user_id" = %s::uuid)'
                 )
                 wv.append(requesting_user_id)
-            elif requesting_user_id and table in SECURE_CONV_TABLES:
+            elif requesting_user_id and not is_admin_user and table in SECURE_CONV_TABLES:
                 # messages / session_participants: ownership filter
                 wc.append(
                     '"conversation_id" IN ('
@@ -1249,7 +1267,7 @@ async def rest_table(table: str, request: Request):
                     'WHERE "user_id" = %s::uuid)'
                 )
                 wv.append(requesting_user_id)
-            elif requesting_user_id and table in SECURE_DIRECT_TABLES:
+            elif requesting_user_id and not is_admin_user and table in SECURE_DIRECT_TABLES:
                 if table == 'facilitators':
                     # Return system facilitators (user_id IS NULL) + user's own custom facilitators
                     wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')

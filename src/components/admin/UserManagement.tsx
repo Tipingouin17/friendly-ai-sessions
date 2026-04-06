@@ -41,7 +41,6 @@ interface Profile {
     id: string;
     email: string;
     role: string | null;
-    plan_id: number | null;
     current_plan_id: number | null;
     created_at: string;
     updated_at: string;
@@ -100,7 +99,7 @@ export const UserManagement = () => {
         queryFn: async () => {
             let query = supabase
                 .from("profiles" as any)
-                .select("id, email, role, plan_id, current_plan_id, created_at, updated_at, banned, subscription_status");
+                .select("id, email, role, current_plan_id, created_at, updated_at, banned, subscription_status");
 
             if (searchTerm) query = query.ilike("email", `%${searchTerm}%`);
             if (roleFilter === "admin") query = query.eq("role", "admin");
@@ -188,7 +187,7 @@ export const UserManagement = () => {
         if (!users) return;
         const headers = ["ID", "Email", "Role", "Plan ID", "Status", "Joined", "Last Active"];
         const rows = users.map(u => [
-            u.id, u.email, u.role ?? "host", u.plan_id ?? "",
+            u.id, u.email, u.role ?? "host", u.current_plan_id ?? "",
             u.banned ? "banned" : "active",
             format(new Date(u.created_at), "yyyy-MM-dd"),
             format(new Date(u.updated_at), "yyyy-MM-dd"),
@@ -299,12 +298,12 @@ export const UserManagement = () => {
                                                     className="text-left font-medium text-gray-900 hover:text-purple-700 transition-colors"
                                                     onClick={() => setDrawerUser(user)}
                                                 >
-                                                    {user.email}
+                                                    {user.email || <span className="text-gray-400 italic text-xs">{user.id.slice(0, 8)}…</span>}
                                                 </button>
                                             </TableCell>
                                             <TableCell>{roleBadge(user.role)}</TableCell>
                                             <TableCell>
-                                                <span className="text-sm text-gray-600">{planName(user.plan_id)}</span>
+                                                <span className="text-sm text-gray-600">{planName(user.current_plan_id)}</span>
                                             </TableCell>
                                             <TableCell>{statusBadge(user.banned)}</TableCell>
                                             <TableCell className="text-sm text-gray-500">
@@ -427,7 +426,7 @@ export const UserManagement = () => {
                                 <CreditCard className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                                 <div>
                                     <p className="text-gray-500 text-xs mb-0.5">Current Plan</p>
-                                    <p className="font-medium">{planName(drawerUser?.plan_id ?? null)}</p>
+                                    <p className="font-medium">{planName(drawerUser?.current_plan_id ?? null)}</p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
@@ -481,7 +480,7 @@ export const UserManagement = () => {
                                 <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assign Plan</Label>
                                 <div className="flex gap-2">
                                     <Select
-                                        value={newPlanId || String(drawerUser?.plan_id ?? "")}
+                                        value={newPlanId || String(drawerUser?.current_plan_id ?? "")}
                                         onValueChange={setNewPlanId}
                                     >
                                         <SelectTrigger className="flex-1">

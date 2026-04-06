@@ -13,6 +13,7 @@ import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { clearJoinToken } from "@/lib/api";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
@@ -456,6 +457,13 @@ const PastWorkshops = () => {
       return old.map(w => w.id === workshopId ? { ...w, is_saved: isSaved } : w);
     });
   };
+
+  // Clear any stale participant join token when the host navigates to the dashboard.
+  // This prevents the X-Join-Token header from leaking into host-only API requests
+  // when the same browser was previously used as a participant in the same session.
+  useEffect(() => {
+    clearJoinToken();
+  }, []);
 
   // Set up real-time listener for workshop status changes
   useEffect(() => {

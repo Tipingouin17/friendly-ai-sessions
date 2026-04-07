@@ -308,6 +308,7 @@ class QueryBuilder<T = Record<string, unknown>> {
   ilike(col: string, p: string): this { this.s.filters.push([col, `ilike.${p}`]); return this; }
   in(col: string, vals: unknown[]): this { this.s.filters.push([col, `in.(${vals.join(",")})`]); return this; }
   is(col: string, val: null | boolean): this { this.s.filters.push([col, `is.${val}`]); return this; }
+  not(col: string, op: string, val: unknown): this { this.s.filters.push([col, `not.${op}.${val}`]); return this; }
   filter(col: string, op: FilterOp, val: unknown): this { this.s.filters.push([col, `${op}.${val}`]); return this; }
   order(col: string, opts?: { ascending?: boolean; nullsFirst?: boolean }): this {
     const dir = opts?.ascending === false ? "desc" : "asc";

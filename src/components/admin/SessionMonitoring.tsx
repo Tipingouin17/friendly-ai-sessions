@@ -90,7 +90,7 @@ export const SessionMonitoring = () => {
                     current_participants, participants, total_messages,
                     participant_description, user_id, sessions_id, status,
                     ended_at, session_duration_minutes, language,
-                    sessions:sessions_id ( title )
+                    sessions!sessions_id ( title )
                 `)
                 .order("created_at", { ascending: false })
                 .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);

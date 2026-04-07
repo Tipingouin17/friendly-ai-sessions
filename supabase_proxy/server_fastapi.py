@@ -470,7 +470,7 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
                     extra_join_cols.append(sj_fcol)
 
     all_sub_cols = base_cols + extra_join_cols
-    col_str = ", ".join([f'"{{c}}"' if c != "*" else c for c in all_sub_cols]) if all_sub_cols else "*"
+    col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_sub_cols]) if all_sub_cols else "*"
     cur = conn.cursor()
 
     if direction == "child_to_parent":

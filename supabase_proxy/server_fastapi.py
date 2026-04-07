@@ -480,15 +480,22 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
                 r[key_name] = None
             return
         ph = ",".join(["%s"] * len(fk_values))
-        cur.execute(f'SELECT {col_str} FROM public."{join_table}" WHERE "{parent_col}" IN ({ph})', fk_values)
+        # Always include parent_col (the PK of the joined table) so we can build jmap.
+        # If base_cols is ['*'] it is already included; otherwise add it explicitly.
+        needs_pk = base_cols != ["*"] and parent_col not in base_cols and parent_col not in extra_join_cols
+        select_str = col_str if not needs_pk else f'"{parent_col}", {col_str}'
+        cur.execute(f'SELECT {select_str} FROM public."{join_table}" WHERE "{parent_col}" IN ({ph})', fk_values)
         jrows = [serialize_row(dict(r)) for r in cur.fetchall()]
         for sj in sub_joins:
             resolve_join(join_table, sj, jrows, conn)
         jmap = {jr.get(parent_col): jr for jr in jrows}
         for row in parent_rows:
             matched = jmap.get(row.get(fk_col))
-            if matched and extra_join_cols:
-                matched = {k: v for k, v in matched.items() if k not in extra_join_cols}
+            if matched:
+                # Strip the injected PK col if it wasn't originally requested
+                strip_cols = extra_join_cols + ([parent_col] if needs_pk else [])
+                if strip_cols:
+                    matched = {k: v for k, v in matched.items() if k not in strip_cols}
             row[key_name] = matched
 
     elif direction == "parent_to_child":

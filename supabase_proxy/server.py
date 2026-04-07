@@ -153,6 +153,7 @@ ALLOWED_RPC_FUNCTIONS = {
 FK_MAP = {
     "conversations_sessions_id_fkey": ("conversations", "sessions_id", "sessions", "id"),
     "fk_conversations_sessions": ("conversations", "sessions_id", "sessions", "id"),
+    "sessions_id": ("conversations", "sessions_id", "sessions", "id"),
     "conversations_final_report_id_fkey": ("conversations", "final_report_id", "session_reports", "id"),
     "sessions_facilitator_fkey": ("sessions", "facilitator", "facilitators", "id"),
     "facilitators_plan_id_fkey": ("facilitators", "plan_id", "plans", "id"),

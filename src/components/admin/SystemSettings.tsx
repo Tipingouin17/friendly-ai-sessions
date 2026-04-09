@@ -25,12 +25,20 @@ import {
 interface Config {
     id: number;
     default_gpt_token: string | null;
+    default_ai_model: string | null;
     default_currency: string;
     google_capcha_key: string | null;
     secret_message: string | null;
     free_plan_message_limit: number | null;
     languages: Record<string, boolean> | null;
 }
+
+const AI_MODEL_OPTIONS = [
+    { value: "gpt-4.1-nano",     label: "GPT-4.1 Nano — Ultra-cheap, Free tier ($0.10/$0.40 per 1M)" },
+    { value: "gpt-4.1-mini",     label: "GPT-4.1 Mini — Recommended: Starter/Premium ($0.40/$1.60 per 1M) ★" },
+    { value: "gpt-4.1",          label: "GPT-4.1 — Highest quality, Enterprise ($2.00/$8.00 per 1M)" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash — Google, ultra-fast reasoning ($0.15/$0.60 per 1M)" },
+];
 
 const CURRENCIES = [
     { value: "USD", label: "USD — US Dollar" },
@@ -72,6 +80,7 @@ export const SystemSettings = () => {
 
     const [form, setForm] = useState<Partial<Config>>({
         default_gpt_token: "",
+        default_ai_model: "gpt-4.1-mini",
         default_currency: "USD",
         google_capcha_key: "",
         secret_message: "",
@@ -96,6 +105,7 @@ export const SystemSettings = () => {
         if (config) {
             setForm({
                 default_gpt_token: config.default_gpt_token ?? "",
+                default_ai_model: config.default_ai_model ?? "gpt-4.1-mini",
                 default_currency: config.default_currency ?? "USD",
                 google_capcha_key: config.google_capcha_key ?? "",
                 secret_message: config.secret_message ?? "",
@@ -113,6 +123,7 @@ export const SystemSettings = () => {
                 .from("configurations")
                 .update({
                     default_gpt_token: form.default_gpt_token || null,
+                    default_ai_model: form.default_ai_model || "gpt-4.1-mini",
                     default_currency: form.default_currency ?? "USD",
                     google_capcha_key: form.google_capcha_key || null,
                     secret_message: form.secret_message || null,
@@ -221,6 +232,26 @@ export const SystemSettings = () => {
                                             </div>
                                             <h3 className="font-semibold text-gray-800">AI Configuration</h3>
                                         </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Platform Default AI Model</Label>
+                                            <p className="text-xs text-gray-500">The AI model used for all sessions unless overridden per-session in Prompt Management</p>
+                                            <Select
+                                                value={form.default_ai_model ?? "gpt-4.1-mini"}
+                                                onValueChange={v => handleChange("default_ai_model", v)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {AI_MODEL_OPTIONS.map(opt => (
+                                                        <SelectItem key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <Separator />
                                         <div className="space-y-1.5">
                                             <Label className="font-semibold">Default OpenAI API Token</Label>
                                             <p className="text-xs text-gray-500">Used as the fallback API key for all AI sessions</p>

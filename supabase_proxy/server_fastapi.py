@@ -105,12 +105,25 @@ STRIPE_CONFIGURED = bool(stripe_lib.api_key)
 # ============================================================
 # AI model mapping
 # ============================================================
+# Maps legacy/alias model names -> canonical model names used in API calls.
+# Canonical models available (April 2026):
+#   gpt-4.1-nano     - ultra-cheap, Free tier ($0.10/$0.40 per 1M tokens)
+#   gpt-4.1-mini     - recommended default, Starter/Premium ($0.40/$1.60 per 1M)
+#   gpt-4.1          - highest quality, Enterprise ($2.00/$8.00 per 1M)
+#   gemini-2.5-flash - Google alternative, ultra-fast reasoning ($0.15/$0.60 per 1M)
 GPT_MODEL_MAP = {
+    # Legacy OpenAI names -> modern equivalents
     "gpt-4": "gpt-4.1-mini",
     "gpt-4o": "gpt-4.1-mini",
-    "gpt-4-turbo": "gpt-4.1-mini",
+    "gpt-4o-mini": "gpt-4.1-mini",
+    "gpt-4-turbo": "gpt-4.1",
     "gpt-3.5-turbo": "gpt-4.1-nano",
     "gpt-3.5": "gpt-4.1-nano",
+    # Pass-through canonical names (no remapping needed)
+    "gpt-4.1-nano": "gpt-4.1-nano",
+    "gpt-4.1-mini": "gpt-4.1-mini",
+    "gpt-4.1": "gpt-4.1",
+    "gemini-2.5-flash": "gemini-2.5-flash",
 }
 DEFAULT_AI_MODEL = "gpt-4.1-mini"
 
@@ -222,6 +235,18 @@ def run_startup_migrations() -> None:
         ALTER TABLE conversations
             ADD COLUMN IF NOT EXISTS total_cost_usd NUMERIC(12, 8) NOT NULL DEFAULT 0;
         """,
+        # 2026-04-10: Add default_ai_model to configurations for platform-wide default model.
+        # Allows admin to change the default AI model from the System Settings panel.
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS default_ai_model TEXT NOT NULL DEFAULT 'gpt-4.1-mini';
+        """,
+        # 2026-04-10: Add plan_upgraded_at to profiles for subscriber growth tracking.
+        # Set when a user upgrades from free to a paid plan.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS plan_upgraded_at TIMESTAMPTZ;
+        """,
     ]
     try:
         conn = get_db()
@@ -305,15 +330,20 @@ def serialize_row(row: dict) -> dict:
 # ============================================================
 # Token cost calculation
 # ============================================================
-# Pricing in USD per 1M tokens (April 2026 OpenAI pricing)
+# Pricing in USD per 1M tokens (April 2026)
 _TOKEN_PRICING: Dict[str, Dict[str, float]] = {
-    "gpt-4.1":       {"input": 2.00,  "output": 8.00},
-    "gpt-4.1-mini":  {"input": 0.40,  "output": 1.60},
-    "gpt-4.1-nano":  {"input": 0.10,  "output": 0.40},
-    "gpt-4o":        {"input": 2.50,  "output": 10.00},
-    "gpt-4o-mini":   {"input": 0.15,  "output": 0.60},
-    "gpt-4-turbo":   {"input": 10.00, "output": 30.00},
-    "gpt-3.5-turbo": {"input": 0.50,  "output": 1.50},
+    # -- OpenAI GPT-4.1 family (current) --
+    "gpt-4.1":           {"input": 2.00,  "output": 8.00},
+    "gpt-4.1-mini":      {"input": 0.40,  "output": 1.60},
+    "gpt-4.1-nano":      {"input": 0.10,  "output": 0.40},
+    # -- Google Gemini (via OpenAI-compatible API) --
+    "gemini-2.5-flash":  {"input": 0.15,  "output": 0.60},
+    "gemini-2.5-pro":    {"input": 1.25,  "output": 10.00},
+    # -- Legacy OpenAI models (kept for cost tracking of historical sessions) --
+    "gpt-4o":            {"input": 2.50,  "output": 10.00},
+    "gpt-4o-mini":       {"input": 0.15,  "output": 0.60},
+    "gpt-4-turbo":       {"input": 10.00, "output": 30.00},
+    "gpt-3.5-turbo":     {"input": 0.50,  "output": 1.50},
 }
 
 def _calculate_token_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
@@ -1195,11 +1225,73 @@ async def admin_cost_analytics(request: Request):
         """)
         token_by_model = [dict(r) for r in cur.fetchall()]
 
+        # --- Subscriber growth over time (new paid users per month, last 12 months) ---
+        cur.execute("""
+            SELECT
+                TO_CHAR(DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at)), 'YYYY-MM') AS month,
+                COUNT(*) AS new_paid_subscribers
+            FROM profiles
+            WHERE current_plan_id IS NOT NULL
+              AND current_plan_id != (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1)
+              AND COALESCE(plan_upgraded_at, updated_at) >= NOW() - INTERVAL '12 months'
+            GROUP BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
+            ORDER BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
+        """)
+        subscriber_growth = [dict(r) for r in cur.fetchall()]
+
+        # --- Monthly revenue vs cost (last 12 months) ---
+        # Revenue: count subscribers per month * their plan price
+        # We approximate monthly revenue as the current MRR (static) for each month
+        # since we don't have historical plan change events.
+        # For cost, we use the monthly_costs data already fetched.
+        cur.execute("""
+            SELECT
+                TO_CHAR(DATE_TRUNC('month', c.created_at), 'YYYY-MM') AS month,
+                COALESCE(SUM(c.total_cost_usd), 0) AS cost_usd
+            FROM conversations c
+            WHERE c.created_at >= NOW() - INTERVAL '12 months'
+            GROUP BY DATE_TRUNC('month', c.created_at)
+            ORDER BY DATE_TRUNC('month', c.created_at)
+        """)
+        monthly_cost_rows = [dict(r) for r in cur.fetchall()]
+
         conn.close()
 
         total_revenue = sum(r["monthly_revenue_eur"] for r in revenue_by_plan)
         # Exchange rate approximation: 1 EUR ≈ 1.08 USD
         total_cost_eur = float(totals["total_cost_usd"]) / 1.08
+
+        # --- Build 12-month MRR growth projection ---
+        # Based on the financial model: M1=600, M3=2400, M6=7500, M9=18000, M12=36000
+        # Using current MRR as baseline and projecting forward with 15% monthly growth
+        import calendar
+        from datetime import date
+        today = date.today()
+        current_mrr = round(total_revenue, 2)
+        MONTHLY_GROWTH_RATE = 0.15  # 15% month-over-month growth assumption
+        mrr_projection = []
+        for i in range(12):
+            month_offset = i + 1
+            # Calculate the month label
+            proj_month = today.replace(day=1)
+            # Add months
+            total_months = today.month + month_offset - 1
+            proj_year = today.year + total_months // 12
+            proj_month_num = (total_months % 12) + 1
+            label = f"{proj_year}-{proj_month_num:02d}"
+            projected_mrr = round(current_mrr * ((1 + MONTHLY_GROWTH_RATE) ** month_offset), 2)
+            mrr_projection.append({
+                "month": label,
+                "projected_mrr_eur": projected_mrr,
+                "projected_arr_eur": round(projected_mrr * 12, 2),
+            })
+
+        # --- Total subscriber count ---
+        total_paid_subscribers = sum(
+            int(r.get("subscriber_count", 0))
+            for r in revenue_by_plan
+            if float(r.get("plan_price_eur", 0)) > 0
+        )
 
         return {
             "summary": {
@@ -1209,11 +1301,15 @@ async def admin_cost_analytics(request: Request):
                 "completed_sessions": int(totals["completed_sessions"]),
                 "monthly_revenue_eur": round(total_revenue, 2),
                 "gross_margin_pct": round((1 - total_cost_eur / total_revenue) * 100, 1) if total_revenue > 0 else None,
+                "total_paid_subscribers": total_paid_subscribers,
+                "monthly_growth_rate_pct": MONTHLY_GROWTH_RATE * 100,
             },
             "monthly_costs": monthly_costs,
             "per_session": per_session,
             "revenue_by_plan": revenue_by_plan,
             "token_by_model": token_by_model,
+            "subscriber_growth": subscriber_growth,
+            "mrr_projection": mrr_projection,
         }
     except Exception as e:
         traceback.print_exc()
@@ -1822,7 +1918,22 @@ async def edge_function(func_name: str, request: Request):
                 print(f"Error fetching session context: {e}")
                 traceback.print_exc()
 
-        model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), DEFAULT_AI_MODEL) if gpt_version else DEFAULT_AI_MODEL
+        # Resolve model: session-specific gpt_version > platform default > hardcoded DEFAULT_AI_MODEL
+        _platform_default = DEFAULT_AI_MODEL
+        try:
+            _cfg_conn = get_db()
+            _cfg_cur = _cfg_conn.cursor()
+            _cfg_cur.execute("SELECT default_ai_model FROM configurations LIMIT 1")
+            _cfg_row = _cfg_cur.fetchone()
+            _cfg_conn.close()
+            if _cfg_row and _cfg_row.get("default_ai_model"):
+                _platform_default = GPT_MODEL_MAP.get(
+                    str(_cfg_row["default_ai_model"]).lower().strip(),
+                    _cfg_row["default_ai_model"]
+                )
+        except Exception:
+            pass  # fall back to hardcoded default
+        model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), _platform_default) if gpt_version else _platform_default
         try:
             max_tokens = int(max_tokens_cfg) if max_tokens_cfg and str(max_tokens_cfg) != "None" else 600
         except (ValueError, TypeError):
@@ -2368,7 +2479,7 @@ async def edge_function(func_name: str, request: Request):
             conn = get_db()
             cur = conn.cursor()
             cur.execute(
-                "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = %s, updated_at = NOW() WHERE id = %s",
+                "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = %s, plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()), updated_at = NOW() WHERE id = %s",
                 (plan_id, customer_id, payment_intent_id, user_id),
             )
             conn.commit()

@@ -21,6 +21,19 @@ interface CostSummary {
     completed_sessions: number;
     monthly_revenue_eur: number;
     gross_margin_pct: number | null;
+    total_paid_subscribers: number;
+    monthly_growth_rate_pct: number;
+}
+
+interface SubscriberGrowth {
+    month: string;
+    new_paid_subscribers: number;
+}
+
+interface MrrProjection {
+    month: string;
+    projected_mrr_eur: number;
+    projected_arr_eur: number;
 }
 
 interface MonthlyCost {
@@ -61,6 +74,8 @@ interface CostAnalyticsData {
     per_session: PerSession[];
     revenue_by_plan: RevenuePlan[];
     token_by_model: TokenByModel[];
+    subscriber_growth: SubscriberGrowth[];
+    mrr_projection: MrrProjection[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -141,7 +156,7 @@ export const CostRevenueDashboard = () => {
         </div>
     );
 
-    const { summary, monthly_costs, per_session, revenue_by_plan, token_by_model } = data;
+    const { summary, monthly_costs, per_session, revenue_by_plan, token_by_model, subscriber_growth, mrr_projection } = data;
 
     // Build monthly revenue vs cost chart data
     const monthlyChartData = monthly_costs.map(m => ({
@@ -164,6 +179,14 @@ export const CostRevenueDashboard = () => {
 
             {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <KpiCard
+                    title="Paid Subscribers"
+                    value={fmt.num(summary.total_paid_subscribers)}
+                    sub="Active paying users"
+                    icon={TrendingUp}
+                    color="bg-violet-500"
+                    trend="up"
+                />
                 <KpiCard
                     title="Monthly Revenue"
                     value={fmt.eur(summary.monthly_revenue_eur)}
@@ -348,6 +371,53 @@ export const CostRevenueDashboard = () => {
                     </table>
                 </div>
             </div>
+
+            {/* MRR Growth Projection */}
+            {mrr_projection && mrr_projection.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-gray-700">12-Month MRR Growth Projection</h3>
+                        <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
+                            {summary.monthly_growth_rate_pct}% monthly growth assumption
+                        </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={mrr_projection} margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `€${v}`} />
+                            <Tooltip
+                                formatter={(v: number, name: string) => [
+                                    `€${v.toLocaleString()}`,
+                                    name === "projected_mrr_eur" ? "Projected MRR" : "Projected ARR"
+                                ]}
+                            />
+                            <Legend formatter={v => v === "projected_mrr_eur" ? "MRR" : "ARR"} />
+                            <Line type="monotone" dataKey="projected_mrr_eur" stroke="#8b5cf6" strokeWidth={2.5} dot={false} />
+                            <Line type="monotone" dataKey="projected_arr_eur" stroke="#6366f1" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                    <p className="text-xs text-gray-400 mt-2">
+                        Based on current MRR of {fmt.eur(summary.monthly_revenue_eur)} projected forward at {summary.monthly_growth_rate_pct}%/month (community-led growth model)
+                    </p>
+                </div>
+            )}
+
+            {/* Subscriber Growth */}
+            {subscriber_growth && subscriber_growth.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4">New Paid Subscribers per Month</h3>
+                    <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={subscriber_growth} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <Tooltip formatter={(v: number) => [v, "New Paid Subscribers"]} />
+                            <Bar dataKey="new_paid_subscribers" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
 
             {/* Revenue vs Cost Summary */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white">

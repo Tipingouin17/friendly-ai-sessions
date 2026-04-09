@@ -39,10 +39,12 @@ interface Session {
 }
 
 const GPT_MODEL_OPTIONS = [
-    { value: "gpt-4o-mini", label: "GPT-4o Mini (fast, cost-efficient)" },
-    { value: "gpt-4o", label: "GPT-4o (powerful, balanced)" },
-    { value: "gpt-4-turbo", label: "GPT-4 Turbo (high capability)" },
-    { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo (legacy, fast)" },
+    // OpenAI GPT-4.1 family (current, April 2026)
+    { value: "gpt-4.1-nano",     label: "GPT-4.1 Nano — Ultra-cheap, Free tier ($0.10/$0.40 per 1M)" },
+    { value: "gpt-4.1-mini",     label: "GPT-4.1 Mini — Recommended: Starter/Premium ($0.40/$1.60 per 1M) ★" },
+    { value: "gpt-4.1",          label: "GPT-4.1 — Highest quality, Enterprise ($2.00/$8.00 per 1M)" },
+    // Google Gemini (via OpenAI-compatible API)
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash — Google, ultra-fast reasoning ($0.15/$0.60 per 1M)" },
 ];
 
 export const PromptManagement = () => {
@@ -52,7 +54,7 @@ export const PromptManagement = () => {
     const [editedPrompt, setEditedPrompt] = useState("");
     const [editedWelcome, setEditedWelcome] = useState("");
     const [editedScope, setEditedScope] = useState("");
-    const [editedGptVersion, setEditedGptVersion] = useState("gpt-4o-mini");
+    const [editedGptVersion, setEditedGptVersion] = useState("gpt-4.1-mini");
     const [editedMaxTokens, setEditedMaxTokens] = useState(600);
     const [editedRandomness, setEditedRandomness] = useState(0.7);
 
@@ -111,7 +113,7 @@ export const PromptManagement = () => {
             setEditedPrompt(session.prompt || "");
             setEditedWelcome(session.welcome_message || "");
             setEditedScope(session.scope || "");
-            setEditedGptVersion(session.gpt_version || "gpt-4o-mini");
+            setEditedGptVersion(session.gpt_version || "gpt-4.1-mini");
             setEditedMaxTokens(session.max_tokens ?? 600);
             setEditedRandomness(session.randomness ?? 0.7);
         }
@@ -136,7 +138,7 @@ export const PromptManagement = () => {
         setEditedPrompt(session.prompt || "");
         setEditedWelcome(session.welcome_message || "");
         setEditedScope(session.scope || "");
-        setEditedGptVersion(session.gpt_version || "gpt-4o-mini");
+        setEditedGptVersion(session.gpt_version || "gpt-4.1-mini");
         setEditedMaxTokens(session.max_tokens ?? 600);
         setEditedRandomness(session.randomness ?? 0.7);
     };
@@ -233,7 +235,7 @@ export const PromptManagement = () => {
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-gray-500">
-                                            The OpenAI model used to generate facilitator responses
+                                            The AI model used to generate facilitator responses. GPT-4.1 Mini is recommended for best cost/quality balance.
                                         </p>
                                     </div>
 

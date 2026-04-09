@@ -15,6 +15,7 @@ import { SessionMonitoring } from "@/components/admin/SessionMonitoring";
 import { SystemSettings } from "@/components/admin/SystemSettings";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { RevenueDashboard } from "@/components/admin/RevenueDashboard";
+import { CostRevenueDashboard } from "@/components/admin/CostRevenueDashboard";
 import { AlertsMonitoring } from "@/components/admin/AlertsMonitoring";
 import { CommunicationCenter } from "@/components/admin/CommunicationCenter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +33,7 @@ const NAV_GROUPS = [
         items: [
             { id: "analytics", label: "Analytics", icon: TrendingUp, description: "Platform growth & engagement" },
             { id: "revenue", label: "Revenue", icon: DollarSign, description: "Subscriptions & billing" },
+            { id: "costs", label: "Cost & Margin", icon: BarChart3, description: "LLM costs, margins & session economics" },
             { id: "alerts", label: "Alerts", icon: Bell, description: "System & business alerts" },
         ],
     },
@@ -62,6 +64,7 @@ const NAV_GROUPS = [
 const CONTENT_MAP: Record<string, React.ReactNode> = {
     analytics: <AnalyticsDashboard />,
     revenue: <RevenueDashboard />,
+    costs: <CostRevenueDashboard />,
     alerts: <AlertsMonitoring />,
     users: <UserManagement />,
     facilitators: <FacilitatorManagement />,
@@ -75,6 +78,7 @@ const CONTENT_MAP: Record<string, React.ReactNode> = {
 const LABEL_MAP: Record<string, string> = {
     analytics: "Analytics",
     revenue: "Revenue",
+    costs: "Cost & Margin",
     alerts: "Alerts",
     users: "Users",
     facilitators: "Facilitators",

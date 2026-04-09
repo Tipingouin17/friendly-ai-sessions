@@ -25,6 +25,14 @@ export const sanitizeInput = (input: string): string => {
 };
 
 /**
+ * Maximum length for a single participant message.
+ * Kept at 500 characters (~100 words) to ensure all messages from all
+ * participants fit within the context window of smaller models (gpt-4.1-mini,
+ * gpt-4.1-nano) when building session reports.
+ */
+export const MAX_MESSAGE_LENGTH = 500;
+
+/**
  * Validates message content before storage
  */
 export const validateMessageContent = (content: string): { isValid: boolean; error?: string } => {
@@ -32,8 +40,8 @@ export const validateMessageContent = (content: string): { isValid: boolean; err
     return { isValid: false, error: 'Message content is required' };
   }
 
-  if (content.length > 2000) {
-    return { isValid: false, error: 'Message content exceeds maximum length of 2000 characters' };
+  if (content.length > MAX_MESSAGE_LENGTH) {
+    return { isValid: false, error: `Message content exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` };
   }
 
   // Check for potential script injection

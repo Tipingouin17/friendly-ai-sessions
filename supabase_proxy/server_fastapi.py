@@ -247,6 +247,21 @@ def run_startup_migrations() -> None:
         ALTER TABLE profiles
             ADD COLUMN IF NOT EXISTS plan_upgraded_at TIMESTAMPTZ;
         """,
+        # 2026-04-10: Update Starter plan price from €20 to €19 and link new Stripe price ID.
+        # Old price: price_1QxBGjK0lFUZlqguTPkwWY6b (€20/mo)
+        # New price: price_1TKRfDK0lFUZlqgubygFSBT8 (€19/mo)
+        """
+        UPDATE plans
+        SET price = 19.00,
+            stripe_plan_id = 'price_1TKRfDK0lFUZlqgubygFSBT8'
+        WHERE stripe_plan_id = 'price_1QxBGjK0lFUZlqguTPkwWY6b';
+        """,
+        # 2026-04-10: Rename Basic plan to Starter in the plans table.
+        """
+        UPDATE plans
+        SET title = 'Starter'
+        WHERE title = 'Basic' AND stripe_plan_id = 'price_1TKRfDK0lFUZlqgubygFSBT8';
+        """,
     ]
     try:
         conn = get_db()

@@ -128,6 +128,57 @@ GPT_MODEL_MAP = {
 DEFAULT_AI_MODEL = "gpt-4.1-mini"
 
 # ============================================================
+# Per-model context window budgets (in tokens)
+# ============================================================
+# These are conservative safe limits leaving room for the system prompt
+# (~1,500 tokens) and the output (up to 1,500 tokens).
+# gpt-4.1-nano and gpt-4.1-mini have 128K context windows.
+# gpt-4.1 and gemini-2.5-flash have 1M context windows.
+_MODEL_CONTEXT_BUDGET: Dict[str, int] = {
+    "gpt-4.1-nano":      80_000,   # 128K window - system prompt - output headroom
+    "gpt-4.1-mini":      80_000,   # 128K window - system prompt - output headroom
+    "gpt-4.1":          800_000,   # 1M window  - generous headroom
+    "gemini-2.5-flash": 800_000,   # 1M window  - generous headroom
+}
+_DEFAULT_CONTEXT_BUDGET = 80_000  # safe fallback for unknown models
+
+# Approximate characters per token (conservative estimate for mixed content)
+_CHARS_PER_TOKEN = 3.5
+
+
+def _truncate_transcript_to_budget(transcript: str, model: str, reserved_tokens: int = 3000) -> tuple[str, bool]:
+    """Truncate a transcript string to fit within the model's context budget.
+
+    Args:
+        transcript: The full conversation transcript string.
+        model: The canonical model name being used.
+        reserved_tokens: Tokens reserved for system prompt + output (default 3000).
+
+    Returns:
+        A tuple of (truncated_transcript, was_truncated).
+        If truncation occurred, a warning header is prepended.
+    """
+    budget = _MODEL_CONTEXT_BUDGET.get(model, _DEFAULT_CONTEXT_BUDGET)
+    available_tokens = budget - reserved_tokens
+    max_chars = int(available_tokens * _CHARS_PER_TOKEN)
+
+    if len(transcript) <= max_chars:
+        return transcript, False
+
+    # Truncate from the BEGINNING (oldest messages) to keep the most recent context.
+    # For reports we want ALL messages, so we split into two halves:
+    # keep the first 20% (opening) + last 80% (most recent/important).
+    keep_start = int(max_chars * 0.20)
+    keep_end = max_chars - keep_start
+    truncated = (
+        transcript[:keep_start]
+        + "\n\n[... earlier messages omitted to fit model context window ...] \n\n"
+        + transcript[-keep_end:]
+    )
+    return truncated, True
+
+
+# ============================================================
 # In-memory user store (pre-registered users)
 # ============================================================
 USERS: Dict[str, Dict] = {}
@@ -2066,6 +2117,13 @@ async def edge_function(func_name: str, request: Request):
                 else:
                     label = role.upper()
                 conversation_text += f"[{label} - {name}]: {text}\n\n"
+            # Apply per-model context budget truncation to prevent context overflow
+            conversation_text, _was_truncated = _truncate_transcript_to_budget(conversation_text, model)
+            _truncation_note = (
+                "\n\n**Note:** Some earlier messages were omitted to fit the AI model's context window. "
+                "The report is based on the opening and most recent portion of the session.\n"
+                if _was_truncated else ""
+            )
             user_prompt = (
                 f'Generate a comprehensive session report for the workshop "{session_title}".\n'
                 f"Objective: {objective}\n\n"
@@ -2074,6 +2132,7 @@ async def edge_function(func_name: str, request: Request):
                 "1. Executive Summary\n2. Key Discussion Points\n"
                 "3. Participant Insights\n4. Key Takeaways\n5. Recommended Next Steps\n\n"
                 "Use markdown formatting with ## headers for sections."
+                + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _was_truncated else "")
             )
             max_tokens = min(max_tokens * 2, 1500)
         else:
@@ -2306,12 +2365,34 @@ async def edge_function(func_name: str, request: Request):
                             content = {"text": content}
                     text = content.get("text", str(content))
                     transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
+                # Apply per-model context budget truncation to prevent context overflow
+                _report_model = DEFAULT_AI_MODEL
+                try:
+                    _cfg_conn2 = get_db()
+                    _cfg_cur2 = _cfg_conn2.cursor()
+                    _cfg_cur2.execute("SELECT default_ai_model FROM configurations LIMIT 1")
+                    _cfg_row2 = _cfg_cur2.fetchone()
+                    _cfg_conn2.close()
+                    if _cfg_row2 and _cfg_row2.get("default_ai_model"):
+                        _report_model = GPT_MODEL_MAP.get(
+                            str(_cfg_row2["default_ai_model"]).lower().strip(),
+                            _cfg_row2["default_ai_model"]
+                        )
+                except Exception:
+                    pass
+                transcript, _eos_truncated = _truncate_transcript_to_budget(transcript, _report_model)
+                _truncation_suffix = (
+                    "\n\n> **Note:** Some earlier messages were omitted to fit the AI model's context window. "
+                    "The report covers the opening and most recent portion of the session."
+                    if _eos_truncated else ""
+                )
+                print(f"[AI] End-of-session report: model={_report_model}, transcript_chars={len(transcript)}, truncated={_eos_truncated}")
                 _report_prompt_tokens: Optional[int] = None
                 _report_completion_tokens: Optional[int] = None
                 _report_model_used: Optional[str] = None
                 try:
                     resp = openai_client.chat.completions.create(
-                        model=DEFAULT_AI_MODEL,
+                        model=_report_model,
                         messages=[
                             {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
                             {"role": "user", "content": (
@@ -2321,12 +2402,13 @@ async def edge_function(func_name: str, request: Request):
                                 f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
                                 "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
                                 "Use markdown formatting. Be specific and reference actual content from the discussion."
+                                + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _eos_truncated else "")
                             )},
                         ],
                         max_tokens=1500,
                         temperature=0.5,
                     )
-                    report_content = resp.choices[0].message.content.strip()
+                    report_content = resp.choices[0].message.content.strip() + _truncation_suffix
                     if resp.usage:
                         _report_prompt_tokens = resp.usage.prompt_tokens
                         _report_completion_tokens = resp.usage.completion_tokens

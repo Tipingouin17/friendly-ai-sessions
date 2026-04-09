@@ -25,12 +25,13 @@ export const sanitizeInput = (input: string): string => {
 };
 
 /**
- * Maximum length for a single participant message.
- * Kept at 500 characters (~100 words) to ensure all messages from all
- * participants fit within the context window of smaller models (gpt-4.1-mini,
- * gpt-4.1-nano) when building session reports.
+ * Maximum length for a single participant message in the UI.
+ * Set to 2000 characters to allow rich, detailed responses.
+ * Context window management is handled server-side via smart pre-compression:
+ * messages exceeding the per-model threshold are summarised by a fast model
+ * before being included in the AI context, so participants are never restricted.
  */
-export const MAX_MESSAGE_LENGTH = 500;
+export const MAX_MESSAGE_LENGTH = 2000;
 
 /**
  * Validates message content before storage

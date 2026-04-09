@@ -41,7 +41,7 @@ const ChatInput = ({
 
   const charCount = inputMessage.length;
   const isOverLimit = charCount > MAX_MESSAGE_LENGTH;
-  const isNearLimit = charCount > MAX_MESSAGE_LENGTH * 0.85; // warn at 85%
+  const isNearLimit = charCount > MAX_MESSAGE_LENGTH * 0.80; // warn at 80% (1600 chars)
 
   // Auto-resize textarea
   useEffect(() => {
@@ -70,7 +70,7 @@ const ChatInput = ({
       const combined = preRecordingTextRef.current
         ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
         : transcript;
-      // Truncate voice input to the limit to prevent overflow
+      // Truncate voice input to the UI limit
       setInputMessage(combined.slice(0, MAX_MESSAGE_LENGTH));
     };
 
@@ -111,7 +111,8 @@ const ChatInput = ({
   };
 
   const handleSend = () => {
-    if (!inputMessage.trim() || disabled || isOverLimit) return;
+    if (!inputMessage.trim() || disabled) return;
+    if (isOverLimit) return; // hard block at 2000 chars
     if (isRecording) handleStopRecording();
     onSendMessage();
   };

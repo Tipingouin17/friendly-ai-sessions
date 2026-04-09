@@ -47,6 +47,8 @@ interface Profile {
     banned: boolean | null;
     subscription_status: string | null;
     stripe_customer_id: string | null;
+    enterprise_ai_model?: string | null;
+    company_name?: string | null;
 }
 
 interface Plan {
@@ -116,17 +118,24 @@ export const UserManagement = () => {
         },
     });
 
+    const [enterpriseModel, setEnterpriseModel] = useState<string>("");
+    const [companyName, setCompanyName] = useState<string>("");
+
     const { data: drawerProfile } = useQuery({
         queryKey: ["admin-user-detail", drawerUser?.id],
         enabled: !!drawerUser?.id,
         queryFn: async () => {
             const { data, error } = await supabase
-                .from("profiles")
-                .select("id, role, current_plan_id, created_at, updated_at, subscription_status, stripe_customer_id, banned")
+                .from("profiles" as any)
+                .select("id, role, current_plan_id, created_at, updated_at, subscription_status, stripe_customer_id, banned, enterprise_ai_model, company_name")
                 .eq("id", drawerUser!.id)
                 .single();
             if (error) throw error;
-            return data as Profile;
+            const profile = data as Profile;
+            // Sync local state with fetched profile
+            setEnterpriseModel(profile.enterprise_ai_model ?? "");
+            setCompanyName(profile.company_name ?? "");
+            return profile;
         },
     });
 
@@ -489,7 +498,7 @@ export const UserManagement = () => {
                                         <SelectContent>
                                             {plans?.map(p => (
                                                 <SelectItem key={p.id} value={String(p.id)}>
-                                                    {p.title}{p.price ? ` — $${p.price}/mo` : " (Free)"}
+                                                    {p.title}{p.price ? ` — €${p.price}/mo` : " (Free)"}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -510,6 +519,70 @@ export const UserManagement = () => {
                                     </Button>
                                 </div>
                             </div>
+
+                            {/* Enterprise AI Model — only shown for Enterprise plan users */}
+                            {(planName(drawerUser?.current_plan_id ?? null).toLowerCase().includes("enterprise") || drawerProfile?.enterprise_ai_model) && (
+                                <div className="space-y-2 pt-1 border-t border-purple-100 mt-3">
+                                    <Label className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Enterprise AI Model</Label>
+                                    <p className="text-xs text-gray-500">Override the platform default model for this company. Applies to all sessions hosted by this account.</p>
+                                    <div className="flex gap-2">
+                                        <Select
+                                            value={enterpriseModel || "platform_default"}
+                                            onValueChange={v => setEnterpriseModel(v === "platform_default" ? "" : v)}
+                                        >
+                                            <SelectTrigger className="flex-1">
+                                                <SelectValue placeholder="Use platform default" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="platform_default">Use platform default</SelectItem>
+                                                <SelectItem value="gpt-4.1-nano">gpt-4.1-nano — Ultra-cheap ($0.10/$0.40)</SelectItem>
+                                                <SelectItem value="gpt-4.1-mini">gpt-4.1-mini — Recommended ($0.40/$1.60)</SelectItem>
+                                                <SelectItem value="gpt-4.1">gpt-4.1 — Highest quality ($2.00/$8.00)</SelectItem>
+                                                <SelectItem value="gemini-2.5-flash">gemini-2.5-flash — Google, fast reasoning ($0.15/$0.60)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Button
+                                            size="sm"
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                            disabled={updateUserMutation.isPending}
+                                            onClick={() => {
+                                                if (!drawerUser) return;
+                                                updateUserMutation.mutate({
+                                                    userId: drawerUser.id,
+                                                    updates: { enterprise_ai_model: enterpriseModel || null },
+                                                });
+                                            }}
+                                        >
+                                            {updateUserMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-gray-500">Company Name</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="e.g. Acme Corp"
+                                                value={companyName}
+                                                onChange={e => setCompanyName(e.target.value)}
+                                                className="flex-1 text-sm"
+                                            />
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={updateUserMutation.isPending}
+                                                onClick={() => {
+                                                    if (!drawerUser) return;
+                                                    updateUserMutation.mutate({
+                                                        userId: drawerUser.id,
+                                                        updates: { company_name: companyName || null },
+                                                    });
+                                                }}
+                                            >
+                                                {updateUserMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </SheetContent>

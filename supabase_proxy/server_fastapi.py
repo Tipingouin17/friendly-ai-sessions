@@ -179,6 +179,94 @@ def _truncate_transcript_to_budget(transcript: str, model: str, reserved_tokens:
 
 
 # ============================================================
+# Per-model message compression thresholds
+# ============================================================
+# When a single message exceeds this character count, it is pre-compressed
+# by gpt-4.1-nano (cheapest model) before being included in the AI context.
+# Thresholds are proportional to the model's context budget:
+#   - Small models (80K budget): compress messages > 400 chars (~115 tokens)
+#   - Large models (800K budget): compress messages > 1200 chars (~345 tokens)
+# This keeps the total context within budget even for very large sessions
+# without restricting what participants can write.
+_MODEL_COMPRESS_THRESHOLD: Dict[str, int] = {
+    "gpt-4.1-nano":      400,   # compress messages > 400 chars
+    "gpt-4.1-mini":      400,   # compress messages > 400 chars
+    "gpt-4.1":          1200,   # compress messages > 1200 chars (large context)
+    "gemini-2.5-flash": 1200,   # compress messages > 1200 chars (large context)
+}
+_DEFAULT_COMPRESS_THRESHOLD = 400  # safe fallback
+
+# Target length (chars) for compressed messages — ~80 tokens, enough to
+# preserve the key insight from any participant answer.
+_COMPRESS_TARGET_CHARS = 280
+
+
+def _compress_messages_for_context(
+    messages: list[dict],
+    model: str,
+    openai_client_ref,
+) -> list[dict]:
+    """Pre-compress long participant messages before building AI context.
+
+    For each message whose text exceeds the per-model threshold, calls
+    gpt-4.1-nano to produce a compact summary (≤ _COMPRESS_TARGET_CHARS chars).
+    The original message is preserved in the DB; only the context copy is
+    compressed.
+
+    Args:
+        messages: List of message dicts with at least 'content', 'role', 'name'.
+        model: The canonical model name for this session (determines threshold).
+        openai_client_ref: The OpenAI client instance.
+
+    Returns:
+        A new list of message dicts with long messages replaced by summaries.
+    """
+    threshold = _MODEL_COMPRESS_THRESHOLD.get(model, _DEFAULT_COMPRESS_THRESHOLD)
+    compressed = []
+    for msg in messages:
+        content = msg.get("content", {})
+        if isinstance(content, str):
+            try:
+                content = __import__('json').loads(content)
+            except Exception:
+                content = {"text": content}
+        text = content.get("text", str(content)) if isinstance(content, dict) else str(content)
+        role = msg.get("role", "unknown")
+
+        # Only compress participant (non-admin) messages that exceed the threshold
+        if role not in ("admin", "system") and len(text) > threshold:
+            try:
+                resp = openai_client_ref.chat.completions.create(
+                    model="gpt-4.1-nano",  # always use cheapest model for compression
+                    messages=[
+                        {"role": "system", "content": (
+                            "You are a concise summariser. Summarise the following workshop "
+                            f"participant answer in under {_COMPRESS_TARGET_CHARS} characters. "
+                            "Preserve all key points, opinions, and named items. "
+                            "Do not add commentary. Output only the summary."
+                        )},
+                        {"role": "user", "content": text},
+                    ],
+                    max_tokens=100,
+                    temperature=0.2,
+                )
+                summary = resp.choices[0].message.content.strip()
+                # Replace text with summary, mark it so logs can track compression
+                compressed_msg = dict(msg)
+                compressed_msg["_compressed"] = True
+                compressed_msg["_original_len"] = len(text)
+                compressed_msg["content"] = {"text": f"[summarised] {summary}"}
+                compressed.append(compressed_msg)
+                continue
+            except Exception as compress_err:
+                # On failure, fall through and use original text
+                print(f"[compress] Warning: could not compress message: {compress_err}")
+
+        compressed.append(msg)
+    return compressed
+
+
+# ============================================================
 # In-memory user store (pre-registered users)
 # ============================================================
 USERS: Dict[str, Dict] = {}
@@ -312,6 +400,18 @@ def run_startup_migrations() -> None:
         UPDATE plans
         SET title = 'Starter'
         WHERE title = 'Basic' AND stripe_plan_id = 'price_1TKRfDK0lFUZlqgubygFSBT8';
+        """,
+        # 2026-04-10: Add enterprise_ai_model to profiles for per-company AI model selection.
+        # Enterprise admins can choose from the 4 implemented models.
+        # NULL means "use the platform default" (configurations.default_ai_model).
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS enterprise_ai_model TEXT DEFAULT NULL;
+        """,
+        # 2026-04-10: Add company_name to profiles for Enterprise account identification.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT NULL;
         """,
     ]
     try:
@@ -1984,7 +2084,11 @@ async def edge_function(func_name: str, request: Request):
                 print(f"Error fetching session context: {e}")
                 traceback.print_exc()
 
-        # Resolve model: session-specific gpt_version > platform default > hardcoded DEFAULT_AI_MODEL
+        # Resolve model — priority chain (highest to lowest):
+        #   1. Session-specific gpt_version (set per-session in PromptManagement)
+        #   2. Enterprise per-company model (profiles.enterprise_ai_model, Enterprise plan only)
+        #   3. Platform-wide default (configurations.default_ai_model, set in SystemSettings)
+        #   4. Hardcoded DEFAULT_AI_MODEL constant
         _platform_default = DEFAULT_AI_MODEL
         try:
             _cfg_conn = get_db()
@@ -1999,7 +2103,43 @@ async def edge_function(func_name: str, request: Request):
                 )
         except Exception:
             pass  # fall back to hardcoded default
-        model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), _platform_default) if gpt_version else _platform_default
+
+        # Check for Enterprise per-company model (only applies when no session-specific model is set)
+        _enterprise_model = None
+        if not gpt_version and user_id:
+            try:
+                _ent_conn = get_db()
+                _ent_cur = _ent_conn.cursor()
+                _ent_cur.execute(
+                    """
+                    SELECT p.enterprise_ai_model, pl.title
+                    FROM profiles p
+                    LEFT JOIN plans pl ON pl.id = p.current_plan_id
+                    WHERE p.id = %s
+                    """,
+                    (user_id,)
+                )
+                _ent_row = _ent_cur.fetchone()
+                _ent_conn.close()
+                if _ent_row:
+                    _plan_title = (_ent_row.get("title") or "").lower()
+                    _ent_model_raw = _ent_row.get("enterprise_ai_model")
+                    # Only apply if the user is on the Enterprise plan and has a model set
+                    if "enterprise" in _plan_title and _ent_model_raw:
+                        _enterprise_model = GPT_MODEL_MAP.get(
+                            str(_ent_model_raw).lower().strip(),
+                            _ent_model_raw
+                        )
+            except Exception:
+                pass  # fall back to platform default
+
+        # Apply resolution chain
+        if gpt_version:
+            model = GPT_MODEL_MAP.get(str(gpt_version).lower().strip(), _platform_default)
+        elif _enterprise_model:
+            model = _enterprise_model
+        else:
+            model = _platform_default
         try:
             max_tokens = int(max_tokens_cfg) if max_tokens_cfg and str(max_tokens_cfg) != "None" else 600
         except (ValueError, TypeError):
@@ -2095,6 +2235,8 @@ async def edge_function(func_name: str, request: Request):
                 conn.close()
             except Exception as e:
                 print(f"Error fetching messages for report: {e}")
+            # Pre-compress long participant messages to fit within model context budget
+            all_messages = _compress_messages_for_context(list(all_messages), model, openai_client)
             conversation_text = ""
             for msg in all_messages:
                 content = msg.get("content", {})
@@ -2355,6 +2497,23 @@ async def edge_function(func_name: str, request: Request):
                 message_count = row["count"] if isinstance(row, dict) else row[0]
                 cur.execute("SELECT content, role, name, created_at FROM messages WHERE conversation_id = %s ORDER BY created_at", (conv_id,))
                 all_msgs = cur.fetchall()
+                # Determine model early so compression uses the right threshold
+                _pre_model = DEFAULT_AI_MODEL
+                try:
+                    _pre_cfg_conn = get_db()
+                    _pre_cfg_cur = _pre_cfg_conn.cursor()
+                    _pre_cfg_cur.execute("SELECT default_ai_model FROM configurations LIMIT 1")
+                    _pre_cfg_row = _pre_cfg_conn.cursor().fetchone() if False else _pre_cfg_cur.fetchone()
+                    _pre_cfg_conn.close()
+                    if _pre_cfg_row and _pre_cfg_row.get("default_ai_model"):
+                        _pre_model = GPT_MODEL_MAP.get(
+                            str(_pre_cfg_row["default_ai_model"]).lower().strip(),
+                            _pre_cfg_row["default_ai_model"]
+                        )
+                except Exception:
+                    pass
+                # Pre-compress long participant messages before building transcript
+                all_msgs = _compress_messages_for_context(list(all_msgs), _pre_model, openai_client)
                 transcript = ""
                 for msg in all_msgs:
                     content = msg.get("content", {})

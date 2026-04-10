@@ -38,6 +38,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const Referrals     = lazy(() => import("./pages/Referrals"));
 const Terms         = lazy(() => import("./pages/Terms"));
 const Privacy       = lazy(() => import("./pages/Privacy"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 // Full-screen loading fallback
 const PageLoader = () => (
@@ -67,6 +68,7 @@ function App() {
                 <Route path="/faqs" element={<FAQs />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/checkout" element={
                   <ProtectedRoute>
                     <Checkout />

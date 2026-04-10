@@ -1528,13 +1528,13 @@ async def admin_cost_analytics(request: Request):
         # --- Revenue by plan (subscriptions) ---
         cur.execute("""
             SELECT
-                pl.name AS plan_name,
+                pl.title AS plan_name,
                 pl.price AS plan_price_eur,
                 COUNT(pr.id) AS subscriber_count,
                 COUNT(pr.id) * pl.price AS monthly_revenue_eur
             FROM plans pl
             LEFT JOIN profiles pr ON pr.current_plan_id = pl.id
-            GROUP BY pl.id, pl.name, pl.price
+            GROUP BY pl.id, pl.title, pl.price
             ORDER BY pl.price
         """)
         revenue_by_plan = []

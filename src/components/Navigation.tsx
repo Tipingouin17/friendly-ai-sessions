@@ -12,7 +12,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { UserCircle, Settings, BookOpen, ChevronDown, Menu, Zap } from "lucide-react";
+import { UserCircle, Settings, BookOpen, ChevronDown, Menu, Zap, Shield } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getUserDisplayName } from "@/utils/userUtils";
@@ -152,6 +152,13 @@ export const Navigation = () => {
                           <BookOpen className="h-4 w-4" /> Past Workshops
                         </Button>
                       </MobileLink>
+                      {user?.role === 'admin' && (
+                        <MobileLink to="/admin" className="w-full">
+                          <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2 text-purple-600 border-purple-200 hover:border-purple-400">
+                            <Shield className="h-4 w-4" /> Admin Panel
+                          </Button>
+                        </MobileLink>
+                      )}
                       <Button
                         variant="outline"
                         className="w-full text-center rounded-xl"
@@ -201,6 +208,16 @@ export const Navigation = () => {
                           <BookOpen className="h-4 w-4" /> Past Workshops
                         </Link>
                       </DropdownMenuItem>
+                      {user?.role === 'admin' && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <DropdownMenuItem asChild>
+                            <Link to="/admin" className="flex items-center gap-2 text-purple-600 font-medium">
+                              <Shield className="h-4 w-4" /> Admin Panel
+                            </Link>
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuItem onClick={logout}>
                         Log out
                       </DropdownMenuItem>

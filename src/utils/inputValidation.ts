@@ -25,6 +25,15 @@ export const sanitizeInput = (input: string): string => {
 };
 
 /**
+ * Maximum length for a single participant message in the UI.
+ * Set to 2000 characters to allow rich, detailed responses.
+ * Context window management is handled server-side via smart pre-compression:
+ * messages exceeding the per-model threshold are summarised by a fast model
+ * before being included in the AI context, so participants are never restricted.
+ */
+export const MAX_MESSAGE_LENGTH = 2000;
+
+/**
  * Validates message content before storage
  */
 export const validateMessageContent = (content: string): { isValid: boolean; error?: string } => {
@@ -32,8 +41,8 @@ export const validateMessageContent = (content: string): { isValid: boolean; err
     return { isValid: false, error: 'Message content is required' };
   }
 
-  if (content.length > 2000) {
-    return { isValid: false, error: 'Message content exceeds maximum length of 2000 characters' };
+  if (content.length > MAX_MESSAGE_LENGTH) {
+    return { isValid: false, error: `Message content exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` };
   }
 
   // Check for potential script injection

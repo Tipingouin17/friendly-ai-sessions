@@ -66,6 +66,8 @@ ALLOWED_CORS_ORIGINS = (
         "http://localhost:8080",
         "https://friendly-ai-sessions.vercel.app",
         "https://aifacilitator.vercel.app",
+        "https://aifacilitator-git-dev-tipingouin17s-projects.vercel.app",
+        "https://aifacilitator-dev.vercel.app",
     ]
 )
 app.add_middleware(

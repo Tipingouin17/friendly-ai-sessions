@@ -32,6 +32,13 @@ from openai import OpenAI
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+try:
+    from email_service import send_welcome_email, send_password_reset_email
+    EMAIL_ENABLED = True
+except ImportError:
+    EMAIL_ENABLED = False
+    def send_welcome_email(*a, **k): return False
+    def send_password_reset_email(*a, **k): return False
 
 # ============================================================
 # OpenAI client
@@ -89,6 +96,8 @@ DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", "5432"))
 DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SITE_URL = os.environ.get("SITE_URL", "https://aifacilitator.ai")
 
 # ============================================================
 # Stripe configuration
@@ -412,6 +421,22 @@ def run_startup_migrations() -> None:
         """
         ALTER TABLE profiles
             ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT NULL;
+        """,
+        # 2026-04-10: Create password_reset_tokens table for secure forgot-password flow.
+        # token: a 64-char hex secret sent to the user's email.
+        # expires_at: 1 hour from creation.
+        # used: prevents token reuse.
+        """
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_prt_token ON password_reset_tokens(token);
+        CREATE INDEX IF NOT EXISTS idx_prt_user_id ON password_reset_tokens(user_id);
         """,
     ]
     try:
@@ -981,6 +1006,13 @@ async def auth_signup(request: Request):
         "created_at": created_at,
         "email_confirmed_at": created_at,
     }
+
+    # --- Send welcome email (non-blocking, failure does not affect signup) ---
+    try:
+        send_welcome_email(email, full_name or email)
+    except Exception as _email_err:
+        print(f"[signup] Welcome email failed (non-fatal): {_email_err}")
+
     token = _make_token(user_id, email)
     return _make_user_response(USERS[email], token)
 
@@ -1122,8 +1154,112 @@ async def auth_logout():
     return Response(status_code=204)
 
 
-# Stub endpoints for Supabase auth compatibility
 @app.post("/auth/v1/recover")
+async def auth_recover(request: Request):
+    """Initiate a password reset: generate a secure token, store it, and email the user."""
+    import secrets
+    from datetime import timedelta
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    email = (data.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(400, detail={"code": "missing_email", "message": "Email is required"})
+
+    # Always return 200 even if email not found (security: don't reveal account existence)
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id, full_name FROM profiles WHERE email = %s", (email,))
+        row = cur.fetchone()
+        if row:
+            user_id = str(row["id"])
+            full_name = row["full_name"] or email
+            token = secrets.token_hex(32)  # 64-char hex string
+            expires_at = datetime.utcnow() + timedelta(hours=1)
+            # Invalidate any existing unused tokens for this user
+            cur.execute(
+                "UPDATE password_reset_tokens SET used = TRUE WHERE user_id = %s AND used = FALSE",
+                (user_id,)
+            )
+            cur.execute(
+                "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
+                (user_id, token, expires_at)
+            )
+            conn.commit()
+            conn.close()
+            # Send the reset email (non-blocking)
+            try:
+                send_password_reset_email(email, full_name, token)
+            except Exception as _email_err:
+                print(f"[recover] Email send failed (non-fatal): {_email_err}")
+        else:
+            conn.close()
+            print(f"[recover] No account found for {email} — returning 200 silently")
+    except Exception as e:
+        print(f"[recover] ERROR: {e}")
+    return {}
+
+
+@app.post("/auth/v1/reset-password")
+async def auth_reset_password(request: Request):
+    """Validate a reset token and set a new password."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    token = (data.get("token") or "").strip()
+    new_password = (data.get("password") or "").strip()
+    if not token or not new_password:
+        raise HTTPException(400, detail={"code": "missing_fields", "message": "Token and password are required"})
+    if len(new_password) < 8:
+        raise HTTPException(400, detail={"code": "weak_password", "message": "Password must be at least 8 characters"})
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = %s",
+            (token,)
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(400, detail={"code": "invalid_token", "message": "Invalid or expired reset link"})
+        if row["used"]:
+            conn.close()
+            raise HTTPException(400, detail={"code": "token_used", "message": "This reset link has already been used"})
+        if row["expires_at"] < datetime.utcnow():
+            conn.close()
+            raise HTTPException(400, detail={"code": "token_expired", "message": "This reset link has expired. Please request a new one."})
+        user_id = str(row["user_id"])
+        pw_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        # Update password in DB
+        cur.execute(
+            "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE id = %s",
+            (pw_hash, user_id)
+        )
+        # Mark token as used
+        cur.execute(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE token = %s",
+            (token,)
+        )
+        conn.commit()
+        # Update in-memory cache
+        cur.execute("SELECT email FROM profiles WHERE id = %s", (user_id,))
+        profile = cur.fetchone()
+        conn.close()
+        if profile and profile["email"] in USERS:
+            USERS[profile["email"]]["password"] = pw_hash
+        return {"message": "Password updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[reset-password] ERROR: {e}")
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not reset password"})
+
+
+# Stub endpoints for Supabase auth compatibility
 @app.get("/auth/v1/callback")
 @app.post("/auth/v1/callback")
 @app.post("/auth/v1/resend")

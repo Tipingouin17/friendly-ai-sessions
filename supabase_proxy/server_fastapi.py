@@ -593,7 +593,11 @@ def _make_token(user_id: str, email: str, role: str = "authenticated") -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
-def _make_user_response(user: dict, token: str) -> dict:
+def _make_user_response(user: dict, token: str, role: str = "authenticated") -> dict:
+    """Build the auth response object returned to the frontend after login/signup.
+    The 'role' field is passed through so the frontend can check user.role for
+    admin-only UI features (e.g. the Admin link in the account menu).
+    """
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -602,7 +606,7 @@ def _make_user_response(user: dict, token: str) -> dict:
         "user": {
             "id": user["id"],
             "email": user["email"],
-            "role": "authenticated",
+            "role": role,
             "email_confirmed_at": user.get("email_confirmed_at", datetime.utcnow().isoformat()),
             "created_at": user.get("created_at", datetime.utcnow().isoformat()),
             "updated_at": datetime.utcnow().isoformat(),
@@ -1121,7 +1125,7 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         print(f"[login] Role lookup error: {e}")
 
     token = _make_token(user["id"], user["email"], profile_role)
-    return _make_user_response(user, token)
+    return _make_user_response(user, token, role=profile_role)
 
 
 @app.get("/auth/v1/user")
@@ -1167,10 +1171,11 @@ async def auth_user(request: Request):
             conn.close()
         except Exception as e:
             print(f"[update_user] error: {e}")
+    # Return the role from the JWT so the frontend can check user.role for admin features
     return {
         "id": user.get("sub") or user.get("id"),
         "email": user.get("email", ""),
-        "role": "authenticated",
+        "role": user.get("role", "authenticated"),
         "email_confirmed_at": datetime.utcnow().isoformat(),
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
@@ -1178,8 +1183,6 @@ async def auth_user(request: Request):
         "user_metadata": {},
         "aud": "authenticated",
     }
-
-
 @app.post("/auth/v1/logout")
 async def auth_logout():
     return Response(status_code=204)

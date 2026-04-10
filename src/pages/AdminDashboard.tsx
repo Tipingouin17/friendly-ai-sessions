@@ -108,7 +108,7 @@ const AdminDashboard = () => {
             >
                 <PageHead title="Admin Dashboard" description="Platform administration and management" />
 
-                <div className="flex h-screen overflow-hidden pt-16">
+                <div className="flex h-screen overflow-hidden">
                     {/* ── Sidebar ─────────────────────────────────────────────────── */}
                     {/* Mobile overlay */}
                     <AnimatePresence>
@@ -125,7 +125,7 @@ const AdminDashboard = () => {
 
                     <aside
                         className={cn(
-                            "fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 shadow-xl z-40 flex flex-col transition-transform duration-300 lg:translate-x-0",
+                            "fixed lg:sticky top-0 left-0 h-screen w-64 bg-white border-r border-gray-200 shadow-xl z-40 flex flex-col transition-transform duration-300 lg:translate-x-0",
                             sidebarOpen ? "translate-x-0" : "-translate-x-full"
                         )}
                     >

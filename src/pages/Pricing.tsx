@@ -101,7 +101,7 @@ const Pricing = () => {
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
               Choose the right plan for your team
             </h1>
-            <p className="text-base md:text-lg text-gray-500">
+            <p className="text-base md:text-lg text-gray-500 text-center">
               Start free, scale as you grow. No hidden fees, cancel anytime.
             </p>
           </div>

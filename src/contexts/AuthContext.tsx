@@ -54,9 +54,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       setSession(existingSession);
-      setUser(existingSession?.user ?? null);
+      if (existingSession?.user) {
+        // Fetch fresh user data from backend so role is always current
+        // (cached session may have stale role from before backend fixes)
+        try {
+          const { data: { user: freshUser } } = await supabase.auth.getUser();
+          setUser(freshUser ?? existingSession.user);
+        } catch {
+          setUser(existingSession.user);
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 

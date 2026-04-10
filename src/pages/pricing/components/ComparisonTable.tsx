@@ -114,7 +114,7 @@ export const ComparisonTable = ({
                   {plan.price === 0 ? (
                     <span className="block text-xs text-gray-500 mt-1 text-center">Free</span>
                   ) : plan.id === 4 ? (
-                    <span className="block text-xs text-gray-500 mt-1">Custom</span>
+                    <span className="block text-xs text-gray-500 mt-1 text-center">Custom</span>
                   ) : (
                     <div className="text-xs text-gray-500 mt-1 flex items-center justify-center">
                       <span>{formatPrice(plan)}{plan.currency === 'EUR' ? '€' : plan.currency === 'GBP' ? '£' : '$'}</span>

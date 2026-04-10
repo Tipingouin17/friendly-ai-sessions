@@ -98,7 +98,7 @@ const Pricing = () => {
             <span className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
               Simple, transparent pricing
             </span>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-gray-900 text-center">
               Choose the right plan for your team
             </h1>
             <p className="text-base md:text-lg text-gray-500 text-center">

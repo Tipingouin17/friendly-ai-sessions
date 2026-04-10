@@ -2,8 +2,19 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
+const DEV_API_URL = 'https://friendly-ai-sessions-development.up.railway.app';
+const DEV_STRIPE_KEY = 'pk_test_51NQ84KK0lFUZlqgu0AihwLfp4CZjiZ5XH9PnVOBVBLRgX8sOpsV2Q4TjyAo3xxxESYRjyTAVV6IOOLfDakE54GfI00y3qEJJs5';
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // When building in development mode (dev branch), hardcode the dev backend URL
+  // This overrides any VITE_API_URL set in Vercel project settings
+  ...(mode === 'development' ? {
+    define: {
+      'import.meta.env.VITE_API_URL': JSON.stringify(DEV_API_URL),
+      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(DEV_STRIPE_KEY),
+    }
+  } : {}),
   server: {
     host: "::",
     port: 8080,

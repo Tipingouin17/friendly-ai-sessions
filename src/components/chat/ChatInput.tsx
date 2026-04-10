@@ -5,12 +5,14 @@
  * - Auto-growing textarea (min 2 lines, max 6 lines)
  * - Prominent send button
  * - Clean voice recording state
+ * - Live character counter with 500-char limit (context window safety)
  */
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Mic, Send, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { SpeechRecognition } from "@/types/chat";
+import { MAX_MESSAGE_LENGTH } from "@/utils/inputValidation";
 
 interface ChatInputProps {
   inputMessage: string;
@@ -36,6 +38,10 @@ const ChatInput = ({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const preRecordingTextRef = useRef<string>('');
   const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
+
+  const charCount = inputMessage.length;
+  const isOverLimit = charCount > MAX_MESSAGE_LENGTH;
+  const isNearLimit = charCount > MAX_MESSAGE_LENGTH * 0.80; // warn at 80% (1600 chars)
 
   // Auto-resize textarea
   useEffect(() => {
@@ -64,7 +70,8 @@ const ChatInput = ({
       const combined = preRecordingTextRef.current
         ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
         : transcript;
-      setInputMessage(combined);
+      // Truncate voice input to the UI limit
+      setInputMessage(combined.slice(0, MAX_MESSAGE_LENGTH));
     };
 
     recognitionRef.current.onerror = (event) => {
@@ -105,6 +112,7 @@ const ChatInput = ({
 
   const handleSend = () => {
     if (!inputMessage.trim() || disabled) return;
+    if (isOverLimit) return; // hard block at 2000 chars
     if (isRecording) handleStopRecording();
     onSendMessage();
   };
@@ -116,6 +124,10 @@ const ChatInput = ({
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+  };
+
   return (
     <div className="px-3 py-3 sm:px-4 sm:py-3.5 bg-white border-t border-slate-200">
       <div className="flex items-end gap-2">
@@ -124,12 +136,18 @@ const ChatInput = ({
           <textarea
             ref={textareaRef}
             value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={disabled ? "Waiting for the next question…" : placeholder}
             disabled={disabled}
             rows={2}
-            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow"
+            className={`w-full resize-none rounded-2xl border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow ${
+              isOverLimit
+                ? "border-red-400 focus:ring-red-400"
+                : isNearLimit
+                  ? "border-amber-400 focus:ring-amber-400"
+                  : "border-slate-200 focus:ring-indigo-400"
+            }`}
             style={{ minHeight: '48px', maxHeight: '144px', overflowY: 'auto' }}
           />
           {isRecording && (
@@ -164,13 +182,27 @@ const ChatInput = ({
         <button
           type="button"
           onClick={handleSend}
-          disabled={!inputMessage.trim() || disabled}
+          disabled={!inputMessage.trim() || disabled || isOverLimit}
           aria-label="Send message"
           className="shrink-0 h-11 w-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
         >
           <Send className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Character counter — only shown when typing */}
+      {charCount > 0 && (
+        <div className={`mt-1 text-right text-xs pr-1 ${
+          isOverLimit
+            ? "text-red-500 font-semibold"
+            : isNearLimit
+              ? "text-amber-500"
+              : "text-slate-400"
+        }`}>
+          {charCount}/{MAX_MESSAGE_LENGTH}
+          {isOverLimit && <span className="ml-1">— message too long</span>}
+        </div>
+      )}
     </div>
   );
 };

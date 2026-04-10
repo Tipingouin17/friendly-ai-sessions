@@ -7,7 +7,7 @@ import { Plan, FEATURE_LABELS, allFeatures } from "../types";
 import { PricingFeatureValue } from "./PricingFeatureValue";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { InfoIcon, DollarSign, Euro, PoundSterling } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 
 interface ComparisonTableProps {
   plans: Plan[];
@@ -70,17 +70,7 @@ export const ComparisonTable = ({
 
   const isPlanPopular = (plan: Plan) => plan.is_popular;
 
-  const getCurrencyIcon = (currency: string) => {
-    switch (currency.toUpperCase()) {
-      case 'EUR':
-        return <Euro className="h-4 w-4 text-primary inline" />;
-      case 'GBP':
-        return <PoundSterling className="h-4 w-4 text-primary inline" />;
-      case 'USD':
-      default:
-        return <DollarSign className="h-4 w-4 text-primary inline" />;
-    }
-  };
+
 
   const formatPrice = (plan: Plan) => {
     if (plan.id === 4) return "Custom";
@@ -127,8 +117,7 @@ export const ComparisonTable = ({
                     <span className="block text-xs text-gray-500 mt-1">Custom</span>
                   ) : (
                     <div className="text-xs text-gray-500 mt-1 flex items-center justify-center">
-                      {getCurrencyIcon(plan.currency || 'USD')}
-                      <span className="ml-0.5">{formatPrice(plan)}</span>
+                      <span>{formatPrice(plan)}{plan.currency === 'EUR' ? '€' : plan.currency === 'GBP' ? '£' : '$'}</span>
                       <span className="ml-0.5">/mo</span>
                     </div>
                   )}

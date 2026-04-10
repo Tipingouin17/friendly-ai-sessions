@@ -422,6 +422,14 @@ def run_startup_migrations() -> None:
         ALTER TABLE profiles
             ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT NULL;
         """,
+        # 2026-04-10: Ensure the seed admin account has role='admin' in the profiles table.
+        # Idempotent — only updates if the role is not already 'admin'.
+        """
+        UPDATE profiles
+        SET role = 'admin'
+        WHERE email = 'admin@myfacilitator.com'
+          AND (role IS NULL OR role != 'admin');
+        """,
         # 2026-04-10: Create password_reset_tokens table for secure forgot-password flow.
         # token: a 64-char hex secret sent to the user's email.
         # expires_at: 1 hour from creation.

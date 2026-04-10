@@ -410,6 +410,15 @@ def run_startup_migrations() -> None:
         SET title = 'Starter'
         WHERE title = 'Basic' AND stripe_plan_id = 'price_1TKRfDK0lFUZlqgubygFSBT8';
         """,
+        # 2026-04-10: Fallback — ensure Starter plan price is €19 regardless of stripe_plan_id.
+        # This handles dev/staging DBs where the stripe_plan_id may differ from production.
+        # Matches on plan_type or title to be robust across environments.
+        """
+        UPDATE plans
+        SET price = 19.00
+        WHERE (LOWER(title) IN ('starter', 'basic') OR LOWER(plan_type) IN ('starter', 'basic'))
+          AND price != 19.00;
+        """,
         # 2026-04-10: Add enterprise_ai_model to profiles for per-company AI model selection.
         # Enterprise admins can choose from the 4 implemented models.
         # NULL means "use the platform default" (configurations.default_ai_model).
@@ -422,13 +431,27 @@ def run_startup_migrations() -> None:
         ALTER TABLE profiles
             ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT NULL;
         """,
-        # 2026-04-10: Ensure the seed admin account has role='admin' in the profiles table.
-        # Idempotent — only updates if the role is not already 'admin'.
+        # 2026-04-10: Ensure the seed admin account exists in profiles with role='admin'.
+        # Uses INSERT ... ON CONFLICT to handle both new DBs (row missing) and existing DBs
+        # (row present but role may be wrong). The admin UUID and password hash are fixed.
+        # Password hash = SHA-256('admin123') = 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
         """
-        UPDATE profiles
-        SET role = 'admin'
-        WHERE email = 'admin@myfacilitator.com'
-          AND (role IS NULL OR role != 'admin');
+        INSERT INTO profiles (id, email, full_name, role, password_hash, email_verified, created_at, updated_at)
+        VALUES (
+            '4c34d445-307a-4bf6-810e-1e06325cd2fc',
+            'admin@myfacilitator.com',
+            'Admin',
+            'admin',
+            '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+            TRUE,
+            NOW(),
+            NOW()
+        )
+        ON CONFLICT (id) DO UPDATE
+            SET role = 'admin',
+                email = EXCLUDED.email,
+                password_hash = EXCLUDED.password_hash,
+                updated_at = NOW();
         """,
         # 2026-04-10: Create password_reset_tokens table for secure forgot-password flow.
         # token: a 64-char hex secret sent to the user's email.

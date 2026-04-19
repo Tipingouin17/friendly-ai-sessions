@@ -94,31 +94,108 @@ function getToken(): string | null {
 }
 
 // ─── Join token store (for unauthenticated participants) ─────────────────────
-// Participants store their session join token here after joining.
-// It is automatically included in REST API requests as X-Join-Token.
-const JOIN_TOKEN_KEY = "mf_join_token";
+// Tokens are scoped per session: stored as `mf_join_token_{sessionId}`.
+// This prevents cross-session token bleed when a host tests the participant
+// flow in the same browser — each session has its own isolated token slot.
+//
+// The session ID is resolved from the current URL (?id=X) when not explicitly
+// provided, so all existing call sites work without modification.
 
-export function setJoinToken(token: string): void {
-  // Use localStorage so the token persists across page navigation.
-  // sessionStorage was cleared on every navigation, causing 403s when
-  // participants navigated away and back to the session page.
-  localStorage.setItem(JOIN_TOKEN_KEY, token);
+const JOIN_TOKEN_PREFIX = "mf_join_token";
+const PARTICIPANT_DATA_PREFIX = "participantSessionData";
+
+/** Derive the session ID from the current URL (?id=X). Returns null when not on a session page. */
+function getSessionIdFromUrl(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    return id && !isNaN(Number(id)) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
-export function clearJoinToken(): void {
-  localStorage.removeItem(JOIN_TOKEN_KEY);
+/** Build the scoped localStorage key for a join token. */
+function joinTokenKey(sessionId?: string | null): string {
+  const id = sessionId ?? getSessionIdFromUrl();
+  return id ? `${JOIN_TOKEN_PREFIX}_${id}` : JOIN_TOKEN_PREFIX;
 }
 
-/** Clear stale participant session data left over from a participant test run.
- *  Call this on any authenticated (host) page load to prevent app crashes
- *  caused by stale participantSessionData in localStorage.
+/** Build the scoped localStorage key for participant session data. */
+export function participantDataKey(sessionId?: string | null): string {
+  const id = sessionId ?? getSessionIdFromUrl();
+  return id ? `${PARTICIPANT_DATA_PREFIX}_${id}` : PARTICIPANT_DATA_PREFIX;
+}
+
+/**
+ * Persist the join token for a specific session.
+ * Uses localStorage so the token survives page navigation.
+ * @param token  The UUID join token returned by the backend.
+ * @param sessionId  Optional session ID; resolved from URL when omitted.
+ */
+export function setJoinToken(token: string, sessionId?: string | null): void {
+  localStorage.setItem(joinTokenKey(sessionId), token);
+}
+
+/**
+ * Remove the join token for a specific session.
+ * @param sessionId  Optional session ID; resolved from URL when omitted.
+ */
+export function clearJoinToken(sessionId?: string | null): void {
+  localStorage.removeItem(joinTokenKey(sessionId));
+  // Also remove the legacy flat key in case it was set by an older build.
+  localStorage.removeItem(JOIN_TOKEN_PREFIX);
+}
+
+/**
+ * Remove ALL scoped join tokens (mf_join_token_*) and participant data
+ * (participantSessionData_*) from localStorage.
+ * Call this when an authenticated host navigates to a protected route to
+ * ensure no stale participant state from any session can interfere.
+ */
+export function clearAllParticipantState(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (
+      key &&
+      (
+        key.startsWith(JOIN_TOKEN_PREFIX) ||
+        key.startsWith(PARTICIPANT_DATA_PREFIX)
+      )
+    ) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+}
+
+/**
+ * Retrieve the join token for the current session.
+ * @param sessionId  Optional session ID; resolved from URL when omitted.
+ */
+export function getJoinToken(sessionId?: string | null): string | null {
+  // Try the scoped key first, then fall back to the legacy flat key.
+  return (
+    localStorage.getItem(joinTokenKey(sessionId)) ??
+    localStorage.getItem(JOIN_TOKEN_PREFIX)
+  );
+}
+
+/**
+ * @deprecated Use clearAllParticipantState() instead.
+ * Kept for backwards compatibility with ProtectedRoute.
+ */
+export function clearJoinToken_legacy(): void {
+  clearAllParticipantState();
+}
+
+/**
+ * @deprecated Use clearAllParticipantState() instead.
+ * Kept for backwards compatibility with ProtectedRoute.
  */
 export function clearParticipantSessionData(): void {
-  localStorage.removeItem('participantSessionData');
-}
-
-export function getJoinToken(): string | null {
-  return localStorage.getItem(JOIN_TOKEN_KEY);
+  clearAllParticipantState();
 }
 
 // ─── HTTP helper ──────────────────────────────────────────────────────────────

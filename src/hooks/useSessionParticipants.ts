@@ -33,9 +33,11 @@ export function useSessionParticipants(conversationId: number | null) {
     if (!mountedRef.current) return;
     const token = (conversation as any)?.join_token;
     if (token) {
-      setJoinToken(token);
+      // Pass the session ID so the token is stored under the scoped key
+      // mf_join_token_{conversationId} rather than the legacy flat key.
+      setJoinToken(token, conversationId != null ? String(conversationId) : null);
     }
-  }, [conversation]);
+  }, [conversation, conversationId]);
 
   // ── isTokenReady — derived synchronously, no useState lag ──────────────────
   // A token is "ready" when EITHER:

@@ -4,8 +4,8 @@
  * Initialises the Crisp live-chat widget and, when a user is logged in,
  * pre-fills their email and name so the support agent sees who they are.
  *
- * The widget is hidden on the Admin Dashboard to avoid cluttering the
- * back-office interface.
+ * The widget is hidden on facilitation pages (session host, participant view,
+ * join-session) and on the Admin Dashboard to avoid cluttering those interfaces.
  */
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -15,8 +15,33 @@ const CRISP_WEBSITE_ID = "551eabf6-0021-417e-86fb-d34812d1f6eb";
 
 declare global {
   interface Window {
-    $crisp: unknown[];
+    // Before Crisp loads: $crisp is an array used to queue commands.
+    // After Crisp loads: $crisp is replaced by the real Crisp SDK object.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $crisp: any;
     CRISP_WEBSITE_ID: string;
+  }
+}
+
+/** Helper that works whether Crisp is still queuing or fully loaded */
+function crispDo(action: string) {
+  if (typeof window === "undefined" || !window.$crisp) return;
+  if (typeof window.$crisp.do === "function") {
+    // Crisp SDK is fully loaded — call the method directly
+    window.$crisp.do(action);
+  } else if (Array.isArray(window.$crisp)) {
+    // Crisp is still initialising — queue the command
+    window.$crisp.push(["do", action]);
+  }
+}
+
+/** Helper for set commands */
+function crispSet(key: string, value: unknown[]) {
+  if (typeof window === "undefined" || !window.$crisp) return;
+  if (typeof window.$crisp.set === "function") {
+    window.$crisp.set(key, value);
+  } else if (Array.isArray(window.$crisp)) {
+    window.$crisp.push(["set", key, value]);
   }
 }
 
@@ -38,7 +63,7 @@ export function CrispChat() {
 
     return () => {
       // Clean up on unmount (hot-reload / SPA navigation)
-      document.head.removeChild(script);
+      try { document.head.removeChild(script); } catch (_) { /* ignore */ }
     };
   }, []);
 
@@ -51,11 +76,11 @@ export function CrispChat() {
         (user.user_metadata?.full_name as string) ||
         (user.user_metadata?.name as string) ||
         user.email;
-      window.$crisp.push(["set", "user:email", [user.email]]);
-      window.$crisp.push(["set", "user:nickname", [name]]);
+      crispSet("user:email", [user.email]);
+      crispSet("user:nickname", [name]);
     } else {
       // Reset identity on logout
-      window.$crisp.push(["do", "session:reset"]);
+      crispDo("session:reset");
     }
   }, [user]);
 
@@ -67,9 +92,9 @@ export function CrispChat() {
     const shouldHide = hiddenPaths.some(p => location.pathname.startsWith(p));
 
     if (shouldHide) {
-      window.$crisp.push(["do", "chat:hide"]);
+      crispDo("chat:hide");
     } else {
-      window.$crisp.push(["do", "chat:show"]);
+      crispDo("chat:show");
     }
   }, [location.pathname]);
 

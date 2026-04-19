@@ -33,9 +33,10 @@ import PageHead from '@/components/PageHead';
 const CACHE_KEY = 'pricing_plans_cache';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// Only cache on production builds (VITE_CACHE_PRICING defaults to "true")
-const CACHE_ENABLED = import.meta.env.VITE_CACHE_PRICING !== 'false'
-  && import.meta.env.MODE !== 'development';
+// Disable cache only when running against localhost (local dev environment).
+// Both the Vercel dev-branch preview and the production deployment point to Railway,
+// so the cache is active there regardless of the Vite --mode flag.
+const CACHE_ENABLED = !String(import.meta.env.VITE_API_URL ?? '').includes('localhost');
 
 interface PlanCache {
   data: Plan[];

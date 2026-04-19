@@ -99,15 +99,18 @@ function getToken(): string | null {
 const JOIN_TOKEN_KEY = "mf_join_token";
 
 export function setJoinToken(token: string): void {
-  sessionStorage.setItem(JOIN_TOKEN_KEY, token);
+  // Use localStorage so the token persists across page navigation.
+  // sessionStorage was cleared on every navigation, causing 403s when
+  // participants navigated away and back to the session page.
+  localStorage.setItem(JOIN_TOKEN_KEY, token);
 }
 
 export function clearJoinToken(): void {
-  sessionStorage.removeItem(JOIN_TOKEN_KEY);
+  localStorage.removeItem(JOIN_TOKEN_KEY);
 }
 
 export function getJoinToken(): string | null {
-  return sessionStorage.getItem(JOIN_TOKEN_KEY);
+  return localStorage.getItem(JOIN_TOKEN_KEY);
 }
 
 // ─── HTTP helper ──────────────────────────────────────────────────────────────

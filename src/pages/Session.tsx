@@ -23,19 +23,22 @@ const Session = () => {
     retryConnection,
     handleProviderInitialized,
     stateRef,
-    isClient
+    isClient,
+    isOnAdminPath
   } = useSessionPageState();
 
   // Check if we're on mobile (will be undefined during hydration)
   const isMobile = useIsMobile();
 
-
-  // Set up session page effects
+  // Set up session page effects — pass isAdmin and isOnAdminPath so the
+  // critical timeout is correctly scoped per persona.
   const { sessionMountedRef } = useSessionPageEffects({
     isLoading,
     hasInitializedProvider,
     setIsLoading,
-    retryConnection
+    retryConnection,
+    isAdmin: stateRef.current.isAdmin ?? false,
+    isOnAdminPath: isOnAdminPath ?? false
   });
 
   // Show mobile nav only when we know we're on mobile

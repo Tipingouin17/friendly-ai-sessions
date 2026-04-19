@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 
 export function useSessionPageEffects({
@@ -38,7 +38,7 @@ export function useSessionPageEffects({
     stateRef.current.hasSetupTimeout = true;
     
     // Different timeouts based on user role
-    const initialTimeout = isOnAdminPath ? 3000 : 5000;
+    const initialTimeout = isOnAdminPath ? 3000 : 8000;
     
     // Set a timeout to check if initialization takes too long
     stateRef.current.initializeTimeout = setTimeout(() => {
@@ -58,28 +58,31 @@ export function useSessionPageEffects({
       }
     }, initialTimeout);
     
-    // Additional critical safety timeout
-    const criticalTimeout = isOnAdminPath ? 5000 : 8000;
+    // Critical safety timeout:
+    // - Admins: 10s (they need the UI to appear quickly)
+    // - Participants: 60s (Railway cold-start can take 30-60s; SessionConnecting shows progress UI)
+    // NOTE: We do NOT call setIsLoading(false) for participants — that causes the blank page.
+    // The SessionConnecting component handles the UX during the cold-start wait.
+    const criticalTimeout = isOnAdminPath ? 10000 : 60000;
     
-    setTimeout(() => {
+    const criticalTimer = setTimeout(() => {
       if (sessionMountedRef.current && isLoading && !hasInitializedProvider) {
         
-        // Skip toast for admin
-        if (!isOnAdminPath && !isAdmin && !stateRef.current.hasShownToast) {
-          stateRef.current.hasShownToast = true;
-          toast({
-            title: "Connection issue",
-            description: "Having trouble loading the session. We'll keep trying to connect.",
-            variant: "destructive"
-          });
+        if (isOnAdminPath || isAdmin) {
+          // For admins: show a toast and force loading off so they see the UI
+          if (!stateRef.current.hasShownToast) {
+            stateRef.current.hasShownToast = true;
+            toast({
+              title: "Connection issue",
+              description: "Having trouble loading the session. We'll keep trying to connect.",
+              variant: "destructive"
+            });
+          }
+          if (isLoading && sessionMountedRef.current) {
+            setIsLoading(false);
+          }
         }
-        
-        // Force clean state to allow UI to render - ONLY if still needed
-        if (isLoading && sessionMountedRef.current) {
-          setIsLoading(false);
-        }
-        
-        // Try to reconnect
+        // For participants: just trigger one final retry; SessionConnecting already shows progress
         if (sessionMountedRef.current) {
           retryConnection();
         }
@@ -91,9 +94,11 @@ export function useSessionPageEffects({
         clearTimeout(stateRef.current.initializeTimeout);
         stateRef.current.initializeTimeout = null;
       }
+      clearTimeout(criticalTimer);
       sessionMountedRef.current = false;
     };
-  }, [isLoading, hasInitializedProvider, toast, retryConnection, isAdmin, isOnAdminPath, setIsLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     sessionMountedRef

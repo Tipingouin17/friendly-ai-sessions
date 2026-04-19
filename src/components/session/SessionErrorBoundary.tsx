@@ -9,6 +9,7 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import SessionConnecting from "./SessionConnecting";
 
 export interface SessionErrorBoundaryProps {
   children: React.ReactNode;
@@ -86,9 +87,24 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
                          pathInfo.isOnAdminPath || 
                          pathInfo.hasAdminQueryParam;
   
-  // CRITICAL FIX: Make participant route see the session even when there are initial connection issues
-  if (effectiveIsAdmin || connectionAttempts < 2) {
+  // During initial connection attempts (< 2), show connecting UI for participants
+  // instead of blank children (which renders null and causes a blank page).
+  if (effectiveIsAdmin) {
     return <>{children}</>;
+  }
+  if (connectionAttempts < 2) {
+    // If children have rendered content (provider is initialised), show them.
+    // Otherwise show the connecting UI so the page is never blank.
+    if (hasInitializedProvider) {
+      return <>{children}</>;
+    }
+    return (
+      <SessionConnecting
+        timeoutSeconds={60}
+        onRetry={retryConnection}
+        isColdStart={true}
+      />
+    );
   }
 
   // IMPROVED ERROR DETECTION: Check for common error conditions that indicate session problems

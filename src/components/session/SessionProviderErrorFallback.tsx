@@ -5,10 +5,10 @@
  */
 
 import React, { useEffect, useState, useCallback } from "react";
-import { SessionContextProps } from "@/types/session";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { isNetworkError, isAbortError } from "@/utils/networkUtils";
+import SessionConnecting from "./SessionConnecting";
 
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
@@ -90,10 +90,12 @@ export const SessionProviderErrorFallback = ({
     }
   }, [isAbortErr, onRetry, autoRetryCount]);
   
-  // For connection lost errors for participants, auto-retry
+  // For connection lost errors, auto-retry with exponential backoff
   useEffect(() => {
-    if (isConnectionLostError && !isAdmin && autoRetryCount < 2 && onRetry) {
-      if (Date.now() - lastRetryTime > 3000) {
+    if (isConnectionLostError && !isAdmin && autoRetryCount < 3 && onRetry) {
+      const timeSinceLastRetry = Date.now() - lastRetryTime;
+      const retryDelay = Math.min(3000 * Math.pow(2, autoRetryCount), 15000);
+      if (timeSinceLastRetry > retryDelay) {
         setLastRetryTime(Date.now());
         setAutoRetryCount(prev => prev + 1);
         onRetry();
@@ -133,11 +135,23 @@ export const SessionProviderErrorFallback = ({
     }
   }, [onRetry, isRetrying, isCircuitBreakerOpen]);
 
-  // All hooks are above this line - early returns below
+  // ─── All hooks above — early returns below ────────────────────────────────
 
-  // For connection lost errors for participants, show children while retrying
-  if (isConnectionLostError && !isAdmin && autoRetryCount < 2) {
+  // For abort errors, don't show any error UI - just render children
+  if (isAbortErr) {
     return <>{children}</>;
+  }
+
+  // For connection lost / cold-start: show the SessionConnecting UI instead of blank
+  // This replaces the old `return <>{children}</>` which rendered null (blank page).
+  if (isConnectionLostError && !isAdmin && autoRetryCount < 3) {
+    return (
+      <SessionConnecting
+        timeoutSeconds={60}
+        onRetry={autoRetryCount >= 2 ? handleManualRetry : undefined}
+        isColdStart={true}
+      />
+    );
   }
   
   // Determine display error
@@ -145,30 +159,14 @@ export const SessionProviderErrorFallback = ({
     ? "You are an admin - overriding session full restriction" 
     : errorMessage;
 
-  // For abort errors, don't show any error UI - just render children
-  if (isAbortErr) {
-    return <>{children}</>;
-  }
-
   // For network errors with active auto-retry, show connection status
   if (isNetworkErr && autoRetryCount < 3 && !isCircuitBreakerOpen) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50">
-        <div className="text-center space-y-6 max-w-md">
-          <div className="flex justify-center">
-            <RefreshCw className="h-12 w-12 text-blue-500 animate-spin" />
-          </div>
-          
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Reconnecting...
-            </h3>
-            <p className="text-gray-600">
-              Connection issue detected. Attempting to reconnect... ({autoRetryCount + 1}/3)
-            </p>
-          </div>
-        </div>
-      </div>
+      <SessionConnecting
+        timeoutSeconds={30}
+        onRetry={handleManualRetry}
+        isColdStart={false}
+      />
     );
   }
 

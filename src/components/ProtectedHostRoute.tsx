@@ -4,7 +4,7 @@
  * Component for the AIfacilitator application.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +21,13 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
   const { logSecurityViolation, logSensitiveAction } = useSecurityAudit();
   const [isHost, setIsHost] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Use refs so the effect never re-runs just because a logging callback
+  // reference changed — same pattern as AuthContext.
+  const logSecurityViolationRef = useRef(logSecurityViolation);
+  const logSensitiveActionRef = useRef(logSensitiveAction);
+  useEffect(() => { logSecurityViolationRef.current = logSecurityViolation; }, [logSecurityViolation]);
+  useEffect(() => { logSensitiveActionRef.current = logSensitiveAction; }, [logSensitiveAction]);
 
   useEffect(() => {
     const checkHostStatus = async () => {
@@ -55,17 +62,17 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
         
         if (error) {
           console.error('Error checking host status:', error);
-          logSecurityViolation('host_check_failed', { error: error.message });
+          logSecurityViolationRef.current('host_check_failed', { error: error.message });
           setIsHost(false);
         } else {
           setIsHost(data || false);
           
           if (data) {
             // Log successful host access
-            logSensitiveAction('host_route_access', location.pathname);
+            logSensitiveActionRef.current('host_route_access', location.pathname);
           } else {
             // Log unauthorized access attempt
-            logSecurityViolation('unauthorized_host_access', { 
+            logSecurityViolationRef.current('unauthorized_host_access', { 
               userId: user.id,
               path: location.pathname,
               conversationId
@@ -74,7 +81,7 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
         }
       } catch (error) {
         console.error('Host check failed:', error);
-        logSecurityViolation('host_check_exception', { error: String(error) });
+        logSecurityViolationRef.current('host_check_exception', { error: String(error) });
         setIsHost(false);
       } finally {
         setIsLoading(false);
@@ -82,7 +89,10 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
     };
 
     checkHostStatus();
-  }, [user, isAuthenticated, authLoading, location.pathname, location.search, logSecurityViolation, logSensitiveAction]);
+    // logSecurityViolation and logSensitiveAction are accessed via refs — exclude
+    // them from the dependency array to prevent infinite re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isAuthenticated, authLoading, location.pathname, location.search]);
 
   // Show loading while auth is loading or while we're checking host status
   if (authLoading || isLoading) {

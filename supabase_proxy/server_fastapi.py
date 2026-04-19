@@ -1265,7 +1265,9 @@ async def auth_reset_password(request: Request):
         if row["used"]:
             conn.close()
             raise HTTPException(400, detail={"code": "token_used", "message": "This reset link has already been used"})
-        if row["expires_at"] < datetime.utcnow():
+        expires_at = row["expires_at"]
+        now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+        if expires_at < now:
             conn.close()
             raise HTTPException(400, detail={"code": "token_expired", "message": "This reset link has expired. Please request a new one."})
         user_id = str(row["user_id"])

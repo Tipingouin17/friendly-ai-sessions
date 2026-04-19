@@ -85,8 +85,43 @@ export function useJoinSessionData(
       sessionStorage.getItem('isAdminSession') === 'true' ||
       window.location.pathname.includes('/admin');
 
+    // ── Pre-validation: check session state BEFORE making any network call ──
+    // This prevents the join button from hanging indefinitely when the session
+    // is not yet active (Railway backend times out on these requests).
+    if (conversation) {
+      if (conversation.is_session_ended) {
+        toast({
+          title: "Session Ended",
+          description: "This session has already ended.",
+          variant: "destructive",
+        });
+        setError("This session has already ended.");
+        return null;
+      }
+      if (conversation.status && conversation.status !== 'active') {
+        toast({
+          title: "Session Not Started",
+          description: "The host hasn't started the session yet. Please wait and try again.",
+          variant: "destructive",
+        });
+        setError("The host hasn't started the session yet. Please wait and try again.");
+        return null;
+      }
+    }
+
     // Force a refetch before joining to ensure we have the latest counts
-    await refetch();
+    // Use a timeout to prevent hanging if the backend is slow
+    try {
+      await Promise.race([
+        refetch(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Refresh timeout')), 8000)
+        )
+      ]);
+    } catch (refetchError: any) {
+      // If refetch times out or fails, continue with cached data
+      console.warn('Pre-join refetch failed or timed out, continuing with cached data:', refetchError?.message);
+    }
 
     // Use only the session-specific max. 0 means no limit.
     const effectiveMaxParticipants = maxParticipantsForSession;

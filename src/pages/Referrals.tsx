@@ -27,9 +27,10 @@ const Referrals = () => {
     const referralLink = `${window.location.origin}/signup?ref=${user?.id}`;
 
     // Fetch referrals
-    const { data: referrals, isLoading } = useQuery({
-        queryKey: ["referrals"],
+    const { data: referrals, isLoading, isError } = useQuery({
+        queryKey: ["referrals", user?.id],
         queryFn: async () => {
+            if (!user?.id) return [];
             const { data, error } = await supabase
                 .from("referrals")
                 .select("*")
@@ -37,11 +38,14 @@ const Referrals = () => {
 
             if (error) {
                 console.warn('Referrals query error:', error);
+                // Return empty array so the page renders instead of hanging
                 return [];
             }
             return data ?? [];
         },
-        retry: false,
+        enabled: !!user?.id,
+        retry: 1,
+        staleTime: 60_000, // 1 minute
     });
 
     // Invite mutation
@@ -216,7 +220,15 @@ const Referrals = () => {
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="text-center py-8 text-gray-500">Loading...</div>
+                        <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
+                            <span className="w-4 h-4 border-t-2 border-gray-400 border-solid rounded-full animate-spin"></span>
+                            Loading your referrals...
+                        </div>
+                    ) : isError ? (
+                        <div className="text-center py-8 text-gray-400">
+                            <Share2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                            <p className="text-sm">Could not load referrals. Please refresh the page.</p>
+                        </div>
                     ) : referrals?.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                             <Share2 className="h-12 w-12 mx-auto mb-4 opacity-20" />

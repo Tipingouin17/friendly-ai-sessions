@@ -77,13 +77,24 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
     onSessionStarted();
   }, [onSessionStarted, stableParticipantCount, conversationId]);
 
-  // Memoize facilitator and session data
+  // Determine if session data has loaded
+  const isDataLoaded = !!conversationData?.sessions;
+
+  // Memoize facilitator and session data — only use fallbacks when data is confirmed loaded
   const sessionInfo = useMemo(() => ({
-    facilitatorTitle: conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator',
-    sessionTitle: conversationData?.sessions?.title || 'Untitled Session',
-    objective: conversationData?.sessions?.objective || 'No objective specified',
-    durationMinutes: conversationData?.session_duration_minutes ?? conversationData?.sessions?.duration_minutes ?? null
-  }), [conversationData]);
+    facilitatorTitle: isDataLoaded
+      ? (conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator')
+      : null,
+    sessionTitle: isDataLoaded
+      ? (conversationData?.sessions?.title || 'Untitled Session')
+      : null,
+    objective: isDataLoaded
+      ? (conversationData?.sessions?.objective || 'No objective specified')
+      : null,
+    durationMinutes: isDataLoaded
+      ? (conversationData?.session_duration_minutes ?? conversationData?.sessions?.duration_minutes ?? null)
+      : null
+  }), [conversationData, isDataLoaded]);
 
   // Memoize participant progress calculation
   const participantProgress = useMemo(() => {
@@ -185,7 +196,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               {/* Session Title and Duration */}
               <div>
                 <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-900">{sessionInfo.sessionTitle}</h3>
+                  <h3 className="text-lg md:text-xl font-semibold text-gray-900">
+                    {sessionInfo.sessionTitle ?? (
+                      <span className="inline-block h-5 w-40 bg-gray-200 rounded animate-pulse" />
+                    )}
+                  </h3>
                   <div className="flex items-center gap-1 text-gray-600 flex-shrink-0">
                     <Clock className="h-4 w-4" />
                     <span className="text-sm font-medium">
@@ -202,7 +217,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs md:text-sm text-gray-600">Facilitated by</p>
-                  <p className="font-medium text-gray-900 text-sm md:text-base truncate">{sessionInfo.facilitatorTitle}</p>
+                  <p className="font-medium text-gray-900 text-sm md:text-base truncate">
+                    {sessionInfo.facilitatorTitle ?? (
+                      <span className="inline-block h-4 w-28 bg-gray-200 rounded animate-pulse" />
+                    )}
+                  </p>
                 </div>
               </div>
 
@@ -210,7 +229,9 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div>
                 <label className="text-xs md:text-sm font-medium text-gray-700">Session Objective</label>
                 <p className="text-gray-900 mt-1 p-2 md:p-3 bg-gray-50 rounded-lg text-xs md:text-sm leading-relaxed">
-                  {sessionInfo.objective}
+                  {sessionInfo.objective ?? (
+                    <span className="inline-block h-4 w-full bg-gray-200 rounded animate-pulse" />
+                  )}
                 </p>
               </div>
             </CardContent>

@@ -20,6 +20,7 @@ import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { UsageMeter } from "@/components/subscription/UsageMeter";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import PageHead from "@/components/PageHead";
+import ReferralBanner from "@/components/referral/ReferralBanner";
 
 const AIfacilitators = () => {
   const [isClient, setIsClient] = useState(false);
@@ -140,6 +141,9 @@ const AIfacilitators = () => {
             />
           )}
         </div>
+
+        {/* Referral programme banner — visible to all logged-in users */}
+        <ReferralBanner />
 
         {!limitsLoading && (
           <PlanLimitAlert

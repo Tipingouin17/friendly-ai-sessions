@@ -473,6 +473,25 @@ def run_startup_migrations() -> None:
         CREATE INDEX IF NOT EXISTS idx_prt_token ON password_reset_tokens(token);
         CREATE INDEX IF NOT EXISTS idx_prt_user_id ON password_reset_tokens(user_id);
         """,
+        # 2026-04-19: Create referrals table for the referral programme.
+        # referrer_id: the user who sent the invite (FK to profiles).
+        # referred_email: the email address that was invited.
+        # status: 'pending' | 'completed' | 'rewarded'
+        # reward_months: how many free months the referrer earned.
+        """
+        CREATE TABLE IF NOT EXISTS referrals (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            referrer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+            referred_email TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'completed', 'rewarded')),
+            reward_months INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
+        CREATE INDEX IF NOT EXISTS idx_referrals_referred_email ON referrals(referred_email);
+        """,
     ]
     try:
         conn = get_db()
@@ -1409,7 +1428,8 @@ async def rpc_call(func_name: str, request: Request):
 # ============================================================
 SECURE_CONV_TABLES = {"messages", "session_participants"}
 SECURE_REPORT_TABLES = {"session_reports"}
-SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators"}
+# referrals is filtered by referrer_id (the owner column) just like user_id tables
+SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals"}
 # Tables participants may read with a valid join token (no auth required)
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
 
@@ -1891,6 +1911,10 @@ async def rest_table(table: str, request: Request):
                 elif table == 'sessions':
                     # Return system workshops (user_id IS NULL) + user's own custom workshops
                     wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
+                    wv.append(requesting_user_id)
+                elif table == 'referrals':
+                    # referrals: filter by referrer_id (the owner column)
+                    wc.append('"referrer_id" = %s::uuid')
                     wv.append(requesting_user_id)
                 else:
                     # conversations: direct user_id filter

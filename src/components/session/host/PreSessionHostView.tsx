@@ -8,10 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Users, Clock, Target, User } from 'lucide-react';
+import { Copy, Check, Users, Clock, Target, User, Pencil } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import StartSessionButton from './StartSessionButton';
+
 interface PreSessionHostViewProps {
   conversationData: any;
   conversationId: number | null;
@@ -21,6 +25,7 @@ interface PreSessionHostViewProps {
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
 }
+
 const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   conversationData,
   conversationId,
@@ -32,9 +37,12 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const [isEditLimitOpen, setIsEditLimitOpen] = useState(false);
+  const [newLimit, setNewLimit] = useState<string>('');
+  const [isSavingLimit, setIsSavingLimit] = useState(false);
+  // Local override so the UI updates immediately after saving without waiting for a refetch
+  const [localMaxParticipants, setLocalMaxParticipants] = useState<number | null>(null);
+  const { toast } = useToast();
 
   // Stabilize participant count to prevent rapid state changes
   const stableParticipantCount = useMemo(() => {
@@ -96,16 +104,55 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
       : null
   }), [conversationData, isDataLoaded]);
 
-  // Memoize participant progress calculation
+  // Memoize participant progress calculation — use localMaxParticipants if the host just edited it
   const participantProgress = useMemo(() => {
-    const maxParticipants = conversationData?.participants || 10;
+    const maxParticipants = localMaxParticipants ?? conversationData?.participants ?? 10;
     const progressPercentage = Math.min(100, stableParticipantCount / maxParticipants * 100);
     return {
       current: stableParticipantCount,
       max: maxParticipants,
       percentage: progressPercentage
     };
-  }, [stableParticipantCount, conversationData?.participants]);
+  }, [stableParticipantCount, conversationData?.participants, localMaxParticipants]);
+
+  // Open the edit-limit dialog and pre-fill with the current max
+  const handleOpenEditLimit = useCallback(() => {
+    setNewLimit(String(participantProgress.max));
+    setIsEditLimitOpen(true);
+  }, [participantProgress.max]);
+
+  // Save the new participant limit to the database
+  const handleSaveLimit = useCallback(async () => {
+    const parsed = parseInt(newLimit, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      toast({ title: "Invalid value", description: "Please enter a number greater than 0.", variant: "destructive" });
+      return;
+    }
+    if (!conversationId) return;
+
+    setIsSavingLimit(true);
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ participants: parsed })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      setLocalMaxParticipants(parsed);
+      setIsEditLimitOpen(false);
+      toast({
+        title: "Participant limit updated",
+        description: `The session can now accept up to ${parsed} participant${parsed === 1 ? '' : 's'}.`
+      });
+    } catch (err: any) {
+      console.error('Error updating participant limit:', err);
+      toast({ title: "Update failed", description: err?.message || "Could not update the participant limit.", variant: "destructive" });
+    } finally {
+      setIsSavingLimit(false);
+    }
+  }, [newLimit, conversationId, toast]);
+
   return <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Ready to Begin Section */}
@@ -171,9 +218,20 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                       {participantProgress.current} of {participantProgress.max} joined
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-sm md:text-lg px-2 md:px-3 py-1">
-                    {participantProgress.current}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-sm md:text-lg px-2 md:px-3 py-1">
+                      {participantProgress.current}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                      title="Edit participant limit"
+                      onClick={handleOpenEditLimit}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="w-full bg-blue-200 rounded-full h-2 mt-2 md:mt-3">
                   <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{
@@ -266,6 +324,46 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <p className="text-sm text-gray-600 text-center max-w-xs">
                 Participants can scan this QR code or use the link to join your session.
               </p>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Participant Limit Dialog */}
+        <Dialog open={isEditLimitOpen} onOpenChange={setIsEditLimitOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Edit Participant Limit</DialogTitle>
+              <DialogDescription>
+                Set the maximum number of participants allowed to join this session.
+                Currently <strong>{participantProgress.current}</strong> participant{participantProgress.current === 1 ? ' has' : 's have'} already joined.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1">
+                <Label htmlFor="participant-limit">Maximum participants</Label>
+                <Input
+                  id="participant-limit"
+                  type="number"
+                  min={Math.max(1, stableParticipantCount)}
+                  value={newLimit}
+                  onChange={(e) => setNewLimit(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLimit(); }}
+                  placeholder="e.g. 20"
+                />
+                {stableParticipantCount > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Must be at least {stableParticipantCount} (current participant count).
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setIsEditLimitOpen(false)} disabled={isSavingLimit}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveLimit} disabled={isSavingLimit}>
+                  {isSavingLimit ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

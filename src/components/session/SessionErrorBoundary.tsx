@@ -97,7 +97,7 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   const isEndedSessionMessage = error?.includes("has ended") || error?.includes("no longer available");
 
   const hasError = (error && !isEndedSessionMessage) || noSessionFound;
-  const waitedTooLong = connectionAttempts > 3 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 10000);
+  const waitedTooLong = connectionAttempts > 3 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 30000);
   
   if (hasError || waitedTooLong) {
     // If there's an active session (based on URL parameter), bypass this error for participants too

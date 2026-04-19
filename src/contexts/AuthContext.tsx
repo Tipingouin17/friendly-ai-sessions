@@ -69,10 +69,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existingSession?.user) {
         // Fetch fresh user data from backend so role is always current
         // (cached session may have stale role from before backend fixes)
+        // Use a 5-second timeout so a slow backend cold-start doesn't block
+        // the UI indefinitely on "Verifying access...".
         try {
-          const { data: { user: freshUser } } = await supabase.auth.getUser();
+          const getUserWithTimeout = Promise.race([
+            supabase.auth.getUser(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('getUser timeout')), 5000)
+            ),
+          ]) as Promise<{ data: { user: import('@/lib/api').ApiUser | null } }>;
+          const { data: { user: freshUser } } = await getUserWithTimeout;
           setUser(freshUser ?? existingSession.user);
         } catch {
+          // Backend slow or unreachable — fall back to cached session user
           setUser(existingSession.user);
         }
       } else {

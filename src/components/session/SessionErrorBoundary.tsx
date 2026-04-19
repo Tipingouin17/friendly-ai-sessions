@@ -87,23 +87,31 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
                          pathInfo.isOnAdminPath || 
                          pathInfo.hasAdminQueryParam;
   
-  // During initial connection attempts (< 2), show connecting UI for participants
-  // instead of blank children (which renders null and causes a blank page).
+  // During initial connection attempts (< 2), always render children (the provider)
+  // so it can fetch data and connect. If the provider hasn't initialised yet,
+  // also show SessionConnecting as a visible overlay so the page is never blank.
   if (effectiveIsAdmin) {
     return <>{children}</>;
   }
   if (connectionAttempts < 2) {
-    // If children have rendered content (provider is initialised), show them.
-    // Otherwise show the connecting UI so the page is never blank.
     if (hasInitializedProvider) {
+      // Provider is ready — show the session UI normally.
       return <>{children}</>;
     }
+    // Provider is still loading: render it with visibility:hidden so it mounts,
+    // runs hooks (React Query fetch + WebSocket), and calls onInitialized().
+    // Show SessionConnecting as an absolute overlay on top.
     return (
-      <SessionConnecting
-        timeoutSeconds={60}
-        onRetry={retryConnection}
-        isColdStart={true}
-      />
+      <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ visibility: 'hidden', position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          {children}
+        </div>
+        <SessionConnecting
+          timeoutSeconds={60}
+          onRetry={retryConnection}
+          isColdStart={true}
+        />
+      </div>
     );
   }
 

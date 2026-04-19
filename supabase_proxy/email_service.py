@@ -10,9 +10,8 @@ import resend
 from datetime import datetime
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-# Temporary workaround: use Resend's shared domain until aifacilitator.ai is verified in Resend.
-# Once the domain is verified, set EMAIL_FROM=noreply@aifacilitator.ai in Railway env vars.
-FROM_EMAIL = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")
+# Domain aifacilitator.ai is verified in Resend — using branded sender.
+FROM_EMAIL = os.environ.get("EMAIL_FROM", "noreply@aifacilitator.ai")
 FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "AIfacilitator")
 SITE_URL = os.environ.get("SITE_URL", "https://aifacilitator.ai")
 

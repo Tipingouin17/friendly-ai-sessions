@@ -6,6 +6,10 @@
  *
  * The widget is hidden on facilitation pages (session host, participant view,
  * join-session) and on the Admin Dashboard to avoid cluttering those interfaces.
+ *
+ * Hiding strategy: CSS injection (`display: none !important`) is used instead
+ * of the Crisp SDK's `chat:hide` API because the SDK call is unreliable when
+ * Crisp overrides inline styles after loading.
  */
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
@@ -14,6 +18,8 @@ import { useAuth } from "@/contexts/AuthContext";
 const CRISP_WEBSITE_ID = "551eabf6-0021-417e-86fb-d34812d1f6eb";
 
 const HIDDEN_PATHS = ["/admin", "/session", "/join-session"];
+
+const STYLE_ID = "crisp-visibility-style";
 
 declare global {
   interface Window {
@@ -26,25 +32,39 @@ declare global {
   }
 }
 
-/** Helper that works whether Crisp is still queuing or fully loaded */
-function crispDo(action: string) {
-  if (typeof window === "undefined" || !window.$crisp) return;
-  if (typeof window.$crisp.do === "function") {
-    // Crisp SDK is fully loaded — call the method directly
-    window.$crisp.do(action);
-  } else if (Array.isArray(window.$crisp)) {
-    // Crisp is still initialising — queue the command
-    window.$crisp.push(["do", action]);
+/** Inject or update a <style> tag that controls Crisp chatbox visibility */
+function setCrispVisibility(hidden: boolean) {
+  if (typeof document === "undefined") return;
+
+  let styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = STYLE_ID;
+    document.head.appendChild(styleEl);
   }
+
+  styleEl.textContent = hidden
+    ? "#crisp-chatbox { display: none !important; }"
+    : "#crisp-chatbox { display: block !important; }";
 }
 
-/** Helper for set commands */
+/** Helper for set commands (works in both queued and loaded states) */
 function crispSet(key: string, value: unknown[]) {
   if (typeof window === "undefined" || !window.$crisp) return;
   if (typeof window.$crisp.set === "function") {
     window.$crisp.set(key, value);
   } else if (Array.isArray(window.$crisp)) {
     window.$crisp.push(["set", key, value]);
+  }
+}
+
+/** Helper for do commands (works in both queued and loaded states) */
+function crispDo(action: string) {
+  if (typeof window === "undefined" || !window.$crisp) return;
+  if (typeof window.$crisp.do === "function") {
+    window.$crisp.do(action);
+  } else if (Array.isArray(window.$crisp)) {
+    window.$crisp.push(["do", action]);
   }
 }
 
@@ -64,12 +84,10 @@ export function CrispChat() {
     window.CRISP_WEBSITE_ID = CRISP_WEBSITE_ID;
 
     // CRISP_READY_TRIGGER fires once when the Crisp SDK finishes loading.
-    // At that point we apply the correct show/hide based on the current path.
+    // At that point we apply the correct visibility based on the current path.
     window.CRISP_READY_TRIGGER = () => {
       const shouldHide = HIDDEN_PATHS.some(p => pathnameRef.current.startsWith(p));
-      if (shouldHide) {
-        crispDo("chat:hide");
-      }
+      setCrispVisibility(shouldHide);
     };
 
     const script = document.createElement("script");
@@ -81,6 +99,9 @@ export function CrispChat() {
       // Clean up on unmount (hot-reload / SPA navigation)
       try { document.head.removeChild(script); } catch (_) { /* ignore */ }
       window.CRISP_READY_TRIGGER = undefined;
+      // Remove the visibility style on unmount
+      const styleEl = document.getElementById(STYLE_ID);
+      if (styleEl) styleEl.remove();
     };
   }, []);
 
@@ -101,17 +122,12 @@ export function CrispChat() {
     }
   }, [user]);
 
-  // Hide/show the widget whenever the route changes (handles SPA navigation)
+  // Hide/show the widget via CSS whenever the route changes (handles SPA navigation)
   useEffect(() => {
-    if (typeof window === "undefined" || !window.$crisp) return;
+    if (typeof window === "undefined") return;
 
     const shouldHide = HIDDEN_PATHS.some(p => location.pathname.startsWith(p));
-
-    if (shouldHide) {
-      crispDo("chat:hide");
-    } else {
-      crispDo("chat:show");
-    }
+    setCrispVisibility(shouldHide);
   }, [location.pathname]);
 
   return null; // No DOM output — widget is injected by the Crisp script

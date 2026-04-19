@@ -52,7 +52,10 @@ const SessionContent: React.FC<SessionContentProps> = ({
       isAdmin={isAdmin}
       sessionMountedRef={sessionMountedRef}
     >
+      {/* key={connectionAttempts} forces a full remount on every retry,
+          which re-runs the React Query fetch and WebSocket connection */}
       <SessionProviderWrapper
+        key={connectionAttempts}
         onInitialized={handleProviderInitialized}
         onLoading={setIsLoading}
         onError={handleError}

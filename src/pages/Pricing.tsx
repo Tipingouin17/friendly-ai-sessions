@@ -3,10 +3,17 @@
  *
  * Page for the AIfacilitator application.
  * Plans are fetched directly from the Railway PostgreSQL database.
+ *
+ * Caching strategy:
+ *  - localStorage key "pricing_plans_cache" stores { data, cachedAt } with a 24-hour TTL.
+ *  - On mount, cached data is shown immediately (zero loading flash for returning visitors).
+ *  - A background refresh runs on every visit; if fresh data differs it updates the cache
+ *    and re-renders seamlessly.
+ *  - On dev builds (VITE_CACHE_PRICING=false) the cache is bypassed so changes are visible
+ *    immediately during development.
  */
 
-import React, { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { StandardPlanCard } from './pricing/components/StandardPlanCard';
 import { EnterprisePlanCard } from './pricing/components/EnterprisePlanCard';
@@ -21,71 +28,128 @@ import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { Quote } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 
+// ─── Cache helpers ────────────────────────────────────────────────────────────
+
+const CACHE_KEY = 'pricing_plans_cache';
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Only cache on production builds (VITE_CACHE_PRICING defaults to "true")
+const CACHE_ENABLED = import.meta.env.VITE_CACHE_PRICING !== 'false'
+  && import.meta.env.MODE !== 'development';
+
+interface PlanCache {
+  data: Plan[];
+  cachedAt: number;
+}
+
+function readCache(): Plan[] | null {
+  if (!CACHE_ENABLED) return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed: PlanCache = JSON.parse(raw);
+    if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: Plan[]): void {
+  if (!CACHE_ENABLED) return;
+  try {
+    const entry: PlanCache = { data, cachedAt: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // localStorage might be full or unavailable — ignore silently
+  }
+}
+
+function mapPlans(raw: any[]): Plan[] {
+  return raw.map((p: any) => {
+    const restrictions = Array.isArray(p.plan_restrictions)
+      ? p.plan_restrictions[0] || {}
+      : p.plan_restrictions || {};
+    return {
+      id: p.id,
+      title: p.title,
+      price: Number(p.price),
+      plan_type: p.plan_type,
+      plan_table_details: restrictions,
+      is_popular: p.is_popular ?? false,
+      stripe_plan_id: p.stripe_plan_id,
+      currency: (p.currency || 'EUR').toUpperCase(),
+    } as Plan;
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const Pricing = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { currentPlanId, isLoading: isUserPlanLoading } = useUserPlan();
 
-  // Fetch plans + restrictions directly from the Railway DB
-  const {
-    data: plans,
-    isLoading: isPlansLoading,
-    error: plansError,
-  } = useQuery<Plan[]>({
-    queryKey: ['pricing-plans'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('plans')
-        .select('*, plan_restrictions(*)')
-        .order('id', { ascending: true });
-
-      if (error) throw error;
-      if (!data) return [];
-
-      return data.map((p: any) => {
-        const restrictions = Array.isArray(p.plan_restrictions)
-          ? p.plan_restrictions[0] || {}
-          : p.plan_restrictions || {};
-        return {
-          id: p.id,
-          title: p.title,
-          price: Number(p.price),
-          plan_type: p.plan_type,
-          plan_table_details: restrictions,
-          is_popular: p.is_popular ?? false,
-          stripe_plan_id: p.stripe_plan_id,
-          currency: (p.currency || 'EUR').toUpperCase(),
-        } as Plan;
-      });
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-  });
-
-  const isLoading = isPlansLoading || isUserPlanLoading;
-  const error = plansError;
+  // Seed state from cache so there is zero loading flash on return visits
+  const [plans, setPlans] = useState<Plan[] | null>(() => readCache());
+  const [fetchError, setFetchError] = useState<Error | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
-    if (error) {
+    let cancelled = false;
+    setIsFetching(true);
+
+    supabase
+      .from('plans')
+      .select('*, plan_restrictions(*)')
+      .order('id', { ascending: true })
+      .then(({ data, error }: { data: any; error: any }) => {
+        if (cancelled) return;
+        setIsFetching(false);
+        if (error) {
+          // Only surface the error if we have no cached data to show
+          if (!plans) setFetchError(error as Error);
+          return;
+        }
+        if (!data) return;
+        const mapped = mapPlans(data);
+        setPlans(mapped);
+        writeCache(mapped);
+      });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (fetchError) {
       toast({
         title: "Error",
         description: "Failed to load pricing plans. Please try again later.",
         variant: "destructive",
       });
     }
-  }, [error, toast]);
+  }, [fetchError, toast]);
+
+  // Show skeleton only when we have no data at all (first-ever visit with cold backend)
+  const isLoading = (!plans && isFetching) || isUserPlanLoading;
 
   if (isLoading) {
     return <LoadingState />;
   }
 
-  if (error || !plans) {
-    return <ErrorState error={error as Error} />;
+  if (fetchError && !plans) {
+    return <ErrorState error={fetchError} />;
   }
 
+  const safePlans = plans ?? [];
+
   // Separate standard plans (Free, Starter, Premium) from Enterprise
-  const standardPlans = plans.filter(plan => plan.title !== 'Enterprise');
-  const enterprisePlan = plans.find(plan => plan.title === 'Enterprise');
+  const standardPlans = safePlans.filter(plan => plan.title !== 'Enterprise');
+  const enterprisePlan = safePlans.find(plan => plan.title === 'Enterprise');
 
   return (
     <div className="min-h-screen bg-white pb-16">
@@ -174,7 +238,7 @@ const Pricing = () => {
         </div>
 
         {/* Full comparison table — shows all plans including Enterprise */}
-        {plans.length > 0 && <ComparisonTable plans={plans} />}
+        {safePlans.length > 0 && <ComparisonTable plans={safePlans} />}
       </div>
     </div>
   );

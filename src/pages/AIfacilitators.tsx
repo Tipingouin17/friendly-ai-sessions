@@ -16,7 +16,7 @@ import { PlanLimitAlert } from "@/components/facilitator/PlanLimitAlert";
 import { StepNavigation } from "@/components/facilitator/StepNavigation";
 import { CreateWorkshopModal } from "@/components/facilitator/CreateWorkshopModal";
 import { useState, useEffect } from "react";
-import { clearJoinToken, clearParticipantSessionData } from "@/lib/api";
+import { clearAllParticipantState } from "@/lib/api";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { UsageMeter } from "@/components/subscription/UsageMeter";
 import { useOnboarding } from "@/hooks/useOnboarding";
@@ -37,8 +37,8 @@ const AIfacilitators = () => {
     setIsClient(true);
   }, []);
 
-  // Clear stale participant localStorage on host page load to prevent app crashes
-  useEffect(() => { clearJoinToken(); clearParticipantSessionData(); }, []);
+  // Clear ALL participant state (all scoped join tokens + session data) on host page load.
+  useEffect(() => { clearAllParticipantState(); }, []);
 
   // Defer welcome modal by 600 ms so the page renders first
   useEffect(() => {

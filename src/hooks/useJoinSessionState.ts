@@ -18,8 +18,11 @@ import { setJoinToken } from '@/lib/api';
   try {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const sessionId = params.get('id');
     if (token) {
-      setJoinToken(token);
+      // Pass the session ID so the token is stored under the scoped key
+      // mf_join_token_{sessionId} rather than the legacy flat key.
+      setJoinToken(token, sessionId);
     }
   } catch {
     // Silently ignore — SSR or environments without window
@@ -48,7 +51,8 @@ export const useJoinSessionState = () => {
   useEffect(() => {
     if (joinTokenParam) {
       // Token is present in the URL — use it immediately.
-      setJoinToken(joinTokenParam);
+      // Pass the session ID so the token is stored under the scoped key.
+      setJoinToken(joinTokenParam, idParam);
     }
     // Do NOT clear the token when it is absent from the URL.  The token will
     // be set from the conversation response by useSessionParticipants as soon

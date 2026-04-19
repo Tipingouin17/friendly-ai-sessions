@@ -88,7 +88,8 @@ export function useParticipantJoining() {
       // The token is in the conversation response — set it now so that
       // checkCapacityAndUpdate and registerParticipant carry the header.
       if (conversation.join_token) {
-        setJoinToken(conversation.join_token);
+        // Store under the scoped key mf_join_token_{conversationId}
+        setJoinToken(conversation.join_token, String(conversationId));
       }
     }
 

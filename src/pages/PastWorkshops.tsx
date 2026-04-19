@@ -11,7 +11,7 @@ import { format, differenceInMinutes } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { clearJoinToken } from "@/lib/api";
+import { clearJoinToken, clearParticipantSessionData } from "@/lib/api";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
@@ -314,7 +314,7 @@ const PastWorkshops = () => {
     );
   };
 
-  useEffect(() => { clearJoinToken(); }, []);
+  useEffect(() => { clearJoinToken(); clearParticipantSessionData(); }, []);
 
   useEffect(() => {
     const channel = supabase.channel('workshops-realtime')

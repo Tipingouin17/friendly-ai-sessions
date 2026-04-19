@@ -87,6 +87,99 @@ function mapPlans(raw: any[]): Plan[] {
   });
 }
 
+// ─── Static fallback plans (shown instantly; API refreshes in background) ─────
+// Sourced from production DB on 2026-04-19. Update if plan pricing changes.
+const FALLBACK_PLANS: Plan[] = [
+  {
+    id: 1,
+    title: 'Free',
+    price: 0,
+    plan_type: 'Free',
+    is_popular: false,
+    stripe_plan_id: 'price_1QxBGlK0lFUZlqguRfa3dJv7',
+    currency: 'EUR',
+    plan_table_details: {
+      facilitator_limit: 2,
+      session_limit: 5,
+      max_participants: 10,
+      question_limit: 10,
+      customisable_sessions: false,
+      customisable_facilitators: false,
+      saved_sessions: false,
+      session_reports: false,
+      data_export: false,
+      priority_support: false,
+      custom_branding: false,
+    },
+  },
+  {
+    id: 2,
+    title: 'Starter',
+    price: 19,
+    plan_type: 'Starter',
+    is_popular: true,
+    stripe_plan_id: 'price_1TKRfDK0lFUZlqgubygFSBT8',
+    currency: 'EUR',
+    plan_table_details: {
+      facilitator_limit: 10,
+      session_limit: 50,
+      max_participants: 50,
+      question_limit: 50,
+      customisable_sessions: true,
+      customisable_facilitators: true,
+      saved_sessions: true,
+      session_reports: true,
+      data_export: true,
+      priority_support: false,
+      custom_branding: false,
+    },
+  },
+  {
+    id: 3,
+    title: 'Premium',
+    price: 49,
+    plan_type: 'Premium',
+    is_popular: false,
+    stripe_plan_id: 'price_1QxBGUK0lFUZlqgulni2MFIu',
+    currency: 'EUR',
+    plan_table_details: {
+      facilitator_limit: null,
+      session_limit: null,
+      max_participants: null,
+      question_limit: null,
+      customisable_sessions: true,
+      customisable_facilitators: true,
+      saved_sessions: true,
+      session_reports: true,
+      data_export: true,
+      priority_support: true,
+      custom_branding: true,
+    },
+  },
+  {
+    id: 4,
+    title: 'Enterprise',
+    price: 99,
+    plan_type: 'Enterprise Plan',
+    is_popular: false,
+    stripe_plan_id: 'price_1THQALK0lFUZlqguAOCVg4ja',
+    currency: 'EUR',
+    plan_table_details: {
+      facilitator_limit: null,
+      session_limit: null,
+      max_participants: null,
+      question_limit: null,
+      customisable_sessions: true,
+      customisable_facilitators: true,
+      saved_sessions: true,
+      session_reports: true,
+      data_export: true,
+      priority_support: true,
+      custom_branding: true,
+    },
+  },
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Pricing = () => {
@@ -94,8 +187,8 @@ const Pricing = () => {
   const navigate = useNavigate();
   const { currentPlanId, isLoading: isUserPlanLoading } = useUserPlan();
 
-  // Seed state from cache so there is zero loading flash on return visits
-  const [plans, setPlans] = useState<Plan[] | null>(() => readCache());
+  // Seed state from cache, or use static fallback so there is zero loading flash
+  const [plans, setPlans] = useState<Plan[] | null>(() => readCache() ?? FALLBACK_PLANS);
   const [fetchError, setFetchError] = useState<Error | null>(null);
   const [isFetching, setIsFetching] = useState(false);
 

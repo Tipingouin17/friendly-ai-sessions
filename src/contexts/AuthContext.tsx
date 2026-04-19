@@ -6,7 +6,7 @@
  * Exposed via the \ hook — must be consumed inside <AuthProvider>.
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { ApiUser, ApiSession } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
@@ -38,6 +38,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { logAuthAttempt, logSecurityViolation } = useSecurityAudit();
 
+  // Use refs to hold the latest callbacks so the auth useEffect never needs
+  // to re-run just because a logging function reference changed.  This prevents
+  // an infinite loading loop where re-rendering AuthProvider caused a new
+  // logAuthAttempt reference, which triggered the useEffect again and reset
+  // loading back to true before getUser() could complete.
+  const logAuthAttemptRef = useRef(logAuthAttempt);
+  const logSecurityViolationRef = useRef(logSecurityViolation);
+  useEffect(() => { logAuthAttemptRef.current = logAuthAttempt; }, [logAuthAttempt]);
+  useEffect(() => { logSecurityViolationRef.current = logSecurityViolation; }, [logSecurityViolation]);
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -48,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Log authentication events
         if (event === 'SIGNED_IN') {
-          logAuthAttempt(true, 'email');
+          logAuthAttemptRef.current(true, 'email');
         }
       }
     );
@@ -72,7 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, [logAuthAttempt]);
+    // Empty dependency array: this effect runs only once on mount.
+    // Logging callbacks are accessed via refs so they are always current
+    // without causing the effect to re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {

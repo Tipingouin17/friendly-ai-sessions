@@ -10,6 +10,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { CrispChat } from "./components/CrispChat";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
@@ -57,6 +58,7 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <CrispChat />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Layout><Outlet /></Layout>}>

@@ -3160,10 +3160,27 @@ async def realtime_websocket(websocket: WebSocket):
     query_params = dict(websocket.query_params)
     apikey = query_params.get("apikey", "")
 
-    # Validate JWT
-    try:
-        jwt.decode(apikey, JWT_SECRET, algorithms=["HS256"])
-    except Exception:
+    # Validate JWT: accept tokens signed with JWT_SECRET (authenticated users)
+    # OR any well-formed JWT with role=anon (anonymous participants using ANON_KEY).
+    ws_auth_ok = False
+    if apikey:
+        try:
+            jwt.decode(apikey, JWT_SECRET, algorithms=["HS256"])
+            ws_auth_ok = True
+        except Exception:
+            # Fall back: accept anonymous tokens (role=anon) regardless of secret.
+            # These are the VITE_API_ANON_KEY tokens used by unauthenticated participants.
+            try:
+                payload_unverified = jwt.decode(
+                    apikey,
+                    options={"verify_signature": False},
+                    algorithms=["HS256"]
+                )
+                if payload_unverified.get("role") == "anon":
+                    ws_auth_ok = True
+            except Exception:
+                pass
+    if not ws_auth_ok:
         await websocket.close(code=4001)
         return
 

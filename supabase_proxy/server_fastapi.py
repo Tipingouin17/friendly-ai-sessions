@@ -68,6 +68,8 @@ ALLOWED_CORS_ORIGINS = (
         "https://aifacilitator.vercel.app",
         "https://aifacilitator-git-dev-tipingouin17s-projects.vercel.app",
         "https://aifacilitator-dev.vercel.app",
+        "https://aifacilitator.ai",
+        "https://www.aifacilitator.ai",
     ]
 )
 app.add_middleware(

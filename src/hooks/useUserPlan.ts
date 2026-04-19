@@ -1,7 +1,15 @@
 /**
- * use User Plan
+ * useUserPlan
  *
  * Hook for the AIfacilitator application.
+ *
+ * Performance strategy:
+ *  - Plans and plan_restrictions are static product data that never change at
+ *    runtime (a code deploy is always required to change pricing/features).
+ *  - We therefore use compile-time constants (STATIC_PLANS / STATIC_RESTRICTIONS)
+ *    instead of hitting the Railway API for these tables.
+ *  - The only live DB call is a single SELECT on `profiles` to get the user's
+ *    current_plan_id, reducing 3–4 sequential API calls to exactly 1.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -31,68 +39,120 @@ export interface UserPlanDetails {
   error: Error | null;
 }
 
-// Helper function to parse numbers or null values
-function parseNumberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  const num = Number(value);
-  return isNaN(num) ? null : num;
-}
+// ─── Static plan catalogue (sourced from DB 2026-04-19) ───────────────────────
+// Update these constants whenever plan pricing or features change.
 
-// Default restrictions for Free plan fallback — used whenever the DB query fails
-// or returns no data. Matches the plan_restrictions row for plan_id=1 (Free).
-const DEFAULT_FREE_RESTRICTIONS: PlanRestrictions = {
-  facilitator_limit: 2,
-  session_limit: 5,
-  max_participants: 10,
-  question_limit: 10,
-  customisable_sessions: false,
-  customisable_facilitators: false,
-  saved_sessions: false,
-  session_reports: false,
-  data_export: false,
-  priority_support: false,
-  custom_branding: false,
+const STATIC_PLANS: Record<number, Plan> = {
+  1: {
+    id: 1,
+    title: 'Free',
+    price: 0,
+    plan_type: 'Free',
+    is_popular: false,
+    stripe_plan_id: 'price_1QxBGlK0lFUZlqguRfa3dJv7',
+    currency: 'EUR',
+  },
+  2: {
+    id: 2,
+    title: 'Starter',
+    price: 19,
+    plan_type: 'Starter',
+    is_popular: true,
+    stripe_plan_id: 'price_1TKRfDK0lFUZlqgubygFSBT8',
+    currency: 'EUR',
+  },
+  3: {
+    id: 3,
+    title: 'Premium',
+    price: 49,
+    plan_type: 'Premium',
+    is_popular: false,
+    stripe_plan_id: 'price_1QxBGUK0lFUZlqgulni2MFIu',
+    currency: 'EUR',
+  },
+  4: {
+    id: 4,
+    title: 'Enterprise',
+    price: 99,
+    plan_type: 'Enterprise Plan',
+    is_popular: false,
+    stripe_plan_id: 'price_1THQALK0lFUZlqguAOCVg4ja',
+    currency: 'EUR',
+  },
 };
 
-function mapRestrictions(r: Record<string, unknown>): PlanRestrictions {
-  return {
-    facilitator_limit: parseNumberOrNull(r.facilitator_limit),
-    session_limit: parseNumberOrNull(r.session_limit),
-    max_participants: parseNumberOrNull(r.max_participants),
-    question_limit: parseNumberOrNull(r.question_limit) ?? 10,
-    customisable_sessions: (r.customisable_sessions as boolean) ?? false,
-    customisable_facilitators: (r.customisable_facilitators as boolean) ?? false,
-    saved_sessions: (r.saved_sessions as boolean) ?? false,
-    session_reports: (r.session_reports as boolean) ?? false,
-    data_export: (r.data_export as boolean) ?? false,
-    priority_support: (r.priority_support as boolean) ?? false,
-    custom_branding: (r.custom_branding as boolean) ?? false,
-  };
-}
+const STATIC_RESTRICTIONS: Record<number, PlanRestrictions> = {
+  1: {
+    facilitator_limit: 2,
+    session_limit: 5,
+    max_participants: 10,
+    question_limit: 10,
+    customisable_sessions: false,
+    customisable_facilitators: false,
+    saved_sessions: false,
+    session_reports: false,
+    data_export: false,
+    priority_support: false,
+    custom_branding: false,
+  },
+  2: {
+    facilitator_limit: 10,
+    session_limit: 50,
+    max_participants: 50,
+    question_limit: 50,
+    customisable_sessions: true,
+    customisable_facilitators: true,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: true,
+    priority_support: false,
+    custom_branding: false,
+  },
+  3: {
+    facilitator_limit: null,
+    session_limit: null,
+    max_participants: null,
+    question_limit: null,
+    customisable_sessions: true,
+    customisable_facilitators: true,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: true,
+    priority_support: true,
+    custom_branding: true,
+  },
+  4: {
+    facilitator_limit: null,
+    session_limit: null,
+    max_participants: null,
+    question_limit: null,
+    customisable_sessions: true,
+    customisable_facilitators: true,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: true,
+    priority_support: true,
+    custom_branding: true,
+  },
+};
 
-function mapPlanForUI(planData: Record<string, unknown>): Plan {
-  return {
-    id: planData.id as number,
-    title: (planData.title as string) || '',
-    price: (planData.price as number) || 0,
-    plan_type: (planData.plan_type as string) || '',
-    is_popular: (planData.is_popular as boolean) || false,
-    stripe_plan_id: (planData.stripe_plan_id as string) || '',
-    currency: planData.currency as string | undefined,
-  };
-}
+// Free plan ID — used as the default when a user has no plan assigned
+const FREE_PLAN_ID = 1;
+
+// Default restrictions for Free plan — used as fallback if profile lookup fails
+const DEFAULT_FREE_RESTRICTIONS: PlanRestrictions = STATIC_RESTRICTIONS[FREE_PLAN_ID];
 
 export const useUserPlan = (): UserPlanDetails => {
   const { user } = useAuth();
-  
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['userPlan', user?.id],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
       try {
-        // Step 1: Get the user's current plan from their profile.
-        // Use maybeSingle() so a missing profile row returns null instead of throwing.
+        // Single DB call: get the user's current_plan_id from their profile.
+        // Plans and restrictions are resolved from static constants — no extra API calls.
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('current_plan_id')
@@ -101,78 +161,44 @@ export const useUserPlan = (): UserPlanDetails => {
 
         if (profileError) {
           console.warn("useUserPlan: profiles query failed, using Free defaults", profileError);
-          return { currentPlanId: null, plan: null, planRestrictions: DEFAULT_FREE_RESTRICTIONS };
-        }
-
-        // Step 2: Determine which plan ID to use (default to Free plan if none set)
-        let planId: number | null = (profileData as Record<string, unknown> | null)?.current_plan_id as number | null ?? null;
-
-        if (!planId) {
-          // Look up the Free plan by title
-          const { data: freePlan, error: freePlanError } = await supabase
-            .from('plans')
-            .select('id')
-            .eq('title', 'Free')
-            .maybeSingle();
-
-          if (freePlanError || !freePlan) {
-            console.warn("useUserPlan: Free plan not found, using hardcoded defaults", freePlanError);
-            return { currentPlanId: null, plan: null, planRestrictions: DEFAULT_FREE_RESTRICTIONS };
-          }
-          planId = (freePlan as Record<string, unknown>).id as number;
-        }
-
-        // Step 3: Get the plan details
-        const { data: planData, error: planError } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('id', planId)
-          .maybeSingle();
-
-        if (planError || !planData) {
-          console.warn("useUserPlan: plan details not found, using Free defaults", planError);
-          return { currentPlanId: planId, plan: null, planRestrictions: DEFAULT_FREE_RESTRICTIONS };
-        }
-
-        // Step 4: Get plan restrictions
-        const { data: planRestrictions, error: restrictionsError } = await supabase
-          .from('plan_restrictions')
-          .select('*')
-          .eq('plan_id', (planData as Record<string, unknown>).id)
-          .maybeSingle();
-
-        if (restrictionsError || !planRestrictions) {
-          console.warn("useUserPlan: plan_restrictions not found, using Free defaults", restrictionsError);
           return {
-            currentPlanId: planId,
-            plan: mapPlanForUI(planData as Record<string, unknown>),
+            currentPlanId: FREE_PLAN_ID,
+            plan: STATIC_PLANS[FREE_PLAN_ID],
             planRestrictions: DEFAULT_FREE_RESTRICTIONS,
           };
         }
 
-        return {
-          currentPlanId: planId,
-          plan: mapPlanForUI(planData as Record<string, unknown>),
-          planRestrictions: mapRestrictions(planRestrictions as Record<string, unknown>),
-        };
+        // Resolve plan ID — fall back to Free if not set
+        const planId: number =
+          (profileData as Record<string, unknown> | null)?.current_plan_id as number | null
+          ?? FREE_PLAN_ID;
+
+        // Look up plan and restrictions from static catalogue
+        const plan = STATIC_PLANS[planId] ?? STATIC_PLANS[FREE_PLAN_ID];
+        const planRestrictions = STATIC_RESTRICTIONS[planId] ?? DEFAULT_FREE_RESTRICTIONS;
+
+        return { currentPlanId: planId, plan, planRestrictions };
       } catch (err) {
         // Last-resort catch: never let the page crash — always return usable defaults
         console.error("useUserPlan: unexpected error, using Free defaults", err);
-        return { currentPlanId: null, plan: null, planRestrictions: DEFAULT_FREE_RESTRICTIONS };
+        return {
+          currentPlanId: FREE_PLAN_ID,
+          plan: STATIC_PLANS[FREE_PLAN_ID],
+          planRestrictions: DEFAULT_FREE_RESTRICTIONS,
+        };
       }
     },
     enabled: !!user,
-    // Retry once on failure before giving up
     retry: 1,
+    // Cache for 5 minutes — plan rarely changes mid-session
+    staleTime: 5 * 60 * 1000,
   });
 
   return {
     currentPlanId: data?.currentPlanId ?? null,
     plan: data?.plan ?? null,
-    // Always return DEFAULT_FREE_RESTRICTIONS if data is not yet available —
-    // this ensures maxSessions is never 0 due to a loading race.
     planRestrictions: data?.planRestrictions ?? (isLoading ? null : DEFAULT_FREE_RESTRICTIONS),
     isLoading,
-    error: error as Error || null
+    error: error as Error || null,
   };
 };

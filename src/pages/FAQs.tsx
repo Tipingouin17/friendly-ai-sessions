@@ -107,15 +107,20 @@ const FALLBACK_FAQS: FAQ[] = [
 ];
 
 const fetchFAQs = async () => {
-  const { data, error } = await supabase
-    .from('faqs')
-    .select('*')
-    .eq('status', true)
-    .order('category', { ascending: true })
-    .order('id', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('faqs')
+      .select('*')
+      .eq('status', true)
+      .order('category', { ascending: true })
+      .order('id', { ascending: true });
 
-  if (error) throw error;
-  return data as FAQ[];
+    if (error) throw error;
+    // If DB is empty, return fallback so the page renders immediately
+    return (data && data.length > 0 ? data : FALLBACK_FAQS) as FAQ[];
+  } catch {
+    return FALLBACK_FAQS;
+  }
 };
 
 const LoadingState = () => (
@@ -168,9 +173,12 @@ const FAQAccordion = ({ faqs }: { faqs: FAQ[] }) => {
 };
 
 const FAQs = () => {
-  const { data: faqs = [], isLoading, error } = useQuery({
+  const { data: faqs = FALLBACK_FAQS, isLoading, error } = useQuery({
     queryKey: ['faqs'],
     queryFn: fetchFAQs,
+    // Use static fallback as initial data so page renders immediately
+    initialData: FALLBACK_FAQS,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Use DB FAQs if available, otherwise fall back to static content

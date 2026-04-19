@@ -1881,9 +1881,11 @@ async def rest_table(table: str, request: Request):
                 # If the user is authenticated AND the query is a list (no specific
                 # conversation_id / id filter), treat it as a host dashboard request
                 # and ignore the stale join token — apply ownership filter instead.
-                _is_list_query = not (params.get('id', '') or params.get('conversation_id', ''))
-                if requesting_user_id and _is_list_query and table in ("conversations", *SECURE_CONV_TABLES):
-                    # Host dashboard path: ignore join token, apply ownership filter below.
+                if requesting_user_id and table in ("conversations", *SECURE_CONV_TABLES):
+                    # Host path: authenticated user querying their own conversations.
+                    # This covers both list queries (dashboard) and specific id queries
+                    # (host session page). In both cases, ignore any stale join token
+                    # and apply ownership filter instead.
                     # Admin users bypass ownership filter entirely — they see all data.
                     if not is_admin_user:
                         join_token_header = ""

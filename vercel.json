@@ -1,6 +1,5 @@
 {
   "buildCommand": "npm run build:dev",
-  "toolbar": false,
   "rewrites": [
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

@@ -1272,7 +1272,7 @@ async def auth_reset_password(request: Request):
         pw_hash = hashlib.sha256(new_password.encode()).hexdigest()
         # Update password in DB
         cur.execute(
-            "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE id = %s",
+            "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE id = %s::uuid",
             (pw_hash, user_id)
         )
         # Mark token as used
@@ -1282,7 +1282,7 @@ async def auth_reset_password(request: Request):
         )
         conn.commit()
         # Update in-memory cache
-        cur.execute("SELECT email FROM profiles WHERE id = %s", (user_id,))
+        cur.execute("SELECT email FROM profiles WHERE id = %s::uuid", (user_id,))
         profile = cur.fetchone()
         conn.close()
         if profile and profile["email"] in USERS:

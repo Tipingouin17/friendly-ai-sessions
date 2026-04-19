@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:dev",
+  "buildCommand": "bash build.sh",
   "rewrites": [
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

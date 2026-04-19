@@ -7,11 +7,13 @@
  * The widget is hidden on facilitation pages (session host, participant view,
  * join-session) and on the Admin Dashboard to avoid cluttering those interfaces.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CRISP_WEBSITE_ID = "551eabf6-0021-417e-86fb-d34812d1f6eb";
+
+const HIDDEN_PATHS = ["/admin", "/session", "/join-session"];
 
 declare global {
   interface Window {
@@ -20,6 +22,7 @@ declare global {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $crisp: any;
     CRISP_WEBSITE_ID: string;
+    CRISP_READY_TRIGGER: (() => void) | undefined;
   }
 }
 
@@ -48,6 +51,10 @@ function crispSet(key: string, value: unknown[]) {
 export function CrispChat() {
   const { user } = useAuth();
   const location = useLocation();
+  // Keep a ref to the latest pathname so the CRISP_READY_TRIGGER callback
+  // always sees the current path without needing to re-register.
+  const pathnameRef = useRef(location.pathname);
+  useEffect(() => { pathnameRef.current = location.pathname; }, [location.pathname]);
 
   // Initialise Crisp once on mount
   useEffect(() => {
@@ -55,6 +62,15 @@ export function CrispChat() {
 
     window.$crisp = [];
     window.CRISP_WEBSITE_ID = CRISP_WEBSITE_ID;
+
+    // CRISP_READY_TRIGGER fires once when the Crisp SDK finishes loading.
+    // At that point we apply the correct show/hide based on the current path.
+    window.CRISP_READY_TRIGGER = () => {
+      const shouldHide = HIDDEN_PATHS.some(p => pathnameRef.current.startsWith(p));
+      if (shouldHide) {
+        crispDo("chat:hide");
+      }
+    };
 
     const script = document.createElement("script");
     script.src = "https://client.crisp.chat/l.js";
@@ -64,6 +80,7 @@ export function CrispChat() {
     return () => {
       // Clean up on unmount (hot-reload / SPA navigation)
       try { document.head.removeChild(script); } catch (_) { /* ignore */ }
+      window.CRISP_READY_TRIGGER = undefined;
     };
   }, []);
 
@@ -84,12 +101,11 @@ export function CrispChat() {
     }
   }, [user]);
 
-  // Hide the widget on facilitation pages (session host, participant, join) and admin
+  // Hide/show the widget whenever the route changes (handles SPA navigation)
   useEffect(() => {
     if (typeof window === "undefined" || !window.$crisp) return;
 
-    const hiddenPaths = ["/admin", "/session", "/join-session"];
-    const shouldHide = hiddenPaths.some(p => location.pathname.startsWith(p));
+    const shouldHide = HIDDEN_PATHS.some(p => location.pathname.startsWith(p));
 
     if (shouldHide) {
       crispDo("chat:hide");

@@ -59,11 +59,14 @@ export function CrispChat() {
     }
   }, [user]);
 
-  // Hide the widget on the Admin Dashboard
+  // Hide the widget on facilitation pages (session host, participant, join) and admin
   useEffect(() => {
     if (typeof window === "undefined" || !window.$crisp) return;
 
-    if (location.pathname.startsWith("/admin")) {
+    const hiddenPaths = ["/admin", "/session", "/join-session"];
+    const shouldHide = hiddenPaths.some(p => location.pathname.startsWith(p));
+
+    if (shouldHide) {
       window.$crisp.push(["do", "chat:hide"]);
     } else {
       window.$crisp.push(["do", "chat:show"]);

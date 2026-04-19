@@ -4,7 +4,7 @@
  * Module for the AIfacilitator application.
  */
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +51,17 @@ const PageLoader = () => (
   </div>
 );
 
+// Fire-and-forget warm-up ping so the Railway container is awake before users navigate to Pricing
+function useBackendWarmup() {
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL as string;
+    if (!apiUrl) return;
+    fetch(`${apiUrl}/health`, { method: "GET", mode: "cors" }).catch(() => { /* ignore errors silently */ });
+  }, []);
+}
+
 function App() {
+  useBackendWarmup();
   return (
     <ErrorBoundary>
       <TooltipProvider>

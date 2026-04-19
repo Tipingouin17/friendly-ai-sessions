@@ -22,7 +22,7 @@ export function useSessionPageState() {
     error: null as string | null,
     noSessionFound: false,
     hasShownToast: false,
-    pageLoadTime: 0 // Will be set in useEffect
+    pageLoadTime: typeof window !== 'undefined' ? Date.now() : 0 // Initialize synchronously
   });
   
   // Mutable state that requires re-renders
@@ -89,6 +89,7 @@ export function useSessionPageState() {
   // Retry connection handler
   const retryConnection = useCallback(() => {
     stateRef.current.connectionAttempts++;
+    stateRef.current.pageLoadTime = Date.now(); // Reset timer on each retry
     
     // Force loading state during retry
     setIsLoading(true);

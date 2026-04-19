@@ -109,6 +109,14 @@ export function clearJoinToken(): void {
   localStorage.removeItem(JOIN_TOKEN_KEY);
 }
 
+/** Clear stale participant session data left over from a participant test run.
+ *  Call this on any authenticated (host) page load to prevent app crashes
+ *  caused by stale participantSessionData in localStorage.
+ */
+export function clearParticipantSessionData(): void {
+  localStorage.removeItem('participantSessionData');
+}
+
 export function getJoinToken(): string | null {
   return localStorage.getItem(JOIN_TOKEN_KEY);
 }

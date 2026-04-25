@@ -492,6 +492,50 @@ def run_startup_migrations() -> None:
         CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
         CREATE INDEX IF NOT EXISTS idx_referrals_referred_email ON referrals(referred_email);
         """,
+        # 2026-04-25: Create appsumo_codes table for tiered LTD redemption flow.
+        # Each row represents one unique AppSumo code.
+        # tier: 1 (Solo €49), 2 (Team €99), 3 (Agency €199)
+        # redeemed_by: FK to profiles.id — NULL until the code is used.
+        """
+        CREATE TABLE IF NOT EXISTS appsumo_codes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            code TEXT NOT NULL UNIQUE,
+            tier INTEGER NOT NULL CHECK (tier IN (1, 2, 3)),
+            redeemed_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+            redeemed_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_appsumo_codes_code ON appsumo_codes(code);
+        CREATE INDEX IF NOT EXISTS idx_appsumo_codes_redeemed_by ON appsumo_codes(redeemed_by);
+        """,
+        # 2026-04-25: Add appsumo_tier and appsumo_codes_redeemed columns to profiles.
+        """
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS appsumo_tier INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS appsumo_codes_redeemed INTEGER DEFAULT 0;
+        """,
+        # 2026-04-25: Seed the three AppSumo LTD plans (no stripe_plan_id — one-time LTD).
+        """
+        INSERT INTO plans (id, title, price, currency, plan_type, is_popular, description)
+        VALUES
+            (101, 'AppSumo Solo',   49,  'EUR', 'appsumo_ltd1', FALSE, 'AppSumo Lifetime Deal — Solo tier'),
+            (102, 'AppSumo Team',   99,  'EUR', 'appsumo_ltd2', TRUE,  'AppSumo Lifetime Deal — Team tier'),
+            (103, 'AppSumo Agency', 199, 'EUR', 'appsumo_ltd3', FALSE, 'AppSumo Lifetime Deal — Agency tier')
+        ON CONFLICT (id) DO NOTHING;
+        """,
+        # 2026-04-25: Seed plan_restrictions for the AppSumo LTD plans.
+        # Tier 1 (Solo):   1 facilitator, 10 sessions/month, 10 participants
+        # Tier 2 (Team):   5 facilitators, 30 sessions/month, 30 participants, data export
+        # Tier 3 (Agency): unlimited, 100 participants, all features, custom branding
+        """
+        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+            customisable_sessions, customisable_facilitators, data_export, session_reports,
+            saved_sessions, question_limit, custom_branding, priority_support)
+        VALUES
+            (101, 1,    10,   10,  TRUE, FALSE, FALSE, TRUE, TRUE, 50,   FALSE, FALSE),
+            (102, 5,    30,   30,  TRUE, TRUE,  TRUE,  TRUE, TRUE, 100,  FALSE, FALSE),
+            (103, NULL, NULL, 100, TRUE, TRUE,  TRUE,  TRUE, TRUE, NULL, TRUE,  FALSE)
+        ON CONFLICT DO NOTHING;
+        """,
     ]
     try:
         conn = get_db()
@@ -2959,6 +3003,102 @@ async def edge_function(func_name: str, request: Request):
             return {"success": True, "status": "active", "planId": plan_id}
         except stripe_lib.error.StripeError as se:
             raise HTTPException(400, str(se))
+
+    # ── redeem-appsumo-code ────────────────────────────────────
+    # Validates an AppSumo code and activates the corresponding LTD plan.
+    # Flow:
+    #   1. Look up the code in appsumo_codes — must exist and not yet redeemed.
+    #   2. Map tier -> plan_id (101/102/103).
+    #   3. Update profiles: current_plan_id, subscription_status='active',
+    #      appsumo_tier, appsumo_codes_redeemed++.
+    #   4. Mark the code as redeemed (redeemed_by, redeemed_at).
+    #   5. Return the activated plan details.
+    elif func_name == "redeem-appsumo-code":
+        user_id = data.get("userId")
+        code = (data.get("code") or "").strip().upper()
+        if not user_id or not code:
+            raise HTTPException(400, "Missing userId or code")
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            # 1. Look up the code
+            cur.execute(
+                "SELECT id, tier, redeemed_by FROM appsumo_codes WHERE code = %s",
+                (code,)
+            )
+            code_row = cur.fetchone()
+            if not code_row:
+                conn.close()
+                raise HTTPException(400, "Invalid AppSumo code. Please check the code and try again.")
+            if code_row["redeemed_by"] is not None:
+                conn.close()
+                raise HTTPException(400, "This code has already been redeemed.")
+            tier = code_row["tier"]
+            plan_id = 100 + tier  # 101, 102, or 103
+            # 2. Check user's current AppSumo tier (stacking guard)
+            cur.execute(
+                "SELECT current_plan_id, appsumo_tier, appsumo_codes_redeemed FROM profiles WHERE id = %s",
+                (user_id,)
+            )
+            profile = cur.fetchone()
+            if not profile:
+                conn.close()
+                raise HTTPException(404, "User profile not found.")
+            current_appsumo_tier = profile["appsumo_tier"] or 0
+            codes_redeemed = profile["appsumo_codes_redeemed"] or 0
+            if tier < current_appsumo_tier:
+                conn.close()
+                raise HTTPException(400, f"You already have a higher AppSumo tier (Tier {current_appsumo_tier}). You cannot redeem a lower tier code.")
+            # 3. Activate the plan
+            cur.execute(
+                """
+                UPDATE profiles
+                SET current_plan_id = %s,
+                    subscription_status = 'active',
+                    appsumo_tier = %s,
+                    appsumo_codes_redeemed = %s,
+                    plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()),
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (plan_id, tier, codes_redeemed + 1, user_id)
+            )
+            # 4. Mark the code as redeemed
+            cur.execute(
+                "UPDATE appsumo_codes SET redeemed_by = %s, redeemed_at = NOW() WHERE id = %s",
+                (user_id, code_row["id"])
+            )
+            conn.commit()
+            # 5. Fetch activated plan details
+            cur.execute(
+                """
+                SELECT p.id, p.title, p.plan_type, p.price, p.currency,
+                       pr.facilitator_limit, pr.session_limit, pr.max_participants,
+                       pr.session_reports, pr.data_export, pr.custom_branding
+                FROM plans p
+                LEFT JOIN plan_restrictions pr ON pr.plan_id = p.id
+                WHERE p.id = %s
+                """,
+                (plan_id,)
+            )
+            plan_row = cur.fetchone()
+            conn.close()
+            tier_names = {1: "Solo", 2: "Team", 3: "Agency"}
+            return {
+                "success": True,
+                "tier": tier,
+                "tierName": tier_names.get(tier, f"Tier {tier}"),
+                "planId": plan_id,
+                "planTitle": plan_row["title"] if plan_row else f"AppSumo Tier {tier}",
+                "codesRedeemed": codes_redeemed + 1,
+                "facilitatorLimit": plan_row["facilitator_limit"] if plan_row else None,
+                "sessionLimit": plan_row["session_limit"] if plan_row else None,
+                "maxParticipants": plan_row["max_participants"] if plan_row else None,
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, f"Redemption failed: {str(e)}")
 
     # ── create-portal-session ──────────────────────────────────
     elif func_name == "create-portal-session":

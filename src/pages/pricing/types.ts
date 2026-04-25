@@ -24,7 +24,7 @@ export interface Plan {
     custom_branding: boolean | null;
   };
   is_popular: boolean;
-  stripe_plan_id: string;
+  stripe_plan_id: string | null;
   currency?: string;
 }
 

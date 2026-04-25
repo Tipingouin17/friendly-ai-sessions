@@ -39,8 +39,10 @@ export interface UserPlanDetails {
   error: Error | null;
 }
 
-// ─── Static plan catalogue (sourced from DB 2026-04-19) ───────────────────────
+// ─── Static plan catalogue (sourced from DB 2026-04-19, AppSumo added 2026-04-25) ───
 // Update these constants whenever plan pricing or features change.
+// AppSumo LTD plans use IDs 101 (Solo), 102 (Team), 103 (Agency).
+// These are lifetime deals — no Stripe billing, no stripe_plan_id.
 
 const STATIC_PLANS: Record<number, Plan> = {
   1: {
@@ -77,6 +79,34 @@ const STATIC_PLANS: Record<number, Plan> = {
     plan_type: 'Enterprise Plan',
     is_popular: false,
     stripe_plan_id: 'price_1THQALK0lFUZlqguAOCVg4ja',
+    currency: 'EUR',
+  },
+  // ── AppSumo Lifetime Deal plans ──────────────────────────────────────────
+  101: {
+    id: 101,
+    title: 'AppSumo Solo',
+    price: 49,
+    plan_type: 'appsumo_ltd1',
+    is_popular: false,
+    stripe_plan_id: null,
+    currency: 'EUR',
+  },
+  102: {
+    id: 102,
+    title: 'AppSumo Team',
+    price: 99,
+    plan_type: 'appsumo_ltd2',
+    is_popular: true,
+    stripe_plan_id: null,
+    currency: 'EUR',
+  },
+  103: {
+    id: 103,
+    title: 'AppSumo Agency',
+    price: 199,
+    plan_type: 'appsumo_ltd3',
+    is_popular: false,
+    stripe_plan_id: null,
     currency: 'EUR',
   },
 };
@@ -132,6 +162,49 @@ const STATIC_RESTRICTIONS: Record<number, PlanRestrictions> = {
     session_reports: true,
     data_export: true,
     priority_support: true,
+    custom_branding: true,
+  },
+  // ── AppSumo Lifetime Deal restrictions ───────────────────────────────────
+  // Tier 1 (Solo):   1 facilitator, 10 sessions/month, 10 participants
+  // Tier 2 (Team):   5 facilitators, 30 sessions/month, 30 participants, data export
+  // Tier 3 (Agency): unlimited everything, 100 participants, custom branding
+  101: {
+    facilitator_limit: 1,
+    session_limit: 10,
+    max_participants: 10,
+    question_limit: 50,
+    customisable_sessions: true,
+    customisable_facilitators: false,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: false,
+    priority_support: false,
+    custom_branding: false,
+  },
+  102: {
+    facilitator_limit: 5,
+    session_limit: 30,
+    max_participants: 30,
+    question_limit: 100,
+    customisable_sessions: true,
+    customisable_facilitators: true,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: true,
+    priority_support: false,
+    custom_branding: false,
+  },
+  103: {
+    facilitator_limit: null,
+    session_limit: null,
+    max_participants: 100,
+    question_limit: null,
+    customisable_sessions: true,
+    customisable_facilitators: true,
+    saved_sessions: true,
+    session_reports: true,
+    data_export: true,
+    priority_support: false,
     custom_branding: true,
   },
 };

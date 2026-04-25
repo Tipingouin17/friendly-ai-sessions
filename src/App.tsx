@@ -40,6 +40,7 @@ const Referrals     = lazy(() => import("./pages/Referrals"));
 const Terms         = lazy(() => import("./pages/Terms"));
 const Privacy       = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const RedeemAppSumo = lazy(() => import("./pages/RedeemAppSumo"));
 
 // Full-screen loading fallback
 const PageLoader = () => (
@@ -109,6 +110,11 @@ function App() {
                 <Route path="/referrals" element={
                   <ProtectedRoute>
                     <Referrals />
+                  </ProtectedRoute>
+                } />
+                <Route path="/redeem" element={
+                  <ProtectedRoute>
+                    <RedeemAppSumo />
                   </ProtectedRoute>
                 } />
               </Route>

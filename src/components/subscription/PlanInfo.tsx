@@ -74,14 +74,19 @@ export const PlanInfo = () => {
   };
 
   const isHighestTier = plan?.id === 3 || plan?.id === 4;
+  const isAppSumoLTD = plan?.id === 101 || plan?.id === 102 || plan?.id === 103;
   return <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex justify-between">
           <span>Your Plan: {plan?.title || 'Free'}</span>
-          {plan?.price ? <span>{formatPrice(plan.price)}</span> : <span>Free</span>}
+          {isAppSumoLTD
+            ? <span className="text-sm font-medium text-green-600">Lifetime Deal</span>
+            : plan?.price ? <span>{formatPrice(plan.price)}</span> : <span>Free</span>}
         </CardTitle>
         <CardDescription>
-          {plan?.title === plan?.plan_type ? 'Standard subscription' : (plan?.plan_type || 'Standard subscription')}
+          {isAppSumoLTD
+            ? 'AppSumo Lifetime Deal — no recurring charges'
+            : plan?.title === plan?.plan_type ? 'Standard subscription' : (plan?.plan_type || 'Standard subscription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -135,9 +140,15 @@ export const PlanInfo = () => {
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleUpgrade} className="w-full" variant={isHighestTier ? "outline" : "default"}>
-          {isHighestTier ? "Manage Subscription" : "Upgrade Plan"}
-        </Button>
+        {isAppSumoLTD ? (
+          <div className="w-full text-center text-sm text-muted-foreground py-1">
+            You have a lifetime deal — no subscription needed
+          </div>
+        ) : (
+          <Button onClick={handleUpgrade} className="w-full" variant={isHighestTier ? "outline" : "default"}>
+            {isHighestTier ? "Manage Subscription" : "Upgrade Plan"}
+          </Button>
+        )}
       </CardFooter>
     </Card>;
 };

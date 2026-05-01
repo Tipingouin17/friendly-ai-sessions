@@ -4,7 +4,7 @@
  * Session component for the AIfacilitator application.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
 import { Copy, CheckCircle } from "lucide-react";
@@ -33,14 +33,16 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
   onStartSession,
   onSessionFull
 }) => {
-  const [sessionLink, setSessionLink] = useState('');
   const [showCopied, setShowCopied] = useState(false);
   const { toast } = useToast();
   const isMobile = window.innerWidth < 768;
 
-  useEffect(() => {
-    setSessionLink(buildJoinUrl(conversationId, joinToken));
-  }, [conversationId, joinToken]);
+  // Compute the join URL synchronously — no useEffect needed.
+  // When joinToken is not yet loaded, sessionLink will be the base URL without
+  // the token; we hide the QR / link until the token is available to avoid
+  // showing an insecure URL that then gets replaced (visible flash).
+  const sessionLink = buildJoinUrl(conversationId, joinToken);
+  const isLinkReady = Boolean(joinToken);
 
   const copyToClipboard = useCallback(() => {
     navigator.clipboard.writeText(sessionLink)
@@ -88,17 +90,24 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
             />
           </div>
 
-          {/* QR Code and Link */}
+          {/* QR Code and Link — only shown once the secure token is available */}
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             {/* QR Code */}
             <div className="flex flex-col items-center">
               <h3 className="text-xl font-semibold mb-4 text-gray-800">Scan to Join</h3>
               <div className="bg-white p-4 rounded-lg border-2 border-gray-200 shadow-sm">
-                <QRCodeSVG 
-                  value={sessionLink} 
-                  size={isMobile ? 200 : 250}
-                  className="mx-auto"
-                />
+                {isLinkReady ? (
+                  <QRCodeSVG 
+                    value={sessionLink} 
+                    size={isMobile ? 200 : 250}
+                    className="mx-auto"
+                  />
+                ) : (
+                  <div
+                    className="animate-pulse bg-gray-200 rounded"
+                    style={{ width: isMobile ? 200 : 250, height: isMobile ? 200 : 250 }}
+                  />
+                )}
               </div>
             </div>
 
@@ -106,27 +115,36 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
             <div className="flex flex-col items-center">
               <h3 className="text-xl font-semibold mb-4 text-gray-800">Or Use This Link</h3>
               <div className="w-full max-w-md">
-                <div className="flex items-center bg-gray-50 rounded-lg p-3 border">
-                  <input
-                    type="text"
-                    value={sessionLink}
-                    readOnly
-                    className="flex-1 bg-transparent text-sm text-gray-700 border-none outline-none"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={copyToClipboard}
-                    className="ml-2 text-blue-600 hover:text-blue-700"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                {showCopied && (
-                  <p className="text-sm text-green-600 mt-2 flex items-center justify-center">
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Link copied!
-                  </p>
+                {isLinkReady ? (
+                  <>
+                    <div className="flex items-center bg-gray-50 rounded-lg p-3 border">
+                      <input
+                        type="text"
+                        value={sessionLink}
+                        readOnly
+                        className="flex-1 bg-transparent text-sm text-gray-700 border-none outline-none"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={copyToClipboard}
+                        className="ml-2 text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {showCopied && (
+                      <p className="text-sm text-green-600 mt-2 flex items-center justify-center">
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Link copied!
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-10 bg-gray-200 rounded-lg" />
+                    <p className="text-xs text-gray-400 text-center">Generating secure link…</p>
+                  </div>
                 )}
               </div>
             </div>

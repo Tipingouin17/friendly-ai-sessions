@@ -20,6 +20,8 @@ export const useWorkshopCreation = () => {
   const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState<number | "">("");
+  /** True while the session creation API call (+ OpenAI) is in-flight */
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   // Secure navigation for host session page
@@ -49,7 +51,7 @@ export const useWorkshopCreation = () => {
       });
       return;
     }
-    
+
     try {
       if (!selectedWorkshop) {
         toast({
@@ -59,10 +61,10 @@ export const useWorkshopCreation = () => {
         });
         return;
       }
-      
+
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user ?? null;
-      
+
       if (!user) {
         toast({
           title: "Error",
@@ -71,6 +73,9 @@ export const useWorkshopCreation = () => {
         });
         return;
       }
+
+      // Show spinner immediately — the OpenAI call can take 10–15 s
+      setIsSubmitting(true);
 
       const data = await createConversation({
         description,
@@ -83,8 +88,8 @@ export const useWorkshopCreation = () => {
       });
 
       if (data?.id) {
-
-        // Use secure navigation for host sessions instead of direct navigate
+        // Navigate immediately — the session page shows a ThinkingIndicator
+        // while the AI generates the welcome message server-side.
         await navigateToHostSession(data.id);
 
         toast({
@@ -99,6 +104,8 @@ export const useWorkshopCreation = () => {
         description: "Something went wrong. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -123,6 +130,7 @@ export const useWorkshopCreation = () => {
     setAgreed,
     durationMinutes,
     setDurationMinutes,
+    isSubmitting,
     handleNext,
     handlePrevious,
     handleSubmit,

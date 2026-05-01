@@ -9,13 +9,12 @@
  * inline inside the card — no jarring full-page swaps.
  */
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Zap } from "lucide-react";
 import { useJoinSessionData } from "@/hooks/useJoinSessionData";
 import { useJoinSessionNavigation } from "@/hooks/useJoinSessionNavigation";
 import { useJoinSessionState } from "@/hooks/useJoinSessionState";
-import { useWelcomeMessageMonitor } from "@/hooks/useWelcomeMessageMonitor";
 import JoinSessionErrorState from "./JoinSessionErrorState";
 import JoinSessionMain from "./JoinSessionMain";
 import SessionFullPage from "./SessionFullPage";
@@ -49,13 +48,7 @@ const PageShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const JoinSessionContainer = () => {
   const queryClient = useQueryClient();
 
-  // Track join result to monitor welcome message generation
-  const [joinResult, setJoinResult] = useState<{
-    conversationId: number;
-    participantId: number;
-    name: string;
-    avatarSeed: string;
-  } | null>(null);
+  // No need to track join result for welcome message — navigation is immediate.
 
   // Navigation management
   const {
@@ -117,21 +110,9 @@ const JoinSessionContainer = () => {
     defaultAvatarSeed
   });
 
-  // Monitor welcome message generation after joining
-  const {
-    isWaiting: isWaitingForMessage,
-    hasMessage,
-    error: messageError,
-    retryCount: messageRetryCount,
-    waitForWelcomeMessage
-  } = useWelcomeMessageMonitor({
-    conversationId: joinResult?.conversationId || null,
-    participantId: joinResult?.participantId || null,
-    isEnabled: !!joinResult
-  });
-
-  // Handle successful join - navigate immediately and let the session page
-  // show the thinking indicator while the AI generates the welcome message.
+  // Handle successful join — navigate immediately to the session page.
+  // The session page shows a ThinkingIndicator while the AI generates the
+  // welcome message in the background on the server side.
   const handleJoin = useCallback(async () => {
     // CRITICAL: Check navigation state first
     if (checkNavigationState() || isJoining) {
@@ -141,23 +122,8 @@ const JoinSessionContainer = () => {
     try {
       const result = await handleJoinSession();
       if (result && conversationId) {
-
-        // Fire-and-forget: trigger AI welcome message generation in the background.
-        // The session page will show the ThinkingIndicator while it generates.
-        setJoinResult({
-          conversationId,
-          participantId: result.participantId,
-          name: result.name,
-          avatarSeed: result.avatarSeed
-        });
-        // Kick off generation without awaiting — participant sees the chat
-        // screen immediately with the thinking indicator.
-        waitForWelcomeMessage().catch((err: unknown) => {
-          console.error('[JoinSessionContainer] Background welcome message generation failed:', err);
-        });
-
-        // Navigate immediately so the participant sees the conversation screen
-        // with the ThinkingIndicator rather than a blank join form.
+        // Navigate immediately — the session page handles the ThinkingIndicator
+        // while the AI generates the welcome message server-side.
         navigateToSession(conversationId, result.name, result.participantId, result.avatarSeed);
         return;
       }
@@ -165,9 +131,8 @@ const JoinSessionContainer = () => {
       console.error("Error during join:", error);
       // Reset navigation flags on error so user can retry
       resetNavigationFlags();
-      setJoinResult(null);
     }
-  }, [handleJoinSession, conversationId, navigateToSession, isJoining, checkNavigationState, resetNavigationFlags, waitForWelcomeMessage]);
+  }, [handleJoinSession, conversationId, navigateToSession, isJoining, checkNavigationState, resetNavigationFlags]);
 
   const handleRetry = useCallback(() => {
     if (conversationId && !checkNavigationState()) {
@@ -284,9 +249,9 @@ const JoinSessionContainer = () => {
       onAvatarChange={() => setAvatarSeed(Math.random().toString())}
       onJoinSession={handleJoin}
       isTokenReady={isTokenReady}
-      isJoining={isJoining || isWaitingForMessage}
+      isJoining={isJoining}
       isLoading={isLoading}
-      isPreparingSession={isWaitingForMessage}
+      isPreparingSession={false}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}
       onRetry={handleRetry}

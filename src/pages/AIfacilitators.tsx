@@ -68,7 +68,8 @@ const AIfacilitators = () => {
     handleNext,
     handlePrevious,
     handleSubmit,
-    handleUpgradePlan
+    handleUpgradePlan,
+    isSubmitting
   } = useWorkshopCreation();
 
   const {
@@ -217,6 +218,7 @@ const AIfacilitators = () => {
             isNextDisabled={(currentStep === 1 && !selectedFacilitator) || (currentStep === 2 && !selectedWorkshop)}
             isSubmitDisabled={isSubmitDisabled}
             hasReachedSessionLimit={hasReachedSessionLimit}
+            isSubmitting={isSubmitting}
           />
         </div>
       </div>

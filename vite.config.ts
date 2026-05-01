@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: 'all',
     proxy: {
       '/rest/v1': {
         target: 'http://localhost:3333',

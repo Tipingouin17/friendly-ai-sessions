@@ -91,34 +91,45 @@ export const useConversation = (conversationId: number | null) => {
         // Note: We return data even for completed sessions
         // Let consuming components decide how to handle completed sessions
         
-        // Process facilitator profile picture to ensure it's a complete URL
+        // Process facilitator profile picture synchronously — do NOT await any
+        // network call here.  Awaiting getFacilitatorAvatarUrl() blocks the entire
+        // query resolution and keeps the join page in skeleton state for 1-3 extra
+        // seconds on every load.  Instead:
+        //   1. If the picture is already a full URL or public path, use it as-is.
+        //   2. If it's a plain filename (e.g. "52.jpg"), build the Railway storage
+        //      public URL directly — no network round-trip needed.
+        //   3. If the cached URL is still fresh, use it.
+        // The <img> element on the join page will handle progressive loading.
         if (data.sessions?.facilitator_details) {
           const facilitator = data.sessions.facilitator_details;
           
-          // Use cached avatar URL if available and not expired
           if (facilitator.id) {
             const cachedAvatar = facilitatorAvatarCache.get(facilitator.id);
             const now = Date.now();
             
             if (cachedAvatar && (now - cachedAvatar.timestamp) < AVATAR_CACHE_TTL) {
-              // Use cached avatar URL
+              // Use cached avatar URL — no network call
               facilitator.profile_picture = cachedAvatar.url;
             } else {
-              // Process and cache the new avatar URL
-              try {
-                const avatarUrl = await getFacilitatorAvatarUrl(facilitator);
-                facilitator.profile_picture = avatarUrl;
-                
-                // Cache the processed URL
-                facilitatorAvatarCache.set(facilitator.id, {
-                  url: avatarUrl,
-                  timestamp: now
-                });
-                
-              } catch (error) {
-                console.error('Error processing facilitator avatar:', error);
-                facilitator.profile_picture = '/placeholder.svg';
+              const pic = facilitator.profile_picture;
+              let resolvedUrl: string;
+
+              if (pic && (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/'))) {
+                // Already a usable URL — use directly
+                resolvedUrl = pic;
+              } else if (pic) {
+                // Plain filename stored in DB (e.g. "52.jpg") — build the public
+                // Railway storage URL synchronously without a network call.
+                const apiUrl = (import.meta.env.VITE_API_URL as string) || '';
+                resolvedUrl = `${apiUrl}/storage/v1/object/public/facilitator-avatars/${pic}`;
+              } else {
+                // No picture — try the conventional {id}.jpg filename
+                const apiUrl = (import.meta.env.VITE_API_URL as string) || '';
+                resolvedUrl = `${apiUrl}/storage/v1/object/public/facilitator-avatars/${facilitator.id}.jpg`;
               }
+
+              facilitator.profile_picture = resolvedUrl;
+              facilitatorAvatarCache.set(facilitator.id, { url: resolvedUrl, timestamp: now });
             }
           }
         }

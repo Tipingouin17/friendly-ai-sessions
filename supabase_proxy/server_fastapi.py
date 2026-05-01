@@ -527,20 +527,20 @@ def run_startup_migrations() -> None:
         # Tier 2 (Team):   5 facilitators, 30 sessions/month, 30 participants, data export
         # Tier 3 (Agency): unlimited, 100 participants, all features, custom branding
         """
-        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
-        SELECT 101, 1, 10, 10, TRUE, FALSE, FALSE, TRUE, TRUE, 50, FALSE, FALSE
+        SELECT 101, 101, 1, 10, 10, TRUE, FALSE, FALSE, TRUE, TRUE, 50, FALSE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 101);
-        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
-        SELECT 102, 5, 30, 30, TRUE, TRUE, TRUE, TRUE, TRUE, 100, FALSE, FALSE
+        SELECT 102, 102, 5, 30, 30, TRUE, TRUE, TRUE, TRUE, TRUE, 100, FALSE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 102);
-        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
-        SELECT 103, NULL, NULL, 100, TRUE, TRUE, TRUE, TRUE, TRUE, NULL, TRUE, FALSE
+        SELECT 103, 103, NULL, NULL, 100, TRUE, TRUE, TRUE, TRUE, TRUE, NULL, TRUE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103);
         """,
     ]

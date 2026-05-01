@@ -319,12 +319,13 @@ ALLOWED_RPC_FUNCTIONS = {
 def get_db() -> psycopg2.extensions.connection:
     """Open a synchronous psycopg2 connection."""
     if DB_URL:
-        conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=10)
     else:
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, host=DB_HOST,
             port=DB_PORT, password=DB_PASSWORD,
             cursor_factory=psycopg2.extras.RealDictCursor,
+            connect_timeout=10,
         )
     conn.autocommit = False
     return conn

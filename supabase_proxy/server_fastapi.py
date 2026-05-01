@@ -594,6 +594,17 @@ def load_users_from_db() -> None:
         print(f"[auth] WARNING: Could not load users from DB: {e}")
 
 
+# ============================================================
+# STARTUP DIAGNOSTICS — printed before any request is served
+# ============================================================
+_startup_port = os.environ.get("PORT", "3333 (default)")
+_db_url = os.environ.get("DATABASE_URL", "NOT SET")
+_db_host = _db_url.split("@")[1].split("/")[0] if "@" in _db_url else "UNKNOWN"
+print(f"[startup] PORT env var = {_startup_port}")
+print(f"[startup] DATABASE_URL host = {_db_host}")
+print(f"[startup] ALLOWED_ORIGINS count = {len(ALLOWED_CORS_ORIGINS)}")
+print(f"[startup] Python version = {__import__('sys').version}")
+
 # Run migrations immediately on import (before any request is served)
 try:
     run_startup_migrations()
@@ -605,6 +616,25 @@ try:
     load_users_from_db()
 except Exception:
     pass
+
+
+@app.on_event("startup")
+async def on_startup():
+    """Log the actual port uvicorn is bound to once the server is ready."""
+    port = os.environ.get("PORT", "3333")
+    print(f"[startup] Uvicorn ready — listening on 0.0.0.0:{port}")
+    print(f"[startup] Health check: http://localhost:{port}/health")
+
+
+@app.middleware("http")
+async def log_all_requests(request: Request, call_next):
+    """Log every incoming HTTP request with client IP and method for diagnostics."""
+    client = request.client
+    client_ip = client.host if client else "unknown"
+    print(f"[req] {request.method} {request.url.path} from {client_ip} (origin={request.headers.get('origin', '-')})")
+    response = await call_next(request)
+    print(f"[res] {request.method} {request.url.path} -> {response.status_code}")
+    return response
 
 
 def serialize_row(row: dict) -> dict:

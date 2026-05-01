@@ -36,45 +36,33 @@ export const usePlanLimits = (): PlanLimits => {
 
   const { data: counts, isLoading: countsLoading } = useQuery({
     queryKey: ['userUsage', user?.id],
+    staleTime: 5 * 60 * 1000, // 5 minutes — counts don't change often
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      // Get facilitator count (user-created custom facilitators only)
-      const { count: facilitatorCount, error: facilitatorError } = await api
-        .from('facilitators')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      if (facilitatorError) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch facilitator count",
-          variant: "destructive",
-        });
-        throw facilitatorError;
-      }
-
-      // Get session count for the current calendar month
+      // Run both count queries in parallel
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { count: sessionCount, error: sessionError } = await api
-        .from('conversations')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', startOfMonth);
 
-      if (sessionError) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch session count",
-          variant: "destructive",
-        });
-        throw sessionError;
+      const [facilitatorResult, sessionResult] = await Promise.all([
+        api.from('facilitators').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        api.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', startOfMonth)
+      ]);
+
+      if (facilitatorResult.error) {
+        toast({ title: "Error", description: "Failed to fetch facilitator count", variant: "destructive" });
+        throw facilitatorResult.error;
+      }
+      if (sessionResult.error) {
+        toast({ title: "Error", description: "Failed to fetch session count", variant: "destructive" });
+        throw sessionResult.error;
       }
 
       return {
-        facilitatorCount: facilitatorCount || 0,
-        sessionCount: sessionCount || 0
+        facilitatorCount: facilitatorResult.count || 0,
+        sessionCount: sessionResult.count || 0
       };
     },
     enabled: !!user && !planLoading,

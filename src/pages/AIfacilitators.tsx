@@ -89,7 +89,10 @@ const AIfacilitators = () => {
     isLoading: isFacilitatorsLoading
   } = useQuery({
     queryKey: ['facilitators'],
-    queryFn: fetchFacilitators
+    queryFn: fetchFacilitators,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const {
@@ -99,7 +102,10 @@ const AIfacilitators = () => {
   } = useQuery({
     queryKey: ['workshops', selectedFacilitator],
     queryFn: () => fetchWorkshops(selectedFacilitator),
-    enabled: currentStep === 2 && isClient
+    enabled: currentStep === 2 && isClient,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Determine if steps should be disabled based on limits

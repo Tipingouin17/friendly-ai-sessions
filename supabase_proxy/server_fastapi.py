@@ -1026,6 +1026,7 @@ async def rest_root():
 # Auth endpoints
 # ============================================================
 @app.post("/auth/v1/signup")
+@limiter.limit("5/minute")
 async def auth_signup(request: Request):
     """Register a new user account.
 
@@ -1120,6 +1121,7 @@ async def auth_signup(request: Request):
 
 
 @app.post("/auth/v1/token")
+@limiter.limit("10/minute")
 async def auth_token(request: Request, grant_type: str = Query(default="password")):
     """Authenticate a user with email and password.
 
@@ -2180,6 +2182,7 @@ async def edge_function_options(func_name: str):
 
 
 @app.post("/functions/v1/{func_name}")
+@limiter.limit("30/minute")
 async def edge_function(func_name: str, request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
 
@@ -2923,12 +2926,16 @@ async def edge_function(func_name: str, request: Request):
     elif func_name == "create-subscription":
         if not STRIPE_CONFIGURED:
             raise HTTPException(500, "Stripe is not configured on this server")
+        # ── Security: extract user from JWT, not from untrusted request body ──
+        _jwt_user = get_current_user(request)
+        user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        if not user_id:
+            raise HTTPException(401, "Authentication required to create a subscription")
         plan_id = data.get("planId")
         stripe_plan_id = data.get("stripePlanId")
-        user_id = data.get("userId")
         billing = data.get("billingDetails", {})
-        if not stripe_plan_id or not user_id:
-            raise HTTPException(400, "Missing planId, stripePlanId, or userId")
+        if not stripe_plan_id:
+            raise HTTPException(400, "Missing stripePlanId")
         # Optional coupon/promo code — validated by validate-coupon before reaching here
         coupon_id = data.get("couponId")  # Stripe coupon ID (not the human-readable code)
         try:
@@ -2982,12 +2989,16 @@ async def edge_function(func_name: str, request: Request):
 
     # ── confirm-subscription ───────────────────────────────────
     elif func_name == "confirm-subscription":
+        # ── Security: extract user from JWT, not from untrusted request body ──
+        _jwt_user = get_current_user(request)
+        user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        if not user_id:
+            raise HTTPException(401, "Authentication required to confirm a subscription")
         payment_intent_id = data.get("paymentIntentId")
-        user_id = data.get("userId")
         plan_id = data.get("planId")
         customer_id = data.get("customerId")
-        if not payment_intent_id or not user_id:
-            raise HTTPException(400, "Missing paymentIntentId or userId")
+        if not payment_intent_id:
+            raise HTTPException(400, "Missing paymentIntentId")
         try:
             intent = stripe_lib.PaymentIntent.retrieve(payment_intent_id)
             if intent.status not in ("succeeded", "processing"):
@@ -3014,10 +3025,14 @@ async def edge_function(func_name: str, request: Request):
     #   4. Mark the code as redeemed (redeemed_by, redeemed_at).
     #   5. Return the activated plan details.
     elif func_name == "redeem-appsumo-code":
-        user_id = data.get("userId")
+        # ── Security: extract user from JWT, not from untrusted request body ──
+        _jwt_user = get_current_user(request)
+        user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        if not user_id:
+            raise HTTPException(401, "Authentication required to redeem a code")
         code = (data.get("code") or "").strip().upper()
-        if not user_id or not code:
-            raise HTTPException(400, "Missing userId or code")
+        if not code:
+            raise HTTPException(400, "Missing code")
         try:
             conn = get_db()
             cur = conn.cursor()

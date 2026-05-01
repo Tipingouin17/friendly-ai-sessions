@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useToast } from '@/hooks/use-toast';
 
 interface SessionEvent {
@@ -26,7 +26,7 @@ export const useEnhancedSessionLogger = () => {
 
   const logSessionEvent = useCallback(async (event: SessionEvent) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       const user = session?.user ?? null;
       
       const eventRecord = {
@@ -43,7 +43,7 @@ export const useEnhancedSessionLogger = () => {
         }
       };
 
-      const { error } = await supabase
+      const { error } = await api
         .from('session_events')
         .insert(eventRecord);
 

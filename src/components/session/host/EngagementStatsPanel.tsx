@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { SkipForward, PauseCircle, MessageSquare, TrendingUp, Users } from 'lucide-react';
 
 interface EngagementEvent {
@@ -41,7 +41,7 @@ export const EngagementStatsPanel: React.FC<EngagementStatsPanelProps> = ({
 
   const fetchEvents = useCallback(async () => {
     if (!conversationId) return;
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from('session_events')
       .select('id, event_type, data, created_at')
       .eq('conversation_id', conversationId)

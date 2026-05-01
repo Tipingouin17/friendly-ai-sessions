@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +83,7 @@ export const SessionMonitoring = () => {
     const { data: conversations, isLoading, refetch } = useQuery({
         queryKey: ["admin-conversations", statusFilter, page],
         queryFn: async () => {
-            let query = supabase
+            let query = api
                 .from("conversations")
                 .select(`
                     id, created_at, session_started, is_session_ended,
@@ -109,7 +109,7 @@ export const SessionMonitoring = () => {
         queryKey: ["admin-messages", selectedConversation?.id],
         enabled: !!selectedConversation,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from("messages")
                 .select("id, content, sender, created_at, participant_name")
                 .eq("conversation_id", selectedConversation!.id)
@@ -121,7 +121,7 @@ export const SessionMonitoring = () => {
 
     const forceCloseMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { error } = await supabase
+            const { error } = await api
                 .from("conversations")
                 .update({ is_session_ended: true, status: "force_closed", ended_at: new Date().toISOString() })
                 .eq("id", id);

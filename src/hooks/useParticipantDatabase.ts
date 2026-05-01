@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { ParticipantInfo } from '@/types/chat';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 export function useParticipantDatabase(conversationId: number | null) {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
@@ -21,7 +21,7 @@ export function useParticipantDatabase(conversationId: number | null) {
     const fetchParticipants = async () => {
       try {
         // First, get all participants from session_participants
-        const { data: participantsData, error: participantsError } = await supabase
+        const { data: participantsData, error: participantsError } = await api
           .from('session_participants')
           .select(`
             participant_id,
@@ -40,7 +40,7 @@ export function useParticipantDatabase(conversationId: number | null) {
         }
 
         // Also check messages to find any participants not in the database
-        const { data: messagesData, error: messagesError } = await supabase
+        const { data: messagesData, error: messagesError } = await api
           .from('messages')
           .select('content')
           .eq('conversation_id', conversationId)
@@ -98,7 +98,7 @@ export function useParticipantDatabase(conversationId: number | null) {
 
           // Insert missing participants into database for future consistency
           if (missingParticipants.length > 0) {
-            const { error: insertError } = await supabase
+            const { error: insertError } = await api
               .from('session_participants')
               .upsert(
                 missingParticipants.map(p => ({
@@ -120,7 +120,7 @@ export function useParticipantDatabase(conversationId: number | null) {
 
         // Update conversation participant count to match actual participants
         if (allParticipantsData.length > 0) {
-          const { error: updateError } = await supabase
+          const { error: updateError } = await api
             .from('conversations')
             .update({ current_participants: allParticipantsData.length })
             .eq('id', conversationId);

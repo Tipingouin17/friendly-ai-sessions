@@ -7,7 +7,7 @@
 import { useState, useCallback } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseAdminSessionStateProps {
   conversationId: number | null;
@@ -87,7 +87,7 @@ export function useAdminSessionState({
         };
         
         // Send to database
-        const { error } = await supabase
+        const { error } = await api
           .from('messages')
           .insert(messageData);
           

@@ -4,7 +4,7 @@
  * Utility for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 /**
  * Safely removes a Supabase channel subscription
@@ -18,8 +18,8 @@ export const removeChannel = (channel: any) => {
       channel.unsubscribe();
     }
     
-    if (supabase && typeof supabase.removeChannel === 'function') {
-      supabase.removeChannel(channel);
+    if (api && typeof api.removeChannel === 'function') {
+      api.removeChannel(channel);
     }
   } catch (err) {
     console.error("Error removing channel:", err);
@@ -57,7 +57,7 @@ export const createReliableChannel = (channelName: string, options = { maxRetrie
   
   const createChannel = () => {
     try {
-      channel = supabase.channel(uniqueChannelName);
+      channel = api.channel(uniqueChannelName);
       
       // Add status handling
       channel.on('system', { event: 'disconnect' }, () => {

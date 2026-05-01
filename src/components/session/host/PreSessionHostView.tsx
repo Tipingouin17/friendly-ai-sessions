@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Users, Clock, Target, User, Pencil } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import StartSessionButton from './StartSessionButton';
 
 interface PreSessionHostViewProps {
@@ -132,7 +132,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
 
     setIsSavingLimit(true);
     try {
-      const { error } = await supabase
+      const { error } = await api
         .from('conversations')
         .update({ participants: parsed })
         .eq('id', conversationId);

@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
 export function useSessionStatus(conversationId: number | null, refetch: () => void) {
@@ -41,7 +41,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
       if (!conversationId || !mountedRef.current) return;
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('conversations')
           .select('is_session_ended, status')
           .eq('id', conversationId)
@@ -81,7 +81,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
     // Create a unique channel name to prevent stale connections
     const channelName = `session-status-${conversationId}-${Date.now()}`;
     
-    const channel = supabase
+    const channel = api
       .channel(channelName)
       .on('postgres_changes', {
         event: 'UPDATE',

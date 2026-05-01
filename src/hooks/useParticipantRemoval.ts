@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { ParticipantInfo } from "@/types/chat";
 
@@ -59,7 +59,7 @@ export const useParticipantRemoval = ({
     try {
       
       // Remove from session_participants table
-      const { error: removeError, data } = await supabase
+      const { error: removeError, data } = await api
         .from('session_participants')
         .delete()
         .eq('conversation_id', conversationId)
@@ -99,7 +99,7 @@ export const useParticipantRemoval = ({
       const newCount = originalParticipants.length - 1;
       
       // Update conversations table with the new count
-      const { error: updateError } = await supabase
+      const { error: updateError } = await api
         .from('conversations')
         .update({ current_participants: newCount })
         .eq('id', conversationId);
@@ -114,7 +114,7 @@ export const useParticipantRemoval = ({
       }
       
       // Create a participant_removed event for real-time updates to other clients
-      const { error: eventError } = await supabase
+      const { error: eventError } = await api
         .from('session_events')
         .insert({
           conversation_id: conversationId,

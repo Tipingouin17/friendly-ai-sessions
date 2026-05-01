@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 import { ParticipantInfo } from '@/types/chat';
 import { ConversationWithSession } from '@/types/database';
@@ -73,7 +73,7 @@ export function useSessionParticipantManager({
     const channelName = `participant-manager-${conversationId}-${Date.now()}`;
     
     try {
-      const channel = supabase
+      const channel = api
         .channel(channelName)
         // Listen to conversation updates for participant counts
         .on('postgres_changes', {
@@ -174,7 +174,7 @@ export function useSessionParticipantManager({
     if (!conversationId) return;
 
     try {
-      const { data: participantsData, error: participantsError } = await supabase
+      const { data: participantsData, error: participantsError } = await api
         .from('session_participants')
         .select('*')
         .eq('conversation_id', conversationId);

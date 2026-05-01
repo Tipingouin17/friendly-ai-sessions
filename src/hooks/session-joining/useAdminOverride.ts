@@ -1,15 +1,16 @@
 /**
  * use Admin Override
  *
- * Session joining hook for the AIfacilitator application.
+ * Allows a verified system admin to join a session that is at capacity.
+ * Uses the same atomic /functions/v1/join-session endpoint as regular
+ * participants — is_host:true signals the backend to bypass capacity limits.
  */
 
 import { useToast } from "@/components/ui/use-toast";
-import { registerParticipant } from "./useParticipantRegistration";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { sanitizeInput } from "@/utils/inputValidation";
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface AdminOverrideParams {
   conversationId: number;
@@ -34,52 +35,48 @@ export function useAdminOverride() {
       throw new Error("Authentication required for admin override");
     }
 
-    try {
-      const { data: isAdmin, error } = await supabase.rpc('is_system_admin');
-      
-      if (error || !isAdmin) {
-        throw new Error("Unauthorized: Admin privileges required");
-      }
+    const safeName = sanitizeInput(participantName);
+    const safeAvatar = sanitizeInput(avatarSeed);
 
-      // For verified admins, allow them to join with a special participant ID
-      const adminParticipantId = Math.floor(Math.random() * 900) + 9000; // Use a very high ID for admin override
-      
-      await registerParticipant({
-        conversationId, 
-        participantId: adminParticipantId,
-        participantName: sanitizeInput(participantName),
-        avatarSeed: sanitizeInput(avatarSeed),
-        isAnonymous,
-        isAdmin: true // Force admin for this registration
-      });
-      
-      // Persist admin participant data
-      persistParticipantData({
-        participantId: adminParticipantId,
-        conversationId,
-        name: sanitizeInput(participantName),
-        avatarSeed: sanitizeInput(avatarSeed),
-        isAnonymous,
-        isAdmin: true
-      });
-      
-      toast({
-        title: "Admin Override",
-        description: "Session is full, but you're joining as an admin.",
-        variant: "default"
-      });
-      
-      return {
-        participantId: adminParticipantId,
-        name: sanitizeInput(participantName),
-        avatarSeed: sanitizeInput(avatarSeed),
-        isAdmin: true,
-        isExistingParticipant: false
-      };
-    } catch (error) {
-      console.error('Admin override failed:', error);
-      throw error;
+    // Single atomic call — is_host:true bypasses capacity check server-side
+    const { data, error } = await api.functions.invoke('join-session', {
+      body: {
+        conversation_id: conversationId,
+        participant_name: safeName,
+        avatar_seed: safeAvatar,
+        is_anonymous: isAnonymous,
+        is_host: true,
+      }
+    });
+
+    if (error || !data?.success) {
+      throw new Error(error?.message || "Admin override failed");
     }
+
+    const newParticipantId: number = data.participant_id;
+
+    persistParticipantData({
+      participantId: newParticipantId,
+      conversationId,
+      name: safeName,
+      avatarSeed: safeAvatar,
+      isAnonymous,
+      isAdmin: true
+    });
+
+    toast({
+      title: "Admin Override",
+      description: "Session is full, but you're joining as an admin.",
+      variant: "default"
+    });
+
+    return {
+      participantId: newParticipantId,
+      name: safeName,
+      avatarSeed: safeAvatar,
+      isAdmin: true,
+      isExistingParticipant: false
+    };
   };
 
   return {

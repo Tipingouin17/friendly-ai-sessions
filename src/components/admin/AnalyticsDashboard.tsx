@@ -4,7 +4,7 @@
  * Admin component for the AIfacilitator application.
  */
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     TrendingUp,
@@ -55,35 +55,35 @@ export const AnalyticsDashboard = () => {
         queryKey: ['admin-analytics'],
         queryFn: async (): Promise<AnalyticsData> => {
             // Total users
-            const { count: totalUsers } = await supabase
+            const { count: totalUsers } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true });
 
             // Active users (logged in last 30 days)
             const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-            const { count: activeUsers } = await supabase
+            const { count: activeUsers } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .gte('updated_at', thirtyDaysAgo);
 
             // Total conversations
-            const { count: totalSessions } = await supabase
+            const { count: totalSessions } = await api
                 .from('conversations')
                 .select('*', { count: 'exact', head: true });
 
             // Active sessions
-            const { count: activeSessions } = await supabase
+            const { count: activeSessions } = await api
                 .from('conversations')
                 .select('*', { count: 'exact', head: true })
                 .eq('is_session_ended', false);
 
             // Total messages
-            const { count: totalMessages } = await supabase
+            const { count: totalMessages } = await api
                 .from('messages')
                 .select('*', { count: 'exact', head: true });
 
             // Average session duration (exclude 0-minute and null sessions)
-            const { data: durationData } = await supabase
+            const { data: durationData } = await api
                 .from('conversations')
                 .select('session_duration_minutes')
                 .not('session_duration_minutes', 'is', null)
@@ -98,7 +98,7 @@ export const AnalyticsDashboard = () => {
             const userGrowthData: Array<{ date: string; users: number }> = [];
             for (let i = 29; i >= 0; i--) {
                 const date = startOfDay(subDays(new Date(), i));
-                const { count } = await supabase
+                const { count } = await api
                     .from('profiles')
                     .select('*', { count: 'exact', head: true })
                     .lte('created_at', date.toISOString());
@@ -110,7 +110,7 @@ export const AnalyticsDashboard = () => {
             }
 
             // Sessions by facilitator
-            const { data: sessionsData } = await supabase
+            const { data: sessionsData } = await api
                 .from('conversations')
                 .select(`
           sessions_id,
@@ -135,7 +135,7 @@ export const AnalyticsDashboard = () => {
                 .slice(0, 10);
 
             // Plan distribution
-            const { data: planData } = await supabase
+            const { data: planData } = await api
                 .from('profiles')
                 .select('role');
 
@@ -164,13 +164,13 @@ export const AnalyticsDashboard = () => {
                 const date = startOfDay(subDays(new Date(), i));
                 const nextDay = startOfDay(subDays(new Date(), i - 1));
 
-                const { count: sessionCount } = await supabase
+                const { count: sessionCount } = await api
                     .from('conversations')
                     .select('*', { count: 'exact', head: true })
                     .gte('created_at', date.toISOString())
                     .lt('created_at', nextDay.toISOString());
 
-                const { count: messageCount } = await supabase
+                const { count: messageCount } = await api
                     .from('messages')
                     .select('*', { count: 'exact', head: true })
                     .gte('created_at', date.toISOString())

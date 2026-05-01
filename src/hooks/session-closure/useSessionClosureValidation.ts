@@ -4,7 +4,7 @@
  * Session closure hook for the AIfacilitator application.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { validateSecureSessionOperation } from '@/utils/securityEnhanced';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
@@ -18,7 +18,7 @@ export const useSessionClosureValidation = () => {
       throw new Error('No conversation ID provided');
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await api.auth.getSession();
     const user = session?.user ?? null;
     
     if (!user) {
@@ -43,7 +43,7 @@ export const useSessionClosureValidation = () => {
       throw new Error(securityValidation.error || 'Security validation failed');
     }
 
-    const { data: conversation, error: convError } = await supabase
+    const { data: conversation, error: convError } = await api
       .from('conversations')
       .select('user_id, is_session_ended')
       .eq('id', conversationId)

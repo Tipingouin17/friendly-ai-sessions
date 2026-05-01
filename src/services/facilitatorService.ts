@@ -4,10 +4,10 @@
  * Service for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export const fetchFacilitators = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('facilitators')
     .select('*')
     .order('order', { ascending: true });
@@ -17,7 +17,7 @@ export const fetchFacilitators = async () => {
 };
 
 export const fetchWorkshops = async (facilitatorId: number | null) => {
-  const query = supabase
+  const query = api
     .from('sessions')
     .select('*, facilitator:facilitators!inner(*)')
     .eq('status', true);
@@ -40,7 +40,7 @@ export const createConversation = async (params: {
   userId: string;
   durationMinutes?: number;
 }) => {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('conversations')
     .insert({
       participant_description: params.description,

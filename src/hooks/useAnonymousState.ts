@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 type UseAnonymousStateProps = {
   conversationId: number | null;
@@ -20,7 +20,7 @@ export function useAnonymousState({ conversationId, currentParticipantId }: UseA
     if (conversationId && currentParticipantId) {
       const loadAnonymousSetting = async () => {
         try {
-          const { data, error } = await supabase
+          const { data, error } = await api
             .from('session_participants')
             .select('is_anonymous')
             .eq('conversation_id', conversationId)
@@ -52,7 +52,7 @@ export function useAnonymousState({ conversationId, currentParticipantId }: UseA
     setIsAnonymous(newValue);
     
     try {
-      const { error } = await supabase
+      const { error } = await api
         .from('session_participants')
         .update({ is_anonymous: newValue })
         .eq('conversation_id', conversationId)

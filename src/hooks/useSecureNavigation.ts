@@ -6,7 +6,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 export function useSecureNavigation() {
@@ -56,7 +56,7 @@ export function useSecureNavigation() {
 
     try {
       // Verify admin status before navigation using the updated function
-      const { data: isAdmin, error } = await supabase.rpc('is_system_admin');
+      const { data: isAdmin, error } = await api.rpc('is_system_admin');
       
       if (error || !isAdmin) {
         logSecurityViolation('unauthorized_admin_navigation_attempt', { 
@@ -99,7 +99,7 @@ export function useSecureNavigation() {
 
     try {
       // Verify host status before navigation
-      const { data: isHost, error } = await supabase.rpc('is_session_host', {
+      const { data: isHost, error } = await api.rpc('is_session_host', {
         conversation_id: conversationId
       });
       

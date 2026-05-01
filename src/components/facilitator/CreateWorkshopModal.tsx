@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -72,7 +72,7 @@ export const CreateWorkshopModal = ({
     
     try {
       // Get the current user's ID from the local session (no network call needed)
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       const user = session?.user ?? null;
       if (!user) {
         toast({
@@ -83,7 +83,7 @@ export const CreateWorkshopModal = ({
         return;
       }
 
-      const { error } = await supabase
+      const { error } = await api
         .from('sessions')
         .insert({
           title: title.trim(),

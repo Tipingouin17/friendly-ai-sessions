@@ -1,12 +1,16 @@
 /**
  * Railway API Client
  * Zero-dependency HTTP + WebSocket client for the AIfacilitator FastAPI backend.
- * Replaces @supabase/supabase-js entirely.
+ * Replaces @api/api-js entirely.
  */
 
 const API_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 const ANON_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 const SESSION_KEY = "mf_session";
+
+// Named exports for files that import these constants directly
+export const EDGE_FUNCTION_URL: string = (import.meta.env.VITE_API_URL as string) || "";
+export const EDGE_FUNCTION_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 
 if (!API_URL) {
   throw new Error("Missing VITE_API_URL. Set it to your Railway backend URL.");
@@ -84,7 +88,7 @@ function loadSession(): ApiSession | null {
 function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
   Object.keys(localStorage)
-    .filter((k) => k.startsWith("sb-") || k.includes("supabase"))
+    .filter((k) => k.startsWith("sb-") || k.includes("api"))
     .forEach((k) => localStorage.removeItem(k));
   sessionStorage.clear();
 }

@@ -2,7 +2,7 @@
  * Change Password Modal
  *
  * Allows an authenticated user to update their password.
- * Uses the Railway API client (supabase shim) via PUT /auth/v1/user,
+ * Uses the Railway API client (api shim) via PUT /auth/v1/user,
  * which persists the new password_hash to the database so it survives
  * container restarts.
  */
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface ChangePasswordModalProps {
     isOpen: boolean;
@@ -60,7 +60,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
         try {
             // The Railway API client sends PUT /auth/v1/user with { password: newPassword }.
             // The backend persists the new password_hash to the DB.
-            const { error } = await supabase.auth.updateUser({
+            const { error } = await api.auth.updateUser({
                 password: newPassword,
             });
 

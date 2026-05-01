@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +79,7 @@ export const FacilitatorManagement = () => {
     const { data: facilitators, isLoading, refetch } = useQuery({
         queryKey: ["admin-facilitators", searchTerm],
         queryFn: async () => {
-            let query = supabase
+            let query = api
                 .from("facilitators")
                 .select("id, title, description, details, profile_picture, is_promoted, plan_id, specialties, languages, expertise_level, rating, total_sessions, order, created_at, last_active")
                 .order("order", { ascending: true });
@@ -93,7 +93,7 @@ export const FacilitatorManagement = () => {
     const { data: plans } = useQuery({
         queryKey: ["admin-plans-list"],
         queryFn: async () => {
-            const { data, error } = await supabase.from("plans").select("id, title").order("id");
+            const { data, error } = await api.from("plans").select("id, title").order("id");
             if (error) throw error;
             return data as { id: number; title: string }[];
         },
@@ -103,11 +103,11 @@ export const FacilitatorManagement = () => {
         mutationFn: async (facilitator: Partial<Facilitator>) => {
             if (facilitator.id) {
                 const { id, created_at, last_active, ...updates } = facilitator;
-                const { error } = await supabase.from("facilitators").update(updates).eq("id", id!);
+                const { error } = await api.from("facilitators").update(updates).eq("id", id!);
                 if (error) throw error;
             } else {
                 const { id: _id, ...insertData } = facilitator;
-                const { error } = await supabase.from("facilitators").insert(insertData as any);
+                const { error } = await api.from("facilitators").insert(insertData as any);
                 if (error) throw error;
             }
         },
@@ -124,7 +124,7 @@ export const FacilitatorManagement = () => {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { error } = await supabase.from("facilitators").delete().eq("id", id);
+            const { error } = await api.from("facilitators").delete().eq("id", id);
             if (error) throw error;
         },
         onSuccess: () => {

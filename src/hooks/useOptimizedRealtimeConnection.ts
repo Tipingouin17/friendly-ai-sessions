@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 
 interface UseOptimizedRealtimeConnectionProps {
@@ -38,7 +38,7 @@ export const useOptimizedRealtimeConnection = ({
       channelsRef.current = [];
 
       // Single conversation updates channel
-      const conversationChannel = supabase
+      const conversationChannel = api
         .channel(`conversation-${conversationId}`)
         .on('postgres_changes', {
           event: 'UPDATE',
@@ -56,7 +56,7 @@ export const useOptimizedRealtimeConnection = ({
 
       // Participant changes channel (for host primarily)
       if (isHost) {
-        const participantChannel = supabase
+        const participantChannel = api
           .channel(`participants-${conversationId}`)
           .on('postgres_changes', {
             event: '*',
@@ -74,7 +74,7 @@ export const useOptimizedRealtimeConnection = ({
       }
 
       // Session events channel
-      const eventsChannel = supabase
+      const eventsChannel = api
         .channel(`events-${conversationId}`)
         .on('postgres_changes', {
           event: 'INSERT',

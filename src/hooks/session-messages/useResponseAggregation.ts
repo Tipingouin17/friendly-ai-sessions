@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Message } from '@/types/chat';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { debugLog } from '@/utils/debugLogger';
 
 interface UseResponseAggregationProps {
@@ -75,7 +75,7 @@ export const useResponseAggregation = ({
         questionContext: currentQuestionId
       };
 
-      const { data: aiResponse, error } = await supabase.functions.invoke('handle-facilitator-response', {
+      const { data: aiResponse, error } = await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: pendingResponses.map(r => ({
             id: `response-${r.participantId}`,

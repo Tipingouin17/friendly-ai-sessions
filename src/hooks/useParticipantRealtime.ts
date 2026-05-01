@@ -6,7 +6,7 @@
 
 import { useEffect, useRef } from "react";
 import { ParticipantInfo } from "@/types/chat";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
 
@@ -27,8 +27,8 @@ export function useParticipantRealtime({
   maxParticipants,
   enabled = true
 }: UseParticipantRealtimeProps) {
-  const participantsChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const eventsChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const participantsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
+  const eventsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const hasSetupSubscription = useRef(false);
   const currentConversationIdRef = useRef<number | null>(null);
   
@@ -64,7 +64,7 @@ export function useParticipantRealtime({
     
     try {
       // Subscribe to direct table changes (INSERT, UPDATE, DELETE)
-      const participantsChannel = supabase
+      const participantsChannel = api
         .channel(`admin-session-participants-${conversationId}`)
         .on('postgres_changes', {
           event: '*', // Listen for all events
@@ -131,7 +131,7 @@ export function useParticipantRealtime({
     
     try {
       // Subscribe to session events for additional coordination
-      const eventsChannel = supabase
+      const eventsChannel = api
         .channel(`admin-participant-events-${conversationId}`)
         .on('postgres_changes', {
           event: 'INSERT',
@@ -172,7 +172,7 @@ export function useParticipantRealtime({
             
             // Auto-start session when max participants reached
             if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
-              supabase
+              api
                 .from('conversations')
                 .update({ session_started: true })
                 .eq('id', conversationId)

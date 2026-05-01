@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 export function useSessionHostStatus() {
   const [isHost, setIsHost] = useState<boolean>(false);
@@ -20,7 +20,7 @@ export function useSessionHostStatus() {
 
     try {
       // First check if user is the conversation owner
-      const { data: conversationData, error: conversationError } = await supabase
+      const { data: conversationData, error: conversationError } = await api
         .from('conversations')
         .select('user_id')
         .eq('id', conversationId)
@@ -34,7 +34,7 @@ export function useSessionHostStatus() {
       }
 
       // Also check using the RPC function as fallback
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('is_session_host', {
+      const { data: rpcResult, error: rpcError } = await api.rpc('is_session_host', {
         conversation_id: conversationId
       });
 

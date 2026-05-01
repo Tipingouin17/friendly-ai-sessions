@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useMessageFetching } from "./session-messages/useMessageFetching";
 import { useResponseAggregation } from "./session-messages/useResponseAggregation";
@@ -212,7 +212,7 @@ export const useHostMessages = ({
     setMessages(prev => [...prev, optimisticMsg]);
 
     try {
-      const { error } = await supabase
+      const { error } = await api
         .from('messages')
         .insert({
           conversation_id: conversationId,

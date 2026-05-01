@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export const useWorkshopReports = (conversationIds: number[]) => {
   return useQuery({
@@ -13,7 +13,7 @@ export const useWorkshopReports = (conversationIds: number[]) => {
     queryFn: async () => {
       if (conversationIds.length === 0) return { /* no-op */ };
       
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('session_reports')
         .select('conversation_id, report_content, metadata')
         .in('conversation_id', conversationIds);

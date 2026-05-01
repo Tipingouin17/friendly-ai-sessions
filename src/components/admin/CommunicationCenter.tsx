@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export const CommunicationCenter = () => {
     const { data: messages, isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
         queryKey: ["admin-contact-messages", messageFilter],
         queryFn: async () => {
-            let query = supabase
+            let query = api
                 .from("contact_form")
                 .select("*")
                 .order("created_at", { ascending: false });
@@ -90,7 +90,7 @@ export const CommunicationCenter = () => {
     const { data: faqs, isLoading: faqsLoading } = useQuery({
         queryKey: ["admin-faqs", faqCategoryFilter],
         queryFn: async () => {
-            let query = supabase
+            let query = api
                 .from("faqs")
                 .select("*")
                 .order("created_at", { ascending: false });
@@ -103,7 +103,7 @@ export const CommunicationCenter = () => {
 
     const markRespondedMutation = useMutation({
         mutationFn: async ({ id, responded }: { id: number; responded: boolean }) => {
-            const { error } = await supabase
+            const { error } = await api
                 .from("contact_form")
                 .update({ responded })
                 .eq("id", id);
@@ -119,13 +119,13 @@ export const CommunicationCenter = () => {
     const saveFaqMutation = useMutation({
         mutationFn: async (faq: { id?: number; title: string; description: string; category: string; status: boolean }) => {
             if (faq.id) {
-                const { error } = await supabase
+                const { error } = await api
                     .from("faqs")
                     .update({ title: faq.title, description: faq.description, category: faq.category, status: faq.status })
                     .eq("id", faq.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { error } = await api
                     .from("faqs")
                     .insert({ title: faq.title, description: faq.description, category: faq.category, status: faq.status } as any);
                 if (error) throw error;
@@ -143,7 +143,7 @@ export const CommunicationCenter = () => {
 
     const deleteFaqMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { error } = await supabase.from("faqs").delete().eq("id", id);
+            const { error } = await api.from("faqs").delete().eq("id", id);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -156,7 +156,7 @@ export const CommunicationCenter = () => {
 
     const toggleFaqStatus = useMutation({
         mutationFn: async ({ id, status }: { id: number; status: boolean }) => {
-            const { error } = await supabase.from("faqs").update({ status }).eq("id", id);
+            const { error } = await api.from("faqs").update({ status }).eq("id", id);
             if (error) throw error;
         },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-faqs"] }),

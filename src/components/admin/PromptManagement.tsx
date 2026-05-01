@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,7 +62,7 @@ export const PromptManagement = () => {
     const { data: sessions, isLoading } = useQuery({
         queryKey: ['admin-sessions'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from('sessions')
                 .select('id, title, facilitator, prompt, welcome_message, objective, difficulty_level, scope, gpt_version, max_tokens, randomness')
                 .order('facilitator', { ascending: true });
@@ -85,7 +85,7 @@ export const PromptManagement = () => {
             max_tokens: number;
             randomness: number;
         }) => {
-            const { error } = await supabase
+            const { error } = await api
                 .from('sessions')
                 .update({ prompt, welcome_message: welcome, scope, gpt_version, max_tokens, randomness })
                 .eq('id', sessionId);

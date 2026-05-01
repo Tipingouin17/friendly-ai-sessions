@@ -65,9 +65,9 @@ export const useSecureSessionValidation = () => {
     conversationId: number
   ): Promise<SessionValidationResult> => {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
+      const api = (await import('@/lib/api')).default;
       
-      const { data: conversation } = await supabase
+      const { data: conversation } = await api
         .from('conversations')
         .select('current_participants, participants, session_started')
         .eq('id', conversationId)
@@ -105,9 +105,9 @@ export const useSecureSessionValidation = () => {
     participantId: number
   ): Promise<SessionValidationResult> => {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
+      const api = (await import('@/lib/api')).default;
       
-      const { data: existingParticipant } = await supabase
+      const { data: existingParticipant } = await api
         .from('session_participants')
         .select('id')
         .eq('conversation_id', conversationId)

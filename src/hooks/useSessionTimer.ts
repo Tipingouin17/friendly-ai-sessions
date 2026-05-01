@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { ConversationWithSession } from "@/types/database";
 
 export interface SessionTimerState {
@@ -130,7 +130,7 @@ export function useSessionTimer(
         if (currentDuration === null) {
           addTimeOriginRef.current = Date.now();
         }
-        const { error } = await supabase
+        const { error } = await api
           .from("conversations")
           .update({ session_duration_minutes: newDuration })
           .eq("id", conversation.id);

@@ -7,7 +7,7 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Bell, X, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +38,7 @@ const WaitingParticipantsBanner: React.FC<WaitingParticipantsBannerProps> = ({
     enabled: !!conversationId,
     refetchInterval: 15_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("session_events")
         .select("id, created_at, data")
         .eq("conversation_id", conversationId!)
@@ -52,7 +52,7 @@ const WaitingParticipantsBanner: React.FC<WaitingParticipantsBannerProps> = ({
   // Dismiss a single waiting event (mark it as handled by deleting it)
   const dismissMutation = useMutation({
     mutationFn: async (eventId: number) => {
-      const { error } = await supabase
+      const { error } = await api
         .from("session_events")
         .delete()
         .eq("id", eventId);

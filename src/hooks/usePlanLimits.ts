@@ -6,7 +6,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useUserPlan } from "./useUserPlan";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -40,7 +40,7 @@ export const usePlanLimits = (): PlanLimits => {
       if (!user) throw new Error("User not authenticated");
 
       // Get facilitator count (user-created custom facilitators only)
-      const { count: facilitatorCount, error: facilitatorError } = await supabase
+      const { count: facilitatorCount, error: facilitatorError } = await api
         .from('facilitators')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
@@ -57,7 +57,7 @@ export const usePlanLimits = (): PlanLimits => {
       // Get session count for the current calendar month
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { count: sessionCount, error: sessionError } = await supabase
+      const { count: sessionCount, error: sessionError } = await api
         .from('conversations')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)

@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 
 interface UseSimplifiedParticipantMonitoringProps {
@@ -54,7 +54,7 @@ export function useSimplifiedParticipantMonitoring({
       if (!mountedRef.current || !conversationId) return;
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('conversations')
           .select('current_participants, participants')
           .eq('id', conversationId)
@@ -91,7 +91,7 @@ export function useSimplifiedParticipantMonitoring({
     const channelName = `participant-monitoring-${conversationId}-${Date.now()}`;
     
     try {
-      const channel = supabase
+      const channel = api
         .channel(channelName)
         .on('postgres_changes', {
           event: 'UPDATE',

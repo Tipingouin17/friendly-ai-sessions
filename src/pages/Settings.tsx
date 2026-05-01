@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import {
   Bell, Shield, Trash2, ChevronRight, Check,
   Volume2, Mail, Smartphone, Eye, EyeOff, AlertTriangle
@@ -73,7 +73,7 @@ const Settings = () => {
     if (!user) return;
     setIsDeletingAccount(true);
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', user.id);
+      const { error } = await api.from('profiles').delete().eq('id', user.id);
       if (error) throw error;
       if (settingsKey) localStorage.removeItem(settingsKey);
       await logout();

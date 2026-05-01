@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseWelcomeMessageGateProps {
   conversationId: number | null;
@@ -39,7 +39,7 @@ export const useWelcomeMessageGate = ({
 
     try {
       
-      const { data: messages, error } = await supabase
+      const { data: messages, error } = await api
         .from('messages')
         .select('id, content, role, created_at')
         .eq('conversation_id', conversationId)
@@ -83,7 +83,7 @@ export const useWelcomeMessageGate = ({
 
     // Check conversation status for AI generation progress
     try {
-      const { data: conversation } = await supabase
+      const { data: conversation } = await api
         .from('conversations')
         .select('welcome_message_status')
         .eq('id', conversationId)
@@ -115,7 +115,7 @@ export const useWelcomeMessageGate = ({
 
     // Listen for welcome message ready notification and status changes
     const channelName = `welcome-gate-${conversationId}-${Date.now()}`;
-    channelRef.current = supabase
+    channelRef.current = api
       .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
@@ -183,7 +183,7 @@ export const useWelcomeMessageGate = ({
         timeoutRef.current = null;
       }
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        api.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };

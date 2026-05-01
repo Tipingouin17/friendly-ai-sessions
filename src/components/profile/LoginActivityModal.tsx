@@ -6,7 +6,7 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { format } from 'date-fns';
 import { Laptop, Smartphone, Globe, MapPin } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,7 +29,7 @@ export const LoginActivityModal: React.FC<LoginActivityModalProps> = ({ isOpen, 
     const { data: activities, isLoading } = useQuery({
         queryKey: ['loginActivity'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from('login_activity')
                 .select('*')
                 .order('created_at', { ascending: false })

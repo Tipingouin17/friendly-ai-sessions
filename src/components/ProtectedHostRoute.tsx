@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 import { Loader2 } from 'lucide-react';
 
@@ -56,7 +56,7 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
         }
 
         // Check if user is host of this specific session
-        const { data, error } = await supabase.rpc('is_session_host', {
+        const { data, error } = await api.rpc('is_session_host', {
           conversation_id: parseInt(conversationId)
         });
         

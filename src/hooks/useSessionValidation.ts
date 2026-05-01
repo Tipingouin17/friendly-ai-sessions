@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseSessionValidationProps {
   conversationId: number | null;
@@ -29,7 +29,7 @@ export const useSessionValidation = ({ conversationId, isAdmin = false }: UseSes
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('conversations')
           .select('is_session_ended, status, user_id')
           .eq('id', conversationId)

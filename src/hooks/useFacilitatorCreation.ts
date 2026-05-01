@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useUserPlan } from "@/hooks/useUserPlan";
 
 export const useFacilitatorCreation = (onSuccess: () => void) => {
@@ -33,12 +33,12 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
     setIsLoading(true);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       const user = session?.user ?? null;
       if (!user) throw new Error('Not authenticated');
       
       // Create the facilitator entry first so we have an ID
-      const { data: facilitator, error } = await supabase
+      const { data: facilitator, error } = await api
         .from('facilitators')
         .insert({
           title,
@@ -61,7 +61,7 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
         const blob = await base64Response.blob();
         
         // IMPORTANT: MUST use 'facilitator-avatars' as the bucket name consistently across the app
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await api.storage
           .from('facilitator-avatars')
           .upload(`${facilitator.id}.jpg`, blob, {
             contentType: 'image/jpeg',
@@ -77,12 +77,12 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
           });
         } else {
           // Get the public URL - ensure we use the correct bucket name
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = api.storage
             .from('facilitator-avatars')
             .getPublicUrl(`${facilitator.id}.jpg`);
             
           // Update the facilitator with the profile picture URL
-          const { error: updateError } = await supabase
+          const { error: updateError } = await api
             .from('facilitators')
             .update({
               profile_picture: publicUrlData.publicUrl

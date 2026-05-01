@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
@@ -62,7 +62,7 @@ export const useWorkshopCreation = () => {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       const user = session?.user ?? null;
 
       if (!user) {

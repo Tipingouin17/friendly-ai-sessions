@@ -14,8 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { EDGE_FUNCTION_URL } from '@/integrations/supabase/client';
-import { supabase } from '@/integrations/supabase/client';
+import { EDGE_FUNCTION_URL } from '@/lib/api';
+import api from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface RedemptionResult {
@@ -91,7 +91,7 @@ const RedeemAppSumo: React.FC = () => {
 
     try {
       // Get the user's session JWT for authenticated request
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const { data: { session: currentSession } } = await api.auth.getSession();
       if (!currentSession?.access_token) {
         throw new Error('Session expired. Please log in again.');
       }

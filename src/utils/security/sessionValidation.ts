@@ -18,9 +18,9 @@ export const validateSessionAccess = async (
       return false;
     }
 
-    const { supabase } = await import('@/integrations/supabase/client');
+    const api = (await import('@/lib/api')).default;
 
-    const { data: conversation, error: fetchError } = await supabase
+    const { data: conversation, error: fetchError } = await api
       .from('conversations')
       .select('user_id, session_started, is_session_ended, status')
       .eq('id', conversationId)

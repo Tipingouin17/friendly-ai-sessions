@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,9 +119,9 @@ export const PlanManagement = () => {
         queryKey: ["admin-plans"],
         queryFn: async () => {
             const [{ data: plansData, error: plansError }, { data: restrictions }, { data: profiles }] = await Promise.all([
-                supabase.from("plans").select("*").order("price", { ascending: true }),
-                supabase.from("plan_restrictions").select("*"),
-                supabase.from("profiles").select("current_plan_id"),
+                api.from("plans").select("*").order("price", { ascending: true }),
+                api.from("plan_restrictions").select("*"),
+                api.from("profiles").select("current_plan_id"),
             ]);
             if (plansError) throw plansError;
 
@@ -146,7 +146,7 @@ export const PlanManagement = () => {
             if (isCreating) {
                 const maxId = Math.max(0, ...(plans?.map(p => p.id) ?? []));
                 const newId = maxId + 1;
-                const { error: planError } = await supabase.from("plans").insert({
+                const { error: planError } = await api.from("plans").insert({
                     id: newId,
                     title: editingPlan.title,
                     price: editingPlan.price ?? 0,
@@ -161,7 +161,7 @@ export const PlanManagement = () => {
                 if (planError) throw planError;
 
                 if (editingRestriction) {
-                    const { error: rError } = await supabase.from("plan_restrictions").insert({
+                    const { error: rError } = await api.from("plan_restrictions").insert({
                         id: newId,
                         plan_id: newId,
                         session_limit: editingRestriction.session_limit,
@@ -179,7 +179,7 @@ export const PlanManagement = () => {
                     if (rError) throw rError;
                 }
             } else {
-                const { error: planError } = await supabase.from("plans").update({
+                const { error: planError } = await api.from("plans").update({
                     title: editingPlan.title,
                     price: editingPlan.price,
                     description: editingPlan.description,
@@ -195,7 +195,7 @@ export const PlanManagement = () => {
                 if (editingRestriction) {
                     const existingRestriction = plans?.find(p => p.id === editingPlan.id)?.restriction;
                     if (existingRestriction) {
-                        const { error: rError } = await supabase.from("plan_restrictions").update({
+                        const { error: rError } = await api.from("plan_restrictions").update({
                             session_limit: editingRestriction.session_limit,
                             facilitator_limit: editingRestriction.facilitator_limit,
                             max_participants: editingRestriction.max_participants,
@@ -210,7 +210,7 @@ export const PlanManagement = () => {
                         }).eq("plan_id", editingPlan.id!);
                         if (rError) throw rError;
                     } else {
-                        const { error: rError } = await supabase.from("plan_restrictions").insert({
+                        const { error: rError } = await api.from("plan_restrictions").insert({
                             id: editingPlan.id!,
                             plan_id: editingPlan.id!,
                             session_limit: editingRestriction.session_limit,
@@ -242,8 +242,8 @@ export const PlanManagement = () => {
 
     const deletePlanMutation = useMutation({
         mutationFn: async (id: number) => {
-            await supabase.from("plan_restrictions").delete().eq("plan_id", id);
-            const { error } = await supabase.from("plans").delete().eq("id", id);
+            await api.from("plan_restrictions").delete().eq("plan_id", id);
+            const { error } = await api.from("plans").delete().eq("id", id);
             if (error) throw error;
         },
         onSuccess: () => {

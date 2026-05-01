@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 
@@ -21,7 +21,7 @@ export function useAdminSessions() {
     queryFn: async () => {
       try {
         
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('conversations')
           .select(`
             *,
@@ -64,7 +64,7 @@ export function useAdminSessions() {
   // Set up real-time listener for conversations changes
   useEffect(() => {
     
-    const channel = supabase
+    const channel = api
       .channel('admin-sessions-realtime')
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -93,7 +93,7 @@ export function useAdminSessions() {
       .subscribe((status) => { /* no-op */ });
 
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, [queryClient, refetch]);
   

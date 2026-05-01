@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play } from 'lucide-react';
 import { useSessionStart } from '@/hooks/useSessionStart';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface StartSessionButtonProps {
   conversationId: number | null;
@@ -35,7 +35,7 @@ const StartSessionButton: React.FC<StartSessionButtonProps> = ({
       if (!conversationId || propParticipants.length > 0) return;
       
       try {
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('session_participants')
           .select('*')
           .eq('conversation_id', conversationId);

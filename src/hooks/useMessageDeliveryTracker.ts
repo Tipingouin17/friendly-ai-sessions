@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface MessageDeliveryStatus {
   messageId: number;
@@ -42,7 +42,7 @@ export function useMessageDeliveryTracker({
     if (!conversationId || !enabled || !mountedRef.current) return;
 
     try {
-      const { data: messages, error } = await supabase
+      const { data: messages, error } = await api
         .from('messages')
         .select('id, created_at, role')
         .eq('conversation_id', conversationId)

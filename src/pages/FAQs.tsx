@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Link } from "react-router-dom";
 import PageHead from "@/components/PageHead";
 import {
@@ -108,7 +108,7 @@ const FALLBACK_FAQS: FAQ[] = [
 
 const fetchFAQs = async () => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from('faqs')
       .select('*')
       .eq('status', true)

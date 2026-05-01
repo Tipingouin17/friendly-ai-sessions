@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSessionClosureValidation } from './session-closure/useSessionClosureValidation';
 import { useSessionClosureExecution } from './session-closure/useSessionClosureExecution';
 import { useReportDownloader } from './session-closure/useReportDownloader';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface SessionClosureResult {
   reportId: string;
@@ -110,14 +110,14 @@ export const useSessionClosure = () => {
 
       // --- Compute session stats before closing ---
       // 1. Fetch the conversation to get created_at for duration calculation
-      const { data: convData } = await supabase
+      const { data: convData } = await api
         .from('conversations')
         .select('created_at')
         .eq('id', conversationId)
         .single();
 
       // 2. Count all messages in this conversation
-      const { data: allMessages } = await supabase
+      const { data: allMessages } = await api
         .from('messages')
         .select('id, role, user_id')
         .eq('conversation_id', conversationId);
@@ -127,7 +127,7 @@ export const useSessionClosure = () => {
       const uniqueRespondents = new Set(userMessages.map(m => m.user_id).filter(Boolean)).size;
 
       // 3. Count participants
-      const { count: participantCount } = await supabase
+      const { count: participantCount } = await api
         .from('session_participants')
         .select('id', { count: 'exact', head: true })
         .eq('conversation_id', conversationId);
@@ -150,7 +150,7 @@ export const useSessionClosure = () => {
       const participantsForDb = Math.max(1, activeParticipants);
 
       // Mark the conversation as ended with all stats
-      const { error } = await supabase
+      const { error } = await api
         .from('conversations')
         .update({
           is_session_ended: true,

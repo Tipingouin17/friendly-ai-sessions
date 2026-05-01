@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,7 @@ export const UserManagement = () => {
     const { data: plans } = useQuery({
         queryKey: ["admin-plans-list"],
         queryFn: async () => {
-            const { data, error } = await supabase.from("plans").select("id, title, price").order("price", { ascending: true });
+            const { data, error } = await api.from("plans").select("id, title, price").order("price", { ascending: true });
             if (error) throw error;
             return data as Plan[];
         },
@@ -99,7 +99,7 @@ export const UserManagement = () => {
     const { data: users, isLoading, refetch } = useQuery({
         queryKey: ["admin-users", searchTerm, roleFilter, statusFilter, sortBy, sortOrder, page],
         queryFn: async () => {
-            let query = supabase
+            let query = api
                 .from("profiles" as any)
                 .select("id, email, role, current_plan_id, created_at, updated_at, banned, subscription_status");
 
@@ -125,7 +125,7 @@ export const UserManagement = () => {
         queryKey: ["admin-user-detail", drawerUser?.id],
         enabled: !!drawerUser?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from("profiles" as any)
                 .select("id, role, current_plan_id, created_at, updated_at, subscription_status, stripe_customer_id, banned, enterprise_ai_model, company_name")
                 .eq("id", drawerUser!.id)
@@ -143,7 +143,7 @@ export const UserManagement = () => {
         queryKey: ["admin-user-sessions", drawerUser?.id],
         enabled: !!drawerUser?.id,
         queryFn: async () => {
-            const { count } = await supabase
+            const { count } = await api
                 .from("conversations")
                 .select("*", { count: "exact", head: true })
                 .eq("user_id", drawerUser!.id);
@@ -153,7 +153,7 @@ export const UserManagement = () => {
 
     const updateUserMutation = useMutation({
         mutationFn: async ({ userId, updates }: { userId: string; updates: Record<string, unknown> }) => {
-            const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
+            const { error } = await api.from("profiles").update(updates).eq("id", userId);
             if (error) throw error;
         },
         onSuccess: () => {

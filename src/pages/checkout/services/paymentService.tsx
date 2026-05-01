@@ -4,7 +4,7 @@
  * Page for the AIfacilitator application.
  */
 
-import { supabase, EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
+import { supabase, EDGE_FUNCTION_URL } from '@/integrations/supabase/client';
 import { BillingDetails } from '../types';
 import { createSafeUrl, applySafeCookieParams, handleStripeCookies, setCrossDomainCookie } from '@/utils/crossOriginUtils';
 import { CardElement } from '@stripe/react-stripe-js';
@@ -66,17 +66,22 @@ export const createSubscription = async (
   // Create the return URL with proper cross-origin support
   const returnUrl = createSafeUrl('/profile');
 
+  // Get the user's session JWT for authenticated request
+  const { data: { session: currentSession } } = await supabase.auth.getSession();
+  if (!currentSession?.access_token) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
   // Apply safe cookie parameters to fetch options
   const fetchOptions = applySafeCookieParams({
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`,
+      'Authorization': `Bearer ${currentSession.access_token}`,
     },
     body: JSON.stringify({ 
       planId: plan.id,
       stripePlanId: plan.stripe_plan_id,
-      userId: userId,
       billingDetails,
       returnUrl: returnUrl,
       // Only include couponId when a validated coupon has been applied
@@ -168,18 +173,23 @@ export const confirmSubscription = async (
   // Ensure Stripe cookies are properly handled before API call
   handleStripeCookies();
   
+  // Get the user's session JWT for authenticated request
+  const { data: { session: confirmSession } } = await supabase.auth.getSession();
+  if (!confirmSession?.access_token) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
   // Apply safe cookie parameters to fetch options
   const confirmOptions = applySafeCookieParams({
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`,
+      'Authorization': `Bearer ${confirmSession.access_token}`,
       'Cache-Control': 'no-cache, no-store, must-revalidate',
     },
     body: JSON.stringify({ 
       subscriptionId,
       customerId,
-      userId,
       planId,
       paymentIntentId
     }),

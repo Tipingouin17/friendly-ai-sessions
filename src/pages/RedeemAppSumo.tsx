@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
+import { EDGE_FUNCTION_URL } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface RedemptionResult {
@@ -89,14 +90,19 @@ const RedeemAppSumo: React.FC = () => {
     setError(null);
 
     try {
+      // Get the user's session JWT for authenticated request
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        throw new Error('Session expired. Please log in again.');
+      }
+
       const response = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/redeem-appsumo-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${EDGE_FUNCTION_KEY}`,
+          'Authorization': `Bearer ${currentSession.access_token}`,
         },
         body: JSON.stringify({
-          userId: user.id,
           code: trimmedCode,
         }),
       });

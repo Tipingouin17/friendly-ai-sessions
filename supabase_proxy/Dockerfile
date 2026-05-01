@@ -30,13 +30,14 @@ COPY storage/ /app/storage/
 RUN chown -R appuser:appgroup /app
 USER appuser
 
-# Expose port
-EXPOSE 3333
+# Railway injects PORT env var; default to 3333 for local development
+ENV PORT=3333
+EXPOSE ${PORT}
 
-# Health check so Railway/Docker can verify the service is alive
+# Health check — uses $PORT so it works regardless of Railway's assigned port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:3333/health')" || exit 1
+    CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",3333)}/health')" || exit 1
 
-# Run FastAPI with uvicorn (async, native WebSocket support)
+# Run FastAPI with uvicorn — use shell form so $PORT is expanded at runtime
 # Single worker — WebSocket connection state is in-process
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "3333", "--workers", "1", "--loop", "asyncio"]
+CMD uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1 --loop asyncio

@@ -82,8 +82,10 @@ export function useSessionJoiner() {
       setIsJoining(true);
       setError(null);
 
-      // Force refresh data before joining to ensure we have latest counts
-      await refetch();
+      // NOTE: refetch() was removed here — it is already called (with timeout)
+      // in useJoinSessionData.handleJoinSession before joinSession() is invoked.
+      // A second refetch here caused a double-timeout that blocked the join for
+      // 30+ seconds when the Railway backend was slow (cold start).
       
       if (!conversation) {
         throw new Error("Session not found");

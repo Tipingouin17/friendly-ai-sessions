@@ -109,19 +109,10 @@ export function useJoinSessionData(
       }
     }
 
-    // Force a refetch before joining to ensure we have the latest counts
-    // Use a timeout to prevent hanging if the backend is slow
-    try {
-      await Promise.race([
-        refetch(),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Refresh timeout')), 8000)
-        )
-      ]);
-    } catch (refetchError: any) {
-      // If refetch times out or fails, continue with cached data
-      console.warn('Pre-join refetch failed or timed out, continuing with cached data:', refetchError?.message);
-    }
+    // NOTE: Pre-join refetch removed — the atomic /functions/v1/join-session
+    // endpoint performs its own capacity check server-side in the same DB
+    // transaction.  A client-side refetch before joining was redundant and
+    // added up to 8 s of latency on slow connections.
 
     // Use only the session-specific max. 0 means no limit.
     const effectiveMaxParticipants = maxParticipantsForSession;

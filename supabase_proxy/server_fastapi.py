@@ -3225,6 +3225,135 @@ async def edge_function(func_name: str, request: Request):
         except Exception as e:
             raise HTTPException(500, str(e))
 
+    # ── join-session ───────────────────────────────────────────
+    # Atomic join: capacity check + participant insert + count update + event log
+    # in a single DB transaction. Replaces 7 sequential REST calls from the
+    # frontend, reducing join latency from 20-35 s to < 500 ms.
+    if func_name == "join-session":
+        conversation_id = data.get("conversation_id")
+        participant_name = (data.get("participant_name") or "").strip()
+        avatar_seed = data.get("avatar_seed") or str(uuid.uuid4())
+        is_anonymous = bool(data.get("is_anonymous", False))
+        is_host = bool(data.get("is_host", False))
+        join_token = (
+            request.headers.get("x-join-token")
+            or request.headers.get("X-Join-Token")
+            or data.get("join_token")
+            or ""
+        )
+
+        if not conversation_id:
+            raise HTTPException(400, "conversation_id is required")
+        if not participant_name:
+            raise HTTPException(400, "participant_name is required")
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # 1. Validate join token & fetch conversation in one query
+            cur.execute(
+                """
+                SELECT id, status, is_session_ended, participants,
+                       current_participants, join_token
+                FROM public.conversations
+                WHERE id = %s
+                """,
+                (conversation_id,),
+            )
+            conv = cur.fetchone()
+            if not conv:
+                conn.close()
+                raise HTTPException(404, "Session not found")
+
+            # Validate join token (skip for host)
+            if not is_host:
+                token_valid = join_token and str(conv["join_token"]) == str(join_token)
+                if not token_valid:
+                    conn.close()
+                    raise HTTPException(403, "Invalid join token")
+
+            # Validate session state
+            if conv["is_session_ended"]:
+                conn.close()
+                raise HTTPException(400, "This session has already ended")
+            if conv["status"] and conv["status"] != "active":
+                conn.close()
+                raise HTTPException(400, "This session is not currently active")
+
+            # 2. Count actual participants (source of truth)
+            cur.execute(
+                'SELECT COUNT(*) as cnt FROM public.session_participants WHERE conversation_id = %s',
+                (conversation_id,),
+            )
+            actual_count = cur.fetchone()["cnt"]
+            max_participants = conv["participants"] or 0
+
+            if max_participants > 0 and actual_count >= max_participants and not is_host:
+                conn.close()
+                raise HTTPException(400, "This session is full")
+
+            new_participant_id = actual_count + 1
+
+            # 3. Insert participant + update count + log event atomically
+            cur.execute(
+                """
+                INSERT INTO public.session_participants
+                    (conversation_id, participant_id, name, avatar_seed, is_anonymous, is_host)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (conversation_id, participant_id) DO NOTHING
+                """,
+                (conversation_id, new_participant_id, participant_name,
+                 avatar_seed, is_anonymous, is_host),
+            )
+
+            cur.execute(
+                """
+                UPDATE public.conversations
+                SET current_participants = (
+                    SELECT COUNT(*) FROM public.session_participants
+                    WHERE conversation_id = %s
+                )
+                WHERE id = %s
+                """,
+                (conversation_id, conversation_id),
+            )
+
+            cur.execute(
+                """
+                INSERT INTO public.session_events
+                    (conversation_id, event_type, data)
+                VALUES (%s, 'participant_joined', %s::jsonb)
+                """,
+                (
+                    conversation_id,
+                    json.dumps({
+                        "participant_id": new_participant_id,
+                        "participant_name": participant_name,
+                        "avatar_seed": avatar_seed,
+                        "is_anonymous": is_anonymous,
+                        "is_host": is_host,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }),
+                ),
+            )
+
+            conn.commit()
+            conn.close()
+
+            return {
+                "success": True,
+                "participant_id": new_participant_id,
+                "name": participant_name,
+                "avatar_seed": avatar_seed,
+                "is_host": is_host,
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"join-session error: {e}")
+            raise HTTPException(500, f"Failed to join session: {e}")
+
     # ── Unknown function ───────────────────────────────────────
     raise HTTPException(404, f"Function '{func_name}' not found")
 

@@ -48,13 +48,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { logAuthAttemptRef.current = logAuthAttempt; }, [logAuthAttempt]);
   useEffect(() => { logSecurityViolationRef.current = logSecurityViolation; }, [logSecurityViolation]);
 
+  // Track whether the initial getSession() call has completed.
+  // onAuthStateChange must NOT call setLoading(false) until after that point
+  // to avoid the race condition where INITIAL_SESSION fires with session=null
+  // before getSession() has had a chance to restore the persisted session.
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST.
+    // IMPORTANT: Do NOT call setLoading(false) here — only getSession() controls
+    // the loading flag during startup.  onAuthStateChange handles post-init events
+    // (SIGNED_IN after login, SIGNED_OUT after logout, TOKEN_REFRESHED).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
+        // Only update state for post-initialization events.
+        // During startup, getSession() is the single source of truth.
+        if (!initializedRef.current) return;
+
         setSession(newSession);
         setUser(newSession?.user ?? null);
-        setLoading(false);
 
         // Log authentication events
         if (event === 'SIGNED_IN') {
@@ -63,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session — this is the authoritative startup path.
     supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       setSession(existingSession);
       if (existingSession?.user) {
@@ -87,6 +99,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setUser(null);
       }
+      // Mark initialization complete BEFORE setLoading(false) so that any
+      // onAuthStateChange events queued during startup are processed correctly
+      // from this point forward.
+      initializedRef.current = true;
       setLoading(false);
     });
 

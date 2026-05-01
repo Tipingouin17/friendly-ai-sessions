@@ -43,9 +43,8 @@ const Profile = () => {
     queryKey: ['userMetadata', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase.auth.getUser();
-      if (error) throw error;
-      return data.user;
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.user ?? null;
     },
     enabled: !!user,
   });

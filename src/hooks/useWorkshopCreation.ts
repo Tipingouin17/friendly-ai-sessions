@@ -60,9 +60,10 @@ export const useWorkshopCreation = () => {
         return;
       }
       
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       
-      if (userError || !user) {
+      if (!user) {
         toast({
           title: "Error",
           description: "You must be logged in to create a session",

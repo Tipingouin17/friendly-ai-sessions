@@ -18,12 +18,8 @@ export const useSessionClosureValidation = () => {
       throw new Error('No conversation ID provided');
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error("User authentication error:", userError);
-      throw new Error(`Authentication failed: ${userError.message}`);
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     
     if (!user) {
       console.error("No authenticated user found");

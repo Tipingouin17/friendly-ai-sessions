@@ -71,9 +71,10 @@ export const CreateWorkshopModal = ({
     setIsLoading(true);
     
     try {
-      // Get the current user's ID via the Supabase auth session (not localStorage)
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
+      // Get the current user's ID from the local session (no network call needed)
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      if (!user) {
         toast({
           title: "Authentication Error",
           description: "You must be logged in to create a workshop.",

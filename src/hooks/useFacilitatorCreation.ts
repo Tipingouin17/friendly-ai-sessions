@@ -33,8 +33,9 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
     setIsLoading(true);
     
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      if (!user) throw new Error('Not authenticated');
       
       // Create the facilitator entry first so we have an ID
       const { data: facilitator, error } = await supabase

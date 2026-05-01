@@ -19,7 +19,8 @@ export const useSecurityAudit = () => {
 
   const logSecurityEvent = useCallback(async (event: SecurityEvent) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
 
       const { error } = await supabase
         .from('security_audit_log')

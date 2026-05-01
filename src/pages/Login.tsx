@@ -105,8 +105,11 @@ const Login = () => {
     }
   };
 
-  // Show loading state while checking auth
-  if (loading) {
+  // Show loading state ONLY when there's an existing session being validated
+  // (i.e. a token is in localStorage and we're waiting for server confirmation).
+  // If there's no session, show the form immediately — no need to wait.
+  const hasExistingSession = !!localStorage.getItem('mf_session');
+  if (loading && hasExistingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

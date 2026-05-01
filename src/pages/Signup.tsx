@@ -22,7 +22,8 @@ const Signup = () => {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  if (loading) return null;
+  // Only block rendering if there's an existing session being validated
+  if (loading && !!localStorage.getItem('mf_session')) return null;
 
   return (
     <SignupContainer>

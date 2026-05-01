@@ -285,20 +285,8 @@ def _compress_messages_for_context(
 USERS: Dict[str, Dict] = {}
 SESSIONS_AUTH: Dict[str, Dict] = {}
 
-USERS["admin@myfacilitator.com"] = {
-    "id": "4c34d445-307a-4bf6-810e-1e06325cd2fc",
-    "email": "admin@myfacilitator.com",
-    "password": hashlib.sha256("admin123".encode()).hexdigest(),
-    "created_at": "2025-02-28T03:15:56Z",
-    "email_confirmed_at": "2025-02-28T03:15:56Z",
-}
-USERS["test@myfacilitator.com"] = {
-    "id": "5efc6527-0252-4494-97ba-4649e6dc1059",
-    "email": "test@myfacilitator.com",
-    "password": hashlib.sha256("test123".encode()).hexdigest(),
-    "created_at": "2025-02-28T03:15:56Z",
-    "email_confirmed_at": "2025-02-28T03:15:56Z",
-}
+# Legacy seed accounts removed — all users are now loaded exclusively from the DB
+# via load_users_from_db() at startup. No hardcoded credentials in production.
 
 # ============================================================
 # Idempotency lock for AI responses (prevents duplicate inserts)
@@ -436,28 +424,10 @@ def run_startup_migrations() -> None:
         ALTER TABLE profiles
             ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT NULL;
         """,
-        # 2026-04-10: Ensure the seed admin account exists in profiles with role='admin'.
-        # Uses INSERT ... ON CONFLICT to handle both new DBs (row missing) and existing DBs
-        # (row present but role may be wrong). The admin UUID and password hash are fixed.
-        # Password hash = SHA-256('admin123') = 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
-        """
-        INSERT INTO profiles (id, email, full_name, role, password_hash, email_verified, created_at, updated_at)
-        VALUES (
-            '4c34d445-307a-4bf6-810e-1e06325cd2fc',
-            'admin@myfacilitator.com',
-            'Admin',
-            'admin',
-            '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
-            TRUE,
-            NOW(),
-            NOW()
-        )
-        ON CONFLICT (id) DO UPDATE
-            SET role = 'admin',
-                email = EXCLUDED.email,
-                password_hash = EXCLUDED.password_hash,
-                updated_at = NOW();
-        """,
+        # 2026-04-10 (superseded 2026-05-01): Old admin@myfacilitator.com seed kept as no-op.
+        # The account is deleted by the 2026-05-01 migration below.
+        # jerome.gauvin@gmail.com is now the admin account.
+        "SELECT 1; -- admin seed replaced",
         # 2026-04-10: Create password_reset_tokens table for secure forgot-password flow.
         # token: a 64-char hex secret sent to the user's email.
         # expires_at: 1 hour from creation.
@@ -542,6 +512,16 @@ def run_startup_migrations() -> None:
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 103, 103, 999999, 999999, 100, TRUE, TRUE, TRUE, TRUE, TRUE, 999999, TRUE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103)""",
+        # 2026-05-01: Promote jerome.gauvin@gmail.com to admin role (replaces admin@myfacilitator.com).
+        # Also add appsumo_tier and appsumo_codes_redeemed columns if missing (idempotent).
+        """
+        UPDATE profiles SET role = 'admin', updated_at = NOW()
+        WHERE email = 'jerome.gauvin@gmail.com';
+        """,
+        # 2026-05-01: Remove the legacy admin@myfacilitator.com seed account (weak password, no longer needed).
+        """
+        DELETE FROM profiles WHERE email = 'admin@myfacilitator.com';
+        """,
     ]
     try:
         conn = get_db()
@@ -1827,7 +1807,8 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         # This avoids adding httpx/aiohttp as a dependency.  The call is made
         # in a thread executor so it doesn't block the event loop.
         import urllib.request as _urllib_req
-        base_url = os.environ.get("INTERNAL_BASE_URL", "http://localhost:3333")
+        _default_internal = f"http://localhost:{os.environ.get('PORT', '3333')}"
+        base_url = os.environ.get("INTERNAL_BASE_URL", _default_internal)
         payload = json.dumps({
             "conversationId": conv_id,
             "sessionStart": True,
@@ -3154,7 +3135,7 @@ async def edge_function(func_name: str, request: Request):
     # ── create-portal-session ──────────────────────────────────
     elif func_name == "create-portal-session":
         user_id = data.get("userId")
-        return_url = data.get("returnUrl", "https://aifacilitator.vercel.app/settings")
+        return_url = data.get("returnUrl", f"{SITE_URL}/settings")
         if not user_id:
             raise HTTPException(400, "Missing userId")
         try:

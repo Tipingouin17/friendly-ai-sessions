@@ -535,11 +535,11 @@ def run_startup_migrations() -> None:
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 102, 102, 5, 30, 30, TRUE, TRUE, TRUE, TRUE, TRUE, 100, FALSE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 102)""",
-        # Tier 3 (Agency): unlimited, 100 participants, all features, custom branding
+        # Tier 3 (Agency): unlimited (999999), 100 participants, all features, custom branding
         """INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
-        SELECT 103, 103, NULL, NULL, 100, TRUE, TRUE, TRUE, TRUE, TRUE, NULL, TRUE, FALSE
+        SELECT 103, 103, 999999, 999999, 100, TRUE, TRUE, TRUE, TRUE, TRUE, 999999, TRUE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103)""",
     ]
     try:

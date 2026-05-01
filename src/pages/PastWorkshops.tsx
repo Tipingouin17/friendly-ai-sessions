@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { clearAllParticipantState } from "@/lib/api";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
-import { useUserPlan } from "@/hooks/useUserPlan";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
 import { useReportDownloader } from "@/hooks/session-closure/useReportDownloader";
 import ReportDownloadDialog from "@/components/session/ReportDownloadDialog";
@@ -289,15 +289,31 @@ const PastWorkshops = () => {
   const navigate = useNavigate();
   const { navigateToHostSession } = useNavigateToSession();
   const queryClient = useQueryClient();
-  const { planRestrictions } = useUserPlan();
+  const { canGenerateReports, canSaveSessions } = usePlanLimits();
   const [pastPage, setPastPage] = useState(1);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
-  const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({ queryKey: ['past-workshops'], queryFn: fetchPastWorkshops });
-  const { data: activeWorkshops, isLoading: isActiveLoading, error: activeError } = useQuery({ queryKey: ['active-workshops'], queryFn: fetchActiveWorkshops });
+  // past-workshops: completed sessions don't change — 60 s staleTime avoids
+  // redundant fetches on every visit.  The realtime channel below invalidates
+  // the cache immediately when a conversation is updated.
+  const { data: pastWorkshops, isLoading: isPastLoading, error: pastError } = useQuery({
+    queryKey: ['past-workshops'],
+    queryFn: fetchPastWorkshops,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  // active-workshops: live sessions can change, but the realtime channel
+  // handles invalidation.  2 min staleTime prevents double-fetch on tab focus.
+  const { data: activeWorkshops, isLoading: isActiveLoading, error: activeError } = useQuery({
+    queryKey: ['active-workshops'],
+    queryFn: fetchActiveWorkshops,
+    staleTime: 2 * 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
-  const canGenerateReports = !!planRestrictions?.session_reports;
-  const canSaveSessions = !!planRestrictions?.saved_sessions;
+  // canGenerateReports and canSaveSessions come directly from usePlanLimits above
 
   const filteredPast = activeTab === 'saved'
     ? (pastWorkshops || []).filter(w => w.is_saved)

@@ -88,12 +88,25 @@ export const FacilitatorCarousel = ({
     return facilitatorImages[facilitator.id] ?? '/placeholder.svg';
   };
 
-  // Determine if a facilitator is locked for the current user's plan
-  // A facilitator is locked if its plan_id is greater than the user's current plan_id
+  // Map a plan ID to its equivalent access tier for facilitator lock checks.
+  // Standard plans (1-4) map to themselves.
+  // AppSumo LTD plans (101-103) map to their equivalent standard tier:
+  //   Solo (101)   → Starter (2): can use pre-built facilitators, not custom
+  //   Team (102)   → Starter (2): same access level as Starter
+  //   Agency (103) → Premium (3): full access, equivalent to Premium
+  const effectivePlanTier = (planId: number | null): number => {
+    if (!planId) return 1; // no plan = Free
+    if (planId === 101) return 2; // AppSumo Solo → Starter
+    if (planId === 102) return 2; // AppSumo Team → Starter
+    if (planId === 103) return 3; // AppSumo Agency → Premium
+    return planId; // standard plans map to themselves
+  };
+
+  // Determine if a facilitator is locked for the current user's plan.
+  // A facilitator is locked if its required plan tier exceeds the user's effective tier.
   const isFacilitatorLocked = (facilitator: Facilitator): boolean => {
     if (!facilitator.plan_id) return false; // no plan requirement = always accessible
-    if (!userPlanId) return facilitator.plan_id > 1; // no plan = Free (id=1)
-    return facilitator.plan_id > userPlanId;
+    return facilitator.plan_id > effectivePlanTier(userPlanId);
   };
 
   // Build the visible items for this page, including the CreateFacilitatorButton slot

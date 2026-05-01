@@ -122,6 +122,20 @@ const Checkout = () => {
     }
   }, [planId, navigate, toast]);
 
+  // AppSumo LTD plans (IDs ≥ 100) have no Stripe price ID and cannot be purchased
+  // via the checkout flow. They are activated exclusively via /redeem-appsumo.
+  // Guard against direct URL manipulation (e.g. /checkout?plan=101).
+  useEffect(() => {
+    if (plan && (plan.id >= 100 || !plan.stripe_plan_id)) {
+      toast({
+        title: "Invalid Plan",
+        description: "This plan cannot be purchased here. If you have an AppSumo code, please use the redemption page.",
+        variant: "destructive",
+      });
+      navigate('/redeem-appsumo');
+    }
+  }, [plan, navigate, toast]);
+
   // If no user is logged in, redirect to login
   useEffect(() => {
     if (!user) {

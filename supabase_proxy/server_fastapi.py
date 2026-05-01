@@ -530,11 +530,18 @@ def run_startup_migrations() -> None:
         INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
-        VALUES
-            (101, 1,    10,   10,  TRUE, FALSE, FALSE, TRUE, TRUE, 50,   FALSE, FALSE),
-            (102, 5,    30,   30,  TRUE, TRUE,  TRUE,  TRUE, TRUE, 100,  FALSE, FALSE),
-            (103, NULL, NULL, 100, TRUE, TRUE,  TRUE,  TRUE, TRUE, NULL, TRUE,  FALSE)
-        ON CONFLICT DO NOTHING;
+        SELECT 101, 1, 10, 10, TRUE, FALSE, FALSE, TRUE, TRUE, 50, FALSE, FALSE
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 101);
+        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+            customisable_sessions, customisable_facilitators, data_export, session_reports,
+            saved_sessions, question_limit, custom_branding, priority_support)
+        SELECT 102, 5, 30, 30, TRUE, TRUE, TRUE, TRUE, TRUE, 100, FALSE, FALSE
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 102);
+        INSERT INTO plan_restrictions (plan_id, facilitator_limit, session_limit, max_participants,
+            customisable_sessions, customisable_facilitators, data_export, session_reports,
+            saved_sessions, question_limit, custom_branding, priority_support)
+        SELECT 103, NULL, NULL, 100, TRUE, TRUE, TRUE, TRUE, TRUE, NULL, TRUE, FALSE
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103);
         """,
     ]
     try:

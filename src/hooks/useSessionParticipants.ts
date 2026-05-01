@@ -110,8 +110,13 @@ export function useSessionParticipants(conversationId: number | null) {
   // Monitor session status (ended, started, etc.)
   useSessionStatus(conversationId, refetch);
 
-  // Derive final error from all sources
-  const finalError = stateError || connectionError || participantChannelResult.error;
+  // Derive final error from all sources.
+  // IMPORTANT: connectionError and participantChannelResult.error are realtime/WebSocket
+  // monitoring failures — they are non-fatal and must NEVER block the join form or be
+  // shown to participants as an error.  The fallback polling (refetch every 5s) handles
+  // participant count updates without WebSocket.  Only stateError (conversation fetch
+  // failure) is a true blocking error that prevents joining.
+  const finalError = stateError;
 
   // Force periodic refresh to ensure data consistency
   useEffect(() => {

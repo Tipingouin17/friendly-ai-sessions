@@ -62,7 +62,7 @@ export const useSessionData = () => {
     showQrCodeView,
     isSessionStarted,
     handleStartSession
-  } = useSessionInterface(currentConversationId);
+  } = useSessionInterface(currentConversationId, conversation as ConversationWithSession);
 
   return {
     currentConversationId,

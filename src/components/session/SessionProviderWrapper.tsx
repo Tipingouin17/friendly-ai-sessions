@@ -178,26 +178,6 @@ const SessionProviderWrapper: React.FC<SessionProviderWrapperProps> = ({
     isOnAdminPath: isOnAdminPath
   });
 
-  // Auto-retry for participants to ensure they can connect
-  useEffect(() => {
-    if (!sessionMountedRef.current) return;
-
-    if (stateRef.current.hasSetup) return;
-    stateRef.current.hasSetup = true;
-
-    if (isParticipantPath && !stateRef.current.hasToggledRetry &&
-      !stateRef.current.effectiveAdmin && !stateRef.current.effectiveHost &&
-      connectionAttempts === 0) {
-      const retryTimeout = setTimeout(() => {
-        if (!sessionMountedRef.current) return;
-        retryConnection();
-        stateRef.current.hasToggledRetry = true;
-      }, 3000);
-
-      return () => clearTimeout(retryTimeout);
-    }
-  }, [isParticipantPath, connectionAttempts, retryConnection, sessionMountedRef]);
-
   return (
     <SessionProvider
       handleSessionFull={handleSessionFull}

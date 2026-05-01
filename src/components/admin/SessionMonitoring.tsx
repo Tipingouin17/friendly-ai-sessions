@@ -103,6 +103,8 @@ export const SessionMonitoring = () => {
             if (error) throw error;
             return data as unknown as Conversation[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: messages, isLoading: messagesLoading } = useQuery({
@@ -117,6 +119,8 @@ export const SessionMonitoring = () => {
             if (error) throw error;
             return data as Message[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const forceCloseMutation = useMutation({

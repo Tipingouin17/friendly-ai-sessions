@@ -99,6 +99,8 @@ export const SystemSettings = () => {
             if (error) throw error;
             return data as Config;
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     useEffect(() => {

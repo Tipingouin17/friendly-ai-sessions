@@ -53,14 +53,17 @@ export const RevenueDashboard = () => {
     const { data: revenue, isLoading } = useQuery({
         queryKey: ['admin-revenue'],
         queryFn: async (): Promise<RevenueData> => {
-            // Get all profiles with plan info
+            // Get all profiles with plan info (email and full_name for transaction display)
             const { data: profiles } = await api
                 .from('profiles')
                 .select(`
           id,
+          email,
+          full_name,
           role,
           current_plan_id,
           created_at,
+          updated_at,
           subscription_status
         `);
 
@@ -116,44 +119,63 @@ export const RevenueDashboard = () => {
                 users: data.users
             }));
 
-            // Monthly revenue for last 6 months
+            // Monthly revenue for last 6 months — single query, client-side grouping.
+            // Fetch all profiles created in the last 6 months in one request.
+            const sixMonthsAgo = startOfMonth(subDays(new Date(), 5 * 30)).toISOString();
+            const { data: recentProfiles } = await api
+                .from('profiles')
+                .select('id, created_at, current_plan_id, subscription_status')
+                .gte('created_at', sixMonthsAgo);
+
             const monthlyRevenue: Array<{ month: string; revenue: number; newUsers: number }> = [];
             for (let i = 5; i >= 0; i--) {
                 const monthStart = startOfMonth(subDays(new Date(), i * 30));
                 const monthEnd = endOfMonth(monthStart);
+                const monthStartMs = monthStart.getTime();
+                const monthEndMs = monthEnd.getTime();
 
-                // Count users who joined this month
-                const { count: newUsers } = await api
-                    .from('profiles')
-                    .select('*', { count: 'exact', head: true })
-                    .gte('created_at', monthStart.toISOString())
-                    .lte('created_at', monthEnd.toISOString());
+                const monthProfiles = (recentProfiles || []).filter(p => {
+                    const t = new Date(p.created_at).getTime();
+                    return t >= monthStartMs && t <= monthEndMs;
+                });
 
-                // Estimate revenue (simplified - in production, track actual payments)
-                const estimatedRevenue = (newUsers || 0) * 29; // Assuming avg $29/user
+                // Calculate actual MRR contribution from users who joined this month
+                // and are still on a paid plan (more accurate than a flat $29 estimate)
+                const monthRevenue = monthProfiles.reduce((sum, p) => {
+                    if (p.subscription_status === 'active' && p.current_plan_id) {
+                        const plan = plans?.find(pl => pl.id === p.current_plan_id);
+                        return sum + (plan?.price || 0);
+                    }
+                    return sum;
+                }, 0);
 
                 monthlyRevenue.push({
                     month: format(monthStart, 'MMM yyyy'),
-                    revenue: estimatedRevenue,
-                    newUsers: newUsers || 0
+                    revenue: monthRevenue,
+                    newUsers: monthProfiles.length
                 });
             }
 
-            // Mock recent transactions (in production, fetch from Stripe)
-            const recentTransactions = profiles
-                ?.filter(p => p.subscription_status === 'active')
+            // Recent subscription activity: profiles with active/canceled status,
+            // sorted by updated_at descending (most recent subscription change first).
+            // This is the best available data without a dedicated payments table.
+            const recentTransactions = (profiles || [])
+                .filter(p => p.subscription_status === 'active' || p.subscription_status === 'canceled')
+                .sort((a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime())
                 .slice(0, 10)
-                .map((profile, index) => {
+                .map((profile) => {
                     const plan = plans?.find(p => p.id === profile.current_plan_id);
+                    const displayEmail = (profile as { email?: string }).email
+                        || `user_${profile.id.substring(0, 8)}`;
                     return {
-                        id: `txn_${index}`,
-                        user_email: `user_${profile.id.substring(0, 8)}`,
+                        id: profile.id,
+                        user_email: displayEmail,
                         plan: plan?.title || 'Unknown',
                         amount: plan?.price || 0,
-                        date: profile.created_at,
-                        status: 'succeeded'
+                        date: (profile as { updated_at?: string }).updated_at ?? profile.created_at,
+                        status: profile.subscription_status === 'active' ? 'active' : 'canceled'
                     };
-                }) || [];
+                });
 
             return {
                 mrr,
@@ -166,7 +188,9 @@ export const RevenueDashboard = () => {
                 recentTransactions
             };
         },
-        refetchInterval: 300000 // Refresh every 5 minutes
+        staleTime: 5 * 60 * 1000, // 5 minutes — matches refetchInterval
+        refetchInterval: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     if (isLoading) {

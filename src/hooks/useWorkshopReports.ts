@@ -29,5 +29,7 @@ export const useWorkshopReports = (conversationIds: number[]) => {
       return reportsMap;
     },
     enabled: conversationIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };

@@ -54,140 +54,110 @@ export const AnalyticsDashboard = () => {
     const { data: analytics, isLoading } = useQuery({
         queryKey: ['admin-analytics'],
         queryFn: async (): Promise<AnalyticsData> => {
-            // Total users
-            const { count: totalUsers } = await api
-                .from('profiles')
-                .select('*', { count: 'exact', head: true });
-
-            // Active users (logged in last 30 days)
+            // ── Batch all reads into 6 parallel requests ──────────────────────────
+            // Previously this fired 44+ sequential HTTP requests (N+1 loops).
+            // Now we fetch the raw data once and group client-side.
             const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-            const { count: activeUsers } = await api
-                .from('profiles')
-                .select('*', { count: 'exact', head: true })
-                .gte('updated_at', thirtyDaysAgo);
+            const fourteenDaysAgo = subDays(new Date(), 14).toISOString();
 
-            // Total conversations
-            const { count: totalSessions } = await api
-                .from('conversations')
-                .select('*', { count: 'exact', head: true });
+            const [
+                { count: totalUsers },
+                { count: activeUsers },
+                { data: allConversations },
+                { count: totalMessages },
+                { data: recentProfilesRaw },
+                { data: recentConversationsRaw },
+                { data: recentMessagesRaw },
+                { data: plansData },
+            ] = await Promise.all([
+                api.from('profiles').select('*', { count: 'exact', head: true }),
+                api.from('profiles').select('*', { count: 'exact', head: true }).gte('updated_at', thirtyDaysAgo),
+                api.from('conversations').select('id, created_at, is_session_ended, session_duration_minutes, sessions_id, sessions(title), user_id'),
+                api.from('messages').select('*', { count: 'exact', head: true }),
+                api.from('profiles').select('id, created_at, current_plan_id').gte('created_at', thirtyDaysAgo),
+                api.from('conversations').select('id, created_at').gte('created_at', fourteenDaysAgo),
+                api.from('messages').select('id, created_at').gte('created_at', fourteenDaysAgo),
+                api.from('plans').select('id, title'),
+            ]);
 
-            // Active sessions
-            const { count: activeSessions } = await api
-                .from('conversations')
-                .select('*', { count: 'exact', head: true })
-                .eq('is_session_ended', false);
+            // ── Derived KPIs ───────────────────────────────────────────────────────
+            const activeSessions = (allConversations || []).filter(c => !c.is_session_ended).length;
+            const totalSessions = (allConversations || []).length;
 
-            // Total messages
-            const { count: totalMessages } = await api
-                .from('messages')
-                .select('*', { count: 'exact', head: true });
-
-            // Average session duration (exclude 0-minute and null sessions)
-            const { data: durationData } = await api
-                .from('conversations')
-                .select('session_duration_minutes')
-                .not('session_duration_minutes', 'is', null)
-                .gt('session_duration_minutes', 0);
-
-            const validDurations = durationData?.filter(s => s.session_duration_minutes && s.session_duration_minutes > 0) || [];
+            const validDurations = (allConversations || []).filter(
+                c => c.session_duration_minutes && c.session_duration_minutes > 0
+            );
             const avgSessionDuration = validDurations.length > 0
-                ? validDurations.reduce((sum, s) => sum + (s.session_duration_minutes || 0), 0) / validDurations.length
+                ? validDurations.reduce((sum, c) => sum + (c.session_duration_minutes || 0), 0) / validDurations.length
                 : 0;
 
-            // User growth (last 30 days)
+            // ── User growth: cumulative count per day for last 30 days ─────────────
+            // We only have profiles created in the last 30 days; for days before that
+            // we use (totalUsers - recentProfilesRaw.length) as the baseline.
+            const baseline = (totalUsers || 0) - (recentProfilesRaw?.length || 0);
             const userGrowthData: Array<{ date: string; users: number }> = [];
             for (let i = 29; i >= 0; i--) {
-                const date = startOfDay(subDays(new Date(), i));
-                const { count } = await api
-                    .from('profiles')
-                    .select('*', { count: 'exact', head: true })
-                    .lte('created_at', date.toISOString());
-
+                const dayStart = startOfDay(subDays(new Date(), i));
+                const dayEnd = startOfDay(subDays(new Date(), i - 1));
+                const dayStartMs = dayStart.getTime();
+                const dayEndMs = dayEnd.getTime();
+                const joinedByDay = (recentProfilesRaw || []).filter(p => {
+                    const t = new Date(p.created_at).getTime();
+                    return t < dayEndMs;
+                }).length;
                 userGrowthData.push({
-                    date: format(date, 'MMM dd'),
-                    users: count || 0
+                    date: format(dayStart, 'MMM dd'),
+                    users: baseline + joinedByDay
                 });
+                void dayStartMs; // suppress unused warning
             }
 
-            // Sessions by facilitator
-            const { data: sessionsData } = await api
-                .from('conversations')
-                .select(`
-          sessions_id,
-          sessions (
-            title
-          )
-        `);
-
-            const facilitatorCounts: Record<string, number> = { /* no-op */ };
-            sessionsData?.forEach(session => {
-                const title = session.sessions?.title || null;
-                if (title) {
-                    facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;
-                } else {
-                    facilitatorCounts['Other'] = (facilitatorCounts['Other'] || 0) + 1;
-                }
+            // ── Sessions by facilitator ────────────────────────────────────────────
+            const facilitatorCounts: Record<string, number> = {};
+            (allConversations || []).forEach(session => {
+                const title = (session.sessions as { title?: string } | null)?.title || 'Other';
+                facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;
             });
-
             const sessionsByFacilitator = Object.entries(facilitatorCounts)
                 .map(([name, count]) => ({ name, count }))
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 10);
 
-            // Plan distribution
-            const { data: planData } = await api
-                .from('profiles')
-                .select('role');
-
-            const planCounts: Record<string, number> = {
-                'Free': 0,
-                'Basic': 0,
-                'Premium': 0,
-                'Admin': 0
-            };
-
-            planData?.forEach(profile => {
-                const role = profile.role || 'free';
-                if (role === 'admin') planCounts['Admin']++;
-                else if (role === 'premium') planCounts['Premium']++;
-                else if (role === 'basic') planCounts['Basic']++;
-                else planCounts['Free']++;
+            // ── Plan distribution (uses current_plan_id + plans table, not role) ──
+            const planCountMap: Record<string, number> = {};
+            const allProfilesForPlan = await api.from('profiles').select('current_plan_id');
+            (allProfilesForPlan.data || []).forEach(p => {
+                const plan = (plansData || []).find(pl => pl.id === p.current_plan_id);
+                const label = plan?.title || 'Free';
+                planCountMap[label] = (planCountMap[label] || 0) + 1;
             });
-
-            const planDistribution = Object.entries(planCounts)
-                .filter(([_, value]) => value > 0)
+            const planDistribution = Object.entries(planCountMap)
+                .filter(([, v]) => v > 0)
                 .map(([name, value]) => ({ name, value }));
 
-            // Recent activity (last 14 days)
+            // ── Recent activity: last 14 days, client-side grouping ────────────────
             const recentActivity: Array<{ date: string; sessions: number; messages: number }> = [];
             for (let i = 13; i >= 0; i--) {
-                const date = startOfDay(subDays(new Date(), i));
-                const nextDay = startOfDay(subDays(new Date(), i - 1));
-
-                const { count: sessionCount } = await api
-                    .from('conversations')
-                    .select('*', { count: 'exact', head: true })
-                    .gte('created_at', date.toISOString())
-                    .lt('created_at', nextDay.toISOString());
-
-                const { count: messageCount } = await api
-                    .from('messages')
-                    .select('*', { count: 'exact', head: true })
-                    .gte('created_at', date.toISOString())
-                    .lt('created_at', nextDay.toISOString());
-
-                recentActivity.push({
-                    date: format(date, 'MMM dd'),
-                    sessions: sessionCount || 0,
-                    messages: messageCount || 0
-                });
+                const dayStart = startOfDay(subDays(new Date(), i));
+                const dayEnd = startOfDay(subDays(new Date(), i - 1));
+                const dayStartMs = dayStart.getTime();
+                const dayEndMs = dayEnd.getTime();
+                const sessions = (recentConversationsRaw || []).filter(c => {
+                    const t = new Date(c.created_at).getTime();
+                    return t >= dayStartMs && t < dayEndMs;
+                }).length;
+                const messages = (recentMessagesRaw || []).filter(m => {
+                    const t = new Date(m.created_at).getTime();
+                    return t >= dayStartMs && t < dayEndMs;
+                }).length;
+                recentActivity.push({ date: format(dayStart, 'MMM dd'), sessions, messages });
             }
 
             return {
                 totalUsers: totalUsers || 0,
                 activeUsers: activeUsers || 0,
-                totalSessions: totalSessions || 0,
-                activeSessions: activeSessions || 0,
+                totalSessions,
+                activeSessions,
                 totalMessages: totalMessages || 0,
                 avgSessionDuration: Math.round(avgSessionDuration),
                 userGrowth: userGrowthData,
@@ -196,7 +166,9 @@ export const AnalyticsDashboard = () => {
                 recentActivity
             };
         },
-        refetchInterval: 60000 // Refresh every minute
+        staleTime: 60_000,       // 1 minute — matches refetchInterval
+        refetchInterval: 60_000,
+        refetchOnWindowFocus: false,
     });
 
     if (isLoading) {

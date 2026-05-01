@@ -13,6 +13,7 @@ import time
 import hashlib
 import traceback
 import asyncio
+import bcrypt as _bcrypt
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -39,6 +40,36 @@ except ImportError:
     EMAIL_ENABLED = False
     def send_welcome_email(*a, **k): return False
     def send_password_reset_email(*a, **k): return False
+
+# ============================================================
+# Password hashing helpers (bcrypt with SHA-256 legacy upgrade)
+# ============================================================
+# New passwords are always hashed with bcrypt (cost 12).
+# Legacy SHA-256 hashes (64-char hex) are detected on login and transparently
+# upgraded to bcrypt on the user's next successful login.
+
+def _hash_password(plain: str) -> str:
+    """Hash a plain-text password with bcrypt (cost 12)."""
+    return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt(rounds=12)).decode()
+
+
+def _verify_password(plain: str, stored_hash: str) -> bool:
+    """Verify a plain-text password against a stored hash.
+
+    Handles both bcrypt hashes (starts with '$2b$') and legacy SHA-256 hashes
+    (64-char lowercase hex).  Returns True if the password matches.
+    """
+    if not stored_hash:
+        return False
+    # Legacy SHA-256 hash detection: 64-char lowercase hex string
+    if len(stored_hash) == 64 and all(c in '0123456789abcdef' for c in stored_hash):
+        return hashlib.sha256(plain.encode()).hexdigest() == stored_hash
+    # Modern bcrypt hash
+    try:
+        return _bcrypt.checkpw(plain.encode(), stored_hash.encode())
+    except Exception:
+        return False
+
 
 # ============================================================
 # OpenAI client
@@ -522,6 +553,63 @@ def run_startup_migrations() -> None:
         """
         DELETE FROM profiles WHERE email = 'admin@myfacilitator.com';
         """,
+        # 2026-05-02: Per-tier facilitator access matrix.
+        # Replaces the single plan_id column approach with a many-to-many table that
+        # records which plans can use each facilitator and an optional per-session
+        # quantity cap (max_concurrent).  The legacy plan_id column is kept for
+        # backward compatibility but is no longer the source of truth for access control.
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_plan_access (
+            facilitator_id  INTEGER NOT NULL REFERENCES facilitators(id) ON DELETE CASCADE,
+            plan_id         INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+            max_concurrent  INTEGER DEFAULT NULL,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (facilitator_id, plan_id)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_fpa_plan_id ON facilitator_plan_access(plan_id);
+        """,
+        # 2026-05-02: Data integrity constraints — audit-identified gaps.
+        # All wrapped in DO $$ blocks so they are idempotent (skip if already exists).
+        """
+        DO $$ BEGIN
+            -- H2: Ensure only one plan_restrictions row per plan
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_plan_restrictions_plan_id'
+            ) THEN
+                ALTER TABLE plan_restrictions
+                    ADD CONSTRAINT uq_plan_restrictions_plan_id UNIQUE (plan_id);
+            END IF;
+        END $$;
+        """,
+        """
+        DO $$ BEGIN
+            -- H3: Conversations status must be one of the known values
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'chk_conversations_status'
+            ) THEN
+                ALTER TABLE conversations
+                    ADD CONSTRAINT chk_conversations_status
+                    CHECK (status IN ('active', 'ended', 'paused'));
+            END IF;
+        END $$;
+        """,
+        """
+        DO $$ BEGIN
+            -- M14: Profiles role must be a known value
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'chk_profiles_role'
+            ) THEN
+                ALTER TABLE profiles
+                    ADD CONSTRAINT chk_profiles_role
+                    CHECK (role IN ('free', 'user', 'admin', 'host', 'starter', 'premium', 'enterprise'));
+            END IF;
+        END $$;
+        """,
     ]
     try:
         conn = get_db()
@@ -728,6 +816,8 @@ FK_MAP: Dict[str, tuple] = {
     "profiles_current_plan_id_fkey": ("profiles", "current_plan_id", "plans", "id"),
     "facilitators_user_id_fkey": ("facilitators", "user_id", "profiles", "id"),
     "plan_restrictions_plan_id_fkey": ("plan_restrictions", "plan_id", "plans", "id"),
+    "facilitator_plan_access_facilitator_id_fkey": ("facilitator_plan_access", "facilitator_id", "facilitators", "id"),
+    "facilitator_plan_access_plan_id_fkey": ("facilitator_plan_access", "plan_id", "plans", "id"),
 }
 
 TABLE_PK: Dict[str, str] = {
@@ -736,6 +826,7 @@ TABLE_PK: Dict[str, str] = {
     "session_participants": "id", "session_events": "id",
     "session_reports": "id", "faqs": "id",
     "plan_restrictions": "id",
+    "facilitator_plan_access": "facilitator_id",  # composite PK — use facilitator_id as representative
 }
 
 
@@ -1081,7 +1172,7 @@ async def auth_signup(request: Request):
     )
 
     user_id = str(uuid.uuid4())
-    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    pw_hash = _hash_password(password)  # bcrypt cost 12
     created_at = datetime.utcnow().isoformat()
 
     # --- DB persistence (primary store) ---
@@ -1149,8 +1240,6 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     data = await request.json()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password", "")
-    pw_hash = hashlib.sha256(password.encode()).hexdigest()
-
     # Fast path: check in-memory store
     user = USERS.get(email)
     if not user:
@@ -1181,12 +1270,29 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                 USERS[email] = user
         except Exception as e:
             print(f"[login] DB lookup error: {e}")
-
     # Reject if user not found OR password does not match.
-    # Legacy seed accounts that have no password_hash (password=None) are also rejected
-    # — they must be updated with a real password before they can log in.
-    if not user or not user.get("password") or user.get("password") != pw_hash:
+    # _verify_password handles both bcrypt and legacy SHA-256 hashes transparently.
+    stored_hash = (user or {}).get("password", "")
+    if not user or not stored_hash or not _verify_password(password, stored_hash):
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
+    # Transparent bcrypt upgrade: if the stored hash is legacy SHA-256, re-hash with bcrypt
+    # and persist immediately so the account is protected on the next login.
+    if len(stored_hash) == 64 and all(c in '0123456789abcdef' for c in stored_hash):
+        new_hash = _hash_password(password)
+        try:
+            _upg_conn = get_db()
+            _upg_cur = _upg_conn.cursor()
+            _upg_cur.execute(
+                "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE email = %s",
+                (new_hash, email)
+            )
+            _upg_conn.commit()
+            _upg_conn.close()
+            user["password"] = new_hash
+            USERS[email]["password"] = new_hash
+            print(f"[auth] Upgraded password hash for {email} from SHA-256 to bcrypt")
+        except Exception as _upg_err:
+            print(f"[auth] Password upgrade failed for {email}: {_upg_err}")
 
     # Look up the user's profile role so admins get the correct JWT claim
     # Also backfill email if it's null (for users created before email column was added)
@@ -1210,6 +1316,21 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         print(f"[login] Role lookup error: {e}")
 
     token = _make_token(user["id"], user["email"], profile_role)
+    # Record login activity for the Profile security modal
+    try:
+        _la_conn = get_db()
+        _la_cur = _la_conn.cursor()
+        ip_addr = request.headers.get("x-forwarded-for", request.headers.get("x-real-ip", "")).split(",")[0].strip() or None
+        user_agent = request.headers.get("user-agent", "")[:512] or None
+        _la_cur.execute(
+            "INSERT INTO login_activity (id, user_id, ip_address, user_agent, success, created_at) "
+            "VALUES (%s, %s::uuid, %s, %s, TRUE, NOW())",
+            (str(uuid.uuid4()), user["id"], ip_addr, user_agent)
+        )
+        _la_conn.commit()
+        _la_conn.close()
+    except Exception as _la_err:
+        print(f"[auth] login_activity insert failed: {_la_err}")
     return _make_user_response(user, token, role=profile_role)
 
 
@@ -1241,7 +1362,7 @@ async def auth_user(request: Request):
                     updates["avatar_url"] = meta["avatar_url"]
             # Password update — persist new hash to DB and refresh memory cache
             if "password" in data and data["password"]:
-                new_pw_hash = hashlib.sha256(data["password"].encode()).hexdigest()
+                new_pw_hash = _hash_password(data["password"])  # bcrypt cost 12
                 updates["password_hash"] = new_pw_hash
                 # Refresh in-memory entry so subsequent logins work immediately
                 if email in USERS:
@@ -1274,6 +1395,7 @@ async def auth_logout():
 
 
 @app.post("/auth/v1/recover")
+@limiter.limit("3/minute")
 async def auth_recover(request: Request):
     """Initiate a password reset: generate a secure token, store it, and email the user."""
     import secrets
@@ -1322,6 +1444,7 @@ async def auth_recover(request: Request):
 
 
 @app.post("/auth/v1/reset-password")
+@limiter.limit("5/minute")
 async def auth_reset_password(request: Request):
     """Validate a reset token and set a new password."""
     try:
@@ -1354,7 +1477,7 @@ async def auth_reset_password(request: Request):
             conn.close()
             raise HTTPException(400, detail={"code": "token_expired", "message": "This reset link has expired. Please request a new one."})
         user_id = str(row["user_id"])
-        pw_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        pw_hash = _hash_password(new_password)  # bcrypt cost 12
         # Update password in DB
         cur.execute(
             "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE id = %s::uuid",
@@ -1515,8 +1638,14 @@ def _validate_join_token(token: str, conversation_id: str | int | None, conn) ->
 # Public endpoint to re-run safe startup migrations (all idempotent)
 # ============================================================
 @app.post("/admin/apply-migrations")
-async def apply_migrations_endpoint():
-    """Re-run all idempotent startup migrations. Safe to call multiple times."""
+async def apply_migrations_endpoint(request: Request):
+    """Re-run all idempotent startup migrations. Protected by MIGRATION_SECRET."""
+    migration_secret = os.environ.get("MIGRATION_SECRET", "")
+    if not migration_secret:
+        raise HTTPException(403, "Migration endpoint disabled: MIGRATION_SECRET not set")
+    auth = request.headers.get("x-migration-secret", "")
+    if auth != migration_secret:
+        raise HTTPException(403, "Invalid migration secret")
     try:
         run_startup_migrations()
         return {"success": True, "message": "Migrations applied"}
@@ -2069,7 +2198,59 @@ async def rest_table(table: str, request: Request):
             if not data:
                 conn.close()
                 raise HTTPException(400, "No data")
-
+            # H7: Enforce per-plan question limit server-side for participant messages.
+            # Only applies to participant (non-admin) messages with a conversation_id.
+            if table == "messages":
+                msg_data = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else {})
+                msg_conv_id = msg_data.get("conversation_id")
+                msg_role = msg_data.get("role", "")
+                # Only count participant messages (role = 'user'), not admin/facilitator messages
+                if msg_conv_id and msg_role not in ("admin", "system", "assistant"):
+                    try:
+                        # Get the plan's question_limit for this conversation's host
+                        cur.execute("""
+                            SELECT pr.question_limit
+                            FROM conversations c
+                            JOIN profiles p ON p.id = c.user_id
+                            JOIN plan_restrictions pr ON pr.plan_id = p.current_plan_id
+                            WHERE c.id = %s
+                        """, (msg_conv_id,))
+                        ql_row = cur.fetchone()
+                        if ql_row and ql_row["question_limit"] is not None:
+                            question_limit = ql_row["question_limit"]
+                            # Count existing participant messages in this conversation
+                            cur.execute(
+                                "SELECT COUNT(*) AS cnt FROM messages "
+                                "WHERE conversation_id = %s AND role NOT IN ('admin', 'system', 'assistant')",
+                                (msg_conv_id,)
+                            )
+                            cnt_row = cur.fetchone()
+                            current_count = cnt_row["cnt"] if cnt_row else 0
+                            if current_count >= question_limit:
+                                conn.close()
+                                raise HTTPException(429, detail={
+                                    "code": "question_limit_reached",
+                                    "message": f"Session question limit of {question_limit} has been reached."
+                                })
+                    except HTTPException:
+                        raise
+                    except Exception as _ql_err:
+                        print(f"[messages POST] Question limit check failed: {_ql_err}")
+            # H6: Enforce session lock — reject conversation creation if the referenced
+            # session template has lock=TRUE (admin moderation flag).
+            if table == "conversations":
+                session_id = (data if isinstance(data, dict) else (data[0] if data else {})).get("sessions_id")
+                if session_id:
+                    try:
+                        cur.execute('SELECT lock FROM public.sessions WHERE id = %s', (session_id,))
+                        sess_row = cur.fetchone()
+                        if sess_row and sess_row["lock"]:
+                            conn.close()
+                            raise HTTPException(403, detail={"code": "session_locked", "message": "This session template has been locked by an administrator and cannot be used."})
+                    except HTTPException:
+                        raise
+                    except Exception as _lock_err:
+                        print(f"[conversations POST] Session lock check failed: {_lock_err}")
             def _adapt(d):
                 return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
 

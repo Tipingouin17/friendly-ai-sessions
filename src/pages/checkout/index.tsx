@@ -82,6 +82,8 @@ const Checkout = () => {
 
       return processedPlan;
     },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
   });
 
   // Handle back to pricing

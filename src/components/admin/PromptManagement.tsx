@@ -2,6 +2,7 @@
  * Prompt Management
  *
  * Admin component for the AIfacilitator application.
+ * Manages per-session AI prompts, model settings, and content moderation locks.
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,11 +10,11 @@ import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, AlertTriangle, Sparkles, Bot, Sliders } from "lucide-react";
+import { Loader2, Save, AlertTriangle, Sparkles, Bot, Sliders, Lock, LockOpen, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
     Select,
@@ -36,6 +37,9 @@ interface Session {
     gpt_version: string | null;
     max_tokens: number | null;
     randomness: number | null;
+    /** Admin moderation lock — prevents users from starting new conversations with this session. */
+    lock: boolean | null;
+    lock_reason: string | null;
 }
 
 const GPT_MODEL_OPTIONS = [
@@ -57,19 +61,22 @@ export const PromptManagement = () => {
     const [editedGptVersion, setEditedGptVersion] = useState("gpt-4.1-mini");
     const [editedMaxTokens, setEditedMaxTokens] = useState(600);
     const [editedRandomness, setEditedRandomness] = useState(0.7);
+    const [editedLockReason, setEditedLockReason] = useState("");
 
-    // Fetch all sessions
+    // Fetch all sessions including lock state
     const { data: sessions, isLoading } = useQuery({
         queryKey: ['admin-sessions'],
         queryFn: async () => {
             const { data, error } = await api
                 .from('sessions')
-                .select('id, title, facilitator, prompt, welcome_message, objective, difficulty_level, scope, gpt_version, max_tokens, randomness')
+                .select('id, title, facilitator, prompt, welcome_message, objective, difficulty_level, scope, gpt_version, max_tokens, randomness, lock, lock_reason')
                 .order('facilitator', { ascending: true });
 
             if (error) throw error;
             return data as Session[];
-        }
+        },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     // Update session — prompt, welcome, scope, and AI model settings
@@ -96,13 +103,47 @@ export const PromptManagement = () => {
             queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
             toast({ title: "Success", description: "Session settings updated successfully" });
         },
-        onError: (error) => {
+        onError: (error: Error) => {
             toast({
                 title: "Error",
                 description: `Failed to update: ${error.message}`,
                 variant: "destructive",
             });
         }
+    });
+
+    /**
+     * Moderation lock mutation — operates independently of the prompt save flow.
+     * Setting lock=true with a reason immediately prevents new conversations from
+     * being created with this session template.
+     */
+    const lockMutation = useMutation({
+        mutationFn: async ({
+            sessionId, lock, lock_reason
+        }: {
+            sessionId: number;
+            lock: boolean;
+            lock_reason: string;
+        }) => {
+            const { error } = await api
+                .from('sessions')
+                .update({ lock, lock_reason: lock ? (lock_reason.trim() || null) : null })
+                .eq('id', sessionId);
+
+            if (error) throw error;
+        },
+        onSuccess: (_data, vars) => {
+            queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+            toast({
+                title: vars.lock ? "Session locked" : "Session unlocked",
+                description: vars.lock
+                    ? "Users can no longer start new conversations with this session."
+                    : "The session is now available to users.",
+            });
+        },
+        onError: (error: Error) => {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        },
     });
 
     const handleSessionSelect = (sessionId: string) => {
@@ -116,6 +157,7 @@ export const PromptManagement = () => {
             setEditedGptVersion(session.gpt_version || "gpt-4.1-mini");
             setEditedMaxTokens(session.max_tokens ?? 600);
             setEditedRandomness(session.randomness ?? 0.7);
+            setEditedLockReason(session.lock_reason || "");
         }
     };
 
@@ -141,9 +183,11 @@ export const PromptManagement = () => {
         setEditedGptVersion(session.gpt_version || "gpt-4.1-mini");
         setEditedMaxTokens(session.max_tokens ?? 600);
         setEditedRandomness(session.randomness ?? 0.7);
+        setEditedLockReason(session.lock_reason || "");
     };
 
     const selectedSessionData = sessions?.find(s => s.id === selectedSession);
+    const isLocked = !!selectedSessionData?.lock;
 
     if (isLoading) {
         return (
@@ -162,7 +206,7 @@ export const PromptManagement = () => {
                         <CardTitle className="text-2xl">AI Prompt Management</CardTitle>
                     </div>
                     <CardDescription>
-                        Configure AI behaviour, prompts, and model settings for each facilitator session
+                        Configure AI behaviour, prompts, model settings, and content moderation for each facilitator session
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
@@ -187,6 +231,9 @@ export const PromptManagement = () => {
                                     {sessions?.map((session) => (
                                         <SelectItem key={session.id} value={session.id.toString()}>
                                             <div className="flex items-center gap-2">
+                                                {session.lock && (
+                                                    <Lock className="h-3 w-3 text-red-500 shrink-0" />
+                                                )}
                                                 <span className="font-medium">{session.title}</span>
                                                 <span className="text-xs text-gray-500">
                                                     ({session.difficulty_level})
@@ -200,6 +247,93 @@ export const PromptManagement = () => {
 
                         {selectedSessionData && (
                             <div className="space-y-6 pt-4 border-t">
+
+                                {/* ── Moderation Lock ── */}
+                                <div className={`p-4 rounded-lg border-2 transition-colors ${
+                                    isLocked
+                                        ? "bg-red-50 border-red-300"
+                                        : "bg-green-50 border-green-200"
+                                }`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {isLocked
+                                                ? <Lock className="h-5 w-5 text-red-600 shrink-0" />
+                                                : <LockOpen className="h-5 w-5 text-green-600 shrink-0" />
+                                            }
+                                            <div>
+                                                <p className={`font-semibold text-sm ${isLocked ? "text-red-800" : "text-green-800"}`}>
+                                                    {isLocked ? "Session Locked — Moderation Active" : "Session Active"}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {isLocked
+                                                        ? "Users cannot start new conversations with this session."
+                                                        : "Users can start new conversations with this session."
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Switch
+                                            checked={isLocked}
+                                            onCheckedChange={(checked) => {
+                                                if (!selectedSession) return;
+                                                lockMutation.mutate({
+                                                    sessionId: selectedSession,
+                                                    lock: checked,
+                                                    lock_reason: editedLockReason,
+                                                });
+                                            }}
+                                            disabled={lockMutation.isPending}
+                                            className="data-[state=checked]:bg-red-600"
+                                        />
+                                    </div>
+
+                                    {/* Moderation reason — always visible so admin can pre-fill before locking */}
+                                    <div className="mt-3 space-y-1.5">
+                                        <Label
+                                            htmlFor="lock-reason"
+                                            className={`text-xs font-medium flex items-center gap-1 ${isLocked ? "text-red-700" : "text-gray-600"}`}
+                                        >
+                                            <ShieldAlert className="h-3 w-3" />
+                                            Moderation Reason {isLocked ? "(required)" : "(optional — set before locking)"}
+                                        </Label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                id="lock-reason"
+                                                type="text"
+                                                value={editedLockReason}
+                                                onChange={e => setEditedLockReason(e.target.value)}
+                                                placeholder="e.g. Inappropriate language detected — under review"
+                                                className={`flex-1 text-sm border rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-1 ${
+                                                    isLocked
+                                                        ? "border-red-200 focus:ring-red-400"
+                                                        : "border-gray-200 focus:ring-purple-400"
+                                                }`}
+                                            />
+                                            {isLocked && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-red-200 text-red-700 hover:bg-red-50 text-xs shrink-0"
+                                                    onClick={() => {
+                                                        if (!selectedSession) return;
+                                                        lockMutation.mutate({
+                                                            sessionId: selectedSession,
+                                                            lock: true,
+                                                            lock_reason: editedLockReason,
+                                                        });
+                                                    }}
+                                                    disabled={lockMutation.isPending}
+                                                >
+                                                    {lockMutation.isPending
+                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                        : "Save Reason"
+                                                    }
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Session overview */}
                                 <div className="grid md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                                     <div>

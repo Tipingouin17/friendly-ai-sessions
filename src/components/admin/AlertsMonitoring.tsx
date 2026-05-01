@@ -175,7 +175,9 @@ export const AlertsMonitoring = () => {
                 return b.timestamp.getTime() - a.timestamp.getTime();
             });
         },
-        refetchInterval: 60000 // Refresh every minute
+        staleTime: 60_000,
+        refetchInterval: 60_000,
+        refetchOnWindowFocus: false,
     });
 
     const getAlertIcon = (type: SystemAlert['type']) => {

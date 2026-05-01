@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Shield, Tag, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Plan } from '../pricing/types';
-import { supabase, EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/integrations/supabase/client';
+import api, { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from "@/lib/api";
 
 /** Shape returned by the validate-coupon backend endpoint. */
 interface CouponResult {

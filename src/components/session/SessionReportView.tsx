@@ -27,7 +27,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { useToast } from '@/hooks/use-toast';
@@ -51,7 +51,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     queryFn: async () => {
       
       // Fetch conversation with sessions
-      const { data: conversation, error: convError } = await supabase
+      const { data: conversation, error: convError } = await api
         .from('conversations')
         .select(`
           *,
@@ -79,7 +79,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       // Get facilitator details separately if facilitator exists
       let facilitatorData = null;
       if (conversation.sessions?.facilitator) {
-        const { data: facilitator, error: facilitatorError } = await supabase
+        const { data: facilitator, error: facilitatorError } = await api
           .from('facilitators')
           .select('id, title, profile_picture')
           .eq('id', conversation.sessions.facilitator)
@@ -91,7 +91,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       }
 
       // Fetch session report
-      const { data: report, error: reportError } = await supabase
+      const { data: report, error: reportError } = await api
         .from('session_reports')
         .select('*')
         .eq('conversation_id', reportConversationId)
@@ -110,7 +110,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       }
 
       // Fetch messages
-      const { data: messages, error: msgError } = await supabase
+      const { data: messages, error: msgError } = await api
         .from('messages')
         .select('*')
         .eq('conversation_id', reportConversationId)
@@ -122,7 +122,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
       }
 
       // Fetch participants
-      const { data: participants, error: partError } = await supabase
+      const { data: participants, error: partError } = await api
         .from('session_participants')
         .select('*')
         .eq('conversation_id', reportConversationId);

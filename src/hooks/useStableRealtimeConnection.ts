@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 
 interface UseStableRealtimeConnectionProps {
@@ -84,7 +84,7 @@ export function useStableRealtimeConnection({
     const channelName = `stable-realtime-${conversationId}-${Date.now()}`;
 
     try {
-      const channel = supabase
+      const channel = api
         .channel(channelName)
         // Messages channel
         .on('postgres_changes', {

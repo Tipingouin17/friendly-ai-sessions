@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Message } from '@/types/chat';
 import { useStableRealtimeConnection } from './useStableRealtimeConnection';
 import { useMessageDeliveryTracker } from './useMessageDeliveryTracker';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseEnhancedSessionMessagesProps {
   conversationId: number | null;
@@ -45,7 +45,7 @@ export const useEnhancedSessionMessages = ({
     setError(null);
 
     try {
-      const { data: messagesData, error: messagesError } = await supabase
+      const { data: messagesData, error: messagesError } = await api
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)

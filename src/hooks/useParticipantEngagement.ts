@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 export type EngagementStatus = 'active' | 'paused' | 'skipped';
 
@@ -38,7 +38,7 @@ export const useParticipantEngagement = ({
     async (eventType: string, data: Record<string, unknown> = {}) => {
       if (!conversationId) return;
       try {
-        await supabase.from('session_events').insert({
+        await api.from('session_events').insert({
           conversation_id: conversationId,
           event_type: eventType,
           data: {
@@ -90,7 +90,7 @@ export const useParticipantEngagement = ({
         // 2. Insert a messages row so the host sees it in their message list.
         //    role: 'admin' ensures it renders as a centred admin announcement.
         //    private_to_host: true marks it as a private participant note.
-        await supabase.from('messages').insert({
+        await api.from('messages').insert({
           conversation_id: conversationId,
           content: {
             text: `🔒 Private message from ${participantName}: ${message.trim()}`,

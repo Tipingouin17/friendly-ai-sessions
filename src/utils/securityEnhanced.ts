@@ -26,8 +26,8 @@ export const validateSecureSessionOperation = async (
     switch (operation) {
       case 'close_session': {
         // Only session owner can close sessions
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data: conversation, error: convErr } = await supabase
+        const api = (await import('@/lib/api')).default;
+        const { data: conversation, error: convErr } = await api
           .from('conversations')
           .select('user_id')
           .eq('id', conversationId)

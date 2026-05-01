@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { StandardPlanCard } from './pricing/components/StandardPlanCard';
 import { EnterprisePlanCard } from './pricing/components/EnterprisePlanCard';
 import { ComparisonTable } from './pricing/components/ComparisonTable';
@@ -196,7 +196,7 @@ const Pricing = () => {
     let cancelled = false;
     setIsFetching(true);
 
-    supabase
+    api
       .from('plans')
       .select('*, plan_restrictions(*)')
       .order('id', { ascending: true })

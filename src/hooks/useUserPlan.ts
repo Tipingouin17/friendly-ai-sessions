@@ -14,7 +14,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Plan } from "@/pages/pricing/types";
 
 export interface PlanRestrictions {
@@ -226,7 +226,7 @@ export const useUserPlan = (): UserPlanDetails => {
       try {
         // Single DB call: get the user's current_plan_id from their profile.
         // Plans and restrictions are resolved from static constants — no extra API calls.
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData, error: profileError } = await api
           .from('profiles')
           .select('current_plan_id')
           .eq('id', user.id)

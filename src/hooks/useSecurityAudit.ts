@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useToast } from '@/hooks/use-toast';
 
 interface SecurityEvent {
@@ -19,10 +19,10 @@ export const useSecurityAudit = () => {
 
   const logSecurityEvent = useCallback(async (event: SecurityEvent) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       const user = session?.user ?? null;
 
-      const { error } = await supabase
+      const { error } = await api
         .from('security_audit_log')
         .insert({
           user_id: user?.id || null,

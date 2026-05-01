@@ -4,7 +4,7 @@
  * Message sender hook for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Message } from "@/types/chat";
 import { nanoid } from "nanoid";
 
@@ -56,7 +56,7 @@ export const useMessageSaver = () => {
     };
 
     // Save to database with participant_id column for privacy
-    const { data, error } = await supabase.from('messages').insert({
+    const { data, error } = await api.from('messages').insert({
       conversation_id: currentConversationId,
       participant_id: effectiveParticipantId,
       content: {

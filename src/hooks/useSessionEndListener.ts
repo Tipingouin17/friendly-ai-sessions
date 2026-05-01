@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export function useSessionEndListener(conversationId: number | null, isAdmin: boolean = false) {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
     // Create a unique channel name to prevent stale connections
     const channelName = `session-end-${conversationId}-${Date.now()}`;
     
-    const channel = supabase
+    const channel = api
       .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
@@ -56,7 +56,7 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
     return () => {
       if (mountedRef.current) { /* no-op */ }
       try {
-        supabase.removeChannel(channel);
+        api.removeChannel(channel);
       } catch (err) {
         console.error("Error removing session end channel:", err);
       }

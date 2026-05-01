@@ -15,7 +15,7 @@ import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
 import JoinSessionLoadingState from "./JoinSessionLoadingState";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
 import { useSecurityAudit } from "@/hooks/useSecurityAudit";
 import { useWelcomeMessageGate } from "@/hooks/useWelcomeMessageGate";
@@ -128,7 +128,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     const channelName = `participant-events-${props.currentConversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
     try {
-      const channel = supabase
+      const channel = api
         .channel(channelName)
         .on('postgres_changes', { 
           event: 'INSERT', 
@@ -199,7 +199,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         try {
           const channel = participantEventChannelRef.current;
           participantEventChannelRef.current = null;
-          supabase.removeChannel(channel);
+          api.removeChannel(channel);
         } catch (err) {
           console.error("Error removing participant events channel:", err);
         }

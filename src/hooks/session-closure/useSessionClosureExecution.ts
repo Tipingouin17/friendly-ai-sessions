@@ -4,7 +4,7 @@
  * Session closure hook for the AIfacilitator application.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,7 +33,7 @@ export const useSessionClosureExecution = () => {
     // Log the sensitive action
     logSensitiveAction('session_closure_initiated', conversationId);
 
-    const { data, error } = await supabase.functions.invoke('close-session-and-generate-report', {
+    const { data, error } = await api.functions.invoke('close-session-and-generate-report', {
       body: {
         conversationId,
         userId

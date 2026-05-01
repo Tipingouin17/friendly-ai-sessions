@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export function useHostSessions() {
   const { 
@@ -15,7 +15,7 @@ export function useHostSessions() {
   } = useQuery({
     queryKey: ['host-sessions'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('conversations')
         .select(`
           *,

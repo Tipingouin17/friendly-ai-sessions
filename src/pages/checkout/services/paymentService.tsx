@@ -4,7 +4,7 @@
  * Page for the AIfacilitator application.
  */
 
-import { supabase, EDGE_FUNCTION_URL } from '@/integrations/supabase/client';
+import api, { EDGE_FUNCTION_URL } from "@/lib/api";
 import { BillingDetails } from '../types';
 import { createSafeUrl, applySafeCookieParams, handleStripeCookies, setCrossDomainCookie } from '@/utils/crossOriginUtils';
 import { CardElement } from '@stripe/react-stripe-js';
@@ -67,7 +67,7 @@ export const createSubscription = async (
   const returnUrl = createSafeUrl('/profile');
 
   // Get the user's session JWT for authenticated request
-  const { data: { session: currentSession } } = await supabase.auth.getSession();
+  const { data: { session: currentSession } } = await api.auth.getSession();
   if (!currentSession?.access_token) {
     throw new Error('Session expired. Please log in again.');
   }
@@ -174,7 +174,7 @@ export const confirmSubscription = async (
   handleStripeCookies();
   
   // Get the user's session JWT for authenticated request
-  const { data: { session: confirmSession } } = await supabase.auth.getSession();
+  const { data: { session: confirmSession } } = await api.auth.getSession();
   if (!confirmSession?.access_token) {
     throw new Error('Session expired. Please log in again.');
   }

@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { ConversationWithSession } from "@/types/database";
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
@@ -16,7 +16,7 @@ const fetchConversation = async (id: number | null) => {
   try {
     
     // Enhanced query with proper facilitator joins through sessions table
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from('conversations')
       .select(`
         *,

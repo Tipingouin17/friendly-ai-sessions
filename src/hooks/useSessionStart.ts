@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/utils/debugLogger';
 
@@ -51,7 +51,7 @@ export const useSessionStart = ({
       
       // First, mark the session as started in the database
       const dbUpdateStart = performance.now();
-      const { error: updateError } = await supabase
+      const { error: updateError } = await api
         .from('conversations')
         .update({ 
           session_started: true 
@@ -81,7 +81,7 @@ export const useSessionStart = ({
       
       logger.category('session', '📤 Edge function request payload:', requestPayload);
 
-      const { data: responseData, error: responseError } = await supabase.functions.invoke(
+      const { data: responseData, error: responseError } = await api.functions.invoke(
         'handle-facilitator-response',
         {
           body: requestPayload

@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SessionContextProps } from "@/types/session";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
 interface UseSessionStateTransitionProps {
@@ -49,7 +49,7 @@ export function useSessionStateTransition({
       try {
         if (!props.currentConversationId || !props.currentUserParticipantId) return;
         
-        const { data, error } = await supabase
+        const { data, error } = await api
           .from('session_participants')
           .select('*')
           .eq('conversation_id', props.currentConversationId)

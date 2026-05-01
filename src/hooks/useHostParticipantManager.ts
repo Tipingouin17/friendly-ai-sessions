@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 import { ParticipantInfo } from '@/types/chat';
 import { createLogger } from '@/utils/debugLogger';
@@ -158,7 +158,7 @@ export function useHostParticipantManager({
     if (!conversationId) return;
 
     try {
-      const { data: participantsData, error: participantsError } = await supabase
+      const { data: participantsData, error: participantsError } = await api
         .from('session_participants')
         .select('*')
         .eq('conversation_id', conversationId);
@@ -215,7 +215,7 @@ export function useHostParticipantManager({
 
       try {
         // Fetch conversation data
-        const { data: convData, error: convError } = await supabase
+        const { data: convData, error: convError } = await api
           .from('conversations')
           .select('current_participants, participants, session_started')
           .eq('id', conversationId)
@@ -281,7 +281,7 @@ export function useHostParticipantManager({
     const channelName = `enhanced-host-${conversationId}-${Date.now()}`;
 
     try {
-      const channel = supabase
+      const channel = api
         .channel(channelName)
         // Listen to conversation updates
         .on('postgres_changes', {
@@ -401,7 +401,7 @@ export function useHostParticipantManager({
 
     try {
       // Fetch conversation data
-      const { data: convData, error: convError } = await supabase
+      const { data: convData, error: convError } = await api
         .from('conversations')
         .select('current_participants, participants, session_started')
         .eq('id', conversationId)

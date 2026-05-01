@@ -11,9 +11,9 @@ export const validateUserPermissions = async (
   requiredRole: 'admin' | 'moderator' | 'user' = 'user'
 ): Promise<boolean> => {
   try {
-    const { supabase } = await import('@/integrations/supabase/client');
+    const api = (await import('@/lib/api')).default;
     
-    const { data: profile } = await supabase
+    const { data: profile } = await api
       .from('profiles')
       .select('role')
       .eq('id', userId)

@@ -6,7 +6,7 @@
 
 import { useEffect, useRef } from 'react';
 import { ParticipantInfo } from '@/types/chat';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseParticipantRealtimeSubscriptionsProps {
   conversationId: number | null;
@@ -34,7 +34,7 @@ export function useParticipantRealtimeSubscriptions({
         participantsChannelRef.current = null;
         cleanupAttemptedRef.current.participants = true;
         
-        supabase.removeChannel(channel);
+        api.removeChannel(channel);
       } catch (err) {
         console.error('Error cleaning up participants channel:', err);
       }
@@ -45,7 +45,7 @@ export function useParticipantRealtimeSubscriptions({
     
     try {
       // Subscribe to changes in session_participants table
-      const channel = supabase
+      const channel = api
         .channel(participantsChannelName)
         .on('postgres_changes', {
           event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
@@ -122,7 +122,7 @@ export function useParticipantRealtimeSubscriptions({
         participantEventsChannelRef.current = null;
         cleanupAttemptedRef.current.events = true;
         
-        supabase.removeChannel(eventsChannel);
+        api.removeChannel(eventsChannel);
       } catch (err) {
         console.error('Error cleaning up participant events channel:', err);
       }
@@ -132,7 +132,7 @@ export function useParticipantRealtimeSubscriptions({
     
     try {
       // Subscribe to participant events
-      const eventsChannel = supabase
+      const eventsChannel = api
         .channel(eventsChannelName)
         .on('postgres_changes', {
           event: 'INSERT',
@@ -198,7 +198,7 @@ export function useParticipantRealtimeSubscriptions({
           const channel = participantsChannelRef.current;
           participantsChannelRef.current = null;
           cleanupAttemptedRef.current.participants = true;
-          supabase.removeChannel(channel);
+          api.removeChannel(channel);
         }
       } catch (err) {
         console.error('Error cleaning up participants channel:', err);
@@ -210,7 +210,7 @@ export function useParticipantRealtimeSubscriptions({
           const eventsChannel = participantEventsChannelRef.current;
           participantEventsChannelRef.current = null;
           cleanupAttemptedRef.current.events = true;
-          supabase.removeChannel(eventsChannel);
+          api.removeChannel(eventsChannel);
         }
       } catch (err) {
         console.error('Error cleaning up participant events channel:', err);

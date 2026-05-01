@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface SessionAnalytics {
   totalEvents: number;
@@ -46,7 +46,7 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
       setIsLoading(true);
       
       // Fetch all session events for this conversation
-      const { data: events, error: eventsError } = await supabase
+      const { data: events, error: eventsError } = await api
         .from('session_events')
         .select('*')
         .eq('conversation_id', conversationId)
@@ -140,7 +140,7 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
     calculateAnalytics();
 
     // Set up realtime subscription
-    const channel = supabase
+    const channel = api
       .channel(`session-analytics-${conversationId}`)
       .on('postgres_changes', {
         event: '*',
@@ -153,7 +153,7 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, [conversationId, realtime, calculateAnalytics]);
 

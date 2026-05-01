@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
@@ -34,7 +34,7 @@ export function useSessionInterface(conversationId: number | null) {
       // Check if session is already marked as started in the database
       const checkSessionStarted = async () => {
         try {
-          const { data, error } = await supabase
+          const { data, error } = await api
             .from('conversations')
             .select('session_started, join_token')
             .eq('id', conversationId)
@@ -76,12 +76,12 @@ export function useSessionInterface(conversationId: number | null) {
 
     // Clean up any existing channel
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
+      api.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
     // Create new channel for this conversation
-    const channel = supabase
+    const channel = api
       .channel(`session-interface-${conversationId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -115,7 +115,7 @@ export function useSessionInterface(conversationId: number | null) {
     // Cleanup function
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        api.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
@@ -150,7 +150,7 @@ export function useSessionInterface(conversationId: number | null) {
     
     try {
       // Update the session_started flag in the database
-      const { error } = await supabase
+      const { error } = await api
         .from('conversations')
         .update({ 
           session_started: true 

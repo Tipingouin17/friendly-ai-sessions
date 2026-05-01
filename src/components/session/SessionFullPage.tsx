@@ -12,7 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Bell, RefreshCw, CheckCircle, Zap } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { ConversationWithSession } from '@/types/database';
 
 interface SessionFullPageProps {
@@ -65,7 +65,7 @@ const SessionFullPage: React.FC<SessionFullPageProps> = ({
     if (!notifyName.trim() || !conversationId) return;
     setIsSending(true);
     try {
-      await supabase.from('session_events').insert({
+      await api.from('session_events').insert({
         conversation_id: conversationId,
         event_type: 'participant_waiting',
         data: {

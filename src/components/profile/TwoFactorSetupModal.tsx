@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -33,7 +33,7 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
         setIsLoading(true);
         setError(null);
         try {
-            const { data, error } = await supabase.auth.mfa.enroll({
+            const { data, error } = await api.auth.mfa.enroll({
                 factorType: 'totp',
             });
 
@@ -61,7 +61,7 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
         setError(null);
 
         try {
-            const { data, error } = await supabase.auth.mfa.challengeAndVerify({
+            const { data, error } = await api.auth.mfa.challengeAndVerify({
                 factorId,
                 code: verifyCode,
             });

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, MessageSquare, Users, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 interface SessionStartingGateProps {
   conversationId: number;
@@ -53,7 +53,7 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
     
     try {
       
-      const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],
           conversationId,

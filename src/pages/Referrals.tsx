@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { pageVariants, staggerContainer, staggerItem } from "@/lib/animations";
 import PageHead from "@/components/PageHead";
@@ -31,7 +31,7 @@ const Referrals = () => {
         queryKey: ["referrals", user?.id],
         queryFn: async () => {
             if (!user?.id) return [];
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from("referrals")
                 .select("*")
                 .order("created_at", { ascending: false });
@@ -51,7 +51,7 @@ const Referrals = () => {
     // Invite mutation
     const inviteMutation = useMutation({
         mutationFn: async (email: string) => {
-            const { error } = await supabase.from("referrals").insert({
+            const { error } = await api.from("referrals").insert({
                 referrer_id: user?.id,
                 referred_email: email,
                 status: "pending",

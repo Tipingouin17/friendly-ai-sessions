@@ -6,7 +6,7 @@
  */
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,7 +91,7 @@ export const SystemSettings = () => {
     const { data: config, isLoading, refetch } = useQuery({
         queryKey: ["admin-system-config"],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from("configurations")
                 .select("*")
                 .limit(1)
@@ -119,7 +119,7 @@ export const SystemSettings = () => {
     const saveMutation = useMutation({
         mutationFn: async () => {
             if (!config) throw new Error("No configuration record found.");
-            const { error } = await supabase
+            const { error } = await api
                 .from("configurations")
                 .update({
                     default_gpt_token: form.default_gpt_token || null,

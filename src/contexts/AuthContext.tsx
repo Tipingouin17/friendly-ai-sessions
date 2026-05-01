@@ -8,7 +8,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { ApiUser, ApiSession } from '@/lib/api';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 interface AuthContextType {
@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // IMPORTANT: Do NOT call setLoading(false) here — only getSession() controls
     // the loading flag during startup.  onAuthStateChange handles post-init events
     // (SIGNED_IN after login, SIGNED_OUT after logout, TOKEN_REFRESHED).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = api.auth.onAuthStateChange(
       (event, newSession) => {
         // Only update state for post-initialization events.
         // During startup, getSession() is the single source of truth.
@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session — this is the authoritative startup path.
-    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+    api.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       setSession(existingSession);
       if (existingSession?.user) {
         // Fetch fresh user data from backend so role is always current
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // the UI indefinitely on "Verifying access...".
         try {
           const getUserWithTimeout = Promise.race([
-            supabase.auth.getUser(),
+            api.auth.getUser(),
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error('getUser timeout')), 5000)
             ),
@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Invalid email format');
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await api.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
@@ -154,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Password must be at least 8 characters long');
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { error } = await api.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
@@ -179,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await api.auth.signOut();
       if (error) throw error;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Logout failed';
@@ -194,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Valid email is required');
       }
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      const { error } = await api.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: `${window.location.origin}/reset-password`
       });
       if (error) throw error;

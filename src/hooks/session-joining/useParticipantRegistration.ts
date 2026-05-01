@@ -4,7 +4,7 @@
  * Session joining hook for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export interface RegisterParticipantParams {
   conversationId: number;
@@ -49,7 +49,7 @@ export const registerParticipant = async ({
       is_host: isHost || isAdmin // Map isAdmin to isHost for compatibility
     };
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await api
       .from('session_participants')
       .insert(insertData);
 
@@ -66,7 +66,7 @@ export const registerParticipant = async ({
 
     // FIXED: Update the conversation participant count to match actual participants
     // This ensures data consistency after successful participant registration
-    const { data: participantCount, error: countError } = await supabase
+    const { data: participantCount, error: countError } = await api
       .from('session_participants')
       .select('participant_id', { count: 'exact' })
       .eq('conversation_id', conversationId);
@@ -76,7 +76,7 @@ export const registerParticipant = async ({
     } else {
       const actualCount = participantCount?.length || 0;
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await api
         .from('conversations')
         .update({ current_participants: actualCount })
         .eq('id', conversationId);

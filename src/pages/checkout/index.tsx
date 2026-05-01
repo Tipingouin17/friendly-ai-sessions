@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Plan } from '../pricing/types';
@@ -45,7 +45,7 @@ const Checkout = () => {
       if (isNaN(numericPlanId)) throw new Error('Invalid plan ID');
 
       // Query the plans table with plan_restrictions join (consistent with Pricing page)
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('plans')
         .select('*, plan_restrictions(*)')
         .eq('id', numericPlanId)

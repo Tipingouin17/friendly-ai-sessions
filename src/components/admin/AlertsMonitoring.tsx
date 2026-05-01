@@ -4,7 +4,7 @@
  * Admin component for the AIfacilitator application.
  */
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     AlertTriangle,
@@ -43,12 +43,12 @@ export const AlertsMonitoring = () => {
             const oneHourAgo = subHours(now, 1).toISOString();
             const twoHoursAgo = subHours(now, 2).toISOString();
 
-            const { count: lastHourSignups } = await supabase
+            const { count: lastHourSignups } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', oneHourAgo);
 
-            const { count: previousHourSignups } = await supabase
+            const { count: previousHourSignups } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', twoHoursAgo)
@@ -68,7 +68,7 @@ export const AlertsMonitoring = () => {
 
             // Check for inactive users (no login in 30 days)
             const thirtyDaysAgo = subDays(now, 30).toISOString();
-            const { count: inactiveUsers } = await supabase
+            const { count: inactiveUsers } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .lt('updated_at', thirtyDaysAgo);
@@ -86,7 +86,7 @@ export const AlertsMonitoring = () => {
             }
 
             // Check for flagged content (from session monitoring)
-            const { data: recentMessages } = await supabase
+            const { data: recentMessages } = await api
                 .from('messages')
                 .select('content, created_at')
                 .gte('created_at', subHours(now, 24).toISOString())
@@ -121,7 +121,7 @@ export const AlertsMonitoring = () => {
             // (No random mock — only real checks are performed)
 
             // Check for users whose subscription_status is 'past_due' (real Stripe webhook data)
-            const { count: pastDueCount } = await supabase
+            const { count: pastDueCount } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .eq('subscription_status', 'past_due');
@@ -139,7 +139,7 @@ export const AlertsMonitoring = () => {
             }
 
             // Check database connection (simplified)
-            const { error: dbError } = await supabase
+            const { error: dbError } = await api
                 .from('profiles')
                 .select('id')
                 .limit(1);

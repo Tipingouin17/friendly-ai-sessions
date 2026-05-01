@@ -7,7 +7,7 @@
 import React, { useEffect } from 'react';
 import { Clock, Users } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
@@ -42,7 +42,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     
     try {
       // Listen for conversation changes
-      const conversationChannel = supabase
+      const conversationChannel = api
         .channel(`conversation-updates-${conversationId}`)
         .on('postgres_changes', { 
           event: 'UPDATE', 
@@ -75,7 +75,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
         .subscribe((status) => { /* no-op */ });
       
       // Also listen for session events for more immediate updates
-      const eventsChannel = supabase
+      const eventsChannel = api
         .channel(`session-events-${conversationId}`)
         .on('postgres_changes', {
           event: 'INSERT',

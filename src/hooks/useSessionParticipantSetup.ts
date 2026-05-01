@@ -9,7 +9,7 @@ import { ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import { LocationStateType } from "@/hooks/useConversationId";
 import { getParticipantInfo } from "@/utils/participantUtils";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
 import { retryWithBackoff, isNetworkError, isAbortError } from "@/utils/networkUtils";
@@ -87,7 +87,7 @@ export const useSessionParticipantSetup = ({
       
       const result = await requestDeduplicator.deduplicate(requestKey, async () => {
         return await retryWithBackoff(async () => {
-          const { data, error } = await supabase
+          const { data, error } = await api
             .from('session_participants')
             .select('*')
             .eq('conversation_id', conversationId)
@@ -166,7 +166,7 @@ export const useSessionParticipantSetup = ({
             // Auto-register participant if they have a name but aren't registered yet
             try {
               const avatarSeed = `${urlName}-${Date.now()}`;
-              const { error: regError } = await supabase
+              const { error: regError } = await api
                 .from('session_participants')
                 .insert({
                   conversation_id: conversationId,

@@ -4,7 +4,7 @@
  * Utility for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
 /**
@@ -24,7 +24,7 @@ export const createPingChannel = async (conversationId: number): Promise<boolean
       const timeoutId = setTimeout(() => resolve(false), 5000);
       
       try {
-        const channel = supabase
+        const channel = api
           .channel(channelName)
           .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
@@ -76,7 +76,7 @@ export const performDatabasePing = async (conversationId: number): Promise<boole
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     // Create the request
-    const query = supabase.from('conversations')
+    const query = api.from('conversations')
       .select('id')
       .eq('id', conversationId)
       .limit(1)

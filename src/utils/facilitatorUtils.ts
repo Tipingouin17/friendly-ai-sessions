@@ -4,7 +4,7 @@
  * Utility for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { debugLog } from "@/utils/debugLogger";
 
 /**
@@ -63,7 +63,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
 
       // Otherwise, treat it as a filename in the facilitator-avatars bucket
       // This is the recommended approach for both system and user-uploaded avatars
-      const { data } = await supabase.storage
+      const { data } = await api.storage
         .from('facilitator-avatars')
         .getPublicUrl(pic);
 
@@ -77,7 +77,7 @@ export const getFacilitatorAvatarUrl = async (facilitator: { id?: number, profil
     if (facilitator.id) {
       try {
         const filename = `${facilitator.id}.jpg`;
-        const { data } = await supabase.storage
+        const { data } = await api.storage
           .from('facilitator-avatars')
           .getPublicUrl(filename);
 
@@ -122,7 +122,7 @@ export const isImageUrl = (url: string): boolean => {
   const normalizedUrl = url.replace(/([^:])\/\//g, '$1/');
 
   // Legacy storage URLs (kept for backward compatibility with any pre-migration data)
-  if (normalizedUrl.includes('supabase.co/storage/v1/object/public/')) return true;
+  if (normalizedUrl.includes('api.co/storage/v1/object/public/')) return true;
 
   // Common image extensions
   if (normalizedUrl.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i) !== null) return true;

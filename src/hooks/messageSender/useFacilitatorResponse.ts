@@ -4,7 +4,7 @@
  * Message sender hook for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Message } from "@/types/chat";
 import { nanoid } from "nanoid";
 import { resolveFacilitatorAvatar } from "@/utils/avatarUtils";
@@ -20,7 +20,7 @@ export const useFacilitatorResponse = () => {
   ): Promise<Message> => {
 
     try {
-      const response = await supabase.functions.invoke('handle-facilitator-response', {
+      const response = await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages,
           conversationId,

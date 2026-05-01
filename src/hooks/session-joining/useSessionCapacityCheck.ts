@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { ConversationWithSession } from "@/types/database";
 
 interface SessionCapacityResult {
@@ -24,7 +24,7 @@ export async function checkSessionCapacity(
   const isOnAdminPath = window.location.pathname.includes('/admin');
   const effectiveIsAdmin = isAdmin || isOnAdminPath;
   
-  const { data: latestConversation, error: fetchError } = await supabase
+  const { data: latestConversation, error: fetchError } = await api
     .from('conversations')
     .select('id, current_participants, participants')
     .eq('id', conversationId)
@@ -59,7 +59,7 @@ export async function checkSessionCapacity(
   }
   
   // Get actual participant count from session_participants table
-  const { data: actualParticipants, error: participantsError } = await supabase
+  const { data: actualParticipants, error: participantsError } = await api
     .from('session_participants')
     .select('participant_id')
     .eq('conversation_id', conversationId);
@@ -86,7 +86,7 @@ export async function checkSessionCapacity(
   // FIXED: Use actual count for capacity check, not the stored current_participants
   if (maxAllowed > 0 && actualCount >= maxAllowed) {
     
-    const { error: startError } = await supabase
+    const { error: startError } = await api
       .from('conversations')
       .update({ session_started: true })
       .eq('id', conversationId);
@@ -136,7 +136,7 @@ export function useSessionCapacityCheck() {
         // This prevents count inflation when join attempts fail
         
         try {
-          const { error: broadcastError } = await supabase
+          const { error: broadcastError } = await api
             .from('session_events')
             .insert({
               conversation_id: conversationId,

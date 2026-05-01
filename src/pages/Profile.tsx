@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getUserDisplayName } from '@/utils/userUtils';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 type Tab = 'overview' | 'security' | 'plan';
 
@@ -43,7 +43,7 @@ const Profile = () => {
     queryKey: ['userMetadata', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await api.auth.getSession();
       return session?.user ?? null;
     },
     enabled: !!user,
@@ -54,7 +54,7 @@ const Profile = () => {
     queryKey: ['profileStats', user?.id],
     queryFn: async () => {
       if (!user) return { sessions: 0, participants: 0, messages: 0 };
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('conversations')
         .select('participants, total_messages')
         .eq('is_session_ended', true);

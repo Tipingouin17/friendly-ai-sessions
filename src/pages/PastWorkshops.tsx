@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Users, MessageSquare, Clock, Zap, LayoutDashboard, Activity } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInMinutes } from "date-fns";
@@ -47,7 +47,7 @@ const getWorkshopTitle = (workshop: Workshop): string => {
 };
 
 const fetchPastWorkshops = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('conversations')
     .select(`*, sessions!conversations_sessions_id_fkey (title, facilitator, objective, difficulty_level, tags, facilitators!sessions_facilitator_fkey (title, profile_picture)), messages!messages_conversation_id_fkey (id, role)`)
     .eq('is_session_ended', true)
@@ -60,7 +60,7 @@ const fetchPastWorkshops = async () => {
 };
 
 const fetchActiveWorkshops = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('conversations')
     .select(`*, sessions!conversations_sessions_id_fkey (title, facilitator, objective, difficulty_level, tags, facilitators!sessions_facilitator_fkey (title, profile_picture))`)
     .eq('is_session_ended', false)
@@ -88,7 +88,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
     }
     setIsSaving(true);
     const newState = !workshop.is_saved;
-    const { error } = await supabase.from('conversations').update({ is_saved: newState }).eq('id', workshop.id);
+    const { error } = await api.from('conversations').update({ is_saved: newState }).eq('id', workshop.id);
     setIsSaving(false);
     if (error) {
       toast({ title: 'Error', description: 'Failed to update saved status.', variant: 'destructive' });
@@ -317,12 +317,12 @@ const PastWorkshops = () => {
   useEffect(() => { clearAllParticipantState(); }, []);
 
   useEffect(() => {
-    const channel = supabase.channel('workshops-realtime')
+    const channel = api.channel('workshops-realtime')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
         queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
         queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
       }).subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { api.removeChannel(channel); };
   }, [queryClient]);
 
   useEffect(() => {

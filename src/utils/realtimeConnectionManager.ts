@@ -4,7 +4,7 @@
  * Utility for the AIfacilitator application.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { removeChannel, createUniqueChannelName, createReliableChannel } from "./realtimeHelpers";
 
 /**
@@ -42,7 +42,7 @@ export const createConversationChannel = (
   const channelName = createUniqueChannelName(`conversation-${conversationId}`);
   
   try {
-    return supabase
+    return api
       .channel(channelName)
       .on('postgres_changes', { 
         event: 'UPDATE', 
@@ -82,7 +82,7 @@ export const createParticipantsChannel = (
   const channelName = createUniqueChannelName(`participants-${conversationId}`);
   
   try {
-    return supabase
+    return api
       .channel(channelName)
       .on('postgres_changes', { 
         event: 'INSERT', 
@@ -122,7 +122,7 @@ export const createMessagesChannel = (
   const channelName = createUniqueChannelName(`messages-${conversationId}`);
   
   try {
-    return supabase
+    return api
       .channel(channelName)
       .on('postgres_changes', {
         event: '*', // Listen to all events (INSERT, UPDATE, DELETE)

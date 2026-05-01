@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MessageSquare, Clock, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 interface SessionAnalyticsDashboardProps {
   conversationId: number;
@@ -32,14 +32,14 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
     const fetchAnalytics = async () => {
       try {
         // 1. Fetch conversation metadata — use created_at as session start time
-        const { data: conv } = await supabase
+        const { data: conv } = await api
           .from('conversations')
           .select('created_at, is_session_ended')
           .eq('id', conversationId)
           .single();
 
         // 2. Fetch registered participants (ground truth for participant count)
-        const { data: participants } = await supabase
+        const { data: participants } = await api
           .from('session_participants')
           .select('id, participant_id')
           .eq('conversation_id', conversationId);
@@ -47,7 +47,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
         const totalParticipants = (participants || []).length;
 
         // 3. Fetch participant messages (role = 'user') with participant_id
-        const { data: messages } = await supabase
+        const { data: messages } = await api
           .from('messages')
           .select('role, created_at, participant_id')
           .eq('conversation_id', conversationId)

@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 type ParticipantEngagementStatus = 'active' | 'paused' | 'skipped';
 
@@ -35,7 +35,7 @@ export const useParticipantStatusTracker = ({
     if (!conversationId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('session_events')
         .select('event_type, data, created_at')
         .eq('conversation_id', conversationId)

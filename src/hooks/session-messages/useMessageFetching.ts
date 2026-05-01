@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message } from '@/types/chat';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useWelcomeMessageRecovery } from '@/hooks/useWelcomeMessageRecovery';
 
 interface UseMessageFetchingProps {
@@ -75,7 +75,7 @@ export const useMessageFetching = ({
     if (!cId) return;
 
     try {
-      const { data: messagesData, error: messagesError } = await supabase
+      const { data: messagesData, error: messagesError } = await api
         .from('messages')
         .select('*')
         .eq('conversation_id', cId)
@@ -193,7 +193,7 @@ export const useMessageFetching = ({
       welcomeGeneratedRef.current = true;
 
       // Trigger AI generation
-      supabase.functions.invoke('handle-facilitator-response', {
+      api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],
           conversationId,
@@ -208,7 +208,7 @@ export const useMessageFetching = ({
           try {
             const fallbackContent = "Welcome to the session! I'm your AI facilitator. I'm here to guide the conversation and help you get the most out of our time together. To begin, could everyone please introduce themselves?";
 
-            const { error: insertError } = await supabase
+            const { error: insertError } = await api
               .from('messages')
               .insert({
                 conversation_id: conversationId,
@@ -228,7 +228,7 @@ export const useMessageFetching = ({
               welcomeGeneratedRef.current = true;
 
               // Update conversation status
-              await supabase
+              await api
                 .from('conversations')
                 .update({ welcome_message_status: 'fallback_ready' })
                 .eq('id', conversationId);
@@ -351,7 +351,7 @@ export const useMessageFetching = ({
         body.hostInstruction = hostInstruction.trim();
       }
 
-      const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
         body
       });
 

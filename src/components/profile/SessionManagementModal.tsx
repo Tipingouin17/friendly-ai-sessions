@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { format, formatDistanceToNow } from 'date-fns';
 import { Laptop, Smartphone, Tablet, Monitor, Globe, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,7 +42,7 @@ export const SessionManagementModal: React.FC<SessionManagementModalProps> = ({ 
     const { data: sessions, isLoading } = useQuery({
         queryKey: ['userSessions'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await api
                 .from('user_sessions')
                 .select('*')
                 .is('revoked_at', null)
@@ -56,7 +56,7 @@ export const SessionManagementModal: React.FC<SessionManagementModalProps> = ({ 
 
     const revokeSessionMutation = useMutation({
         mutationFn: async (sessionId: string) => {
-            const { error } = await supabase
+            const { error } = await api
                 .from('user_sessions')
                 .update({ revoked_at: new Date().toISOString() })
                 .eq('id', sessionId);

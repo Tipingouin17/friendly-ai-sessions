@@ -4,14 +4,14 @@
  * Page for the AIfacilitator application.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 export const updateUserSubscription = async (userId: string, planId: number) => {
   if (!userId) {
     throw new Error("User must be logged in to update subscription");
   }
   
-  const { data, error: updateError } = await supabase
+  const { data, error: updateError } = await api
     .from('profiles')
     .update({ 
       current_plan_id: planId, 

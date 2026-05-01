@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, X, Check, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 import { useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -140,7 +140,7 @@ export const AvatarUploadModal: React.FC<AvatarUploadModalProps> = ({
             const filePath = `avatars/${fileName}`;
 
             // Upload to Supabase storage
-            const { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await api.storage
                 .from('user-avatars')
                 .upload(filePath, selectedFile, {
                     upsert: true,
@@ -150,12 +150,12 @@ export const AvatarUploadModal: React.FC<AvatarUploadModalProps> = ({
             if (uploadError) throw uploadError;
 
             // Get public URL
-            const { data: { publicUrl } } = supabase.storage
+            const { data: { publicUrl } } = api.storage
                 .from('user-avatars')
                 .getPublicUrl(filePath);
 
             // Store avatar URL in user metadata
-            const { error: updateError } = await supabase.auth.updateUser({
+            const { error: updateError } = await api.auth.updateUser({
                 data: { avatar_url: publicUrl }
             });
 

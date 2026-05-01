@@ -4,7 +4,7 @@
  * Admin component for the AIfacilitator application.
  */
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     DollarSign,
@@ -54,7 +54,7 @@ export const RevenueDashboard = () => {
         queryKey: ['admin-revenue'],
         queryFn: async (): Promise<RevenueData> => {
             // Get all profiles with plan info
-            const { data: profiles } = await supabase
+            const { data: profiles } = await api
                 .from('profiles')
                 .select(`
           id,
@@ -65,7 +65,7 @@ export const RevenueDashboard = () => {
         `);
 
             // Get plan pricing
-            const { data: plans } = await supabase
+            const { data: plans } = await api
                 .from('plans')
                 .select('id, title, price');
 
@@ -95,11 +95,11 @@ export const RevenueDashboard = () => {
 
             // Calculate churn rate (users who cancelled in last 30 days)
             const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-            const { count: totalUsers } = await supabase
+            const { count: totalUsers } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true });
 
-            const { count: churnedUsers } = await supabase
+            const { count: churnedUsers } = await api
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .eq('subscription_status', 'canceled')
@@ -123,7 +123,7 @@ export const RevenueDashboard = () => {
                 const monthEnd = endOfMonth(monthStart);
 
                 // Count users who joined this month
-                const { count: newUsers } = await supabase
+                const { count: newUsers } = await api
                     .from('profiles')
                     .select('*', { count: 'exact', head: true })
                     .gte('created_at', monthStart.toISOString())

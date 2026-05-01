@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import api from "@/lib/api";
 
 interface UseWelcomeMessageRecoveryProps {
   conversationId: number | null;
@@ -31,7 +31,7 @@ export const useWelcomeMessageRecovery = ({
 
     const checkAndRecover = async () => {
       // Check if we've been stuck in ai_generating for too long
-      const { data: conversation } = await supabase
+      const { data: conversation } = await api
         .from('conversations')
         .select('updated_at, welcome_message_status')
         .eq('id', conversationId)
@@ -72,7 +72,7 @@ export const useWelcomeMessageRecovery = ({
     try {
 
       // First, reset the status to pending
-      await supabase
+      await api
         .from('conversations')
         .update({ 
           welcome_message_status: 'pending',
@@ -84,7 +84,7 @@ export const useWelcomeMessageRecovery = ({
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Try to generate the welcome message again
-      const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],
           conversationId,
@@ -117,7 +117,7 @@ export const useWelcomeMessageRecovery = ({
     try {
 
       // Reset conversation status
-      await supabase
+      await api
         .from('conversations')
         .update({ 
           welcome_message_status: 'pending',
@@ -126,7 +126,7 @@ export const useWelcomeMessageRecovery = ({
         .eq('id', conversationId);
 
       // Try generation again
-      const { data, error } = await supabase.functions.invoke('handle-facilitator-response', {
+      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],
           conversationId,

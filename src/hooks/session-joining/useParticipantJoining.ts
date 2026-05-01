@@ -7,7 +7,7 @@
  * caused 20-35 s join latency.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 
@@ -75,7 +75,7 @@ export function useParticipantJoining() {
     }
 
     // Single atomic backend call — replaces 7 sequential REST calls
-    const { data, error } = await supabase.functions.invoke('join-session', {
+    const { data, error } = await api.functions.invoke('join-session', {
       body: {
         conversation_id: conversationId,
         participant_name: participantName,

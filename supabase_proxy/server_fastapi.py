@@ -522,27 +522,25 @@ def run_startup_migrations() -> None:
             (103, 'AppSumo Agency', 199, 'EUR', 'appsumo_ltd3', FALSE, 'AppSumo Lifetime Deal — Agency tier')
         ON CONFLICT (id) DO NOTHING;
         """,
-        # 2026-04-25: Seed plan_restrictions for the AppSumo LTD plans.
+        # 2026-04-25: Seed plan_restrictions for the AppSumo LTD plans (split into individual statements).
         # Tier 1 (Solo):   1 facilitator, 10 sessions/month, 10 participants
-        # Tier 2 (Team):   5 facilitators, 30 sessions/month, 30 participants, data export
-        # Tier 3 (Agency): unlimited, 100 participants, all features, custom branding
-        """
-        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
+        """INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 101, 101, 1, 10, 10, TRUE, FALSE, FALSE, TRUE, TRUE, 50, FALSE, FALSE
-        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 101);
-        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 101)""",
+        # Tier 2 (Team):   5 facilitators, 30 sessions/month, 30 participants, data export
+        """INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 102, 102, 5, 30, 30, TRUE, TRUE, TRUE, TRUE, TRUE, 100, FALSE, FALSE
-        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 102);
-        INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 102)""",
+        # Tier 3 (Agency): unlimited, 100 participants, all features, custom branding
+        """INSERT INTO plan_restrictions (id, plan_id, facilitator_limit, session_limit, max_participants,
             customisable_sessions, customisable_facilitators, data_export, session_reports,
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 103, 103, NULL, NULL, 100, TRUE, TRUE, TRUE, TRUE, TRUE, NULL, TRUE, FALSE
-        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103);
-        """,
+        WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103)""",
     ]
     try:
         conn = get_db()

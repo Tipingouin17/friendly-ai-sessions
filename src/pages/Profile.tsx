@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getUserDisplayName } from '@/utils/userUtils';
 import { useQuery } from '@tanstack/react-query';
-import api from "@/lib/api";
+import api, { ApiUser } from "@/lib/api";
 
 type Tab = 'overview' | 'security' | 'plan';
 
@@ -39,17 +39,14 @@ const Profile = () => {
 
   const userDisplayName = getUserDisplayName(user);
 
-  const { data: userMetadata } = useQuery({
-    queryKey: ['userMetadata', user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data: { session } } = await api.auth.getSession();
-      return session?.user ?? null;
-    },
-    enabled: !!user,
-  });
+  // user from AuthContext already contains user_metadata, email_confirmed_at,
+  // and created_at — no network call needed.  Alias to userMetadata to keep
+  // the rest of the component unchanged.
+  const userMetadata: ApiUser | null = user ?? null;
 
   // Fetch session stats
+  // Profile stats: completed sessions don't change frequently.
+  // 5 min staleTime avoids re-fetching every time the user visits the page.
   const { data: stats } = useQuery({
     queryKey: ['profileStats', user?.id],
     queryFn: async () => {
@@ -66,6 +63,9 @@ const Profile = () => {
       };
     },
     enabled: !!user,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const getInitials = (name: string) =>
@@ -285,7 +285,7 @@ const Profile = () => {
 
       {/* Modals */}
       <AvatarUploadModal isOpen={isAvatarModalOpen} onClose={() => setIsAvatarModalOpen(false)} userId={user?.id || ''} currentAvatarUrl={meta?.avatar_url} userName={userDisplayName} />
-      <EditProfileModal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)} user={userMetadata || user} />
+      <EditProfileModal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)} user={user} />
       <ChangePasswordModal isOpen={isChangePasswordModalOpen} onClose={() => setIsChangePasswordModalOpen(false)} />
       <TwoFactorSetupModal isOpen={isTwoFactorModalOpen} onClose={() => setIsTwoFactorModalOpen(false)} />
       <LoginActivityModal isOpen={isLoginActivityModalOpen} onClose={() => setIsLoginActivityModalOpen(false)} />

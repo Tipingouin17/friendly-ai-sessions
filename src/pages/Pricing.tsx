@@ -241,9 +241,17 @@ const Pricing = () => {
 
   const safePlans = plans ?? [];
 
+  // AppSumo LTD plans (IDs 101-103) are activated via /redeem-appsumo only —
+  // they must not appear as purchasable cards on the public pricing page.
+  const publicPlans = safePlans.filter(plan => plan.id < 100);
+
   // Separate standard plans (Free, Starter, Premium) from Enterprise
-  const standardPlans = safePlans.filter(plan => plan.title !== 'Enterprise');
-  const enterprisePlan = safePlans.find(plan => plan.title === 'Enterprise');
+  const standardPlans = publicPlans.filter(plan => plan.title !== 'Enterprise');
+  const enterprisePlan = publicPlans.find(plan => plan.title === 'Enterprise');
+
+  // AppSumo LTD users (plan IDs 101-103) already have a lifetime deal —
+  // they should not see the upgrade prompt or be offered standard subscriptions.
+  const isAppSumoUser = currentPlanId !== null && currentPlanId >= 100;
 
   return (
     <div className="min-h-screen bg-white pb-16">
@@ -268,8 +276,8 @@ const Pricing = () => {
 
       <div className="container mx-auto px-4">
 
-        {/* Only show limited time offer for Free and Starter plans */}
-        {currentPlanId && currentPlanId < 3 && (
+        {/* Only show limited time offer for Free and Starter plans — never for AppSumo LTD holders */}
+        {!isAppSumoUser && currentPlanId !== null && currentPlanId < 3 && (
           <div className="max-w-4xl mx-auto mb-10 md:mb-12">
             <UpgradePrompt
               variant="banner"
@@ -331,8 +339,8 @@ const Pricing = () => {
           </div>
         </div>
 
-        {/* Full comparison table — shows all plans including Enterprise */}
-        {safePlans.length > 0 && <ComparisonTable plans={safePlans} />}
+        {/* Full comparison table — shows only purchasable plans (excludes AppSumo LTD) */}
+        {publicPlans.length > 0 && <ComparisonTable plans={publicPlans} />}
       </div>
     </div>
   );

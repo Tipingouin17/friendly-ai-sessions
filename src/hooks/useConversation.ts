@@ -142,29 +142,15 @@ export const useConversation = (conversationId: number | null) => {
     enabled: !!conversationId,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 0, // Always refetch fresh data (joins must be current)
-    gcTime: 60000, // 1 minute
+    // 30 s staleTime: conversation data is stable during an active session.
+    // useSessionStatus already calls refetch() on every WebSocket UPDATE event
+    // (session_started, is_session_ended, status changes) and falls back to
+    // 5 s polling when WebSocket is unavailable.  Duplicating that with a
+    // refetchInterval here causes unnecessary network traffic and re-renders.
+    staleTime: 30_000,
+    gcTime: 60_000,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
+    refetchOnMount: true, // refetch only when data is stale (> 30 s old)
     refetchOnReconnect: true,
-    refetchInterval: (queryData) => {
-      // Only poll every 30 seconds for active admin sessions
-      const isAdmin = sessionStorage.getItem('isAdminSession') === 'true';
-      
-      if (queryData && queryData.state && queryData.state.data) {
-        const conversationData = queryData.state.data;
-        
-        if (conversationData) {
-          const isActive = conversationData.status === 'active' && !conversationData.is_session_ended;
-          
-          if (isAdmin && isActive) {
-            return 30000; // 30 seconds for active admin sessions
-          } else if (isActive) {
-            return 60000; // 1 minute for active non-admin sessions
-          }
-        }
-      }
-      return false; // Don't poll for inactive sessions or if data is null
-    }
   });
 };

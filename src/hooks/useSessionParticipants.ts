@@ -118,15 +118,16 @@ export function useSessionParticipants(conversationId: number | null) {
   // failure) is a true blocking error that prevents joining.
   const finalError = stateError;
 
-  // Force periodic refresh to ensure data consistency
+  // Fallback polling: only active when WebSocket is not connected.
+  // useSimplifiedParticipantMonitoring already handles participant-count
+  // updates via WebSocket events and starts its own 3 s fallback when the
+  // channel errors.  This outer 5 s interval is a belt-and-suspenders
+  // safety net for the conversation record itself (join_token, status).
   useEffect(() => {
-    if (!conversationId || !mountedRef.current) return;
-
-    // Initial refresh to ensure we have the latest participant count
-    refetch();
+    if (!conversationId || !mountedRef.current || isConnected) return;
 
     const intervalId = setInterval(() => {
-      if (mountedRef.current) {
+      if (mountedRef.current && !isConnected) {
         refetch();
       }
     }, 5000);
@@ -134,7 +135,7 @@ export function useSessionParticipants(conversationId: number | null) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [conversationId, refetch]);
+  }, [conversationId, isConnected, refetch]);
 
   return {
     currentParticipantCount,

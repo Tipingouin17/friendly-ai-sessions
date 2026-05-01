@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from "@/lib/api";
-import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,10 +39,9 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const navigate = useNavigate();
   const params = useParams();
   const { toast } = useToast();
-  const { planRestrictions } = useUserPlan();
-  
   const reportConversationId = conversationId || parseInt(params.id || '0');
-  const { canGenerateReports } = usePlanLimits();
+  // canExportData covers planRestrictions?.data_export — no separate useUserPlan call needed
+  const { canGenerateReports, canExportData } = usePlanLimits();
   
   // Fetch session report data
   const { data: reportData, isLoading, error, refetch } = useQuery({
@@ -150,7 +148,7 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     retryDelay: 1000
   });
 
-  const canDownloadPDF = planRestrictions?.data_export;
+  const canDownloadPDF = canExportData;
   const canViewReport = canGenerateReports;
 
   const handleBack = () => {

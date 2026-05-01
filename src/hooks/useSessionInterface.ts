@@ -4,71 +4,51 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
-export function useSessionInterface(conversationId: number | null) {
-  const [sessionLink, setSessionLink] = useState('');
-  const [showQrCodeView, setShowQrCodeView] = useState(true);
+export function useSessionInterface(
+  conversationId: number | null,
+  conversation?: ConversationWithSession | null
+) {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
+  const [showQrCodeView, setShowQrCodeView] = useState(true);
   const { toast } = useToast();
   const location = useLocation();
   const { navigateToHostSession } = useSecureNavigation();
   const isMobile = window.innerWidth < 768;
-  
+
   // Real-time subscription refs
   const channelRef = useRef<any>(null);
   const lastSessionStarted = useRef<boolean>(false);
-  
-  // Generate session link when conversationId changes
-  useEffect(() => {
-    if (conversationId) {
-      const baseUrl = window.location.origin;
-      // Note: join_token is fetched below and the link is updated once available.
-      // We set a placeholder without token first, then update it.
-      
-      // Check if session is already marked as started in the database
-      const checkSessionStarted = async () => {
-        try {
-          const { data, error } = await api
-            .from('conversations')
-            .select('session_started, join_token')
-            .eq('id', conversationId)
-            .maybeSingle();
-            
-          if (error) {
-            console.error("[useSessionInterface] Error checking session_started:", error);
-          } else if (data) {
-            // Build the session link with the join token for secure sharing.
-            const token = (data as any).join_token;
-            const baseUrl = window.location.origin;
-            const link = token
-              ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
-              : `${baseUrl}/join-session?id=${conversationId}`;
-            setSessionLink(link);
 
-            if (data.session_started) {
-              setIsSessionStarted(true);
-              setShowQrCodeView(false);
-              lastSessionStarted.current = true;
-            } else {
-              setShowQrCodeView(true);
-              setIsSessionStarted(false);
-              lastSessionStarted.current = false;
-            }
-          }
-        } catch (err) {
-          console.error("[useSessionInterface] Exception checking session_started:", err);
-        }
-      };
-      
-      checkSessionStarted();
+  // Derive session link directly from conversation data — no network call needed
+  const sessionLink = useMemo(() => {
+    if (!conversationId) return '';
+    const baseUrl = window.location.origin;
+    const token = (conversation as any)?.join_token;
+    return token
+      ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
+      : `${baseUrl}/join-session?id=${conversationId}`;
+  }, [conversationId, (conversation as any)?.join_token]);
+
+  // Sync session_started from conversation data
+  useEffect(() => {
+    if (!conversation) return;
+    const started = (conversation as any).session_started === true;
+    if (started && !lastSessionStarted.current) {
+      lastSessionStarted.current = true;
+      setIsSessionStarted(true);
+      setShowQrCodeView(false);
+    } else if (!started && !lastSessionStarted.current) {
+      setIsSessionStarted(false);
+      setShowQrCodeView(true);
     }
-  }, [conversationId]);
+  }, [(conversation as any)?.session_started]);
 
   // Set up real-time subscription for session_started updates
   useEffect(() => {
@@ -80,7 +60,6 @@ export function useSessionInterface(conversationId: number | null) {
       channelRef.current = null;
     }
 
-    // Create new channel for this conversation
     const channel = api
       .channel(`session-interface-${conversationId}`)
       .on('postgres_changes', {
@@ -89,18 +68,15 @@ export function useSessionInterface(conversationId: number | null) {
         table: 'conversations',
         filter: `id=eq.${conversationId}`
       }, (payload) => {
-        
-        // Check if session_started field changed
-        if (payload.new && 
-            payload.old?.session_started !== payload.new.session_started &&
-            payload.new.session_started === true) {
-          
-          // Prevent duplicate processing
+        if (
+          payload.new &&
+          payload.old?.session_started !== payload.new.session_started &&
+          payload.new.session_started === true
+        ) {
           if (!lastSessionStarted.current) {
             lastSessionStarted.current = true;
             setIsSessionStarted(true);
             setShowQrCodeView(false);
-            
             toast({
               title: "Session Started",
               description: "The session has been automatically started.",
@@ -108,11 +84,10 @@ export function useSessionInterface(conversationId: number | null) {
           }
         }
       })
-      .subscribe((status) => { /* no-op */ });
+      .subscribe();
 
     channelRef.current = channel;
 
-    // Cleanup function
     return () => {
       if (channelRef.current) {
         api.removeChannel(channelRef.current);
@@ -120,23 +95,18 @@ export function useSessionInterface(conversationId: number | null) {
       }
     };
   }, [conversationId, toast]);
-  
+
   // Determine if we should show QR code view based on device and user state
   useEffect(() => {
     const locationState = location.state as { isGuest?: boolean; showMessaging?: boolean } | null;
-    
-    // Admin pages should never hide QR code view based on mobile status
     const isAdminPage = location.pathname.includes('/admin');
-    
     if (!isAdminPage && (isMobile && locationState?.isGuest) || locationState?.showMessaging === true) {
       setShowQrCodeView(false);
     }
   }, [isMobile, location.state, location.pathname]);
-  
+
   const handleStartSession = async () => {
-    
     if (!conversationId) {
-      console.error("[useSessionInterface] Cannot start session: No conversation ID provided");
       toast({
         title: "Error starting session",
         description: "No conversation ID found. Please try again.",
@@ -144,43 +114,32 @@ export function useSessionInterface(conversationId: number | null) {
       });
       return;
     }
-    
-    // Always ensure host status is preserved
+
     sessionStorage.setItem('isHostSession', 'true');
-    
+
     try {
-      // Update the session_started flag in the database
       const { error } = await api
         .from('conversations')
-        .update({ 
-          session_started: true 
-        })
+        .update({ session_started: true })
         .eq('id', conversationId);
-        
+
       if (error) {
-        console.error("[useSessionInterface] Error updating session_started:", error);
         toast({
           title: "Error starting session",
           description: "There was a problem starting the session. Please try again.",
           variant: "destructive",
         });
       } else {
-        
-        // Update local state immediately (real-time will confirm)
         setIsSessionStarted(true);
         setShowQrCodeView(false);
         lastSessionStarted.current = true;
-        
         toast({
           title: "Session started",
           description: "The session has been successfully started.",
         });
-        
-        // Use secure navigation for host redirect
         await navigateToHostSession(conversationId);
       }
     } catch (err) {
-      console.error("[useSessionInterface] Exception updating session_started:", err);
       toast({
         title: "Error starting session",
         description: "There was a problem starting the session. Please try again.",
@@ -188,7 +147,7 @@ export function useSessionInterface(conversationId: number | null) {
       });
     }
   };
-  
+
   return {
     sessionLink,
     showQrCodeView,

@@ -16,11 +16,10 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
   const mountedRef = useRef(true);
   const [sessionEnded, setSessionEnded] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeConnected = useRef(false);
 
-  // Don't auto-redirect on join-session page - let JoinSessionContainer handle it
   const isJoinPage = useRef(window.location.pathname.includes('/join-session'));
-  
-  // Set up cleanup on unmount
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -31,56 +30,39 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
     };
   }, []);
 
-  // Fallback polling to check session status
-  const startFallbackPolling = () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
+  const handleSessionEnd = () => {
+    if (!mountedRef.current) return;
+    setSessionEnded(true);
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    toast({ title: "Session Ended", description: "This session has been closed." });
+    if (!isJoinPage.current) navigate('/past-workshops', { replace: true });
+  };
 
+  // Fallback polling — only used when WebSocket fails
+  const startFallbackPolling = () => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(async () => {
       if (!conversationId || !mountedRef.current) return;
-
       try {
         const { data, error } = await api
           .from('conversations')
           .select('is_session_ended, status')
           .eq('id', conversationId)
           .single();
-
-        if (error) {
-          console.error('Error polling session status:', error);
-          return;
-        }
-
+        if (error) return;
         if (data && (data.is_session_ended || data.status !== 'active')) {
-          setSessionEnded(true);
-          
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-          }
-
-          toast({
-            title: "Session Ended",
-            description: "This session has been closed.",
-          });
-          
-          // Navigate away immediately (but not on join-session page)
-          if (!isJoinPage.current) {
-            navigate('/past-workshops', { replace: true });
-          }
+          handleSessionEnd();
         }
-      } catch (error) {
-        console.error('Exception during session status polling:', error);
-      }
-    }, 5000); // Poll every 5 seconds
+      } catch { /* silent */ }
+    }, 5000);
   };
-  
+
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
-    
-    // Create a unique channel name to prevent stale connections
+
     const channelName = `session-status-${conversationId}-${Date.now()}`;
-    
+    realtimeConnected.current = false;
+
     const channel = api
       .channel(channelName)
       .on('postgres_changes', {
@@ -89,52 +71,43 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
         table: 'conversations',
         filter: `id=eq.${conversationId}`
       }, (payload) => {
-        if (!mountedRef.current) return;
-        
-        if (payload.new) {
-          // Check if session was ended or status changed
-          if (payload.new.is_session_ended || payload.new.status !== 'active') {
-            setSessionEnded(true);
-            
-            toast({
-              title: "Session Ended",
-              description: "This session has been closed.",
-            });
-            
-            // Navigate away immediately (but not on join-session page)
-            if (!isJoinPage.current) {
-              navigate('/past-workshops', { replace: true });
-            }
-          }
-          // Check if session was started
-          if (payload.new.session_started && !payload.old.session_started) {
-            toast({
-              title: "Session Started",
-              description: "The session has been started.",
-            });
-          }
-          refetch();
+        if (!mountedRef.current || !payload.new) return;
+        if (payload.new.is_session_ended || payload.new.status !== 'active') {
+          handleSessionEnd();
         }
+        if (payload.new.session_started && !payload.old?.session_started) {
+          toast({ title: "Session Started", description: "The session has been started." });
+        }
+        refetch();
       })
       .subscribe((status) => {
-        
-        if (status === 'SUBSCRIBED') { /* no-op */ } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'SUBSCRIBED') {
+          realtimeConnected.current = true;
+          // WebSocket connected — stop any existing polling
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('Session status channel error, starting fallback polling');
+          realtimeConnected.current = false;
           startFallbackPolling();
         }
       });
 
-    // Start fallback polling as backup
-    startFallbackPolling();
+    // Only start polling if WebSocket hasn't connected within 3 seconds
+    const fallbackTimer = setTimeout(() => {
+      if (!realtimeConnected.current && mountedRef.current) {
+        startFallbackPolling();
+      }
+    }, 3000);
 
     return () => {
-      if (mountedRef.current) { /* no-op */ }
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+      clearTimeout(fallbackTimer);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       removeChannel(channel);
     };
-  }, [conversationId, navigate, refetch, toast]);
+  }, [conversationId]);
 
   return { sessionEnded };
 }

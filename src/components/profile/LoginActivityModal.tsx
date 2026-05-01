@@ -2,11 +2,13 @@
  * Login Activity Modal
  *
  * Profile component for the AIfacilitator application.
+ * Shows the current user's own recent login events only.
  */
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import api from "@/lib/api";
+import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { Laptop, Smartphone, Globe, MapPin } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,19 +28,24 @@ interface LoginActivity {
 }
 
 export const LoginActivityModal: React.FC<LoginActivityModalProps> = ({ isOpen, onClose }) => {
+    const { user } = useAuth();
+
     const { data: activities, isLoading } = useQuery({
-        queryKey: ['loginActivity'],
+        queryKey: ['loginActivity', user?.id],
         queryFn: async () => {
+            if (!user?.id) return [];
             const { data, error } = await api
                 .from('login_activity')
                 .select('*')
+                .eq('user_id', user.id)   // privacy: only the current user's own logins
                 .order('created_at', { ascending: false })
                 .limit(20);
 
             if (error) throw error;
             return data as LoginActivity[];
         },
-        enabled: isOpen,
+        enabled: isOpen && !!user?.id,
+        staleTime: 60_000,
     });
 
     const getDeviceIcon = (userAgent: string | null) => {

@@ -145,7 +145,9 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     },
     enabled: !!reportConversationId,
     retry: 2,
-    retryDelay: 1000
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const canDownloadPDF = canExportData;

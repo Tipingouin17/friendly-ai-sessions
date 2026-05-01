@@ -3,15 +3,14 @@
  *
  * Hook for the AIfacilitator application.
  */
-
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 
 export function useHostSessions() {
-  const { 
-    data: activeSessions = [], 
-    isLoading, 
-    refetch: refreshSessions 
+  const {
+    data: activeSessions = [],
+    isLoading,
+    refetch: refreshSessions
   } = useQuery({
     queryKey: ['host-sessions'],
     queryFn: async () => {
@@ -33,10 +32,12 @@ export function useHostSessions() {
         console.error('Error fetching active sessions:', error);
         throw error;
       }
-
       return data || [];
     },
-    refetchInterval: 30000 // Refetch every 30 seconds
+    // Active sessions change frequently — 30s staleTime matches the refetch interval
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   return {

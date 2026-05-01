@@ -85,6 +85,8 @@ export const CommunicationCenter = () => {
             if (error) throw error;
             return data as ContactMessage[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: faqs, isLoading: faqsLoading } = useQuery({
@@ -99,6 +101,8 @@ export const CommunicationCenter = () => {
             if (error) throw error;
             return data as FAQ[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const markRespondedMutation = useMutation({

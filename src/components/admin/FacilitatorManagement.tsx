@@ -88,6 +88,8 @@ export const FacilitatorManagement = () => {
             if (error) throw error;
             return data as Facilitator[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: plans } = useQuery({
@@ -97,6 +99,8 @@ export const FacilitatorManagement = () => {
             if (error) throw error;
             return data as { id: number; title: string }[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const upsertMutation = useMutation({

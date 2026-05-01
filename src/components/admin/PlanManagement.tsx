@@ -138,6 +138,8 @@ export const PlanManagement = () => {
                 restriction: restrictions?.find(r => r.plan_id === plan.id) ?? null,
             })) as PlanWithStats[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const savePlanMutation = useMutation({

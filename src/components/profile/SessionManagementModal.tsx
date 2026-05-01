@@ -52,6 +52,8 @@ export const SessionManagementModal: React.FC<SessionManagementModalProps> = ({ 
             return data as UserSession[];
         },
         enabled: isOpen,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const revokeSessionMutation = useMutation({

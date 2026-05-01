@@ -94,6 +94,8 @@ export const UserManagement = () => {
             if (error) throw error;
             return data as Plan[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: users, isLoading, refetch } = useQuery({
@@ -116,6 +118,8 @@ export const UserManagement = () => {
             if (error) throw error;
             return (data as any[]) as Profile[];
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const [enterpriseModel, setEnterpriseModel] = useState<string>("");
@@ -137,6 +141,8 @@ export const UserManagement = () => {
             setCompanyName(profile.company_name ?? "");
             return profile;
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: userSessionCount } = useQuery({
@@ -149,6 +155,8 @@ export const UserManagement = () => {
                 .eq("user_id", drawerUser!.id);
             return count ?? 0;
         },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const updateUserMutation = useMutation({

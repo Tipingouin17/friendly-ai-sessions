@@ -5,6 +5,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('usePlanLimits', 'plan');
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { useUserPlan } from "./useUserPlan";

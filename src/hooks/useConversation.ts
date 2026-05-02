@@ -5,6 +5,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useConversation', 'conversation');
 import api from "@/lib/api";
 import { ConversationWithSession } from "@/types/database";
 import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
@@ -71,6 +74,7 @@ export const useConversation = (conversationId: number | null) => {
   return useQuery<ConversationWithSession | null, Error>({
     queryKey: ['conversation', conversationId],
     queryFn: async () => {
+      log.log(`fetching conversation id=${conversationId}`);
       try {
         if (!conversationId) {
           throw new Error("No conversation ID provided");

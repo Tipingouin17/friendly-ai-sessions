@@ -4,6 +4,10 @@
  * Hook for the AIfacilitator application.
  */
 
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useSessionValidity', 'session');
+
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useConversationId } from "./useConversationId";

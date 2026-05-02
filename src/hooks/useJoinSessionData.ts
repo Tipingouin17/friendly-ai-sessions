@@ -5,6 +5,9 @@
  */
 
 import { useState, useEffect } from "react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useJoinSessionData', 'session');
 // usePlanLimits is intentionally NOT used on the join page.
 // Participants are unauthenticated — plan limits are irrelevant here.
 // The only source of truth for max participants is conversation.participants.

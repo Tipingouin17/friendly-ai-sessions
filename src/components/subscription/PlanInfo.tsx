@@ -4,6 +4,9 @@
  * Subscription component for the AIfacilitator application.
  */
 import React from 'react';
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('PlanInfo', 'plan');
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';

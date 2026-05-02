@@ -5,6 +5,9 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('SessionDataContext', 'session');
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
 import { useSessionData } from "@/hooks/useSessionData";

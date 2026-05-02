@@ -4,6 +4,9 @@
  * Hook for the AIfacilitator application.
  */
 import { useState, useEffect, useRef } from "react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useSessionParticipants', 'participants');
 import { useConversation } from "@/hooks/useConversation";
 import { useToast } from "@/components/ui/use-toast";
 import { useRealtimeConnection } from "@/hooks/useRealtimeConnection";

@@ -5,6 +5,9 @@
  */
 
 import { useState } from "react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useFacilitatorCreation', 'admin');
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/api";
 import { useUserPlan } from "@/hooks/useUserPlan";

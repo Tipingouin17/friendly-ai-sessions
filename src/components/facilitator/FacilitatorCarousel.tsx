@@ -4,6 +4,9 @@
  * Facilitator component for the AIfacilitator application.
  */
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('FacilitatorCarousel', 'plan');
 import { Button } from "@/components/ui/button";
 import { Facilitator } from "@/types/facilitator";
 import { FacilitatorCard } from "./FacilitatorCard";
@@ -105,6 +108,7 @@ export const FacilitatorCarousel = ({
   // Determine if a facilitator is locked for the current user's plan.
   // A facilitator is locked if its required plan tier exceeds the user's effective tier.
   const isFacilitatorLocked = (facilitator: Facilitator): boolean => {
+  // Logged at call site to avoid noise per-render
     if (!facilitator.plan_id) return false; // no plan requirement = always accessible
     return facilitator.plan_id > effectivePlanTier(userPlanId);
   };

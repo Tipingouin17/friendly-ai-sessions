@@ -8,6 +8,9 @@
  * Route: /redeem  (ProtectedRoute — user must be logged in)
  */
 import React, { useState } from 'react';
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('RedeemAppSumo', 'plan');
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, Tag, Zap, Users, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';

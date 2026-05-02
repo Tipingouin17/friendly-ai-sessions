@@ -13,8 +13,41 @@ import time
 import hashlib
 import traceback
 import asyncio
+import logging
+import sys
 import bcrypt as _bcrypt
 from datetime import datetime
+
+# ============================================================
+# Structured logging setup
+# ============================================================
+# Format: LEVEL YYYY-MM-DD HH:MM:SS [category] message
+# Set LOG_LEVEL env var to DEBUG/INFO/WARNING/ERROR (default: INFO)
+# Categories: app, auth, plan, session, ws, db, stripe, req
+_log_level_name = os.environ.get('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, _log_level_name, logging.INFO),
+    format='%(levelname)-8s %(asctime)s [%(name)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stdout,
+    force=True,
+)
+# Silence noisy third-party loggers in production
+logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
+logging.getLogger('uvicorn.error').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('openai').setLevel(logging.WARNING)
+
+logger       = logging.getLogger('app')      # general application events
+log_auth     = logging.getLogger('auth')     # login, signup, token, password
+log_plan     = logging.getLogger('plan')     # plan limits, enforcement
+log_session  = logging.getLogger('session')  # session lock, conversation create
+log_ws       = logging.getLogger('ws')       # WebSocket connect/disconnect
+log_db       = logging.getLogger('db')       # migrations, DB errors
+log_stripe   = logging.getLogger('stripe')   # Stripe events
+log_req      = logging.getLogger('req')      # HTTP request/response
+# ============================================================
+
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -304,7 +337,7 @@ def _compress_messages_for_context(
                 continue
             except Exception as compress_err:
                 # On failure, fall through and use original text
-                print(f"[compress] Warning: could not compress message: {compress_err}")
+                logger.warning("compress: could not compress message: %s", compress_err)
 
         compressed.append(msg)
     return compressed
@@ -618,13 +651,13 @@ def run_startup_migrations() -> None:
         for sql in migrations:
             try:
                 cur.execute(sql)
-                print(f"[migration] OK: {sql.strip()[:80]}")
+                log_db.debug("migration OK: %s", sql.strip()[:80])
             except Exception as mig_err:
-                print(f"[migration] WARN: {mig_err}")
+                log_db.warning("migration WARN: %s", mig_err)
         conn.close()
-        print("[migration] Startup migrations complete.")
+        log_db.info("Startup migrations complete.")
     except Exception as e:
-        print(f"[migration] ERROR running startup migrations: {e}")
+        log_db.error("ERROR running startup migrations: %s", e, exc_info=True)
 
 
 def load_users_from_db() -> None:
@@ -657,9 +690,9 @@ def load_users_from_db() -> None:
                     ),
                     "email_confirmed_at": datetime.utcnow().isoformat(),
                 }
-        print(f"[auth] Loaded {len(rows)} user(s) from DB into memory.")
+        log_auth.info("Loaded %d user(s) from DB into memory.", len(rows))
     except Exception as e:
-        print(f"[auth] WARNING: Could not load users from DB: {e}")
+        log_auth.warning("Could not load users from DB: %s", e)
 
 
 # ============================================================
@@ -668,10 +701,10 @@ def load_users_from_db() -> None:
 _startup_port = os.environ.get("PORT", "3333 (default)")
 _db_url = os.environ.get("DATABASE_URL", "NOT SET")
 _db_host = _db_url.split("@")[1].split("/")[0] if "@" in _db_url else "UNKNOWN"
-print(f"[startup] PORT env var = {_startup_port}")
-print(f"[startup] DATABASE_URL host = {_db_host}")
-print(f"[startup] ALLOWED_ORIGINS count = {len(ALLOWED_CORS_ORIGINS)}")
-print(f"[startup] Python version = {__import__('sys').version}")
+logger.info("PORT env var = %s", _startup_port)
+logger.info("DATABASE_URL host = %s", _db_host)
+logger.info("ALLOWED_ORIGINS count = %d", len(ALLOWED_CORS_ORIGINS))
+logger.info("Python version = %s", sys.version)
 
 # Run migrations immediately on import (before any request is served)
 try:
@@ -690,8 +723,8 @@ except Exception:
 async def on_startup():
     """Log the actual port uvicorn is bound to once the server is ready."""
     port = os.environ.get("PORT", "3333")
-    print(f"[startup] Uvicorn ready — listening on 0.0.0.0:{port}")
-    print(f"[startup] Health check: http://localhost:{port}/health")
+    logger.info("Uvicorn ready — listening on 0.0.0.0:%d", port)
+    logger.info("Health check: http://localhost:%d/health", port)
 
 
 @app.middleware("http")
@@ -699,9 +732,9 @@ async def log_all_requests(request: Request, call_next):
     """Log every incoming HTTP request with client IP and method for diagnostics."""
     client = request.client
     client_ip = client.host if client else "unknown"
-    print(f"[req] {request.method} {request.url.path} from {client_ip} (origin={request.headers.get('origin', '-')})")
+    log_req.debug("%s %s from %s (origin=%s)", request.method, request.url.path, client_ip, request.headers.get('origin', '-'))
     response = await call_next(request)
-    print(f"[res] {request.method} {request.url.path} -> {response.status_code}")
+    log_req.debug("%s %s -> %d", request.method, request.url.path, response.status_code)
     return response
 
 
@@ -1201,7 +1234,7 @@ async def auth_signup(request: Request):
         raise
     except Exception as e:
         err_msg = str(e)
-        print(f"[signup] DB error: {err_msg}")
+        log_auth.error("signup DB error: %s", err_msg)
         # Surface DB errors to the caller so they know the account was NOT saved.
         raise HTTPException(
             500,
@@ -1221,7 +1254,7 @@ async def auth_signup(request: Request):
     try:
         send_welcome_email(email, full_name or email)
     except Exception as _email_err:
-        print(f"[signup] Welcome email failed (non-fatal): {_email_err}")
+        log_auth.warning("signup welcome email failed (non-fatal): %s", _email_err)
 
     token = _make_token(user_id, email)
     return _make_user_response(USERS[email], token)
@@ -1269,7 +1302,7 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                 }
                 USERS[email] = user
         except Exception as e:
-            print(f"[login] DB lookup error: {e}")
+            log_auth.error("login DB lookup error: %s", e, exc_info=True)
     # Reject if user not found OR password does not match.
     # _verify_password handles both bcrypt and legacy SHA-256 hashes transparently.
     stored_hash = (user or {}).get("password", "")
@@ -1290,9 +1323,9 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
             _upg_conn.close()
             user["password"] = new_hash
             USERS[email]["password"] = new_hash
-            print(f"[auth] Upgraded password hash for {email} from SHA-256 to bcrypt")
+            log_auth.info("Upgraded password hash for %s from SHA-256 to bcrypt", email)
         except Exception as _upg_err:
-            print(f"[auth] Password upgrade failed for {email}: {_upg_err}")
+            log_auth.warning("Password upgrade failed for %s: %s", email, _upg_err)
 
     # Look up the user's profile role so admins get the correct JWT claim
     # Also backfill email if it's null (for users created before email column was added)
@@ -1313,7 +1346,7 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                 conn_role.commit()
         conn_role.close()
     except Exception as e:
-        print(f"[login] Role lookup error: {e}")
+        log_auth.error("login role lookup error: %s", e, exc_info=True)
 
     token = _make_token(user["id"], user["email"], profile_role)
     # Record login activity for the Profile security modal
@@ -1330,7 +1363,7 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         _la_conn.commit()
         _la_conn.close()
     except Exception as _la_err:
-        print(f"[auth] login_activity insert failed: {_la_err}")
+        log_auth.warning("login_activity insert failed (non-fatal): %s", _la_err)
     return _make_user_response(user, token, role=profile_role)
 
 
@@ -1376,7 +1409,7 @@ async def auth_user(request: Request):
                 conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[update_user] error: {e}")
+            log_auth.error("update_user error: %s", e, exc_info=True)
     # Return the role from the JWT so the frontend can check user.role for admin features
     return {
         "id": user.get("sub") or user.get("id"),
@@ -1434,12 +1467,12 @@ async def auth_recover(request: Request):
             try:
                 send_password_reset_email(email, full_name, token)
             except Exception as _email_err:
-                print(f"[recover] Email send failed (non-fatal): {_email_err}")
+                log_auth.warning("recover email send failed (non-fatal): %s", _email_err)
         else:
             conn.close()
-            print(f"[recover] No account found for {email} — returning 200 silently")
+            log_auth.info("recover: no account found for %s — returning 200 silently", email)
     except Exception as e:
-        print(f"[recover] ERROR: {e}")
+        log_auth.error("recover ERROR: %s", e, exc_info=True)
     return {}
 
 
@@ -1499,7 +1532,7 @@ async def auth_reset_password(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[reset-password] ERROR: {e}")
+        log_auth.error("reset-password ERROR: %s", e, exc_info=True)
         raise HTTPException(500, detail={"code": "server_error", "message": "Could not reset password"})
 
 
@@ -1590,7 +1623,7 @@ async def rpc_call(func_name: str, request: Request):
             return serialize_row(dict(result))
         return None
     except Exception as e:
-        print(f"RPC error {func_name}: {e}")
+        logger.error("RPC error %s: %s", func_name, e, exc_info=True)
         traceback.print_exc()
         raise HTTPException(400, str(e))
 
@@ -1926,11 +1959,11 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         conn.close()
 
         if not row:
-            print(f"[welcome-bg] Conversation {conv_id} not found, skipping.")
+            log_session.warning("welcome-bg: conversation %s not found, skipping.", conv_id)
             return
 
         row = dict(row)
-        print(f"[welcome-bg] Triggering AI welcome message for conv={conv_id}")
+        log_session.info("welcome-bg: triggering AI welcome message for conv=%s", conv_id)
 
         # Use stdlib urllib to make an internal HTTP call to the edge function.
         # This avoids adding httpx/aiohttp as a dependency.  The call is made
@@ -1955,14 +1988,14 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                 with _urllib_req.urlopen(req, timeout=90) as resp:
                     resp.read()
             except Exception as e:
-                print(f"[welcome-bg] HTTP call failed for conv={conv_id}: {e}")
+                log_session.error("welcome-bg: HTTP call failed for conv=%s: %s", conv_id, e)
         try:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, _do_post)
         except Exception as http_err:
-            print(f"[welcome-bg] Executor error for conv={conv_id}: {http_err}")
+            log_session.error("welcome-bg: executor error for conv=%s: %s", conv_id, http_err)
     except Exception as e:
-        print(f"[welcome-bg] Error generating welcome message for conv={conv_id}: {e}")
+        log_session.error("welcome-bg: error generating welcome message for conv=%s: %s", conv_id, e, exc_info=True)
 
 
 # ============================================================
@@ -2235,7 +2268,7 @@ async def rest_table(table: str, request: Request):
                     except HTTPException:
                         raise
                     except Exception as _ql_err:
-                        print(f"[messages POST] Question limit check failed: {_ql_err}")
+                        log_plan.warning("messages POST: question limit check failed: %s", _ql_err)
             # H6: Enforce session lock — reject conversation creation if the referenced
             # session template has lock=TRUE (admin moderation flag).
             if table == "conversations":
@@ -2250,7 +2283,7 @@ async def rest_table(table: str, request: Request):
                     except HTTPException:
                         raise
                     except Exception as _lock_err:
-                        print(f"[conversations POST] Session lock check failed: {_lock_err}")
+                        log_session.warning("conversations POST: session lock check failed: %s", _lock_err)
             def _adapt(d):
                 return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
 
@@ -2366,7 +2399,7 @@ async def rest_table(table: str, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"REST error on {table}: {e}")
+        logger.error("REST error on %s: %s", table, e, exc_info=True)
         traceback.print_exc()
         raise HTTPException(400, detail={"error": str(e), "message": str(e), "code": "PGRST000"})
 
@@ -2402,7 +2435,7 @@ async def edge_function(func_name: str, request: Request):
                     plan_meta[row["stripe_plan_id"]] = row
                 conn.close()
             except Exception as db_err:
-                print(f"get-stripe-prices DB lookup warning: {db_err}")
+                log_stripe.warning("get-stripe-prices DB lookup warning: %s", db_err)
 
             prices = []
             for p in stripe_prices.data:
@@ -2528,7 +2561,7 @@ async def edge_function(func_name: str, request: Request):
                             facilitator_language = langs.strip()
                 conn.close()
             except Exception as e:
-                print(f"Error fetching session context: {e}")
+                log_session.error("error fetching session context: %s", e, exc_info=True)
                 traceback.print_exc()
 
         # Resolve model — priority chain (highest to lowest):
@@ -2681,7 +2714,7 @@ async def edge_function(func_name: str, request: Request):
                 all_messages = cur.fetchall()
                 conn.close()
             except Exception as e:
-                print(f"Error fetching messages for report: {e}")
+                log_session.error("error fetching messages for report: %s", e, exc_info=True)
             # Pre-compress long participant messages to fit within model context budget
             all_messages = _compress_messages_for_context(list(all_messages), model, openai_client)
             conversation_text = ""
@@ -2733,7 +2766,7 @@ async def edge_function(func_name: str, request: Request):
                 recent_messages = list(reversed(cur.fetchall()))
                 conn.close()
             except Exception as e:
-                print(f"Error fetching recent messages: {e}")
+                log_session.error("error fetching recent messages: %s", e, exc_info=True)
             conversation_context = ""
             for msg in recent_messages:
                 content = msg.get("content", {})
@@ -2775,7 +2808,7 @@ async def edge_function(func_name: str, request: Request):
                     "Keep your response to 2-3 short paragraphs. Be specific about what participants said."
                 )
 
-        print(f"[AI] Calling {model} for conv={conv_id} (start={is_session_start}, report={generate_report})")
+        logger.info("[AI] Calling %s for conv=%s (start=%s, report=%s)", model, conv_id, is_session_start, generate_report)
         # Token usage tracking (populated only on successful API call)
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
@@ -2788,14 +2821,14 @@ async def edge_function(func_name: str, request: Request):
                 temperature=temperature,
             )
             txt = response.choices[0].message.content.strip()
-            print(f"[AI] Response received ({len(txt)} chars)")
+            logger.debug("[AI] Response received (%d chars)", len(txt))
             # Capture token usage for cost tracking
             if response.usage:
                 _prompt_tokens = response.usage.prompt_tokens
                 _completion_tokens = response.usage.completion_tokens
                 _model_used = response.model or model
         except Exception as e:
-            print(f"[AI] OpenAI API error: {e}")
+            logger.error("[AI] OpenAI API error: %s", e, exc_info=True)
             traceback.print_exc()
             if is_session_start:
                 txt = (f'Welcome to "{session_title}"! I\'m {facilitator_name}, and I\'m excited to facilitate our session today.\n\n'
@@ -2850,7 +2883,7 @@ async def edge_function(func_name: str, request: Request):
                     },
                 }))
             except Exception as e:
-                print(f"Error saving AI message: {e}")
+                log_session.error("error saving AI message: %s", e, exc_info=True)
                 traceback.print_exc()
 
         return {"content": txt, "id": str(msg_id) if msg_id else str(uuid.uuid4()), "success": True}
@@ -2894,7 +2927,7 @@ async def edge_function(func_name: str, request: Request):
             except HTTPException:
                 raise
             except Exception as _e:
-                print(f"Ownership check error: {_e}")
+                log_session.warning("ownership check error: %s", _e)
                 raise HTTPException(500, "Failed to verify session ownership")
 
         # ── Security: verify the user's plan allows session reports ──
@@ -2916,7 +2949,7 @@ async def edge_function(func_name: str, request: Request):
         except HTTPException:
             raise
         except Exception as _e:
-            print(f"Plan check error: {_e}")
+            log_plan.warning("plan check error: %s", _e)
             # Fail open on plan check errors to avoid blocking legitimate users
 
         if conv_id:
@@ -2992,7 +3025,7 @@ async def edge_function(func_name: str, request: Request):
                     "The report covers the opening and most recent portion of the session."
                     if _eos_truncated else ""
                 )
-                print(f"[AI] End-of-session report: model={_report_model}, transcript_chars={len(transcript)}, truncated={_eos_truncated}")
+                logger.info("[AI] End-of-session report: model=%s, transcript_chars=%d, truncated=%s", _report_model, len(transcript), _eos_truncated)
                 _report_prompt_tokens: Optional[int] = None
                 _report_completion_tokens: Optional[int] = None
                 _report_model_used: Optional[str] = None
@@ -3020,7 +3053,7 @@ async def edge_function(func_name: str, request: Request):
                         _report_completion_tokens = resp.usage.completion_tokens
                         _report_model_used = resp.model or DEFAULT_AI_MODEL
                 except Exception as e:
-                    print(f"[AI] Report generation error: {e}")
+                    logger.error("[AI] Report generation error: %s", e, exc_info=True)
                     report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
 
                 _report_cost = _calculate_token_cost(_report_model_used or DEFAULT_AI_MODEL, _report_prompt_tokens or 0, _report_completion_tokens or 0)
@@ -3050,7 +3083,7 @@ async def edge_function(func_name: str, request: Request):
                     },
                 }))
             except Exception as e:
-                print(f"Error closing session: {e}")
+                log_session.error("error closing session: %s", e, exc_info=True)
                 traceback.print_exc()
                 if not report_content:
                     report_content = f"## Session Report\n\nSession completed. Participants: {participant_count}, Messages: {message_count}"
@@ -3392,7 +3425,7 @@ async def edge_function(func_name: str, request: Request):
                         _tw_completion_tokens = _resp.usage.completion_tokens
                         _tw_model = _resp.model or DEFAULT_AI_MODEL
                 except Exception as ai_err:
-                    print(f"[template-welcome] AI translation failed, using original: {ai_err}")
+                    log_session.warning("template-welcome: AI translation failed, using original: %s", ai_err)
             _tw_cost = _calculate_token_cost(_tw_model or DEFAULT_AI_MODEL, _tw_prompt_tokens or 0, _tw_completion_tokens or 0)
             cur.execute(
                 "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES (%s, %s, 'assistant', %s, %s, %s, %s) RETURNING id",
@@ -3532,7 +3565,7 @@ async def edge_function(func_name: str, request: Request):
         except HTTPException:
             raise
         except Exception as e:
-            print(f"join-session error: {e}")
+            log_session.error("join-session error: %s", e, exc_info=True)
             raise HTTPException(500, f"Failed to join session: {e}")
 
     # ── Unknown function ───────────────────────────────────────
@@ -3555,7 +3588,7 @@ async def stripe_webhook(request: Request):
 
     event_type = event["type"]
     event_data = event["data"]["object"]
-    print(f"Stripe webhook: {event_type}")
+    log_stripe.info("webhook received: %s", event_type)
 
     try:
         conn = get_db()
@@ -3591,7 +3624,7 @@ async def stripe_webhook(request: Request):
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"Stripe webhook DB error for event {event_type}: {e}")
+        log_stripe.error("webhook DB error for event %s: %s", event_type, e, exc_info=True)
         traceback.print_exc()
         return {"received": True, "warning": "DB update failed"}
 
@@ -3670,7 +3703,7 @@ async def realtime_websocket(websocket: WebSocket):
     subscribed_conv_id: Optional[str] = None
 
     await websocket.accept()
-    print(f"[WS] Client connected")
+    log_ws.info("client connected")
 
     try:
         while True:
@@ -3720,9 +3753,9 @@ async def realtime_websocket(websocket: WebSocket):
                 if conv_id:
                     subscribed_conv_id = conv_id
                     await manager.connect(websocket, conv_id, topic)
-                    print(f"[WS] Subscribed topic={topic!r} → conv={conv_id}")
+                    log_ws.info("subscribed topic=%r -> conv=%s", topic, conv_id)
                 else:
-                    print(f"[WS] phx_join: could not extract conv_id from topic={topic!r}")
+                    log_ws.warning("phx_join: could not extract conv_id from topic=%r", topic)
                 await websocket.send_json({
                     "event": "phx_reply",
                     "topic": topic,
@@ -3747,9 +3780,9 @@ async def realtime_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         if subscribed_conv_id:
             await manager.disconnect(websocket, subscribed_conv_id)
-        print("[WS] Client disconnected")
+        log_ws.info("client disconnected")
     except Exception as e:
-        print(f"[WS] Error: {e}")
+        log_ws.error("error: %s", e, exc_info=True)
         if subscribed_conv_id:
             await manager.disconnect(websocket, subscribed_conv_id)
 
@@ -3762,5 +3795,5 @@ if __name__ == "__main__":
     import uvicorn
     os.makedirs(STORAGE_DIR, exist_ok=True)
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3333
-    print(f"Starting MyFacilitator FastAPI proxy v3 on port {port}...")
+    logger.info("Starting MyFacilitator FastAPI proxy v3 on port %d...", port)
     uvicorn.run("server_fastapi:app", host="0.0.0.0", port=port, reload=False, workers=1)

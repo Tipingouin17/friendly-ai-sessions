@@ -14,6 +14,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('Pricing', 'plan');
 import api from "@/lib/api";
 import { StandardPlanCard } from './pricing/components/StandardPlanCard';
 import { EnterprisePlanCard } from './pricing/components/EnterprisePlanCard';

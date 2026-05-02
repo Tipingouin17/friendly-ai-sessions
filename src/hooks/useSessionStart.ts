@@ -54,7 +54,8 @@ export const useSessionStart = ({
       const { error: updateError } = await api
         .from('conversations')
         .update({ 
-          session_started: true 
+          session_started: true,
+          session_started_at: new Date().toISOString()
         })
         .eq('id', conversationId);
         

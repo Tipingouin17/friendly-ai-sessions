@@ -117,7 +117,7 @@ export const WorkshopSelection = ({
               <div 
                 key="add-new"
                 className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 p-4 hover:border-primary transition-all min-h-[100px]"
-                onClick={onAddNewWorkshop}
+                onClick={(e) => { e.stopPropagation(); onAddNewWorkshop(); }}
               >
                 {!canCreateCustomSessions && (
                   <Badge

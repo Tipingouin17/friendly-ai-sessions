@@ -131,6 +131,8 @@ ALLOWED_CORS_ORIGINS = (
         "https://friendly-ai-sessions.vercel.app",
         "https://aifacilitator.vercel.app",
         "https://aifacilitator-git-dev-tipingouin17s-projects.vercel.app",
+        "https://aifacilitator-git-main-tipingouin17s-projects.vercel.app",
+        "https://aifacilitator-tipingouin17s-projects.vercel.app",
         "https://aifacilitator-dev.vercel.app",
         "https://aifacilitator.ai",
         "https://www.aifacilitator.ai",
@@ -2021,6 +2023,18 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
 @app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
 async def rest_table(table: str, request: Request):
     params = dict(request.query_params)
+    # ── Comprehensive request logging ────────────────────────────────────────
+    _has_token = bool(request.headers.get("x-join-token", "").strip())
+    _has_auth  = bool(request.headers.get("authorization", "").strip())
+    _origin    = request.headers.get("origin", "-")
+    log_req.info(
+        "REST %s /%s | auth=%s token=%s origin=%s params=%s",
+        request.method, table,
+        "jwt" if _has_auth else "none",
+        "yes" if _has_token else "no",
+        _origin,
+        dict(request.query_params),
+    )
 
     # ── Row-level security ────────────────────────────────────
     # Authenticated hosts see only their own data (ownership filter).
@@ -2040,6 +2054,7 @@ async def rest_table(table: str, request: Request):
         # session_reports: authenticated hosts only, no participant bypass
         if table in SECURE_REPORT_TABLES:
             if not requesting_user_id:
+                log_req.warning("REST GET /%s -> 401 (no auth, report table) origin=%s", table, request.headers.get("origin", "-"))
                 return JSONResponse(
                     content={
                         "error": "Authentication required",
@@ -2190,6 +2205,12 @@ async def rest_table(table: str, request: Request):
                 token_valid = _validate_join_token(join_token_header, raw_conv_id or None, conn)
                 if not token_valid:
                     conn.close()
+                    log_req.warning(
+                        "REST GET /%s -> 403 (invalid join token) conv_id=%s token_prefix=%s origin=%s",
+                        table, raw_conv_id or "?",
+                        join_token_header[:8] + "..." if join_token_header else "none",
+                        request.headers.get("origin", "-"),
+                    )
                     return JSONResponse(
                         content={
                             "error": "Invalid or missing session token",
@@ -2241,6 +2262,12 @@ async def rest_table(table: str, request: Request):
             else:
                 body = rows
             conn.close()
+            log_req.info(
+                "REST GET /%s -> %d row(s) | user=%s token=%s",
+                table, len(rows) if isinstance(rows, list) else 1,
+                requesting_user_id or "anon",
+                "yes" if join_token_header else "no",
+            )
             return JSONResponse(content=body, headers={"Content-Range": content_range})
 
         if request.method == "POST":
@@ -3466,6 +3493,11 @@ async def edge_function(func_name: str, request: Request):
         avatar_seed = data.get("avatar_seed") or str(uuid.uuid4())
         is_anonymous = bool(data.get("is_anonymous", False))
         is_host = bool(data.get("is_host", False))
+        log_session.info(
+            "join-session: conv_id=%s name=%r is_host=%s is_anon=%s origin=%s",
+            conversation_id, participant_name, is_host, is_anonymous,
+            request.headers.get("origin", "-"),
+        )
         join_token = (
             request.headers.get("x-join-token")
             or request.headers.get("X-Join-Token")
@@ -3572,6 +3604,10 @@ async def edge_function(func_name: str, request: Request):
             conn.commit()
             conn.close()
 
+            log_session.info(
+                "join-session: SUCCESS conv_id=%s participant_id=%s name=%r is_host=%s",
+                conversation_id, new_participant_id, participant_name, is_host,
+            )
             return {
                 "success": True,
                 "participant_id": new_participant_id,
@@ -3720,7 +3756,9 @@ async def realtime_websocket(websocket: WebSocket):
     subscribed_conv_id: Optional[str] = None
 
     await websocket.accept()
-    log_ws.info("client connected")
+    _ws_origin = websocket.headers.get("origin", "-")
+    _ws_host = websocket.headers.get("host", "-")
+    log_ws.info("client connected | origin=%s host=%s client=%s", _ws_origin, _ws_host, websocket.client)
 
     try:
         while True:
@@ -3797,7 +3835,7 @@ async def realtime_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         if subscribed_conv_id:
             await manager.disconnect(websocket, subscribed_conv_id)
-        log_ws.info("client disconnected")
+        log_ws.info("client disconnected | client=%s", websocket.client)
     except Exception as e:
         log_ws.error("error: %s", e, exc_info=True)
         if subscribed_conv_id:

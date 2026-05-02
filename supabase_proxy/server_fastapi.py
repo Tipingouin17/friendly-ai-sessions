@@ -2309,10 +2309,19 @@ async def rest_table(table: str, request: Request):
                 off = params.get("offset", "")
 
                 # ── Ownership / token filter injection ────────────
-                if join_token_header and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES):
-                    if requesting_user_id and table in ("conversations", *SECURE_CONV_TABLES):
-                        if not is_admin_user:
-                            join_token_header = ""
+                # If a join_token is present for participant-accessible tables,
+                # ALWAYS validate it — even for authenticated users.
+                # A participant may have a JWT but not own the conversation.
+                # The join_token is the correct access credential in that case.
+                # We only skip the join_token path for admin users (who bypass all checks).
+                _use_join_token = (
+                    join_token_header
+                    and table in ("conversations", *SECURE_CONV_TABLES)
+                    and not is_admin_user
+                )
+                if _use_join_token:
+                    # Token path: validate below at line 2344
+                    pass
                 elif requesting_user_id and not is_admin_user and table in SECURE_REPORT_TABLES:
                     wc.append(
                         '"conversation_id" IN ('
@@ -2341,7 +2350,7 @@ async def rest_table(table: str, request: Request):
                         wc.append('"user_id" = $__uid__::uuid')
                         wv.append(requesting_user_id)
 
-                if join_token_header and (not requesting_user_id or table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES)):
+                if _use_join_token or (join_token_header and not requesting_user_id and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES)):
                     conv_id_param = (
                         params.get("conversation_id") or
                         params.get("conversation_id=eq.") or

@@ -8,6 +8,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PageHead from '@/components/PageHead';
+import SectionHeading from '@/components/SectionHeading';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -107,12 +108,10 @@ const Index = () => {
             {/* ── Features Section ─────────────────────────────────────── */}
             <section className="py-16 md:py-24 px-4 bg-gray-50">
                 <div className="container mx-auto max-w-6xl">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything you need to run great workshops</h2>
-                        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-                            AIfacilitator combines the expertise of a professional facilitator with the scalability of AI.
-                        </p>
-                    </div>
+                    <SectionHeading
+                        title="Everything you need to run great workshops"
+                        subtitle="AIfacilitator combines the expertise of a professional facilitator with the scalability of AI."
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[
                             {
@@ -161,10 +160,10 @@ const Index = () => {
             {/* ── How It Works ─────────────────────────────────────────── */}
             <section className="py-16 md:py-24 px-4 bg-white">
                 <div className="container mx-auto max-w-5xl">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Up and running in minutes</h2>
-                        <p className="text-lg text-gray-500 max-w-xl mx-auto">No setup, no training, no hassle.</p>
-                    </div>
+                    <SectionHeading
+                        title="Up and running in minutes"
+                        subtitle="No setup, no training, no hassle."
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {[
                             { step: '1', icon: <Globe className="h-6 w-6 text-indigo-600" />, title: 'Choose a Facilitator', description: 'Pick from our library of expert AI facilitators or create your own.' },
@@ -187,9 +186,7 @@ const Index = () => {
             {/* ── Testimonials ─────────────────────────────────────────── */}
             <section className="py-16 md:py-24 px-4 bg-gray-50">
                 <div className="container mx-auto max-w-5xl">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Loved by teams everywhere</h2>
-                    </div>
+                    <SectionHeading title="Loved by teams everywhere" />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {[
                             { quote: 'AIfacilitator cut our meeting time in half while doubling the quality of our decisions.', author: 'Sarah K.', role: 'Product Lead' },

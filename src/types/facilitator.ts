@@ -29,6 +29,20 @@ export interface Workshop {
   welcome_message?: string;
   status?: boolean;
   facilitator?: number;
+  /**
+   * Joined facilitator object returned by fetchWorkshops via
+   * `facilitator:facilitators!inner(*)`. The PostgREST alias "facilitator"
+   * shadows the numeric FK field, so the raw API response returns an object
+   * here instead of a number when the join is active.
+   * We type it as `unknown` at this layer and cast it where needed.
+   */
+  facilitator_obj?: {
+    id: number;
+    plan_id?: number | null;
+    lock?: boolean;
+    title?: string;
+  } | null;
+  duration_minutes?: number | null;
 }
 
 export interface Conversation {

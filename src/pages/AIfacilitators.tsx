@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";
 import { fetchFacilitators, fetchWorkshops } from "@/services/facilitatorService";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 import { FacilitatorStepper } from "@/components/facilitator/FacilitatorStepper";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
@@ -85,6 +86,20 @@ const AIfacilitators = () => {
     planName
   } = usePlanLimits();
 
+  const { currentPlanId } = useUserPlan();
+
+  // Map a plan ID to its effective access tier for facilitator lock checks.
+  // Mirrors the same logic in FacilitatorCarousel.tsx.
+  const effectivePlanTier = (planId: number | null): number => {
+    if (!planId) return 1;
+    if (planId === 101) return 2; // AppSumo Solo → Starter
+    if (planId === 102) return 2; // AppSumo Team → Starter
+    if (planId === 103) return 3; // AppSumo Agency → Premium
+    return planId;
+  };
+
+  const userTier = effectivePlanTier(currentPlanId);
+
   // Don't render plan-dependent UI until data is loaded
   const planDataReady = !limitsLoading && maxSessions > 0;
 
@@ -100,7 +115,7 @@ const AIfacilitators = () => {
   });
 
   const {
-    data: workshops = [],
+    data: rawWorkshops = [],
     isLoading: isWorkshopsLoading,
     refetch: refetchWorkshops
   } = useQuery({
@@ -110,6 +125,19 @@ const AIfacilitators = () => {
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+
+  // Filter out workshops belonging to facilitators that are locked for the
+  // current user's plan tier. The fetchWorkshops query returns the joined
+  // facilitator row as `workshop.facilitator` (PostgREST alias). We cast it
+  // to access plan_id and lock fields.
+  const workshops = rawWorkshops.filter((workshop) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fac = workshop.facilitator as any;
+    if (!fac || typeof fac !== 'object') return true; // no join data → show it
+    const facPlanId: number | null = fac.plan_id ?? null;
+    if (!facPlanId) return true; // no plan requirement → always accessible
+    return facPlanId <= userTier; // only show if facilitator tier ≤ user tier
   });
 
   // Determine if steps should be disabled based on limits

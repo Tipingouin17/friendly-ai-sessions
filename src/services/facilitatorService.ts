@@ -44,24 +44,42 @@ export const createConversation = async (params: {
   userId: string;
   durationMinutes?: number;
 }) => {
-  // Guard: verify the session template is not admin-locked before creating a
+  // Guard: verify the session template is not admin-locked and that the
+  // facilitator is accessible for the user's plan tier before creating a
   // conversation. This is a client-side check; the backend REST endpoint also
-  // enforces this via a trigger/check to prevent direct API bypass.
+  // enforces the admin lock via a trigger/check to prevent direct API bypass.
   const { data: session, error: sessionError } = await api
     .from('sessions')
-    .select('id, lock, lock_reason')
+    .select('id, lock, facilitator:facilitators!inner(id, plan_id, lock)')
     .eq('id', params.workshopId)
     .single();
 
   if (sessionError) throw sessionError;
 
   if (session?.lock) {
-    const reason = session.lock_reason
-      ? ` Reason: ${session.lock_reason}`
-      : "";
     throw new Error(
-      `This session has been locked by an administrator and is not available.${reason}`
+      `This session has been locked by an administrator and is not available.`
     );
+  }
+
+  // Check facilitator plan-tier lock
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const facilitatorData = session?.facilitator as any;
+  if (facilitatorData && typeof facilitatorData === 'object' && facilitatorData.lock === true) {
+    // Resolve user's plan tier from their profile
+    const { data: profileData } = await api
+      .from('profiles')
+      .select('current_plan_id')
+      .eq('id', params.userId)
+      .maybeSingle();
+    const userPlanId: number = (profileData as Record<string, unknown> | null)?.current_plan_id as number ?? 1;
+    const effectiveTier = userPlanId === 101 || userPlanId === 102 ? 2 : userPlanId === 103 ? 3 : userPlanId;
+    const facPlanId: number = facilitatorData.plan_id ?? 1;
+    if (facPlanId > effectiveTier) {
+      throw new Error(
+        `This workshop requires a higher plan tier. Please upgrade to access it.`
+      );
+    }
   }
 
   const { data, error } = await api

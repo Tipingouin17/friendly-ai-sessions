@@ -386,11 +386,15 @@ _DB_KEEPALIVE_OPTS = dict(
 
 def _open_db_conn() -> psycopg2.extensions.connection:
     """Open a fresh psycopg2 connection with TCP keepalives enabled."""
+    # statement_timeout=10s prevents any single query from blocking the
+    # asyncio event loop for too long (psycopg2 is synchronous/blocking).
+    _PG_OPTIONS = "-c statement_timeout=10000"
     if DB_URL:
         conn = psycopg2.connect(
             DB_URL,
             cursor_factory=psycopg2.extras.RealDictCursor,
-            connect_timeout=10,
+            connect_timeout=3,
+            options=_PG_OPTIONS,
             **_DB_KEEPALIVE_OPTS,
         )
     else:
@@ -398,7 +402,8 @@ def _open_db_conn() -> psycopg2.extensions.connection:
             dbname=DB_NAME, user=DB_USER, host=DB_HOST,
             port=DB_PORT, password=DB_PASSWORD,
             cursor_factory=psycopg2.extras.RealDictCursor,
-            connect_timeout=10,
+            connect_timeout=3,
+            options=_PG_OPTIONS,
             **_DB_KEEPALIVE_OPTS,
         )
     conn.autocommit = False
@@ -409,18 +414,18 @@ def get_db() -> psycopg2.extensions.connection:
     """Open a synchronous psycopg2 connection with TCP keepalives.
 
     Each call opens a fresh connection.  This is intentional: the server
-    is stateless per-request and we rely on TCP keepalives (above) to
-    keep connections alive during the lifetime of a single request rather
-    than across requests.  This avoids the TCP_TOO_OLD_ACK error that
-    occurs when a long-lived connection is reused after Railway's network
-    layer has silently dropped the underlying TCP session.
+    is stateless per-request and we rely on TCP keepalives (configured in
+    _DB_KEEPALIVE_OPTS) to detect dead connections during the lifetime of
+    a single request.  A short connect_timeout (3s) ensures that stale
+    TCP sessions fail fast instead of blocking the asyncio event loop.
+
+    IMPORTANT: This function is synchronous (psycopg2 is blocking).  When
+    called from an ``async def`` endpoint it blocks the entire asyncio
+    event loop.  The connect_timeout is kept short (3s) to minimise the
+    impact.  A future refactor should move all DB work to a thread pool.
     """
     try:
-        conn = _open_db_conn()
-        # Quick liveness check — costs one round-trip but prevents stale
-        # connections from being handed to callers.
-        conn.cursor().execute("SELECT 1")
-        return conn
+        return _open_db_conn()
     except Exception as e:
         log_db.warning("get_db: initial connection failed (%s), retrying once", e)
         try:

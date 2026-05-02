@@ -2,10 +2,11 @@
  * use Session Closure Validation
  *
  * Session closure hook for the AIfacilitator application.
+ * Refactored to fetch the conversation row only ONCE (was 3 redundant fetches
+ * via validateSessionAccess -> validateSecureSessionOperation -> direct fetch).
  */
 
 import api from "@/lib/api";
-import { validateSecureSessionOperation } from '@/utils/securityEnhanced';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 export const useSessionClosureValidation = () => {
@@ -13,65 +14,46 @@ export const useSessionClosureValidation = () => {
 
   const validateSessionClosure = async (conversationId: number) => {
     if (!conversationId) {
-      console.error("No conversation ID provided to closeSessionAndGenerateReport");
       logSecurityViolation('invalid_session_closure_attempt', { conversationId });
       throw new Error('No conversation ID provided');
     }
 
+    // --- Auth check ---
     const { data: { session } } = await api.auth.getSession();
     const user = session?.user ?? null;
-    
+
     if (!user) {
-      console.error("No authenticated user found");
       logSecurityViolation('unauthenticated_session_closure_attempt', { conversationId });
       throw new Error('User not authenticated');
     }
-    
-    const securityValidation = await validateSecureSessionOperation(
-      conversationId, 
-      user.id, 
-      'close_session'
-    );
-    
-    if (!securityValidation.isValid) {
-      console.error("Security validation failed:", securityValidation.error);
-      logSecurityViolation('unauthorized_session_closure', { 
-        conversationId, 
-        userId: user.id,
-        error: securityValidation.error 
-      });
-      throw new Error(securityValidation.error || 'Security validation failed');
-    }
 
+    // --- Single DB fetch (replaces 3 redundant fetches from the old flow) ---
     const { data: conversation, error: convError } = await api
       .from('conversations')
-      .select('user_id, is_session_ended')
+      .select('user_id, is_session_ended, status')
       .eq('id', conversationId)
       .single();
 
     if (convError) {
-      console.error("Error fetching conversation:", convError);
       throw new Error(`Failed to fetch conversation: ${convError.message}`);
     }
-
     if (!conversation) {
-      console.error("Conversation not found");
       throw new Error('Conversation not found');
     }
 
-    if (conversation.user_id !== user.id) {
-      console.error("User does not own this conversation");
-      logSecurityViolation('unauthorized_session_access', { 
-        conversationId, 
-        userId: user.id,
-        ownerId: conversation.user_id 
-      });
-      throw new Error('Access denied: You do not own this conversation');
+    // --- State checks ---
+    if (conversation.is_session_ended) {
+      throw new Error('Session is already ended');
     }
 
-    if (conversation.is_session_ended) {
-      console.error("Session is already ended");
-      throw new Error('Session is already ended');
+    // --- Ownership check ---
+    if (conversation.user_id !== user.id) {
+      logSecurityViolation('unauthorized_session_closure', {
+        conversationId,
+        userId: user.id,
+        ownerId: conversation.user_id,
+      });
+      throw new Error('Access denied: You do not own this conversation');
     }
 
     return { user, conversation };

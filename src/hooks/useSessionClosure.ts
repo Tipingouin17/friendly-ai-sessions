@@ -42,6 +42,17 @@ export const useSessionClosure = () => {
     setIsClosing(true);
     setClosureProgress('Initializing session closure...');
 
+    // 30-second timeout guard — prevents infinite spinner if backend is slow/sleeping
+    const timeoutId = setTimeout(() => {
+      setIsClosing(false);
+      setClosureProgress('');
+      toast({
+        title: "Request Timed Out",
+        description: "The server took too long to respond. The backend may be waking up — please try again in a few seconds.",
+        variant: "destructive",
+      });
+    }, 30000);
+
     try {
       // Step 1-3: Validation
       setClosureProgress('Validating session permissions...');
@@ -69,12 +80,14 @@ export const useSessionClosure = () => {
       });
 
       // Ensure navigation happens
+      clearTimeout(timeoutId);
       setTimeout(() => {
         navigate('/past-workshops', { replace: true });
       }, 1000);
 
       return true;
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('Error in closeSessionAndGenerateReport:', error);
       
       let errorMessage = "Failed to close session and generate report";
@@ -103,6 +116,17 @@ export const useSessionClosure = () => {
   const stopSessionWithoutReport = async (conversationId: number) => {
     setIsStopping(true);
     setClosureProgress('Stopping session...');
+
+    // 30-second timeout guard
+    const timeoutId = setTimeout(() => {
+      setIsStopping(false);
+      setClosureProgress('');
+      toast({
+        title: "Request Timed Out",
+        description: "The server took too long to respond. The backend may be waking up — please try again in a few seconds.",
+        variant: "destructive",
+      });
+    }, 30000);
 
     try {
       // Reuse the same validation (ownership + not-already-ended checks)
@@ -182,12 +206,14 @@ export const useSessionClosure = () => {
         description: "The session has been ended. No report was generated.",
       });
 
+      clearTimeout(timeoutId);
       setTimeout(() => {
         navigate('/past-workshops', { replace: true });
       }, 800);
 
       return true;
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('Error in stopSessionWithoutReport:', error);
 
       let errorMessage = "Failed to stop session";

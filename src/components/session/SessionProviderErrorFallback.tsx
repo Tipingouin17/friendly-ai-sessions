@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { isNetworkError, isAbortError } from "@/utils/networkUtils";
 import SessionConnecting from "./SessionConnecting";
+import api from "@/lib/api";
 
 interface SessionProviderErrorFallbackProps {
   errorMessage: string;
@@ -126,6 +127,9 @@ export const SessionProviderErrorFallback = ({
         setIsCircuitBreakerOpen(false);
         setAutoRetryCount(0);
       }
+      
+      // Force the shared WebSocket to reconnect immediately, resetting backoff.
+      api.forceReconnect();
       
       try {
         await onRetry();

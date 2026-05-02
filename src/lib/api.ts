@@ -223,7 +223,21 @@ async function apiFetch<T>(
     // instead of the ownership filter (which would return 403 for non-owners).
     if (joinToken) headers["X-Join-Token"] = joinToken;
 
-    const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+    // Apply a 15-second timeout so Railway cold-start / network issues fail fast
+    // instead of hanging indefinitely. The caller (React Query) will retry.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    const signal = options.signal
+      ? (AbortSignal as any).any
+        ? (AbortSignal as any).any([options.signal, controller.signal])
+        : controller.signal
+      : controller.signal;
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${path}`, { ...options, headers, signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     let count: number | null = null;
     const cr = res.headers.get("Content-Range");
@@ -449,8 +463,21 @@ class QueryBuilder<T = Record<string, unknown>> {
     if (token) headers["Authorization"] = `Bearer ${token}`;
     // Always send the join token when present — even for authenticated users.
     if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Apply a 15-second timeout so Railway cold-start / network issues fail fast.
+    const _ctrl = new AbortController();
+    const _tid = setTimeout(() => _ctrl.abort(), 15_000);
+    const _sig = this.s.signal
+      ? (AbortSignal as any).any
+        ? (AbortSignal as any).any([this.s.signal, _ctrl.signal])
+        : _ctrl.signal
+      : _ctrl.signal;
     try {
-      const res = await fetch(`${API_URL}${this.url("GET")}`, { headers, signal: this.s.signal });
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}${this.url("GET")}`, { headers, signal: _sig });
+      } finally {
+        clearTimeout(_tid);
+      }
       let count: number | null = null;
       const cr = res.headers.get("Content-Range");
       if (cr) { const m = cr.match(/\/(\d+)$/); if (m) count = parseInt(m[1], 10); }

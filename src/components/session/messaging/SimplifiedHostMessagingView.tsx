@@ -396,7 +396,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           <span className="text-xs font-semibold text-slate-700">
                             {isAI
                               ? (conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator')
-                              : (message.participant || 'Participant')
+                              : message.sender === 'admin'
+                                ? 'Host'
+                                : (participants.find(p => String(p.id) === message.participant)?.name || message.name || 'Participant')
                             }
                           </span>
                           <span className="text-[10px] text-slate-400">

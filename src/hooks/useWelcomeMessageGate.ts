@@ -33,6 +33,11 @@ export const useWelcomeMessageGate = ({
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  // BUG #3 FIX: Track the conversation ID for which messageReady was confirmed.
+  // Once messageReady is true for a given session, never reset it back to false
+  // for the same session — even if the conversation object re-fetches or the
+  // component briefly re-mounts during a backend reconnection.
+  const messageReadyForConversationRef = useRef<number | null>(null);
 
   const checkForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId) return false;
@@ -60,8 +65,20 @@ export const useWelcomeMessageGate = ({
     }
   }, [conversationId]);
 
+  // BUG #3 FIX: Remove state.messageReady and state.timeoutReached from the
+  // dependency array. These caused a new waitForWelcomeMessage reference on
+  // every state change, which could trigger re-renders that reset the gate.
+  // Use refs instead to read the latest values inside the callback.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const waitForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId || !sessionStarted) return true;
+
+    // BUG #3 FIX: If messageReady was already confirmed for this session, skip.
+    if (messageReadyForConversationRef.current === conversationId) return true;
 
     setState(prev => ({ 
       ...prev, 
@@ -73,6 +90,7 @@ export const useWelcomeMessageGate = ({
     // First check if message already exists
     const messageExists = await checkForWelcomeMessage();
     if (messageExists) {
+      messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
@@ -90,6 +108,7 @@ export const useWelcomeMessageGate = ({
         .single();
 
       if (conversation?.welcome_message_status === 'ai_ready' || conversation?.welcome_message_status === 'template_ready') {
+        messageReadyForConversationRef.current = conversationId;
         setState(prev => ({ 
           ...prev, 
           isWaitingForMessage: false, 
@@ -105,6 +124,7 @@ export const useWelcomeMessageGate = ({
 
     // Set up timeout (15 seconds for database trigger generation)
     timeoutRef.current = setTimeout(() => {
+      messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
@@ -129,6 +149,7 @@ export const useWelcomeMessageGate = ({
           timeoutRef.current = null;
         }
         
+        messageReadyForConversationRef.current = conversationId;
         setState(prev => ({ 
           ...prev, 
           isWaitingForMessage: false, 
@@ -149,6 +170,7 @@ export const useWelcomeMessageGate = ({
             timeoutRef.current = null;
           }
           
+          messageReadyForConversationRef.current = conversationId;
           setState(prev => ({ 
             ...prev, 
             isWaitingForMessage: false, 
@@ -167,13 +189,16 @@ export const useWelcomeMessageGate = ({
 
     return new Promise((resolve) => {
       const checkInterval = setInterval(async () => {
-        if (state.messageReady || state.timeoutReached) {
+        // BUG #3 FIX: Use ref instead of stale closure over state
+        if (stateRef.current.messageReady || stateRef.current.timeoutReached) {
           clearInterval(checkInterval);
           resolve(true);
         }
       }, 1000);
     });
-  }, [conversationId, sessionStarted, checkForWelcomeMessage, state.messageReady, state.timeoutReached]);
+  // BUG #3 FIX: Removed state.messageReady and state.timeoutReached from deps
+  // to prevent new function references on every state change.
+  }, [conversationId, sessionStarted, checkForWelcomeMessage]);
 
   // Clean up on unmount or conversation change
   useEffect(() => {
@@ -189,15 +214,33 @@ export const useWelcomeMessageGate = ({
     };
   }, [conversationId]);
 
-  // Reset state when conversation changes
+  // BUG #3 FIX: Only reset state when conversation ID actually changes to a
+  // DIFFERENT session. If the same conversation ID re-renders (e.g., after a
+  // backend reconnection), preserve the messageReady=true state to prevent
+  // the "Session Starting" screen from flashing back.
+  const prevConversationIdRef = useRef<number | null>(null);
   useEffect(() => {
-    setState({
-      isWaitingForMessage: false,
-      messageReady: false,
-      error: null,
-      timeoutReached: false
-    });
+    if (conversationId !== prevConversationIdRef.current) {
+      prevConversationIdRef.current = conversationId;
+      // Only reset if we don't already have messageReady confirmed for this session
+      if (messageReadyForConversationRef.current !== conversationId) {
+        setState({
+          isWaitingForMessage: false,
+          messageReady: false,
+          error: null,
+          timeoutReached: false
+        });
+      }
+    }
   }, [conversationId]);
+
+  // BUG #3 FIX: If messageReady was already confirmed for this conversationId
+  // (e.g., after a reconnection re-mounts the component), restore it immediately.
+  useEffect(() => {
+    if (conversationId && messageReadyForConversationRef.current === conversationId && !state.messageReady) {
+      setState(prev => ({ ...prev, messageReady: true, isWaitingForMessage: false }));
+    }
+  }, [conversationId, state.messageReady]);
 
   return {
     ...state,

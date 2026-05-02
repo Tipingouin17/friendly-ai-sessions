@@ -359,7 +359,7 @@ const PastWorkshops = () => {
     : '—';
 
   const filterTabs: { id: FilterTab; label: string; count?: number }[] = [
-    { id: 'all', label: 'All Workshops', count: pastWorkshops?.length },
+    { id: 'all', label: 'All Workshops', count: (pastWorkshops?.length || 0) + (activeWorkshops?.length || 0) },
     { id: 'active', label: 'Active', count: activeWorkshops?.length || 0 },
     { id: 'saved', label: 'Saved', count: (pastWorkshops || []).filter(w => w.is_saved).length },
   ];

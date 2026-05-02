@@ -2186,7 +2186,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                     "new": {
                         "id": str(_msg_id),
                         "conversation_id": str(conv_id),
-                        "content": _content_json,
+                        "content": _content_dict,
                         "role": "assistant",
                         "name": _facilitator,
                         "created_at": datetime.utcnow().isoformat(),
@@ -3046,7 +3046,7 @@ async def edge_function(func_name: str, request: Request):
                         "new": {
                             "id": str(msg_id),
                             "conversation_id": str(conv_id),
-                            "content": content_json,
+                            "content": content_dict,
                             "role": "assistant",
                             "name": facilitator_name,
                             "created_at": datetime.utcnow().isoformat(),

@@ -17,14 +17,15 @@ export const fetchFacilitators = async () => {
 };
 
 export const fetchWorkshops = async (facilitatorId: number | null) => {
-  // Exclude sessions that are inactive (status=false) or admin-locked for
-  // content moderation (lock=true). The OR filter handles NULL lock values
-  // (legacy rows without the column) as unlocked.
+  // Fetch active sessions. The backend's build_where() does not support the
+  // PostgREST 'or' filter yet (fix pending Railway redeploy), so we filter
+  // admin-locked sessions (lock=true) on the client side instead.
+  // Sessions with lock=null (legacy rows) or lock=false are both considered
+  // unlocked — this matches the intended PostgREST .or('lock.is.null,lock.eq.false').
   const query = api
     .from('sessions')
     .select('*, facilitator:facilitators!inner(*)')
-    .eq('status', true)
-    .or('lock.is.null,lock.eq.false');
+    .eq('status', true);
     
   if (facilitatorId) {
     query.eq('facilitator', facilitatorId);
@@ -32,7 +33,9 @@ export const fetchWorkshops = async (facilitatorId: number | null) => {
   
   const { data, error } = await query;
   if (error) throw error;
-  return data;
+  // Filter out admin-locked sessions client-side (lock === true means locked)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[])?.filter((s: any) => s.lock !== true) ?? [];
 };
 
 export const createConversation = async (params: {

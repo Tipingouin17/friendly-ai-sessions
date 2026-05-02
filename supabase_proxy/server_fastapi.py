@@ -1113,23 +1113,48 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
     pass
 
 
+def _coerce_value(v: str):
+    """Try to coerce a string query-param value to int or float so asyncpg
+    receives the correct Python type for INTEGER / NUMERIC columns.
+    UUIDs, booleans ('true'/'false'), and general strings are left as-is.
+    """
+    if not isinstance(v, str):
+        return v
+    # Boolean literals
+    if v == "true":
+        return True
+    if v == "false":
+        return False
+    # Integer
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        pass
+    # Float
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        pass
+    return v
+
+
 def build_where(params: dict):
     wc, wv = [], []
     for key, value in params.items():
         if key in ("select", "order", "limit", "offset", "on_conflict", "columns", "count"):
             continue
         if value.startswith("eq."):
-            wc.append(f'"{key}" = %s'); wv.append(value[3:])
+            wc.append(f'"{key}" = %s'); wv.append(_coerce_value(value[3:]))
         elif value.startswith("neq."):
-            wc.append(f'"{key}" != %s'); wv.append(value[4:])
+            wc.append(f'"{key}" != %s'); wv.append(_coerce_value(value[4:]))
         elif value.startswith("gt."):
-            wc.append(f'"{key}" > %s'); wv.append(value[3:])
+            wc.append(f'"{key}" > %s'); wv.append(_coerce_value(value[3:]))
         elif value.startswith("gte."):
-            wc.append(f'"{key}" >= %s'); wv.append(value[4:])
+            wc.append(f'"{key}" >= %s'); wv.append(_coerce_value(value[4:]))
         elif value.startswith("lt."):
-            wc.append(f'"{key}" < %s'); wv.append(value[3:])
+            wc.append(f'"{key}" < %s'); wv.append(_coerce_value(value[3:]))
         elif value.startswith("lte."):
-            wc.append(f'"{key}" <= %s'); wv.append(value[4:])
+            wc.append(f'"{key}" <= %s'); wv.append(_coerce_value(value[4:]))
         elif value.startswith("like."):
             wc.append(f'"{key}" LIKE %s'); wv.append(value[5:])
         elif value.startswith("ilike."):
@@ -1143,17 +1168,17 @@ def build_where(params: dict):
             elif v == "false":
                 wc.append(f'"{key}" = false')
         elif value.startswith("in."):
-            items = [i.strip().strip('"').strip("'") for i in value[3:].strip("()").split(",")]
+            items = [_coerce_value(i.strip().strip('"').strip("'")) for i in value[3:].strip("()").split(",")]
             wc.append(f'"{key}" IN ({",".join(["%s"] * len(items))})')
             wv.extend(items)
         elif value.startswith("not."):
             rest = value[4:]
             if rest.startswith("eq."):
-                wc.append(f'"{key}" != %s'); wv.append(rest[3:])
+                wc.append(f'"{key}" != %s'); wv.append(_coerce_value(rest[3:]))
             elif rest.startswith("is.null"):
                 wc.append(f'"{key}" IS NOT NULL')
         else:
-            wc.append(f'"{key}" = %s'); wv.append(value)
+            wc.append(f'"{key}" = %s'); wv.append(_coerce_value(value))
     return wc, wv
 
 

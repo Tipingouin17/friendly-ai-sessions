@@ -10,6 +10,14 @@
  * Hiding strategy: CSS injection (`display: none !important`) is used instead
  * of the Crisp SDK's `chat:hide` API because the SDK call is unreliable when
  * Crisp overrides inline styles after loading.
+ *
+ * IMPORTANT — crash fix (2026-05-02):
+ * The Crisp SDK replaces window.$crisp (array → object) during loading, but
+ * internal methods like set_user_email are not ready until CRISP_READY_TRIGGER
+ * fires. Calling window.$crisp.set() before that point throws:
+ *   TypeError: Cannot read properties of undefined (reading 'setEmail')
+ * Fix: all SDK calls are deferred until crispReady = true. Before that, we
+ * always use the array-push queue interface.
  */
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
@@ -32,6 +40,10 @@ declare global {
   }
 }
 
+// Module-level flag: true only after CRISP_READY_TRIGGER has fired.
+// Prevents crispSet/crispDo from calling SDK methods before full initialisation.
+let crispReady = false;
+
 /** Inject or update a <style> tag that controls Crisp chatbox visibility */
 function setCrispVisibility(hidden: boolean) {
   if (typeof document === "undefined") return;
@@ -48,29 +60,60 @@ function setCrispVisibility(hidden: boolean) {
     : "#crisp-chatbox { display: block !important; }";
 }
 
-/** Helper for set commands (works in both queued and loaded states) */
+/**
+ * Helper for set commands.
+ * Before SDK is ready: queues via the array interface (safe, Crisp processes
+ * the queue once loaded). After SDK is ready: calls the SDK method directly,
+ * with a try/catch as a last-resort safety net.
+ */
 function crispSet(key: string, value: unknown[]) {
   if (typeof window === "undefined" || !window.$crisp) return;
-  if (typeof window.$crisp.set === "function") {
-    window.$crisp.set(key, value);
-  } else if (Array.isArray(window.$crisp)) {
-    window.$crisp.push(["set", key, value]);
+  if (!crispReady || Array.isArray(window.$crisp)) {
+    // SDK not yet fully initialised — queue the command
+    if (Array.isArray(window.$crisp)) {
+      window.$crisp.push(["set", key, value]);
+    }
+    return;
+  }
+  try {
+    if (typeof window.$crisp.set === "function") {
+      window.$crisp.set(key, value);
+    }
+  } catch (e) {
+    console.warn("[CrispChat] crispSet failed (SDK not fully ready):", e);
   }
 }
 
-/** Helper for do commands (works in both queued and loaded states) */
+/**
+ * Helper for do commands.
+ * Same deferred-until-ready strategy as crispSet.
+ */
 function crispDo(action: string) {
   if (typeof window === "undefined" || !window.$crisp) return;
-  if (typeof window.$crisp.do === "function") {
-    window.$crisp.do(action);
-  } else if (Array.isArray(window.$crisp)) {
-    window.$crisp.push(["do", action]);
+  if (!crispReady || Array.isArray(window.$crisp)) {
+    if (Array.isArray(window.$crisp)) {
+      window.$crisp.push(["do", action]);
+    }
+    return;
+  }
+  try {
+    if (typeof window.$crisp.do === "function") {
+      window.$crisp.do(action);
+    }
+  } catch (e) {
+    console.warn("[CrispChat] crispDo failed (SDK not fully ready):", e);
   }
 }
 
 export function CrispChat() {
   const { user } = useAuth();
   const location = useLocation();
+
+  // Keep a ref to the latest user so CRISP_READY_TRIGGER can set identity
+  // after the SDK finishes loading (user may already be logged in at that point).
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   // Keep a ref to the latest pathname so the CRISP_READY_TRIGGER callback
   // always sees the current path without needing to re-register.
   const pathnameRef = useRef(location.pathname);
@@ -80,14 +123,29 @@ export function CrispChat() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    crispReady = false;
     window.$crisp = [];
     window.CRISP_WEBSITE_ID = CRISP_WEBSITE_ID;
 
     // CRISP_READY_TRIGGER fires once when the Crisp SDK finishes loading.
-    // At that point we apply the correct visibility based on the current path.
+    // This is the ONLY safe point to call SDK methods like set_user_email.
     window.CRISP_READY_TRIGGER = () => {
+      crispReady = true;
+
+      // Apply correct visibility for the current route
       const shouldHide = HIDDEN_PATHS.some(p => pathnameRef.current.startsWith(p));
       setCrispVisibility(shouldHide);
+
+      // Set user identity now that the SDK is fully ready
+      const currentUser = userRef.current;
+      if (currentUser) {
+        const name =
+          (currentUser.user_metadata?.full_name as string) ||
+          (currentUser.user_metadata?.name as string) ||
+          currentUser.email;
+        crispSet("user:email", [currentUser.email]);
+        crispSet("user:nickname", [name]);
+      }
     };
 
     const script = document.createElement("script");
@@ -97,6 +155,7 @@ export function CrispChat() {
 
     return () => {
       // Clean up on unmount (hot-reload / SPA navigation)
+      crispReady = false;
       try { document.head.removeChild(script); } catch (_) { /* ignore */ }
       window.CRISP_READY_TRIGGER = undefined;
       // Remove the visibility style on unmount
@@ -105,9 +164,11 @@ export function CrispChat() {
     };
   }, []);
 
-  // Pre-fill user identity whenever the logged-in user changes
+  // Pre-fill user identity whenever the logged-in user changes.
+  // Only runs after crispReady = true; the initial identity set is handled
+  // by CRISP_READY_TRIGGER above to avoid the set_user_email crash.
   useEffect(() => {
-    if (typeof window === "undefined" || !window.$crisp) return;
+    if (typeof window === "undefined" || !window.$crisp || !crispReady) return;
 
     if (user) {
       const name =

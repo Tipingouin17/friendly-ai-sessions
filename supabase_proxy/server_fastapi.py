@@ -1730,11 +1730,16 @@ async def _validate_join_token(token: str, conversation_id: str | int | None, co
     """Return True if `token` is the correct join_token for `conversation_id` (asyncpg)."""
     if not token or not conversation_id:
         return False
+    # asyncpg requires an integer for the id column — cast from string if needed
+    try:
+        conv_id_int = int(conversation_id)
+    except (ValueError, TypeError):
+        return False
     try:
         row = await conn.fetchrow(
             'SELECT 1 FROM public."conversations" '
             'WHERE id = $1 AND join_token = $2::uuid',
-            conversation_id, token,
+            conv_id_int, token,
         )
         return row is not None
     except Exception:

@@ -1726,8 +1726,12 @@ SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals"
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
 
 
-async def _validate_join_token(token: str, conversation_id: str | int | None, conn) -> bool:
-    """Return True if `token` is the correct join_token for `conversation_id` (asyncpg)."""
+async def _validate_join_token(token: str, conversation_id: str | int | None, conn=None) -> bool:
+    """Return True if `token` is the correct join_token for `conversation_id` (asyncpg).
+    
+    IMPORTANT: Always acquires its own connection from the pool to avoid deadlocks.
+    The `conn` parameter is ignored and kept only for backwards compatibility.
+    """
     if not token or not conversation_id:
         return False
     # asyncpg requires an integer for the id column — cast from string if needed
@@ -1736,11 +1740,14 @@ async def _validate_join_token(token: str, conversation_id: str | int | None, co
     except (ValueError, TypeError):
         return False
     try:
-        row = await conn.fetchrow(
-            'SELECT 1 FROM public."conversations" '
-            'WHERE id = $1 AND join_token = $2::uuid',
-            conv_id_int, token,
-        )
+        # Always use a fresh connection to avoid deadlocks when called
+        # from within an existing async with _pool.acquire() block
+        async with _pool.acquire() as fresh_conn:
+            row = await fresh_conn.fetchrow(
+                'SELECT 1 FROM public."conversations" '
+                'WHERE id = $1 AND join_token = $2::uuid',
+                conv_id_int, token,
+            )
         return row is not None
     except Exception:
         return False

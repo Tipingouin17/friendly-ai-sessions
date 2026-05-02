@@ -370,19 +370,64 @@ ALLOWED_RPC_FUNCTIONS = {
 # ============================================================
 # Database helpers
 # ============================================================
-def get_db() -> psycopg2.extensions.connection:
-    """Open a synchronous psycopg2 connection."""
+# TCP keepalive parameters to prevent TCP_TOO_OLD_ACK from Railway's
+# network layer killing idle connections to PostgreSQL.
+# keepalives=1        : enable TCP keepalives
+# keepalives_idle=30  : send first keepalive probe after 30s of idle
+# keepalives_interval=10 : resend probe every 10s if no reply
+# keepalives_count=5  : drop connection after 5 unanswered probes
+_DB_KEEPALIVE_OPTS = dict(
+    keepalives=1,
+    keepalives_idle=30,
+    keepalives_interval=10,
+    keepalives_count=5,
+)
+
+
+def _open_db_conn() -> psycopg2.extensions.connection:
+    """Open a fresh psycopg2 connection with TCP keepalives enabled."""
     if DB_URL:
-        conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=10)
+        conn = psycopg2.connect(
+            DB_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+            connect_timeout=10,
+            **_DB_KEEPALIVE_OPTS,
+        )
     else:
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, host=DB_HOST,
             port=DB_PORT, password=DB_PASSWORD,
             cursor_factory=psycopg2.extras.RealDictCursor,
             connect_timeout=10,
+            **_DB_KEEPALIVE_OPTS,
         )
     conn.autocommit = False
     return conn
+
+
+def get_db() -> psycopg2.extensions.connection:
+    """Open a synchronous psycopg2 connection with TCP keepalives.
+
+    Each call opens a fresh connection.  This is intentional: the server
+    is stateless per-request and we rely on TCP keepalives (above) to
+    keep connections alive during the lifetime of a single request rather
+    than across requests.  This avoids the TCP_TOO_OLD_ACK error that
+    occurs when a long-lived connection is reused after Railway's network
+    layer has silently dropped the underlying TCP session.
+    """
+    try:
+        conn = _open_db_conn()
+        # Quick liveness check — costs one round-trip but prevents stale
+        # connections from being handed to callers.
+        conn.cursor().execute("SELECT 1")
+        return conn
+    except Exception as e:
+        log_db.warning("get_db: initial connection failed (%s), retrying once", e)
+        try:
+            return _open_db_conn()
+        except Exception as e2:
+            log_db.error("get_db: retry also failed: %s", e2)
+            raise
 
 
 def run_startup_migrations() -> None:

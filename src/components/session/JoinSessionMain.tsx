@@ -4,8 +4,8 @@
  * Session component for the AIfacilitator application.
  */
 
-import React from 'react';
-import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag } from "lucide-react";
+import React, { useState, useEffect, useRef } from 'react';
+import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import JoinForm from "./JoinForm";
 import SessionFullAlert from "./SessionFullAlert";
@@ -66,8 +66,64 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
     if (onJoinSession) await onJoinSession();
   };
 
+  // ── Loading-timeout state: show error after 20 s of skeleton ────────────
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isLoading && !conversation) {
+      loadingTimerRef.current = setTimeout(() => setLoadingTimedOut(true), 20_000);
+    } else {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      setLoadingTimedOut(false);
+    }
+    return () => { if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current); };
+  }, [isLoading, conversation]);
+
   // ── Skeleton while conversation data loads ────────────────────────────
   if (isLoading && !conversation) {
+    if (loadingTimedOut) {
+      // Backend did not respond within 20 s — show a clear error with retry button
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <div className="p-2 bg-indigo-600 rounded-xl">
+                  <Zap className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="p-3 bg-yellow-50 rounded-full">
+                  <WifiOff className="h-8 w-8 text-yellow-500" />
+                </div>
+              </div>
+              <p className="text-gray-900 font-semibold text-lg mb-1">Unable to reach the session</p>
+              <p className="text-gray-500 text-sm mb-6">The server is taking too long to respond. Please check your connection and try again.</p>
+              <div className="space-y-2.5">
+                <button
+                  onClick={onRetry}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => { window.location.href = '/'; }}
+                  className="w-full border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium py-2.5 px-4 rounded-xl transition-colors"
+                >
+                  Return Home
+                </button>
+              </div>
+            </div>
+            <p className="text-center text-xs text-gray-400 mt-4">
+              Powered by AIfacilitator · AI-driven workshop facilitation
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
         <div className="w-full max-w-md">

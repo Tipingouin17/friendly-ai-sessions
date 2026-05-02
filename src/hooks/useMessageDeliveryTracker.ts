@@ -2,6 +2,8 @@
  * use Message Delivery Tracker
  *
  * Hook for the AIfacilitator application.
+ * Fixed: use refs for mutable state to prevent stale-closure re-subscription loops
+ * that caused the polling interval to multiply (500ms effective instead of 2000ms).
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -26,49 +28,59 @@ export function useMessageDeliveryTracker({
   enabled = true
 }: UseMessageDeliveryTrackerProps) {
   const [deliveryStatus, setDeliveryStatus] = useState<Map<number, MessageDeliveryStatus>>(new Map());
-  const [pendingMessages, setPendingMessages] = useState<number[]>([]);
-  const [lastKnownMessageId, setLastKnownMessageId] = useState<number | null>(null);
-  
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use refs for values that should NOT re-trigger the polling useEffect
   const mountedRef = useRef(true);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastKnownMessageIdRef = useRef<number | null>(null);
+  const onMessageReceivedRef = useRef(onMessageReceived);
+  const conversationIdRef = useRef(conversationId);
+  const enabledRef = useRef(enabled);
+
+  // Keep refs in sync with latest props without triggering re-renders
+  useEffect(() => { onMessageReceivedRef.current = onMessageReceived; }, [onMessageReceived]);
+  useEffect(() => { conversationIdRef.current = conversationId; }, [conversationId]);
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+
   const maxRetries = 3;
   const pollInterval = 2000; // 2 seconds
-  const retryDelay = 5000; // 5 seconds
+  const retryDelay = 5000;   // 5 seconds
 
-  // Check for new messages
+  // Stable callback: reads all mutable values from refs, never changes identity
   const checkForNewMessages = useCallback(async () => {
-    if (!conversationId || !enabled || !mountedRef.current) return;
+    const cid = conversationIdRef.current;
+    if (!cid || !enabledRef.current || !mountedRef.current) return;
 
     try {
       const { data: messages, error } = await api
         .from('messages')
         .select('id, created_at, role')
-        .eq('conversation_id', conversationId)
+        .eq('conversation_id', cid)
         .order('created_at', { ascending: false })
         .limit(5);
 
+      if (!mountedRef.current) return;
+
       if (error) {
+        // Suppress AbortError noise — it is expected when the component unmounts
+        if ((error as any)?.message?.includes('aborted')) return;
         console.error('Error checking for new messages:', error);
         return;
       }
 
       if (messages && messages.length > 0) {
         const latestMessageId = messages[0].id;
-        
-        // Check if we have a new message
-        if (lastKnownMessageId === null) {
-          setLastKnownMessageId(latestMessageId);
+
+        if (lastKnownMessageIdRef.current === null) {
+          lastKnownMessageIdRef.current = latestMessageId;
           return;
         }
 
-        if (latestMessageId > lastKnownMessageId) {
-          // We have new message(s)
-          const newMessages = messages.filter(msg => msg.id > lastKnownMessageId);
-          
+        if (latestMessageId > lastKnownMessageIdRef.current) {
+          const newMessages = messages.filter(msg => msg.id > lastKnownMessageIdRef.current!);
+
           newMessages.forEach(message => {
-            // Mark as delivered
             setDeliveryStatus(prev => {
               const newStatus = new Map(prev);
               newStatus.set(message.id, {
@@ -80,44 +92,21 @@ export function useMessageDeliveryTracker({
               return newStatus;
             });
 
-            // Notify callback
-            if (onMessageReceived) {
-              onMessageReceived(message.id);
+            if (onMessageReceivedRef.current) {
+              onMessageReceivedRef.current(message.id);
             }
           });
 
-          setLastKnownMessageId(latestMessageId);
+          lastKnownMessageIdRef.current = latestMessageId;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (!mountedRef.current) return;
+      // Suppress AbortError — normal during component unmount / re-render
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) return;
       console.error('Exception checking for new messages:', error);
     }
-  }, [conversationId, enabled, lastKnownMessageId, onMessageReceived]);
-
-  // Start message polling
-  const startPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-
-    // Initial check
-    checkForNewMessages();
-    
-    // Set up polling interval
-    pollIntervalRef.current = setInterval(() => {
-      if (mountedRef.current) {
-        checkForNewMessages();
-      }
-    }, pollInterval);
-  }, [conversationId, checkForNewMessages]);
-
-  // Stop polling
-  const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  }, []);
+  }, []); // ← empty deps: stable for the lifetime of the component
 
   // Track message delivery failure and retry
   const trackDeliveryFailure = useCallback((messageId: number) => {
@@ -130,25 +119,16 @@ export function useMessageDeliveryTracker({
       };
 
       if (current.retryCount < maxRetries) {
-        const updated = {
-          ...current,
-          retryCount: current.retryCount + 1,
-          timestamp: Date.now()
-        };
-
+        const updated = { ...current, retryCount: current.retryCount + 1, timestamp: Date.now() };
         const newStatus = new Map(prev);
         newStatus.set(messageId, updated);
 
-        // Schedule retry
         retryTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) {
-            checkForNewMessages();
-          }
+          if (mountedRef.current) checkForNewMessages();
         }, retryDelay);
 
         return newStatus;
       }
-
       return prev;
     });
   }, [checkForNewMessages]);
@@ -156,39 +136,55 @@ export function useMessageDeliveryTracker({
   // Get delivery statistics
   const getDeliveryStats = useCallback(() => {
     const statusArray = Array.from(deliveryStatus.values());
-    
     return {
       totalMessages: statusArray.length,
       deliveredMessages: statusArray.filter(s => s.delivered).length,
       failedMessages: statusArray.filter(s => !s.delivered && s.retryCount >= maxRetries).length,
       pendingMessages: statusArray.filter(s => !s.delivered && s.retryCount < maxRetries).length,
-      averageDeliveryTime: statusArray.length > 0 
-        ? statusArray.reduce((sum, s) => sum + (Date.now() - s.timestamp), 0) / statusArray.length 
+      averageDeliveryTime: statusArray.length > 0
+        ? statusArray.reduce((sum, s) => sum + (Date.now() - s.timestamp), 0) / statusArray.length
         : 0
     };
   }, [deliveryStatus]);
 
-  // Setup and cleanup effects
+  // Single effect: starts/stops polling when conversationId or enabled changes.
+  // checkForNewMessages is stable (empty deps) so this effect only fires when
+  // conversationId or enabled actually changes — not on every state update.
   useEffect(() => {
     mountedRef.current = true;
-    
+
     if (enabled && conversationId) {
-      startPolling();
+      // Clear any existing interval before starting a new one
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+
+      // Initial check
+      checkForNewMessages();
+
+      // Stable interval — will NOT be recreated on re-renders
+      pollIntervalRef.current = setInterval(() => {
+        if (mountedRef.current) checkForNewMessages();
+      }, pollInterval);
     }
-    
+
     return () => {
       mountedRef.current = false;
-      stopPolling();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
       }
     };
-  }, [conversationId, enabled, startPolling, stopPolling]);
+  }, [conversationId, enabled, checkForNewMessages]); // checkForNewMessages is stable
 
   return {
     deliveryStatus: Array.from(deliveryStatus.values()),
-    pendingMessages,
-    lastKnownMessageId,
+    lastKnownMessageId: lastKnownMessageIdRef.current,
     trackDeliveryFailure,
     getDeliveryStats,
     forceCheck: checkForNewMessages,

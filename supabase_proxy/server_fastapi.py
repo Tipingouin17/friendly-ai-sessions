@@ -807,7 +807,8 @@ async def log_all_requests(request: Request, call_next):
 
 
 def serialize_row(row: dict) -> dict:
-    """Convert psycopg2 row to JSON-serialisable dict."""
+    """Convert asyncpg Record/dict to JSON-serialisable dict."""
+    import uuid as _uuid
     result = {}
     for k, v in row.items():
         if isinstance(v, datetime):
@@ -816,6 +817,11 @@ def serialize_row(row: dict) -> dict:
             result[k] = float(v)
         elif isinstance(v, (bytes, bytearray)):
             result[k] = v.decode("utf-8", errors="replace")
+        elif isinstance(v, _uuid.UUID):
+            result[k] = str(v)
+        elif isinstance(v, list):
+            # Recursively serialize list items (e.g. array of UUIDs)
+            result[k] = [str(i) if isinstance(i, _uuid.UUID) else i for i in v]
         else:
             result[k] = v
     return result

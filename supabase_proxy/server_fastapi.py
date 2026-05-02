@@ -723,8 +723,8 @@ except Exception:
 async def on_startup():
     """Log the actual port uvicorn is bound to once the server is ready."""
     port = os.environ.get("PORT", "3333")
-    logger.info("Uvicorn ready — listening on 0.0.0.0:%d", port)
-    logger.info("Health check: http://localhost:%d/health", port)
+    logger.info("Uvicorn ready — listening on 0.0.0.0:%s", port)
+    logger.info("Health check: http://localhost:%s/health", port)
 
 
 @app.middleware("http")

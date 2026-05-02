@@ -2155,14 +2155,15 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
 
         # Persist the welcome message and update conversation status
         _cost_usd = _calculate_token_cost(_model_used or _model, _prompt_tokens or 0, _completion_tokens or 0)
-        _content_json = json.dumps({"text": _txt, **({"avatar": _avatar_url} if _avatar_url else {})})
+        _content_dict = {"text": _txt, **({"avatar": _avatar_url} if _avatar_url else {})}
+        _content_json = json.dumps(_content_dict)  # for WebSocket broadcast only
         try:
             async with _pool.acquire() as conn:
                 async with conn.transaction():
                     _msg_row = await conn.fetchrow(
                         "INSERT INTO messages (conversation_id, content, role, name, "
                         "prompt_tokens, completion_tokens, model_used) "
-                        "VALUES ($1, $2, 'assistant', $3, $4, $5, $6) RETURNING id",
+                        "VALUES ($1, $2::jsonb, 'assistant', $3, $4, $5, $6) RETURNING id",
                         conv_id, _content_json, _facilitator,
                         _prompt_tokens, _completion_tokens, _model_used,
                     )
@@ -3021,11 +3022,12 @@ async def edge_function(func_name: str, request: Request):
         msg_id = None
         if conv_id:
             try:
-                content_json = json.dumps({"text": txt, **({"avatar": avatar_url} if avatar_url else {})})
+                content_dict = {"text": txt, **({"avatar": avatar_url} if avatar_url else {})}
+                content_json = json.dumps(content_dict)  # for WebSocket broadcast only
                 async with _pool.acquire() as conn:
                     async with conn.transaction():
                         _row = await conn.fetchrow(
-                            "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2, 'assistant', $3, $4, $5, $6) RETURNING id",
+                            "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2::jsonb, 'assistant', $3, $4, $5, $6) RETURNING id",
                             conv_id, content_json, facilitator_name, _prompt_tokens, _completion_tokens, _model_used,
                         )
                         msg_id = _row["id"]
@@ -3545,7 +3547,7 @@ async def edge_function(func_name: str, request: Request):
             async with _pool.acquire() as conn:
                 async with conn.transaction():
                     _tw_row = await conn.fetchrow(
-                        "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2, 'assistant', $3, $4, $5, $6) RETURNING id",
+                        "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2::jsonb, 'assistant', $3, $4, $5, $6) RETURNING id",
                         conv_id, json.dumps({"text": template}), fname, _tw_prompt_tokens, _tw_completion_tokens, _tw_model,
                     )
                     msg_id = _tw_row["id"]

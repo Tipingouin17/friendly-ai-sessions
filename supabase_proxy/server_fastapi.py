@@ -725,6 +725,23 @@ async def on_startup():
     port = os.environ.get("PORT", "3333")
     logger.info("Uvicorn ready — listening on 0.0.0.0:%s", port)
     logger.info("Health check: http://localhost:%s/health", port)
+    # Start keep-alive background task to prevent Railway cold starts.
+    # Pings the local health endpoint every 4 minutes so the service stays warm.
+    asyncio.create_task(_keepalive_loop(int(port)))
+
+
+async def _keepalive_loop(port: int) -> None:
+    """Ping the local /health endpoint every 4 minutes to prevent Railway sleep."""
+    import httpx
+    await asyncio.sleep(60)  # Wait 1 minute after startup before first ping
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.get(f"http://localhost:{port}/health")
+            logger.debug("[keepalive] self-ping ok")
+        except Exception as e:
+            logger.debug("[keepalive] self-ping failed: %s", e)
+        await asyncio.sleep(240)  # 4 minutes
 
 
 @app.middleware("http")

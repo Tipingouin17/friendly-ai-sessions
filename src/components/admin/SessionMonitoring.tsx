@@ -113,11 +113,14 @@ export const SessionMonitoring = () => {
         queryFn: async () => {
             const { data, error } = await api
                 .from("messages")
-                .select("id, content, sender, created_at, participant_name")
+                .select("id, content, role, created_at, participant_name")
                 .eq("conversation_id", selectedConversation!.id)
                 .order("created_at", { ascending: true });
             if (error) throw error;
-            return data as Message[];
+            return (data || []).map((m: any) => ({
+                ...m,
+                sender: m.role === 'assistant' ? 'assistant' : m.role === 'admin' ? 'admin' : 'user',
+            })) as Message[];
         },
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -151,7 +154,7 @@ export const SessionMonitoring = () => {
             "─".repeat(60),
             "",
             ...messages.map(m =>
-                `[${format(new Date(m.created_at), "HH:mm:ss")}] ${m.sender === "ai" ? "AI Facilitator" : (m.participant_name ?? m.sender)}: ${m.content}`
+                `[${format(new Date(m.created_at), "HH:mm:ss")}] ${m.sender === "assistant" || m.sender === "ai" ? "AI Facilitator" : (m.participant_name ?? m.sender)}: ${m.content}`
             ),
         ];
         const blob = new Blob([lines.join("\n")], { type: "text/plain" });

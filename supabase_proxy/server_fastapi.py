@@ -664,6 +664,23 @@ async def run_startup_migrations() -> None:
             END IF;
         END $$;
         """,
+        # M15: Resync sequences for integer-PK tables to prevent duplicate-key errors
+        # when rows were inserted with explicit IDs (e.g. seed data) that advanced
+        # the max(id) beyond the sequence's current value.
+        """
+        SELECT setval(
+            pg_get_serial_sequence('facilitators', 'id'),
+            GREATEST(COALESCE((SELECT MAX(id) FROM facilitators), 0), 1),
+            true
+        );
+        """,
+        """
+        SELECT setval(
+            pg_get_serial_sequence('sessions', 'id'),
+            GREATEST(COALESCE((SELECT MAX(id) FROM sessions), 0), 1),
+            true
+        );
+        """,
     ]
     try:
         async with _pool.acquire() as conn:

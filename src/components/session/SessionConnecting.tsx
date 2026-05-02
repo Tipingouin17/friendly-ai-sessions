@@ -3,9 +3,10 @@
  *
  * Shown while the backend is cold-starting or the WebSocket is being established.
  * Replaces the blank-page experience during Railway cold-starts (up to 60 s).
+ * Auto-retries when the backend health check passes.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Wifi, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -17,6 +18,9 @@ interface SessionConnectingProps {
   isColdStart?: boolean;
 }
 
+const HEALTH_CHECK_URL = `${import.meta.env.VITE_API_URL || ""}/health`;
+const HEALTH_CHECK_INTERVAL_MS = 6000; // Poll every 6 seconds
+
 const SessionConnecting: React.FC<SessionConnectingProps> = ({
   timeoutSeconds = 60,
   onRetry,
@@ -24,7 +28,10 @@ const SessionConnecting: React.FC<SessionConnectingProps> = ({
 }) => {
   const [elapsed, setElapsed] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
+  const [serverReady, setServerReady] = useState(false);
+  const hasAutoRetried = useRef(false);
 
+  // Countdown timer
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((prev) => {
@@ -39,6 +46,36 @@ const SessionConnecting: React.FC<SessionConnectingProps> = ({
 
     return () => clearInterval(interval);
   }, [timeoutSeconds]);
+
+  // Auto health-check polling: ping the backend every 6s and auto-retry when it responds
+  useEffect(() => {
+    if (!isColdStart || !onRetry) return;
+
+    const checkHealth = async () => {
+      try {
+        const res = await fetch(HEALTH_CHECK_URL, {
+          method: "GET",
+          signal: AbortSignal.timeout(4000),
+        });
+        if (res.ok && !hasAutoRetried.current) {
+          hasAutoRetried.current = true;
+          setServerReady(true);
+          // Small delay to let the server fully stabilise before reconnecting
+          setTimeout(() => {
+            onRetry?.();
+          }, 1000);
+        }
+      } catch {
+        // Server not ready yet — keep polling
+      }
+    };
+
+    // Start polling immediately, then every HEALTH_CHECK_INTERVAL_MS
+    checkHealth();
+    const healthInterval = setInterval(checkHealth, HEALTH_CHECK_INTERVAL_MS);
+
+    return () => clearInterval(healthInterval);
+  }, [isColdStart, onRetry]);
 
   const remaining = Math.max(0, timeoutSeconds - elapsed);
   const progress = Math.min(100, (elapsed / timeoutSeconds) * 100);
@@ -59,10 +96,16 @@ const SessionConnecting: React.FC<SessionConnectingProps> = ({
         {/* Title */}
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            {isColdStart ? "Waking up the server…" : "Connecting to session…"}
+            {serverReady
+              ? "Server ready — reconnecting…"
+              : isColdStart
+              ? "Waking up the server…"
+              : "Connecting to session…"}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            {isColdStart
+            {serverReady
+              ? "The server is back online. Resuming your session…"
+              : isColdStart
               ? "The server is starting up. This can take up to a minute on the first load."
               : "Establishing a secure connection. Please wait."}
           </p>
@@ -78,13 +121,17 @@ const SessionConnecting: React.FC<SessionConnectingProps> = ({
               />
             </div>
             <p className="text-xs text-gray-400">
-              {remaining > 0 ? `Retrying for up to ${remaining}s…` : "Still trying…"}
+              {serverReady
+                ? "Reconnecting…"
+                : remaining > 0
+                ? `Retrying for up to ${remaining}s…`
+                : "Still trying…"}
             </p>
           </div>
         )}
 
         {/* Manual retry button — shown after timeout */}
-        {showRetry && onRetry && (
+        {showRetry && !serverReady && onRetry && (
           <div className="space-y-3">
             <p className="text-sm text-gray-500">
               Connection is taking longer than expected.

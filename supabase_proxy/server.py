@@ -419,10 +419,54 @@ def resolve_join(parent_table, join_info, parent_rows, conn):
             row[key_name] = items
 
 
+def _parse_or_filter(or_value):
+    """Parse PostgREST-style or filter: 'col.op.val,col2.op2.val2' into SQL.
+    Supports: is.null, is.true, is.false, eq.val, neq.val, gt.val, gte.val, lt.val, lte.val
+    Returns (sql_fragment, values_list)
+    """
+    parts = [p.strip() for p in or_value.split(",")]
+    clauses, vals = [], []
+    for part in parts:
+        # Split on first two dots: col.op[.val]
+        tokens = part.split(".", 2)
+        if len(tokens) < 2:
+            continue
+        col, op = tokens[0], tokens[1]
+        val = tokens[2] if len(tokens) > 2 else None
+        if op == "is":
+            if val == "null":
+                clauses.append(f'"{col}" IS NULL')
+            elif val == "true":
+                clauses.append(f'"{col}" = true')
+            elif val == "false":
+                clauses.append(f'"{col}" = false')
+        elif op == "eq" and val is not None:
+            clauses.append(f'"{col}" = %s'); vals.append(val)
+        elif op == "neq" and val is not None:
+            clauses.append(f'"{col}" != %s'); vals.append(val)
+        elif op == "gt" and val is not None:
+            clauses.append(f'"{col}" > %s'); vals.append(val)
+        elif op == "gte" and val is not None:
+            clauses.append(f'"{col}" >= %s'); vals.append(val)
+        elif op == "lt" and val is not None:
+            clauses.append(f'"{col}" < %s'); vals.append(val)
+        elif op == "lte" and val is not None:
+            clauses.append(f'"{col}" <= %s'); vals.append(val)
+    if not clauses:
+        return None, []
+    return "(" + " OR ".join(clauses) + ")", vals
+
+
 def build_where(args):
     wc, wv = [], []
     for key, value in args.items():
         if key in ("select", "order", "limit", "offset", "on_conflict", "columns", "count"):
+            continue
+        # Handle PostgREST 'or' filter: ?or=col.op.val,col2.op2.val2
+        if key == "or":
+            sql_frag, or_vals = _parse_or_filter(value)
+            if sql_frag:
+                wc.append(sql_frag); wv.extend(or_vals)
             continue
         if value.startswith("eq."):
             wc.append(f'"{key}" = %s'); wv.append(value[3:])

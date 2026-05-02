@@ -3672,6 +3672,10 @@ async def edge_function(func_name: str, request: Request):
                 "join-session: SUCCESS conv_id=%s participant_id=%s name=%r is_host=%s",
                 conversation_id, new_participant_id, participant_name, is_host,
             )
+            # Fire-and-forget: trigger AI welcome message generation when a
+            # non-host participant joins (mirrors the REST /session_participants path).
+            if not is_host:
+                asyncio.create_task(_maybe_generate_welcome_message(conversation_id))
             return {
                 "success": True,
                 "participant_id": new_participant_id,

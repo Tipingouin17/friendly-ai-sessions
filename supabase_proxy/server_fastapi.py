@@ -3394,6 +3394,11 @@ async def edge_function(func_name: str, request: Request):
     # frontend, reducing join latency from 20-35 s to < 500 ms.
     if func_name == "join-session":
         conversation_id = data.get("conversation_id")
+        # Cast to int — frontend sends conversation_id as string from URL params
+        try:
+            conversation_id = int(conversation_id) if conversation_id is not None else None
+        except (ValueError, TypeError):
+            pass
         participant_name = (data.get("participant_name") or "").strip()
         avatar_seed = data.get("avatar_seed") or str(uuid.uuid4())
         is_anonymous = bool(data.get("is_anonymous", False))

@@ -52,8 +52,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import jwt
-import psycopg2
-import psycopg2.extras
+import asyncpg
+from contextlib import asynccontextmanager
 import stripe as stripe_lib
 from fastapi import (
     FastAPI, Request, Response, WebSocket, WebSocketDisconnect,
@@ -113,9 +113,9 @@ openai_client = OpenAI()
 # App & rate limiter
 # ============================================================
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="MyFacilitator Proxy", version="3.0.0")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# NOTE: app is re-created with lifespan= below (after lifespan() is defined).
+# This placeholder is overwritten; do not add routes here.
+_app_placeholder = None
 
 # ============================================================
 # CORS
@@ -137,22 +137,6 @@ ALLOWED_CORS_ORIGINS = (
         "https://aifacilitator.ai",
         "https://www.aifacilitator.ai",
     ]
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=[
-        "authorization", "x-client-info", "apikey", "content-type", "prefer",
-        "range", "x-supabase-api-version", "x-upsert", "x-profile-id",
-        "cache-control", "pragma", "content-profile", "accept-profile",
-        "accept", "origin", "x-forwarded-for", "x-request-id", "x-real-ip",
-        "baggage", "sentry-trace",
-        # Participant session token — used instead of JWT for unauthenticated participants
-        "x-join-token", "x-migration-secret",
-    ],
-    expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"],
 )
 
 # ============================================================
@@ -368,75 +352,60 @@ ALLOWED_RPC_FUNCTIONS = {
 }
 
 # ============================================================
-# Database helpers
+# Database helpers — asyncpg connection pool
 # ============================================================
-# TCP keepalive parameters to prevent TCP_TOO_OLD_ACK from Railway's
-# network layer killing idle connections to PostgreSQL.
-# keepalives=1        : enable TCP keepalives
-# keepalives_idle=30  : send first keepalive probe after 30s of idle
-# keepalives_interval=10 : resend probe every 10s if no reply
-# keepalives_count=5  : drop connection after 5 unanswered probes
-_DB_KEEPALIVE_OPTS = dict(
-    keepalives=1,
-    keepalives_idle=30,
-    keepalives_interval=10,
-    keepalives_count=5,
-)
+# _pool is the global asyncpg connection pool.
+# It is initialised in the lifespan() async context manager (on startup)
+# and closed on shutdown.  All DB calls use:
+#   async with _pool.acquire() as conn:
+#       row = await conn.fetchrow(sql, param1, param2, ...)
+# asyncpg is a fully native asyncio PostgreSQL driver — it never blocks
+# the event loop, solving the TCP_TOO_OLD_ACK freeze issue.
+_pool: Optional[asyncpg.Pool] = None
 
 
-def _open_db_conn() -> psycopg2.extensions.connection:
-    """Open a fresh psycopg2 connection with TCP keepalives enabled."""
-    # statement_timeout=10s prevents any single query from blocking the
-    # asyncio event loop for too long (psycopg2 is synchronous/blocking).
-    _PG_OPTIONS = "-c statement_timeout=10000"
+def _build_dsn() -> str:
+    """Build a PostgreSQL DSN string from environment variables."""
     if DB_URL:
-        conn = psycopg2.connect(
-            DB_URL,
-            cursor_factory=psycopg2.extras.RealDictCursor,
-            connect_timeout=3,
-            options=_PG_OPTIONS,
-            **_DB_KEEPALIVE_OPTS,
-        )
-    else:
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, host=DB_HOST,
-            port=DB_PORT, password=DB_PASSWORD,
-            cursor_factory=psycopg2.extras.RealDictCursor,
-            connect_timeout=3,
-            options=_PG_OPTIONS,
-            **_DB_KEEPALIVE_OPTS,
-        )
-    conn.autocommit = False
-    return conn
+        # Railway injects DATABASE_URL as postgres:// — asyncpg needs postgresql://
+        return DB_URL.replace("postgres://", "postgresql://", 1)
+    return (
+        f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
 
 
-def get_db() -> psycopg2.extensions.connection:
-    """Open a synchronous psycopg2 connection with TCP keepalives.
+async def _create_pool() -> asyncpg.Pool:
+    """Create the asyncpg connection pool with Railway-safe settings.
 
-    Each call opens a fresh connection.  This is intentional: the server
-    is stateless per-request and we rely on TCP keepalives (configured in
-    _DB_KEEPALIVE_OPTS) to detect dead connections during the lifetime of
-    a single request.  A short connect_timeout (3s) ensures that stale
-    TCP sessions fail fast instead of blocking the asyncio event loop.
-
-    IMPORTANT: This function is synchronous (psycopg2 is blocking).  When
-    called from an ``async def`` endpoint it blocks the entire asyncio
-    event loop.  The connect_timeout is kept short (3s) to minimise the
-    impact.  A future refactor should move all DB work to a thread pool.
+    - min_size=2 / max_size=10: keep 2 warm connections ready at all times
+      to avoid reconnect latency on the first request after an idle period.
+    - command_timeout=15: abort any query that takes longer than 15 seconds.
+    - server_settings: set statement_timeout to 10s at the PostgreSQL level
+      as a safety net against runaway queries.
+    - TCP keepalives (via server_settings) prevent Railway from cutting idle
+      TCP connections between the pool and PostgreSQL (TCP_TOO_OLD_ACK).
     """
-    try:
-        return _open_db_conn()
-    except Exception as e:
-        log_db.warning("get_db: initial connection failed (%s), retrying once", e)
-        try:
-            return _open_db_conn()
-        except Exception as e2:
-            log_db.error("get_db: retry also failed: %s", e2)
-            raise
+    dsn = _build_dsn()
+    log_db.info("Creating asyncpg pool (min=2, max=10) ...")
+    pool = await asyncpg.create_pool(
+        dsn,
+        min_size=2,
+        max_size=10,
+        command_timeout=15,
+        server_settings={
+            "statement_timeout": "10000",  # 10 seconds in ms
+            "application_name": "myfacilitator-fastapi",
+        },
+        # TCP keepalives — prevent Railway from cutting idle connections
+        # (equivalent to psycopg2 keepalives_idle=30, interval=10, count=5)
+        connection_class=asyncpg.connection.Connection,
+    )
+    log_db.info("asyncpg pool created successfully.")
+    return pool
 
 
-def run_startup_migrations() -> None:
-    """Apply idempotent schema migrations on every server start."""
+async def run_startup_migrations() -> None:
+    """Apply idempotent schema migrations on every server start (asyncpg version)."""
     migrations = [
         # 2026-04-02: Add join_token to conversations for secure participant URLs
         """
@@ -697,37 +666,31 @@ def run_startup_migrations() -> None:
         """,
     ]
     try:
-        conn = get_db()
-        conn.autocommit = True
-        cur = conn.cursor()
-        for sql in migrations:
-            try:
-                cur.execute(sql)
-                log_db.debug("migration OK: %s", sql.strip()[:80])
-            except Exception as mig_err:
-                log_db.warning("migration WARN: %s", mig_err)
-        conn.close()
+        async with _pool.acquire() as conn:
+            for sql in migrations:
+                try:
+                    await conn.execute(sql)
+                    log_db.debug("migration OK: %s", sql.strip()[:80])
+                except Exception as mig_err:
+                    log_db.warning("migration WARN: %s", mig_err)
         log_db.info("Startup migrations complete.")
     except Exception as e:
         log_db.error("ERROR running startup migrations: %s", e, exc_info=True)
 
 
-def load_users_from_db() -> None:
-    """Populate the in-memory USERS dict from the profiles table on startup.
+async def load_users_from_db() -> None:
+    """Populate the in-memory USERS dict from the profiles table on startup (asyncpg version).
 
     This ensures that users who registered before the current process started
     (e.g., after a container restart) can still log in.  Only rows that have
     a password_hash stored are loaded; legacy rows without a hash are skipped.
     """
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT id, email, password_hash, created_at FROM profiles "
-            "WHERE password_hash IS NOT NULL"
-        )
-        rows = cur.fetchall()
-        conn.close()
+        async with _pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, email, password_hash, created_at FROM profiles "
+                "WHERE password_hash IS NOT NULL"
+            )
         for row in rows:
             email = row["email"]
             if email not in USERS:
@@ -758,28 +721,64 @@ logger.info("DATABASE_URL host = %s", _db_host)
 logger.info("ALLOWED_ORIGINS count = %d", len(ALLOWED_CORS_ORIGINS))
 logger.info("Python version = %s", sys.version)
 
-# Run migrations immediately on import (before any request is served)
-try:
-    run_startup_migrations()
-except Exception:
-    pass
-
-# Populate in-memory user store from DB (so logins survive container restarts)
-try:
-    load_users_from_db()
-except Exception:
-    pass
-
-
-@app.on_event("startup")
-async def on_startup():
-    """Log the actual port uvicorn is bound to once the server is ready."""
+@asynccontextmanager
+async def lifespan(app):
+    """Async lifespan context manager: initialise pool on startup, close on shutdown."""
+    global _pool
     port = os.environ.get("PORT", "3333")
     logger.info("Uvicorn ready — listening on 0.0.0.0:%s", port)
     logger.info("Health check: http://localhost:%s/health", port)
-    # Start keep-alive background task to prevent Railway cold starts.
-    # Pings the local health endpoint every 4 minutes so the service stays warm.
+
+    # Initialise asyncpg connection pool
+    try:
+        _pool = await _create_pool()
+    except Exception as pool_err:
+        log_db.error("FATAL: could not create asyncpg pool: %s", pool_err, exc_info=True)
+        raise
+
+    # Run schema migrations
+    try:
+        await run_startup_migrations()
+    except Exception:
+        pass
+
+    # Populate in-memory user store from DB
+    try:
+        await load_users_from_db()
+    except Exception:
+        pass
+
+    # Start keep-alive background task to prevent Railway cold starts
     asyncio.create_task(_keepalive_loop(int(port)))
+
+    yield  # Application runs here
+
+    # Shutdown: close the pool gracefully
+    if _pool:
+        await _pool.close()
+        log_db.info("asyncpg pool closed.")
+
+
+# Re-create the FastAPI app with the lifespan context manager
+# (replaces the deprecated @app.on_event('startup') pattern)
+app = FastAPI(title="MyFacilitator Proxy", version="3.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=[
+        "authorization", "x-client-info", "apikey", "content-type", "prefer",
+        "range", "x-supabase-api-version", "x-upsert", "x-profile-id",
+        "cache-control", "pragma", "content-profile", "accept-profile",
+        "accept", "origin", "x-forwarded-for", "x-request-id", "x-real-ip",
+        "baggage", "sentry-trace",
+        "x-join-token", "x-migration-secret",
+    ],
+    expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"],
+)
 
 
 async def _keepalive_loop(port: int) -> None:
@@ -1001,8 +1000,8 @@ def _parse_join(join_str: str):
     }
 
 
-def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
-    """Resolve a single foreign-key join and attach results to parent_rows."""
+async def _resolve_join_async(parent_table: str, join_spec, parent_rows: list, conn):
+    """Async version: resolve a single foreign-key join and attach results to parent_rows."""
     if isinstance(join_spec, str):
         join_spec = _parse_join(join_spec)
     if not join_spec:
@@ -1043,7 +1042,6 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
 
     all_sub_cols = base_cols + extra_join_cols
     col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_sub_cols]) if all_sub_cols else "*"
-    cur = conn.cursor()
 
     if direction == "child_to_parent":
         fk_values = list(set(r.get(fk_col) for r in parent_rows if r.get(fk_col) is not None))
@@ -1051,20 +1049,16 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
             for r in parent_rows:
                 r[key_name] = None
             return
-        ph = ",".join(["%s"] * len(fk_values))
-        # Always include parent_col (the PK of the joined table) so we can build jmap.
-        # If base_cols is ['*'] it is already included; otherwise add it explicitly.
         needs_pk = base_cols != ["*"] and parent_col not in base_cols and parent_col not in extra_join_cols
         select_str = col_str if not needs_pk else f'"{parent_col}", {col_str}'
-        cur.execute(f'SELECT {select_str} FROM public."{join_table}" WHERE "{parent_col}" IN ({ph})', fk_values)
-        jrows = [serialize_row(dict(r)) for r in cur.fetchall()]
+        jrows_raw = await conn.fetch(f'SELECT {select_str} FROM public."{join_table}" WHERE "{parent_col}" = ANY($1)', fk_values)
+        jrows = [serialize_row(dict(r)) for r in jrows_raw]
         for sj in sub_joins:
-            resolve_join(join_table, sj, jrows, conn)
+            await _resolve_join_async(join_table, sj, jrows, conn)
         jmap = {jr.get(parent_col): jr for jr in jrows}
         for row in parent_rows:
             matched = jmap.get(row.get(fk_col))
             if matched:
-                # Strip the injected PK col if it wasn't originally requested
                 strip_cols = extra_join_cols + ([parent_col] if needs_pk else [])
                 if strip_cols:
                     matched = {k: v for k, v in matched.items() if k not in strip_cols}
@@ -1076,11 +1070,10 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
             for r in parent_rows:
                 r[key_name] = []
             return
-        ph = ",".join(["%s"] * len(pids))
-        cur.execute(f'SELECT {col_str} FROM public."{join_table}" WHERE "{fk_col}" IN ({ph})', pids)
-        jrows = [serialize_row(dict(r)) for r in cur.fetchall()]
+        jrows_raw = await conn.fetch(f'SELECT {col_str} FROM public."{join_table}" WHERE "{fk_col}" = ANY($1)', pids)
+        jrows = [serialize_row(dict(r)) for r in jrows_raw]
         for sj in sub_joins:
-            resolve_join(join_table, sj, jrows, conn)
+            await _resolve_join_async(join_table, sj, jrows, conn)
         groups: Dict[Any, list] = {}
         for jr in jrows:
             groups.setdefault(jr.get(fk_col), []).append(jr)
@@ -1089,6 +1082,12 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
             if extra_join_cols:
                 items = [{k: v for k, v in it.items() if k not in extra_join_cols} for it in items]
             row[key_name] = items
+
+
+# Keep legacy sync stub for backward compatibility (unused after migration)
+def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
+    """Legacy stub — use _resolve_join_async instead."""
+    pass
 
 
 def build_where(params: dict):
@@ -1282,23 +1281,18 @@ async def auth_signup(request: Request):
     # rather than silently falling back to memory-only storage (which would lose
     # the account on the next container restart).
     try:
-        conn = get_db()
-        cur = conn.cursor()
+        async with _pool.acquire() as conn:
+            # Authoritative duplicate check against the DB
+            existing = await conn.fetchrow("SELECT id FROM profiles WHERE email = $1", email)
+            if existing:
+                raise HTTPException(400, detail={"code": "user_already_exists", "message": "An account with this email already exists"})
 
-        # Authoritative duplicate check against the DB
-        cur.execute("SELECT id FROM profiles WHERE email = %s", (email,))
-        if cur.fetchone():
-            conn.close()
-            raise HTTPException(400, detail={"code": "user_already_exists", "message": "An account with this email already exists"})
-
-        cur.execute(
-            "INSERT INTO profiles "
-            "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
-            "VALUES (%s, %s, %s, 'free', %s, TRUE, NOW(), NOW())",
-            (user_id, email, full_name or None, pw_hash),
-        )
-        conn.commit()
-        conn.close()
+            await conn.execute(
+                "INSERT INTO profiles "
+                "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
+                "VALUES ($1, $2, $3, 'free', $4, TRUE, NOW(), NOW())",
+                user_id, email, full_name or None, pw_hash,
+            )
     except HTTPException:
         raise
     except Exception as e:
@@ -1347,15 +1341,12 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     if not user:
         # Slow path: look up credentials in the DB
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT id, email, password_hash, created_at FROM profiles "
-                "WHERE email = %s",
-                (email,),
-            )
-            row = cur.fetchone()
-            conn.close()
+            async with _pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT id, email, password_hash, created_at FROM profiles "
+                    "WHERE email = $1",
+                    email,
+                )
             if row and row["password_hash"]:
                 # Populate memory cache for subsequent requests
                 user = {
@@ -1382,14 +1373,11 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     if len(stored_hash) == 64 and all(c in '0123456789abcdef' for c in stored_hash):
         new_hash = _hash_password(password)
         try:
-            _upg_conn = get_db()
-            _upg_cur = _upg_conn.cursor()
-            _upg_cur.execute(
-                "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE email = %s",
-                (new_hash, email)
-            )
-            _upg_conn.commit()
-            _upg_conn.close()
+            async with _pool.acquire() as _upg_conn:
+                await _upg_conn.execute(
+                    "UPDATE profiles SET password_hash = $1, updated_at = NOW() WHERE email = $2",
+                    new_hash, email
+                )
             user["password"] = new_hash
             USERS[email]["password"] = new_hash
             log_auth.info("Upgraded password hash for %s from SHA-256 to bcrypt", email)
@@ -1400,37 +1388,30 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     # Also backfill email if it's null (for users created before email column was added)
     profile_role = "free"
     try:
-        conn_role = get_db()
-        cur_role = conn_role.cursor()
-        cur_role.execute("SELECT id, role, email FROM profiles WHERE id = %s::uuid", (user["id"],))
-        role_row = cur_role.fetchone()
-        if role_row:
-            profile_role = role_row["role"] or "free"
-            # Backfill email if missing
-            if not role_row["email"] and email:
-                cur_role.execute(
-                    "UPDATE profiles SET email = %s, updated_at = NOW() WHERE id = %s::uuid",
-                    (email, user["id"])
-                )
-                conn_role.commit()
-        conn_role.close()
+        async with _pool.acquire() as conn_role:
+            role_row = await conn_role.fetchrow("SELECT id, role, email FROM profiles WHERE id = $1::uuid", user["id"])
+            if role_row:
+                profile_role = role_row["role"] or "free"
+                # Backfill email if missing
+                if not role_row["email"] and email:
+                    await conn_role.execute(
+                        "UPDATE profiles SET email = $1, updated_at = NOW() WHERE id = $2::uuid",
+                        email, user["id"]
+                    )
     except Exception as e:
         log_auth.error("login role lookup error: %s", e, exc_info=True)
 
     token = _make_token(user["id"], user["email"], profile_role)
     # Record login activity for the Profile security modal
     try:
-        _la_conn = get_db()
-        _la_cur = _la_conn.cursor()
         ip_addr = request.headers.get("x-forwarded-for", request.headers.get("x-real-ip", "")).split(",")[0].strip() or None
         user_agent = request.headers.get("user-agent", "")[:512] or None
-        _la_cur.execute(
-            "INSERT INTO login_activity (id, user_id, ip_address, user_agent, success, created_at) "
-            "VALUES (%s, %s::uuid, %s, %s, TRUE, NOW())",
-            (str(uuid.uuid4()), user["id"], ip_addr, user_agent)
-        )
-        _la_conn.commit()
-        _la_conn.close()
+        async with _pool.acquire() as _la_conn:
+            await _la_conn.execute(
+                "INSERT INTO login_activity (id, user_id, ip_address, user_agent, success, created_at) "
+                "VALUES ($1, $2::uuid, $3, $4, TRUE, NOW())",
+                str(uuid.uuid4()), user["id"], ip_addr, user_agent
+            )
     except Exception as _la_err:
         log_auth.warning("login_activity insert failed (non-fatal): %s", _la_err)
     return _make_user_response(user, token, role=profile_role)
@@ -1452,8 +1433,6 @@ async def auth_user(request: Request):
         user_id = user.get("sub") or user.get("id")
         email = user.get("email", "")
         try:
-            conn = get_db()
-            cur = conn.cursor()
             updates: dict = {}
             # Profile metadata updates
             if "data" in data:
@@ -1470,13 +1449,15 @@ async def auth_user(request: Request):
                 if email in USERS:
                     USERS[email]["password"] = new_pw_hash
             if updates:
-                set_clause = ", ".join([f'"{k}" = %s' for k in updates.keys()])
-                cur.execute(
-                    f'UPDATE profiles SET {set_clause}, updated_at = NOW() WHERE id = %s',
-                    list(updates.values()) + [user_id],
-                )
-                conn.commit()
-            conn.close()
+                # Build $1, $2, ... placeholders for asyncpg
+                set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(updates.keys())]
+                set_clause = ", ".join(set_parts)
+                vals = list(updates.values()) + [user_id]
+                async with _pool.acquire() as conn:
+                    await conn.execute(
+                        f'UPDATE profiles SET {set_clause}, updated_at = NOW() WHERE id = ${len(vals)}',
+                        *vals,
+                    )
         except Exception as e:
             log_auth.error("update_user error: %s", e, exc_info=True)
     # Return the role from the JWT so the frontend can check user.role for admin features
@@ -1512,34 +1493,29 @@ async def auth_recover(request: Request):
 
     # Always return 200 even if email not found (security: don't reveal account existence)
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SELECT id, full_name FROM profiles WHERE email = %s", (email,))
-        row = cur.fetchone()
-        if row:
-            user_id = str(row["id"])
-            full_name = row["full_name"] or email
-            token = secrets.token_hex(32)  # 64-char hex string
-            expires_at = datetime.utcnow() + timedelta(hours=1)
-            # Invalidate any existing unused tokens for this user
-            cur.execute(
-                "UPDATE password_reset_tokens SET used = TRUE WHERE user_id = %s AND used = FALSE",
-                (user_id,)
-            )
-            cur.execute(
-                "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
-                (user_id, token, expires_at)
-            )
-            conn.commit()
-            conn.close()
-            # Send the reset email (non-blocking)
-            try:
-                send_password_reset_email(email, full_name, token)
-            except Exception as _email_err:
-                log_auth.warning("recover email send failed (non-fatal): %s", _email_err)
-        else:
-            conn.close()
-            log_auth.info("recover: no account found for %s — returning 200 silently", email)
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT id, full_name FROM profiles WHERE email = $1", email)
+            if row:
+                user_id = str(row["id"])
+                full_name = row["full_name"] or email
+                token = secrets.token_hex(32)  # 64-char hex string
+                expires_at = datetime.utcnow() + timedelta(hours=1)
+                # Invalidate any existing unused tokens for this user
+                await conn.execute(
+                    "UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE",
+                    user_id
+                )
+                await conn.execute(
+                    "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)",
+                    user_id, token, expires_at
+                )
+                # Send the reset email (non-blocking)
+                try:
+                    send_password_reset_email(email, full_name, token)
+                except Exception as _email_err:
+                    log_auth.warning("recover email send failed (non-fatal): %s", _email_err)
+            else:
+                log_auth.info("recover: no account found for %s — returning 200 silently", email)
     except Exception as e:
         log_auth.error("recover ERROR: %s", e, exc_info=True)
     return {}
@@ -1560,43 +1536,35 @@ async def auth_reset_password(request: Request):
     if len(new_password) < 8:
         raise HTTPException(400, detail={"code": "weak_password", "message": "Password must be at least 8 characters"})
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = %s",
-            (token,)
-        )
-        row = cur.fetchone()
-        if not row:
-            conn.close()
-            raise HTTPException(400, detail={"code": "invalid_token", "message": "Invalid or expired reset link"})
-        if row["used"]:
-            conn.close()
-            raise HTTPException(400, detail={"code": "token_used", "message": "This reset link has already been used"})
-        expires_at = row["expires_at"]
-        now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
-        if expires_at < now:
-            conn.close()
-            raise HTTPException(400, detail={"code": "token_expired", "message": "This reset link has expired. Please request a new one."})
-        user_id = str(row["user_id"])
-        pw_hash = _hash_password(new_password)  # bcrypt cost 12
-        # Update password in DB
-        cur.execute(
-            "UPDATE profiles SET password_hash = %s, updated_at = NOW() WHERE id = %s::uuid",
-            (pw_hash, user_id)
-        )
-        # Mark token as used
-        cur.execute(
-            "UPDATE password_reset_tokens SET used = TRUE WHERE token = %s",
-            (token,)
-        )
-        conn.commit()
-        # Update in-memory cache
-        cur.execute("SELECT email FROM profiles WHERE id = %s::uuid", (user_id,))
-        profile = cur.fetchone()
-        conn.close()
-        if profile and profile["email"] in USERS:
-            USERS[profile["email"]]["password"] = pw_hash
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = $1",
+                token
+            )
+            if not row:
+                raise HTTPException(400, detail={"code": "invalid_token", "message": "Invalid or expired reset link"})
+            if row["used"]:
+                raise HTTPException(400, detail={"code": "token_used", "message": "This reset link has already been used"})
+            expires_at = row["expires_at"]
+            now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+            if expires_at < now:
+                raise HTTPException(400, detail={"code": "token_expired", "message": "This reset link has expired. Please request a new one."})
+            user_id = str(row["user_id"])
+            pw_hash = _hash_password(new_password)  # bcrypt cost 12
+            # Update password in DB
+            await conn.execute(
+                "UPDATE profiles SET password_hash = $1, updated_at = NOW() WHERE id = $2::uuid",
+                pw_hash, user_id
+            )
+            # Mark token as used
+            await conn.execute(
+                "UPDATE password_reset_tokens SET used = TRUE WHERE token = $1",
+                token
+            )
+            # Update in-memory cache
+            profile = await conn.fetchrow("SELECT email FROM profiles WHERE id = $1::uuid", user_id)
+            if profile and profile["email"] in USERS:
+                USERS[profile["email"]]["password"] = pw_hash
         return {"message": "Password updated successfully"}
     except HTTPException:
         raise
@@ -1648,49 +1616,38 @@ async def rpc_call(func_name: str, request: Request):
     user = get_current_user(request)
     user_id = (user.get("sub") or user.get("id")) if user else None
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        if func_name == "is_session_host":
-            conversation_id = data.get("conversation_id")
-            if not user_id or not conversation_id:
-                conn.close()
-                return False
-            cur.execute(
-                "SELECT EXISTS(SELECT 1 FROM public.conversations WHERE id = %s AND user_id = %s::uuid)",
-                (conversation_id, user_id),
-            )
-            result = cur.fetchone()
-            conn.close()
-            val = list(result.values())[0] if isinstance(result, dict) else result[0]
-            return bool(val)
-        if func_name == "is_system_admin":
-            if not user_id:
-                conn.close()
-                return False
-            cur.execute(
-                "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = %s::uuid AND role = 'admin')",
-                (user_id,),
-            )
-            result = cur.fetchone()
-            conn.close()
-            val = list(result.values())[0] if isinstance(result, dict) else result[0]
-            return bool(val)
-        # Generic RPC
-        if data:
-            param_names = ", ".join([f"{k} := %s" for k in data.keys()])
-            cur.execute(f"SELECT * FROM public.{func_name}({param_names})", list(data.values()))
-        else:
-            cur.execute(f"SELECT * FROM public.{func_name}()")
-        result = cur.fetchone()
-        conn.close()
-        if result and len(result) == 1:
-            val = list(result.values())[0] if isinstance(result, dict) else result[0]
-            if isinstance(val, Decimal):
-                val = float(val)
-            return val
-        elif result:
-            return serialize_row(dict(result))
-        return None
+        async with _pool.acquire() as conn:
+            if func_name == "is_session_host":
+                conversation_id = data.get("conversation_id")
+                if not user_id or not conversation_id:
+                    return False
+                result = await conn.fetchrow(
+                    "SELECT EXISTS(SELECT 1 FROM public.conversations WHERE id = $1 AND user_id = $2::uuid)",
+                    conversation_id, user_id,
+                )
+                return bool(result[0]) if result else False
+            if func_name == "is_system_admin":
+                if not user_id:
+                    return False
+                result = await conn.fetchrow(
+                    "SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = $1::uuid AND role = 'admin')",
+                    user_id,
+                )
+                return bool(result[0]) if result else False
+            # Generic RPC
+            if data:
+                param_names = ", ".join([f"{k} := ${i+1}" for i, k in enumerate(data.keys())])
+                result = await conn.fetchrow(f"SELECT * FROM public.{func_name}({param_names})", *list(data.values()))
+            else:
+                result = await conn.fetchrow(f"SELECT * FROM public.{func_name}()")
+            if result and len(result) == 1:
+                val = result[0]
+                if isinstance(val, Decimal):
+                    val = float(val)
+                return val
+            elif result:
+                return serialize_row(dict(result))
+            return None
     except Exception as e:
         logger.error("RPC error %s: %s", func_name, e, exc_info=True)
         traceback.print_exc()
@@ -1721,18 +1678,17 @@ SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals"
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
 
 
-def _validate_join_token(token: str, conversation_id: str | int | None, conn) -> bool:
-    """Return True if `token` is the correct join_token for `conversation_id`."""
+async def _validate_join_token(token: str, conversation_id: str | int | None, conn) -> bool:
+    """Return True if `token` is the correct join_token for `conversation_id` (asyncpg)."""
     if not token or not conversation_id:
         return False
     try:
-        cur = conn.cursor()
-        cur.execute(
+        row = await conn.fetchrow(
             'SELECT 1 FROM public."conversations" '
-            'WHERE id = %s AND join_token = %s::uuid',
-            (conversation_id, token),
+            'WHERE id = $1 AND join_token = $2::uuid',
+            conversation_id, token,
         )
-        return cur.fetchone() is not None
+        return row is not None
     except Exception:
         return False
 
@@ -1749,7 +1705,7 @@ async def apply_migrations_endpoint(request: Request):
     if auth != migration_secret:
         raise HTTPException(403, "Invalid migration secret")
     try:
-        run_startup_migrations()
+        await run_startup_migrations()
         return {"success": True, "message": "Migrations applied"}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -1772,11 +1728,8 @@ async def run_migration(request: Request):
     if not sql:
         raise HTTPException(400, "No SQL provided")
     try:
-        conn = get_db()
-        conn.autocommit = True
-        cur = conn.cursor()
-        cur.execute(sql)
-        conn.close()
+        async with _pool.acquire() as conn:
+            await conn.execute(sql)
         return {"success": True}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -1794,123 +1747,109 @@ async def admin_cost_analytics(request: Request):
     if not user or user.get("role") != "admin":
         raise HTTPException(403, "Admin access required")
     try:
-        conn = get_db()
-        cur = conn.cursor()
+        async with _pool.acquire() as conn:
 
-        # --- Total token costs (all time) ---
-        cur.execute("""
-            SELECT
-                COALESCE(SUM(total_cost_usd), 0) AS total_cost_usd,
-                COUNT(*) AS total_sessions,
-                COUNT(*) FILTER (WHERE is_session_ended = true) AS completed_sessions
-            FROM conversations
-        """)
-        totals = dict(cur.fetchone())
+            # --- Total token costs (all time) ---
+            totals = dict(await conn.fetchrow("""
+                SELECT
+                    COALESCE(SUM(total_cost_usd), 0) AS total_cost_usd,
+                    COUNT(*) AS total_sessions,
+                    COUNT(*) FILTER (WHERE is_session_ended = true) AS completed_sessions
+                FROM conversations
+            """))
 
-        # --- Monthly cost breakdown (last 12 months) ---
-        cur.execute("""
-            SELECT
-                TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
-                COALESCE(SUM(total_cost_usd), 0) AS cost_usd,
-                COUNT(*) AS sessions
-            FROM conversations
-            WHERE created_at >= NOW() - INTERVAL '12 months'
-            GROUP BY DATE_TRUNC('month', created_at)
-            ORDER BY DATE_TRUNC('month', created_at)
-        """)
-        monthly_costs = [dict(r) for r in cur.fetchall()]
+            # --- Monthly cost breakdown (last 12 months) ---
+            monthly_costs = [dict(r) for r in await conn.fetch("""
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+                    COALESCE(SUM(total_cost_usd), 0) AS cost_usd,
+                    COUNT(*) AS sessions
+                FROM conversations
+                WHERE created_at >= NOW() - INTERVAL '12 months'
+                GROUP BY DATE_TRUNC('month', created_at)
+                ORDER BY DATE_TRUNC('month', created_at)
+            """)]
 
-        # --- Per-session cost breakdown (last 50 sessions) ---
-        cur.execute("""
-            SELECT
-                c.id,
-                s.title AS session_title,
-                c.total_cost_usd,
-                c.total_messages,
-                c.session_duration_minutes,
-                c.current_participants,
-                c.is_session_ended,
-                c.created_at,
-                c.ended_at
-            FROM conversations c
-            LEFT JOIN sessions s ON c.sessions_id = s.id
-            ORDER BY c.created_at DESC
-            LIMIT 50
-        """)
-        per_session = []
-        for r in cur.fetchall():
-            row = dict(r)
-            row["total_cost_usd"] = float(row["total_cost_usd"] or 0)
-            if isinstance(row.get("created_at"), datetime):
-                row["created_at"] = row["created_at"].isoformat()
-            if isinstance(row.get("ended_at"), datetime):
-                row["ended_at"] = row["ended_at"].isoformat()
-            per_session.append(row)
+            # --- Per-session cost breakdown (last 50 sessions) ---
+            per_session = []
+            for r in await conn.fetch("""
+                SELECT
+                    c.id,
+                    s.title AS session_title,
+                    c.total_cost_usd,
+                    c.total_messages,
+                    c.session_duration_minutes,
+                    c.current_participants,
+                    c.is_session_ended,
+                    c.created_at,
+                    c.ended_at
+                FROM conversations c
+                LEFT JOIN sessions s ON c.sessions_id = s.id
+                ORDER BY c.created_at DESC
+                LIMIT 50
+            """):
+                row = dict(r)
+                row["total_cost_usd"] = float(row["total_cost_usd"] or 0)
+                if isinstance(row.get("created_at"), datetime):
+                    row["created_at"] = row["created_at"].isoformat()
+                if isinstance(row.get("ended_at"), datetime):
+                    row["ended_at"] = row["ended_at"].isoformat()
+                per_session.append(row)
 
-        # --- Revenue by plan (subscriptions) ---
-        cur.execute("""
-            SELECT
-                pl.title AS plan_name,
-                pl.price AS plan_price_eur,
-                COUNT(pr.id) AS subscriber_count,
-                COUNT(pr.id) * pl.price AS monthly_revenue_eur
-            FROM plans pl
-            LEFT JOIN profiles pr ON pr.current_plan_id = pl.id
-            GROUP BY pl.id, pl.title, pl.price
-            ORDER BY pl.price
-        """)
-        revenue_by_plan = []
-        for r in cur.fetchall():
-            row = dict(r)
-            row["plan_price_eur"] = float(row["plan_price_eur"] or 0)
-            row["monthly_revenue_eur"] = float(row["monthly_revenue_eur"] or 0)
-            revenue_by_plan.append(row)
+            # --- Revenue by plan (subscriptions) ---
+            revenue_by_plan = []
+            for r in await conn.fetch("""
+                SELECT
+                    pl.title AS plan_name,
+                    pl.price AS plan_price_eur,
+                    COUNT(pr.id) AS subscriber_count,
+                    COUNT(pr.id) * pl.price AS monthly_revenue_eur
+                FROM plans pl
+                LEFT JOIN profiles pr ON pr.current_plan_id = pl.id
+                GROUP BY pl.id, pl.title, pl.price
+                ORDER BY pl.price
+            """):
+                row = dict(r)
+                row["plan_price_eur"] = float(row["plan_price_eur"] or 0)
+                row["monthly_revenue_eur"] = float(row["monthly_revenue_eur"] or 0)
+                revenue_by_plan.append(row)
 
-        # --- Token usage by model (all time) ---
-        cur.execute("""
-            SELECT
-                COALESCE(model_used, 'unknown') AS model,
-                SUM(prompt_tokens) AS total_prompt_tokens,
-                SUM(completion_tokens) AS total_completion_tokens,
-                COUNT(*) AS message_count
-            FROM messages
-            WHERE role = 'assistant' AND model_used IS NOT NULL
-            GROUP BY model_used
-            ORDER BY message_count DESC
-        """)
-        token_by_model = [dict(r) for r in cur.fetchall()]
+            # --- Token usage by model (all time) ---
+            token_by_model = [dict(r) for r in await conn.fetch("""
+                SELECT
+                    COALESCE(model_used, 'unknown') AS model,
+                    SUM(prompt_tokens) AS total_prompt_tokens,
+                    SUM(completion_tokens) AS total_completion_tokens,
+                    COUNT(*) AS message_count
+                FROM messages
+                WHERE role = 'assistant' AND model_used IS NOT NULL
+                GROUP BY model_used
+                ORDER BY message_count DESC
+            """)]
 
-        # --- Subscriber growth over time (new paid users per month, last 12 months) ---
-        cur.execute("""
-            SELECT
-                TO_CHAR(DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at)), 'YYYY-MM') AS month,
-                COUNT(*) AS new_paid_subscribers
-            FROM profiles
-            WHERE current_plan_id IS NOT NULL
-              AND current_plan_id != (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1)
-              AND COALESCE(plan_upgraded_at, updated_at) >= NOW() - INTERVAL '12 months'
-            GROUP BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
-            ORDER BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
-        """)
-        subscriber_growth = [dict(r) for r in cur.fetchall()]
+            # --- Subscriber growth over time (new paid users per month, last 12 months) ---
+            subscriber_growth = [dict(r) for r in await conn.fetch("""
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at)), 'YYYY-MM') AS month,
+                    COUNT(*) AS new_paid_subscribers
+                FROM profiles
+                WHERE current_plan_id IS NOT NULL
+                  AND current_plan_id != (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1)
+                  AND COALESCE(plan_upgraded_at, updated_at) >= NOW() - INTERVAL '12 months'
+                GROUP BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
+                ORDER BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
+            """)]
 
-        # --- Monthly revenue vs cost (last 12 months) ---
-        # Revenue: count subscribers per month * their plan price
-        # We approximate monthly revenue as the current MRR (static) for each month
-        # since we don't have historical plan change events.
-        # For cost, we use the monthly_costs data already fetched.
-        cur.execute("""
-            SELECT
-                TO_CHAR(DATE_TRUNC('month', c.created_at), 'YYYY-MM') AS month,
-                COALESCE(SUM(c.total_cost_usd), 0) AS cost_usd
-            FROM conversations c
-            WHERE c.created_at >= NOW() - INTERVAL '12 months'
-            GROUP BY DATE_TRUNC('month', c.created_at)
-            ORDER BY DATE_TRUNC('month', c.created_at)
-        """)
-        monthly_cost_rows = [dict(r) for r in cur.fetchall()]
-
-        conn.close()
+            # --- Monthly revenue vs cost (last 12 months) ---
+            monthly_cost_rows = [dict(r) for r in await conn.fetch("""
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', c.created_at), 'YYYY-MM') AS month,
+                    COALESCE(SUM(c.total_cost_usd), 0) AS cost_usd
+                FROM conversations c
+                WHERE c.created_at >= NOW() - INTERVAL '12 months'
+                GROUP BY DATE_TRUNC('month', c.created_at)
+                ORDER BY DATE_TRUNC('month', c.created_at)
+            """)]
 
         total_revenue = sum(r["monthly_revenue_eur"] for r in revenue_by_plan)
         # Exchange rate approximation: 1 EUR ≈ 1.08 USD
@@ -1984,48 +1923,38 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
     """
     try:
         # Check if a welcome message already exists for this conversation
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT COUNT(*) FROM messages WHERE conversation_id = %s",
-            (conv_id,)
-        )
-        row = cur.fetchone()
-        msg_count = (row["count"] if isinstance(row, dict) else row[0]) if row else 0
-        conn.close()
+        async with _pool.acquire() as conn:
+            _cnt_row = await conn.fetchrow(
+                "SELECT COUNT(*) FROM messages WHERE conversation_id = $1",
+                conv_id
+            )
+        msg_count = _cnt_row[0] if _cnt_row else 0
 
         if msg_count > 0:
             # Message already exists — nothing to do
             return
 
         # Idempotency guard: skip if AI generation is already in progress
-        # NOTE: Do NOT set the lock here — handle-facilitator-response will set it.
-        # Setting it here would cause handle-facilitator-response to see the lock
-        # and skip the generation (double-lock bug).
         _now = time.time()
         _lock_key = f"ai_lock_{conv_id}"
         _last = _ai_response_locks.get(_lock_key, 0)
         if _now - _last < 10:
             return
-        # Do NOT set _ai_response_locks[_lock_key] here — let handle-facilitator-response do it
 
         # Fetch conversation + session + facilitator details needed by the AI
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT c.id, c.user_id, c.language, "
-            "s.title, s.objective, s.welcome_message, s.scope, "
-            "s.gpt_version, s.max_tokens, s.randomness, "
-            "f.title as facilitator_name, f.details as facilitator_details, "
-            "f.profile_picture, f.languages as facilitator_language "
-            "FROM conversations c "
-            "LEFT JOIN sessions s ON s.id = c.sessions_id "
-            "LEFT JOIN facilitators f ON f.id = s.facilitator "
-            "WHERE c.id = %s",
-            (conv_id,)
-        )
-        row = cur.fetchone()
-        conn.close()
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT c.id, c.user_id, c.language, "
+                "s.title, s.objective, s.welcome_message, s.scope, "
+                "s.gpt_version, s.max_tokens, s.randomness, "
+                "f.title as facilitator_name, f.details as facilitator_details, "
+                "f.profile_picture, f.languages as facilitator_language "
+                "FROM conversations c "
+                "LEFT JOIN sessions s ON s.id = c.sessions_id "
+                "LEFT JOIN facilitators f ON f.id = s.facilitator "
+                "WHERE c.id = $1",
+                conv_id
+            )
 
         if not row:
             log_session.warning("welcome-bg: conversation %s not found, skipping.", conv_id)
@@ -2147,348 +2076,306 @@ async def rest_table(table: str, request: Request):
                     )
 
     try:
-        conn = get_db()
-        cur = conn.cursor()
+        async with _pool.acquire() as conn:
 
-        if request.method in ("GET", "HEAD"):
-            select_str = params.get("select", "*")
-            base_cols, joins = _parse_select(select_str)
-            # Detect extra FK cols needed for joins
-            extra_fk_cols: list = []
-            for j in joins:
-                jp = _parse_join(j) if isinstance(j, str) else j
-                if not jp:
-                    continue
-                jt = jp["table"]
-                for constraint, (tbl, fc, ftbl, fpc) in FK_MAP.items():
-                    needed_col = None
-                    if tbl == table and ftbl == jt:
-                        needed_col = fc
-                    elif tbl == jt and ftbl == table:
-                        needed_col = fpc
-                    if needed_col and needed_col not in base_cols and needed_col not in extra_fk_cols:
-                        extra_fk_cols.append(needed_col)
-            all_cols = base_cols + extra_fk_cols
-            col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_cols]) if all_cols else "*"
-            wc, wv = build_where(params)
-            oc = build_order(params.get("order", ""))
-            lim = params.get("limit", "")
-            off = params.get("offset", "")
+            if request.method in ("GET", "HEAD"):
+                select_str = params.get("select", "*")
+                base_cols, joins = _parse_select(select_str)
+                # Detect extra FK cols needed for joins
+                extra_fk_cols: list = []
+                for j in joins:
+                    jp = _parse_join(j) if isinstance(j, str) else j
+                    if not jp:
+                        continue
+                    jt = jp["table"]
+                    for constraint, (tbl, fc, ftbl, fpc) in FK_MAP.items():
+                        needed_col = None
+                        if tbl == table and ftbl == jt:
+                            needed_col = fc
+                        elif tbl == jt and ftbl == table:
+                            needed_col = fpc
+                        if needed_col and needed_col not in base_cols and needed_col not in extra_fk_cols:
+                            extra_fk_cols.append(needed_col)
+                all_cols = base_cols + extra_fk_cols
+                col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_cols]) if all_cols else "*"
+                wc, wv = build_where(params)
+                oc = build_order(params.get("order", ""))
+                lim = params.get("limit", "")
+                off = params.get("offset", "")
 
-            # ── Ownership / token filter injection ────────────────
-            # Priority order:
-            # 1. Join token present → participant path (even if authenticated).
-            #    An authenticated user joining someone else's session must be
-            #    allowed through via the join token, not blocked by ownership.
-            # 2. Authenticated host with no join token → ownership filter.
-            # 3. Anonymous with no token → public guard (active sessions only).
-            if join_token_header and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES):
-                # Participant path: only use join-token auth when the request is
-                # NOT an authenticated host listing their own conversations.
-                # If the user is authenticated AND the query is a list (no specific
-                # conversation_id / id filter), treat it as a host dashboard request
-                # and ignore the stale join token — apply ownership filter instead.
-                if requesting_user_id and table in ("conversations", *SECURE_CONV_TABLES):
-                    # Host path: authenticated user querying their own conversations.
-                    # This covers both list queries (dashboard) and specific id queries
-                    # (host session page). In both cases, ignore any stale join token
-                    # and apply ownership filter instead.
-                    # Admin users bypass ownership filter entirely — they see all data.
-                    if not is_admin_user:
-                        join_token_header = ""
-            elif requesting_user_id and not is_admin_user and table in SECURE_REPORT_TABLES:
-                # session_reports: ownership via conversation's user_id
-                wc.append(
-                    '"conversation_id" IN ('
-                    'SELECT id FROM public."conversations" '
-                    'WHERE "user_id" = %s::uuid)'
-                )
-                wv.append(requesting_user_id)
-            elif requesting_user_id and not is_admin_user and table in SECURE_CONV_TABLES:
-                # messages / session_participants: ownership filter
-                wc.append(
-                    '"conversation_id" IN ('
-                    'SELECT id FROM public."conversations" '
-                    'WHERE "user_id" = %s::uuid)'
-                )
-                wv.append(requesting_user_id)
-            elif requesting_user_id and not is_admin_user and table in SECURE_DIRECT_TABLES:
-                if table == 'facilitators':
-                    # Return system facilitators (user_id IS NULL) + user's own custom facilitators
-                    wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
+                # ── Ownership / token filter injection ────────────
+                if join_token_header and table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES):
+                    if requesting_user_id and table in ("conversations", *SECURE_CONV_TABLES):
+                        if not is_admin_user:
+                            join_token_header = ""
+                elif requesting_user_id and not is_admin_user and table in SECURE_REPORT_TABLES:
+                    wc.append(
+                        '"conversation_id" IN ('
+                        'SELECT id FROM public."conversations" '
+                        'WHERE "user_id" = $__uid__::uuid)'
+                    )
                     wv.append(requesting_user_id)
-                elif table == 'sessions':
-                    # Return system workshops (user_id IS NULL) + user's own custom workshops
-                    wc.append('("user_id" IS NULL OR "user_id" = %s::uuid)')
+                elif requesting_user_id and not is_admin_user and table in SECURE_CONV_TABLES:
+                    wc.append(
+                        '"conversation_id" IN ('
+                        'SELECT id FROM public."conversations" '
+                        'WHERE "user_id" = $__uid__::uuid)'
+                    )
                     wv.append(requesting_user_id)
-                elif table == 'referrals':
-                    # referrals: filter by referrer_id (the owner column)
-                    wc.append('"referrer_id" = %s::uuid')
-                    wv.append(requesting_user_id)
-                else:
-                    # conversations: direct user_id filter
-                    wc.append('"user_id" = %s::uuid')
-                    wv.append(requesting_user_id)
-            if join_token_header and (not requesting_user_id or table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES)):
-                # Participant path: validate join token against the
-                # conversation_id present in the query parameters.
-                # Extract conversation_id from the WHERE params.
-                conv_id_param = (
-                    params.get("conversation_id") or
-                    params.get("conversation_id=eq.") or
-                    params.get("id")
-                )
-                # Also check for eq. filter pattern
-                for pk, pv in params.items():
-                    if pk in ("conversation_id", "id") and not conv_id_param:
-                        conv_id_param = pv
-                    elif "conversation_id" in pk and "eq." in pk:
-                        conv_id_param = pk.split("eq.")[-1] or pv
-                # Extract from build_where style params like conversation_id=eq.5
-                raw_conv_id = params.get("conversation_id", "")
-                if raw_conv_id.startswith("eq."):
-                    raw_conv_id = raw_conv_id[3:]
-                if not raw_conv_id:
-                    raw_conv_id = params.get("id", "")
+                elif requesting_user_id and not is_admin_user and table in SECURE_DIRECT_TABLES:
+                    if table == 'facilitators':
+                        wc.append('("user_id" IS NULL OR "user_id" = $__uid__::uuid)')
+                        wv.append(requesting_user_id)
+                    elif table == 'sessions':
+                        wc.append('("user_id" IS NULL OR "user_id" = $__uid__::uuid)')
+                        wv.append(requesting_user_id)
+                    elif table == 'referrals':
+                        wc.append('"referrer_id" = $__uid__::uuid')
+                        wv.append(requesting_user_id)
+                    else:
+                        wc.append('"user_id" = $__uid__::uuid')
+                        wv.append(requesting_user_id)
+
+                if join_token_header and (not requesting_user_id or table in ("conversations", *SECURE_CONV_TABLES, *SECURE_REPORT_TABLES)):
+                    conv_id_param = (
+                        params.get("conversation_id") or
+                        params.get("conversation_id=eq.") or
+                        params.get("id")
+                    )
+                    for pk, pv in params.items():
+                        if pk in ("conversation_id", "id") and not conv_id_param:
+                            conv_id_param = pv
+                        elif "conversation_id" in pk and "eq." in pk:
+                            conv_id_param = pk.split("eq.")[-1] or pv
+                    raw_conv_id = params.get("conversation_id", "")
                     if raw_conv_id.startswith("eq."):
                         raw_conv_id = raw_conv_id[3:]
-                token_valid = _validate_join_token(join_token_header, raw_conv_id or None, conn)
-                if not token_valid:
-                    conn.close()
-                    log_req.warning(
-                        "REST GET /%s -> 403 (invalid join token) conv_id=%s token_prefix=%s origin=%s",
-                        table, raw_conv_id or "?",
-                        join_token_header[:8] + "..." if join_token_header else "none",
-                        request.headers.get("origin", "-"),
-                    )
-                    return JSONResponse(
-                        content={
-                            "error": "Invalid or missing session token",
-                            "message": "The join token is invalid or does not match this session",
-                            "code": "PGRST403",
-                        },
-                        status_code=403,
-                    )
-                # Token is valid: restrict query to this specific conversation
-                if table in SECURE_CONV_TABLES and raw_conv_id:
-                    # Already filtered by conversation_id in params; no extra filter needed
-                    pass
-                elif table == "conversations" and raw_conv_id:
-                    # Already filtered by id in params; no extra filter needed
-                    pass
-            elif not requesting_user_id and not join_token_header and table == "conversations":
-                # Anonymous public read of a specific conversation (join-session page).
-                # Guard: only expose conversations that are active and not ended.
-                wc.append('"is_session_ended" IS NOT TRUE')
+                    if not raw_conv_id:
+                        raw_conv_id = params.get("id", "")
+                        if raw_conv_id.startswith("eq."):
+                            raw_conv_id = raw_conv_id[3:]
+                    token_valid = await _validate_join_token(join_token_header, raw_conv_id or None, conn)
+                    if not token_valid:
+                        log_req.warning(
+                            "REST GET /%s -> 403 (invalid join token) conv_id=%s token_prefix=%s origin=%s",
+                            table, raw_conv_id or "?",
+                            join_token_header[:8] + "..." if join_token_header else "none",
+                            request.headers.get("origin", "-"),
+                        )
+                        return JSONResponse(
+                            content={
+                                "error": "Invalid or missing session token",
+                                "message": "The join token is invalid or does not match this session",
+                                "code": "PGRST403",
+                            },
+                            status_code=403,
+                        )
+                elif not requesting_user_id and not join_token_header and table == "conversations":
+                    wc.append('"is_session_ended" IS NOT TRUE')
 
-            sql = f'SELECT {col_str} FROM public."{table}"'
-            if wc:
-                sql += " WHERE " + " AND ".join(wc)
-            if oc:
-                sql += " " + oc
-            if lim:
-                sql += f" LIMIT {int(lim)}"
-            if off:
-                sql += f" OFFSET {int(off)}"
-            cur.execute(sql, wv)
-            rows = [serialize_row(dict(r)) for r in cur.fetchall()]
-            for j in joins:
-                resolve_join(table, j, rows, conn)
-            # Only strip extra FK cols that were not already covered by SELECT *.
-            # When base_cols is ['*'], all columns are already in the result, so
-            # stripping extra_fk_cols would remove columns the client expects.
-            cols_to_strip = extra_fk_cols if "*" not in base_cols else []
-            if cols_to_strip:
-                for row in rows:
-                    for ec in cols_to_strip:
-                        row.pop(ec, None)
-            prefer = request.headers.get("prefer", "")
-            accept = request.headers.get("accept", "")
-            content_range = f"0-{len(rows)-1}/{len(rows)}" if rows else "*/0"
-            if "vnd.pgrst.object" in accept and rows:
-                body = rows[0]
-            elif "return=representation" in prefer and len(rows) == 1:
-                body = rows[0]
-            else:
-                body = rows
-            conn.close()
-            log_req.info(
-                "REST GET /%s -> %d row(s) | user=%s token=%s",
-                table, len(rows) if isinstance(rows, list) else 1,
-                requesting_user_id or "anon",
-                "yes" if join_token_header else "no",
-            )
-            return JSONResponse(content=body, headers={"Content-Range": content_range})
+                # Build the final SQL with asyncpg $N placeholders
+                # Replace $__uid__ markers with actual positional params
+                def _renumber_wc(wc_list, wv_list):
+                    """Replace $__uid__ markers with proper $N positional params."""
+                    counter = [0]
+                    new_wc = []
+                    for clause in wc_list:
+                        def _repl(m):
+                            counter[0] += 1
+                            return f'${counter[0]}'
+                        new_clause = re.sub(r'\$__uid__|%s', _repl, clause)
+                        new_wc.append(new_clause)
+                    return new_wc, counter[0]
 
-        if request.method == "POST":
-            data = await request.json()
-            if not data:
-                conn.close()
-                raise HTTPException(400, "No data")
-            # H7: Enforce per-plan question limit server-side for participant messages.
-            # Only applies to participant (non-admin) messages with a conversation_id.
-            if table == "messages":
-                msg_data = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else {})
-                msg_conv_id = msg_data.get("conversation_id")
-                msg_role = msg_data.get("role", "")
-                # Only count participant messages (role = 'user'), not admin/facilitator messages
-                if msg_conv_id and msg_role not in ("admin", "system", "assistant"):
-                    try:
-                        # Get the plan's question_limit for this conversation's host
-                        cur.execute("""
-                            SELECT pr.question_limit
-                            FROM conversations c
-                            JOIN profiles p ON p.id = c.user_id
-                            JOIN plan_restrictions pr ON pr.plan_id = p.current_plan_id
-                            WHERE c.id = %s
-                        """, (msg_conv_id,))
-                        ql_row = cur.fetchone()
-                        if ql_row and ql_row["question_limit"] is not None:
-                            question_limit = ql_row["question_limit"]
-                            # Count existing participant messages in this conversation
-                            cur.execute(
-                                "SELECT COUNT(*) AS cnt FROM messages "
-                                "WHERE conversation_id = %s AND role NOT IN ('admin', 'system', 'assistant')",
-                                (msg_conv_id,)
-                            )
-                            cnt_row = cur.fetchone()
-                            current_count = cnt_row["cnt"] if cnt_row else 0
-                            if current_count >= question_limit:
-                                conn.close()
-                                raise HTTPException(429, detail={
-                                    "code": "question_limit_reached",
-                                    "message": f"Session question limit of {question_limit} has been reached."
-                                })
-                    except HTTPException:
-                        raise
-                    except Exception as _ql_err:
-                        log_plan.warning("messages POST: question limit check failed: %s", _ql_err)
-            # H6: Enforce session lock — reject conversation creation if the referenced
-            # session template has lock=TRUE (admin moderation flag).
-            if table == "conversations":
-                session_id = (data if isinstance(data, dict) else (data[0] if data else {})).get("sessions_id")
-                if session_id:
-                    try:
-                        cur.execute('SELECT lock FROM public.sessions WHERE id = %s', (session_id,))
-                        sess_row = cur.fetchone()
-                        if sess_row and sess_row["lock"]:
-                            conn.close()
-                            raise HTTPException(403, detail={"code": "session_locked", "message": "This session template has been locked by an administrator and cannot be used."})
-                    except HTTPException:
-                        raise
-                    except Exception as _lock_err:
-                        log_session.warning("conversations POST: session lock check failed: %s", _lock_err)
-            def _adapt(d):
-                return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
-
-            if isinstance(data, list):
-                results = []
-                for item in data:
-                    cols = ", ".join([f'"{k}"' for k in item.keys()])
-                    vals = ", ".join(["%s"] * len(item))
-                    cur.execute(f'INSERT INTO public."{table}" ({cols}) VALUES ({vals}) RETURNING *', _adapt(item))
-                    row = cur.fetchone()
-                    if row:
-                        results.append(serialize_row(dict(row)))
-                conn.commit()
-                conn.close()
-                # Broadcast INSERT events for messages and session_participants
-                if table in ("messages", "session_participants") and results:
-                    conv_id = str(results[0].get("conversation_id", ""))
-                    asyncio.create_task(manager.broadcast(conv_id, {
-                        "event": "INSERT", "table": table, "new": results[0]
-                    }))
-                return JSONResponse(content=results, status_code=201)
-            else:
-                cols = ", ".join([f'"{k}"' for k in data.keys()])
-                vals = ", ".join(["%s"] * len(data))
-                oc = params.get("on_conflict", "")
-                sql = f'INSERT INTO public."{table}" ({cols}) VALUES ({vals})'
+                new_wc, param_count = _renumber_wc(wc, wv)
+                sql = f'SELECT {col_str} FROM public."{table}"'
+                if new_wc:
+                    sql += " WHERE " + " AND ".join(new_wc)
                 if oc:
-                    uc = ", ".join([f'"{k}" = EXCLUDED."{k}"' for k in data.keys() if k != oc])
-                    sql += (
-                        f' ON CONFLICT ("{oc}") DO UPDATE SET {uc}'
-                        if uc
-                        else f' ON CONFLICT ("{oc}") DO NOTHING'
-                    )
+                    sql += " " + oc
+                if lim:
+                    sql += f" LIMIT {int(lim)}"
+                if off:
+                    sql += f" OFFSET {int(off)}"
+                rows = [serialize_row(dict(r)) for r in await conn.fetch(sql, *wv)]
+                for j in joins:
+                    await _resolve_join_async(table, j, rows, conn)
+                cols_to_strip = extra_fk_cols if "*" not in base_cols else []
+                if cols_to_strip:
+                    for row in rows:
+                        for ec in cols_to_strip:
+                            row.pop(ec, None)
+                prefer = request.headers.get("prefer", "")
+                accept = request.headers.get("accept", "")
+                content_range = f"0-{len(rows)-1}/{len(rows)}" if rows else "*/0"
+                if "vnd.pgrst.object" in accept and rows:
+                    body = rows[0]
+                elif "return=representation" in prefer and len(rows) == 1:
+                    body = rows[0]
+                else:
+                    body = rows
+                log_req.info(
+                    "REST GET /%s -> %d row(s) | user=%s token=%s",
+                    table, len(rows) if isinstance(rows, list) else 1,
+                    requesting_user_id or "anon",
+                    "yes" if join_token_header else "no",
+                )
+                return JSONResponse(content=body, headers={"Content-Range": content_range})
+
+            if request.method == "POST":
+                data = await request.json()
+                if not data:
+                    raise HTTPException(400, "No data")
+                # H7: Enforce per-plan question limit server-side for participant messages.
+                if table == "messages":
+                    msg_data = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else {})
+                    msg_conv_id = msg_data.get("conversation_id")
+                    msg_role = msg_data.get("role", "")
+                    if msg_conv_id and msg_role not in ("admin", "system", "assistant"):
+                        try:
+                            ql_row = await conn.fetchrow("""
+                                SELECT pr.question_limit
+                                FROM conversations c
+                                JOIN profiles p ON p.id = c.user_id
+                                JOIN plan_restrictions pr ON pr.plan_id = p.current_plan_id
+                                WHERE c.id = $1
+                            """, msg_conv_id)
+                            if ql_row and ql_row["question_limit"] is not None:
+                                question_limit = ql_row["question_limit"]
+                                cnt_row = await conn.fetchrow(
+                                    "SELECT COUNT(*) AS cnt FROM messages "
+                                    "WHERE conversation_id = $1 AND role NOT IN ('admin', 'system', 'assistant')",
+                                    msg_conv_id
+                                )
+                                current_count = cnt_row["cnt"] if cnt_row else 0
+                                if current_count >= question_limit:
+                                    raise HTTPException(429, detail={
+                                        "code": "question_limit_reached",
+                                        "message": f"Session question limit of {question_limit} has been reached."
+                                    })
+                        except HTTPException:
+                            raise
+                        except Exception as _ql_err:
+                            log_plan.warning("messages POST: question limit check failed: %s", _ql_err)
+                # H6: Enforce session lock
+                if table == "conversations":
+                    session_id = (data if isinstance(data, dict) else (data[0] if data else {})).get("sessions_id")
+                    if session_id:
+                        try:
+                            sess_row = await conn.fetchrow('SELECT lock FROM public.sessions WHERE id = $1', session_id)
+                            if sess_row and sess_row["lock"]:
+                                raise HTTPException(403, detail={"code": "session_locked", "message": "This session template has been locked by an administrator and cannot be used."})
+                        except HTTPException:
+                            raise
+                        except Exception as _lock_err:
+                            log_session.warning("conversations POST: session lock check failed: %s", _lock_err)
+
+                def _adapt(d):
+                    return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
+
+                if isinstance(data, list):
+                    results = []
+                    async with conn.transaction():
+                        for item in data:
+                            cols = ", ".join([f'"{k}"' for k in item.keys()])
+                            ph = ", ".join([f'${i+1}' for i in range(len(item))])
+                            row = await conn.fetchrow(
+                                f'INSERT INTO public."{table}" ({cols}) VALUES ({ph}) RETURNING *',
+                                *_adapt(item)
+                            )
+                            if row:
+                                results.append(serialize_row(dict(row)))
+                    if table in ("messages", "session_participants") and results:
+                        conv_id = str(results[0].get("conversation_id", ""))
+                        asyncio.create_task(manager.broadcast(conv_id, {
+                            "event": "INSERT", "table": table, "new": results[0]
+                        }))
+                    return JSONResponse(content=results, status_code=201)
+                else:
+                    cols = ", ".join([f'"{k}"' for k in data.keys()])
+                    ph = ", ".join([f'${i+1}' for i in range(len(data))])
+                    oc = params.get("on_conflict", "")
+                    sql = f'INSERT INTO public."{table}" ({cols}) VALUES ({ph})'
+                    if oc:
+                        uc = ", ".join([f'"{k}" = EXCLUDED."{k}"' for k in data.keys() if k != oc])
+                        sql += (
+                            f' ON CONFLICT ("{oc}") DO UPDATE SET {uc}'
+                            if uc
+                            else f' ON CONFLICT ("{oc}") DO NOTHING'
+                        )
+                    sql += " RETURNING *"
+                    row = await conn.fetchrow(sql, *_adapt(data))
+                    result = serialize_row(dict(row)) if row else {}
+                    if table in ("messages", "session_participants") and result:
+                        conv_id = str(result.get("conversation_id", ""))
+                        asyncio.create_task(manager.broadcast(conv_id, {
+                            "event": "INSERT",
+                            "payload": {
+                                "eventType": "INSERT",
+                                "new": result,
+                                "old": {},
+                                "table": table,
+                                "schema": "public",
+                            },
+                        }))
+                        if table == "session_participants" and conv_id:
+                            asyncio.create_task(_maybe_generate_welcome_message(int(conv_id)))
+                    return JSONResponse(content=result, status_code=201)
+
+            if request.method == "PATCH":
+                data = await request.json()
+                if not data:
+                    raise HTTPException(400, "No data")
+                wc, wv = build_where(params)
+                # Build SET clause with asyncpg positional params
+                set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(data.keys())]
+                sc = ", ".join(set_parts)
+                data_vals = list(data.values())
+                # Renumber WHERE clause params starting after data params
+                offset = len(data_vals)
+                new_wc_parts = []
+                wv_idx = 0
+                for clause in wc:
+                    def _repl_patch(m, _idx=[wv_idx]):
+                        offset_val = offset + _idx[0] + 1
+                        _idx[0] += 1
+                        return f'${offset_val}'
+                    new_clause = re.sub(r'%s|\$__uid__', _repl_patch, clause)
+                    new_wc_parts.append(new_clause)
+                values = data_vals + wv
+                sql = f'UPDATE public."{table}" SET {sc}'
+                if new_wc_parts:
+                    sql += " WHERE " + " AND ".join(new_wc_parts)
                 sql += " RETURNING *"
-                cur.execute(sql, _adapt(data))
-                row = cur.fetchone()
-                conn.commit()
-                conn.close()
-                result = serialize_row(dict(row)) if row else {}
-                # Broadcast INSERT events for messages and session_participants.
-                # The payload must match the RealtimePayload shape expected by the
-                # frontend Supabase shim (api.ts onmessage handler).
-                if table in ("messages", "session_participants") and result:
-                    conv_id = str(result.get("conversation_id", ""))
+                rows = [serialize_row(dict(r)) for r in await conn.fetch(sql, *values)]
+                if table in ("conversations", "session_participants") and rows:
+                    conv_id = str(rows[0].get("id") or rows[0].get("conversation_id", ""))
                     asyncio.create_task(manager.broadcast(conv_id, {
-                        "event": "INSERT",
+                        "event": "UPDATE",
                         "payload": {
-                            "eventType": "INSERT",
-                            "new": result,
+                            "eventType": "UPDATE",
+                            "new": rows[0],
                             "old": {},
                             "table": table,
                             "schema": "public",
                         },
                     }))
-                    # ── Auto-trigger AI welcome message on first participant join ──────
-                    # When a participant joins a session we immediately kick off AI
-                    # welcome message generation as a background task.  The frontend
-                    # polls for the message while showing a 'Preparing your session'
-                    # spinner, so the message is ready by the time they land on the
-                    # session page.  The helper checks whether a message already
-                    # exists to avoid double-generation.
-                    if table == "session_participants" and conv_id:
-                        asyncio.create_task(_maybe_generate_welcome_message(int(conv_id)))
-                return JSONResponse(content=result, status_code=201)
+                return rows[0] if len(rows) == 1 else rows
 
-        if request.method == "PATCH":
-            data = await request.json()
-            if not data:
-                conn.close()
-                raise HTTPException(400, "No data")
-            wc, wv = build_where(params)
-            sc = ", ".join([f'"{k}" = %s' for k in data.keys()])
-            values = list(data.values()) + wv
-            sql = f'UPDATE public."{table}" SET {sc}'
-            if wc:
-                sql += " WHERE " + " AND ".join(wc)
-            sql += " RETURNING *"
-            cur.execute(sql, values)
-            rows = cur.fetchall()
-            conn.commit()
-            conn.close()
-            result = [serialize_row(dict(r)) for r in rows]
-            # Broadcast updates for conversations/session_participants.
-            if table in ("conversations", "session_participants") and result:
-                conv_id = str(result[0].get("id") or result[0].get("conversation_id", ""))
-                asyncio.create_task(manager.broadcast(conv_id, {
-                    "event": "UPDATE",
-                    "payload": {
-                        "eventType": "UPDATE",
-                        "new": result[0],
-                        "old": {},
-                        "table": table,
-                        "schema": "public",
-                    },
-                }))
-            return result[0] if len(result) == 1 else result
+            if request.method == "DELETE":
+                wc, wv = build_where(params)
+                new_wc_parts = []
+                for i, clause in enumerate(wc):
+                    new_clause = re.sub(r'%s|\$__uid__', lambda m, _i=[i]: f'${_i[0]+1}', clause)
+                    new_wc_parts.append(new_clause)
+                sql = f'DELETE FROM public."{table}"'
+                if new_wc_parts:
+                    sql += " WHERE " + " AND ".join(new_wc_parts)
+                sql += " RETURNING *"
+                rows = [serialize_row(dict(r)) for r in await conn.fetch(sql, *wv)]
+                return rows
 
-        if request.method == "DELETE":
-            wc, wv = build_where(params)
-            sql = f'DELETE FROM public."{table}"'
-            if wc:
-                sql += " WHERE " + " AND ".join(wc)
-            sql += " RETURNING *"
-            cur.execute(sql, wv)
-            rows = cur.fetchall()
-            conn.commit()
-            conn.close()
-            return [serialize_row(dict(r)) for r in rows]
-
-        conn.close()
-        raise HTTPException(405, "Method not allowed")
+            raise HTTPException(405, "Method not allowed")
 
     except HTTPException:
         raise
@@ -2519,15 +2406,13 @@ async def edge_function(func_name: str, request: Request):
             stripe_prices = stripe_lib.Price.list(active=True, limit=50, expand=["data.product"])
             plan_meta: dict = {}
             try:
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT id, title, price, currency, stripe_plan_id, plan_type "
-                    "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
-                )
-                for row in cur.fetchall():
-                    plan_meta[row["stripe_plan_id"]] = row
-                conn.close()
+                async with _pool.acquire() as _pc:
+                    rows_plans = await _pc.fetch(
+                        "SELECT id, title, price, currency, stripe_plan_id, plan_type "
+                        "FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC"
+                    )
+                    for row in rows_plans:
+                        plan_meta[row["stripe_plan_id"]] = dict(row)
             except Exception as db_err:
                 log_stripe.warning("get-stripe-prices DB lookup warning: %s", db_err)
 
@@ -2540,11 +2425,8 @@ async def edge_function(func_name: str, request: Request):
                 stripe_amount_major = stripe_amount_cents / 100
                 if float(meta["price"]) != stripe_amount_major:
                     try:
-                        sync_conn = get_db()
-                        sync_cur = sync_conn.cursor()
-                        sync_cur.execute("UPDATE plans SET price = %s WHERE stripe_plan_id = %s", (stripe_amount_major, p.id))
-                        sync_conn.commit()
-                        sync_conn.close()
+                        async with _pool.acquire() as _sync_conn:
+                            await _sync_conn.execute("UPDATE plans SET price = $1 WHERE stripe_plan_id = $2", stripe_amount_major, p.id)
                     except Exception:
                         pass
                 prices.append({
@@ -2561,11 +2443,8 @@ async def edge_function(func_name: str, request: Request):
             return {"prices": prices, "success": True}
         except stripe_lib.error.StripeError as se:
             try:
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute("SELECT id, title, price, currency, stripe_plan_id, plan_type FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC")
-                rows = cur.fetchall()
-                conn.close()
+                async with _pool.acquire() as _fc:
+                    rows = await _fc.fetch("SELECT id, title, price, currency, stripe_plan_id, plan_type FROM plans WHERE stripe_plan_id IS NOT NULL ORDER BY price ASC")
                 prices = [{"id": r["stripe_plan_id"], "plan_db_id": r["id"], "unit_amount": float(r["price"]), "unit_amount_cents": int(float(r["price"]) * 100), "currency": (r["currency"] or "eur").lower(), "recurring": {"interval": "month"}, "title": r["title"], "plan_type": r["plan_type"]} for r in rows]
                 return {"prices": prices, "success": True, "source": "db_fallback"}
             except Exception:
@@ -2611,49 +2490,44 @@ async def edge_function(func_name: str, request: Request):
 
         if conv_id:
             try:
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT c.id, c.language as conversation_language, "
-                    "s.title, s.facilitator, s.objective, s.prompt, "
-                    "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
-                    "f.title as facilitator_name, f.details as facilitator_details, "
-                    "f.profile_picture, f.languages as facilitator_languages "
-                    "FROM conversations c "
-                    "LEFT JOIN sessions s ON c.sessions_id = s.id "
-                    "LEFT JOIN facilitators f ON s.facilitator = f.id "
-                    "WHERE c.id = %s",
-                    (conv_id,),
-                )
-                row = cur.fetchone()
+                async with _pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        "SELECT c.id, c.language as conversation_language, "
+                        "s.title, s.facilitator, s.objective, s.prompt, "
+                        "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
+                        "f.title as facilitator_name, f.details as facilitator_details, "
+                        "f.profile_picture, f.languages as facilitator_languages "
+                        "FROM conversations c "
+                        "LEFT JOIN sessions s ON c.sessions_id = s.id "
+                        "LEFT JOIN facilitators f ON s.facilitator = f.id "
+                        "WHERE c.id = $1",
+                        conv_id,
+                    )
                 if row:
-                    session_title = row.get("title") or session_title
-                    facilitator_name = row.get("facilitator_name") or facilitator_name
-                    facilitator_details = row.get("facilitator_details") or ""
-                    objective = row.get("objective") or objective
-                    session_prompt = row.get("prompt") or ""
-                    welcome_message_template = row.get("welcome_message") or ""
-                    session_scope = row.get("scope") or ""
-                    gpt_version = row.get("gpt_version")
-                    max_tokens_cfg = row.get("max_tokens")
-                    randomness_cfg = row.get("randomness")
-                    pp = row.get("profile_picture") or ""
+                    session_title = row["title"] or session_title
+                    facilitator_name = row["facilitator_name"] or facilitator_name
+                    facilitator_details = row["facilitator_details"] or ""
+                    objective = row["objective"] or objective
+                    session_prompt = row["prompt"] or ""
+                    welcome_message_template = row["welcome_message"] or ""
+                    session_scope = row["scope"] or ""
+                    gpt_version = row["gpt_version"]
+                    max_tokens_cfg = row["max_tokens"]
+                    randomness_cfg = row["randomness"]
+                    pp = row["profile_picture"] or ""
                     if pp:
                         avatar_url = f"/storage/v1/object/public/facilitator-avatars/{pp}"
-                    # Priority 1: use the conversation's chosen language (ISO code → full name)
-                    conv_lang_code = (row.get("conversation_language") or "").strip().lower()
+                    conv_lang_code = (row["conversation_language"] or "").strip().lower()
                     if conv_lang_code and conv_lang_code != "en":
                         facilitator_language = LANGUAGE_CODE_MAP.get(conv_lang_code, conv_lang_code.capitalize())
                     elif conv_lang_code == "en":
-                        facilitator_language = "English"  # explicit English — still set so instruction is clear
+                        facilitator_language = "English"
                     else:
-                        # Fallback: use first language from facilitator's supported languages
-                        langs = row.get("facilitator_languages")
+                        langs = row["facilitator_languages"]
                         if langs and isinstance(langs, list) and len(langs) > 0:
                             facilitator_language = langs[0]
                         elif langs and isinstance(langs, str) and langs.strip():
                             facilitator_language = langs.strip()
-                conn.close()
             except Exception as e:
                 log_session.error("error fetching session context: %s", e, exc_info=True)
                 traceback.print_exc()
@@ -2665,12 +2539,9 @@ async def edge_function(func_name: str, request: Request):
         #   4. Hardcoded DEFAULT_AI_MODEL constant
         _platform_default = DEFAULT_AI_MODEL
         try:
-            _cfg_conn = get_db()
-            _cfg_cur = _cfg_conn.cursor()
-            _cfg_cur.execute("SELECT default_ai_model FROM configurations LIMIT 1")
-            _cfg_row = _cfg_cur.fetchone()
-            _cfg_conn.close()
-            if _cfg_row and _cfg_row.get("default_ai_model"):
+            async with _pool.acquire() as _cfg_conn:
+                _cfg_row = await _cfg_conn.fetchrow("SELECT default_ai_model FROM configurations LIMIT 1")
+            if _cfg_row and _cfg_row["default_ai_model"]:
                 _platform_default = GPT_MODEL_MAP.get(
                     str(_cfg_row["default_ai_model"]).lower().strip(),
                     _cfg_row["default_ai_model"]
@@ -2682,23 +2553,19 @@ async def edge_function(func_name: str, request: Request):
         _enterprise_model = None
         if not gpt_version and user_id:
             try:
-                _ent_conn = get_db()
-                _ent_cur = _ent_conn.cursor()
-                _ent_cur.execute(
-                    """
-                    SELECT p.enterprise_ai_model, pl.title
-                    FROM profiles p
-                    LEFT JOIN plans pl ON pl.id = p.current_plan_id
-                    WHERE p.id = %s
-                    """,
-                    (user_id,)
-                )
-                _ent_row = _ent_cur.fetchone()
-                _ent_conn.close()
+                async with _pool.acquire() as _ent_conn:
+                    _ent_row = await _ent_conn.fetchrow(
+                        """
+                        SELECT p.enterprise_ai_model, pl.title
+                        FROM profiles p
+                        LEFT JOIN plans pl ON pl.id = p.current_plan_id
+                        WHERE p.id = $1
+                        """,
+                        user_id
+                    )
                 if _ent_row:
-                    _plan_title = (_ent_row.get("title") or "").lower()
-                    _ent_model_raw = _ent_row.get("enterprise_ai_model")
-                    # Only apply if the user is on the Enterprise plan and has a model set
+                    _plan_title = (_ent_row["title"] or "").lower()
+                    _ent_model_raw = _ent_row["enterprise_ai_model"]
                     if "enterprise" in _plan_title and _ent_model_raw:
                         _enterprise_model = GPT_MODEL_MAP.get(
                             str(_ent_model_raw).lower().strip(),
@@ -2802,11 +2669,9 @@ async def edge_function(func_name: str, request: Request):
         elif generate_report:
             all_messages = []
             try:
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = %s ORDER BY m.created_at", (conv_id,))
-                all_messages = cur.fetchall()
-                conn.close()
+                async with _pool.acquire() as conn:
+                    _raw = await conn.fetch("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = $1 ORDER BY m.created_at", conv_id)
+                all_messages = [dict(r) for r in _raw]
             except Exception as e:
                 log_session.error("error fetching messages for report: %s", e, exc_info=True)
             # Pre-compress long participant messages to fit within model context budget
@@ -2854,11 +2719,9 @@ async def edge_function(func_name: str, request: Request):
         else:
             recent_messages = []
             try:
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = %s ORDER BY m.created_at DESC LIMIT 20", (conv_id,))
-                recent_messages = list(reversed(cur.fetchall()))
-                conn.close()
+                async with _pool.acquire() as conn:
+                    _rows = await conn.fetch("SELECT m.content, m.role, m.name, m.created_at FROM messages m WHERE m.conversation_id = $1 ORDER BY m.created_at DESC LIMIT 20", conv_id)
+                recent_messages = list(reversed([dict(r) for r in _rows]))
             except Exception as e:
                 log_session.error("error fetching recent messages: %s", e, exc_info=True)
             conversation_context = ""
@@ -2940,24 +2803,21 @@ async def edge_function(func_name: str, request: Request):
         msg_id = None
         if conv_id:
             try:
-                conn = get_db()
-                cur = conn.cursor()
                 content_json = json.dumps({"text": txt, **({"avatar": avatar_url} if avatar_url else {})})
-                cur.execute(
-                    "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES (%s, %s, 'assistant', %s, %s, %s, %s) RETURNING id",
-                    (conv_id, content_json, facilitator_name, _prompt_tokens, _completion_tokens, _model_used),
-                )
-                msg_id = cur.fetchone()["id"]
-                if is_session_start:
-                    cur.execute("UPDATE conversations SET welcome_message_status = 'ai_ready' WHERE id = %s", (conv_id,))
-                # Increment the per-conversation cost tracker
-                if _cost_usd > 0:
-                    cur.execute(
-                        "UPDATE conversations SET total_cost_usd = total_cost_usd + %s WHERE id = %s",
-                        (_cost_usd, conv_id),
-                    )
-                conn.commit()
-                conn.close()
+                async with _pool.acquire() as conn:
+                    async with conn.transaction():
+                        _row = await conn.fetchrow(
+                            "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2, 'assistant', $3, $4, $5, $6) RETURNING id",
+                            conv_id, content_json, facilitator_name, _prompt_tokens, _completion_tokens, _model_used,
+                        )
+                        msg_id = _row["id"]
+                        if is_session_start:
+                            await conn.execute("UPDATE conversations SET welcome_message_status = 'ai_ready' WHERE id = $1", conv_id)
+                        if _cost_usd > 0:
+                            await conn.execute(
+                                "UPDATE conversations SET total_cost_usd = total_cost_usd + $1 WHERE id = $2",
+                                _cost_usd, conv_id,
+                            )
                 # Broadcast new AI message to all WebSocket clients in this room.
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "INSERT",
@@ -3007,15 +2867,12 @@ async def edge_function(func_name: str, request: Request):
         # ── Security: verify the requesting user owns this conversation ──
         if conv_id:
             try:
-                _chk_conn = get_db()
-                _chk_cur = _chk_conn.cursor()
-                _chk_cur.execute(
-                    "SELECT user_id FROM conversations WHERE id = %s",
-                    (conv_id,),
-                )
-                _chk_row = _chk_cur.fetchone()
-                _chk_conn.close()
-                _conv_owner = str(_chk_row["user_id"] if isinstance(_chk_row, dict) else _chk_row[0]) if _chk_row else None
+                async with _pool.acquire() as _chk_conn:
+                    _chk_row = await _chk_conn.fetchrow(
+                        "SELECT user_id FROM conversations WHERE id = $1",
+                        conv_id,
+                    )
+                _conv_owner = str(_chk_row["user_id"]) if _chk_row else None
                 if not _chk_row or _conv_owner != str(user_id):
                     raise HTTPException(403, "You do not have permission to close this session")
             except HTTPException:
@@ -3026,18 +2883,15 @@ async def edge_function(func_name: str, request: Request):
 
         # ── Security: verify the user's plan allows session reports ──
         try:
-            _plan_conn = get_db()
-            _plan_cur = _plan_conn.cursor()
-            _plan_cur.execute(
-                "SELECT pr.session_reports FROM profiles p "
-                "LEFT JOIN plans pl ON p.current_plan_id = pl.id "
-                "LEFT JOIN plan_restrictions pr ON pr.plan_id = pl.id "
-                "WHERE p.id = %s::uuid",
-                (user_id,),
-            )
-            _plan_row = _plan_cur.fetchone()
-            _plan_conn.close()
-            _can_generate = bool((_plan_row["session_reports"] if isinstance(_plan_row, dict) else _plan_row[0]) if _plan_row else False)
+            async with _pool.acquire() as _plan_conn:
+                _plan_row = await _plan_conn.fetchrow(
+                    "SELECT pr.session_reports FROM profiles p "
+                    "LEFT JOIN plans pl ON p.current_plan_id = pl.id "
+                    "LEFT JOIN plan_restrictions pr ON pr.plan_id = pl.id "
+                    "WHERE p.id = $1::uuid",
+                    user_id,
+                )
+            _can_generate = bool(_plan_row["session_reports"] if _plan_row else False)
             if not _can_generate:
                 raise HTTPException(403, "Your current plan does not include session reports. Please upgrade to access this feature.")
         except HTTPException:
@@ -3047,124 +2901,101 @@ async def edge_function(func_name: str, request: Request):
             # Fail open on plan check errors to avoid blocking legitimate users
 
         if conv_id:
-            conn = None
             try:
-                conn = get_db()
-                conn.autocommit = True
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT s.title, s.objective FROM conversations c "
-                    "LEFT JOIN sessions s ON c.sessions_id = s.id WHERE c.id = %s",
-                    (conv_id,),
-                )
-                srow = cur.fetchone()
-                if srow:
-                    session_title = srow.get("title") or session_title
-                    objective = srow.get("objective") or ""
-                cur.execute("SELECT COUNT(*) FROM session_participants WHERE conversation_id = %s", (conv_id,))
-                row = cur.fetchone()
-                participant_count = row["count"] if isinstance(row, dict) else row[0]
-                cur.execute("SELECT name FROM session_participants WHERE conversation_id = %s", (conv_id,))
-                participant_names = [r["name"] for r in cur.fetchall() if r.get("name")]
-                cur.execute("SELECT COUNT(*) FROM messages WHERE conversation_id = %s", (conv_id,))
-                row = cur.fetchone()
-                message_count = row["count"] if isinstance(row, dict) else row[0]
-                cur.execute("SELECT content, role, name, created_at FROM messages WHERE conversation_id = %s ORDER BY created_at", (conv_id,))
-                all_msgs = cur.fetchall()
-                # Determine model early so compression uses the right threshold
-                _pre_model = DEFAULT_AI_MODEL
-                try:
-                    _pre_cfg_conn = get_db()
-                    _pre_cfg_cur = _pre_cfg_conn.cursor()
-                    _pre_cfg_cur.execute("SELECT default_ai_model FROM configurations LIMIT 1")
-                    _pre_cfg_row = _pre_cfg_conn.cursor().fetchone() if False else _pre_cfg_cur.fetchone()
-                    _pre_cfg_conn.close()
-                    if _pre_cfg_row and _pre_cfg_row.get("default_ai_model"):
-                        _pre_model = GPT_MODEL_MAP.get(
-                            str(_pre_cfg_row["default_ai_model"]).lower().strip(),
-                            _pre_cfg_row["default_ai_model"]
-                        )
-                except Exception:
-                    pass
-                # Pre-compress long participant messages before building transcript
-                all_msgs = _compress_messages_for_context(list(all_msgs), _pre_model, openai_client)
-                transcript = ""
-                for msg in all_msgs:
-                    content = msg.get("content", {})
-                    if isinstance(content, str):
-                        try:
-                            content = json.loads(content)
-                        except Exception:
-                            content = {"text": content}
-                    text = content.get("text", str(content))
-                    transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
-                # Apply per-model context budget truncation to prevent context overflow
-                _report_model = DEFAULT_AI_MODEL
-                try:
-                    _cfg_conn2 = get_db()
-                    _cfg_cur2 = _cfg_conn2.cursor()
-                    _cfg_cur2.execute("SELECT default_ai_model FROM configurations LIMIT 1")
-                    _cfg_row2 = _cfg_cur2.fetchone()
-                    _cfg_conn2.close()
-                    if _cfg_row2 and _cfg_row2.get("default_ai_model"):
-                        _report_model = GPT_MODEL_MAP.get(
-                            str(_cfg_row2["default_ai_model"]).lower().strip(),
-                            _cfg_row2["default_ai_model"]
-                        )
-                except Exception:
-                    pass
-                transcript, _eos_truncated = _truncate_transcript_to_budget(transcript, _report_model)
-                _truncation_suffix = (
-                    "\n\n> **Note:** Some earlier messages were omitted to fit the AI model's context window. "
-                    "The report covers the opening and most recent portion of the session."
-                    if _eos_truncated else ""
-                )
-                logger.info("[AI] End-of-session report: model=%s, transcript_chars=%d, truncated=%s", _report_model, len(transcript), _eos_truncated)
-                _report_prompt_tokens: Optional[int] = None
-                _report_completion_tokens: Optional[int] = None
-                _report_model_used: Optional[str] = None
-                try:
-                    resp = openai_client.chat.completions.create(
-                        model=_report_model,
-                        messages=[
-                            {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
-                            {"role": "user", "content": (
-                                f'Generate a comprehensive session report for the workshop "{session_title}".\n'
-                                f"Objective: {objective}\n"
-                                f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
-                                f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
-                                "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
-                                "Use markdown formatting. Be specific and reference actual content from the discussion."
-                                + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _eos_truncated else "")
-                            )},
-                        ],
-                        max_tokens=1500,
-                        temperature=0.5,
+                async with _pool.acquire() as conn:
+                    srow = await conn.fetchrow(
+                        "SELECT s.title, s.objective FROM conversations c "
+                        "LEFT JOIN sessions s ON c.sessions_id = s.id WHERE c.id = $1",
+                        conv_id,
                     )
-                    report_content = resp.choices[0].message.content.strip() + _truncation_suffix
-                    if resp.usage:
-                        _report_prompt_tokens = resp.usage.prompt_tokens
-                        _report_completion_tokens = resp.usage.completion_tokens
-                        _report_model_used = resp.model or DEFAULT_AI_MODEL
-                except Exception as e:
-                    logger.error("[AI] Report generation error: %s", e, exc_info=True)
-                    report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
+                    if srow:
+                        session_title = srow["title"] or session_title
+                        objective = srow["objective"] or ""
+                    _pc_row = await conn.fetchrow("SELECT COUNT(*) FROM session_participants WHERE conversation_id = $1", conv_id)
+                    participant_count = _pc_row[0] if _pc_row else 0
+                    _pnames = await conn.fetch("SELECT name FROM session_participants WHERE conversation_id = $1", conv_id)
+                    participant_names = [r["name"] for r in _pnames if r["name"]]
+                    _mc_row = await conn.fetchrow("SELECT COUNT(*) FROM messages WHERE conversation_id = $1", conv_id)
+                    message_count = _mc_row[0] if _mc_row else 0
+                    _all_msgs_raw = await conn.fetch("SELECT content, role, name, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at", conv_id)
+                    all_msgs = [dict(r) for r in _all_msgs_raw]
+                    # Determine model for compression
+                    _pre_model = DEFAULT_AI_MODEL
+                    try:
+                        _pre_cfg_row = await conn.fetchrow("SELECT default_ai_model FROM configurations LIMIT 1")
+                        if _pre_cfg_row and _pre_cfg_row["default_ai_model"]:
+                            _pre_model = GPT_MODEL_MAP.get(
+                                str(_pre_cfg_row["default_ai_model"]).lower().strip(),
+                                _pre_cfg_row["default_ai_model"]
+                            )
+                    except Exception:
+                        pass
+                    # Pre-compress long participant messages before building transcript
+                    all_msgs = _compress_messages_for_context(all_msgs, _pre_model, openai_client)
+                    transcript = ""
+                    for msg in all_msgs:
+                        content = msg.get("content", {})
+                        if isinstance(content, str):
+                            try:
+                                content = json.loads(content)
+                            except Exception:
+                                content = {"text": content}
+                        text = content.get("text", str(content))
+                        transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
+                    # Apply per-model context budget truncation
+                    _report_model = _pre_model
+                    transcript, _eos_truncated = _truncate_transcript_to_budget(transcript, _report_model)
+                    _truncation_suffix = (
+                        "\n\n> **Note:** Some earlier messages were omitted to fit the AI model's context window. "
+                        "The report covers the opening and most recent portion of the session."
+                        if _eos_truncated else ""
+                    )
+                    logger.info("[AI] End-of-session report: model=%s, transcript_chars=%d, truncated=%s", _report_model, len(transcript), _eos_truncated)
+                    _report_prompt_tokens: Optional[int] = None
+                    _report_completion_tokens: Optional[int] = None
+                    _report_model_used: Optional[str] = None
+                    try:
+                        resp = openai_client.chat.completions.create(
+                            model=_report_model,
+                            messages=[
+                                {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
+                                {"role": "user", "content": (
+                                    f'Generate a comprehensive session report for the workshop "{session_title}".\n'
+                                    f"Objective: {objective}\n"
+                                    f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
+                                    f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
+                                    "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
+                                    "Use markdown formatting. Be specific and reference actual content from the discussion."
+                                    + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _eos_truncated else "")
+                                )},
+                            ],
+                            max_tokens=1500,
+                            temperature=0.5,
+                        )
+                        report_content = resp.choices[0].message.content.strip() + _truncation_suffix
+                        if resp.usage:
+                            _report_prompt_tokens = resp.usage.prompt_tokens
+                            _report_completion_tokens = resp.usage.completion_tokens
+                            _report_model_used = resp.model or DEFAULT_AI_MODEL
+                    except Exception as e:
+                        logger.error("[AI] Report generation error: %s", e, exc_info=True)
+                        report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
 
-                _report_cost = _calculate_token_cost(_report_model_used or DEFAULT_AI_MODEL, _report_prompt_tokens or 0, _report_completion_tokens or 0)
-                cur.execute(
-                    "INSERT INTO session_reports (id, conversation_id, report_content, report_type, generated_by, metadata) VALUES (%s, %s, %s, 'comprehensive', %s, %s) RETURNING id",
-                    (report_id, conv_id, report_content, user_id, json.dumps({"participant_count": participant_count, "message_count": message_count})),
-                )
-                row = cur.fetchone()
-                report_id = str(row["id"] if isinstance(row, dict) else row[0])
-                cur.execute(
-                    "UPDATE conversations SET is_session_ended = true, ended_at = NOW(), status = 'completed', final_report_id = %s, total_messages = %s, total_cost_usd = total_cost_usd + %s WHERE id = %s",
-                    (report_id, message_count, _report_cost, conv_id),
-                )
-                cur.execute(
-                    "INSERT INTO session_events (conversation_id, event_type, data) VALUES (%s, 'session_ended', %s)",
-                    (conv_id, json.dumps({"ended_by": user_id, "report_id": report_id})),
-                )
+                    _report_cost = _calculate_token_cost(_report_model_used or DEFAULT_AI_MODEL, _report_prompt_tokens or 0, _report_completion_tokens or 0)
+                    async with conn.transaction():
+                        _rep_row = await conn.fetchrow(
+                            "INSERT INTO session_reports (id, conversation_id, report_content, report_type, generated_by, metadata) VALUES ($1, $2, $3, 'comprehensive', $4, $5) RETURNING id",
+                            report_id, conv_id, report_content, user_id, json.dumps({"participant_count": participant_count, "message_count": message_count}),
+                        )
+                        report_id = str(_rep_row["id"])
+                        await conn.execute(
+                            "UPDATE conversations SET is_session_ended = true, ended_at = NOW(), status = 'completed', final_report_id = $1, total_messages = $2, total_cost_usd = total_cost_usd + $3 WHERE id = $4",
+                            report_id, message_count, _report_cost, conv_id,
+                        )
+                        await conn.execute(
+                            "INSERT INTO session_events (conversation_id, event_type, data) VALUES ($1, 'session_ended', $2)",
+                            conv_id, json.dumps({"ended_by": user_id, "report_id": report_id}),
+                        )
                 # Broadcast session ended to all WebSocket clients.
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "UPDATE",
@@ -3181,12 +3012,6 @@ async def edge_function(func_name: str, request: Request):
                 traceback.print_exc()
                 if not report_content:
                     report_content = f"## Session Report\n\nSession completed. Participants: {participant_count}, Messages: {message_count}"
-            finally:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
 
         return {
             "success": True,
@@ -3281,23 +3106,18 @@ async def edge_function(func_name: str, request: Request):
                 except stripe_lib.error.InvalidRequestError:
                     coupon_id = None  # Ignore invalid coupon silently
 
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute("SELECT stripe_customer_id FROM profiles WHERE id = %s", (user_id,))
-            profile = cur.fetchone()
-            customer_id = profile["stripe_customer_id"] if profile else None
-            if not customer_id:
-                customer = stripe_lib.Customer.create(
-                    email=billing.get("email", ""),
-                    name=billing.get("name", ""),
-                    address={"line1": billing.get("address", {}).get("line1", ""), "city": billing.get("address", {}).get("city", ""), "state": billing.get("address", {}).get("state", ""), "postal_code": billing.get("address", {}).get("postal_code", ""), "country": billing.get("address", {}).get("country", "")},
-                    metadata={"user_id": user_id},
-                )
-                customer_id = customer.id
-                cur.execute("UPDATE profiles SET stripe_customer_id = %s WHERE id = %s", (customer_id, user_id))
-            conn.commit()
-            cur.close()
-            conn.close()
+            async with _pool.acquire() as conn:
+                profile = await conn.fetchrow("SELECT stripe_customer_id FROM profiles WHERE id = $1", user_id)
+                customer_id = profile["stripe_customer_id"] if profile else None
+                if not customer_id:
+                    customer = stripe_lib.Customer.create(
+                        email=billing.get("email", ""),
+                        name=billing.get("name", ""),
+                        address={"line1": billing.get("address", {}).get("line1", ""), "city": billing.get("address", {}).get("city", ""), "state": billing.get("address", {}).get("state", ""), "postal_code": billing.get("address", {}).get("postal_code", ""), "country": billing.get("address", {}).get("country", "")},
+                        metadata={"user_id": user_id},
+                    )
+                    customer_id = customer.id
+                    await conn.execute("UPDATE profiles SET stripe_customer_id = $1 WHERE id = $2", customer_id, user_id)
             intent_meta = {"user_id": user_id, "plan_id": str(plan_id), "stripe_plan_id": stripe_plan_id}
             if coupon_id:
                 intent_meta["coupon_id"] = coupon_id
@@ -3328,14 +3148,11 @@ async def edge_function(func_name: str, request: Request):
             intent = stripe_lib.PaymentIntent.retrieve(payment_intent_id)
             if intent.status not in ("succeeded", "processing"):
                 raise HTTPException(400, f"Payment not completed. Status: {intent.status}")
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = %s, plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()), updated_at = NOW() WHERE id = %s",
-                (plan_id, customer_id, payment_intent_id, user_id),
-            )
-            conn.commit()
-            conn.close()
+            async with _pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE profiles SET current_plan_id = $1, subscription_status = 'active', stripe_customer_id = COALESCE($2, stripe_customer_id), stripe_subscription_id = $3, plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()), updated_at = NOW() WHERE id = $4",
+                    plan_id, customer_id, payment_intent_id, user_id,
+                )
             return {"success": True, "status": "active", "planId": plan_id}
         except stripe_lib.error.StripeError as se:
             raise HTTPException(400, str(se))
@@ -3359,70 +3176,61 @@ async def edge_function(func_name: str, request: Request):
         if not code:
             raise HTTPException(400, "Missing code")
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            # 1. Look up the code
-            cur.execute(
-                "SELECT id, tier, redeemed_by FROM appsumo_codes WHERE code = %s",
-                (code,)
-            )
-            code_row = cur.fetchone()
-            if not code_row:
-                conn.close()
-                raise HTTPException(400, "Invalid AppSumo code. Please check the code and try again.")
-            if code_row["redeemed_by"] is not None:
-                conn.close()
-                raise HTTPException(400, "This code has already been redeemed.")
-            tier = code_row["tier"]
-            plan_id = 100 + tier  # 101, 102, or 103
-            # 2. Check user's current AppSumo tier (stacking guard)
-            cur.execute(
-                "SELECT current_plan_id, appsumo_tier, appsumo_codes_redeemed FROM profiles WHERE id = %s",
-                (user_id,)
-            )
-            profile = cur.fetchone()
-            if not profile:
-                conn.close()
-                raise HTTPException(404, "User profile not found.")
-            current_appsumo_tier = profile["appsumo_tier"] or 0
-            codes_redeemed = profile["appsumo_codes_redeemed"] or 0
-            if tier < current_appsumo_tier:
-                conn.close()
-                raise HTTPException(400, f"You already have a higher AppSumo tier (Tier {current_appsumo_tier}). You cannot redeem a lower tier code.")
-            # 3. Activate the plan
-            cur.execute(
-                """
-                UPDATE profiles
-                SET current_plan_id = %s,
-                    subscription_status = 'active',
-                    appsumo_tier = %s,
-                    appsumo_codes_redeemed = %s,
-                    plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()),
-                    updated_at = NOW()
-                WHERE id = %s
-                """,
-                (plan_id, tier, codes_redeemed + 1, user_id)
-            )
-            # 4. Mark the code as redeemed
-            cur.execute(
-                "UPDATE appsumo_codes SET redeemed_by = %s, redeemed_at = NOW() WHERE id = %s",
-                (user_id, code_row["id"])
-            )
-            conn.commit()
-            # 5. Fetch activated plan details
-            cur.execute(
-                """
-                SELECT p.id, p.title, p.plan_type, p.price, p.currency,
-                       pr.facilitator_limit, pr.session_limit, pr.max_participants,
-                       pr.session_reports, pr.data_export, pr.custom_branding
-                FROM plans p
-                LEFT JOIN plan_restrictions pr ON pr.plan_id = p.id
-                WHERE p.id = %s
-                """,
-                (plan_id,)
-            )
-            plan_row = cur.fetchone()
-            conn.close()
+            async with _pool.acquire() as conn:
+                async with conn.transaction():
+                    # 1. Look up the code
+                    code_row = await conn.fetchrow(
+                        "SELECT id, tier, redeemed_by FROM appsumo_codes WHERE code = $1",
+                        code
+                    )
+                    if not code_row:
+                        raise HTTPException(400, "Invalid AppSumo code. Please check the code and try again.")
+                    if code_row["redeemed_by"] is not None:
+                        raise HTTPException(400, "This code has already been redeemed.")
+                    tier = code_row["tier"]
+                    plan_id = 100 + tier  # 101, 102, or 103
+                    # 2. Check user's current AppSumo tier (stacking guard)
+                    profile = await conn.fetchrow(
+                        "SELECT current_plan_id, appsumo_tier, appsumo_codes_redeemed FROM profiles WHERE id = $1",
+                        user_id
+                    )
+                    if not profile:
+                        raise HTTPException(404, "User profile not found.")
+                    current_appsumo_tier = profile["appsumo_tier"] or 0
+                    codes_redeemed = profile["appsumo_codes_redeemed"] or 0
+                    if tier < current_appsumo_tier:
+                        raise HTTPException(400, f"You already have a higher AppSumo tier (Tier {current_appsumo_tier}). You cannot redeem a lower tier code.")
+                    # 3. Activate the plan
+                    await conn.execute(
+                        """
+                        UPDATE profiles
+                        SET current_plan_id = $1,
+                            subscription_status = 'active',
+                            appsumo_tier = $2,
+                            appsumo_codes_redeemed = $3,
+                            plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()),
+                            updated_at = NOW()
+                        WHERE id = $4
+                        """,
+                        plan_id, tier, codes_redeemed + 1, user_id
+                    )
+                    # 4. Mark the code as redeemed
+                    await conn.execute(
+                        "UPDATE appsumo_codes SET redeemed_by = $1, redeemed_at = NOW() WHERE id = $2",
+                        user_id, code_row["id"]
+                    )
+                    # 5. Fetch activated plan details
+                    plan_row = await conn.fetchrow(
+                        """
+                        SELECT p.id, p.title, p.plan_type, p.price, p.currency,
+                               pr.facilitator_limit, pr.session_limit, pr.max_participants,
+                               pr.session_reports, pr.data_export, pr.custom_branding
+                        FROM plans p
+                        LEFT JOIN plan_restrictions pr ON pr.plan_id = p.id
+                        WHERE p.id = $1
+                        """,
+                        plan_id
+                    )
             tier_names = {1: "Solo", 2: "Team", 3: "Agency"}
             return {
                 "success": True,
@@ -3447,11 +3255,8 @@ async def edge_function(func_name: str, request: Request):
         if not user_id:
             raise HTTPException(400, "Missing userId")
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute("SELECT stripe_customer_id FROM profiles WHERE id = %s", (user_id,))
-            profile = cur.fetchone()
-            conn.close()
+            async with _pool.acquire() as conn:
+                profile = await conn.fetchrow("SELECT stripe_customer_id FROM profiles WHERE id = $1", user_id)
             customer_id = profile["stripe_customer_id"] if profile else None
             if not customer_id:
                 raise HTTPException(400, "No Stripe customer found for this user")
@@ -3466,18 +3271,16 @@ async def edge_function(func_name: str, request: Request):
         if not conv_id:
             raise HTTPException(400, "Missing conversationId")
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT s.welcome_message, f.title as facilitator_name, c.language as conv_lang "
-                "FROM conversations c LEFT JOIN sessions s ON c.sessions_id = s.id "
-                "LEFT JOIN facilitators f ON s.facilitator = f.id WHERE c.id = %s",
-                (conv_id,),
-            )
-            row = cur.fetchone()
-            template = (row.get("welcome_message") or "") if row else ""
-            fname = (row.get("facilitator_name") or "Facilitator") if row else "Facilitator"
-            conv_lang_code = (row.get("conv_lang") or "en").strip().lower() if row else "en"
+            async with _pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT s.welcome_message, f.title as facilitator_name, c.language as conv_lang "
+                    "FROM conversations c LEFT JOIN sessions s ON c.sessions_id = s.id "
+                    "LEFT JOIN facilitators f ON s.facilitator = f.id WHERE c.id = $1",
+                    conv_id,
+                )
+            template = (row["welcome_message"] or "") if row else ""
+            fname = (row["facilitator_name"] or "Facilitator") if row else "Facilitator"
+            conv_lang_code = (row["conv_lang"] or "en").strip().lower() if row else "en"
             # Map ISO code to full language name for the AI instruction
             lang_map = {
                 "en": "English", "fr": "French", "es": "Spanish", "de": "German",
@@ -3521,14 +3324,14 @@ async def edge_function(func_name: str, request: Request):
                 except Exception as ai_err:
                     log_session.warning("template-welcome: AI translation failed, using original: %s", ai_err)
             _tw_cost = _calculate_token_cost(_tw_model or DEFAULT_AI_MODEL, _tw_prompt_tokens or 0, _tw_completion_tokens or 0)
-            cur.execute(
-                "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES (%s, %s, 'assistant', %s, %s, %s, %s) RETURNING id",
-                (conv_id, json.dumps({"text": template}), fname, _tw_prompt_tokens, _tw_completion_tokens, _tw_model),
-            )
-            msg_id = cur.fetchone()["id"]
-            cur.execute("UPDATE conversations SET welcome_message_status = 'template_ready' WHERE id = %s", (conv_id,))
-            conn.commit()
-            conn.close()
+            async with _pool.acquire() as conn:
+                async with conn.transaction():
+                    _tw_row = await conn.fetchrow(
+                        "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2, 'assistant', $3, $4, $5, $6) RETURNING id",
+                        conv_id, json.dumps({"text": template}), fname, _tw_prompt_tokens, _tw_completion_tokens, _tw_model,
+                    )
+                    msg_id = _tw_row["id"]
+                    await conn.execute("UPDATE conversations SET welcome_message_status = 'template_ready' WHERE id = $1", conv_id)
             return {"success": True, "messageId": str(msg_id), "content": template}
         except Exception as e:
             raise HTTPException(500, str(e))
@@ -3561,98 +3364,86 @@ async def edge_function(func_name: str, request: Request):
             raise HTTPException(400, "participant_name is required")
 
         try:
-            conn = get_db()
-            cur = conn.cursor()
+            async with _pool.acquire() as conn:
+                async with conn.transaction():
+                    # 1. Validate join token & fetch conversation in one query
+                    conv = await conn.fetchrow(
+                        """
+                        SELECT id, status, is_session_ended, participants,
+                               current_participants, join_token
+                        FROM public.conversations
+                        WHERE id = $1
+                        """,
+                        conversation_id,
+                    )
+                    if not conv:
+                        raise HTTPException(404, "Session not found")
 
-            # 1. Validate join token & fetch conversation in one query
-            cur.execute(
-                """
-                SELECT id, status, is_session_ended, participants,
-                       current_participants, join_token
-                FROM public.conversations
-                WHERE id = %s
-                """,
-                (conversation_id,),
-            )
-            conv = cur.fetchone()
-            if not conv:
-                conn.close()
-                raise HTTPException(404, "Session not found")
+                    # Validate join token (skip for host)
+                    if not is_host:
+                        token_valid = join_token and str(conv["join_token"]) == str(join_token)
+                        if not token_valid:
+                            raise HTTPException(403, "Invalid join token")
 
-            # Validate join token (skip for host)
-            if not is_host:
-                token_valid = join_token and str(conv["join_token"]) == str(join_token)
-                if not token_valid:
-                    conn.close()
-                    raise HTTPException(403, "Invalid join token")
+                    # Validate session state
+                    if conv["is_session_ended"]:
+                        raise HTTPException(400, "This session has already ended")
+                    if conv["status"] and conv["status"] != "active":
+                        raise HTTPException(400, "This session is not currently active")
 
-            # Validate session state
-            if conv["is_session_ended"]:
-                conn.close()
-                raise HTTPException(400, "This session has already ended")
-            if conv["status"] and conv["status"] != "active":
-                conn.close()
-                raise HTTPException(400, "This session is not currently active")
+                    # 2. Count actual participants (source of truth)
+                    _cnt = await conn.fetchrow(
+                        'SELECT COUNT(*) FROM public.session_participants WHERE conversation_id = $1',
+                        conversation_id,
+                    )
+                    actual_count = _cnt[0] if _cnt else 0
+                    max_participants = conv["participants"] or 0
 
-            # 2. Count actual participants (source of truth)
-            cur.execute(
-                'SELECT COUNT(*) as cnt FROM public.session_participants WHERE conversation_id = %s',
-                (conversation_id,),
-            )
-            actual_count = cur.fetchone()["cnt"]
-            max_participants = conv["participants"] or 0
+                    if max_participants > 0 and actual_count >= max_participants and not is_host:
+                        raise HTTPException(400, "This session is full")
 
-            if max_participants > 0 and actual_count >= max_participants and not is_host:
-                conn.close()
-                raise HTTPException(400, "This session is full")
+                    new_participant_id = actual_count + 1
 
-            new_participant_id = actual_count + 1
+                    # 3. Insert participant + update count + log event atomically
+                    await conn.execute(
+                        """
+                        INSERT INTO public.session_participants
+                            (conversation_id, participant_id, name, avatar_seed, is_anonymous, is_host)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        ON CONFLICT (conversation_id, participant_id) DO NOTHING
+                        """,
+                        conversation_id, new_participant_id, participant_name,
+                        avatar_seed, is_anonymous, is_host,
+                    )
 
-            # 3. Insert participant + update count + log event atomically
-            cur.execute(
-                """
-                INSERT INTO public.session_participants
-                    (conversation_id, participant_id, name, avatar_seed, is_anonymous, is_host)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (conversation_id, participant_id) DO NOTHING
-                """,
-                (conversation_id, new_participant_id, participant_name,
-                 avatar_seed, is_anonymous, is_host),
-            )
+                    await conn.execute(
+                        """
+                        UPDATE public.conversations
+                        SET current_participants = (
+                            SELECT COUNT(*) FROM public.session_participants
+                            WHERE conversation_id = $1
+                        )
+                        WHERE id = $2
+                        """,
+                        conversation_id, conversation_id,
+                    )
 
-            cur.execute(
-                """
-                UPDATE public.conversations
-                SET current_participants = (
-                    SELECT COUNT(*) FROM public.session_participants
-                    WHERE conversation_id = %s
-                )
-                WHERE id = %s
-                """,
-                (conversation_id, conversation_id),
-            )
-
-            cur.execute(
-                """
-                INSERT INTO public.session_events
-                    (conversation_id, event_type, data)
-                VALUES (%s, 'participant_joined', %s::jsonb)
-                """,
-                (
-                    conversation_id,
-                    json.dumps({
-                        "participant_id": new_participant_id,
-                        "participant_name": participant_name,
-                        "avatar_seed": avatar_seed,
-                        "is_anonymous": is_anonymous,
-                        "is_host": is_host,
-                        "timestamp": datetime.utcnow().isoformat(),
-                    }),
-                ),
-            )
-
-            conn.commit()
-            conn.close()
+                    await conn.execute(
+                        """
+                        INSERT INTO public.session_events
+                            (conversation_id, event_type, data)
+                        VALUES ($1, 'participant_joined', $2::jsonb)
+                        """,
+                        conversation_id,
+                        json.dumps({
+                            "participant_id": new_participant_id,
+                            "participant_name": participant_name,
+                            "avatar_seed": avatar_seed,
+                            "is_anonymous": is_anonymous,
+                            "is_host": is_host,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }),
+                    )
 
             log_session.info(
                 "join-session: SUCCESS conv_id=%s participant_id=%s name=%r is_host=%s",
@@ -3694,38 +3485,35 @@ async def stripe_webhook(request: Request):
     log_stripe.info("webhook received: %s", event_type)
 
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        if event_type == "payment_intent.succeeded":
-            pi = event_data
-            user_id = pi.get("metadata", {}).get("user_id")
-            plan_id = pi.get("metadata", {}).get("plan_id")
-            customer_id = pi.get("customer")
-            if user_id and plan_id:
-                cur.execute(
-                    "UPDATE profiles SET current_plan_id = %s, subscription_status = 'active', stripe_customer_id = COALESCE(%s, stripe_customer_id), stripe_subscription_id = COALESCE(%s, stripe_subscription_id), updated_at = NOW() WHERE id = %s",
-                    (plan_id, customer_id, pi.get("id"), user_id),
-                )
-        elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
-            sub = event_data
-            customer_id = sub.get("customer")
-            status = sub.get("status")
-            db_status = "active" if status == "active" else ("past_due" if status == "past_due" else ("canceled" if status in ("canceled", "unpaid") else status))
-            if customer_id:
-                cur.execute("UPDATE profiles SET subscription_status = %s, stripe_subscription_id = %s, updated_at = NOW() WHERE stripe_customer_id = %s", (db_status, sub.get("id"), customer_id))
-        elif event_type == "customer.subscription.deleted":
-            sub = event_data
-            customer_id = sub.get("customer")
-            if customer_id:
-                cur.execute("UPDATE profiles SET subscription_status = 'canceled', stripe_subscription_id = NULL, current_plan_id = (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1), updated_at = NOW() WHERE stripe_customer_id = %s", (customer_id,))
-        elif event_type == "invoice.payment_failed":
-            inv = event_data
-            customer_id = inv.get("customer")
-            if customer_id:
-                cur.execute("UPDATE profiles SET subscription_status = 'past_due', updated_at = NOW() WHERE stripe_customer_id = %s", (customer_id,))
-        conn.commit()
-        cur.close()
-        conn.close()
+        async with _pool.acquire() as conn:
+            async with conn.transaction():
+                if event_type == "payment_intent.succeeded":
+                    pi = event_data
+                    user_id = pi.get("metadata", {}).get("user_id")
+                    plan_id = pi.get("metadata", {}).get("plan_id")
+                    customer_id = pi.get("customer")
+                    if user_id and plan_id:
+                        await conn.execute(
+                            "UPDATE profiles SET current_plan_id = $1, subscription_status = 'active', stripe_customer_id = COALESCE($2, stripe_customer_id), stripe_subscription_id = COALESCE($3, stripe_subscription_id), updated_at = NOW() WHERE id = $4",
+                            plan_id, customer_id, pi.get("id"), user_id,
+                        )
+                elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
+                    sub = event_data
+                    customer_id = sub.get("customer")
+                    status = sub.get("status")
+                    db_status = "active" if status == "active" else ("past_due" if status == "past_due" else ("canceled" if status in ("canceled", "unpaid") else status))
+                    if customer_id:
+                        await conn.execute("UPDATE profiles SET subscription_status = $1, stripe_subscription_id = $2, updated_at = NOW() WHERE stripe_customer_id = $3", db_status, sub.get("id"), customer_id)
+                elif event_type == "customer.subscription.deleted":
+                    sub = event_data
+                    customer_id = sub.get("customer")
+                    if customer_id:
+                        await conn.execute("UPDATE profiles SET subscription_status = 'canceled', stripe_subscription_id = NULL, current_plan_id = (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1), updated_at = NOW() WHERE stripe_customer_id = $1", customer_id)
+                elif event_type == "invoice.payment_failed":
+                    inv = event_data
+                    customer_id = inv.get("customer")
+                    if customer_id:
+                        await conn.execute("UPDATE profiles SET subscription_status = 'past_due', updated_at = NOW() WHERE stripe_customer_id = $1", customer_id)
     except Exception as e:
         log_stripe.error("webhook DB error for event %s: %s", event_type, e, exc_info=True)
         traceback.print_exc()

@@ -703,7 +703,8 @@ class SharedWSManager {
   private channels = new Map<string, RealtimeChannelImpl>();
   private ref = 0;
   private retryCount = 0;
-  private readonly MAX_RETRIES = 8;
+  // No hard cap — reconnect indefinitely with capped backoff (max 60 s between attempts)
+  private readonly MAX_BACKOFF_MS = 60_000;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private ping: ReturnType<typeof setInterval> | null = null;
   private connecting = false;
@@ -715,6 +716,18 @@ class SharedWSManager {
     } else {
       this.ensureConnected();
     }
+  }
+
+  /** Force an immediate reconnect attempt (e.g. when the user clicks "Retry"). */
+  forceReconnect(): void {
+    // Clear any pending reconnect timer and reset backoff counter so the
+    // next attempt happens immediately instead of waiting up to 60 s.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.retryCount = 0;
+    if (this.channels.size > 0) this.ensureConnected();
   }
 
   unregister(ch: RealtimeChannelImpl): void {
@@ -791,8 +804,9 @@ class SharedWSManager {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
-    if (this.retryCount >= this.MAX_RETRIES) return;
-    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), 60_000);
+    // Exponential backoff capped at MAX_BACKOFF_MS — no hard retry limit so
+    // the connection is always re-established after transient network issues.
+    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), this.MAX_BACKOFF_MS);
     this.retryCount++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -867,6 +881,13 @@ export const api = {
   },
   removeChannel(channel: RealtimeChannel): void {
     channel.unsubscribe();
+  },
+  /**
+   * Force an immediate WebSocket reconnect, resetting the backoff counter.
+   * Call this when the user manually clicks "Retry Connection".
+   */
+  forceReconnect(): void {
+    sharedWS.forceReconnect();
   },
 };
 

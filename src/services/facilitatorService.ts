@@ -52,7 +52,7 @@ export const createConversation = async (params: {
     .from('sessions')
     .select('id, lock, facilitator:facilitators!inner(id, plan_id, lock)')
     .eq('id', params.workshopId)
-    .single();
+    .maybeSingle();
 
   if (sessionError) throw sessionError;
 

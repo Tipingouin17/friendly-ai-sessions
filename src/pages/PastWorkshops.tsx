@@ -30,7 +30,10 @@ const calculateDuration = (workshop: Workshop): number => {
     return workshop.session_duration_minutes;
   }
   if (workshop.created_at && workshop.ended_at) {
-    return Math.max(1, differenceInMinutes(new Date(workshop.ended_at), new Date(workshop.created_at)));
+    const diff = differenceInMinutes(new Date(workshop.ended_at), new Date(workshop.created_at));
+    // Cap at 480 minutes (8 hours) to avoid showing absurd durations for sessions
+    // that were left open for days (e.g. ended via direct DB update without proper closure)
+    return diff > 480 ? 0 : Math.max(1, diff);
   }
   return 0;
 };
@@ -98,7 +101,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
     }
   };
 
-  const participantCount = workshop.participants || 0;
+  const participantCount = workshop.current_participants ?? workshop.participants ?? 0;
   const messageCount = workshop.total_messages || 0;
   const duration = calculateDuration(workshop);
   const title = getWorkshopTitle(workshop);
@@ -352,8 +355,8 @@ const PastWorkshops = () => {
 
   // Aggregate stats
   const totalSessions = (pastWorkshops?.length || 0) + (activeWorkshops?.length || 0);
-  const totalParticipants = (pastWorkshops || []).reduce((s, w) => s + (w.participants || 0), 0);
-  const totalMessages = (pastWorkshops || []).reduce((s, w) => s + (w.total_messages || 0), 0);
+  const totalParticipants = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.current_participants ?? 0), 0);
+  const totalMessages = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.total_messages || 0), 0);
   const avgEngagement = pastWorkshops?.length
     ? ((pastWorkshops.reduce((s, w) => s + (w.participant_engagement_score || 0), 0) / pastWorkshops.length)).toFixed(1)
     : '—';

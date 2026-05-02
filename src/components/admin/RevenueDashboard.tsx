@@ -296,6 +296,13 @@ export const RevenueDashboard = () => {
                         <CardDescription>Monthly revenue and new user acquisition</CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {revenue?.monthlyRevenue?.every(m => m.revenue === 0 && m.newUsers === 0) ? (
+                            <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                                <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
+                                <p className="text-sm font-medium">No revenue data yet</p>
+                                <p className="text-xs mt-1">Revenue will appear here once subscriptions are active</p>
+                            </div>
+                        ) : (
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={revenue?.monthlyRevenue}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -322,6 +329,7 @@ export const RevenueDashboard = () => {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -335,6 +343,13 @@ export const RevenueDashboard = () => {
                         <CardDescription>Monthly revenue breakdown</CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {!revenue?.revenueByPlan?.length ? (
+                            <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                                <DollarSign className="h-12 w-12 mb-3 opacity-20" />
+                                <p className="text-sm font-medium">No plan revenue data yet</p>
+                                <p className="text-xs mt-1">Revenue breakdown will appear once paid subscriptions are active</p>
+                            </div>
+                        ) : (
                         <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={revenue?.revenueByPlan}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -346,6 +361,7 @@ export const RevenueDashboard = () => {
                                 <Bar dataKey="users" fill="#3b82f6" name="Users" />
                             </BarChart>
                         </ResponsiveContainer>
+                        )}
                     </CardContent>
                 </Card>
             </div>

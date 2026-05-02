@@ -57,16 +57,28 @@ export const useEnhancedSessionMessages = ({
         return;
       }
 
-      const formattedMessages: Message[] = (messagesData || []).map(msg => ({
-        id: msg.id.toString(),
-        content: typeof msg.content === 'string' ? msg.content : (msg.content && typeof msg.content === 'object' && 'text' in msg.content ? String(msg.content.text) : ''),
-        sender: msg.role === 'assistant' ? 'assistant' : 'user',
-        timestamp: new Date(msg.created_at),
-        participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
-        name: msg.name || undefined,
-        avatar: typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content) && 'avatar' in msg.content ? String(msg.content.avatar) : undefined,
-        role: msg.role || 'user'
-      }));
+      const formattedMessages: Message[] = (messagesData || []).map(msg => {
+        // Normalise content: may arrive as JSONB object, JSON string, or plain string
+        let parsedContent: Record<string, unknown> | null = null;
+        if (typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content)) {
+          parsedContent = msg.content as Record<string, unknown>;
+        } else if (typeof msg.content === 'string') {
+          try {
+            const p = JSON.parse(msg.content);
+            if (p && typeof p === 'object' && !Array.isArray(p)) parsedContent = p as Record<string, unknown>;
+          } catch { /* plain text string — leave parsedContent null */ }
+        }
+        return {
+          id: msg.id.toString(),
+          content: parsedContent && 'text' in parsedContent ? String(parsedContent.text) : (typeof msg.content === 'string' ? msg.content : ''),
+          sender: msg.role === 'assistant' ? 'assistant' : 'user',
+          timestamp: new Date(msg.created_at),
+          participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
+          name: msg.name || undefined,
+          avatar: parsedContent && 'avatar' in parsedContent ? String(parsedContent.avatar) : undefined,
+          role: msg.role || 'user'
+        };
+      });
 
       // Deduplicate by ID before updating state (prevents duplicate rows from multiple triggers)
       const seen = new Set<string>();

@@ -87,9 +87,18 @@ export const useMessageFetching = ({
       }
 
       const formattedMessages: Message[] = (messagesData || []).map(msg => {
-        const contentObj = typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content) ? msg.content as Record<string, unknown> : null;
-        const textContent = typeof msg.content === 'string' ? msg.content : (contentObj && 'text' in contentObj ? String(contentObj.text) : '');
-        const isPrivateToHost = contentObj ? Boolean(contentObj.private_to_host) : false;
+        // Normalise content: may arrive as JSONB object, JSON string, or plain string
+        let parsedContent: Record<string, unknown> | null = null;
+        if (typeof msg.content === 'object' && msg.content && !Array.isArray(msg.content)) {
+          parsedContent = msg.content as Record<string, unknown>;
+        } else if (typeof msg.content === 'string') {
+          try {
+            const p = JSON.parse(msg.content);
+            if (p && typeof p === 'object' && !Array.isArray(p)) parsedContent = p as Record<string, unknown>;
+          } catch { /* plain text string — leave parsedContent null */ }
+        }
+        const textContent = parsedContent && 'text' in parsedContent ? String(parsedContent.text) : (typeof msg.content === 'string' ? msg.content : '');
+        const isPrivateToHost = parsedContent ? Boolean(parsedContent.private_to_host) : false;
         return {
           id: msg.id.toString(),
           content: textContent,
@@ -97,7 +106,7 @@ export const useMessageFetching = ({
           timestamp: new Date(msg.created_at),
           participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
           name: msg.name || undefined,
-          avatar: contentObj && 'avatar' in contentObj ? String(contentObj.avatar) : undefined,
+          avatar: parsedContent && 'avatar' in parsedContent ? String(parsedContent.avatar) : undefined,
           role: msg.role || 'user',
           isPrivateToHost,
         };

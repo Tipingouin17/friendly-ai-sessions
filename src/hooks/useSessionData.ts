@@ -5,6 +5,9 @@
  */
 
 import { useRef, useEffect } from "react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useSessionData', 'session');
 import { useNavigate } from "react-router-dom";
 import { useConversation } from "@/hooks/useConversation";
 import { useConversationId, LocationStateType } from "@/hooks/useConversationId";

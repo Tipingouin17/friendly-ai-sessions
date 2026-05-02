@@ -5,6 +5,10 @@
  * Includes participant engagement controls (skip, pause, message host).
  */
 
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('InputFooter', 'session');
+
 import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";

@@ -5,6 +5,9 @@
  */
 
 import { Button } from "@/components/ui/button";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('WorkshopSetup', 'session');
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";

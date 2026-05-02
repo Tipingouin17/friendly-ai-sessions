@@ -3,6 +3,10 @@
  *
  * Hook for the AIfacilitator application.
  */
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useJoinSessionState', 'session');
+
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useParticipantPersistence } from './useParticipantPersistence';

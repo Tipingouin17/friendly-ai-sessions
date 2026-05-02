@@ -5,6 +5,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('Checkout', 'plan');
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from "@/lib/api";

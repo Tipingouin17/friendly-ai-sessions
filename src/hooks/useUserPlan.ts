@@ -13,6 +13,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('useUserPlan', 'plan');
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { Plan } from "@/pages/pricing/types";
@@ -221,6 +224,7 @@ export const useUserPlan = (): UserPlanDetails => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['userPlan', user?.id],
     queryFn: async () => {
+      log.log('fetching user plan...');
       if (!user) throw new Error("User not authenticated");
 
       try {

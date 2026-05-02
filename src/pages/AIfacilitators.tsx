@@ -15,6 +15,10 @@ import { WorkshopSetup } from "@/components/facilitator/WorkshopSetup";
 import { PlanLimitAlert } from "@/components/facilitator/PlanLimitAlert";
 import { StepNavigation } from "@/components/facilitator/StepNavigation";
 import { CreateWorkshopModal } from "@/components/facilitator/CreateWorkshopModal";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('AIfacilitators', 'plan');
+
 import { useState, useEffect } from "react";
 import { clearAllParticipantState } from "@/lib/api";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";

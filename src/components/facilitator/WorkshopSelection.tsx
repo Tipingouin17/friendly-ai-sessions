@@ -4,6 +4,9 @@
  * Facilitator component for the AIfacilitator application.
  */
 import { ChevronLeft, ChevronRight, Plus, BookOpen, GraduationCap, Brain, Puzzle, Microscope, Sparkles } from "lucide-react";
+import { createLogger } from '@/utils/debugLogger';
+
+const log = createLogger('WorkshopSelection', 'session');
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

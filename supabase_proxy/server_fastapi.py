@@ -2277,7 +2277,11 @@ async def rest_table(table: str, request: Request):
                             log_session.warning("conversations POST: session lock check failed: %s", _lock_err)
 
                 def _adapt(d):
-                    return [json.dumps(v) if isinstance(v, (dict, list)) else v for v in d.values()]
+                    # asyncpg handles Python lists natively as PostgreSQL arrays (TEXT[], INT[], etc.).
+                    # Only dicts need to be serialised to JSON strings for JSONB columns.
+                    # Passing a list as json.dumps() would produce a string, which asyncpg
+                    # then rejects when the target column is a real array type.
+                    return [json.dumps(v) if isinstance(v, dict) else v for v in d.values()]
 
                 if isinstance(data, list):
                     results = []

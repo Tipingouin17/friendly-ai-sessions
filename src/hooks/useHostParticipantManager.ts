@@ -247,6 +247,11 @@ export function useHostParticipantManager({
           if (onMaxParticipantsChange) {
             onMaxParticipantsChange(newMaxCount);
           }
+          // Auto-start: trigger when session reaches max capacity via polling
+          if (newMaxCount > 0 && newCurrentCount >= newMaxCount && !sessionStarted && onSessionFull) {
+            logger.category('admin', `Session full via polling: ${newCurrentCount}/${newMaxCount}`);
+            onSessionFull();
+          }
 
           // Fetch participant list
           await fetchParticipantList();
@@ -258,7 +263,7 @@ export function useHostParticipantManager({
         setError('Connection failed');
       }
     }, 5000); // 5 second polling instead of 30 seconds
-  }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, fetchParticipantList, logger]);
+  }, [conversationId, onParticipantCountChange, onMaxParticipantsChange, onSessionFull, fetchParticipantList, logger]);
 
   // Setup enhanced realtime subscription
   const setupEnhancedSubscription = useCallback(() => {
@@ -311,6 +316,11 @@ export function useHostParticipantManager({
             }
             if (sessionStarted && onSessionStarted) {
               onSessionStarted();
+            }
+            // Auto-start: trigger when session reaches max capacity via realtime
+            if (newMaxCount > 0 && newCurrentCount >= newMaxCount && !sessionStarted && onSessionFull) {
+              logger.category('admin', `Session full via realtime: ${newCurrentCount}/${newMaxCount}`);
+              onSessionFull();
             }
           }
         })
@@ -393,7 +403,7 @@ export function useHostParticipantManager({
       setError("Failed to establish enhanced connection");
       startFastPolling();
     }
-  }, [conversationId, enabled, canCreateConnection, cleanup, onParticipantCountChange, onMaxParticipantsChange, onSessionStarted, fetchParticipantList, processParticipantNotification, processSessionStartNotification, startFastPolling, logger]);
+  }, [conversationId, enabled, canCreateConnection, cleanup, onParticipantCountChange, onMaxParticipantsChange, onSessionStarted, onSessionFull, fetchParticipantList, processParticipantNotification, processSessionStartNotification, startFastPolling, logger]);
 
   // Initial data fetch
   const fetchInitialData = useCallback(async () => {

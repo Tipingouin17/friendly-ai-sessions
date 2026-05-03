@@ -112,6 +112,18 @@ const SessionContent: React.FC<{
     }
 
     if (props.error) {
+      if (isParticipant) {
+        // Route participant errors through the unified shell so they never see
+        // a different design.
+        return (
+          <ParticipantLoadingShell
+            phase="error"
+            errorMessage={props.error}
+            onRetry={() => props.refetch?.()}
+          />
+        );
+      }
+      // Admin/host: simple inline error card is fine
       return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">

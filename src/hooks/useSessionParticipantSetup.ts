@@ -85,8 +85,19 @@ export const useSessionParticipantSetup = ({
       
       const requestKey = `participants-${conversationId}`;
       
+      // NOTE: We do NOT pass the abortController.signal to requestDeduplicator.
+      // Passing it caused a loop: the deduplicator's internal abort would fire
+      // whenever the signal was aborted (e.g. on unmount), which deleted the
+      // pending request entry and allowed a new request to start immediately,
+      // which was then aborted again — producing the "The operation was aborted."
+      // loop visible in the console.  The abortController is still used on the
+      // Supabase query itself so that in-flight network requests are cancelled
+      // on unmount, but the deduplicator no longer listens to it.
       const result = await requestDeduplicator.deduplicate(requestKey, async () => {
         return await retryWithBackoff(async () => {
+          // Check abort before each attempt
+          if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
           const { data, error } = await api
             .from('session_participants')
             .select('*')
@@ -104,7 +115,7 @@ export const useSessionParticipantSetup = ({
           baseDelay: 1000,
           maxDelay: 3000
         });
-      }, abortController.signal);
+      });
       
       if (abortController.signal.aborted) {
         return;

@@ -217,11 +217,14 @@ async function apiFetch<T>(
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    // An authenticated participant joining someone else's session must send the
-    // join token so the backend can apply the participant-path access rules
-    // instead of the ownership filter (which would return 403 for non-owners).
-    if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Send the join token only when the user is NOT authenticated.
+    // When a JWT is present (host/admin), the backend uses ownership-based
+    // access control. Sending the join token alongside a JWT confuses the
+    // backend into applying participant-path rules for host queries (e.g.
+    // GET /conversations?user_id=eq.xxx), which causes spurious 401 errors.
+    // Unauthenticated participants (no JWT) still get the join token so they
+    // can read the session data they are allowed to access.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
 
     // Apply a 15-second timeout so Railway cold-start / network issues fail fast
     // instead of hanging indefinitely. The caller (React Query) will retry.

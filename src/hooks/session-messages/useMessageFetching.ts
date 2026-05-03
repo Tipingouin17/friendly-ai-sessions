@@ -383,21 +383,20 @@ export const useMessageFetching = ({
   // We track the ID of the last assistant message for which we already triggered a response,
   // so the trigger fires exactly once per AI question — even if the Host loads the page after
   // participants have already responded (in which case responseCount never passes through 0).
+  //
+  // MULTI-SESSION ISOLATION: Each instance of useMessageFetching has its own refs and state,
+  // so multiple Host tabs (one per session) are fully independent.
+  //
+  // STABILITY: generateAggregatedResponse is stored in a ref so it never appears in the
+  // dependency array of the auto-advance useEffect — this prevents spurious re-triggers
+  // when isGeneratingResponse toggles (which would recreate the callback reference).
   const autoAdvanceForMessageIdRef = useRef<string | null>(null);
+  const generateAggregatedResponseRef = useRef(generateAggregatedResponse);
+  useEffect(() => {
+    generateAggregatedResponseRef.current = generateAggregatedResponse;
+  }, [generateAggregatedResponse]);
 
   useEffect(() => {
-    console.log('[AUTO-ADVANCE] effect triggered', {
-      isWaitingForResponses,
-      isGeneratingResponse,
-      isSessionEnded: conversation?.is_session_ended,
-      totalParticipants,
-      excludedCount,
-      responseCount,
-      skippedCount,
-      messagesCount: messagesRef.current.length,
-      autoAdvanceForMessageId: autoAdvanceForMessageIdRef.current,
-    });
-
     if (!isWaitingForResponses || isGeneratingResponse || conversation?.is_session_ended) return;
 
     // Effective participant count excludes only paused participants
@@ -407,23 +406,16 @@ export const useMessageFetching = ({
 
     // Find the ID of the last assistant message (the question we are answering)
     const lastAssistantMsg = [...messagesRef.current].reverse().find(m => m.sender === 'assistant');
-    if (!lastAssistantMsg) {
-      console.log('[AUTO-ADVANCE] no last assistant message found');
-      return;
-    }
-
-    console.log('[AUTO-ADVANCE] lastAssistantMsg.id =', lastAssistantMsg.id, 'autoAdvanceForMessageIdRef =', autoAdvanceForMessageIdRef.current);
+    if (!lastAssistantMsg) return;
 
     // Only trigger once per assistant message — prevents duplicate calls
-    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) {
-      console.log('[AUTO-ADVANCE] already triggered for this message, skipping');
-      return;
-    }
+    // This also ensures correct behaviour when the Host opens the page AFTER
+    // participants have already responded (responseCount never passes through 0).
+    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) return;
 
-    console.log('[AUTO-ADVANCE] TRIGGERING generateAggregatedResponse for message', lastAssistantMsg.id);
     autoAdvanceForMessageIdRef.current = lastAssistantMsg.id;
-    generateAggregatedResponse();
-  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse, conversation?.is_session_ended]);
+    generateAggregatedResponseRef.current();
+  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, conversation?.is_session_ended]);
 
   return {
     messages,

@@ -106,7 +106,12 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   // Trigger welcome message wait when session starts
   useEffect(() => {
     if (!isAdmin && sessionStartedInDB && !isWaitingForMessage && !messageReady) {
-      waitForWelcomeMessage();
+      waitForWelcomeMessage().catch((err) => {
+        // AbortError is expected when the component unmounts mid-flight — suppress it.
+        if (err?.name !== 'AbortError' && !err?.message?.toLowerCase().includes('abort')) {
+          console.error('[SessionViewSelector] waitForWelcomeMessage error:', err);
+        }
+      });
     }
   }, [isAdmin, sessionStartedInDB, isWaitingForMessage, messageReady, waitForWelcomeMessage]);
 

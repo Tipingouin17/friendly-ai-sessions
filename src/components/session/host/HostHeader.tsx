@@ -257,6 +257,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                 <SessionStatusBadge
                   isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
                   sessionStarted={isSessionStarted}
+                  isSessionEnded={isSessionEnded}
                 />
                 {isSessionStarted && !isSessionEnded && (
                   <span className="hidden sm:flex">

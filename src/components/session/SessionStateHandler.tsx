@@ -88,27 +88,27 @@ const SessionContent: React.FC<{
     }, [isAdmin, sessionStarted, transitionState.currentParticipants, toast, props.conversation, props.isSessionStartedInDB]);
 
     // ── Participant loading state ─────────────────────────────────────────────
-    // For participants: instead of showing <LoadingState> (which unmounts and
-    // causes a flash), we show <ParticipantLoadingShell phase="connecting"> so
-    // the SAME component stays mounted throughout the entire loading sequence.
+    // CRITICAL: Do NOT render <ParticipantLoadingShell> here for participants.
+    // If we do, React mounts one instance here, then unmounts it and mounts a
+    // NEW instance inside <SessionViewSelector> once isLoading becomes false.
+    // That unmount/remount causes the white flash.
+    //
+    // Instead, we pass `isParticipantLoading` down to SessionViewSelector so it
+    // can keep the SAME <ParticipantLoadingShell> mounted with phase="connecting"
+    // throughout the entire pre-session flow.
     const isParticipant = !isAdmin && !isOnAdminPath;
 
     if (props.isLoading) {
-      if (isParticipant) {
-        // Keep the unified shell mounted — no flash when loading completes
+      if (!isParticipant) {
+        // For admin/host: a simple spinner is fine (no flash concern)
         return (
-          <ParticipantLoadingShell
-            phase="connecting"
-            facilitatorTitle={props.conversation?.sessions?.facilitator_details?.title}
-          />
+          <div className="flex items-center justify-center min-h-screen bg-gray-50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          </div>
         );
       }
-      // For admin/host: a simple spinner is fine (no flash concern)
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-        </div>
-      );
+      // For participants: fall through to SessionViewSelector with isParticipantLoading=true
+      // so the same ParticipantLoadingShell instance stays mounted.
     }
 
     if (props.error) {
@@ -122,11 +122,14 @@ const SessionContent: React.FC<{
       );
     }
 
-    if (!props.conversation) {
+    // For participants: even when isLoading=true, we still need conversation data
+    // to render ParticipantLoadingShell (for the facilitator title). If we don't
+    // have it yet, show a minimal shell without the title.
+    if (!props.conversation && !isParticipant) {
       return <EmptyState />;
     }
 
-    if (!props.currentConversationId) {
+    if (!props.currentConversationId && !isParticipant) {
       return <EmptyState />;
     }
 
@@ -199,6 +202,7 @@ const SessionContent: React.FC<{
           sessionStarted={sessionStarted}
           isTransitioning={isTransitioning}
           shouldShowSession={shouldShowSession}
+          isParticipantLoading={isParticipant && !!props.isLoading}
           onStartSession={() => {
             toast({
               title: "Starting Session",

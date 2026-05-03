@@ -122,16 +122,17 @@ export const useWelcomeMessageGate = ({
       console.error('[WelcomeMessageGate] [AI-TRACKING] Error checking conversation status:', error);
     }
 
-    // Set up timeout (15 seconds for database trigger generation)
+    // Set up timeout (45 seconds — accounts for Railway cold start + OpenAI generation time).
+    // On timeout, set timeoutReached=true but keep isWaitingForMessage=false so the UI
+    // shows the timeout phase with a "Try Again" button instead of blocking indefinitely.
     timeoutRef.current = setTimeout(() => {
-      messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
-        messageReady: true, 
+        messageReady: false, 
         timeoutReached: true 
       }));
-    }, 15000);
+    }, 45000);
 
     // Listen for welcome message ready notification and status changes
     const channelName = `welcome-gate-${conversationId}-${Date.now()}`;

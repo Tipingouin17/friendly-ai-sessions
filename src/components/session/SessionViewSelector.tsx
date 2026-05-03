@@ -32,6 +32,8 @@ interface SessionViewSelectorProps {
   sessionStarted: boolean;
   isTransitioning: boolean;
   shouldShowSession: boolean;
+  /** When true, the participant data is still loading — show phase="connecting" */
+  isParticipantLoading?: boolean;
   onStartSession: () => void;
   onSessionFull: () => void;
 }
@@ -42,6 +44,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   sessionStarted,
   isTransitioning,
   shouldShowSession,
+  isParticipantLoading = false,
   onStartSession,
   onSessionFull
 }) => {
@@ -221,7 +224,11 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     // Determine which phase we're in
     let phase: ParticipantLoadingPhase;
 
-    if (!sessionStartedInDB) {
+    if (isParticipantLoading) {
+      // Data still loading — keep the shell mounted with connecting phase
+      // (same component instance, no unmount/remount = no flash)
+      phase = 'connecting';
+    } else if (!sessionStartedInDB) {
       // Host hasn't started the session yet
       phase = 'waiting_host';
     } else if (timeoutReached) {

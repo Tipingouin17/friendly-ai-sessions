@@ -4,7 +4,7 @@
  * Type definitions for the AIfacilitator application.
  */
 
-import { Database } from "@/integrations/api/types";
+import { Database } from "@/integrations/supabase/types";
 
 export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"] & {
   session_started: boolean;

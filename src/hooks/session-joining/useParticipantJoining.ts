@@ -109,7 +109,7 @@ export function useParticipantJoining() {
     // Sending it in the body ensures the backend always receives it.
     const joinToken =
       getJoinToken(String(conversationId)) ||
-      (conversation as any)?.join_token ||
+      conversation?.join_token ||
       null;
 
     // Single atomic backend call — replaces 7 sequential REST calls

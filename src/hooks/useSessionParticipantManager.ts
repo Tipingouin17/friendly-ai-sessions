@@ -78,7 +78,7 @@ export function useSessionParticipantManager({
     setError(null);
     setConnectionAttempts(prev => prev + 1);
     
-    const channelName = `participant-manager-${conversationId}-${Date.now()}`;
+    const channelName = `participant-manager-${conversationId}`;
     
     try {
       const channel = api

@@ -140,7 +140,7 @@ export const useWelcomeMessageGate = ({
     }, 45000);
 
     // Listen for welcome message ready notification and status changes
-    const channelName = `welcome-gate-${conversationId}-${Date.now()}`;
+    const channelName = `welcome-gate-${conversationId}`;
     channelRef.current = api
       .channel(channelName)
       .on('postgres_changes', {

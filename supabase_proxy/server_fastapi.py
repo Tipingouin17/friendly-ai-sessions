@@ -2224,7 +2224,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
 
     Algorithm:
       1. Load conversation + session metadata from DB.
-      2. Count expected participants (from conversations.max_participants).
+      2. Count expected participants (from conversations.participants).
       3. Find the last assistant message ID.
       4. Count distinct participant messages posted AFTER that last assistant message.
       5. If count >= expected participants → trigger AI response.
@@ -2243,7 +2243,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         async with _pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT c.id, c.is_session_ended, c.max_participants,
+                SELECT c.id, c.is_session_ended, c.participants,
                        c.language as conversation_language,
                        s.title, s.objective, s.prompt, s.scope,
                        s.gpt_version, s.max_tokens, s.randomness,
@@ -2266,7 +2266,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             log_session.debug("facilitator-bg: session %s already ended, skipping", conv_id)
             return
 
-        expected_participants = int(row.get("max_participants") or 1)
+        expected_participants = int(row.get("participants") or 1)
 
         # ── Check how many participants have answered since last AI message ──
         async with _pool.acquire() as conn:
@@ -2740,6 +2740,29 @@ async def rest_table(table: str, request: Request):
                 data = await request.json()
                 if not data:
                     raise HTTPException(400, "No data")
+                # H8: Validate join token for unauthenticated participant POST to messages.
+                # This prevents ghost participants from a previous conversation from
+                # accidentally posting messages to a different conversation.
+                if table == "messages" and join_token_header and not requesting_user_id:
+                    _msg_data = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else {})
+                    _msg_conv_id = _msg_data.get("conversation_id")
+                    if _msg_conv_id:
+                        _token_valid = await _validate_join_token(join_token_header, _msg_conv_id, conn)
+                        if not _token_valid:
+                            log_req.warning(
+                                "REST POST /messages -> 403 (invalid join token) conv_id=%s token_prefix=%s origin=%s",
+                                _msg_conv_id,
+                                join_token_header[:8] + "..." if join_token_header else "none",
+                                request.headers.get("origin", "-"),
+                            )
+                            return JSONResponse(
+                                content={
+                                    "error": "Invalid or missing session token",
+                                    "message": "The join token is invalid or does not match this session",
+                                    "code": "PGRST403",
+                                },
+                                status_code=403,
+                            )
                 # H7: Enforce per-plan question limit server-side for participant messages.
                 if table == "messages":
                     msg_data = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else {})

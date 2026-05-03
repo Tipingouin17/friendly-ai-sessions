@@ -119,7 +119,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   useEffect(() => {
     if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
 
-    const channelName = `participant-events-${props.currentConversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const channelName = `participant-events-${props.currentConversationId}-${props.currentUserParticipantId}`;
 
     try {
       const channel = api

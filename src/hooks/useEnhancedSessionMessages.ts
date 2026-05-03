@@ -158,14 +158,17 @@ export const useEnhancedSessionMessages = ({
   // Connection recovery mechanism — poll every 3s when unstable, every 5s as a safety net
   // even when the realtime connection is stable (guards against missed broadcasts).
   // Reduced from 8s/5s to 3s/5s for faster recovery when a broadcast is missed.
+  // Do NOT poll for ended sessions — one-time fetch is sufficient and prevents
+  // ghost participants from previous conversations from generating unnecessary traffic.
+  const isSessionEnded = conversation?.is_session_ended ?? false;
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || isSessionEnded) return;
     const interval = hasStableConnection ? 5000 : 3000;
     const fallbackInterval = setInterval(() => {
       fetchMessages(false); // throttled poll — won't fire if a force-refresh just ran
     }, interval);
     return () => clearInterval(fallbackInterval);
-  }, [hasStableConnection, conversationId, fetchMessages]);
+  }, [hasStableConnection, conversationId, fetchMessages, isSessionEnded]);
 
   // Enhanced message handler
   const handleNewMessage = useCallback((message: Message) => {

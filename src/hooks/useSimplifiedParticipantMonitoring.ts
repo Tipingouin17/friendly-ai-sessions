@@ -88,7 +88,7 @@ export function useSimplifiedParticipantMonitoring({
     
     setError(null);
     
-    const channelName = `participant-monitoring-${conversationId}-${Date.now()}`;
+    const channelName = `participant-monitoring-${conversationId}`;
     
     try {
       const channel = api

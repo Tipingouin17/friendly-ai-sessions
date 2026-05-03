@@ -3028,7 +3028,7 @@ async def edge_function(func_name: str, request: Request):
                     async with conn.transaction():
                         _row = await conn.fetchrow(
                             "INSERT INTO messages (conversation_id, content, role, name, prompt_tokens, completion_tokens, model_used) VALUES ($1, $2::jsonb, 'assistant', $3, $4, $5, $6) RETURNING id",
-                            conv_id, content_json, facilitator_name, _prompt_tokens, _completion_tokens, _model_used,
+                            conv_id, content_dict, facilitator_name, _prompt_tokens, _completion_tokens, _model_used,
                         )
                         msg_id = _row["id"]
                         if is_session_start:

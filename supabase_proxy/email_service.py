@@ -4,6 +4,7 @@ Uses Resend (https://resend.com) for transactional emails.
 Provides beautiful HTML email templates for:
   - Welcome / signup confirmation
   - Password reset
+  - Email address verification
 """
 import os
 import resend
@@ -118,6 +119,32 @@ def build_welcome_email(full_name: str, login_url: str) -> tuple[str, str]:
     return subject, _base_template(f"Welcome to AIfacilitator, {first}! Your account is ready.", body)
 
 
+# ── Email verification ────────────────────────────────────────────────────────
+def build_verification_email(full_name: str, verify_url: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for the email verification message."""
+    first = full_name.split()[0] if full_name else "there"
+    subject = "Verify your AIfacilitator email address"
+    body = f"""
+      <h1>Almost there, {first}! ✉️</h1>
+      <p>Thanks for signing up for AIfacilitator. To activate your account and start running AI-powered sessions, please verify your email address by clicking the button below:</p>
+
+      <div class="btn-wrap">
+        <a href="{verify_url}" class="btn">Verify Email Address →</a>
+      </div>
+
+      <div class="divider"></div>
+
+      <p class="small">⏱ <strong>This link expires in 24 hours.</strong></p>
+      <p class="small">If you didn't create an AIfacilitator account, you can safely ignore this email.</p>
+      <p class="small" style="margin-top:12px;">If the button doesn't work, copy and paste this link into your browser:</p>
+      <p class="small"><a href="{verify_url}" class="link">{verify_url}</a></p>
+    """
+    return subject, _base_template(
+        f"Verify your email to activate your AIfacilitator account, {first}.",
+        body,
+    )
+
+
 # ── Password reset email ──────────────────────────────────────────────────────
 def build_password_reset_email(full_name: str, reset_url: str) -> tuple[str, str]:
     """Returns (subject, html_body)."""
@@ -166,6 +193,12 @@ def send_email(to_email: str, subject: str, html: str) -> bool:
 def send_welcome_email(to_email: str, full_name: str) -> bool:
     login_url = f"{SITE_URL}/login"
     subject, html = build_welcome_email(full_name, login_url)
+    return send_email(to_email, subject, html)
+
+
+def send_verification_email(to_email: str, full_name: str, token: str) -> bool:
+    verify_url = f"{SITE_URL}/verify-email?token={token}"
+    subject, html = build_verification_email(full_name, verify_url)
     return send_email(to_email, subject, html)
 
 

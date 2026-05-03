@@ -6,7 +6,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
-import api from "@/lib/api";
+import api, { getJoinToken } from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 export function useSecureNavigation() {
@@ -29,7 +29,11 @@ export function useSecureNavigation() {
       console.error('Error clearing admin flags:', error);
     }
     
-    navigate(`/session?id=${conversationId}`, {
+    // Include the join token in the URL so it survives a cache/localStorage clear.
+    // The session page bootstraps the token synchronously from ?token= on first load.
+    const joinToken = getJoinToken(String(conversationId));
+    const tokenParam = joinToken ? `&token=${encodeURIComponent(joinToken)}` : '';
+    navigate(`/session?id=${conversationId}&name=${encodeURIComponent(name)}&participantId=${participantId}&avatarSeed=${avatarSeed}${tokenParam}`, {
       state: { 
         participantName: name,
         avatarSeed,

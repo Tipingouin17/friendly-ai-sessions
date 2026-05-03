@@ -179,6 +179,13 @@ export const useHostMessages = ({
         }, 500);
       }
     }, [triggerImmediateWelcomeGeneration]),
+    // Trigger an immediate re-fetch whenever a new message is inserted so the
+    // auto-advance logic in useMessageFetching sees the new AI message ID right
+    // away — without waiting for the 3-second polling interval.  This is what
+    // makes consecutive AI responses fire correctly.
+    onNewMessage: useCallback(() => {
+      fetchMessages();
+    }, [fetchMessages]),
     isHost: true
   });
 

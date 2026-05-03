@@ -106,7 +106,7 @@ const FacilitatorAvatar = ({
           className="object-cover rounded-xl"
           crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
         />
-        <AvatarFallback className="bg-blue-100 text-blue-500 rounded-xl">
+        <AvatarFallback className="p-0 bg-transparent rounded-xl">
           <InlineAvatar name={name} size={size} className="!rounded-xl" />
         </AvatarFallback>
       </Avatar>

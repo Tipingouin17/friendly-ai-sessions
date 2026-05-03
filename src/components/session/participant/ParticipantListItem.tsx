@@ -74,7 +74,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
         ) : participant.avatar ? (
           <Avatar className="h-8 w-8">
             <AvatarImage src={participant.avatar} alt={displayName} />
-            <AvatarFallback><InlineAvatar name={displayName} size="md" /></AvatarFallback>
+            <AvatarFallback className="p-0 bg-transparent"><InlineAvatar name={displayName} size="md" /></AvatarFallback>
           </Avatar>
         ) : (
           <InlineAvatar name={displayName} size="md" />

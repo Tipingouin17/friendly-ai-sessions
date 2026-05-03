@@ -27,7 +27,7 @@ export function useSessionEndListener(conversationId: number | null, isAdmin: bo
     if (!conversationId || !mountedRef.current || isAdmin) return;
     
     // Create a unique channel name to prevent stale connections
-    const channelName = `session-end-${conversationId}-${Date.now()}`;
+    const channelName = `session-end-${conversationId}`;
     
     const channel = api
       .channel(channelName)

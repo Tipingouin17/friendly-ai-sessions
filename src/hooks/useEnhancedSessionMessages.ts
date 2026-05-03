@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Message } from '@/types/chat';
 import { useStableRealtimeConnection } from './useStableRealtimeConnection';
 import { useMessageDeliveryTracker } from './useMessageDeliveryTracker';
@@ -30,14 +30,15 @@ export const useEnhancedSessionMessages = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const lastFetchTimeRef = useRef<number>(0);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0); // kept for connectionStatus only
 
   // Enhanced message fetching
   const fetchMessages = useCallback(async (forceRefresh = false) => {
     if (!conversationId) return;
 
     const now = Date.now();
-    if (!forceRefresh && now - lastFetchTime < 1000) {
+    if (!forceRefresh && now - lastFetchTimeRef.current < 1000) {
       return;
     }
 
@@ -97,6 +98,7 @@ export const useEnhancedSessionMessages = ({
         return prev;
       });
       
+      lastFetchTimeRef.current = now;
       setLastFetchTime(now);
     } catch (err) {
       console.error('Exception fetching messages:', err);
@@ -104,7 +106,8 @@ export const useEnhancedSessionMessages = ({
     } finally {
       setIsLoading(false);
     }
-  }, [conversationId, lastFetchTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]); // lastFetchTime intentionally excluded — use ref to avoid stale closure recreation
 
   // Stable realtime connection
   const { isConnected, hasStableConnection, forceReconnect } = useStableRealtimeConnection({
@@ -143,15 +146,15 @@ export const useEnhancedSessionMessages = ({
   // NOTE: Removed redundant delayed participant fetch (was causing duplicate renders).
   // The initial fetch + realtime subscription already covers this case.
 
-  // Connection recovery mechanism
+  // Connection recovery mechanism — poll every 5s when unstable, every 8s as a safety net
+  // even when the realtime connection is stable (guards against missed broadcasts).
   useEffect(() => {
-    if (!hasStableConnection && conversationId) {
-      const fallbackInterval = setInterval(() => {
-        fetchMessages(true);
-      }, 5000); // Poll every 5 seconds when connection is unstable
-      
-      return () => clearInterval(fallbackInterval);
-    }
+    if (!conversationId) return;
+    const interval = hasStableConnection ? 8000 : 5000;
+    const fallbackInterval = setInterval(() => {
+      fetchMessages(false); // throttled poll — won't fire if a force-refresh just ran
+    }, interval);
+    return () => clearInterval(fallbackInterval);
   }, [hasStableConnection, conversationId, fetchMessages]);
 
   // Enhanced message handler

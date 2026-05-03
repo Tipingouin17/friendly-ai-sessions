@@ -4196,6 +4196,28 @@ async def edge_function(func_name: str, request: Request):
                 conversation_id, new_participant_id, participant_name, is_host,
             )
             is_rejoining = existing_slot is not None
+            # Broadcast participant join/rejoin event to all WebSocket subscribers
+            # so the host dashboard updates in real-time without polling.
+            _participant_broadcast = {
+                "conversation_id": str(conversation_id),
+                "participant_id": new_participant_id,
+                "name": participant_name,
+                "avatar_seed": avatar_seed,
+                "is_anonymous": is_anonymous,
+                "is_host": is_host,
+                "is_rejoining": is_rejoining,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            asyncio.create_task(manager.broadcast(str(conversation_id), {
+                "event": "INSERT",
+                "payload": {
+                    "eventType": "INSERT",
+                    "new": _participant_broadcast,
+                    "old": {},
+                    "table": "session_participants",
+                    "schema": "public",
+                },
+            }))
             # Fire-and-forget: trigger AI welcome message generation only for
             # first-time joins (not rejoins) to avoid duplicate welcome messages.
             if not is_host and not is_rejoining:

@@ -21,7 +21,7 @@ import ParticipantLoadingShell, { ParticipantLoadingPhase } from "./ParticipantL
 import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-import api from "@/lib/api";
+import api, { clearAllParticipantState } from "@/lib/api";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
 import { useSecurityAudit } from "@/hooks/useSecurityAudit";
 import { useWelcomeMessageGate } from "@/hooks/useWelcomeMessageGate";
@@ -153,7 +153,11 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
             setTimeout(() => {
               try {
-                localStorage.removeItem('participant_session');
+                // Clear ALL scoped participant state (mf_join_token_N,
+                // participantSessionData_N) so the removed participant cannot
+                // silently rejoin using their stale cached token/slot.
+                clearAllParticipantState();
+                localStorage.removeItem('participant_session'); // legacy key
                 sessionStorage.removeItem('isAdminSession');
               } catch (err) {
                 console.error("Error clearing session storage:", err);

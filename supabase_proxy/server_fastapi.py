@@ -2897,6 +2897,35 @@ async def rest_table(table: str, request: Request):
                     sql += " WHERE " + " AND ".join(new_wc_parts)
                 sql += " RETURNING *"
                 rows = [serialize_row(dict(r)) for r in await conn.fetch(sql, *wv)]
+                # When a participant is removed from a conversation, clear all
+                # messages for that conversation so the next participant starts
+                # with a clean slate (no stale messages from the previous participant).
+                if table == "session_participants" and rows:
+                    for removed_row in rows:
+                        _conv_id = str(removed_row.get("conversation_id", ""))
+                        _part_id = removed_row.get("participant_id") or removed_row.get("id")
+                        if _conv_id:
+                            async with _pool.acquire() as _del_conn:
+                                await _del_conn.execute(
+                                    "DELETE FROM messages WHERE conversation_id = $1",
+                                    int(_conv_id),
+                                )
+                            log_session.info(
+                                "participant-remove: cleared messages for conv=%s (removed participant=%s)",
+                                _conv_id, _part_id,
+                            )
+                            # Broadcast a RESET event so connected clients clear
+                            # their local message state immediately.
+                            asyncio.create_task(manager.broadcast(_conv_id, {
+                                "event": "DELETE",
+                                "payload": {
+                                    "eventType": "DELETE",
+                                    "new": {},
+                                    "old": {"conversation_id": _conv_id},
+                                    "table": "messages",
+                                    "schema": "public",
+                                },
+                            }))
                 return rows
 
             raise HTTPException(405, "Method not allowed")

@@ -120,24 +120,32 @@ _app_placeholder = None
 # ============================================================
 # CORS
 # ============================================================
+# The hardcoded list is always included so that known Vercel preview URLs
+# and local dev origins work even when ALLOWED_ORIGINS env var is set.
+# The env var EXTENDS the hardcoded list rather than replacing it.
+_CORS_HARDCODED = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://friendly-ai-sessions.vercel.app",
+    "https://aifacilitator.vercel.app",
+    "https://aifacilitator-git-dev-tipingouin17s-projects.vercel.app",
+    "https://aifacilitator-git-main-tipingouin17s-projects.vercel.app",
+    "https://aifacilitator-tipingouin17s-projects.vercel.app",
+    "https://aifacilitator-dev.vercel.app",
+    "https://aifacilitator.ai",
+    "https://www.aifacilitator.ai",
+]
 _cors_env = os.environ.get("ALLOWED_ORIGINS", "")
-ALLOWED_CORS_ORIGINS = (
-    [o.strip() for o in _cors_env.split(",") if o.strip()]
-    if _cors_env
-    else [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "https://friendly-ai-sessions.vercel.app",
-        "https://aifacilitator.vercel.app",
-        "https://aifacilitator-git-dev-tipingouin17s-projects.vercel.app",
-        "https://aifacilitator-git-main-tipingouin17s-projects.vercel.app",
-        "https://aifacilitator-tipingouin17s-projects.vercel.app",
-        "https://aifacilitator-dev.vercel.app",
-        "https://aifacilitator.ai",
-        "https://www.aifacilitator.ai",
-    ]
-)
+_cors_extra = [o.strip() for o in _cors_env.split(",") if o.strip()] if _cors_env else []
+# Deduplicate while preserving order (hardcoded first, env extras appended)
+_cors_seen: set = set()
+_cors_merged: list = []
+for _o in _CORS_HARDCODED + _cors_extra:
+    if _o not in _cors_seen:
+        _cors_seen.add(_o)
+        _cors_merged.append(_o)
+ALLOWED_CORS_ORIGINS = _cors_merged
 
 # ============================================================
 # Database configuration
@@ -1113,11 +1121,21 @@ def resolve_join(parent_table: str, join_spec, parent_rows: list, conn):
     pass
 
 
+_UUID_RE = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE,
+)
+
 def _coerce_value(v: str):
-    """Try to coerce a string query-param value to int or float so asyncpg
-    receives the correct Python type for INTEGER / NUMERIC columns.
-    UUIDs, booleans ('true'/'false'), and general strings are left as-is.
+    """Try to coerce a string query-param value to the correct Python type
+    so asyncpg receives the right type for each PostgreSQL column.
+    - Booleans: 'true'/'false' -> bool
+    - Integers: numeric strings -> int
+    - Floats: decimal strings -> float
+    - UUIDs: UUID-shaped strings -> uuid.UUID (avoids asyncpg text->uuid cast errors)
+    - Everything else: returned as-is (str)
     """
+    import uuid as _uuid_mod
     if not isinstance(v, str):
         return v
     # Boolean literals
@@ -1135,6 +1153,12 @@ def _coerce_value(v: str):
         return float(v)
     except (ValueError, TypeError):
         pass
+    # UUID — return a uuid.UUID object so asyncpg binds it to uuid columns correctly
+    if _UUID_RE.match(v):
+        try:
+            return _uuid_mod.UUID(v)
+        except ValueError:
+            pass
     return v
 
 

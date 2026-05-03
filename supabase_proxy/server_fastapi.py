@@ -1159,6 +1159,15 @@ def _coerce_value(v: str):
             return _uuid_mod.UUID(v)
         except ValueError:
             pass
+    # ISO 8601 datetime — asyncpg requires a datetime object for timestamptz columns.
+    # Handles formats like '2026-04-30T22:00:00.000Z' and '2026-04-30T22:00:00+00:00'.
+    if len(v) >= 19 and v[4:5] == '-' and v[7:8] == '-' and 'T' in v:
+        import datetime as _dt
+        _s = v.replace('Z', '+00:00')
+        try:
+            return _dt.datetime.fromisoformat(_s)
+        except ValueError:
+            pass
     return v
 
 

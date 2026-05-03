@@ -12,6 +12,7 @@ import { X, Crown, Loader2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import InlineAvatar from '@/components/chat/avatars/InlineAvatar';
 
 interface ParticipantListItemProps {
   participant: ParticipantInfo;
@@ -63,15 +64,21 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
     <div className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
       {/* Avatar */}
       <div className="relative shrink-0">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={participant.avatar} alt={displayName} />
-          <AvatarFallback
-            className="text-white text-xs font-semibold"
-            style={{ backgroundColor: participantColor }}
-          >
-            {participant.isHost ? <Crown className="h-3.5 w-3.5" /> : displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        {participant.isHost ? (
+          <Avatar className="h-8 w-8">
+            {participant.avatar && <AvatarImage src={participant.avatar} alt={displayName} />}
+            <AvatarFallback className="bg-indigo-100 text-indigo-600">
+              <Crown className="h-3.5 w-3.5" />
+            </AvatarFallback>
+          </Avatar>
+        ) : participant.avatar ? (
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={participant.avatar} alt={displayName} />
+            <AvatarFallback><InlineAvatar name={displayName} size="md" /></AvatarFallback>
+          </Avatar>
+        ) : (
+          <InlineAvatar name={displayName} size="md" />
+        )}
         {/* Activity dot */}
         <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${activityDotClass}`} />
       </div>

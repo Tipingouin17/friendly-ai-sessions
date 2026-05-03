@@ -1384,7 +1384,12 @@ async def generate_avatar(name: str = "?", variant: str = "beam", palette: int =
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        },
     )
 
 
@@ -4385,11 +4390,18 @@ async def stripe_webhook(request: Request):
 # Storage
 # ============================================================
 @app.get("/storage/v1/object/public/{filepath:path}")
-async def storage_public(filepath: str):
+async def storage_public(filepath: str, request: Request):
     full_path = os.path.join(STORAGE_DIR, filepath)
-    if os.path.exists(full_path):
-        return FileResponse(full_path)
-    raise HTTPException(404, "File not found")
+    if not os.path.exists(full_path):
+        raise HTTPException(404, "File not found")
+    origin = request.headers.get("origin", "*")
+    response = FileResponse(full_path)
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
 
 
 @app.post("/storage/v1/object/{bucket}/{filepath:path}")
@@ -4406,9 +4418,16 @@ async def storage_upload(bucket: str, filepath: str, request: Request):
 
 
 @app.head("/storage/v1/object/public/{bucket}/{filepath:path}")
-async def storage_head(bucket: str, filepath: str):
+async def storage_head(bucket: str, filepath: str, request: Request):
     exists = os.path.exists(os.path.join(STORAGE_DIR, bucket, filepath))
-    return Response(status_code=200 if exists else 404)
+    origin = request.headers.get("origin", "*")
+    headers = {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Credentials": "true",
+    }
+    return Response(status_code=200 if exists else 404, headers=headers)
 
 
 # ============================================================

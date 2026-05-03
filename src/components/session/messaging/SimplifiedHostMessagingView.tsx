@@ -6,6 +6,8 @@
  * control panel. The chat transcript is available as a secondary tab.
  */
 import React, { useState } from 'react';
+import { useInactivityTimer } from '@/hooks/useInactivityTimer';
+import InactivityAlert from '@/components/session/host/InactivityAlert';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +62,26 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [inactivityDismissed, setInactivityDismissed] = useState(false);
+
+  // Inactivity timer — purely indicative, never auto-triggers anything
+  const { elapsedSeconds, isInactive, pendingCount, resetTimer } = useInactivityTimer({
+    messages,
+    responseCount,
+    totalParticipants,
+    isWaitingForResponses,
+    isSessionEnded,
+    thresholdSeconds: 180, // 3 minutes — will be a configurable admin setting later
+  });
+
+  // Reset dismissed state whenever a new inactivity period starts
+  const handleDismissInactivity = () => {
+    setInactivityDismissed(true);
+  };
+  // Auto-un-dismiss when the timer resets (new question or all responded)
+  React.useEffect(() => {
+    if (!isInactive) setInactivityDismissed(false);
+  }, [isInactive]);
 
   // Show pre-session view if session hasn't started
   if (!isSessionStarted) {
@@ -270,6 +292,16 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     </Button>
                   )}
                 </div>
+              )}
+
+              {/* Inactivity alert — shown after 3 min of no new response */}
+              {isInactive && !inactivityDismissed && (
+                <InactivityAlert
+                  elapsedSeconds={elapsedSeconds}
+                  pendingCount={pendingCount}
+                  totalParticipants={totalParticipants}
+                  onDismiss={handleDismissInactivity}
+                />
               )}
 
               {/* Steer the AI Facilitator */}

@@ -2263,6 +2263,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
       5. If count >= expected participants → trigger AI response.
       6. Insert AI message, broadcast via WebSocket.
     """
+    log_session.info("facilitator-bg: CALLED for conv=%s", conv_id)
     try:
         # ── Idempotency guard ────────────────────────────────────────────────
         _now = time.time()
@@ -2900,7 +2901,16 @@ async def rest_table(table: str, request: Request):
                         # The function checks internally whether all expected participants have
                         # answered before generating a response (idempotent, mutex-protected).
                         if table == "messages" and conv_id and result.get("role") == "user":
+                            log_session.info(
+                                "REST POST /messages -> triggering AI facilitator for conv=%s msg_id=%s",
+                                conv_id, result.get("id"),
+                            )
                             asyncio.create_task(_maybe_generate_facilitator_response(int(conv_id)))
+                        elif table == "messages" and conv_id:
+                            log_session.debug(
+                                "REST POST /messages -> NOT triggering AI (role=%s conv=%s)",
+                                result.get("role"), conv_id,
+                            )
                     return JSONResponse(content=result, status_code=201)
 
             if request.method == "PATCH":

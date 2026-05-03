@@ -379,43 +379,17 @@ export const useMessageFetching = ({
     }
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
-  // Auto-advance logic: Trigger response when all participants have answered or skipped.
-  // We track the ID of the last assistant message for which we already triggered a response,
-  // so the trigger fires exactly once per AI question — even if the Host loads the page after
-  // participants have already responded (in which case responseCount never passes through 0).
+  // Auto-advance is now handled server-side via _maybe_generate_facilitator_response.
+  // The server triggers the AI response automatically after each participant message INSERT,
+  // making the cycle fully resilient (host tab does not need to be open).
   //
-  // MULTI-SESSION ISOLATION: Each instance of useMessageFetching has its own refs and state,
-  // so multiple Host tabs (one per session) are fully independent.
+  // The host page remains the entry point for:
+  //   - Manual host instructions (via the instruction input)
+  //   - Session report generation
+  //   - Pausing / skipping participants
   //
-  // STABILITY: generateAggregatedResponse is stored in a ref so it never appears in the
-  // dependency array of the auto-advance useEffect — this prevents spurious re-triggers
-  // when isGeneratingResponse toggles (which would recreate the callback reference).
+  // We keep autoAdvanceForMessageIdRef for backward compatibility with any code that reads it.
   const autoAdvanceForMessageIdRef = useRef<string | null>(null);
-  const generateAggregatedResponseRef = useRef(generateAggregatedResponse);
-  useEffect(() => {
-    generateAggregatedResponseRef.current = generateAggregatedResponse;
-  }, [generateAggregatedResponse]);
-
-  useEffect(() => {
-    if (!isWaitingForResponses || isGeneratingResponse || conversation?.is_session_ended) return;
-
-    // Effective participant count excludes only paused participants
-    const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedCount);
-    if (effectiveTotalParticipants <= 0) return;
-    if (responseCount < effectiveTotalParticipants) return;
-
-    // Find the ID of the last assistant message (the question we are answering)
-    const lastAssistantMsg = [...messagesRef.current].reverse().find(m => m.sender === 'assistant');
-    if (!lastAssistantMsg) return;
-
-    // Only trigger once per assistant message — prevents duplicate calls
-    // This also ensures correct behaviour when the Host opens the page AFTER
-    // participants have already responded (responseCount never passes through 0).
-    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) return;
-
-    autoAdvanceForMessageIdRef.current = lastAssistantMsg.id;
-    generateAggregatedResponseRef.current();
-  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, conversation?.is_session_ended]);
 
   return {
     messages,

@@ -2676,7 +2676,70 @@ async def edge_function(func_name: str, request: Request):
         generate_report = data.get("generateReport", False)
         host_instruction = (data.get("hostInstruction") or "").strip()
 
-        # Idempotency guard: prevent duplicate AI responses within 10 seconds
+        # ── SECURITY LAYER 1: JWT Authentication ──────────────────────────────
+        # Extract the caller's identity from the JWT in the Authorization header.
+        # The token is either:
+        #   - The Host's session JWT (authenticated user) — required for mid-session
+        #     AI triggers and report generation.
+        #   - The anon token — allowed ONLY for session start (welcome message), where
+        #     no authenticated user is present yet (the Host just created the session).
+        _jwt_caller = get_current_user(request)
+        _caller_id = (_jwt_caller.get("sub") or _jwt_caller.get("id")) if _jwt_caller else None
+
+        if conv_id and not is_session_start:
+            # Mid-session AI triggers MUST come from an authenticated user.
+            if not _caller_id:
+                log_session.warning(
+                    "handle-facilitator-response: unauthenticated request rejected for conv=%s",
+                    conv_id,
+                )
+                raise HTTPException(401, detail={"error": "Authentication required", "message": "A valid session token is required to trigger the AI facilitator."})
+
+            # ── SECURITY LAYER 2: Ownership Verification ──────────────────────
+            # Verify the caller owns this conversation OR is a system admin.
+            # This prevents a Host from triggering AI responses for another Host's session.
+            try:
+                async with _pool.acquire() as _auth_conn:
+                    _conv_owner = await _auth_conn.fetchrow(
+                        "SELECT user_id, is_session_ended FROM conversations WHERE id = $1",
+                        conv_id,
+                    )
+                if not _conv_owner:
+                    raise HTTPException(404, detail={"error": "Conversation not found", "message": f"No conversation with id={conv_id}"})
+
+                # ── SECURITY LAYER 3: Session State Validation ────────────────
+                # Refuse to generate AI content for an already-ended session.
+                if _conv_owner["is_session_ended"]:
+                    return {"success": True, "skipped": True, "reason": "session_already_ended"}
+
+                _conv_owner_id = str(_conv_owner["user_id"]) if _conv_owner["user_id"] else None
+                if _conv_owner_id and _conv_owner_id != str(_caller_id):
+                    # Check if caller is a system admin (admins can act on any session)
+                    _is_admin = False
+                    try:
+                        async with _pool.acquire() as _admin_conn:
+                            _admin_row = await _admin_conn.fetchrow(
+                                "SELECT role FROM profiles WHERE id = $1", _caller_id
+                            )
+                        _is_admin = _admin_row and _admin_row["role"] == "admin"
+                    except Exception:
+                        pass
+                    if not _is_admin:
+                        log_session.warning(
+                            "handle-facilitator-response: ownership mismatch — caller=%s owner=%s conv=%s",
+                            _caller_id, _conv_owner_id, conv_id,
+                        )
+                        raise HTTPException(403, detail={"error": "Forbidden", "message": "You are not the owner of this session."})
+            except HTTPException:
+                raise
+            except Exception as _auth_err:
+                log_session.error("Security check failed for conv=%s: %s", conv_id, _auth_err, exc_info=True)
+                raise HTTPException(500, detail={"error": "Security check failed"})
+
+        # ── SECURITY LAYER 4: Per-Conversation Mutex (Race Condition Prevention) ──
+        # Prevents two concurrent requests for the SAME conversation from both
+        # triggering AI generation (e.g., Host with two browser tabs open).
+        # The lock is scoped to conv_id only — different conversations are never blocked.
         if conv_id and not generate_report:
             _now = time.time()
             _lock_key = f"ai_lock_{conv_id}"

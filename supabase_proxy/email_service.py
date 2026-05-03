@@ -5,20 +5,33 @@ Provides beautiful HTML email templates for:
   - Welcome / signup confirmation
   - Password reset
   - Email address verification
+
+NOTE: All env vars (RESEND_API_KEY, EMAIL_FROM, etc.) are read at *call time*
+inside send_email() — not at module import time — so that Railway env var
+updates take effect without requiring a full redeploy.
 """
 import os
 import resend
 from datetime import datetime
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-# Domain aifacilitator.ai is verified in Resend — using branded sender.
-FROM_EMAIL = os.environ.get("EMAIL_FROM", "noreply@aifacilitator.ai")
-FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "AIfacilitator")
-SITE_URL = os.environ.get("SITE_URL", "https://aifacilitator.ai")
+# ── Helpers to read config at call time ───────────────────────────────────────
+def _api_key() -> str:
+    return os.environ.get("RESEND_API_KEY", "")
+
+def _from_email() -> str:
+    return os.environ.get("EMAIL_FROM", "noreply@aifacilitator.ai")
+
+def _from_name() -> str:
+    return os.environ.get("EMAIL_FROM_NAME", "AIfacilitator")
+
+def _site_url() -> str:
+    return os.environ.get("SITE_URL", "https://aifacilitator.ai")
+
 
 # ── Base template ─────────────────────────────────────────────────────────────
 def _base_template(preheader: str, body_html: str) -> str:
     year = datetime.utcnow().year
+    site_url = _site_url()
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,7 +75,7 @@ def _base_template(preheader: str, body_html: str) -> str:
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <a href="{SITE_URL}" class="logo-mark">
+        <a href="{site_url}" class="logo-mark">
           <span class="logo-icon"></span>
           <span class="logo-text">AIfacilitator</span>
         </a>
@@ -75,7 +88,7 @@ def _base_template(preheader: str, body_html: str) -> str:
       </div>
       <div class="footer">
         <p>© {year} AIfacilitator. All rights reserved.</p>
-        <p style="margin-top:6px;"><a href="{SITE_URL}/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="{SITE_URL}/terms">Terms of Service</a></p>
+        <p style="margin-top:6px;"><a href="{site_url}/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="{site_url}/terms">Terms of Service</a></p>
       </div>
     </div>
   </div>
@@ -170,39 +183,49 @@ def build_password_reset_email(full_name: str, reset_url: str) -> tuple[str, str
 
 # ── Send helper ───────────────────────────────────────────────────────────────
 def send_email(to_email: str, subject: str, html: str) -> bool:
-    """Send an email via Resend. Returns True on success, False on failure."""
-    if not RESEND_API_KEY:
+    """Send an email via Resend. Returns True on success, False on failure.
+
+    Env vars are read at call time (not module import time) so that Railway
+    env var updates are picked up without a full redeploy.
+    """
+    api_key = _api_key()
+    from_addr = f"{_from_name()} <{_from_email()}>"
+
+    if not api_key:
         print(f"[email] WARNING: RESEND_API_KEY not set — skipping email to {to_email}")
         return False
+
+    print(f"[email] Sending '{subject}' to {to_email} via {from_addr} (key prefix: {api_key[:8]}...)")
     try:
-        resend.api_key = RESEND_API_KEY
+        resend.api_key = api_key
         params: resend.Emails.SendParams = {
-            "from": f"{FROM_NAME} <{FROM_EMAIL}>",
+            "from": from_addr,
             "to": [to_email],
             "subject": subject,
             "html": html,
         }
         result = resend.Emails.send(params)
-        print(f"[email] Sent '{subject}' to {to_email} — id: {result.get('id', '?')}")
+        email_id = result.get("id", "?") if isinstance(result, dict) else getattr(result, "id", "?")
+        print(f"[email] SUCCESS: '{subject}' sent to {to_email} — Resend id: {email_id}")
         return True
     except Exception as e:
-        print(f"[email] ERROR sending to {to_email}: {e}")
+        print(f"[email] ERROR sending '{subject}' to {to_email}: {e}")
         return False
 
 
 def send_welcome_email(to_email: str, full_name: str) -> bool:
-    login_url = f"{SITE_URL}/login"
+    login_url = f"{_site_url()}/login"
     subject, html = build_welcome_email(full_name, login_url)
     return send_email(to_email, subject, html)
 
 
 def send_verification_email(to_email: str, full_name: str, token: str) -> bool:
-    verify_url = f"{SITE_URL}/verify-email?token={token}"
+    verify_url = f"{_site_url()}/verify-email?token={token}"
     subject, html = build_verification_email(full_name, verify_url)
     return send_email(to_email, subject, html)
 
 
 def send_password_reset_email(to_email: str, full_name: str, token: str) -> bool:
-    reset_url = f"{SITE_URL}/reset-password?token={token}"
+    reset_url = f"{_site_url()}/reset-password?token={token}"
     subject, html = build_password_reset_email(full_name, reset_url)
     return send_email(to_email, subject, html)

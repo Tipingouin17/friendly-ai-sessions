@@ -11,13 +11,24 @@ import { Circle } from "lucide-react";
 interface SessionStatusBadgeProps {
   isActive: boolean;
   sessionStarted: boolean;
+  isSessionEnded?: boolean;
 }
 
 const SessionStatusBadge: React.FC<SessionStatusBadgeProps> = ({ 
   isActive, 
-  sessionStarted 
+  sessionStarted,
+  isSessionEnded = false,
 }) => {
   const getStatusInfo = () => {
+    // Ended takes absolute priority over all other states
+    if (isSessionEnded) {
+      return {
+        label: "Ended",
+        variant: "outline" as const,
+        color: "text-red-500"
+      };
+    }
+
     if (!sessionStarted) {
       return {
         label: "Not Started",

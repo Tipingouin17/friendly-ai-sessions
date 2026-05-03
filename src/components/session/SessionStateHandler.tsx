@@ -2,19 +2,27 @@
  * Session State Handler
  *
  * Session component for the AIfacilitator application.
+ *
+ * BUG-C FIX (definitive): Previously, the handler returned <LoadingState /> for
+ * 500ms (artificial delay from useSessionInitialization), then swapped to
+ * <ParticipantWaitingScreen> or <SessionViewSelector>. Each swap unmounts the
+ * previous component and mounts the new one, causing a white flash.
+ *
+ * The fix: for participants, we NEVER render <LoadingState> as a separate
+ * component. Instead, we pass a `isParticipantLoading` flag down to
+ * SessionViewSelector so it can keep the single <ParticipantLoadingShell>
+ * mounted with phase="connecting" during the initial load — no unmount/remount.
  */
 
 import React, { useState, useEffect } from "react";
 import { SessionContextProps } from "@/types/session";
-import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
 import { SessionStateProvider } from "@/contexts/SessionStateProvider";
 import { useToast } from "@/components/ui/use-toast";
 import { useSessionStateTransition } from "@/hooks/useSessionStateTransition";
 import SessionViewSelector from "./SessionViewSelector";
 import SessionStateDebugger from "./SessionStateDebugger";
-import { useSessionInitialization } from "@/hooks/useSessionInitialization";
-import ParticipantWaitingScreen from "./ParticipantWaitingScreen";
+import ParticipantLoadingShell from "./ParticipantLoadingShell";
 
 interface SessionStateHandlerProps {
   props: SessionContextProps;
@@ -32,7 +40,6 @@ const SessionContent: React.FC<{
   sessionStarted: boolean;
   setSessionStarted: (started: boolean) => void;
   onSessionFull: () => void;
-  initializing: boolean;
   transitionState: {
     isTransitioning: boolean;
     shouldShowSession: boolean;
@@ -47,7 +54,6 @@ const SessionContent: React.FC<{
   sessionStarted,
   setSessionStarted,
   onSessionFull,
-  initializing,
   transitionState
 }) => {
     const { toast } = useToast();
@@ -81,9 +87,28 @@ const SessionContent: React.FC<{
       }
     }, [isAdmin, sessionStarted, transitionState.currentParticipants, toast, props.conversation, props.isSessionStartedInDB]);
 
-    // Error and loading states are handled first with early returns
-    if (props.isLoading || initializing) {
-      return <LoadingState />;
+    // ── Participant loading state ─────────────────────────────────────────────
+    // For participants: instead of showing <LoadingState> (which unmounts and
+    // causes a flash), we show <ParticipantLoadingShell phase="connecting"> so
+    // the SAME component stays mounted throughout the entire loading sequence.
+    const isParticipant = !isAdmin && !isOnAdminPath;
+
+    if (props.isLoading) {
+      if (isParticipant) {
+        // Keep the unified shell mounted — no flash when loading completes
+        return (
+          <ParticipantLoadingShell
+            phase="connecting"
+            facilitatorTitle={props.conversation?.sessions?.facilitator_details?.title}
+          />
+        );
+      }
+      // For admin/host: a simple spinner is fine (no flash concern)
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        </div>
+      );
     }
 
     if (props.error) {
@@ -103,25 +128,6 @@ const SessionContent: React.FC<{
 
     if (!props.currentConversationId) {
       return <EmptyState />;
-    }
-
-    // Check if this is a participant (not admin) and session hasn't started
-    const isParticipant = !isAdmin && !isOnAdminPath;
-    const sessionHasStarted = props.isSessionStartedInDB || sessionStarted;
-
-    // If participant and session hasn't started, show waiting screen
-    if (isParticipant && !sessionHasStarted) {
-      return (
-        <ParticipantWaitingScreen
-          conversationId={props.currentConversationId}
-          currentParticipantCount={transitionState.currentParticipants}
-          maxParticipants={transitionState.maxParticipants}
-          facilitatorTitle={props.conversation?.sessions?.facilitator_details?.title}
-          onSessionStarted={() => {
-            setSessionStarted(true);
-          }}
-        />
-      );
     }
 
     // Always show session for admin route
@@ -227,13 +233,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
     }
   }, [isOnAdminPath, sessionStarted, setSessionStarted]);
 
-  // Use initialization hook - called unconditionally
-  const { initializing } = useSessionInitialization({
-    props,
-    setSessionStarted,
-    isAdmin: isAdmin || isOnAdminPath
-  });
-
   // Use transition state hook - called unconditionally
   const transitionState = useSessionStateTransition({
     props,
@@ -251,7 +250,6 @@ const SessionStateHandler: React.FC<SessionStateHandlerProps> = ({
       sessionStarted={sessionStarted || isOnAdminPath}
       setSessionStarted={setSessionStarted}
       onSessionFull={onSessionFull}
-      initializing={initializing}
       transitionState={transitionState}
     />
   );

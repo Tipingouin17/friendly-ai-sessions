@@ -57,6 +57,15 @@ export const useHostMessages = ({
     lastAssistantMessageId,
   });
 
+  // Use conversationData.current_participants as a fallback when the
+  // participants list hasn't loaded yet (async). This prevents the
+  // auto-advance from firing with totalParticipants=0 and blocking the
+  // "Facilitator is thinking…" state indefinitely.
+  const effectiveTotalParticipants =
+    participants.length > 0
+      ? participants.length
+      : (conversationState?.current_participants ?? 1);
+
   const {
     messages: fetchedMessages,
     fetchMessages,
@@ -71,7 +80,7 @@ export const useHostMessages = ({
     conversationId,
     isAdmin: true,
     conversation: conversationState,
-    totalParticipants: participants.length,
+    totalParticipants: effectiveTotalParticipants,
     excludedParticipantIds,
     skippedParticipantIds,
   });
@@ -101,7 +110,7 @@ export const useHostMessages = ({
     startResponseCollection
   } = useResponseAggregation({
     conversationId,
-    totalParticipants: participants.length,
+    totalParticipants: effectiveTotalParticipants,
     conversation: conversationState
   });
 
@@ -277,7 +286,7 @@ export const useHostMessages = ({
     handleSendHostMessage,
     responseCount,
     isWaitingForResponses,
-    totalParticipants: participants.length,
+    totalParticipants: effectiveTotalParticipants,
     triggerFacilitatorResponse,
     isGeneratingWelcome,
     isGeneratingResponse,

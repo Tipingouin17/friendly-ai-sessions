@@ -107,7 +107,12 @@ export const useSessionParticipantSetup = ({
             .abortSignal(abortController.signal);
             
           if (error) {
-            console.error("Supabase error loading participants:", error);
+            // Only log non-abort errors — AbortError is a normal cancellation
+            // (component unmount or conversation change) and must not appear
+            // in the console as a "Supabase error".
+            if (!isAbortError(error)) {
+              console.error("Error loading participants:", error);
+            }
             throw error;
           }
           

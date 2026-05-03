@@ -80,24 +80,29 @@ export const useWelcomeMessageGate = ({
     // BUG #3 FIX: If messageReady was already confirmed for this session, skip.
     if (messageReadyForConversationRef.current === conversationId) return true;
 
-    setState(prev => ({ 
-      ...prev, 
-      isWaitingForMessage: true, 
-      error: null,
-      timeoutReached: false 
-    }));
-
-    // First check if message already exists
+    // PERF FIX: Check if message already exists BEFORE setting isWaitingForMessage=true.
+    // Previously we set isWaitingForMessage=true immediately, which forced phase='ai_generating'
+    // for 500ms-1s even when the welcome message was already in DB — causing a visible flash.
     const messageExists = await checkForWelcomeMessage();
     if (messageExists) {
       messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
-        messageReady: true 
+        messageReady: true,
+        error: null,
+        timeoutReached: false
       }));
       return true;
     }
+
+    // Message not ready yet — now set isWaitingForMessage=true to show the loading UI
+    setState(prev => ({ 
+      ...prev, 
+      isWaitingForMessage: true, 
+      error: null,
+      timeoutReached: false 
+    }));
 
     // Check conversation status for AI generation progress
     try {

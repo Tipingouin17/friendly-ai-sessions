@@ -94,12 +94,16 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAuthenticated, authLoading, location.pathname, location.search]);
 
-  // Show loading while auth is loading or while we're checking host status
+  // Show a single unified loading screen that covers both the auth check
+  // ("Verifying access") and the subsequent session initialisation phase.
+  // The Host never sees two separate loading states.
   if (authLoading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-        <span className="ml-2">Verifying access...</span>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading your session...</p>
+        </div>
       </div>
     );
   }

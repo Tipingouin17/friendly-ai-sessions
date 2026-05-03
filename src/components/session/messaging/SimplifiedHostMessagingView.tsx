@@ -110,10 +110,36 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   };
 
   const quickInstructions = [
-    { label: 'Wrap up', icon: '🏁', instruction: 'Please wrap up the session. Summarize the key takeaways and provide closing remarks instead of asking another question.' },
-    { label: 'Go deeper', icon: '🔍', instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question.' },
-    { label: 'Change topic', icon: '↗️', instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet.' },
-    { label: 'Be practical', icon: '⚡', instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas.' },
+    {
+      label: 'Wrap up',
+      icon: '🏁',
+      instruction: 'The host has decided to end the session now. Do NOT ask another question. Instead: (1) warmly thank all participants for their contributions, (2) synthesize the 2-3 most important insights that emerged from the discussion, (3) share a brief closing thought or call to action relevant to the session objective, and (4) formally close the session.'
+    },
+    {
+      label: 'Final round',
+      icon: '🎯',
+      instruction: 'This is the last question of the session. Ask one final, meaningful question that invites participants to share their single most important takeaway or commitment from today\'s discussion. After collecting responses, you will close the session.'
+    },
+    {
+      label: 'Go deeper',
+      icon: '🔍',
+      instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question that challenges participants to think beyond their initial answers.'
+    },
+    {
+      label: 'Change topic',
+      icon: '↗️',
+      instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet. Briefly acknowledge what was shared so far, then pivot naturally.'
+    },
+    {
+      label: 'Be practical',
+      icon: '⚡',
+      instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas or next steps they could take within the next week.'
+    },
+    {
+      label: 'Open floor',
+      icon: '🎤',
+      instruction: 'Open the floor for participants to raise any topic, question, or concern they feel has not been addressed yet in the session. Invite them to share freely.'
+    },
   ];
 
   const statusConfig = isSessionEnded

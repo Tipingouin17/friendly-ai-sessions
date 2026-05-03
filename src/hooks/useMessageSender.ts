@@ -9,7 +9,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { Message } from "@/types/chat";
 import { participantColors } from "@/utils/sessionHelpers";
 import { useMessageSaver } from "./messageSender/useMessageSaver";
-import { useFacilitatorResponse } from "./messageSender/useFacilitatorResponse";
 import { useEnhancedSessionLogger } from "./useEnhancedSessionLogger";
 import { useResponseCollection } from "./useResponseCollection";
 
@@ -45,8 +44,7 @@ export const useMessageSender = ({
   
   // Import our helper hooks
   const { saveUserMessage } = useMessageSaver();
-  const { requestFacilitatorResponse } = useFacilitatorResponse();
-  const { logMessageSent, logAIResponse, logPerformanceMetric } = useEnhancedSessionLogger();
+  const { logMessageSent, logPerformanceMetric } = useEnhancedSessionLogger();
   
   // Use the live participant array length for accurate multi-participant counting.
   // conversation.participants is a static DB column set at session creation and may be stale.
@@ -155,49 +153,18 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
-      // For multi-participant sessions (totalParticipants > 1), the host-side
-      // useMessageFetching auto-advance is the ONLY mechanism that should invoke the AI.
-      // The participant-side must only save the message and show a waiting indicator.
-      // Invoking AI from the participant side would cause premature responses before
-      // all participants have answered.
+      // ARCHITECTURE HARMONISÉE : Le participant ne déclenche JAMAIS l'IA directement.
+      // Quel que soit le nombre de participants (1 ou N), c'est TOUJOURS le Host
+      // (via useMessageFetching.generateAggregatedResponse) qui orchestre l'appel IA.
       //
-      // For single-participant sessions, invoke AI directly from the participant side
-      // since there is no one else to wait for.
-      const isMultiParticipant = totalParticipants > 1;
-
-      if (!isMultiParticipant) {
-        // Single-participant: invoke AI directly
-        setIsWaitingForResponse(true);
-        const aiStartTime = performance.now();
-        try {
-          const updatedMessages = [...sessionState.messages, newMessage];
-          const aiResponse = await requestFacilitatorResponse(
-            currentConversationId,
-            updatedMessages,
-            conversation
-          );
-          const aiResponseTime = performance.now() - aiStartTime;
-          logAIResponse(currentConversationId, aiResponseTime, 'ai', undefined);
-          sessionState.setMessages(prev => [...prev, aiResponse]);
-        } catch (aiError) {
-          console.error("AI Response Error:", aiError);
-          setError("Failed to get facilitator response. Please try again.");
-          toast({
-            title: "AI Response Error",
-            description: "Failed to get facilitator response. Please try again.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsWaitingForResponse(false);
-        }
-      } else {
-        // Multi-participant: just show the waiting indicator.
-        // The host-side useMessageFetching will detect when all participants have
-        // responded and invoke the AI via generateAggregatedResponse.
-        // isWaitingForResponse stays false here — the ThinkingIndicator is shown
-        // via isWaitingForFirstMessage / the host-side isWaitingForResponses state.
-        // No direct AI call from the participant side.
-      }
+      // Avantages :
+      //  - Un seul chemin de code pour tous les scénarios (1 participant, multi, skip, host trigger)
+      //  - La logique skip/pause est centralisée côté Host (useParticipantStatusTracker)
+      //  - Pas de double déclenchement possible
+      //  - L'état UI du participant est dérivé de la DB (dernier message = participant → en attente)
+      //
+      // Le ThinkingIndicator est affiché via isWaitingForOtherParticipants dans
+      // useSessionContextValue (détecte que le dernier message est du participant, pas de l'IA).
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -221,9 +188,7 @@ export const useMessageSender = ({
     responseCount,
     toast,
     saveUserMessage,
-    requestFacilitatorResponse,
     logMessageSent,
-    logAIResponse,
     logPerformanceMetric,
     recordParticipantResponse,
     stopWaitingForResponses,

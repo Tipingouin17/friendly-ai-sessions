@@ -2969,17 +2969,22 @@ async def edge_function(func_name: str, request: Request):
                 user_prompt = (
                     f'Here is the recent conversation in our workshop "{session_title}":\n\n'
                     f"{conversation_context}\n"
-                    f"The host has instructed you to: {host_instruction}\n\n"
-                    "Follow the host's instruction. Reference participants' contributions where relevant. "
-                    "Keep your response to 2-3 short paragraphs."
+                    f"HOST INSTRUCTION (MANDATORY — override default behaviour):\n"
+                    f"{host_instruction}\n\n"
+                    "IMPORTANT RULES FOR THIS RESPONSE:\n"
+                    "- Follow the host instruction exactly and completely.\n"
+                    "- Reference specific participant contributions where relevant.\n"
+                    "- Maintain your facilitator persona and tone throughout.\n"
+                    "- If the instruction says to close or wrap up the session, do NOT ask another question.\n"
+                    "- Keep your response to 2-3 short paragraphs unless the instruction requires more."
                 )
             else:
                 user_prompt = (
                     f'Here is the recent conversation in our workshop "{session_title}":\n\n'
                     f"{conversation_context}\n"
-                    "Based on the participants' responses above:\n"
+                    "Based on the participants\u2019 responses above:\n"
                     "1. Briefly acknowledge and synthesize the key themes from their answers\n"
-                    "2. Highlight any interesting connections or contrasts between different participants' views\n"
+                    "2. Highlight any interesting connections or contrasts between different participants\u2019 views\n"
                     "3. Ask a thoughtful follow-up question that builds on what they shared\n\n"
                     "Keep your response to 2-3 short paragraphs. Be specific about what participants said."
                 )

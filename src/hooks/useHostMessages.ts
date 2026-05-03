@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Message, ParticipantInfo } from "@/types/chat";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
@@ -44,9 +44,17 @@ export const useHostMessages = ({
     }
   }, [conversationData]);
 
-  // Track paused/skipped participants for response counting
+  // Reactive state for the last assistant message ID.
+  // useParticipantStatusTracker depends on this value to reset 'skipped' statuses
+  // whenever a new AI question arrives. Using state (not ref) ensures the tracker
+  // re-runs reactively when the value changes.
+  const [lastAssistantMessageId, setLastAssistantMessageId] = useState<string | null>(null);
+
+  // Track paused/skipped participants for response counting.
+  // lastAssistantMessageId resets all 'skipped' statuses when a new AI question arrives.
   const { excludedParticipantIds, skippedParticipantIds } = useParticipantStatusTracker({
     conversationId,
+    lastAssistantMessageId,
   });
 
   const {
@@ -74,6 +82,19 @@ export const useHostMessages = ({
       setMessages(fetchedMessages);
     }
   }, [fetchedMessages, setMessages]);
+
+  // Keep lastAssistantMessageId in sync with fetchedMessages so that
+  // useParticipantStatusTracker resets 'skipped' statuses on each new AI question.
+  useEffect(() => {
+    if (!fetchedMessages || fetchedMessages.length === 0) return;
+    for (let i = fetchedMessages.length - 1; i >= 0; i--) {
+      if (fetchedMessages[i].sender === 'assistant') {
+        const newId = fetchedMessages[i].id;
+        setLastAssistantMessageId(prev => (prev !== newId ? newId : prev));
+        break;
+      }
+    }
+  }, [fetchedMessages]);
 
   const {
     recordParticipantResponse,

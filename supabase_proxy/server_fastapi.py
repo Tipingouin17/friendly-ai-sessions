@@ -2010,7 +2010,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         # Fetch conversation + session + facilitator details needed by the AI
         async with _pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT c.id, c.user_id, c.language, ""
+                "SELECT c.id, c.user_id, c.language, "
                 "s.title, s.objective, s.welcome_message, s.scope, "
                 "s.gpt_version, s.max_tokens, s.randomness, s.prompt, "
                 "f.title as facilitator_name, f.details as facilitator_details, "

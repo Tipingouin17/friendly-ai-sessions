@@ -705,6 +705,11 @@ async def run_startup_migrations() -> None:
         CREATE INDEX IF NOT EXISTS idx_evt_user_id ON email_verification_tokens(user_id);
         CREATE INDEX IF NOT EXISTS idx_evt_expires_at ON email_verification_tokens(expires_at);
         """,
+        # 2026-05-03: Add lock_reason column to sessions for admin PromptManagement UI.
+        """
+        ALTER TABLE sessions
+            ADD COLUMN IF NOT EXISTS lock_reason TEXT;
+        """,
         # M15: Resync sequences for integer-PK tables to prevent duplicate-key errors
         # when rows were inserted with explicit IDs (e.g. seed data) that advanced
         # the max(id) beyond the sequence's current value.

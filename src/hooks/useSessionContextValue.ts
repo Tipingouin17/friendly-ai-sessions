@@ -121,14 +121,21 @@ export function useSessionContextValue({
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].sender === 'assistant') { lastAssistantIdx = i; break; }
     }
-    if (lastAssistantIdx === -1) return false;
+    const lastMsg = msgs[msgs.length - 1];
+    // No assistant message yet: if the participant already sent a message and the last
+    // message is still from a user, they are waiting for the AI's first response.
+    if (lastAssistantIdx === -1) {
+      const hasUserMsg = msgs.some(
+        (m: any) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
+      );
+      return hasUserMsg && lastMsg.sender !== 'assistant';
+    }
     // Check if the current participant has answered after the last assistant message
     const hasAnsweredThisRound = msgs.slice(lastAssistantIdx + 1).some(
       (m: any) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
     );
     // If the participant has answered but the last message is not from the assistant,
     // they are waiting for other participants and/or the AI response.
-    const lastMsg = msgs[msgs.length - 1];
     return hasAnsweredThisRound && lastMsg.sender !== 'assistant';
   }, [isAdmin, effectiveAdmin, currentUserParticipantId, safeRoomState.messages, conversation]);
 

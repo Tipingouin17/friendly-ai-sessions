@@ -1998,18 +1998,19 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             # Message already exists — nothing to do
             return
 
-        # Idempotency guard: skip if AI generation is already in progress
+        # Idempotency guard: skip if welcome generation is already in progress.
+        # Use a SEPARATE key from the facilitator-response lock so that a fast
+        # participant message (sent within 10 s of joining) is never blocked.
         _now = time.time()
-        _lock_key = f"ai_lock_{conv_id}"
+        _lock_key = f"welcome_lock_{conv_id}"
         _last = _ai_response_locks.get(_lock_key, 0)
         if _now - _last < 10:
             return
         _ai_response_locks[_lock_key] = _now
-
         # Fetch conversation + session + facilitator details needed by the AI
         async with _pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT c.id, c.user_id, c.language, "
+                "SELECT c.id, c.user_id, c.language, ""
                 "s.title, s.objective, s.welcome_message, s.scope, "
                 "s.gpt_version, s.max_tokens, s.randomness, s.prompt, "
                 "f.title as facilitator_name, f.details as facilitator_details, "

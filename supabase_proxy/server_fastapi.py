@@ -2273,13 +2273,25 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             )
             last_ai_id = last_ai_row["id"] if last_ai_row else 0
 
-            # Count distinct participant (non-assistant, non-admin) messages after last AI message
+            # Count distinct participant (non-assistant, non-admin) messages after last AI message.
+            # COALESCE handles participant_id=NULL (anonymous) by using the row id as a unique key.
+            # This prevents COUNT(DISTINCT NULL) returning 0 for anonymous participants.
             response_count_row = await conn.fetchrow(
-                "SELECT COUNT(DISTINCT participant_id) as cnt FROM messages "
+                "SELECT COUNT(DISTINCT COALESCE(participant_id::text, 'anon_' || id::text)) as cnt "
+                "FROM messages "
                 "WHERE conversation_id = $1 AND role = 'user' AND id > $2",
                 conv_id, last_ai_id
             )
             response_count = int(response_count_row["cnt"] or 0) if response_count_row else 0
+            # For single-participant sessions: if expected=1 and COALESCE count is still 0,
+            # fall back to a plain COUNT(*) to handle edge cases (participant_id=0 stored as int).
+            if expected_participants == 1 and response_count == 0:
+                fallback_row = await conn.fetchrow(
+                    "SELECT COUNT(*) as cnt FROM messages "
+                    "WHERE conversation_id = $1 AND role = 'user' AND id > $2",
+                    conv_id, last_ai_id
+                )
+                response_count = int(fallback_row["cnt"] or 0) if fallback_row else 0
 
         log_session.info(
             "facilitator-bg: conv=%s responses=%d/%d since last AI msg id=%s",

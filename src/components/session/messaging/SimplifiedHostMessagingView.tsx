@@ -6,6 +6,8 @@
  * control panel. The chat transcript is available as a secondary tab.
  */
 import React, { useState } from 'react';
+import { useInactivityTimer } from '@/hooks/useInactivityTimer';
+import InactivityAlert from '@/components/session/host/InactivityAlert';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +62,26 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [inactivityDismissed, setInactivityDismissed] = useState(false);
+
+  // Inactivity timer — purely indicative, never auto-triggers anything
+  const { elapsedSeconds, isInactive, pendingCount, resetTimer } = useInactivityTimer({
+    messages,
+    responseCount,
+    totalParticipants,
+    isWaitingForResponses,
+    isSessionEnded,
+    thresholdSeconds: 180, // 3 minutes — will be a configurable admin setting later
+  });
+
+  // Reset dismissed state whenever a new inactivity period starts
+  const handleDismissInactivity = () => {
+    setInactivityDismissed(true);
+  };
+  // Auto-un-dismiss when the timer resets (new question or all responded)
+  React.useEffect(() => {
+    if (!isInactive) setInactivityDismissed(false);
+  }, [isInactive]);
 
   // Show pre-session view if session hasn't started
   if (!isSessionStarted) {
@@ -110,10 +132,36 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   };
 
   const quickInstructions = [
-    { label: 'Wrap up', icon: '🏁', instruction: 'Please wrap up the session. Summarize the key takeaways and provide closing remarks instead of asking another question.' },
-    { label: 'Go deeper', icon: '🔍', instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question.' },
-    { label: 'Change topic', icon: '↗️', instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet.' },
-    { label: 'Be practical', icon: '⚡', instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas.' },
+    {
+      label: 'Wrap up',
+      icon: '🏁',
+      instruction: 'The host has decided to end the session now. Do NOT ask another question. Instead: (1) warmly thank all participants for their contributions, (2) synthesize the 2-3 most important insights that emerged from the discussion, (3) share a brief closing thought or call to action relevant to the session objective, and (4) formally close the session.'
+    },
+    {
+      label: 'Final round',
+      icon: '🎯',
+      instruction: 'This is the last question of the session. Ask one final, meaningful question that invites participants to share their single most important takeaway or commitment from today\'s discussion. After collecting responses, you will close the session.'
+    },
+    {
+      label: 'Go deeper',
+      icon: '🔍',
+      instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question that challenges participants to think beyond their initial answers.'
+    },
+    {
+      label: 'Change topic',
+      icon: '↗️',
+      instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet. Briefly acknowledge what was shared so far, then pivot naturally.'
+    },
+    {
+      label: 'Be practical',
+      icon: '⚡',
+      instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas or next steps they could take within the next week.'
+    },
+    {
+      label: 'Open floor',
+      icon: '🎤',
+      instruction: 'Open the floor for participants to raise any topic, question, or concern they feel has not been addressed yet in the session. Invite them to share freely.'
+    },
   ];
 
   const statusConfig = isSessionEnded
@@ -244,6 +292,16 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     </Button>
                   )}
                 </div>
+              )}
+
+              {/* Inactivity alert — shown after 3 min of no new response */}
+              {isInactive && !inactivityDismissed && (
+                <InactivityAlert
+                  elapsedSeconds={elapsedSeconds}
+                  pendingCount={pendingCount}
+                  totalParticipants={totalParticipants}
+                  onDismiss={handleDismissInactivity}
+                />
               )}
 
               {/* Steer the AI Facilitator */}

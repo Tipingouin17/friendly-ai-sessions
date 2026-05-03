@@ -60,7 +60,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
   useEffect(() => {
     if (!conversationId || !mountedRef.current) return;
 
-    const channelName = `session-status-${conversationId}-${Date.now()}`;
+    const channelName = `session-status-${conversationId}`;
     realtimeConnected.current = false;
 
     const channel = api

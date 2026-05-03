@@ -38,7 +38,9 @@ export function useSessionPageEffects({
     stateRef.current.hasSetupTimeout = true;
     
     // Different timeouts based on user role
-    const initialTimeout = isOnAdminPath ? 3000 : 8000;
+    // PERF FIX: Reduced participant toast timeout from 8s to 4s — the loading
+    // screen was silent for too long before giving any feedback to the user.
+    const initialTimeout = isOnAdminPath ? 3000 : 4000;
     
     // Set a timeout to check if initialization takes too long
     stateRef.current.initializeTimeout = setTimeout(() => {

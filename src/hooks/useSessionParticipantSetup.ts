@@ -14,6 +14,8 @@ import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
 import { retryWithBackoff, isNetworkError, isAbortError } from "@/utils/networkUtils";
 import { requestDeduplicator } from "@/utils/requestDeduplication";
+import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
+import { readParticipantDataByDevice } from "@/hooks/useParticipantPersistence";
 
 type UseSessionParticipantSetupProps = {
   conversationId: number | null;
@@ -85,8 +87,19 @@ export const useSessionParticipantSetup = ({
       
       const requestKey = `participants-${conversationId}`;
       
+      // NOTE: We do NOT pass the abortController.signal to requestDeduplicator.
+      // Passing it caused a loop: the deduplicator's internal abort would fire
+      // whenever the signal was aborted (e.g. on unmount), which deleted the
+      // pending request entry and allowed a new request to start immediately,
+      // which was then aborted again — producing the "The operation was aborted."
+      // loop visible in the console.  The abortController is still used on the
+      // Supabase query itself so that in-flight network requests are cancelled
+      // on unmount, but the deduplicator no longer listens to it.
       const result = await requestDeduplicator.deduplicate(requestKey, async () => {
         return await retryWithBackoff(async () => {
+          // Check abort before each attempt
+          if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
           const { data, error } = await api
             .from('session_participants')
             .select('*')
@@ -94,7 +107,12 @@ export const useSessionParticipantSetup = ({
             .abortSignal(abortController.signal);
             
           if (error) {
-            console.error("Supabase error loading participants:", error);
+            // Only log non-abort errors — AbortError is a normal cancellation
+            // (component unmount or conversation change) and must not appear
+            // in the console as a "Supabase error".
+            if (!isAbortError(error)) {
+              console.error("Error loading participants:", error);
+            }
             throw error;
           }
           
@@ -104,7 +122,7 @@ export const useSessionParticipantSetup = ({
           baseDelay: 1000,
           maxDelay: 3000
         });
-      }, abortController.signal);
+      });
       
       if (abortController.signal.aborted) {
         return;
@@ -143,76 +161,57 @@ export const useSessionParticipantSetup = ({
       setLoadingError(null);
       setRetryCount(0);
       
-      // Enhanced participant ID detection from multiple sources
-      let participantId = null;
-      
-      // Priority 1: URL location state
+      // ── Participant ID resolution ──────────────────────────────────────────
+      // We use a strict priority chain that relies on the deviceId as the
+      // authoritative identity signal.  The old heuristics (match-by-name,
+      // single-participant assumption) are removed because they caused
+      // BUG-A: a new participant who happened to get the same slot number
+      // (participant_id) as a previously removed participant would load the
+      // wrong conversation.
+      let participantId: number | null = null;
+
+      const deviceId = getOrCreateDeviceId();
+
+      // Priority 1: React Router location state (set by useJoinSessionNavigation
+      //   right after a successful join — most reliable source).
       if (locationState?.participantId) {
         participantId = locationState.participantId;
       }
 
-      // Priority 1.5: Direct URL params (for direct navigation without React Router state)
+      // Priority 2: localStorage scoped by (conversationId + deviceId).
+      //   This covers the case where the participant refreshes the page or
+      //   navigates back after a successful join in the same browser.
+      if (!participantId && conversationId) {
+        const stored = readParticipantDataByDevice(conversationId, deviceId);
+        if (stored) {
+          // Verify the stored participantId still exists in the current
+          // participant list (it may have been removed by the host).
+          const stillPresent = participantInfos.find(p => p.id === stored.participantId);
+          if (stillPresent) {
+            participantId = stored.participantId;
+          }
+          // If the slot was removed, participantId stays null → the join
+          // form will be shown so the participant can re-enter.
+        }
+      }
+
+      // Priority 3: URL param — only trusted when the participant was
+      //   just redirected here by useJoinSessionNavigation (i.e. the
+      //   localStorage entry hasn't been written yet because this effect
+      //   ran before persistParticipantData completed).  We still verify
+      //   the slot exists in the DB list to avoid accepting stale URLs.
       if (!participantId) {
         const urlParams = new URLSearchParams(window.location.search);
         const urlParticipantId = urlParams.get('participantId');
-        const urlName = urlParams.get('name');
         if (urlParticipantId) {
           const parsedId = parseInt(urlParticipantId, 10);
-          // Check if this participant already exists in the list
           const existingParticipant = participantInfos.find(p => p.id === parsedId);
           if (existingParticipant) {
             participantId = parsedId;
-          } else if (urlName && conversationId) {
-            // Auto-register participant if they have a name but aren't registered yet
-            try {
-              const avatarSeed = `${urlName}-${Date.now()}`;
-              const { error: regError } = await api
-                .from('session_participants')
-                .insert({
-                  conversation_id: conversationId,
-                  participant_id: parsedId,
-                  name: urlName,
-                  avatar_seed: avatarSeed,
-                  is_anonymous: false,
-                  is_host: false
-                });
-              if (!regError) {
-                participantId = parsedId;
-                // Reload participants after registration
-                requestDeduplicator.clear(`participants-${conversationId}`);
-              } else {
-                // If insert fails (e.g. duplicate), still use the ID
-                participantId = parsedId;
-              }
-            } catch (regErr) {
-              // If registration fails, still use the URL participant ID
-              participantId = parsedId;
-            }
-          } else {
-            participantId = parsedId;
           }
+          // If the slot doesn't exist in the DB list we intentionally do NOT
+          // fall back to it — this is the exact scenario that caused BUG-A.
         }
-      }
-      
-      // Priority 2: Find participant by checking if current user is in the participant list
-      if (!participantId && participantInfos.length > 0) {
-        // For participants accessing via direct URL, try to find their ID
-        const urlParams = new URLSearchParams(window.location.search);
-        const participantName = urlParams.get('name');
-        
-        if (participantName) {
-          const matchingParticipant = participantInfos.find(p => 
-            p.name.toLowerCase() === participantName.toLowerCase()
-          );
-          if (matchingParticipant) {
-            participantId = matchingParticipant.id;
-          }
-        }
-      }
-      
-      // Priority 3: If still no ID and only one participant, assume it's them
-      if (!participantId && participantInfos.length === 1 && !window.location.pathname.includes('/admin') && !window.location.pathname.includes('/host')) {
-        participantId = participantInfos[0].id;
       }
       
       if (participantId) {

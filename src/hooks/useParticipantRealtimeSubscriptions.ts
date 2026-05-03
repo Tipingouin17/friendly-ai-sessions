@@ -41,7 +41,7 @@ export function useParticipantRealtimeSubscriptions({
     }
     
     // Generate unique channel names with timestamps and random strings to prevent conflicts
-    const participantsChannelName = `participants-${conversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const participantsChannelName = `participants-${conversationId}`;
     
     try {
       // Subscribe to changes in session_participants table
@@ -128,7 +128,7 @@ export function useParticipantRealtimeSubscriptions({
       }
     }
     
-    const eventsChannelName = `participant-events-${conversationId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const eventsChannelName = `participant-events-${conversationId}`;
     
     try {
       // Subscribe to participant events

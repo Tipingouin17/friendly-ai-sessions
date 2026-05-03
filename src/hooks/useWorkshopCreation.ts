@@ -10,6 +10,7 @@ import api from "@/lib/api";
 import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
+import { useNavigate } from "react-router-dom";
 
 export const useWorkshopCreation = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -26,6 +27,7 @@ export const useWorkshopCreation = () => {
 
   // Secure navigation for host session page
   const { navigateToHostSession } = useNavigateToSession();
+  const navigate = useNavigate();
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -44,11 +46,8 @@ export const useWorkshopCreation = () => {
 
   const handleSubmit = async (hasReachedSessionLimit: boolean) => {
     if (hasReachedSessionLimit) {
-      toast({
-        title: "Plan Limit Reached",
-        description: "You've reached your plan's session limit. Please upgrade to create more sessions.",
-        variant: "destructive"
-      });
+      // Redirect to pricing page instead of showing a toast
+      navigate('/pricing');
       return;
     }
 

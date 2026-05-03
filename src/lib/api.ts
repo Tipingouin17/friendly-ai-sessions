@@ -174,6 +174,27 @@ export function clearAllParticipantState(): void {
   keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
+// ─── Bootstrap join token from URL on every page load ───────────────────────
+// This IIFE runs once when api.ts is first imported (which happens on every
+// page load because api.ts is a top-level dependency of almost every hook).
+// It reads the ?token= query parameter and persists it to localStorage so
+// that all subsequent API calls carry the X-Join-Token header — even when
+// the participant navigates directly to /session?id=42&token=xyz (bookmark,
+// page refresh, or mobile deep-link) without going through /join-session first.
+(function bootstrapJoinTokenFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const sessionId = params.get('id');
+    if (token) {
+      // Store under the scoped key so it never bleeds across sessions.
+      localStorage.setItem(joinTokenKey(sessionId), token);
+    }
+  } catch {
+    // Silently ignore — SSR or environments without window/localStorage.
+  }
+})();
+
 /**
  * Retrieve the join token for the current session.
  * @param sessionId  Optional session ID; resolved from URL when omitted.
@@ -217,11 +238,14 @@ async function apiFetch<T>(
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    // An authenticated participant joining someone else's session must send the
-    // join token so the backend can apply the participant-path access rules
-    // instead of the ownership filter (which would return 403 for non-owners).
-    if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Send the join token only when the user is NOT authenticated.
+    // When a JWT is present (host/admin), the backend uses ownership-based
+    // access control. Sending the join token alongside a JWT confuses the
+    // backend into applying participant-path rules for host queries (e.g.
+    // GET /conversations?user_id=eq.xxx), which causes spurious 401 errors.
+    // Unauthenticated participants (no JWT) still get the join token so they
+    // can read the session data they are allowed to access.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
 
     // Apply a 15-second timeout so Railway cold-start / network issues fail fast
     // instead of hanging indefinitely. The caller (React Query) will retry.

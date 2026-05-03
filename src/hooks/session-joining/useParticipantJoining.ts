@@ -7,9 +7,10 @@
  * caused 20-35 s join latency.
  */
 
-import api from "@/lib/api";
+import api, { getJoinToken } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
+import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
 
 interface JoinParticipantParams {
   conversationId: number;
@@ -34,9 +35,34 @@ export function useParticipantJoining() {
     participantName: string,
     avatarSeed: string
   ) => {
+    const deviceId = getOrCreateDeviceId();
     const sessionData = getSessionByConversationId(conversationId);
 
-    if (sessionData) {
+    // Only treat as existing participant if the device_id matches.
+    // This prevents a different browser from hijacking a slot by reusing
+    // the same participantId from the URL.
+    if (sessionData && sessionData.deviceId === deviceId) {
+      // Verify the slot still exists in the DB — the host may have removed
+      // this participant since the last visit.  If the row is gone we must
+      // fall through to joinAsNewParticipant so the backend assigns a fresh
+      // slot instead of silently reusing a phantom participant_id.
+      try {
+        const { data: rows, error } = await api
+          .from('session_participants')
+          .select('participant_id')
+          .eq('conversation_id', conversationId)
+          .eq('participant_id', sessionData.participantId);
+
+        if (error || !rows || rows.length === 0) {
+          // Slot no longer exists — clear stale local state and fall through
+          // to joinAsNewParticipant.
+          return null;
+        }
+      } catch {
+        // Network error — optimistically allow rejoin; the backend will
+        // handle the device_id lookup and create/reuse the slot.
+      }
+
       updateSessionAccessTime(conversationId);
       toast({
         title: "Rejoining Session",
@@ -74,6 +100,18 @@ export function useParticipantJoining() {
       }
     }
 
+    const deviceId = getOrCreateDeviceId();
+
+    // Pass the join_token explicitly in the body as a safety net.
+    // apiFetch() reads getJoinToken() at call time via the X-Join-Token header,
+    // but if the token was written to localStorage in the same render cycle by
+    // useSessionParticipants there can be a race where the header is absent.
+    // Sending it in the body ensures the backend always receives it.
+    const joinToken =
+      getJoinToken(String(conversationId)) ||
+      conversation?.join_token ||
+      null;
+
     // Single atomic backend call — replaces 7 sequential REST calls
     const { data, error } = await api.functions.invoke('join-session', {
       body: {
@@ -82,6 +120,8 @@ export function useParticipantJoining() {
         avatar_seed: avatarSeed,
         is_anonymous: isAnonymous,
         is_host: isAdmin,
+        device_id: deviceId,
+        ...(joinToken ? { join_token: joinToken } : {}),
       }
     });
 
@@ -97,14 +137,17 @@ export function useParticipantJoining() {
 
     const newParticipantId: number = data.participant_id;
 
-    // Persist participant data to localStorage for rejoin detection
+    // Persist participant data to localStorage for rejoin detection.
+    // The deviceId is stored alongside so handleExistingParticipant can
+    // verify the returning browser is the same one that originally joined.
     persistParticipantData({
       participantId: newParticipantId,
       conversationId,
       name: participantName,
       avatarSeed,
       isAnonymous,
-      isAdmin
+      isAdmin,
+      deviceId,
     });
 
     return {

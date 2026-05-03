@@ -42,7 +42,15 @@ export function useSessionParticipantManager({
   // Memoized values
   const currentParticipantCount = useMemo(() => participants.length, [participants.length]);
   const maxParticipantsForSession = useMemo(() => conversation?.participants || 0, [conversation?.participants]);
-  const currentUserParticipantId = useMemo(() => locationState?.participantId || null, [locationState?.participantId]);
+  // Fall back to the URL search param when location.state is absent (page refresh,
+  // direct navigation, or mobile deep-link — React Router drops state in those cases).
+  const currentUserParticipantId = useMemo(() => {
+    if (locationState?.participantId) return locationState.participantId as number;
+    try {
+      const p = new URLSearchParams(window.location.search).get('participantId');
+      return p ? parseInt(p, 10) : null;
+    } catch { return null; }
+  }, [locationState?.participantId]);
   const isSessionFull = useMemo(() => 
     currentParticipantCount >= maxParticipantsForSession && maxParticipantsForSession > 0,
     [currentParticipantCount, maxParticipantsForSession]
@@ -70,7 +78,7 @@ export function useSessionParticipantManager({
     setError(null);
     setConnectionAttempts(prev => prev + 1);
     
-    const channelName = `participant-manager-${conversationId}-${Date.now()}`;
+    const channelName = `participant-manager-${conversationId}`;
     
     try {
       const channel = api

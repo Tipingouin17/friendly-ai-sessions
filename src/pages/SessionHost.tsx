@@ -50,13 +50,18 @@ const SessionHost = () => {
     }, { /* no-op */ } as { [key: string]: string });
   }, [participants]);
 
-  // Show loading state only if we're not ready
+  // ProtectedHostRoute already shows a unified loading screen while auth is
+  // being verified and the host check is in progress. By the time SessionHost
+  // mounts, the user is confirmed as an authenticated host. We therefore only
+  // need a minimal guard here for the brief moment useSessionHostLogic is
+  // still fetching data — rendered as a transparent pass-through so the
+  // ProtectedHostRoute spinner remains visible without a second loading flash.
   if (isLoading && !hostViewReady) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Initializing host session...</p>
+          <p className="text-muted-foreground">Loading your session...</p>
         </div>
       </div>
     );

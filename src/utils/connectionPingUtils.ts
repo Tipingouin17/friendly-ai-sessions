@@ -2,119 +2,36 @@
  * connection Ping Utils
  *
  * Utility for the AIfacilitator application.
+ * Uses a lightweight HTTP GET /health ping instead of WebSocket channels,
+ * so the connection check works regardless of WebSocket availability.
  */
 
-import api from "@/lib/api";
-import { removeChannel } from "@/utils/realtimeHelpers";
+import { EDGE_FUNCTION_URL } from "@/lib/api";
 
 /**
- * Creates a lightweight channel to test connection to Supabase
- * @param conversationId The conversation ID
- * @returns A promise that resolves to true if connection is successful
+ * Performs a lightweight HTTP ping to the /health endpoint.
+ * This is the primary connection check — it does not depend on WebSocket state.
+ * @returns A promise that resolves to true if the backend is reachable.
  */
-export const createPingChannel = async (conversationId: number): Promise<boolean> => {
-  
-  // Create a lightweight ping channel
-  const channelName = `ping-${conversationId}-${Date.now()}`;
-  let pingChannel = null;
-  
+export const createPingChannel = async (_conversationId: number): Promise<boolean> => {
   try {
-    // Create a promise that resolves when subscription succeeds
-    const pingPromise = new Promise<boolean>((resolve) => {
-      const timeoutId = setTimeout(() => resolve(false), 5000);
-      
-      try {
-        const channel = api
-          .channel(channelName)
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              clearTimeout(timeoutId);
-              resolve(true);
-            } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              clearTimeout(timeoutId);
-              resolve(false);
-            }
-          });
-        
-        pingChannel = channel;
-      } catch (err) {
-        clearTimeout(timeoutId);
-        resolve(false);
-      }
-    });
-    
-    // Wait for ping result
-    const pingResult = await pingPromise;
-    
-    // Clean up ping channel
-    if (pingChannel) {
-      removeChannel(pingChannel);
-    }
-    
-    return pingResult;
-  } catch (err) {
-    //console.error("Error in ping channel:", err);
-    
-    // Clean up ping channel
-    if (pingChannel) {
-      removeChannel(pingChannel);
-    }
-    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${EDGE_FUNCTION_URL}/health`, {
+      method: "GET",
+      signal: controller.signal,
+    }).catch(() => null);
+    clearTimeout(timeoutId);
+    return res !== null && res.ok;
+  } catch {
     return false;
   }
 };
 
 /**
- * Performs a simple database query to check connection
- * @param conversationId The conversation ID
- * @returns A promise that resolves to true if connection is successful
+ * Fallback: also pings /health (same as primary, kept for API compatibility).
+ * @returns A promise that resolves to true if the backend is reachable.
  */
-export const performDatabasePing = async (conversationId: number): Promise<boolean> => {
-  try {
-    // Simple ping to check connection with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    // Create the request
-    const query = api.from('conversations')
-      .select('id')
-      .eq('id', conversationId)
-      .limit(1)
-      .maybeSingle();
-      
-    // Manually handle the AbortController
-    const signal = controller.signal;
-    const abortPromise = new Promise((_, reject) => {
-      signal.addEventListener('abort', () => {
-        reject(new Error('Request aborted due to timeout'));
-      });
-    });
-    
-    // Race the query against the abort promise
-    const { data, error } = await Promise.race([
-      query,
-      abortPromise.then(() => {
-        throw new Error('Request timed out');
-      })
-    ]).catch(err => {
-      //console.error("Connection check error:", err);
-      return { data: null, error: err };
-    }) as { data: any, error: any };
-    
-    clearTimeout(timeoutId);
-    
-    if (error) {
-      console.error("Database ping failed:", error);
-      return false;
-    } 
-    
-    if (data) {
-      return true;
-    }
-    
-    return false;
-  } catch (err) {
-    //console.error("Error in database ping:", err);
-    return false;
-  }
+export const performDatabasePing = async (_conversationId: number): Promise<boolean> => {
+  return createPingChannel(_conversationId);
 };

@@ -6,6 +6,7 @@
 
 import { useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getJoinToken } from '@/lib/api';
 
 export const useJoinSessionNavigation = () => {
   const navigate = useNavigate();
@@ -20,11 +21,28 @@ export const useJoinSessionNavigation = () => {
     isNavigatingRef.current = true;
     hasNavigated.current = true;
     
-    // Navigate immediately and synchronously
-    const navigationPath = `/session?id=${conversationId}&name=${encodeURIComponent(participantName)}&participantId=${participantId}&avatarSeed=${encodeURIComponent(avatarSeed)}`;
+    // Include the join token in the URL so it survives a cache/localStorage clear.
+    // The session page bootstraps the token synchronously from ?token= on first load.
+    const joinToken = getJoinToken(String(conversationId));
+    const tokenParam = joinToken ? `&token=${encodeURIComponent(joinToken)}` : '';
+
+    const navigationPath = `/session?id=${conversationId}&name=${encodeURIComponent(participantName)}&participantId=${participantId}&avatarSeed=${encodeURIComponent(avatarSeed)}${tokenParam}`;
     
-    // Use replace to prevent back navigation issues
-    navigate(navigationPath, { replace: true });
+    // Use replace to prevent back navigation issues.
+    // Pass participantId and conversationId in location state so that
+    // useConversationId picks them up immediately without relying on localStorage.
+    navigate(navigationPath, {
+      replace: true,
+      state: {
+        participantName,
+        avatarSeed,
+        isGuest: true,
+        participantId,
+        showMessaging: true,
+        isAdmin: false,
+        conversationId
+      }
+    });
   }, [navigate]);
   
   const resetNavigationFlags = useCallback(() => {

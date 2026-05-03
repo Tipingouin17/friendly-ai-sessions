@@ -96,7 +96,7 @@ export const useParticipantRemoval = ({
         return;
       }
       
-      const newCount = originalParticipants.length - 1;
+      const newCount = Math.max(0, originalParticipants.length - 1);
       
       // Update conversations table with the new count
       const { error: updateError } = await api

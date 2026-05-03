@@ -379,32 +379,17 @@ export const useMessageFetching = ({
     }
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
-  // Auto-advance logic: Trigger response when all participants have answered or skipped.
-  // Depends on skippedCount and excludedCount (numbers) so it fires reactively when skip/pause changes.
-  const autoAdvanceTriggeredRef = useRef(false);
-
-  useEffect(() => {
-    // Reset trigger flag when both response count and skip count are zero (new round)
-    if (responseCount === 0 && skippedCount === 0) {
-      autoAdvanceTriggeredRef.current = false;
-    }
-
-    // Effective participant count excludes only paused participants
-    const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedCount);
-
-    const shouldAdvance =
-      !isGeneratingResponse &&
-      !autoAdvanceTriggeredRef.current &&
-      effectiveTotalParticipants > 0 &&
-      isWaitingForResponses &&
-      responseCount >= effectiveTotalParticipants &&
-      !conversation?.is_session_ended;
-
-    if (shouldAdvance) {
-      autoAdvanceTriggeredRef.current = true;
-      generateAggregatedResponse();
-    }
-  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse]);
+  // Auto-advance is now handled server-side via _maybe_generate_facilitator_response.
+  // The server triggers the AI response automatically after each participant message INSERT,
+  // making the cycle fully resilient (host tab does not need to be open).
+  //
+  // The host page remains the entry point for:
+  //   - Manual host instructions (via the instruction input)
+  //   - Session report generation
+  //   - Pausing / skipping participants
+  //
+  // We keep autoAdvanceForMessageIdRef for backward compatibility with any code that reads it.
+  const autoAdvanceForMessageIdRef = useRef<string | null>(null);
 
   return {
     messages,

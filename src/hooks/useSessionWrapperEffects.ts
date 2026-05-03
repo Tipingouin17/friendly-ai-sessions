@@ -105,8 +105,13 @@ export function useSessionWrapperEffects({
       providerInitialized.current = true;
       onInitialized();
       
-      // Set loading to false immediately for valid sessions
-      if ((props.isSessionStartedInDB || props.conversation || hasSessionId) && !stateRef.current.hasUpdatedLoading) {
+      // PERF FIX: For participants with a valid session ID in the URL, call
+      // onLoading(false) immediately — the ParticipantLoadingShell handles all
+      // subsequent loading states (connecting → waiting_host → ai_generating).
+      // Previously we waited for props.conversation to be non-null, which kept
+      // the page-level isLoading=true and blocked SessionStateRenderer from
+      // rendering SessionStateHandler at all, adding 1-3s of blank loading.
+      if (!stateRef.current.hasUpdatedLoading) {
         stateRef.current.hasUpdatedLoading = true;
         onLoading(false);
       }

@@ -1,21 +1,15 @@
 /**
  * Loading State
  *
- * Session component for the AIfacilitator application.
+ * Generic session loading screen — now delegates to ParticipantLoadingShell
+ * so every participant-side transition state looks identical.
  */
 
 import React from 'react';
+import ParticipantLoadingShell from './ParticipantLoadingShell';
 
-const LoadingState = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50/50 to-white flex items-center justify-center p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-        <div className="w-12 h-12 border-t-2 border-b-2 border-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-        <h2 className="text-xl font-semibold mb-2">Loading Session</h2>
-        <p className="text-gray-600">Please wait while we prepare your session...</p>
-      </div>
-    </div>
-  );
-};
+const LoadingState = () => (
+  <ParticipantLoadingShell phase="connecting" />
+);
 
 export default LoadingState;

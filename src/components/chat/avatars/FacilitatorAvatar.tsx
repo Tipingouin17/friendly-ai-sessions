@@ -10,6 +10,7 @@ import { Bot } from 'lucide-react';
 import { handleAvatarError, isImageUrl, getFacilitatorAvatarUrl } from '@/utils/facilitatorUtils';
 import { isInCrossOriginContext } from '@/utils/crossOriginUtils';
 import { debugLog } from '@/utils/debugLogger';
+import InlineAvatar from './InlineAvatar';
 
 interface FacilitatorAvatarProps {
   avatarUrl?: string | null;
@@ -105,21 +106,18 @@ const FacilitatorAvatar = ({
           className="object-cover rounded-xl"
           crossOrigin={needsCrossOrigin ? "anonymous" : undefined}
         />
-        <AvatarFallback className="bg-blue-100 text-blue-500 rounded-xl">
-          <Bot className="h-4 w-4" />
+        <AvatarFallback className="p-0 bg-transparent rounded-xl">
+          <InlineAvatar name={name} size={size} className="!rounded-xl" />
         </AvatarFallback>
       </Avatar>
     );
   }
-  
-  // Fallback for facilitator with no avatar
+
+  // Fallback: InlineAvatar with facilitator name for a coloured initial avatar
   return (
-    // rounded-xl matches the MessageBubble's rounded-tl-none flat corner for visual alignment
-    <Avatar className={`${dimensions[size]} !rounded-xl bg-blue-100 avatar-container`}>
-      <AvatarFallback className="bg-blue-100 text-blue-500 rounded-xl">
-        <Bot className="h-4 w-4" />
-      </AvatarFallback>
-    </Avatar>
+    <div className={`${dimensions[size]} overflow-hidden rounded-xl shrink-0`}>
+      <InlineAvatar name={name} size={size} className="!rounded-xl" />
+    </div>
   );
 };
 

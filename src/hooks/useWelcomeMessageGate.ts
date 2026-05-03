@@ -80,24 +80,29 @@ export const useWelcomeMessageGate = ({
     // BUG #3 FIX: If messageReady was already confirmed for this session, skip.
     if (messageReadyForConversationRef.current === conversationId) return true;
 
-    setState(prev => ({ 
-      ...prev, 
-      isWaitingForMessage: true, 
-      error: null,
-      timeoutReached: false 
-    }));
-
-    // First check if message already exists
+    // PERF FIX: Check if message already exists BEFORE setting isWaitingForMessage=true.
+    // Previously we set isWaitingForMessage=true immediately, which forced phase='ai_generating'
+    // for 500ms-1s even when the welcome message was already in DB — causing a visible flash.
     const messageExists = await checkForWelcomeMessage();
     if (messageExists) {
       messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
-        messageReady: true 
+        messageReady: true,
+        error: null,
+        timeoutReached: false
       }));
       return true;
     }
+
+    // Message not ready yet — now set isWaitingForMessage=true to show the loading UI
+    setState(prev => ({ 
+      ...prev, 
+      isWaitingForMessage: true, 
+      error: null,
+      timeoutReached: false 
+    }));
 
     // Check conversation status for AI generation progress
     try {
@@ -122,19 +127,20 @@ export const useWelcomeMessageGate = ({
       console.error('[WelcomeMessageGate] [AI-TRACKING] Error checking conversation status:', error);
     }
 
-    // Set up timeout (15 seconds for database trigger generation)
+    // Set up timeout (45 seconds — accounts for Railway cold start + OpenAI generation time).
+    // On timeout, set timeoutReached=true but keep isWaitingForMessage=false so the UI
+    // shows the timeout phase with a "Try Again" button instead of blocking indefinitely.
     timeoutRef.current = setTimeout(() => {
-      messageReadyForConversationRef.current = conversationId;
       setState(prev => ({ 
         ...prev, 
         isWaitingForMessage: false, 
-        messageReady: true, 
+        messageReady: false, 
         timeoutReached: true 
       }));
-    }, 15000);
+    }, 45000);
 
     // Listen for welcome message ready notification and status changes
-    const channelName = `welcome-gate-${conversationId}-${Date.now()}`;
+    const channelName = `welcome-gate-${conversationId}`;
     channelRef.current = api
       .channel(channelName)
       .on('postgres_changes', {

@@ -8,7 +8,7 @@
  * Tablet+ (sm+): single compact row — same as before.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ import { useSessionClosure } from "@/hooks/useSessionClosure";
 import SessionClosureDialog from "../SessionClosureDialog";
 import ReportDownloadDialog from "../ReportDownloadDialog";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -40,6 +41,7 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/components/ui/use-toast";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import SessionTimerBadge from "../SessionTimerBadge";
+import { getFacilitatorAvatarUrl } from "@/utils/facilitatorUtils";
 
 interface HostHeaderProps {
   conversation: ConversationWithSession | null;
@@ -104,6 +106,15 @@ const HostHeader: React.FC<HostHeaderProps> = ({
     conversation?.sessions?.title || (conversation ? "Untitled Session" : "Loading…");
 
   const facilitatorInfo = conversation?.sessions?.facilitator_details ?? null;
+  const [facilitatorAvatarUrl, setFacilitatorAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!facilitatorInfo) { setFacilitatorAvatarUrl(null); return; }
+    getFacilitatorAvatarUrl(facilitatorInfo).then(url => {
+      setFacilitatorAvatarUrl(url && url !== '/placeholder.svg' ? url : null);
+    }).catch(() => setFacilitatorAvatarUrl(null));
+  }, [facilitatorInfo?.profile_picture, facilitatorInfo?.id]);
+
   const isSessionEnded = conversation?.is_session_ended || false;
   const isSessionStarted = conversation?.session_started || false;
   const isBusy = isClosing || isStopping;
@@ -246,6 +257,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                 <SessionStatusBadge
                   isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
                   sessionStarted={isSessionStarted}
+                  isSessionEnded={isSessionEnded}
                 />
                 {isSessionStarted && !isSessionEnded && (
                   <span className="hidden sm:flex">
@@ -258,12 +270,22 @@ const HostHeader: React.FC<HostHeaderProps> = ({
               {facilitatorInfo && (
                 <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
                   <span className="text-xs text-slate-400">Facilitated by</span>
-                  <Badge
-                    variant="outline"
-                    className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] py-0 px-1.5 h-4"
-                  >
-                    {facilitatorInfo.title}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {facilitatorAvatarUrl && (
+                      <Avatar className="h-4 w-4">
+                        <AvatarImage src={facilitatorAvatarUrl} alt={facilitatorInfo.title ?? ''} />
+                        <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">
+                          {(facilitatorInfo.title || '?').charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] py-0 px-1.5 h-4"
+                    >
+                      {facilitatorInfo.title}
+                    </Badge>
+                  </div>
                 </div>
               )}
             </div>
@@ -290,6 +312,14 @@ const HostHeader: React.FC<HostHeaderProps> = ({
               {facilitatorInfo && (
                 <div className="flex items-center gap-1">
                   <span className="text-[11px] text-slate-400">by</span>
+                  {facilitatorAvatarUrl && (
+                    <Avatar className="h-4 w-4">
+                      <AvatarImage src={facilitatorAvatarUrl} alt={facilitatorInfo.title ?? ''} />
+                      <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">
+                        {(facilitatorInfo.title || '?').charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                   <Badge
                     variant="outline"
                     className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] py-0 px-1.5 h-4"

@@ -2,13 +2,16 @@
  * Contact
  *
  * Page for the AIfacilitator application.
+ * Includes Cloudflare Turnstile anti-spam protection and
+ * sends form submissions to Crisp via the backend edge function.
  */
 import { Mail, MapPin, Clock, ArrowRight, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import api from "@/lib/api";
 import PageHead from "@/components/PageHead";
 
@@ -19,6 +22,8 @@ interface ContactFormData {
   message: string;
 }
 
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
+
 const Contact = () => {
   const [formData, setFormData] = useState<ContactFormData>({
     fname: "",
@@ -28,6 +33,8 @@ const Contact = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<{ reset: () => void } | null>(null);
 
   const handleFormChange = (field: keyof ContactFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -35,29 +42,56 @@ const Contact = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!turnstileToken) {
+      toast({
+        title: "Verification required",
+        description: "Please complete the CAPTCHA verification before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const { error } = await api
-        .from('contact_form')
-        .insert([{ ...formData, responded: false }]);
+      const { data, error } = await api.functions.invoke<{ success: boolean; message: string }>(
+        "contact-form",
+        {
+          body: {
+            ...formData,
+            cf_turnstile_token: turnstileToken,
+          },
+        }
+      );
 
-      if (error) throw error;
+      if (error) {
+        const errMsg =
+          (error as { message?: string }).message ||
+          "Please try again later.";
+        throw new Error(errMsg);
+      }
 
       setSubmitted(true);
       toast({
         title: "Message sent!",
-        description: "We'll get back to you within 24 hours.",
+        description: data?.message ?? "We'll get back to you within 24 hours.",
       });
 
       setFormData({ fname: "", lname: "", email: "", message: "" });
-    } catch (error) {
-      console.error('Error submitting form:', error);
+      setTurnstileToken(null);
+    } catch (err: unknown) {
+      console.error("Error submitting contact form:", err);
+      const errMessage =
+        err instanceof Error ? err.message : "Please try again later.";
       toast({
         title: "Error sending message",
-        description: "Please try again later.",
+        description: errMessage,
         variant: "destructive",
       });
+      // Reset Turnstile so user can try again
+      turnstileRef.current?.reset();
+      setTurnstileToken(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -215,10 +249,24 @@ const Contact = () => {
                     />
                   </div>
 
+                  {/* Cloudflare Turnstile widget */}
+                  {TURNSTILE_SITE_KEY && (
+                    <div className="flex justify-start">
+                      <Turnstile
+                        ref={turnstileRef}
+                        siteKey={TURNSTILE_SITE_KEY}
+                        onSuccess={(token) => setTurnstileToken(token)}
+                        onExpire={() => setTurnstileToken(null)}
+                        onError={() => setTurnstileToken(null)}
+                        options={{ theme: "light" }}
+                      />
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-xl py-5 font-semibold shadow-sm shadow-indigo-500/20 transition-all"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
                   >
                     {isSubmitting ? "Sending..." : "Send Message"}
                     {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}

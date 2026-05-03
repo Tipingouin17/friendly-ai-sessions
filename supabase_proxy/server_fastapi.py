@@ -3275,8 +3275,10 @@ async def edge_function(func_name: str, request: Request):
             pass  # fall back to hardcoded default
 
         # Check for Enterprise per-company model (only applies when no session-specific model is set)
+        # Use _caller_id (the authenticated host's JWT identity) as the user lookup key.
+        # 'user_id' is not defined in this handler — it belongs to close-session-and-generate-report.
         _enterprise_model = None
-        if not gpt_version and user_id:
+        if not gpt_version and _caller_id:
             try:
                 async with _pool.acquire() as _ent_conn:
                     _ent_row = await _ent_conn.fetchrow(
@@ -3286,7 +3288,7 @@ async def edge_function(func_name: str, request: Request):
                         LEFT JOIN plans pl ON pl.id = p.current_plan_id
                         WHERE p.id = $1
                         """,
-                        user_id
+                        _caller_id
                     )
                 if _ent_row:
                     _plan_title = (_ent_row["title"] or "").lower()

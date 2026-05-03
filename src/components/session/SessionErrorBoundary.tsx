@@ -121,11 +121,15 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   const isEndedSessionMessage = error?.includes("has ended") || error?.includes("no longer available");
 
   const hasError = (error && !isEndedSessionMessage) || noSessionFound;
-  const waitedTooLong = connectionAttempts > 3 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 30000);
+  // connectionAttempts is incremented every 5s when WS is disconnected (useConnectionRecovery).
+  // Railway closes idle WS connections after ~60s, causing ~12 reconnection cycles before the
+  // WS stabilises. Use >= 8 to avoid false positives during normal WS reconnection cycles.
+  // The 30s timeout guard covers the case where the provider never initialises at all.
+  const waitedTooLong = connectionAttempts >= 8 || (isLoading && !hasInitializedProvider && Date.now() - lastAttemptTime > 30000);
   
   if (hasError || waitedTooLong) {
     // If there's an active session (based on URL parameter), bypass this error for participants too
-    if (pathInfo.hasSessionId && connectionAttempts < 3) {
+    if (pathInfo.hasSessionId && connectionAttempts < 8) {
       return <>{children}</>;
     }
     

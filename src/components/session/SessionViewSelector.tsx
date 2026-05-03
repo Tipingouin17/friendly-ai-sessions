@@ -241,11 +241,11 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     } else if (isWaitingForMessage || (!messageReady && !timeoutReached)) {
       // Session started, AI is generating the welcome message
       phase = 'ai_generating';
-    } else if (messageReady && isTransitioning) {
-      // Message ready but still transitioning to chat view
-      phase = 'message_ready';
     } else if (messageReady) {
-      // Message ready and not transitioning — show the chat
+      // PERF FIX: Skip the 'message_ready' transitioning phase entirely.
+      // Previously we kept ParticipantLoadingShell visible for 1.5-2s while
+      // isTransitioning=true, adding a visible delay before the chat appeared.
+      // Now we render SessionView immediately when messageReady=true.
       return <SessionView props={props} isAdmin={isAdmin} />;
     } else {
       // Fallback: still connecting

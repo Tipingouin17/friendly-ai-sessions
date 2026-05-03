@@ -1348,6 +1348,47 @@ async def rest_root():
 
 
 # ============================================================
+# Avatar generation endpoint
+# Generates a simple SVG avatar with initials and a deterministic
+# background colour based on the participant name.
+# Compatible with the /api/avatar?name=Alice&variant=beam&palette=0 URL
+# pattern used throughout the frontend.
+# ============================================================
+@app.get("/api/avatar")
+async def generate_avatar(name: str = "?", variant: str = "beam", palette: int = 0):
+    """Return a simple SVG avatar with initials and a deterministic colour."""
+    # Deterministic colour palette derived from the name hash
+    palettes = [
+        ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"],
+        ["#7c3aed", "#db2777", "#d97706", "#059669", "#2563eb", "#dc2626", "#0891b2", "#65a30d"],
+        ["#4f46e5", "#9333ea", "#e11d48", "#ca8a04", "#16a34a", "#1d4ed8", "#b91c1c", "#0e7490"],
+    ]
+    colour_list = palettes[palette % len(palettes)]
+    colour_index = abs(hash(name)) % len(colour_list)
+    bg_colour = colour_list[colour_index]
+    # Initials: up to 2 characters
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        initials = (parts[0][0] + parts[-1][0]).upper()
+    elif parts and parts[0]:
+        initials = parts[0][:2].upper()
+    else:
+        initials = "?"
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">'
+        f'<rect width="40" height="40" rx="20" fill="{bg_colour}"/>'
+        f'<text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" '
+        f'font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="white">{initials}</text>'
+        f'</svg>'
+    )
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+# ============================================================
 # Auth endpoints
 # ============================================================
 @app.post("/auth/v1/signup")

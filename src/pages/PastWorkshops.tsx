@@ -355,10 +355,15 @@ const PastWorkshops = () => {
 
   // Aggregate stats
   const totalSessions = (pastWorkshops?.length || 0) + (activeWorkshops?.length || 0);
-  const totalParticipants = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.current_participants ?? 0), 0);
+  // Use Math.max(0, ...) to guard against negative counts from race conditions
+  const totalParticipants = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce(
+    (s, w) => s + Math.max(0, w.current_participants ?? 0), 0
+  );
   const totalMessages = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.total_messages || 0), 0);
-  const avgEngagement = pastWorkshops?.length
-    ? ((pastWorkshops.reduce((s, w) => s + (w.participant_engagement_score || 0), 0) / pastWorkshops.length)).toFixed(1)
+  // Only show avg engagement when at least one session has a real score
+  const sessionsWithScore = (pastWorkshops || []).filter(w => (w.participant_engagement_score ?? 0) > 0);
+  const avgEngagement = sessionsWithScore.length
+    ? (sessionsWithScore.reduce((s, w) => s + (w.participant_engagement_score || 0), 0) / sessionsWithScore.length).toFixed(1)
     : '—';
 
   const filterTabs: { id: FilterTab; label: string; count?: number }[] = [

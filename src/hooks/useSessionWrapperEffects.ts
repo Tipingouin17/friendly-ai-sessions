@@ -105,7 +105,9 @@ export function useSessionWrapperEffects({
       providerInitialized.current = true;
       onInitialized();
       
-      // Set loading to false immediately for valid sessions
+      // Set loading to false only when we have real data or a valid session ID.
+      // If there is no session ID yet (e.g. session just created and ID not yet in URL),
+      // keep loading=true so the spinner stays visible instead of flashing an error.
       if ((props.isSessionStartedInDB || props.conversation || hasSessionId) && !stateRef.current.hasUpdatedLoading) {
         stateRef.current.hasUpdatedLoading = true;
         onLoading(false);

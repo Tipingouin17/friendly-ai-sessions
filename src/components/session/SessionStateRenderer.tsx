@@ -106,9 +106,24 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
   }
   
   if (!props.currentConversationId && !isLoading && !props.isLoading) {
-    console.error("No conversation ID found in session provider, but no error was returned");
+    // Only treat this as a hard error when a session ID was explicitly provided in the URL.
+    // Without an ?id= param the user may be navigating here before a conversation has been
+    // created (e.g. right after session creation), so we show the loading spinner instead
+    // of a misleading "Session not found" error message.
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSessionId = urlParams.has('id') && !!urlParams.get('id');
+
+    if (hasSessionId) {
+      console.error("No conversation ID found in session provider, but no error was returned");
+      return <JoinSessionLoadingState 
+        error="Session not found. Please try again." 
+        onRetry={retryConnection}
+        retryCount={connectionAttempts} 
+      />;
+    }
+
+    // No ?id= in URL — show a neutral loading spinner while the conversation ID resolves.
     return <JoinSessionLoadingState 
-      error="Session not found. Please try again." 
       onRetry={retryConnection}
       retryCount={connectionAttempts} 
     />;

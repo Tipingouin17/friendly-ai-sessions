@@ -134,7 +134,10 @@ export function useSessionContextValue({
 
   // Create the session context value with safe defaults and proper memoization
   return useMemo<SessionContextProps>(() => ({
-    isLoading: effectiveAdmin ? false : isLoading,
+    // When currentConversationId is null, TanStack Query v5 sets enabled:false and
+    // returns isLoading=false immediately. We must treat this as "still loading" so
+    // SessionStateRenderer doesn't fire the "No conversation ID found" error branch.
+    isLoading: effectiveAdmin ? false : (isLoading || !currentConversationId),
     conversation,
     currentConversationId,
     sessionState,

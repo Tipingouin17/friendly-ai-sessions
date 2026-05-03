@@ -1227,7 +1227,11 @@ class ConnectionManager:
         except Exception:
             pass  # Already accepted by the endpoint handler
         async with self._lock:
-            self._rooms.setdefault(conversation_id, []).append((ws, topic))
+            room = self._rooms.setdefault(conversation_id, [])
+            # Deduplicate: remove any existing entry for this (ws, topic) pair before
+            # adding, so a reconnect with the same stable topic never creates duplicates.
+            self._rooms[conversation_id] = [(w, t) for w, t in room if not (w is ws and t == topic)]
+            self._rooms[conversation_id].append((ws, topic))
 
     async def disconnect(self, ws: WebSocket, conversation_id: str):
         async with self._lock:

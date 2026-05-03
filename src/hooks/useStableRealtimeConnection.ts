@@ -81,7 +81,12 @@ export function useStableRealtimeConnection({
 
     cleanup();
 
-    const channelName = `stable-realtime-${conversationId}-${Date.now()}`;
+    // Use a stable topic name (no timestamp) so the server always broadcasts
+    // to the correct topic even if the channel is recreated after a reconnect.
+    // A timestamp suffix caused topic mismatches: the server stored the old
+    // topic in its room map and broadcast to it after the client had already
+    // unregistered that topic and created a new one with a fresh timestamp.
+    const channelName = `stable-realtime-${conversationId}`;
 
     try {
       const channel = api

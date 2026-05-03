@@ -109,16 +109,25 @@ export const useEnhancedSessionMessages = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]); // lastFetchTime intentionally excluded — use ref to avoid stale closure recreation
 
+  // Stable callbacks — must be wrapped in useCallback so their reference only
+  // changes when fetchMessages changes (i.e. when conversationId changes).
+  // Inline arrow functions would get a new reference on every render, causing
+  // setupConnection to be recreated, the old channel to be unregistered, and
+  // the server to broadcast to a stale topic that the client no longer listens to.
+  const onMessageUpdate = useCallback(() => {
+    fetchMessages(true);
+  }, [fetchMessages]);
+
+  const onSessionUpdate = useCallback(() => {
+    fetchMessages(true);
+  }, [fetchMessages]);
+
   // Stable realtime connection
   const { isConnected, hasStableConnection, forceReconnect } = useStableRealtimeConnection({
     conversationId,
-    onMessageUpdate: () => {
-      fetchMessages(true);
-    },
-    onParticipantUpdate: () => { /* no-op */ },
-    onSessionUpdate: () => {
-      fetchMessages(true);
-    },
+    onMessageUpdate,
+    onParticipantUpdate: undefined,
+    onSessionUpdate,
     enabled: !!conversationId
   });
 
@@ -146,11 +155,12 @@ export const useEnhancedSessionMessages = ({
   // NOTE: Removed redundant delayed participant fetch (was causing duplicate renders).
   // The initial fetch + realtime subscription already covers this case.
 
-  // Connection recovery mechanism — poll every 5s when unstable, every 8s as a safety net
+  // Connection recovery mechanism — poll every 3s when unstable, every 5s as a safety net
   // even when the realtime connection is stable (guards against missed broadcasts).
+  // Reduced from 8s/5s to 3s/5s for faster recovery when a broadcast is missed.
   useEffect(() => {
     if (!conversationId) return;
-    const interval = hasStableConnection ? 8000 : 5000;
+    const interval = hasStableConnection ? 5000 : 3000;
     const fallbackInterval = setInterval(() => {
       fetchMessages(false); // throttled poll — won't fire if a force-refresh just ran
     }, interval);

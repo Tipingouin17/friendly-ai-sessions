@@ -174,6 +174,27 @@ export function clearAllParticipantState(): void {
   keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
+// ─── Bootstrap join token from URL on every page load ───────────────────────
+// This IIFE runs once when api.ts is first imported (which happens on every
+// page load because api.ts is a top-level dependency of almost every hook).
+// It reads the ?token= query parameter and persists it to localStorage so
+// that all subsequent API calls carry the X-Join-Token header — even when
+// the participant navigates directly to /session?id=42&token=xyz (bookmark,
+// page refresh, or mobile deep-link) without going through /join-session first.
+(function bootstrapJoinTokenFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const sessionId = params.get('id');
+    if (token) {
+      // Store under the scoped key so it never bleeds across sessions.
+      localStorage.setItem(joinTokenKey(sessionId), token);
+    }
+  } catch {
+    // Silently ignore — SSR or environments without window/localStorage.
+  }
+})();
+
 /**
  * Retrieve the join token for the current session.
  * @param sessionId  Optional session ID; resolved from URL when omitted.

@@ -2846,7 +2846,15 @@ async def rest_table(table: str, request: Request):
                     # Only dicts need to be serialised to JSON strings for JSONB columns.
                     # Passing a list as json.dumps() would produce a string, which asyncpg
                     # then rejects when the target column is a real array type.
-                    return [json.dumps(v) if isinstance(v, dict) else v for v in d.values()]
+                    # String values are coerced so that datetime strings become datetime objects
+                    # and UUID strings become uuid.UUID objects for asyncpg.
+                    def _adapt_val(v):
+                        if isinstance(v, dict):
+                            return json.dumps(v)
+                        if isinstance(v, str):
+                            return _coerce_value(v)
+                        return v
+                    return [_adapt_val(v) for v in d.values()]
 
                 if isinstance(data, list):
                     results = []
@@ -2921,7 +2929,9 @@ async def rest_table(table: str, request: Request):
                 # Build SET clause with asyncpg positional params
                 set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(data.keys())]
                 sc = ", ".join(set_parts)
-                data_vals = list(data.values())
+                # Coerce body values so datetime strings become datetime objects
+                # and UUID strings become uuid.UUID objects for asyncpg.
+                data_vals = [_coerce_value(v) if isinstance(v, str) else v for v in data.values()]
                 # Renumber WHERE clause params starting after data params
                 offset = len(data_vals)
                 new_wc_parts = []

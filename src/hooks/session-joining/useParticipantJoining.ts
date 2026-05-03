@@ -10,6 +10,7 @@
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
+import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
 
 interface JoinParticipantParams {
   conversationId: number;
@@ -34,9 +35,13 @@ export function useParticipantJoining() {
     participantName: string,
     avatarSeed: string
   ) => {
+    const deviceId = getOrCreateDeviceId();
     const sessionData = getSessionByConversationId(conversationId);
 
-    if (sessionData) {
+    // Only treat as existing participant if the device_id matches.
+    // This prevents a different browser from hijacking a slot by reusing
+    // the same participantId from the URL.
+    if (sessionData && sessionData.deviceId === deviceId) {
       updateSessionAccessTime(conversationId);
       toast({
         title: "Rejoining Session",
@@ -74,6 +79,8 @@ export function useParticipantJoining() {
       }
     }
 
+    const deviceId = getOrCreateDeviceId();
+
     // Single atomic backend call — replaces 7 sequential REST calls
     const { data, error } = await api.functions.invoke('join-session', {
       body: {
@@ -82,6 +89,7 @@ export function useParticipantJoining() {
         avatar_seed: avatarSeed,
         is_anonymous: isAnonymous,
         is_host: isAdmin,
+        device_id: deviceId,
       }
     });
 
@@ -97,14 +105,17 @@ export function useParticipantJoining() {
 
     const newParticipantId: number = data.participant_id;
 
-    // Persist participant data to localStorage for rejoin detection
+    // Persist participant data to localStorage for rejoin detection.
+    // The deviceId is stored alongside so handleExistingParticipant can
+    // verify the returning browser is the same one that originally joined.
     persistParticipantData({
       participantId: newParticipantId,
       conversationId,
       name: participantName,
       avatarSeed,
       isAnonymous,
-      isAdmin
+      isAdmin,
+      deviceId,
     });
 
     return {

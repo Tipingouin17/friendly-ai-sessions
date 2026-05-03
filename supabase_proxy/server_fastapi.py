@@ -3639,9 +3639,14 @@ async def edge_function(func_name: str, request: Request):
         avatar_seed = str(data.get("avatar_seed") or uuid.uuid4())
         is_anonymous = bool(data.get("is_anonymous", False))
         is_host = bool(data.get("is_host", False))
+        # device_id: browser-generated UUID (localStorage 'aif_device_id').
+        # Stored in session_participants to allow safe rejoin detection and
+        # to prevent participantId slot hijacking via URL manipulation.
+        device_id: str | None = (data.get("device_id") or "").strip() or None
         log_session.info(
-            "join-session: conv_id=%s name=%r is_host=%s is_anon=%s origin=%s",
+            "join-session: conv_id=%s name=%r is_host=%s is_anon=%s device_id=%s origin=%s",
             conversation_id, participant_name, is_host, is_anonymous,
+            device_id[:8] + "..." if device_id else "none",
             request.headers.get("origin", "-"),
         )
         join_token = (
@@ -3684,30 +3689,77 @@ async def edge_function(func_name: str, request: Request):
                     if conv["status"] and conv["status"] != "active":
                         raise HTTPException(400, "This session is not currently active")
 
-                    # 2. Count actual participants (source of truth)
-                    _cnt = await conn.fetchrow(
-                        'SELECT COUNT(*) FROM public.session_participants WHERE conversation_id = $1',
-                        conversation_id,
-                    )
-                    actual_count = _cnt[0] if _cnt else 0
-                    max_participants = conv["participants"] or 0
+                    # 2a. If device_id is provided, check for an existing slot
+                    #     for this device in this conversation.  This allows a
+                    #     participant to rejoin after a page refresh without
+                    #     consuming a new slot.
+                    existing_slot = None
+                    if device_id:
+                        existing_slot = await conn.fetchrow(
+                            """
+                            SELECT participant_id, name, avatar_seed
+                            FROM public.session_participants
+                            WHERE conversation_id = $1 AND device_id = $2
+                            """,
+                            conversation_id, device_id,
+                        )
 
-                    if max_participants > 0 and actual_count >= max_participants and not is_host:
-                        raise HTTPException(400, "This session is full")
+                    if existing_slot:
+                        # Participant is rejoining — reuse their existing slot.
+                        new_participant_id = existing_slot["participant_id"]
+                        # Update name/avatar in case they changed them.
+                        await conn.execute(
+                            """
+                            UPDATE public.session_participants
+                            SET name = $3, avatar_seed = $4
+                            WHERE conversation_id = $1 AND participant_id = $2
+                            """,
+                            conversation_id, new_participant_id,
+                            participant_name, avatar_seed,
+                        )
+                        log_session.info(
+                            "join-session: REJOIN conv_id=%s participant_id=%s name=%r",
+                            conversation_id, new_participant_id, participant_name,
+                        )
+                    else:
+                        # 2b. New participant — count existing slots and assign next ID.
+                        _cnt = await conn.fetchrow(
+                            """
+                            SELECT COALESCE(MAX(participant_id), 0)
+                            FROM public.session_participants
+                            WHERE conversation_id = $1
+                            """,
+                            conversation_id,
+                        )
+                        max_id = _cnt[0] if _cnt else 0
+                        # Count non-host participants for capacity check
+                        _cnt2 = await conn.fetchrow(
+                            'SELECT COUNT(*) FROM public.session_participants WHERE conversation_id = $1 AND is_host = false',
+                            conversation_id,
+                        )
+                        actual_count = _cnt2[0] if _cnt2 else 0
+                        max_participants = conv["participants"] or 0
 
-                    new_participant_id = actual_count + 1
+                        if max_participants > 0 and actual_count >= max_participants and not is_host:
+                            raise HTTPException(400, "This session is full")
 
-                    # 3. Insert participant + update count + log event atomically
-                    await conn.execute(
-                        """
-                        INSERT INTO public.session_participants
-                            (conversation_id, participant_id, name, avatar_seed, is_anonymous, is_host)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                        ON CONFLICT (conversation_id, participant_id) DO NOTHING
-                        """,
-                        conversation_id, new_participant_id, participant_name,
-                        avatar_seed, is_anonymous, is_host,
-                    )
+                        # Use MAX(participant_id) + 1 instead of COUNT + 1 to avoid
+                        # reusing IDs of removed participants (was the root cause of BUG-A).
+                        new_participant_id = max_id + 1
+
+                    # 3. Insert (new) or skip (rejoin) + update count + log event atomically
+                    if not existing_slot:
+                        await conn.execute(
+                            """
+                            INSERT INTO public.session_participants
+                                (conversation_id, participant_id, name, avatar_seed,
+                                 is_anonymous, is_host, device_id)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                            ON CONFLICT (conversation_id, participant_id) DO NOTHING
+                            """,
+                            conversation_id, new_participant_id, participant_name,
+                            avatar_seed, is_anonymous, is_host, device_id,
+                        )
 
                     await conn.execute(
                         """
@@ -3742,9 +3794,10 @@ async def edge_function(func_name: str, request: Request):
                 "join-session: SUCCESS conv_id=%s participant_id=%s name=%r is_host=%s",
                 conversation_id, new_participant_id, participant_name, is_host,
             )
-            # Fire-and-forget: trigger AI welcome message generation when a
-            # non-host participant joins (mirrors the REST /session_participants path).
-            if not is_host:
+            is_rejoining = existing_slot is not None
+            # Fire-and-forget: trigger AI welcome message generation only for
+            # first-time joins (not rejoins) to avoid duplicate welcome messages.
+            if not is_host and not is_rejoining:
                 asyncio.create_task(_maybe_generate_welcome_message(conversation_id))
             return {
                 "success": True,
@@ -3752,6 +3805,7 @@ async def edge_function(func_name: str, request: Request):
                 "name": participant_name,
                 "avatar_seed": avatar_seed,
                 "is_host": is_host,
+                "is_rejoining": is_rejoining,
             }
         except HTTPException:
             raise

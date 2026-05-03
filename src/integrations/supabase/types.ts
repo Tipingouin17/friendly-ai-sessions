@@ -709,6 +709,7 @@ export type Database = {
           created_at: string | null
           is_anonymous: boolean | null
           is_host: boolean
+          device_id: string | null
         }
         Insert: {
           id?: number
@@ -719,6 +720,7 @@ export type Database = {
           created_at?: string | null
           is_anonymous?: boolean | null
           is_host?: boolean
+          device_id?: string | null
         }
         Update: {
           id?: number
@@ -729,6 +731,7 @@ export type Database = {
           created_at?: string | null
           is_anonymous?: boolean | null
           is_host?: boolean
+          device_id?: string | null
         }
         Relationships: []
       }

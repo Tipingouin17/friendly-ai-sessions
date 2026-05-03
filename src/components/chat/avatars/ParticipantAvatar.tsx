@@ -69,7 +69,7 @@ const ParticipantAvatar = ({
         className="object-cover"
         crossOrigin={needsCrossOrigin ? 'anonymous' : undefined}
       />
-      <AvatarFallback>
+      <AvatarFallback className="p-0 bg-transparent">
         <InlineAvatar name={name || 'User'} size={size} />
       </AvatarFallback>
     </Avatar>

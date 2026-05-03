@@ -380,31 +380,29 @@ export const useMessageFetching = ({
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
   // Auto-advance logic: Trigger response when all participants have answered or skipped.
-  // Depends on skippedCount and excludedCount (numbers) so it fires reactively when skip/pause changes.
-  const autoAdvanceTriggeredRef = useRef(false);
+  // We track the ID of the last assistant message for which we already triggered a response,
+  // so the trigger fires exactly once per AI question — even if the Host loads the page after
+  // participants have already responded (in which case responseCount never passes through 0).
+  const autoAdvanceForMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Reset trigger flag when both response count and skip count are zero (new round)
-    if (responseCount === 0 && skippedCount === 0) {
-      autoAdvanceTriggeredRef.current = false;
-    }
+    if (!isWaitingForResponses || isGeneratingResponse || conversation?.is_session_ended) return;
 
     // Effective participant count excludes only paused participants
     const effectiveTotalParticipants = Math.max(1, totalParticipants - excludedCount);
+    if (effectiveTotalParticipants <= 0) return;
+    if (responseCount < effectiveTotalParticipants) return;
 
-    const shouldAdvance =
-      !isGeneratingResponse &&
-      !autoAdvanceTriggeredRef.current &&
-      effectiveTotalParticipants > 0 &&
-      isWaitingForResponses &&
-      responseCount >= effectiveTotalParticipants &&
-      !conversation?.is_session_ended;
+    // Find the ID of the last assistant message (the question we are answering)
+    const lastAssistantMsg = [...messagesRef.current].reverse().find(m => m.sender === 'assistant');
+    if (!lastAssistantMsg) return;
 
-    if (shouldAdvance) {
-      autoAdvanceTriggeredRef.current = true;
-      generateAggregatedResponse();
-    }
-  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse]);
+    // Only trigger once per assistant message — prevents duplicate calls
+    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) return;
+
+    autoAdvanceForMessageIdRef.current = lastAssistantMsg.id;
+    generateAggregatedResponse();
+  }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse, conversation?.is_session_ended]);
 
   return {
     messages,

@@ -4327,6 +4327,127 @@ async def edge_function(func_name: str, request: Request):
             raise HTTPException(500, f"Failed to join session: {e}")
 
     # ── Unknown function ───────────────────────────────────────
+
+    # ── contact-form ────────────────────────────────────────────────────────
+    elif func_name == "contact-form":
+        import httpx as _httpx
+        import base64 as _base64
+
+        fname    = (data.get("fname") or "").strip()
+        lname    = (data.get("lname") or "").strip()
+        email    = (data.get("email") or "").strip()
+        message  = (data.get("message") or "").strip()
+        cf_token = (data.get("cf_turnstile_token") or "").strip()
+
+        # ── Basic validation ──────────────────────────────────────────────
+        if not all([fname, lname, email, message]):
+            raise HTTPException(400, detail={"error": "All fields are required."})
+        if not cf_token:
+            raise HTTPException(400, detail={"error": "Turnstile token is required."})
+
+        # ── Cloudflare Turnstile verification ─────────────────────────────
+        _ts_secret = os.environ.get("TURNSTILE_SECRET_KEY", "")
+        if not _ts_secret:
+            logger.warning("contact-form: TURNSTILE_SECRET_KEY not configured, skipping verification")
+        else:
+            try:
+                async with _httpx.AsyncClient(timeout=10) as _hc:
+                    _ts_resp = await _hc.post(
+                        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                        data={"secret": _ts_secret, "response": cf_token},
+                    )
+                _ts_data = _ts_resp.json()
+                if not _ts_data.get("success"):
+                    logger.warning("contact-form: Turnstile verification failed: %s", _ts_data)
+                    raise HTTPException(400, detail={"error": "CAPTCHA verification failed. Please try again."})
+            except HTTPException:
+                raise
+            except Exception as _ts_err:
+                logger.error("contact-form: Turnstile request error: %s", _ts_err)
+                raise HTTPException(502, detail={"error": "Could not verify CAPTCHA. Please try again."})
+
+        # ── Send to Crisp via REST API ─────────────────────────────────────
+        _crisp_id  = os.environ.get("CRISP_API_IDENTIFIER", "")
+        _crisp_key = os.environ.get("CRISP_API_KEY", "")
+        _crisp_ws  = os.environ.get("CRISP_WEBSITE_ID", "2fa7d9e8-136f-4814-a20c-3cd59756b396")
+
+        if not _crisp_id or not _crisp_key:
+            logger.error("contact-form: CRISP_API_IDENTIFIER or CRISP_API_KEY not configured")
+            raise HTTPException(500, detail={"error": "Contact service is not configured."})
+
+        _crisp_auth = _base64.b64encode(f"{_crisp_id}:{_crisp_key}".encode()).decode()
+        _crisp_headers = {
+            "Authorization": f"Basic {_crisp_auth}",
+            "X-Crisp-Tier": "website",
+            "Content-Type": "application/json",
+        }
+        _crisp_msg_content = (
+            f"**Contact Form Submission**\n\n"
+            f"**Name:** {fname} {lname}\n"
+            f"**Email:** {email}\n\n"
+            f"**Message:**\n{message}"
+        )
+        try:
+            async with _httpx.AsyncClient(timeout=15) as _hc:
+                # Step 1: Create a new conversation
+                _conv_resp = await _hc.post(
+                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation",
+                    headers=_crisp_headers,
+                    json={},
+                )
+                if _conv_resp.status_code not in (200, 201):
+                    logger.error(
+                        "contact-form: Crisp create conversation failed: %s %s",
+                        _conv_resp.status_code, _conv_resp.text,
+                    )
+                    raise HTTPException(502, detail={"error": "Failed to create support conversation."})
+                _conv_data = _conv_resp.json()
+                _session_id = (_conv_data.get("data") or {}).get("session_id")
+                if not _session_id:
+                    logger.error("contact-form: No session_id in Crisp response: %s", _conv_data)
+                    raise HTTPException(502, detail={"error": "Failed to create support conversation."})
+
+                # Step 2: Update conversation meta (user email + name)
+                await _hc.patch(
+                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/meta",
+                    headers=_crisp_headers,
+                    json={
+                        "nickname": f"{fname} {lname}",
+                        "email": email,
+                        "subject": f"Contact form: {fname} {lname}",
+                    },
+                )
+
+                # Step 3: Send the message
+                _msg_resp = await _hc.post(
+                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/message",
+                    headers=_crisp_headers,
+                    json={
+                        "type": "text",
+                        "from": "user",
+                        "origin": "email",
+                        "content": _crisp_msg_content,
+                        "user": {
+                            "nickname": f"{fname} {lname}",
+                            "email": email,
+                        },
+                    },
+                )
+                if _msg_resp.status_code not in (200, 201):
+                    logger.error(
+                        "contact-form: Crisp send message failed: %s %s",
+                        _msg_resp.status_code, _msg_resp.text,
+                    )
+                    raise HTTPException(502, detail={"error": "Failed to send message."})
+
+            logger.info("contact-form: message sent to Crisp session=%s from=%s", _session_id, email)
+            return {"success": True, "message": "Your message has been sent. We will get back to you within 24 hours."}
+        except HTTPException:
+            raise
+        except Exception as _crisp_err:
+            logger.error("contact-form: Crisp API error: %s", _crisp_err, exc_info=True)
+            raise HTTPException(502, detail={"error": "Failed to send your message. Please try again later."})
+
     raise HTTPException(404, f"Function '{func_name}' not found")
 
 

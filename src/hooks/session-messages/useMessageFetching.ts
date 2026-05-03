@@ -386,6 +386,18 @@ export const useMessageFetching = ({
   const autoAdvanceForMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    console.log('[AUTO-ADVANCE] effect triggered', {
+      isWaitingForResponses,
+      isGeneratingResponse,
+      isSessionEnded: conversation?.is_session_ended,
+      totalParticipants,
+      excludedCount,
+      responseCount,
+      skippedCount,
+      messagesCount: messagesRef.current.length,
+      autoAdvanceForMessageId: autoAdvanceForMessageIdRef.current,
+    });
+
     if (!isWaitingForResponses || isGeneratingResponse || conversation?.is_session_ended) return;
 
     // Effective participant count excludes only paused participants
@@ -395,11 +407,20 @@ export const useMessageFetching = ({
 
     // Find the ID of the last assistant message (the question we are answering)
     const lastAssistantMsg = [...messagesRef.current].reverse().find(m => m.sender === 'assistant');
-    if (!lastAssistantMsg) return;
+    if (!lastAssistantMsg) {
+      console.log('[AUTO-ADVANCE] no last assistant message found');
+      return;
+    }
+
+    console.log('[AUTO-ADVANCE] lastAssistantMsg.id =', lastAssistantMsg.id, 'autoAdvanceForMessageIdRef =', autoAdvanceForMessageIdRef.current);
 
     // Only trigger once per assistant message — prevents duplicate calls
-    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) return;
+    if (autoAdvanceForMessageIdRef.current === lastAssistantMsg.id) {
+      console.log('[AUTO-ADVANCE] already triggered for this message, skipping');
+      return;
+    }
 
+    console.log('[AUTO-ADVANCE] TRIGGERING generateAggregatedResponse for message', lastAssistantMsg.id);
     autoAdvanceForMessageIdRef.current = lastAssistantMsg.id;
     generateAggregatedResponse();
   }, [isWaitingForResponses, responseCount, totalParticipants, excludedCount, skippedCount, isGeneratingResponse, generateAggregatedResponse, conversation?.is_session_ended]);

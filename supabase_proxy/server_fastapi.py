@@ -395,6 +395,24 @@ async def _create_pool() -> asyncpg.Pool:
     """
     dsn = _build_dsn()
     log_db.info("Creating asyncpg pool (min=2, max=10) ...")
+
+    async def _init_connection(conn):
+        """Register JSON/JSONB codecs so asyncpg returns dicts instead of strings."""
+        await conn.set_type_codec(
+            'jsonb',
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog',
+            format='text',
+        )
+        await conn.set_type_codec(
+            'json',
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog',
+            format='text',
+        )
+
     pool = await asyncpg.create_pool(
         dsn,
         min_size=2,
@@ -407,6 +425,7 @@ async def _create_pool() -> asyncpg.Pool:
         # TCP keepalives — prevent Railway from cutting idle connections
         # (equivalent to psycopg2 keepalives_idle=30, interval=10, count=5)
         connection_class=asyncpg.connection.Connection,
+        init=_init_connection,
     )
     log_db.info("asyncpg pool created successfully.")
     return pool
@@ -832,7 +851,13 @@ async def log_all_requests(request: Request, call_next):
 
 
 def serialize_row(row: dict) -> dict:
-    """Convert asyncpg Record/dict to JSON-serialisable dict."""
+    """Convert asyncpg Record/dict to JSON-serialisable dict.
+
+    asyncpg returns JSONB columns as raw JSON strings by default (no codec
+    registered).  We detect those strings and parse them back into Python
+    objects so the REST API always returns proper JSON objects/arrays for
+    JSONB columns (e.g. the `data` column in session_events).
+    """
     import uuid as _uuid
     result = {}
     for k, v in row.items():
@@ -847,6 +872,13 @@ def serialize_row(row: dict) -> dict:
         elif isinstance(v, list):
             # Recursively serialize list items (e.g. array of UUIDs)
             result[k] = [str(i) if isinstance(i, _uuid.UUID) else i for i in v]
+        elif isinstance(v, str) and len(v) > 1 and v[0] in ('{', '['):
+            # asyncpg returns JSONB columns as raw JSON strings — parse them
+            # back into Python objects so the client receives proper JSON.
+            try:
+                result[k] = json.loads(v)
+            except (ValueError, TypeError):
+                result[k] = v
         else:
             result[k] = v
     return result

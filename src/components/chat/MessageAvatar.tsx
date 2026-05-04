@@ -12,6 +12,7 @@ import AdminAvatar from './avatars/AdminAvatar';
 
 interface MessageAvatarProps {
   avatarUrl?: string | null;
+  avatarSeed?: string | null;
   name: string;
   size?: 'sm' | 'md' | 'lg';
   anonymized?: boolean;
@@ -20,7 +21,8 @@ interface MessageAvatarProps {
 }
 
 const MessageAvatar = ({ 
-  avatarUrl, 
+  avatarUrl,
+  avatarSeed,
   name, 
   size = 'md',
   anonymized = false,
@@ -43,7 +45,7 @@ const MessageAvatar = ({
   }
 
   // Default to participant avatar
-  return <ParticipantAvatar avatarUrl={avatarUrl} name={name} size={size} />;
+  return <ParticipantAvatar avatarUrl={avatarUrl} avatarSeed={avatarSeed} name={name} size={size} />;
 };
 
 export default MessageAvatar;

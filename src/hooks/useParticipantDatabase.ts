@@ -41,7 +41,7 @@ export function useParticipantDatabase(conversationId: number | null) {
           const formatted: ParticipantInfo[] = data.map(p => ({
             id: p.participant_id,
             name: p.name || `Participant ${p.participant_id}`,
-            avatar: p.avatar_seed ? `/api/avatar?name=${p.avatar_seed}&variant=beam&palette=0` : null,
+            avatar: null, // avatarSeed is used directly by ParticipantAvatar via BoringAvatar
             avatarSeed: p.avatar_seed || null,
             isAnonymous: p.is_anonymous || false,
             isHost: p.is_host || false,

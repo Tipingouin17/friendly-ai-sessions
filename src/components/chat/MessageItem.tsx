@@ -108,6 +108,7 @@ const MessageItem = ({
           ) : (
             <MessageAvatar
               avatarUrl={participantInfo?.avatar}
+              avatarSeed={participantInfo?.avatarSeed}
               name={participantInfo?.name || displayParticipantName}
               size="md"
             />

@@ -1489,11 +1489,14 @@ async def auth_signup(request: Request):
             if existing:
                 raise HTTPException(400, detail={"code": "user_already_exists", "message": "An account with this email already exists"})
 
+            # Fetch the free plan id to assign it at signup
+            free_plan_row = await conn.fetchrow("SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1")
+            free_plan_id = free_plan_row["id"] if free_plan_row else None
             await conn.execute(
                 "INSERT INTO profiles "
-                "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
-                "VALUES ($1, $2, $3, 'free', $4, FALSE, NOW(), NOW())",
-                user_id, email, full_name or None, pw_hash,
+                "(id, email, full_name, role, password_hash, email_verified, current_plan_id, created_at, updated_at) "
+                "VALUES ($1, $2, $3, 'free', $4, FALSE, $5, NOW(), NOW())",
+                user_id, email, full_name or None, pw_hash, free_plan_id,
             )
             # Generate a 24-hour email verification token and store it
             verification_token = str(uuid.uuid4())

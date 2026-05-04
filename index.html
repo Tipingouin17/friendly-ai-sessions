@@ -42,6 +42,78 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://aifacilitator.ai/" />
 
+    <!-- Structured Data (JSON-LD) - Schema.org -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "AIfacilitator",
+      "url": "https://aifacilitator.ai",
+      "description": "AI-Powered Workshop Facilitation platform. Expert AI facilitators guide your team through structured conversations, decisions, and outcomes — every time.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Free plan available. Premium plans for teams."
+      },
+      "featureList": [
+        "AI-powered workshop facilitation",
+        "Structured team conversations",
+        "Brainstorming and retrospectives",
+        "Decision-making sessions",
+        "Real-time participant collaboration"
+      ],
+      "screenshot": "https://aifacilitator.ai/og-image.png",
+      "publisher": {
+        "@type": "Organization",
+        "name": "AIfacilitator",
+        "url": "https://aifacilitator.ai",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://aifacilitator.ai/apple-touch-icon.png",
+          "width": 180,
+          "height": 180
+        }
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "AIfacilitator",
+      "url": "https://aifacilitator.ai",
+      "logo": "https://aifacilitator.ai/apple-touch-icon.png",
+      "description": "AIfacilitator provides AI-powered workshop facilitation tools that help teams run better structured conversations, decisions, and outcomes.",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "url": "https://aifacilitator.ai/contact"
+      },
+      "sameAs": []
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "AIfacilitator",
+      "url": "https://aifacilitator.ai",
+      "description": "Run better workshops with AI. Expert AI facilitators guide your team through structured conversations, decisions, and outcomes.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://aifacilitator.ai/?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
     <!-- CSP is enforced via Vercel HTTP response headers (vercel.json) in production.
          No meta CSP here to avoid dual-policy conflicts that cause false-positive console errors. -->
   </head>

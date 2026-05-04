@@ -4,6 +4,7 @@
  * Page for the AIfacilitator application.
  */
 
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Link } from "react-router-dom";
@@ -173,6 +174,33 @@ const FAQAccordion = ({ faqs }: { faqs: FAQ[] }) => {
 };
 
 const FAQs = () => {
+  // Inject JSON-LD FAQPage structured data for Google Rich Results
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.id = 'faq-jsonld';
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: FALLBACK_FAQS.map((faq) => ({
+        '@type': 'Question',
+        name: faq.title,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.description,
+        },
+      })),
+    });
+    // Remove any existing FAQ JSON-LD before inserting
+    const existing = document.getElementById('faq-jsonld');
+    if (existing) existing.remove();
+    document.head.appendChild(script);
+    return () => {
+      const el = document.getElementById('faq-jsonld');
+      if (el) el.remove();
+    };
+  }, []);
+
   const { data: faqs = FALLBACK_FAQS, isLoading, error } = useQuery({
     queryKey: ['faqs'],
     queryFn: fetchFAQs,

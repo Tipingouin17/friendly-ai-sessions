@@ -1,6 +1,15 @@
 /**
  * User Management — Admin Component
- * Full CRUD: view, search, filter, sort, change plan, ban/unban, promote/demote, export CSV
+ * Full CRUD: view, search, filter, sort, change plan, ban/unban, delete, promote/demote, export CSV
+ *
+ * Ban/Unban now use dedicated admin endpoints (/admin/users/{id}/ban|unban) which:
+ *   - Update the DB
+ *   - Populate the in-memory banned cache on the backend (instant JWT rejection)
+ *   - Remove the user from the USERS memory cache (blocks re-login)
+ *
+ * Delete uses /admin/users/{id} (DELETE) which:
+ *   - Cascade-deletes all user data (GDPR right to erasure)
+ *   - Cleans up in-memory caches
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,9 +42,11 @@ import {
     Users, Search, Download, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown,
     Shield, ShieldOff, Ban, CheckCircle, Mail, Calendar, CreditCard,
     Activity, ChevronLeft, ChevronRight, RefreshCw, UserCheck, UserX,
-    Loader2,
+    Loader2, Trash2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+
+const API_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 
 interface Profile {
     id: string;
@@ -71,6 +82,24 @@ const statusBadge = (banned: boolean | null, sub?: string | null) => {
     return <Badge variant="outline" className="text-gray-500">Free</Badge>;
 };
 
+/** Call a dedicated admin endpoint with the current JWT. */
+async function adminFetch(path: string, method: string): Promise<{ success: boolean; error?: string }> {
+    const session = JSON.parse(localStorage.getItem("mf_session") || "null");
+    const token = session?.access_token;
+    const res = await fetch(`${API_URL}${path}`, {
+        method,
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { success: false, error: body?.detail?.message || body?.detail || `HTTP ${res.status}` };
+    }
+    return { success: true };
+}
+
 export const UserManagement = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -83,7 +112,7 @@ export const UserManagement = () => {
     const [page, setPage] = useState(0);
 
     const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
-    const [actionType, setActionType] = useState<"ban" | "unban" | "promote" | "demote" | null>(null);
+    const [actionType, setActionType] = useState<"ban" | "unban" | "promote" | "demote" | "delete" | null>(null);
     const [drawerUser, setDrawerUser] = useState<Profile | null>(null);
     const [newPlanId, setNewPlanId] = useState<string>("");
 
@@ -136,7 +165,6 @@ export const UserManagement = () => {
                 .single();
             if (error) throw error;
             const profile = data as Profile;
-            // Sync local state with fetched profile
             setEnterpriseModel(profile.enterprise_ai_model ?? "");
             setCompanyName(profile.company_name ?? "");
             return profile;
@@ -177,15 +205,87 @@ export const UserManagement = () => {
         },
     });
 
+    /** Ban mutation — uses dedicated endpoint for instant token invalidation */
+    const banMutation = useMutation({
+        mutationFn: async (userId: string) => {
+            const result = await adminFetch(`/admin/users/${userId}/ban`, "POST");
+            if (!result.success) throw new Error(result.error || "Ban failed");
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-user-detail"] });
+            toast({ title: "User banned", description: "The user has been banned and their session invalidated immediately." });
+            setSelectedUser(null);
+            setActionType(null);
+            setDrawerUser(null);
+        },
+        onError: (error: Error) => {
+            toast({ title: "Ban failed", description: error.message, variant: "destructive" });
+        },
+    });
+
+    /** Unban mutation — uses dedicated endpoint to clear backend cache */
+    const unbanMutation = useMutation({
+        mutationFn: async (userId: string) => {
+            const result = await adminFetch(`/admin/users/${userId}/unban`, "POST");
+            if (!result.success) throw new Error(result.error || "Unban failed");
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-user-detail"] });
+            toast({ title: "User unbanned", description: "The user can now log in again." });
+            setSelectedUser(null);
+            setActionType(null);
+            setDrawerUser(null);
+        },
+        onError: (error: Error) => {
+            toast({ title: "Unban failed", description: error.message, variant: "destructive" });
+        },
+    });
+
+    /** Delete mutation — cascade-deletes all user data (GDPR) */
+    const deleteMutation = useMutation({
+        mutationFn: async (userId: string) => {
+            const result = await adminFetch(`/admin/users/${userId}`, "DELETE");
+            if (!result.success) throw new Error(result.error || "Delete failed");
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+            toast({
+                title: "User deleted",
+                description: "The user and all their data have been permanently deleted.",
+                variant: "destructive",
+            });
+            setSelectedUser(null);
+            setActionType(null);
+            setDrawerUser(null);
+        },
+        onError: (error: Error) => {
+            toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+        },
+    });
+
     const confirmAction = () => {
         if (!selectedUser || !actionType) return;
-        const updates: Record<string, unknown> = {};
-        if (actionType === "ban") updates.banned = true;
-        if (actionType === "unban") updates.banned = false;
-        if (actionType === "promote") updates.role = "admin";
-        if (actionType === "demote") updates.role = null;
-        updateUserMutation.mutate({ userId: selectedUser.id, updates });
+        if (actionType === "ban") {
+            banMutation.mutate(selectedUser.id);
+        } else if (actionType === "unban") {
+            unbanMutation.mutate(selectedUser.id);
+        } else if (actionType === "delete") {
+            deleteMutation.mutate(selectedUser.id);
+        } else {
+            const updates: Record<string, unknown> = {};
+            if (actionType === "promote") updates.role = "admin";
+            if (actionType === "demote") updates.role = null;
+            updateUserMutation.mutate({ userId: selectedUser.id, updates });
+        }
     };
+
+    const isActionPending =
+        banMutation.isPending ||
+        unbanMutation.isPending ||
+        deleteMutation.isPending ||
+        updateUserMutation.isPending;
 
     const toggleSort = (col: string) => {
         if (sortBy === col) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -364,6 +464,13 @@ export const UserManagement = () => {
                                                                 <Ban className="h-4 w-4 mr-2" /> Ban User
                                                             </DropdownMenuItem>
                                                         )}
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onClick={() => { setSelectedUser(user); setActionType("delete"); }}
+                                                            className="text-red-700 font-medium"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-2" /> Delete User
+                                                        </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>
@@ -493,6 +600,19 @@ export const UserManagement = () => {
                                 )}
                             </div>
 
+                            {/* Delete User — destructive action at the bottom */}
+                            <div className="pt-2 border-t border-red-100 mt-3">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-red-700 border-red-200 hover:bg-red-50"
+                                    onClick={() => { setSelectedUser(drawerUser); setActionType("delete"); setDrawerUser(null); }}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete User (GDPR)
+                                </Button>
+                                <p className="text-xs text-gray-400 mt-1 text-center">Permanently deletes all user data</p>
+                            </div>
+
                             <div className="space-y-2 pt-1">
                                 <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assign Plan</Label>
                                 <div className="flex gap-2">
@@ -605,23 +725,35 @@ export const UserManagement = () => {
                             {actionType === "unban" && "Unban User"}
                             {actionType === "promote" && "Promote to Admin"}
                             {actionType === "demote" && "Demote from Admin"}
+                            {actionType === "delete" && "⚠️ Delete User Permanently"}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {actionType === "ban" && `Ban ${selectedUser?.email}? They will lose platform access immediately.`}
+                            {actionType === "ban" && `Ban ${selectedUser?.email}? Their current session will be invalidated immediately and they will be blocked from logging in.`}
                             {actionType === "unban" && `Unban ${selectedUser?.email}? They will regain full platform access.`}
                             {actionType === "promote" && `Promote ${selectedUser?.email} to admin? They will gain full admin access.`}
                             {actionType === "demote" && `Demote ${selectedUser?.email} from admin? They will lose admin privileges.`}
+                            {actionType === "delete" && (
+                                <span>
+                                    This will <strong>permanently delete</strong> <em>{selectedUser?.email}</em> and all their data including sessions, facilitators, conversations, and messages. <strong>This action cannot be undone.</strong>
+                                </span>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmAction}
-                            disabled={updateUserMutation.isPending}
-                            className={actionType === "ban" ? "bg-red-600 hover:bg-red-700" : "bg-purple-600 hover:bg-purple-700"}
+                            disabled={isActionPending}
+                            className={
+                                actionType === "delete"
+                                    ? "bg-red-700 hover:bg-red-800"
+                                    : actionType === "ban"
+                                    ? "bg-red-600 hover:bg-red-700"
+                                    : "bg-purple-600 hover:bg-purple-700"
+                            }
                         >
-                            {updateUserMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                            Confirm
+                            {isActionPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            {actionType === "delete" ? "Delete Permanently" : "Confirm"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

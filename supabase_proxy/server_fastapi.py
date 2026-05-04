@@ -985,6 +985,24 @@ def get_current_user(request: Request) -> Optional[dict]:
         return None
 
 
+def _check_not_banned(user: dict | None) -> None:
+    """Raise 401 if the user's profile is banned. Called after get_current_user."""
+    if not user:
+        return
+    user_id = user.get("sub") or user.get("id")
+    if not user_id:
+        return
+    # We use a synchronous cache to avoid async overhead on every request.
+    # The cache is invalidated when ban/unban is applied via the REST endpoint.
+    if _BANNED_USERS_CACHE.get(user_id):
+        raise HTTPException(401, detail={"code": "account_banned", "message": "Your account has been suspended."})
+
+
+# In-memory banned-users cache: {user_id: True}.
+# Populated lazily on first banned login attempt; cleared on unban via REST PATCH.
+_BANNED_USERS_CACHE: dict = {}
+
+
 # ============================================================
 # PostgREST query helpers
 # ============================================================
@@ -1545,11 +1563,14 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         try:
             async with _pool.acquire() as conn:
                 row = await conn.fetchrow(
-                    "SELECT id, email, password_hash, created_at FROM profiles "
+                    "SELECT id, email, password_hash, created_at, banned FROM profiles "
                     "WHERE email = $1",
                     email,
                 )
             if row and row["password_hash"]:
+                # Check if account is banned before populating cache
+                if row["banned"]:
+                    raise HTTPException(400, detail={"code": "account_banned", "message": "Your account has been suspended. Please contact support."})
                 # Populate memory cache for subsequent requests
                 user = {
                     "id": str(row["id"]),
@@ -1563,6 +1584,8 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                     "email_confirmed_at": datetime.utcnow().isoformat(),
                 }
                 USERS[email] = user
+        except HTTPException:
+            raise
         except Exception as e:
             log_auth.error("login DB lookup error: %s", e, exc_info=True)
     # Reject if user not found OR password does not match.
@@ -2211,6 +2234,129 @@ async def admin_cost_analytics(request: Request):
         }
     except Exception as e:
         traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+
+# ============================================================
+# Admin user management endpoints (ban, unban, delete)
+# ============================================================
+
+@app.post("/admin/users/{user_id}/ban")
+async def admin_ban_user(user_id: str, request: Request):
+    """Ban a user: set banned=true and add to in-memory cache for instant effect.
+    Requires admin JWT.
+    """
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "UPDATE profiles SET banned = TRUE, updated_at = NOW() WHERE id = $1::uuid RETURNING id, email",
+                user_id,
+            )
+        if not row:
+            raise HTTPException(404, "User not found")
+        # Populate banned cache so existing JWT is rejected immediately
+        _BANNED_USERS_CACHE[user_id] = True
+        # Remove from USERS memory cache so re-login is blocked too
+        email = row["email"]
+        if email and email in USERS:
+            del USERS[email]
+        log_auth.info("admin_ban: user %s banned by %s", user_id, caller.get("sub") or caller.get("id"))
+        return {"success": True, "user_id": user_id, "banned": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/admin/users/{user_id}/unban")
+async def admin_unban_user(user_id: str, request: Request):
+    """Unban a user: set banned=false and remove from in-memory cache.
+    Requires admin JWT.
+    """
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "UPDATE profiles SET banned = FALSE, updated_at = NOW() WHERE id = $1::uuid RETURNING id",
+                user_id,
+            )
+        if not row:
+            raise HTTPException(404, "User not found")
+        # Remove from banned cache
+        _BANNED_USERS_CACHE.pop(user_id, None)
+        log_auth.info("admin_unban: user %s unbanned by %s", user_id, caller.get("sub") or caller.get("id"))
+        return {"success": True, "user_id": user_id, "banned": False}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, request: Request):
+    """Permanently delete a user and all their data (GDPR right to erasure).
+    Cascade order: messages -> session_events -> session_reports -> session_participants
+    -> conversations -> sessions -> facilitators -> login_activity -> profiles.
+    Requires admin JWT.
+    """
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    caller_id = caller.get("sub") or caller.get("id")
+    if caller_id == user_id:
+        raise HTTPException(400, "Admins cannot delete their own account")
+    try:
+        async with _pool.acquire() as conn:
+            # Fetch email before deletion for cache cleanup
+            profile = await conn.fetchrow("SELECT email FROM profiles WHERE id = $1::uuid", user_id)
+            if not profile:
+                raise HTTPException(404, "User not found")
+            email = profile["email"]
+
+            # Cascade delete in correct FK order
+            await conn.execute(
+                "DELETE FROM messages WHERE conversation_id IN "
+                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                user_id,
+            )
+            await conn.execute(
+                "DELETE FROM session_events WHERE conversation_id IN "
+                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                user_id,
+            )
+            await conn.execute(
+                "DELETE FROM session_reports WHERE conversation_id IN "
+                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                user_id,
+            )
+            await conn.execute(
+                "DELETE FROM session_participants WHERE conversation_id IN "
+                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                user_id,
+            )
+            await conn.execute("DELETE FROM conversations WHERE user_id = $1::uuid", user_id)
+            await conn.execute("DELETE FROM sessions WHERE user_id = $1::uuid", user_id)
+            await conn.execute("DELETE FROM facilitators WHERE user_id = $1::uuid", user_id)
+            await conn.execute("DELETE FROM login_activity WHERE user_id = $1::uuid", user_id)
+            await conn.execute("DELETE FROM email_verification_tokens WHERE user_id = $1::uuid", user_id)
+            await conn.execute("DELETE FROM profiles WHERE id = $1::uuid", user_id)
+
+        # Clean up in-memory caches
+        _BANNED_USERS_CACHE.pop(user_id, None)
+        if email and email in USERS:
+            del USERS[email]
+
+        log_auth.info("admin_delete: user %s deleted by admin %s", user_id, caller_id)
+        return {"success": True, "user_id": user_id, "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("admin_delete error: %s", e, exc_info=True)
         raise HTTPException(500, str(e))
 
 

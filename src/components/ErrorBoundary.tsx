@@ -32,6 +32,26 @@ class ErrorBoundary extends Component<Props, State> {
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         // In production, this would send to an error tracking service like Sentry
         console.error(`[ErrorBoundary] ${this.state.errorId}:`, error, errorInfo);
+
+        // Stale asset detection: after a Vercel/Vite redeploy the hashed JS chunk
+        // filenames change.  If the browser has the old HTML (with old chunk URLs)
+        // cached, dynamic imports will fail with a TypeError about loading a module.
+        // The fix is a single hard reload — the new HTML will reference the new chunks.
+        const isStaleAsset =
+            error instanceof TypeError &&
+            (
+                error.message.includes('dynamically imported module') ||
+                error.message.includes('Failed to fetch dynamically imported module') ||
+                error.message.includes('error loading dynamically imported module')
+            );
+        if (isStaleAsset) {
+            // Avoid reload loops: only reload once per session for this error type.
+            const reloadKey = 'stale_asset_reload';
+            if (!sessionStorage.getItem(reloadKey)) {
+                sessionStorage.setItem(reloadKey, '1');
+                window.location.reload();
+            }
+        }
     }
 
     private handleReload = () => {

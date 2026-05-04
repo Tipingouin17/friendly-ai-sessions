@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import api from "@/lib/api";
+import api, { getJoinToken } from "@/lib/api";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
 export function useSessionStatus(conversationId: number | null, refetch: () => void) {
@@ -35,7 +35,13 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
     setSessionEnded(true);
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     toast({ title: "Session Ended", description: "This session has been closed." });
-    if (!isJoinPage.current) navigate('/past-workshops', { replace: true });
+    if (!isJoinPage.current) {
+      // Anonymous participants (join-token only, no JWT) are not authenticated
+      // and cannot access /past-workshops (protected route). Redirect them to
+      // the home page instead to avoid a 401 → Login stale-asset crash.
+      const isAnonymous = !!getJoinToken() && !localStorage.getItem('mf_session');
+      navigate(isAnonymous ? '/' : '/past-workshops', { replace: true });
+    }
   };
 
   // Fallback polling — only used when WebSocket fails

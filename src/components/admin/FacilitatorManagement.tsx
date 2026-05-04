@@ -2,7 +2,7 @@
  * Facilitator Management — Admin Component
  * Full CRUD: create, view, edit, delete, promote/demote, reorder AI facilitators
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +49,15 @@ interface Facilitator {
 }
 
 const EXPERTISE_LEVELS = ["beginner", "intermediate", "advanced", "expert"];
+
+const API_URL = (import.meta.env.VITE_API_URL as string) || '';
+
+/** Build a full avatar URL from a profile_picture value (filename or full URL). */
+function buildAvatarUrl(pic: string | null): string | null {
+    if (!pic) return null;
+    if (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/')) return pic;
+    return `${API_URL}/storage/v1/object/public/facilitator-avatars/${pic}`;
+}
 
 const emptyFacilitator = (): Partial<Facilitator> => ({
     title: "",
@@ -243,8 +252,8 @@ export const FacilitatorManagement = () => {
                                     <CardContent className="pt-5 pb-4">
                                         <div className="flex items-start gap-3 mb-3">
                                             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shrink-0 overflow-hidden">
-                                                {f.profile_picture ? (
-                                                    <img src={f.profile_picture} alt={f.title ?? ""} className="h-full w-full object-cover" />
+                                                {buildAvatarUrl(f.profile_picture) ? (
+                                                    <img src={buildAvatarUrl(f.profile_picture)!} alt={f.title ?? ""} className="h-full w-full object-cover" />
                                                 ) : (
                                                     (f.title?.[0] ?? "?").toUpperCase()
                                                 )}

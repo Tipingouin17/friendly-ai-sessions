@@ -358,6 +358,8 @@ _ai_response_locks: Dict[str, float] = {}
 ALLOWED_RPC_FUNCTIONS = {
     "is_session_host", "is_system_admin", "get_user_plan_limits",
     "get_session_stats", "increment_session_count",
+    # Subscription & billing
+    "create-subscription", "confirm-subscription", "redeem-appsumo-code",
 }
 
 # ============================================================

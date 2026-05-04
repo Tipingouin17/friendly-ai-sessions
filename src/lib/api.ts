@@ -719,86 +719,61 @@ interface ChannelFilter {
 }
 
 /**
- * SharedWSManager: a singleton WebSocket connection multiplexed across all channels.
- * This prevents the connection storm caused by one WebSocket per channel.
+ * SharedSSEManager: singleton SSE transport for all realtime channels.
+ *
+ * Uses Server-Sent Events instead of WebSockets because Railway's Fastly CDN
+ * blocks WebSocket upgrades in production (returns 404).  SSE works over
+ * standard HTTP/2 and traverses CDN/proxies without any special configuration.
+ *
+ * Each channel gets its own SSE connection (one GET per topic).  This is
+ * acceptable because the number of active channels per page is small (1-3).
  */
-class SharedWSManager {
-  private ws: WebSocket | null = null;
+class SharedSSEManager {
+  private connections = new Map<string, EventSource>();
   private channels = new Map<string, RealtimeChannelImpl>();
-  private ref = 0;
-  private retryCount = 0;
-  // No hard cap — reconnect indefinitely with capped backoff (max 60 s between attempts)
+  private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private retryCounts = new Map<string, number>();
   private readonly MAX_BACKOFF_MS = 60_000;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private ping: ReturnType<typeof setInterval> | null = null;
-  private connecting = false;
 
   register(ch: RealtimeChannelImpl): void {
     this.channels.set(ch.getTopic(), ch);
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      ch.sendJoin(this.ws, String(++this.ref));
-    } else {
-      this.ensureConnected();
-    }
+    this.openSSE(ch.getTopic());
   }
 
-  /** Force an immediate reconnect attempt (e.g. when the user clicks "Retry"). */
   forceReconnect(): void {
-    // Clear any pending reconnect timer and reset backoff counter so the
-    // next attempt happens immediately instead of waiting up to 60 s.
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
+    for (const topic of this.channels.keys()) {
+      this.closeSSE(topic);
+      this.retryCounts.set(topic, 0);
+      this.openSSE(topic);
     }
-    this.retryCount = 0;
-    if (this.channels.size > 0) this.ensureConnected();
   }
 
   unregister(ch: RealtimeChannelImpl): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ event: "phx_leave", topic: ch.getTopic(), payload: {}, ref: String(++this.ref) }));
-    }
+    this.closeSSE(ch.getTopic());
     this.channels.delete(ch.getTopic());
   }
 
-  private ensureConnected(): void {
-    if (this.connecting || this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
-    this.connecting = true;
+  private openSSE(topic: string): void {
+    if (this.connections.has(topic)) return;
     const token = getToken() || ANON_KEY;
-    const wsBase = API_URL.replace(/^http/, "ws");
-    try {
-      this.ws = new WebSocket(`${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(token)}&vsn=1.0.0`);
-    } catch {
-      this.connecting = false;
-      this.scheduleReconnect();
-      return;
-    }
-    this.ws.onopen = () => {
-      this.connecting = false;
-      this.retryCount = 0;
-      // Join all registered channels
-      for (const ch of this.channels.values()) {
-        ch.sendJoin(this.ws!, String(++this.ref));
-      }
-      // Start heartbeat
-      this.ping = setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.send(JSON.stringify({ event: "heartbeat", topic: "phoenix", payload: {}, ref: String(++this.ref) }));
-        }
-      }, 25_000);
-    };
-    this.ws.onmessage = (ev: MessageEvent) => {
+    const url = `${API_URL}/realtime/v1/sse?apikey=${encodeURIComponent(token)}&topic=${encodeURIComponent(topic)}`;
+    const es = new EventSource(url);
+    this.connections.set(topic, es);
+
+    es.onmessage = (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
-        const topic = msg.topic as string;
+        const msgTopic = (msg.topic as string) || topic;
         const event = msg.event as string;
         const payload = msg.payload as Record<string, unknown>;
-        const ch = this.channels.get(topic);
+        const ch = this.channels.get(msgTopic) ?? this.channels.get(topic);
         if (!ch) return;
-        if (event === "phx_reply" && (payload?.status as string) === "ok") {
+        // Initial connection confirmation
+        if (event === "connected") {
           ch.notifyStatus("SUBSCRIBED");
           return;
         }
+        // Standard Supabase-style payload
         if (payload?.type && (payload.type === "INSERT" || payload.type === "UPDATE" || payload.type === "DELETE")) {
           ch.dispatch({
             eventType: payload.type as RealtimeEvent,
@@ -814,32 +789,36 @@ class SharedWSManager {
         }
       } catch { /* ignore */ }
     };
-    this.ws.onerror = () => {
-      this.connecting = false;
-      for (const ch of this.channels.values()) ch.notifyStatus("CHANNEL_ERROR");
-    };
-    this.ws.onclose = () => {
-      this.connecting = false;
-      if (this.ping) { clearInterval(this.ping); this.ping = null; }
-      for (const ch of this.channels.values()) ch.notifyStatus("CLOSED");
-      if (this.channels.size > 0) this.scheduleReconnect();
+
+    es.onerror = () => {
+      const ch = this.channels.get(topic);
+      ch?.notifyStatus("CHANNEL_ERROR");
+      this.closeSSE(topic);
+      this.scheduleReconnect(topic);
     };
   }
 
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
-    // Exponential backoff capped at MAX_BACKOFF_MS — no hard retry limit so
-    // the connection is always re-established after transient network issues.
-    const delay = Math.min(3_000 * Math.pow(2, this.retryCount), this.MAX_BACKOFF_MS);
-    this.retryCount++;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.channels.size > 0) this.ensureConnected();
+  private closeSSE(topic: string): void {
+    const es = this.connections.get(topic);
+    if (es) { es.close(); this.connections.delete(topic); }
+    const t = this.retryTimers.get(topic);
+    if (t) { clearTimeout(t); this.retryTimers.delete(topic); }
+  }
+
+  private scheduleReconnect(topic: string): void {
+    if (this.retryTimers.has(topic)) return;
+    const count = this.retryCounts.get(topic) ?? 0;
+    const delay = Math.min(3_000 * Math.pow(2, count), this.MAX_BACKOFF_MS);
+    this.retryCounts.set(topic, count + 1);
+    const t = setTimeout(() => {
+      this.retryTimers.delete(topic);
+      if (this.channels.has(topic)) this.openSSE(topic);
     }, delay);
+    this.retryTimers.set(topic, t);
   }
 }
 
-const sharedWS = new SharedWSManager();
+const sharedWS = new SharedSSEManager();
 
 class RealtimeChannelImpl implements RealtimeChannel {
   private topic: string;
@@ -850,10 +829,6 @@ class RealtimeChannelImpl implements RealtimeChannel {
   constructor(topic: string) { this.topic = topic; }
 
   getTopic(): string { return this.topic; }
-
-  sendJoin(ws: WebSocket, ref: string): void {
-    ws.send(JSON.stringify({ event: "phx_join", topic: this.topic, payload: {}, ref }));
-  }
 
   notifyStatus(s: SubscriptionStatus): void { this.statusCb?.(s); }
 

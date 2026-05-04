@@ -59,7 +59,7 @@ from fastapi import (
     FastAPI, Request, Response, WebSocket, WebSocketDisconnect,
     HTTPException, Depends, Header, Path, Query
 )
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
@@ -4425,6 +4425,16 @@ async def edge_function(func_name: str, request: Request):
                 "is_rejoining": is_rejoining,
                 "created_at": datetime.utcnow().isoformat(),
             }
+            asyncio.create_task(sse_manager.broadcast(str(conversation_id), {
+                "event": "INSERT",
+                "payload": {
+                    "eventType": "INSERT",
+                    "new": _participant_broadcast,
+                    "old": {},
+                    "table": "session_participants",
+                    "schema": "public",
+                },
+            }))
             asyncio.create_task(manager.broadcast(str(conversation_id), {
                 "event": "INSERT",
                 "payload": {
@@ -4676,6 +4686,130 @@ async def storage_head(bucket: str, filepath: str, request: Request):
         "Access-Control-Allow-Credentials": "true",
     }
     return Response(status_code=200 if exists else 404, headers=headers)
+
+
+# ============================================================
+# SSE (Server-Sent Events) Realtime endpoint
+# Works through CDN/proxies that block WebSockets (e.g. Railway + Fastly).
+# Clients connect to /realtime/v1/sse?apikey=<jwt>&topic=<channel_topic>
+# and receive newline-delimited SSE events.
+# ============================================================
+
+class SSEManager:
+    """Manages SSE connections grouped by conversation_id."""
+
+    def __init__(self):
+        # conversation_id -> list of (asyncio.Queue, topic)
+        self._rooms: Dict[str, List[tuple]] = {}
+        self._lock = asyncio.Lock()
+
+    async def subscribe(self, conversation_id: str, topic: str) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        async with self._lock:
+            room = self._rooms.setdefault(conversation_id, [])
+            room.append((q, topic))
+        return q
+
+    async def unsubscribe(self, conversation_id: str, q: asyncio.Queue):
+        async with self._lock:
+            room = self._rooms.get(conversation_id, [])
+            self._rooms[conversation_id] = [(qi, t) for qi, t in room if qi is not q]
+            if not self._rooms[conversation_id]:
+                self._rooms.pop(conversation_id, None)
+
+    async def broadcast(self, conversation_id: str, payload: dict):
+        room = list(self._rooms.get(conversation_id, []))
+        for q, topic in room:
+            msg = dict(payload)
+            if topic:
+                msg["topic"] = topic
+            try:
+                q.put_nowait(msg)
+            except asyncio.QueueFull:
+                pass  # slow consumer — drop event
+
+
+sse_manager = SSEManager()
+
+
+@app.get("/realtime/v1/sse")
+async def realtime_sse(request: Request, apikey: str = Query(""), topic: str = Query("")):
+    """
+    SSE endpoint — CDN-compatible alternative to WebSocket realtime.
+    The client subscribes by passing ?apikey=<jwt>&topic=<channel_topic>.
+    Events are delivered as SSE data lines containing JSON payloads.
+    """
+    # Validate JWT (same logic as WebSocket endpoint)
+    sse_auth_ok = False
+    if apikey:
+        try:
+            jwt.decode(apikey, JWT_SECRET, algorithms=["HS256"])
+            sse_auth_ok = True
+        except Exception:
+            try:
+                payload_unverified = jwt.decode(
+                    apikey,
+                    options={"verify_signature": False},
+                    algorithms=["HS256"]
+                )
+                if payload_unverified.get("role") == "anon":
+                    sse_auth_ok = True
+            except Exception:
+                pass
+    if not sse_auth_ok:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    # Extract conversation_id from topic (same regex logic as WebSocket handler)
+    conv_id: Optional[str] = None
+    if topic:
+        m = re.search(r"conversation_id=eq\.([^&:]+)", topic)
+        if m:
+            conv_id = m.group(1)
+        if not conv_id:
+            m = re.search(r"(?:^|[^a-z])id=eq\.([^&:]+)", topic)
+            if m:
+                conv_id = m.group(1)
+        if not conv_id:
+            m = re.search(r"-([0-9]+)(?:-|$)", topic)
+            if m:
+                conv_id = m.group(1)
+        if not conv_id:
+            m = re.search(r"-([0-9]+)$", topic)
+            if m:
+                conv_id = m.group(1)
+
+    if not conv_id:
+        return JSONResponse({"error": "could not extract conversation_id from topic"}, status_code=400)
+
+    q = await sse_manager.subscribe(conv_id, topic)
+    log_ws.info("[sse] client connected topic=%r conv=%s", topic, conv_id)
+
+    async def event_generator():
+        try:
+            # Send an initial connection confirmation event
+            yield f"data: {json.dumps({'event': 'connected', 'topic': topic})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {json.dumps(msg)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send a keepalive comment to prevent proxy timeouts
+                    yield ": keepalive\n\n"
+        finally:
+            await sse_manager.unsubscribe(conv_id, q)
+            log_ws.info("[sse] client disconnected topic=%r conv=%s", topic, conv_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable Nginx buffering
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # ============================================================

@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir PyJWT==2.8.0
 
 # Copy application code (FastAPI server replaces Flask server)
 COPY server_fastapi.py ./server.py
+COPY email_service.py ./email_service.py
 
 # Copy facilitator avatar images and any other storage assets into the image
 # This ensures avatars are available in production without needing a volume mount

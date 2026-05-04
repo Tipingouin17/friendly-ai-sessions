@@ -67,12 +67,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 try:
-    from email_service import send_welcome_email, send_password_reset_email
+    from email_service import send_welcome_email, send_password_reset_email, send_verification_email
     EMAIL_ENABLED = True
 except ImportError:
     EMAIL_ENABLED = False
     def send_welcome_email(*a, **k): return False
     def send_password_reset_email(*a, **k): return False
+    def send_verification_email(*a, **k): return False
 
 # ============================================================
 # Password hashing helpers (bcrypt with SHA-256 legacy upgrade)
@@ -690,6 +691,24 @@ async def run_startup_migrations() -> None:
                     CHECK (role IN ('free', 'user', 'admin', 'host', 'starter', 'premium', 'enterprise'));
             END IF;
         END $$;
+        """,
+        # 2026-05-03: Email verification tokens table for account activation flow.
+        """
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+            token       TEXT PRIMARY KEY,
+            user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+            email       TEXT NOT NULL,
+            expires_at  TIMESTAMPTZ NOT NULL,
+            used        BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_evt_user_id ON email_verification_tokens(user_id);
+        CREATE INDEX IF NOT EXISTS idx_evt_expires_at ON email_verification_tokens(expires_at);
+        """,
+        # 2026-05-03: Add lock_reason column to sessions for admin PromptManagement UI.
+        """
+        ALTER TABLE sessions
+            ADD COLUMN IF NOT EXISTS lock_reason TEXT;
         """,
         # M15: Resync sequences for integer-PK tables to prevent duplicate-key errors
         # when rows were inserted with explicit IDs (e.g. seed data) that advanced
@@ -1453,8 +1472,15 @@ async def auth_signup(request: Request):
             await conn.execute(
                 "INSERT INTO profiles "
                 "(id, email, full_name, role, password_hash, email_verified, created_at, updated_at) "
-                "VALUES ($1, $2, $3, 'free', $4, TRUE, NOW(), NOW())",
+                "VALUES ($1, $2, $3, 'free', $4, FALSE, NOW(), NOW())",
                 user_id, email, full_name or None, pw_hash,
+            )
+            # Generate a 24-hour email verification token and store it
+            verification_token = str(uuid.uuid4())
+            await conn.execute(
+                "INSERT INTO email_verification_tokens (token, user_id, email, expires_at) "
+                "VALUES ($1, $2, $3, NOW() + INTERVAL '24 hours')",
+                verification_token, user_id, email,
             )
     except HTTPException:
         raise
@@ -1468,22 +1494,33 @@ async def auth_signup(request: Request):
         )
 
     # --- Memory cache (fast path for subsequent requests in the same process) ---
+    # NOTE: email_confirmed_at is None until the user verifies their email.
     USERS[email] = {
         "id": user_id,
         "email": email,
         "password": pw_hash,
         "created_at": created_at,
-        "email_confirmed_at": created_at,
+        "email_confirmed_at": None,
+        "email_verified": False,
     }
 
-    # --- Send welcome email (non-blocking, failure does not affect signup) ---
+    # --- Send verification email (non-blocking, failure does not affect signup) ---
     try:
-        send_welcome_email(email, full_name or email)
+        send_verification_email(email, full_name or email, verification_token)
+        log_auth.info("signup: verification email sent to %s", email)
     except Exception as _email_err:
-        log_auth.warning("signup welcome email failed (non-fatal): %s", _email_err)
+        log_auth.warning("signup verification email failed (non-fatal): %s", _email_err)
 
-    token = _make_token(user_id, email)
-    return _make_user_response(USERS[email], token)
+    # Return a response indicating that email verification is required.
+    # The user is NOT issued a JWT yet — they must verify their email first.
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Account created. Please check your email to verify your account before logging in.",
+            "email_verification_required": True,
+            "email": email,
+        },
+    )
 
 
 @app.post("/auth/v1/token")
@@ -1531,6 +1568,32 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     stored_hash = (user or {}).get("password", "")
     if not user or not stored_hash or not _verify_password(password, stored_hash):
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
+    # Check email verification status — block login if not yet verified.
+    # We check both the in-memory flag (fast path) and the DB (authoritative).
+    email_verified_in_memory = user.get("email_verified", True)  # default True for legacy accounts
+    if not email_verified_in_memory:
+        # Double-check against DB in case memory is stale
+        try:
+            async with _pool.acquire() as _ev_conn:
+                ev_row = await _ev_conn.fetchrow(
+                    "SELECT email_verified FROM profiles WHERE email = $1", email
+                )
+                if ev_row and not ev_row["email_verified"]:
+                    raise HTTPException(
+                        400,
+                        detail={
+                            "code": "email_not_verified",
+                            "message": "Please verify your email address before logging in. Check your inbox for the verification link.",
+                        },
+                    )
+                elif ev_row and ev_row["email_verified"]:
+                    # DB says verified — update memory cache
+                    user["email_verified"] = True
+                    USERS[email]["email_verified"] = True
+        except HTTPException:
+            raise
+        except Exception as _ev_err:
+            log_auth.warning("email_verified DB check failed (non-fatal): %s", _ev_err)
     # Transparent bcrypt upgrade: if the stored hash is legacy SHA-256, re-hash with bcrypt
     # and persist immediately so the account is protected on the next login.
     if len(stored_hash) == 64 and all(c in '0123456789abcdef' for c in stored_hash):
@@ -1734,6 +1797,70 @@ async def auth_reset_password(request: Request):
     except Exception as e:
         log_auth.error("reset-password ERROR: %s", e, exc_info=True)
         raise HTTPException(500, detail={"code": "server_error", "message": "Could not reset password"})
+
+
+@app.get("/auth/v1/verify-email")
+async def verify_email(token: str = Query(...)):
+    """Verify a user's email address using the token sent during signup."""
+    if not token:
+        raise HTTPException(400, detail={"code": "invalid_token", "message": "Verification token is required."})
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT user_id, email, expires_at, used FROM email_verification_tokens WHERE token = $1",
+                token,
+            )
+            if not row:
+                raise HTTPException(400, detail={"code": "invalid_token", "message": "Invalid or expired verification link."})
+            if row["used"]:
+                raise HTTPException(400, detail={"code": "token_already_used", "message": "This verification link has already been used."})
+            if row["expires_at"] < datetime.utcnow().replace(tzinfo=row["expires_at"].tzinfo):
+                raise HTTPException(400, detail={"code": "token_expired", "message": "This verification link has expired. Please sign up again."})
+            # Mark email as verified and token as used
+            await conn.execute(
+                "UPDATE profiles SET email_verified = TRUE, updated_at = NOW() WHERE id = $1",
+                row["user_id"],
+            )
+            await conn.execute(
+                "UPDATE email_verification_tokens SET used = TRUE WHERE token = $1",
+                token,
+            )
+            # Load the verified user to issue a JWT
+            profile = await conn.fetchrow(
+                "SELECT id, email, full_name, role, created_at FROM profiles WHERE id = $1",
+                row["user_id"],
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("verify-email error: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not verify email. Please try again."})
+
+    user_id_str = str(profile["id"])
+    email = profile["email"]
+    created_at = (
+        profile["created_at"].isoformat()
+        if isinstance(profile["created_at"], datetime)
+        else str(profile["created_at"])
+    )
+    # Update in-memory cache
+    USERS[email] = {
+        "id": user_id_str,
+        "email": email,
+        "password": USERS.get(email, {}).get("password", ""),
+        "created_at": created_at,
+        "email_confirmed_at": datetime.utcnow().isoformat(),
+        "email_verified": True,
+    }
+    # Send welcome email now that the account is activated
+    try:
+        send_welcome_email(email, profile["full_name"] or email)
+    except Exception as _e:
+        log_auth.warning("verify-email: welcome email failed (non-fatal): %s", _e)
+
+    jwt_token = _make_token(user_id_str, email)
+    log_auth.info("verify-email: account activated for %s", email)
+    return _make_user_response(USERS[email], jwt_token)
 
 
 # Stub endpoints for Supabase auth compatibility

@@ -76,10 +76,10 @@ export const SignupForm: React.FC = () => {
     setIsLoading(true);
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
-      // The backend returns a session immediately after signup, so the user
-      // is already authenticated. Redirect straight to the dashboard.
-      toast.success("Account created! Welcome to AIfacilitator.");
-      navigate('/', { replace: true });
+      // The backend now requires email verification before login.
+      // Redirect to a confirmation page instead of the dashboard.
+      toast.success("Account created! Please check your email to verify your account.");
+      navigate('/verify-email-sent', { replace: true, state: { email: sanitizeInput(email) } });
     } catch (error: unknown) {
       setAttempts(prev => prev + 1);
       // Handle both Error instances and Supabase/API error objects with a message property

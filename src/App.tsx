@@ -40,7 +40,9 @@ const Referrals     = lazy(() => import("./pages/Referrals"));
 const Terms         = lazy(() => import("./pages/Terms"));
 const Privacy       = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const RedeemAppSumo = lazy(() => import("./pages/RedeemAppSumo"));
+const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
+const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
+const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
 
 // Full-screen loading fallback
 const PageLoader = () => (
@@ -82,6 +84,8 @@ function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/verify-email-sent" element={<VerifyEmailSent />} />
                 <Route path="/checkout" element={
                   <ProtectedRoute>
                     <Checkout />

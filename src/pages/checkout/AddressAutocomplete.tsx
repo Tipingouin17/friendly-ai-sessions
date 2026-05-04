@@ -317,7 +317,7 @@ export const AddressAutocomplete = ({
             postalCode = component.long_name;
           }
           if (types.includes('country')) {
-            country = component.long_name;
+            country = component.short_name; // Use ISO 2-letter code (e.g. 'FR') not long name ('France')
           }
         });
 

@@ -1,7 +1,7 @@
 /**
  * Session Monitoring — Admin Component
  * View all conversations, read transcripts, force-close sessions, export transcripts, flag content.
- * Uses the real `conversations` table schema.
+ * Uses dedicated admin endpoints to bypass RLS.
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -25,9 +26,12 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Loader2, Search, AlertTriangle, Eye, Users, MessageSquare, Clock,
     Flag, XCircle, Download, RefreshCw, ChevronLeft, ChevronRight,
-    Activity, Filter, Bot,
+    Activity, Filter, Bot, MoreHorizontal, Trash2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -52,7 +56,7 @@ interface Conversation {
 interface Message {
     id: string;
     content: string;
-    sender: string;
+    role: string;
     created_at: string;
     participant_name: string | null;
 }
@@ -79,6 +83,9 @@ export const SessionMonitoring = () => {
     const [page, setPage] = useState(0);
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
     const [forceCloseId, setForceCloseId] = useState<number | null>(null);
+    const [deleteConvId, setDeleteConvId] = useState<number | null>(null);
+    const [reportConv, setReportConv] = useState<Conversation | null>(null);
+    const [reportReason, setReportReason] = useState("");
 
     const { data: conversations, isLoading, refetch } = useQuery({
         queryKey: ["admin-conversations", statusFilter, page],
@@ -107,20 +114,25 @@ export const SessionMonitoring = () => {
         refetchOnWindowFocus: false,
     });
 
+    // Use dedicated admin endpoint to bypass RLS
     const { data: messages, isLoading: messagesLoading } = useQuery({
         queryKey: ["admin-messages", selectedConversation?.id],
         enabled: !!selectedConversation,
         queryFn: async () => {
-            const { data, error } = await api
-                .from("messages")
-                .select("id, content, role, created_at, participant_name")
-                .eq("conversation_id", selectedConversation!.id)
-                .order("created_at", { ascending: true });
-            if (error) throw error;
-            return (data || []).map((m: any) => ({
-                ...m,
-                sender: m.role === 'assistant' ? 'assistant' : m.role === 'admin' ? 'admin' : 'user',
-            })) as Message[];
+            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
+            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
+            const res = await fetch(`${backendUrl}/admin/conversations/${selectedConversation!.id}/messages`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || "Failed to load messages");
+            }
+            const data: Message[] = await res.json();
+            return data;
         },
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -142,6 +154,53 @@ export const SessionMonitoring = () => {
         onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
     });
 
+    const deleteConvMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
+            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
+            const res = await fetch(`${backendUrl}/admin/conversations/${id}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || "Failed to delete conversation");
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-conversations"] });
+            toast({ title: "Conversation deleted", description: "The conversation and all its data have been permanently deleted." });
+            setDeleteConvId(null);
+            setSelectedConversation(null);
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const reportMutation = useMutation({
+        mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
+            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
+            const res = await fetch(`${backendUrl}/admin/conversations/${id}/report`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ reason }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || "Failed to report conversation");
+            }
+        },
+        onSuccess: () => {
+            toast({ title: "Conversation reported", description: "The conversation has been flagged for review." });
+            setReportConv(null);
+            setReportReason("");
+        },
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
     const exportTranscript = () => {
         if (!messages || !selectedConversation) return;
         const lines = [
@@ -153,9 +212,11 @@ export const SessionMonitoring = () => {
             "",
             "─".repeat(60),
             "",
-            ...messages.map(m =>
-                `[${format(new Date(m.created_at), "HH:mm:ss")}] ${m.sender === "assistant" || m.sender === "ai" ? "AI Facilitator" : (m.participant_name ?? m.sender)}: ${m.content}`
-            ),
+            ...messages.map(m => {
+                const isAI = m.role === "assistant";
+                const sender = isAI ? "AI Facilitator" : (m.participant_name ?? m.role);
+                return `[${format(new Date(m.created_at), "HH:mm:ss")}] ${sender}: ${m.content}`;
+            }),
         ];
         const blob = new Blob([lines.join("\n")], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
@@ -301,16 +362,36 @@ export const SessionMonitoring = () => {
                                                         >
                                                             <Eye className="h-3 w-3 mr-1" /> View
                                                         </Button>
-                                                        {!conv.is_session_ended && conv.session_started && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                                                onClick={() => setForceCloseId(conv.id)}
-                                                            >
-                                                                <XCircle className="h-3 w-3" />
-                                                            </Button>
-                                                        )}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                {!conv.is_session_ended && conv.session_started && (
+                                                                    <>
+                                                                        <DropdownMenuItem
+                                                                            className="text-red-600"
+                                                                            onClick={() => setForceCloseId(conv.id)}
+                                                                        >
+                                                                            <XCircle className="h-4 w-4 mr-2" /> Force Close
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuSeparator />
+                                                                    </>
+                                                                )}
+                                                                <DropdownMenuItem onClick={() => { setReportConv(conv); setReportReason(""); }}>
+                                                                    <Flag className="h-4 w-4 mr-2" /> Report
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    className="text-red-600"
+                                                                    onClick={() => setDeleteConvId(conv.id)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -388,7 +469,7 @@ export const SessionMonitoring = () => {
                             </div>
                         ) : (
                             messages?.map(msg => {
-                                const isAI = msg.sender === "ai";
+                                const isAI = msg.role === "assistant";
                                 const isFlagged = checkFlagged(msg.content ?? "");
                                 return (
                                     <div
@@ -400,7 +481,7 @@ export const SessionMonitoring = () => {
                                         </div>
                                         <div className={`max-w-[75%] ${isAI ? "" : "items-end flex flex-col"}`}>
                                             <p className={`text-xs text-gray-400 mb-1 ${isAI ? "" : "text-right"}`}>
-                                                {isAI ? "AI Facilitator" : (msg.participant_name ?? msg.sender)}
+                                                {isAI ? "AI Facilitator" : (msg.participant_name ?? msg.role)}
                                                 {" · "}
                                                 {format(new Date(msg.created_at), "HH:mm")}
                                             </p>
@@ -437,6 +518,22 @@ export const SessionMonitoring = () => {
                                     <XCircle className="h-4 w-4 mr-1.5" /> Force Close
                                 </Button>
                             )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                                onClick={() => { setReportConv(selectedConversation); setReportReason(""); setSelectedConversation(null); }}
+                            >
+                                <Flag className="h-4 w-4 mr-1.5" /> Report
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() => { setDeleteConvId(selectedConversation!.id); setSelectedConversation(null); }}
+                            >
+                                <Trash2 className="h-4 w-4 mr-1.5" /> Delete
+                            </Button>
                         </div>
                         <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={exportTranscript} disabled={!messages?.length}>
@@ -472,6 +569,66 @@ export const SessionMonitoring = () => {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Delete Conversation Confirmation */}
+            <AlertDialog open={!!deleteConvId} onOpenChange={open => !open && setDeleteConvId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                            <Trash2 className="h-5 w-5" /> Delete Conversation
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete conversation #{deleteConvId} and all its messages, participants, and reports. This action <strong>cannot be undone</strong>.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => deleteConvId && deleteConvMutation.mutate(deleteConvId)}
+                            disabled={deleteConvMutation.isPending}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deleteConvMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            Delete Permanently
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Report Conversation Dialog */}
+            <Dialog open={!!reportConv} onOpenChange={open => !open && setReportConv(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Flag className="h-5 w-5 text-amber-500" />
+                            Report Conversation #{reportConv?.id}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Flag this conversation for review. Provide a reason to help with moderation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <Textarea
+                            placeholder="Reason for reporting (e.g., inappropriate content, policy violation...)"
+                            value={reportReason}
+                            onChange={e => setReportReason(e.target.value)}
+                            rows={4}
+                            className="resize-none"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setReportConv(null)}>Cancel</Button>
+                        <Button
+                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                            onClick={() => reportConv && reportMutation.mutate({ id: reportConv.id, reason: reportReason || "Flagged by admin" })}
+                            disabled={reportMutation.isPending}
+                        >
+                            {reportMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            <Flag className="h-4 w-4 mr-1.5" /> Submit Report
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

@@ -2361,6 +2361,93 @@ async def admin_delete_user(user_id: str, request: Request):
 
 
 # ============================================================
+# Admin Session Monitoring endpoints
+# ============================================================
+
+@app.get("/admin/conversations/{conv_id}/messages")
+async def admin_get_conversation_messages(conv_id: int, request: Request):
+    """Get all messages for a conversation (admin only)."""
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    try:
+        async with _pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, content, role, created_at, participant_name "
+                "FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
+                conv_id
+            )
+            return [
+                {
+                    "id": str(r["id"]),
+                    "content": r["content"] if isinstance(r["content"], str) else (r["content"].get("text", str(r["content"])) if isinstance(r["content"], dict) else str(r["content"])),
+                    "role": r["role"],
+                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                    "participant_name": r["participant_name"],
+                }
+                for r in rows
+            ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/admin/conversations/{conv_id}/report")
+async def admin_report_conversation(conv_id: int, request: Request):
+    """Flag a conversation for review and store a report record."""
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    caller_id = caller.get("sub") or caller.get("id")
+    try:
+        body = await request.json()
+        reason = body.get("reason", "Flagged by admin")
+        async with _pool.acquire() as conn:
+            # Verify conversation exists
+            conv = await conn.fetchrow("SELECT id, user_id FROM conversations WHERE id = $1", conv_id)
+            if not conv:
+                raise HTTPException(404, "Conversation not found")
+            # Insert or update report
+            await conn.execute(
+                "INSERT INTO session_reports (conversation_id, report_reason, reported_by, created_at) "
+                "VALUES ($1, $2, $3::uuid, NOW()) "
+                "ON CONFLICT (conversation_id) DO UPDATE SET report_reason = $2, reported_by = $3::uuid, created_at = NOW()",
+                conv_id, reason, caller_id
+            )
+        return {"success": True, "conversation_id": conv_id, "reason": reason}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/admin/conversations/{conv_id}")
+async def admin_delete_conversation(conv_id: int, request: Request):
+    """Permanently delete a conversation and all its messages."""
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    caller_id = caller.get("sub") or caller.get("id")
+    try:
+        async with _pool.acquire() as conn:
+            conv = await conn.fetchrow("SELECT id FROM conversations WHERE id = $1", conv_id)
+            if not conv:
+                raise HTTPException(404, "Conversation not found")
+            await conn.execute("DELETE FROM messages WHERE conversation_id = $1", conv_id)
+            await conn.execute("DELETE FROM session_events WHERE conversation_id = $1", conv_id)
+            await conn.execute("DELETE FROM session_reports WHERE conversation_id = $1", conv_id)
+            await conn.execute("DELETE FROM session_participants WHERE conversation_id = $1", conv_id)
+            await conn.execute("DELETE FROM conversations WHERE id = $1", conv_id)
+        log_auth.info("admin_delete_conversation: conv %s deleted by admin %s", conv_id, caller_id)
+        return {"success": True, "conversation_id": conv_id, "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ============================================================
 # Background AI welcome-message helper
 # ============================================================
 async def _maybe_generate_welcome_message(conv_id: int) -> None:

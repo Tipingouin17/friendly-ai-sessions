@@ -133,7 +133,7 @@ const Referrals = () => {
                 >
                     <Gift className="h-12 w-12 text-purple-600" />
                 </motion.div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold text-gray-900">
                     Invite Friends, Get Free Months
                 </h1>
                 <p className="text-xl text-gray-600 max-w-2xl mx-auto">

@@ -1,8 +1,9 @@
 /**
  * Settings — World-class redesign
  * Sidebar navigation, grouped settings with visual hierarchy, danger zone.
+ * Settings are now persisted to the database via PUT /auth/v1/user.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import {
   Bell, Shield, Trash2, ChevronRight, Check,
-  Volume2, Mail, Smartphone, Eye, EyeOff, AlertTriangle
+  Mail, Smartphone, Eye, AlertTriangle, Loader2
 } from "lucide-react";
 import PageHead from "@/components/PageHead";
 import {
@@ -44,29 +45,77 @@ const navItems: { id: Section; label: string; icon: React.ReactNode; danger?: bo
 
 const Settings = () => {
   const { toast } = useToast();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [activeSection, setActiveSection] = useState<Section>('notifications');
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const settingsKey = user?.id ? `user_settings_${user.id}` : null;
-
+  // Load settings from user_metadata (populated from DB by the backend)
   useEffect(() => {
-    if (!settingsKey) return;
+    if (!user) return;
+    const meta = user.user_metadata || {};
+    const loaded: UserSettings = {
+      emailNotifications: meta.setting_email_notifications ?? defaultSettings.emailNotifications,
+      workshopReminders: meta.setting_workshop_reminders ?? defaultSettings.workshopReminders,
+      publicProfile: meta.setting_public_profile ?? defaultSettings.publicProfile,
+      showActivity: meta.setting_show_activity ?? defaultSettings.showActivity,
+    };
+    // Also try localStorage as fallback for users who haven't logged in since the update
+    const settingsKey = user?.id ? `user_settings_${user.id}` : null;
+    if (settingsKey && meta.setting_email_notifications === undefined) {
+      try {
+        const stored = localStorage.getItem(settingsKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          Object.assign(loaded, {
+            emailNotifications: parsed.emailNotifications ?? loaded.emailNotifications,
+            workshopReminders: parsed.workshopReminders ?? loaded.workshopReminders,
+            publicProfile: parsed.publicProfile ?? loaded.publicProfile,
+            showActivity: parsed.showActivity ?? loaded.showActivity,
+          });
+        }
+      } catch { /* use defaults */ }
+    }
+    setSettings(loaded);
+    setIsLoading(false);
+  }, [user]);
+
+  const persistSettings = useCallback(async (updated: UserSettings) => {
+    if (!user) return;
+    setIsSaving(true);
     try {
-      const stored = localStorage.getItem(settingsKey);
-      if (stored) setSettings(JSON.parse(stored));
-    } catch { /* use defaults */ }
-  }, [settingsKey]);
+      const { error } = await api.auth.updateUser({
+        data: {
+          setting_email_notifications: updated.emailNotifications,
+          setting_workshop_reminders: updated.workshopReminders,
+          setting_public_profile: updated.publicProfile,
+          setting_show_activity: updated.showActivity,
+        },
+      });
+      if (error) throw error;
+      // Also update localStorage as cache
+      const settingsKey = `user_settings_${user.id}`;
+      localStorage.setItem(settingsKey, JSON.stringify(updated));
+      // Refresh user context so user_metadata is up to date
+      if (refreshUser) await refreshUser();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      toast({ title: 'Error saving settings', description: msg, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, toast, refreshUser]);
 
   const updateSetting = (key: keyof UserSettings, value: boolean) => {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
-    if (settingsKey) localStorage.setItem(settingsKey, JSON.stringify(updated));
     setSavedKey(key);
     setTimeout(() => setSavedKey(null), 1500);
     toast({ title: 'Saved', description: 'Your preference has been updated.' });
+    persistSettings(updated);
   };
 
   const handleDeleteAccount = async () => {
@@ -75,6 +124,7 @@ const Settings = () => {
     try {
       const { error } = await api.from('profiles').delete().eq('id', user.id);
       if (error) throw error;
+      const settingsKey = user?.id ? `user_settings_${user.id}` : null;
       if (settingsKey) localStorage.removeItem(settingsKey);
       await logout();
       toast({ title: 'Account deleted', description: 'Your account data has been removed.' });
@@ -92,8 +142,11 @@ const Settings = () => {
       {/* Page header */}
       <div className="bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage your preferences and account options</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Settings</h1>
+            {isSaving && <Loader2 size={16} className="text-indigo-400 animate-spin" />}
+          </div>
+          <p className="text-gray-500 text-sm mt-1">Manage your preferences and account options — saved automatically</p>
         </div>
       </div>
 
@@ -139,6 +192,7 @@ const Settings = () => {
                 icon={<Bell size={18} className="text-indigo-500" />}
                 title="Notifications"
                 description="Control how and when AIfacilitator communicates with you"
+                isLoading={isLoading}
               >
                 <ToggleRow
                   id="email-notifications"
@@ -168,6 +222,7 @@ const Settings = () => {
                 icon={<Shield size={18} className="text-indigo-500" />}
                 title="Privacy"
                 description="Manage who can see your information and how your data is used"
+                isLoading={isLoading}
               >
                 <ToggleRow
                   id="public-profile"
@@ -253,8 +308,8 @@ const Settings = () => {
 
 /* ── Sub-components ── */
 
-const SettingsCard = ({ icon, title, description, children }: {
-  icon: React.ReactNode; title: string; description: string; children: React.ReactNode;
+const SettingsCard = ({ icon, title, description, children, isLoading }: {
+  icon: React.ReactNode; title: string; description: string; children: React.ReactNode; isLoading?: boolean;
 }) => (
   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div className="px-6 py-5 border-b border-gray-50">
@@ -266,7 +321,14 @@ const SettingsCard = ({ icon, title, description, children }: {
         </div>
       </div>
     </div>
-    <div className="px-6 py-2">{children}</div>
+    <div className="px-6 py-2">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Loading your preferences…</span>
+        </div>
+      ) : children}
+    </div>
   </div>
 );
 

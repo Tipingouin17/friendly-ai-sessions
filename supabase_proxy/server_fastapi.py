@@ -729,6 +729,85 @@ async def run_startup_migrations() -> None:
             true
         );
         """,
+        # 2026-05-05: Add profile metadata columns so EditProfile can persist all fields.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS bio TEXT,
+            ADD COLUMN IF NOT EXISTS phone TEXT,
+            ADD COLUMN IF NOT EXISTS timezone TEXT,
+            ADD COLUMN IF NOT EXISTS display_name TEXT,
+            ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+            ADD COLUMN IF NOT EXISTS profile_language TEXT NOT NULL DEFAULT 'en';
+        """,
+        # 2026-05-05: Add user settings columns to profiles for cross-device persistence.
+        """
+        ALTER TABLE profiles
+            ADD COLUMN IF NOT EXISTS setting_email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS setting_workshop_reminders BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS setting_public_profile BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS setting_show_activity BOOLEAN NOT NULL DEFAULT TRUE;
+        """,
+        # 2026-05-05: Create login_activity table if it does not exist yet.
+        """
+        CREATE TABLE IF NOT EXISTS login_activity (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id     UUID REFERENCES profiles(id) ON DELETE CASCADE,
+            ip_address  TEXT,
+            user_agent  TEXT,
+            location    TEXT,
+            success     BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_login_activity_user_id ON login_activity(user_id);
+        CREATE INDEX IF NOT EXISTS idx_login_activity_created_at ON login_activity(created_at);
+        """,
+        # 2026-05-05: Create user_sessions table for device/session management.
+        """
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id         UUID REFERENCES profiles(id) ON DELETE CASCADE,
+            session_token   TEXT NOT NULL UNIQUE,
+            device_name     TEXT,
+            device_type     TEXT,
+            browser         TEXT,
+            os              TEXT,
+            ip_address      TEXT,
+            location        TEXT,
+            user_agent      TEXT,
+            is_current      BOOLEAN NOT NULL DEFAULT FALSE,
+            last_activity   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at      TIMESTAMPTZ,
+            revoked_at      TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+        """,
+        # 2026-05-05: Create security_audit_log table if it does not exist yet.
+        """
+        CREATE TABLE IF NOT EXISTS security_audit_log (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id         UUID REFERENCES profiles(id) ON DELETE CASCADE,
+            event_type      TEXT NOT NULL,
+            event_details   JSONB,
+            ip_address      TEXT,
+            user_agent      TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_sal_user_id ON security_audit_log(user_id);
+        """,
+        # 2026-05-05: Create contact_form table if it does not exist yet.
+        """
+        CREATE TABLE IF NOT EXISTS contact_form (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name        TEXT,
+            email       TEXT,
+            subject     TEXT,
+            message     TEXT,
+            status      TEXT NOT NULL DEFAULT 'open',
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """,
     ]
     try:
         async with _pool.acquire() as conn:
@@ -1668,6 +1747,32 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
             )
     except Exception as _la_err:
         log_auth.warning("login_activity insert failed (non-fatal): %s", _la_err)
+    # Create user_sessions record for device/session management
+    try:
+        _ua = request.headers.get("user-agent", "")
+        _ip = request.client.host if request.client else ""
+        # Parse device info from user agent
+        _device_type = "mobile" if any(m in _ua.lower() for m in ["mobile", "android", "iphone", "ipad"]) else "desktop"
+        _browser = "Unknown"
+        for _b in ["Chrome", "Firefox", "Safari", "Edge", "Opera"]:
+            if _b.lower() in _ua.lower():
+                _browser = _b
+                break
+        _os = "Unknown"
+        for _o, _k in [("Windows", "windows"), ("macOS", "mac os"), ("Linux", "linux"), ("Android", "android"), ("iOS", "iphone")]:
+            if _k in _ua.lower():
+                _os = _o
+                break
+        _sess_token = str(uuid.uuid4())
+        # Mark all previous sessions as not current
+        await conn.execute("UPDATE user_sessions SET is_current = FALSE WHERE user_id = $1::uuid", user_id)
+        await conn.execute(
+            "INSERT INTO user_sessions (user_id, session_token, device_type, browser, os, ip_address, user_agent, is_current) "
+            "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, TRUE)",
+            user_id, _sess_token, _device_type, _browser, _os, _ip, _ua
+        )
+    except Exception as _us_err:
+        log_auth.warning("user_sessions insert failed (non-fatal): %s", _us_err)
     return _make_user_response(user, token, role=profile_role)
 
 
@@ -1695,6 +1800,27 @@ async def auth_user(request: Request):
                     updates["full_name"] = meta["full_name"]
                 if "avatar_url" in meta:
                     updates["avatar_url"] = meta["avatar_url"]
+                if "bio" in meta:
+                    updates["bio"] = meta["bio"]
+                if "phone" in meta:
+                    updates["phone"] = meta["phone"]
+                if "timezone" in meta:
+                    updates["timezone"] = meta["timezone"]
+                if "language" in meta:
+                    updates["profile_language"] = meta["language"]
+                if "display_name" in meta:
+                    updates["display_name"] = meta["display_name"]
+                if "name" in meta and "display_name" not in meta:
+                    updates["display_name"] = meta["name"]
+                # Settings persistence
+                if "setting_email_notifications" in meta:
+                    updates["setting_email_notifications"] = meta["setting_email_notifications"]
+                if "setting_workshop_reminders" in meta:
+                    updates["setting_workshop_reminders"] = meta["setting_workshop_reminders"]
+                if "setting_public_profile" in meta:
+                    updates["setting_public_profile"] = meta["setting_public_profile"]
+                if "setting_show_activity" in meta:
+                    updates["setting_show_activity"] = meta["setting_show_activity"]
             # Password update — persist new hash to DB and refresh memory cache
             if "password" in data and data["password"]:
                 new_pw_hash = _hash_password(data["password"])  # bcrypt cost 12
@@ -1715,15 +1841,46 @@ async def auth_user(request: Request):
         except Exception as e:
             log_auth.error("update_user error: %s", e, exc_info=True)
     # Return the role from the JWT so the frontend can check user.role for admin features
+    # Fetch profile metadata from DB to populate user_metadata
+    user_id = user.get("sub") or user.get("id")
+    user_meta: dict = {}
+    profile_created_at = datetime.utcnow().isoformat()
+    try:
+        async with _pool.acquire() as _meta_conn:
+            row = await _meta_conn.fetchrow(
+                "SELECT full_name, display_name, bio, phone, timezone, profile_language, "
+                "avatar_url, created_at, setting_email_notifications, setting_workshop_reminders, "
+                "setting_public_profile, setting_show_activity FROM profiles WHERE id = $1::uuid",
+                user_id
+            )
+            if row:
+                user_meta = {
+                    "full_name": row["full_name"] or "",
+                    "name": row["display_name"] or row["full_name"] or "",
+                    "display_name": row["display_name"] or "",
+                    "bio": row["bio"] or "",
+                    "phone": row["phone"] or "",
+                    "timezone": row["timezone"] or "",
+                    "language": row["profile_language"] or "en",
+                    "avatar_url": row["avatar_url"] or "",
+                    "setting_email_notifications": row["setting_email_notifications"],
+                    "setting_workshop_reminders": row["setting_workshop_reminders"],
+                    "setting_public_profile": row["setting_public_profile"],
+                    "setting_show_activity": row["setting_show_activity"],
+                }
+                if row["created_at"]:
+                    profile_created_at = row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"])
+    except Exception as _meta_err:
+        log_auth.warning("auth_user: failed to load profile metadata: %s", _meta_err)
     return {
-        "id": user.get("sub") or user.get("id"),
+        "id": user_id,
         "email": user.get("email", ""),
         "role": user.get("role", "authenticated"),
         "email_confirmed_at": datetime.utcnow().isoformat(),
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": profile_created_at,
         "updated_at": datetime.utcnow().isoformat(),
         "app_metadata": {"provider": "email"},
-        "user_metadata": {},
+        "user_metadata": user_meta,
         "aud": "authenticated",
     }
 @app.post("/auth/v1/logout")
@@ -1991,7 +2148,7 @@ async def rpc_call(func_name: str, request: Request):
 SECURE_CONV_TABLES = {"messages", "session_participants"}
 SECURE_REPORT_TABLES = {"session_reports"}
 # referrals is filtered by referrer_id (the owner column) just like user_id tables
-SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals"}
+SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log"}
 # Tables participants may read with a valid join token (no auth required)
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
 
@@ -2981,6 +3138,27 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
 # ============================================================
 # PostgREST REST table CRUD
 # ============================================================
+@app.delete("/auth/v1/user/sessions/{session_id}")
+async def revoke_user_session(session_id: str, request: Request):
+    """Revoke a specific user session (marks it as revoked in user_sessions table)."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+    user_id = user.get("sub") or user.get("id")
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "UPDATE user_sessions SET revoked_at = NOW(), is_current = FALSE "
+                "WHERE id = $1::uuid AND user_id = $2::uuid RETURNING id",
+                session_id, user_id
+            )
+            if not row:
+                return JSONResponse({"error": "Session not found"}, status_code=404)
+            return JSONResponse({"success": True})
+    except Exception as e:
+        log_auth.warning("revoke_user_session error: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
 async def rest_table(table: str, request: Request):
     params = dict(request.query_params)

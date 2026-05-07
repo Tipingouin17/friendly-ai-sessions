@@ -43,6 +43,15 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
 const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
 const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
+// SEO / Content pages
+const DesignSprint       = lazy(() => import("./pages/use-cases/DesignSprint"));
+const Retrospective      = lazy(() => import("./pages/use-cases/Retrospective"));
+const StrategicPlanning  = lazy(() => import("./pages/use-cases/StrategicPlanning"));
+const VsSessionLab       = lazy(() => import("./pages/compare/VsSessionLab"));
+const VsMiro             = lazy(() => import("./pages/compare/VsMiro"));
+const BlogIndex          = lazy(() => import("./pages/blog/BlogIndex"));
+const HowToUseAI         = lazy(() => import("./pages/blog/HowToUseAI"));
+const AIToolsRemoteTeams = lazy(() => import("./pages/blog/AIToolsRemoteTeams"));
 
 // Full-screen loading fallback
 const PageLoader = () => (
@@ -86,6 +95,15 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-email-sent" element={<VerifyEmailSent />} />
+                {/* SEO / Content pages */}
+                <Route path="/use-cases/design-sprint" element={<DesignSprint />} />
+                <Route path="/use-cases/retrospective" element={<Retrospective />} />
+                <Route path="/use-cases/strategic-planning" element={<StrategicPlanning />} />
+                <Route path="/compare/aifacilitator-vs-sessionlab" element={<VsSessionLab />} />
+                <Route path="/compare/aifacilitator-vs-miro" element={<VsMiro />} />
+                <Route path="/blog" element={<BlogIndex />} />
+                <Route path="/blog/how-to-use-ai-for-workshop-facilitation" element={<HowToUseAI />} />
+                <Route path="/blog/ai-tools-for-remote-teams" element={<AIToolsRemoteTeams />} />
                 <Route path="/checkout" element={
                   <ProtectedRoute>
                     <Checkout />

@@ -25,6 +25,45 @@ const SCHEMA_ARTICLE = {
   dateModified: '2026-05-07',
 };
 
+const SCHEMA_FAQ = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is an AI retrospective facilitator?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'An AI retrospective facilitator is an AI system that guides agile teams through retrospective sessions — asking structured questions, collecting responses anonymously, synthesising themes, and generating action items — without needing a human Scrum Master or agile coach to run the session.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AIfacilitator improve retrospectives?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator improves retrospectives by ensuring equal participation, increasing psychological safety through anonymous input, automatically clustering themes and insights, and generating a structured action plan at the end of every session.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What retrospective formats does AIfacilitator support?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator supports all major retrospective formats including Start/Stop/Continue, 4Ls (Liked, Learned, Lacked, Longed For), Mad/Sad/Glad, the Sailboat retrospective, DAKI, and custom formats. The AI adapts the facilitation style to the chosen format.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can AIfacilitator run remote retrospectives?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. AIfacilitator is designed for remote and hybrid teams. All participants join via a shared link with no account required, and the AI facilitates the session in real time.',
+      },
+    },
+  ],
+};
+
 const Retrospective = () => {
   return (
     <div className="min-h-screen bg-white">
@@ -36,7 +75,7 @@ const Retrospective = () => {
           { name: 'Use Cases', item: 'https://aifacilitator.ai/use-cases' },
           { name: 'Retrospective', item: 'https://aifacilitator.ai/use-cases/retrospective' },
         ]}
-        jsonLd={[SCHEMA_ARTICLE]}
+        jsonLd={[SCHEMA_ARTICLE, SCHEMA_FAQ]}
       />
 
       {/* Hero */}

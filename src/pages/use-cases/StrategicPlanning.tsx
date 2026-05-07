@@ -25,6 +25,45 @@ const SCHEMA_ARTICLE = {
   dateModified: '2026-05-07',
 };
 
+const SCHEMA_FAQ = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is an AI strategic planning workshop?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'An AI strategic planning workshop is a facilitated session where an AI guides a leadership team through structured strategy exercises — such as SWOT analysis, OKR setting, and strategic prioritisation — to produce a clear, aligned strategy in a single session without needing an external consultant or facilitator.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AIfacilitator help with strategic planning?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator guides leadership teams through proven strategic planning frameworks including SWOT analysis, OKR setting, PESTLE analysis, and strategic prioritisation matrices. The AI ensures all voices are heard, captures decisions in real time, and produces a structured strategy document at the end of the session.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How long does an AI-facilitated strategic planning session take?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'A focused AI-facilitated strategic planning session typically takes 3–4 hours for a leadership team of 5–10 people. AIfacilitator can also run a full-day strategy offsite or a series of shorter sessions spread over multiple days.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do we need a strategy consultant to use AIfacilitator for strategic planning?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. AIfacilitator is designed to replace or complement an external strategy consultant for the facilitation component. The AI brings proven frameworks, structured exercises, and neutral facilitation — so your leadership team can focus on the strategic thinking rather than managing the process.',
+      },
+    },
+  ],
+};
+
 const StrategicPlanning = () => {
   return (
     <div className="min-h-screen bg-white">
@@ -36,7 +75,7 @@ const StrategicPlanning = () => {
           { name: 'Use Cases', item: 'https://aifacilitator.ai/use-cases' },
           { name: 'Strategic Planning', item: 'https://aifacilitator.ai/use-cases/strategic-planning' },
         ]}
-        jsonLd={[SCHEMA_ARTICLE]}
+        jsonLd={[SCHEMA_ARTICLE, SCHEMA_FAQ]}
       />
 
       {/* Hero */}

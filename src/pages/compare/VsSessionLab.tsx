@@ -25,6 +25,45 @@ const SCHEMA = {
   dateModified: '2026-05-07',
 };
 
+const SCHEMA_FAQ = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the main difference between AIfacilitator and SessionLab?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'SessionLab is a workshop planning and agenda-building tool — it helps facilitators design sessions in advance. AIfacilitator is an active AI facilitator that runs the session in real time, guiding participants through exercises, capturing responses, and generating insights automatically.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is AIfacilitator a good SessionLab alternative?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes, for teams that want live AI facilitation rather than just agenda planning. AIfacilitator adds real-time AI guidance, anonymous participant responses, automatic session summaries, and post-session analytics — features that SessionLab does not offer.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I use AIfacilitator and SessionLab together?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Many facilitators use SessionLab to plan and design their workshop agenda, then use AIfacilitator to run the live session. The two tools complement each other well.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AIfacilitator pricing compare to SessionLab?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Both tools offer a free plan. AIfacilitator paid plans start at $19/month and SessionLab paid plans start at approximately $20/month. AIfacilitator focuses on live AI facilitation and session analytics, while SessionLab focuses on agenda planning and a method library.',
+      },
+    },
+  ],
+};
+
 type FeatureStatus = 'yes' | 'no' | 'partial';
 
 interface Feature {
@@ -68,7 +107,7 @@ const VsSessionLab = () => {
           { name: 'Compare', item: 'https://aifacilitator.ai/compare' },
           { name: 'AIfacilitator vs SessionLab', item: 'https://aifacilitator.ai/compare/aifacilitator-vs-sessionlab' },
         ]}
-        jsonLd={[SCHEMA]}
+        jsonLd={[SCHEMA, SCHEMA_FAQ]}
       />
 
       {/* Hero */}

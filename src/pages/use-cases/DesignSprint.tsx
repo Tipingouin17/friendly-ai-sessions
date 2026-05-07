@@ -25,6 +25,45 @@ const SCHEMA_ARTICLE = {
   dateModified: '2026-05-07',
 };
 
+const SCHEMA_FAQ = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is an AI design sprint?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'An AI design sprint is a structured 5-day innovation process where an AI facilitator guides the team through each phase — problem mapping, ideation, decision-making, prototyping, and user testing — instead of a human sprint master. The AI adapts the agenda in real time based on team progress.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AIfacilitator help with design sprints?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator provides an AI sprint master that guides your team through all five phases of a design sprint. It generates dynamic agendas, facilitates structured discussions, keeps the team on track, and produces a post-sprint summary with key decisions and next steps — without needing a certified sprint master.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do I need a certified sprint master to use AIfacilitator for design sprints?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. AIfacilitator is designed to replace or complement a human sprint master. The AI handles all facilitation tasks — agenda management, time-keeping, discussion prompts, and synthesis — so any team member can run a professional design sprint.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can AIfacilitator run remote design sprints?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. AIfacilitator is built for both in-person and remote/hybrid teams. Participants join via a shared link with no account required, and the AI facilitator guides everyone through the sprint phases in a shared chat environment.',
+      },
+    },
+  ],
+};
+
 const DesignSprint = () => {
   return (
     <div className="min-h-screen bg-white">
@@ -36,7 +75,7 @@ const DesignSprint = () => {
           { name: 'Use Cases', item: 'https://aifacilitator.ai/use-cases' },
           { name: 'Design Sprint', item: 'https://aifacilitator.ai/use-cases/design-sprint' },
         ]}
-        jsonLd={[SCHEMA_ARTICLE]}
+        jsonLd={[SCHEMA_ARTICLE, SCHEMA_FAQ]}
       />
 
       {/* Hero */}

@@ -101,6 +101,12 @@ export const Navigation = () => {
                     Home
                   </MobileLink>
                   <MobileLink
+                    to="/about"
+                    className={`${location.pathname === '/about' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
+                  >
+                    About
+                  </MobileLink>
+                  <MobileLink
                     to="/pricing"
                     className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
                   >
@@ -185,6 +191,7 @@ export const Navigation = () => {
                 </Link>
               )}
               <Link to="/" className={navLinkClass('/')}>Home</Link>
+              <Link to="/about" className={navLinkClass('/about')}>About</Link>
               <Link to="/pricing" className={navLinkClass('/pricing')}>Pricing</Link>
               <Link to="/faqs" className={navLinkClass('/faqs')}>FAQs</Link>
               <Link to="/blog" className={navLinkClass('/blog')}>Blog</Link>

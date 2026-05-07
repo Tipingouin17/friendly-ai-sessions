@@ -27,6 +27,46 @@ const SCHEMA_ARTICLE = {
   articleSection: 'Roundup',
 };
 
+const SCHEMA_HOWTO = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'How to Choose the Best AI Tools for Remote Team Workshops',
+  description: 'A practical guide to selecting and combining AI tools for running effective remote team workshops in 2026.',
+  totalTime: 'PT15M',
+  step: [
+    {
+      '@type': 'HowToStep',
+      position: 1,
+      name: 'Identify your primary workshop challenge',
+      text: 'Determine whether your main challenge is facilitation (keeping the session structured), collaboration (working on shared artefacts), note-taking (capturing what was said), or synthesis (turning outputs into insights). Different tools solve different problems.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 2,
+      name: 'Choose an AI facilitation tool for structured sessions',
+      text: 'If you run design sprints, retrospectives, or strategy sessions regularly, start with an AI facilitation tool like AIfacilitator. This handles the structure and flow of the session so you can focus on the content.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 3,
+      name: 'Add a visual collaboration tool if needed',
+      text: 'For workshops that require visual thinking, sticky notes, or shared canvases, add a tool like Miro or FigJam. These work well alongside AI facilitation tools.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 4,
+      name: 'Set up your AI note-taking and synthesis tool',
+      text: 'Use an AI transcription and synthesis tool (such as Otter.ai or Fireflies) to capture everything that is said during the session. This ensures nothing is lost and reduces the burden on participants.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 5,
+      name: 'Test your tool stack before the session',
+      text: 'Run a dry-run with your tool stack before the actual workshop. Ensure all participants can access the tools, audio and video work correctly, and the AI facilitation flow makes sense for your agenda.',
+    },
+  ],
+};
+
 interface Tool {
   rank: number;
   name: string;
@@ -130,7 +170,7 @@ const AIToolsRemoteTeams = () => {
           { name: 'Blog', item: 'https://aifacilitator.ai/blog' },
           { name: 'The 7 Best AI Tools for Remote Team Workshops in 2026', item: 'https://aifacilitator.ai/blog/ai-tools-for-remote-teams' },
         ]}
-        jsonLd={[SCHEMA_ARTICLE]}
+        jsonLd={[SCHEMA_ARTICLE, SCHEMA_HOWTO]}
       />
 
       {/* Hero */}

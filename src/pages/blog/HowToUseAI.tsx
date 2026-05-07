@@ -27,6 +27,59 @@ const SCHEMA_ARTICLE = {
   articleSection: 'Guide',
 };
 
+const SCHEMA_HOWTO = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'How to Use AI for Workshop Facilitation',
+  description: 'A step-by-step guide to running your first AI-facilitated workshop session using AIfacilitator.',
+  totalTime: 'PT30M',
+  supply: [
+    { '@type': 'HowToSupply', name: 'AIfacilitator account (free plan available)' },
+    { '@type': 'HowToSupply', name: 'Workshop participants (can join without an account)' },
+    { '@type': 'HowToSupply', name: 'A clear workshop objective or agenda topic' },
+  ],
+  step: [
+    {
+      '@type': 'HowToStep',
+      position: 1,
+      name: 'Create your AIfacilitator account',
+      text: 'Sign up for a free AIfacilitator account at aifacilitator.ai/signup. No credit card required. The free plan gives you access to all core facilitation features.',
+      url: 'https://aifacilitator.ai/signup',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 2,
+      name: 'Choose your AI facilitator and workshop type',
+      text: 'Select an AI facilitator from the library or create a custom one. Choose the workshop type that matches your goal: design sprint, retrospective, strategic planning, or a custom format.',
+      url: 'https://aifacilitator.ai/my-facilitators',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 3,
+      name: 'Set your workshop context and goals',
+      text: 'Provide the AI facilitator with context about your team, the problem you are solving, and the desired outcomes. The more context you provide, the more tailored the facilitation will be.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 4,
+      name: 'Invite your participants',
+      text: 'Share the session link with your team. Participants can join directly from their browser without creating an account. They can also choose to participate anonymously.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 5,
+      name: 'Run the AI-facilitated session',
+      text: 'The AI facilitator will guide your team through each phase of the workshop, asking structured questions, managing time, and capturing responses. Your role is to participate, not to facilitate.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 6,
+      name: 'Review the session report and action items',
+      text: 'After the session, the AI generates a structured report with key insights, decisions made, and prioritised action items. Share this report with your team and add action items to your project management tool.',
+    },
+  ],
+};
+
 const HowToUseAI = () => {
   return (
     <div className="min-h-screen bg-white">
@@ -38,7 +91,7 @@ const HowToUseAI = () => {
           { name: 'Blog', item: 'https://aifacilitator.ai/blog' },
           { name: 'How to Use AI for Workshop Facilitation', item: 'https://aifacilitator.ai/blog/how-to-use-ai-for-workshop-facilitation' },
         ]}
-        jsonLd={[SCHEMA_ARTICLE]}
+        jsonLd={[SCHEMA_ARTICLE, SCHEMA_HOWTO]}
       />
 
       {/* Hero */}

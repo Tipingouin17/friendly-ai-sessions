@@ -25,6 +25,45 @@ const SCHEMA = {
   dateModified: '2026-05-07',
 };
 
+const SCHEMA_FAQ = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the difference between AIfacilitator and Miro?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Miro is a visual collaboration whiteboard that provides a canvas for teams to work on together. AIfacilitator is an active AI facilitator that guides teams through structured workshop exercises in real time, capturing responses and generating insights automatically. Miro provides the space; AIfacilitator provides the facilitation.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is AIfacilitator a Miro alternative?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator is a complementary tool to Miro rather than a direct replacement. Miro excels at visual collaboration and whiteboarding. AIfacilitator excels at structured facilitation, anonymous feedback, and automatic session summaries. Many teams use both together: Miro for visual work and AIfacilitator for facilitated discussions.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can AIfacilitator replace Miro for design sprints?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'For the facilitation component of a design sprint, yes. AIfacilitator actively guides teams through each sprint phase, manages time, and captures decisions. However, if your sprint requires visual prototyping or sticky-note mapping on a shared canvas, you may still want to use Miro alongside AIfacilitator.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AIfacilitator pricing compare to Miro?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator offers a free plan and paid plans starting at $19/month per workspace. Miro offers a free plan and paid plans starting at approximately $10/user/month. For small teams, AIfacilitator is often more cost-effective for facilitation-focused use cases.',
+      },
+    },
+  ],
+};
+
 type FeatureStatus = 'yes' | 'no' | 'partial';
 
 interface Feature {
@@ -68,7 +107,7 @@ const VsMiro = () => {
           { name: 'Compare', item: 'https://aifacilitator.ai/compare' },
           { name: 'AIfacilitator vs Miro', item: 'https://aifacilitator.ai/compare/aifacilitator-vs-miro' },
         ]}
-        jsonLd={[SCHEMA]}
+        jsonLd={[SCHEMA, SCHEMA_FAQ]}
       />
 
       {/* Hero */}

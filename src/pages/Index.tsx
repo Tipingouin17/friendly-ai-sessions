@@ -14,8 +14,63 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
     Users, MessageSquare, BarChart3, Sparkles, ArrowRight,
     Clock, TrendingUp, Globe, Settings, CheckCircle2,
-    Zap, Shield, Star
+    Zap, Shield, Star,
 } from 'lucide-react';
+
+const SCHEMA_FAQ_HOME = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is AIfacilitator?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator is an AI-native workshop facilitation platform that provides expert AI facilitators to guide teams through structured conversations, decisions, and outcomes. It replaces or augments traditional human facilitators for design sprints, retrospectives, strategic planning sessions, and more.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AI workshop facilitation work?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator uses large language models (LLMs) to dynamically generate workshop agendas, guide participants through each phase in real time, adapt to the conversation as it unfolds, and produce post-session summaries and insights. Teams interact with the AI facilitator through a chat interface during the session.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Who is AIfacilitator for?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator is designed for product managers running design sprints, agile coaches and Scrum Masters facilitating retrospectives, HR and L&D professionals running team workshops, and consultants who facilitate sessions for clients. It works for both remote/hybrid teams and in-person groups.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What types of workshops can AIfacilitator run?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator supports design sprints, agile retrospectives, strategic planning sessions, team-building workshops, brainstorming sessions, and decision-making meetings. The AI adapts its facilitation style to the specific workshop type and team goals.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How is AIfacilitator different from Miro or SessionLab?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Unlike Miro (a visual collaboration whiteboard) or SessionLab (a workshop agenda planner), AIfacilitator is an active AI facilitator that participates in and guides the session in real time. It does not just provide a canvas or template — it acts as an intelligent co-facilitator that adapts dynamically to the conversation.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is AIfacilitator free to use?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AIfacilitator offers a free plan to get started and run your first AI-facilitated sessions. Paid plans are available for teams that need more sessions, advanced analytics, and additional AI facilitator customization.',
+      },
+    },
+  ],
+};
 
 const Index = () => {
     const { isAuthenticated } = useAuth();
@@ -30,6 +85,8 @@ const Index = () => {
             <PageHead
                 title="AIfacilitator - AI-Powered Workshop Facilitation"
                 description="Transform your meetings into engaging, productive sessions with AI-powered workshop facilitation."
+                canonical="https://aifacilitator.ai/"
+                jsonLd={[SCHEMA_FAQ_HOME]}
             />
 
             {/* ── Hero Section ─────────────────────────────────────────── */}

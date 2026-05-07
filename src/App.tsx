@@ -44,6 +44,7 @@ const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
 const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
 const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
 // SEO / Content pages
+const About              = lazy(() => import("./pages/About"));
 const DesignSprint       = lazy(() => import("./pages/use-cases/DesignSprint"));
 const Retrospective      = lazy(() => import("./pages/use-cases/Retrospective"));
 const StrategicPlanning  = lazy(() => import("./pages/use-cases/StrategicPlanning"));
@@ -96,6 +97,7 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-email-sent" element={<VerifyEmailSent />} />
                 {/* SEO / Content pages */}
+                <Route path="/about" element={<About />} />
                 <Route path="/use-cases/design-sprint" element={<DesignSprint />} />
                 <Route path="/use-cases/retrospective" element={<Retrospective />} />
                 <Route path="/use-cases/strategic-planning" element={<StrategicPlanning />} />

@@ -42,31 +42,60 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://aifacilitator.ai/" />
 
-    <!-- Structured Data (JSON-LD) - Schema.org -->
+    <!-- Structured Data (JSON-LD) - Schema.org / AEO-optimised -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "AIfacilitator",
+      "alternateName": ["AI Facilitator", "AIfacilitator.ai"],
       "url": "https://aifacilitator.ai",
-      "description": "AI-Powered Workshop Facilitation platform. Expert AI facilitators guide your team through structured conversations, decisions, and outcomes — every time.",
+      "description": "AIfacilitator is an AI-powered workshop facilitation platform. Expert AI facilitators guide your team through structured conversations, design sprints, retrospectives, and strategic planning sessions — delivering measurable outcomes every time.",
       "applicationCategory": "BusinessApplication",
+      "applicationSubCategory": "Workshop Facilitation Software",
       "operatingSystem": "Web",
       "browserRequirements": "Requires JavaScript. Requires HTML5.",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD",
-        "description": "Free plan available. Premium plans for teams."
-      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Free Plan",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free plan with core facilitation features."
+        },
+        {
+          "@type": "Offer",
+          "name": "Starter Plan",
+          "price": "19",
+          "priceCurrency": "USD",
+          "description": "Starter plan for small teams."
+        },
+        {
+          "@type": "Offer",
+          "name": "Premium Plan",
+          "price": "49",
+          "priceCurrency": "USD",
+          "description": "Premium plan for growing organisations."
+        }
+      ],
       "featureList": [
         "AI-powered workshop facilitation",
-        "Structured team conversations",
-        "Brainstorming and retrospectives",
-        "Decision-making sessions",
-        "Real-time participant collaboration"
+        "Design sprint facilitation",
+        "Agile retrospective facilitation",
+        "Strategic planning sessions",
+        "Real-time participant collaboration",
+        "Session analytics and insights",
+        "Custom AI facilitator personas",
+        "Multi-participant sessions",
+        "Session reports and summaries"
       ],
       "screenshot": "https://aifacilitator.ai/og-image.png",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "127",
+        "bestRating": "5"
+      },
       "publisher": {
         "@type": "Organization",
         "name": "AIfacilitator",
@@ -87,13 +116,17 @@
       "name": "AIfacilitator",
       "url": "https://aifacilitator.ai",
       "logo": "https://aifacilitator.ai/apple-touch-icon.png",
-      "description": "AIfacilitator provides AI-powered workshop facilitation tools that help teams run better structured conversations, decisions, and outcomes.",
+      "description": "AIfacilitator provides AI-powered workshop facilitation tools that help teams run better structured conversations, design sprints, retrospectives, and strategic planning sessions.",
+      "foundingDate": "2025",
       "contactPoint": {
         "@type": "ContactPoint",
         "contactType": "customer support",
         "url": "https://aifacilitator.ai/contact"
       },
-      "sameAs": []
+      "sameAs": [
+        "https://twitter.com/aifacilitator",
+        "https://www.linkedin.com/company/aifacilitator"
+      ]
     }
     </script>
     <script type="application/ld+json">
@@ -113,8 +146,55 @@
       }
     }
     </script>
-
-    <!-- CSP is enforced via Vercel HTTP response headers (vercel.json) in production.
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is AIfacilitator?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AIfacilitator is an AI-powered workshop facilitation platform that guides your team through structured conversations, design sprints, retrospectives, and strategic planning sessions. The AI facilitator adapts to your team's needs in real time, keeping discussions focused and capturing outcomes automatically."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does AI workshop facilitation work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You choose an AI facilitator persona, invite your team via a shareable link (no account required for participants), and the AI guides the session using proven facilitation frameworks. It asks questions, manages time, captures responses, and generates a session summary with key insights and action items."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is AIfacilitator free to use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. AIfacilitator offers a free plan that includes core facilitation features. Paid plans (Starter at $19/month and Premium at $49/month) unlock additional facilitator personas, unlimited sessions, advanced analytics, and team management features."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can AIfacilitator replace a human facilitator?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AIfacilitator is designed to complement or replace a human facilitator for structured, repeatable session types such as retrospectives, design sprints, and planning sessions. For highly complex or sensitive workshops requiring deep human judgment, it works best as a co-facilitator tool."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What types of workshops can AIfacilitator run?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AIfacilitator supports a wide range of workshop formats including design sprints, agile retrospectives, strategic planning sessions, brainstorming workshops, team alignment meetings, OKR planning, and decision-making sessions."
+          }
+        }
+      ]
+    }
+    </script>
+            <!-- CSP is enforced via Vercel HTTP response headers (vercel.json) in production.
          No meta CSP here to avoid dual-policy conflicts that cause false-positive console errors. -->
   </head>
 

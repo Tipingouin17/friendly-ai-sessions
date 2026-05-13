@@ -157,7 +157,14 @@ DB_USER = os.environ.get("PGUSER") or os.environ.get("DB_USER", "postgres")
 DB_HOST = os.environ.get("PGHOST") or os.environ.get("DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", "5432"))
 DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD", "")
-JWT_SECRET = os.environ.get("JWT_SECRET", "super-secret-jwt-token-for-local-dev")
+_JWT_SECRET_DEFAULT = "super-secret-jwt-token-for-local-dev"
+JWT_SECRET = os.environ.get("JWT_SECRET", _JWT_SECRET_DEFAULT)
+# SECURITY: Fail fast if the default insecure JWT secret is used in production
+if JWT_SECRET == _JWT_SECRET_DEFAULT and os.environ.get("RAILWAY_ENVIRONMENT", "") not in ("", "development"):
+    raise RuntimeError(
+        "SECURITY ERROR: JWT_SECRET is set to the insecure default value. "
+        "Set a strong random JWT_SECRET environment variable before starting the server."
+    )
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "/app/storage")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SITE_URL = os.environ.get("SITE_URL", "https://aifacilitator.ai")

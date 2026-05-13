@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 const DEV_API_URL = 'https://friendly-ai-sessions-development.up.railway.app';
-const DEV_STRIPE_KEY = 'pk_test_51NQ84KK0lFUZlqgu0AihwLfp4CZjiZ5XH9PnVOBVBLRgX8sOpsV2Q4TjyAo3xxxESYRjyTAVV6IOOLfDakE54GfI00y3qEJJs5';
+// SECURITY: Never hardcode Stripe keys in source code.
+// Set VITE_STRIPE_PUBLISHABLE_KEY as an environment variable in Vercel (dev environment).
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,7 +13,7 @@ export default defineConfig(({ mode }) => ({
   ...(mode === 'development' ? {
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(DEV_API_URL),
-      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(DEV_STRIPE_KEY),
+      // VITE_STRIPE_PUBLISHABLE_KEY is set via Vercel environment variables (dev environment)
     }
   } : {}),
   server: {

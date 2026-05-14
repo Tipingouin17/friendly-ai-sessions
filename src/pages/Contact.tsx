@@ -20,6 +20,7 @@ import { useState, useRef, useEffect } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import api from "@/lib/api";
 import PageHead from "@/components/PageHead";
+import { trackContactLead } from "@/lib/tracking";
 
 interface ContactFormData {
   fname: string;
@@ -192,6 +193,7 @@ const Contact = () => {
       }
 
       setSubmitted(true);
+      trackContactLead();
       toast({
         title: "Message sent!",
         description: data?.message ?? "We'll get back to you within 24 hours.",

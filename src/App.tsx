@@ -8,13 +8,14 @@ import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { CrispChat } from "./components/CrispChat";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { initializeTracking, trackPageView } from "./lib/tracking";
 
 // Eagerly loaded — always needed on first paint
 import Index from "./pages/Index";
@@ -73,6 +74,21 @@ function useBackendWarmup() {
   }, []);
 }
 
+function RouteTracking() {
+  const location = useLocation();
+
+  useEffect(() => {
+    initializeTracking();
+  }, []);
+
+  useEffect(() => {
+    const path = `${location.pathname}${location.search}${location.hash}`;
+    trackPageView(path);
+  }, [location.pathname, location.search, location.hash]);
+
+  return null;
+}
+
 function App() {
   useBackendWarmup();
   return (
@@ -81,6 +97,7 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <RouteTracking />
           <CrispChat />
           <Suspense fallback={<PageLoader />}>
             <Routes>

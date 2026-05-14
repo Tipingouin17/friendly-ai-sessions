@@ -1,10 +1,19 @@
 /**
- * Centralized acquisition and conversion tracking.
+ * Centralized acquisition and conversion tracking — GDPR-compliant.
+ *
+ * Scripts are only loaded when the user has given explicit consent via the
+ * CookieBanner component. Consent is stored in localStorage under the key
+ * "cookie_consent_v1" (see src/components/CookieBanner.tsx).
+ *
+ * Strictly necessary tags (Microsoft UET for conversion measurement) are
+ * loaded only after advertising consent.
  *
  * This module deliberately keeps all marketing tags behind safe wrappers so
  * application code never fails if a third-party script is blocked, delayed, or
  * not configured in the current environment.
  */
+
+import { getStoredConsent } from "@/components/CookieBanner";
 
 type GtagCommand = 'js' | 'config' | 'event' | 'set';
 type GtagArguments = [GtagCommand, ...unknown[]];
@@ -32,8 +41,9 @@ const config = {
   clarityProjectId: import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined,
 };
 
-let initialized = false;
+let gtagInitialized = false;
 let clarityInitialized = false;
+let uetInitialized = false;
 
 function hasValue(value?: string): value is string {
   return Boolean(value && value.trim().length > 0 && !value.includes('your_'));
@@ -50,14 +60,20 @@ function appendScript(id: string, src: string): void {
   document.head.appendChild(script);
 }
 
-function initGtag(): void {
-  const primaryGoogleId = hasValue(config.ga4MeasurementId)
-    ? config.ga4MeasurementId
-    : config.googleAdsId;
+/** Load Google Analytics 4 + Google Ads — requires analytics AND advertising consent. */
+function initGtag(analyticsConsent: boolean, advertisingConsent: boolean): void {
+  if (gtagInitialized) return;
 
-  if (!hasValue(primaryGoogleId)) return;
+  // GA4 requires analytics consent; Google Ads requires advertising consent.
+  const loadGa4 = analyticsConsent && hasValue(config.ga4MeasurementId);
+  const loadGads = advertisingConsent && hasValue(config.googleAdsId);
 
-  appendScript('aifacilitator-gtag', `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(primaryGoogleId)}`);
+  if (!loadGa4 && !loadGads) return;
+
+  gtagInitialized = true;
+
+  const primaryId = loadGa4 ? config.ga4MeasurementId! : config.googleAdsId;
+  appendScript('aifacilitator-gtag', `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(primaryId)}`);
 
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function gtag(...args: GtagArguments) {
@@ -66,17 +82,18 @@ function initGtag(): void {
 
   window.gtag('js', new Date());
 
-  if (hasValue(config.ga4MeasurementId)) {
-    window.gtag('config', config.ga4MeasurementId, { send_page_view: false });
+  if (loadGa4) {
+    window.gtag('config', config.ga4MeasurementId!, { send_page_view: false });
   }
 
-  if (hasValue(config.googleAdsId)) {
+  if (loadGads) {
     window.gtag('config', config.googleAdsId, { send_page_view: false });
   }
 }
 
-function initClarity(): void {
-  if (clarityInitialized || !hasValue(config.clarityProjectId) || typeof window === 'undefined') return;
+/** Load Microsoft Clarity — requires analytics consent. */
+function initClarity(analyticsConsent: boolean): void {
+  if (clarityInitialized || !analyticsConsent || !hasValue(config.clarityProjectId) || typeof window === 'undefined') return;
 
   clarityInitialized = true;
   window.clarity = window.clarity || function clarity(...args: unknown[]) {
@@ -86,20 +103,67 @@ function initClarity(): void {
   appendScript('aifacilitator-clarity', `https://www.clarity.ms/tag/${encodeURIComponent(config.clarityProjectId)}`);
 }
 
-export function initializeTracking(): void {
-  if (initialized || typeof window === 'undefined') return;
+/** Load Microsoft UET tag — requires advertising consent. */
+function initUet(advertisingConsent: boolean): void {
+  if (uetInitialized || !advertisingConsent || !hasValue(config.microsoftUetId) || typeof window === 'undefined') return;
 
-  initialized = true;
-  initGtag();
-  initClarity();
+  uetInitialized = true;
+
+  // Inject the UET inline bootstrap (same as the snippet in index.html but deferred)
+  if (!window.uetq) {
+    window.uetq = [] as typeof window.uetq;
+  }
+
+  appendScript('aifacilitator-uet', `https://bat.bing.com/bat.js`);
+
+  // Configure UET after script loads
+  const uetId = config.microsoftUetId;
+  const uetScript = document.createElement('script');
+  uetScript.id = 'aifacilitator-uet-config';
+  uetScript.textContent = `
+    window.uetq = window.uetq || [];
+    (function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[],f=function(){var o={ti:"${uetId}",enableAutoSpaTracking:true};o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")},n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function(){var s=this.readyState;s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)},i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)})(window,document,"script","//bat.bing.com/bat.js","uetq");
+  `;
+  if (!document.getElementById('aifacilitator-uet-config')) {
+    document.head.appendChild(uetScript);
+  }
+}
+
+/**
+ * Initialize tracking scripts based on stored cookie consent.
+ * Called on app mount and whenever consent is updated.
+ */
+export function initializeTracking(): void {
+  if (typeof window === 'undefined') return;
+
+  const consent = getStoredConsent();
+
+  // No consent decision yet — do not load any optional scripts.
+  if (!consent) return;
+
+  initGtag(consent.analytics, consent.advertising);
+  initClarity(consent.analytics);
+  initUet(consent.advertising);
+}
+
+/** Re-initialize tracking after consent is updated (called by cookie-consent-updated event). */
+export function reinitializeTracking(): void {
+  // Reset flags so scripts can be loaded if consent was just granted
+  gtagInitialized = false;
+  clarityInitialized = false;
+  uetInitialized = false;
+  initializeTracking();
 }
 
 export function trackPageView(path: string, title = document.title): void {
   initializeTracking();
 
+  const consent = getStoredConsent();
+  if (!consent) return;
+
   const pageLocation = `${window.location.origin}${path}`;
 
-  if (hasValue(config.ga4MeasurementId) && window.gtag) {
+  if (consent.analytics && hasValue(config.ga4MeasurementId) && window.gtag) {
     window.gtag('event', 'page_view', {
       page_title: title,
       page_location: pageLocation,
@@ -107,7 +171,7 @@ export function trackPageView(path: string, title = document.title): void {
     });
   }
 
-  if (hasValue(config.googleAdsId) && window.gtag) {
+  if (consent.advertising && hasValue(config.googleAdsId) && window.gtag) {
     window.gtag('config', config.googleAdsId, {
       page_title: title,
       page_location: pageLocation,
@@ -115,7 +179,7 @@ export function trackPageView(path: string, title = document.title): void {
     });
   }
 
-  if (window.uetq) {
+  if (consent.advertising && window.uetq) {
     window.uetq.push('event', 'page_view', {
       page_path: path,
       page_location: pageLocation,
@@ -124,6 +188,8 @@ export function trackPageView(path: string, title = document.title): void {
 }
 
 function trackGa4Event(eventName: string, parameters: Record<string, unknown> = {}): void {
+  const consent = getStoredConsent();
+  if (!consent?.analytics) return;
   initializeTracking();
 
   if (hasValue(config.ga4MeasurementId) && window.gtag) {
@@ -132,6 +198,8 @@ function trackGa4Event(eventName: string, parameters: Record<string, unknown> = 
 }
 
 function trackGoogleAdsConversion(label?: string, parameters: Record<string, unknown> = {}): void {
+  const consent = getStoredConsent();
+  if (!consent?.advertising) return;
   initializeTracking();
 
   if (!hasValue(config.googleAdsId) || !hasValue(label) || !window.gtag) return;
@@ -143,6 +211,8 @@ function trackGoogleAdsConversion(label?: string, parameters: Record<string, unk
 }
 
 function trackMicrosoftEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
+  const consent = getStoredConsent();
+  if (!consent?.advertising) return;
   if (!window.uetq) return;
 
   window.uetq.push('event', eventName, {

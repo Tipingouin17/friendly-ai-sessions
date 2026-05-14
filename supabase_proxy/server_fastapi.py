@@ -2046,6 +2046,241 @@ async def delete_own_account(request: Request):
     except Exception as e:
         log_auth.error("gdpr_anonymise error for user %s: %s", user_id, e, exc_info=True)
         raise HTTPException(500, "Account deletion failed. Please contact support.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GDPR Art. 33-34 — Personal Data Breach Notification
+# ─────────────────────────────────────────────────────────────────────────────
+
+class BreachNotificationRequest(BaseModel):
+    title: str
+    description: str
+    affected_data_categories: list[str]  # e.g. ["email", "session_content"]
+    estimated_affected_users: int
+    discovery_timestamp: str             # ISO 8601
+    severity: str                        # "low" | "medium" | "high" | "critical"
+    internal_reporter: str               # name/email of the person reporting
+
+@app.post("/admin/gdpr/breach-notification")
+@limiter.limit("5/minute")
+async def report_data_breach(request: Request, body: BreachNotificationRequest):
+    """
+    GDPR Art. 33-34 — Internal breach notification endpoint.
+
+    Records the breach in the security_audit_log and sends an alert email to
+    the DPO (privacy@aifacilitator.ai). The DPO is then responsible for
+    notifying the supervisory authority (CNIL) within 72 hours if required.
+
+    This endpoint is restricted to admin users only.
+    """
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(401, "Authentication required")
+        token = auth_header.split(" ", 1)[1]
+        payload = verify_jwt(token)
+        if not payload:
+            raise HTTPException(401, "Invalid token")
+        user_id = payload.get("sub")
+        role = payload.get("role", "user")
+        if role != "admin":
+            raise HTTPException(403, "Admin access required")
+
+        discovery_dt = body.discovery_timestamp
+        severity = body.severity
+        categories_str = ", ".join(body.affected_data_categories)
+
+        # Log to security_audit_log
+        async with get_db_connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO security_audit_log
+                    (user_id, event_type, event_data, ip_address, created_at)
+                VALUES ($1, 'gdpr_breach_notification', $2, $3, NOW())
+                """,
+                user_id,
+                {
+                    "title": body.title,
+                    "description": body.description,
+                    "affected_data_categories": body.affected_data_categories,
+                    "estimated_affected_users": body.estimated_affected_users,
+                    "discovery_timestamp": discovery_dt,
+                    "severity": severity,
+                    "internal_reporter": body.internal_reporter,
+                    "reported_by_user_id": user_id,
+                },
+                request.client.host if request.client else "unknown",
+            )
+
+        # Send alert email to DPO
+        dpo_email = "privacy@aifacilitator.ai"
+        subject = f"[GDPR BREACH ALERT - {severity.upper()}] {body.title}"
+        html_body = f"""
+        <h2 style="color:#dc2626;">GDPR Personal Data Breach Notification</h2>
+        <p><strong>Severity:</strong> {severity.upper()}</p>
+        <p><strong>Title:</strong> {body.title}</p>
+        <p><strong>Description:</strong> {body.description}</p>
+        <p><strong>Affected data categories:</strong> {categories_str}</p>
+        <p><strong>Estimated affected users:</strong> {body.estimated_affected_users}</p>
+        <p><strong>Discovery timestamp:</strong> {discovery_dt}</p>
+        <p><strong>Reported by:</strong> {body.internal_reporter}</p>
+        <hr/>
+        <p style="color:#6b7280;font-size:12px;">
+            Under GDPR Art. 33, you must notify the supervisory authority (CNIL) within
+            <strong>72 hours</strong> of this discovery if the breach is likely to result
+            in a risk to individuals' rights and freedoms.<br/>
+            CNIL notification portal: <a href="https://notifications.cnil.fr">https://notifications.cnil.fr</a>
+        </p>
+        """
+        try:
+            await send_email(to=dpo_email, subject=subject, html=html_body)
+        except Exception as email_err:
+            log_auth.error("breach_notification: failed to send DPO alert email: %s", email_err)
+
+        log_auth.critical(
+            "GDPR_BREACH: severity=%s title=%s affected_users=%s categories=%s reporter=%s",
+            severity, body.title, body.estimated_affected_users, categories_str, body.internal_reporter,
+        )
+
+        return {
+            "status": "recorded",
+            "message": "Breach notification recorded. DPO alert sent. Remember: CNIL must be notified within 72h if required (Art. 33).",
+            "cnil_portal": "https://notifications.cnil.fr",
+            "logged_at": "NOW()",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("breach_notification error: %s", e, exc_info=True)
+        raise HTTPException(500, "Failed to record breach notification.")
+
+
+@app.get("/admin/gdpr/processing-register")
+@limiter.limit("10/minute")
+async def get_processing_register(request: Request):
+    """
+    GDPR Art. 30 — Record of Processing Activities (RoPA).
+
+    Returns the static register of all data processing activities performed
+    by AIfacilitator. This register is the authoritative source for GDPR
+    accountability and must be kept up to date.
+    """
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(401, "Authentication required")
+        token = auth_header.split(" ", 1)[1]
+        payload = verify_jwt(token)
+        if not payload:
+            raise HTTPException(401, "Invalid token")
+        role = payload.get("role", "user")
+        if role != "admin":
+            raise HTTPException(403, "Admin access required")
+
+        register = {
+            "controller": {
+                "name": "AIfacilitator",
+                "contact": "privacy@aifacilitator.ai",
+                "website": "https://aifacilitator.ai",
+            },
+            "last_updated": "2026-05-14",
+            "processing_activities": [
+                {
+                    "id": "PA-001",
+                    "name": "Account registration and management",
+                    "purpose": "Create and manage user accounts to provide the service",
+                    "legal_basis": "Contract — Art. 6(1)(b)",
+                    "data_categories": ["name", "email", "hashed_password", "profile_picture"],
+                    "data_subjects": ["registered users"],
+                    "recipients": ["Railway (hosting)", "Resend (email)"],
+                    "retention": "Lifetime of account; deleted immediately on account deletion",
+                    "international_transfers": "Railway (US) — SCC",
+                },
+                {
+                    "id": "PA-002",
+                    "name": "Workshop session hosting and AI facilitation",
+                    "purpose": "Deliver AI-facilitated workshop sessions",
+                    "legal_basis": "Contract — Art. 6(1)(b)",
+                    "data_categories": ["session_transcripts", "ai_reports", "facilitator_configs", "participant_names"],
+                    "data_subjects": ["session hosts", "session participants"],
+                    "recipients": ["Railway (hosting)", "OpenAI (AI processing)"],
+                    "retention": "Anonymised on account deletion; retained for other participants",
+                    "international_transfers": "Railway (US) — SCC; OpenAI (US) — SCC + zero-retention API",
+                },
+                {
+                    "id": "PA-003",
+                    "name": "Payment processing",
+                    "purpose": "Process subscription payments",
+                    "legal_basis": "Contract — Art. 6(1)(b) + Legal obligation for invoicing",
+                    "data_categories": ["billing_name", "last_4_card_digits", "invoice_data"],
+                    "data_subjects": ["paying users"],
+                    "recipients": ["Stripe (payment processor)"],
+                    "retention": "7 years (accounting legal obligation)",
+                    "international_transfers": "Stripe (US/EU) — SCC + PCI-DSS Level 1",
+                },
+                {
+                    "id": "PA-004",
+                    "name": "Transactional email delivery",
+                    "purpose": "Send password reset, email verification, and notification emails",
+                    "legal_basis": "Contract — Art. 6(1)(b)",
+                    "data_categories": ["email", "name"],
+                    "data_subjects": ["registered users"],
+                    "recipients": ["Resend (email delivery)"],
+                    "retention": "Email logs: 30 days",
+                    "international_transfers": "Resend (US) — SCC",
+                },
+                {
+                    "id": "PA-005",
+                    "name": "Security logging and fraud prevention",
+                    "purpose": "Detect and prevent unauthorized access and fraud",
+                    "legal_basis": "Legitimate interest — Art. 6(1)(f)",
+                    "data_categories": ["ip_address", "login_timestamps", "auth_events"],
+                    "data_subjects": ["all users"],
+                    "recipients": ["Railway (hosting — internal only)"],
+                    "retention": "Login activity: 90 days; Security audit log: 12 months",
+                    "international_transfers": "Railway (US) — SCC",
+                },
+                {
+                    "id": "PA-006",
+                    "name": "Analytics (consent-gated)",
+                    "purpose": "Understand how users interact with the service to improve it",
+                    "legal_basis": "Consent — Art. 6(1)(a)",
+                    "data_categories": ["page_views", "session_duration", "device_type", "ip_address (anonymised)"],
+                    "data_subjects": ["consenting users"],
+                    "recipients": ["Google Analytics 4 (US)", "Microsoft Clarity (US)"],
+                    "retention": "GA4: 14 months; Clarity: session-level",
+                    "international_transfers": "Google (US) — SCC; Microsoft (US) — SCC",
+                },
+                {
+                    "id": "PA-007",
+                    "name": "Advertising measurement (consent-gated)",
+                    "purpose": "Measure the effectiveness of advertising campaigns",
+                    "legal_basis": "Consent — Art. 6(1)(a)",
+                    "data_categories": ["page_views", "conversion_events", "ip_address (anonymised)"],
+                    "data_subjects": ["consenting users"],
+                    "recipients": ["Google Ads (US)", "Microsoft Advertising (US)"],
+                    "retention": "As per platform policies (typically 30-90 days)",
+                    "international_transfers": "Google (US) — SCC; Microsoft (US) — SCC",
+                },
+                {
+                    "id": "PA-008",
+                    "name": "Customer support via live chat",
+                    "purpose": "Provide real-time customer support",
+                    "legal_basis": "Legitimate interest — Art. 6(1)(f)",
+                    "data_categories": ["name", "email", "chat_messages"],
+                    "data_subjects": ["users who initiate chat"],
+                    "recipients": ["Crisp (EU — France)"],
+                    "retention": "Chat history: 12 months",
+                    "international_transfers": "None — Crisp is EU-based",
+                },
+            ],
+        }
+        return register
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("processing_register error: %s", e, exc_info=True)
+        raise HTTPException(500, "Failed to retrieve processing register.")
+
 @app.post("/auth/v1/logout")
 async def auth_logout():
     return Response(status_code=204)

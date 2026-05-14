@@ -4,7 +4,7 @@
  * Module for the AIfacilitator application.
  */
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,7 +15,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { initializeTracking, trackPageView } from "./lib/tracking";
+import { initializeTracking, trackPageView, reinitializeTracking } from "./lib/tracking";
+import { CookieBanner } from "./components/CookieBanner";
 
 // Eagerly loaded — always needed on first paint
 import Index from "./pages/Index";
@@ -91,6 +92,21 @@ function RouteTracking() {
 
 function App() {
   useBackendWarmup();
+  const [cookieSettingsOpen, setCookieSettingsOpen] = useState(false);
+
+  // Re-initialize tracking whenever consent is updated
+  useEffect(() => {
+    const handler = () => reinitializeTracking();
+    window.addEventListener("cookie-consent-updated", handler);
+    return () => window.removeEventListener("cookie-consent-updated", handler);
+  }, []);
+
+  // Expose a global function so the Footer "Cookie Settings" link can open the banner
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__openCookieSettings = () => setCookieSettingsOpen(true);
+    return () => { delete (window as unknown as Record<string, unknown>).__openCookieSettings; };
+  }, []);
+
   return (
     <ErrorBoundary>
       <TooltipProvider>
@@ -99,6 +115,10 @@ function App() {
         <BrowserRouter>
           <RouteTracking />
           <CrispChat />
+          <CookieBanner
+            forceOpen={cookieSettingsOpen}
+            onClose={() => setCookieSettingsOpen(false)}
+          />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Layout><Outlet /></Layout>}>

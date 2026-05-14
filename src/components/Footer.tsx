@@ -55,6 +55,12 @@ export const Footer = () => {
             <div className="flex flex-col space-y-2.5">
               <Link to="/privacy" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Terms of Service</Link>
+              <button
+                onClick={() => (window as unknown as Record<string, unknown>).__openCookieSettings?.()}
+                className="text-sm text-gray-400 hover:text-indigo-400 transition-colors text-left"
+              >
+                Cookie Settings
+              </button>
             </div>
           </div>
         </div>

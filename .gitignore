@@ -33,3 +33,20 @@ dist-ssr
 
 # Legacy Supabase directory (functions now on Railway)
 supabase/
+
+# TLS certificates and private keys - NEVER commit to git
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+supabase_proxy/cert.pem
+supabase_proxy/key.pem
+
+# Backup files
+*.bak
+*.backup
+
+# Video analysis files (may contain sensitive session data)
+video_Recording*.md
+*_analysis_*.md

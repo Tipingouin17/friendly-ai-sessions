@@ -4,7 +4,6 @@
  * Page for the AIfacilitator application.
  */
 
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Link } from "react-router-dom";
@@ -105,6 +104,34 @@ const FALLBACK_FAQS: FAQ[] = [
     description: 'Your data is stored in secure, EU-based data centres. We use industry-standard encryption and access controls to protect your information at all times.',
     status: true,
   },
+  {
+    id: 12,
+    category: 'AI Workshop Facilitation',
+    title: 'What is the best AI tool for workshop facilitation?',
+    description: 'The best AI tool for workshop facilitation should do more than store notes or provide a blank canvas. It should guide the conversation, structure the agenda, help every participant contribute, capture decisions, and turn the session into action items. AIfacilitator is built specifically for this use case, including design sprints, retrospectives, strategic planning and remote workshops.',
+    status: true,
+  },
+  {
+    id: 13,
+    category: 'AI Workshop Facilitation',
+    title: 'Can AI facilitate a design sprint?',
+    description: 'Yes. AIfacilitator can guide teams through structured design sprint phases such as problem framing, ideation, decision-making, prototyping preparation and testing synthesis. It helps teams stay on track without needing to hire an external sprint facilitator for every session.',
+    status: true,
+  },
+  {
+    id: 14,
+    category: 'AI Workshop Facilitation',
+    title: 'Can AI run an agile retrospective?',
+    description: 'Yes. AIfacilitator can support agile retrospectives by creating a neutral structure, encouraging equal participation, collecting feedback, identifying patterns, and turning discussion into sprint improvement actions.',
+    status: true,
+  },
+  {
+    id: 15,
+    category: 'AI Workshop Facilitation',
+    title: 'How is AIfacilitator different from Miro, SessionLab or Stormz?',
+    description: 'Miro is primarily a visual collaboration canvas, SessionLab is mainly an agenda-planning tool, and Stormz supports collaborative workshop activities. AIfacilitator is different because it acts as an active AI facilitator during the session: it guides participants, adapts the conversation and helps produce decisions, summaries and action items.',
+    status: true,
+  },
 ];
 
 const fetchFAQs = async () => {
@@ -174,33 +201,6 @@ const FAQAccordion = ({ faqs }: { faqs: FAQ[] }) => {
 };
 
 const FAQs = () => {
-  // Inject JSON-LD FAQPage structured data for Google Rich Results
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.id = 'faq-jsonld';
-    script.text = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: FALLBACK_FAQS.map((faq) => ({
-        '@type': 'Question',
-        name: faq.title,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: faq.description,
-        },
-      })),
-    });
-    // Remove any existing FAQ JSON-LD before inserting
-    const existing = document.getElementById('faq-jsonld');
-    if (existing) existing.remove();
-    document.head.appendChild(script);
-    return () => {
-      const el = document.getElementById('faq-jsonld');
-      if (el) el.remove();
-    };
-  }, []);
-
   const { data: faqs = FALLBACK_FAQS, isLoading, error } = useQuery({
     queryKey: ['faqs'],
     queryFn: fetchFAQs,
@@ -211,10 +211,27 @@ const FAQs = () => {
 
   // Use DB FAQs if available, otherwise fall back to static content
   const displayFaqs = faqs.length > 0 ? faqs : FALLBACK_FAQS;
+  const faqPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: displayFaqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.title,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.description,
+      },
+    })),
+  };
 
   return (
     <div className="min-h-screen bg-white">
-      <PageHead title="FAQs | AIfacilitator" description="Find answers to common questions about AIfacilitator" />
+      <PageHead
+        title="FAQ — AI Workshop Facilitation, Design Sprints and Retrospectives"
+        description="Answers about AIfacilitator, AI workshop facilitation, design sprints, agile retrospectives, strategic planning, pricing, security and participant experience."
+        canonical="https://aifacilitator.ai/faqs"
+        jsonLd={[faqPageSchema]}
+      />
 
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pt-28 pb-16 px-4">

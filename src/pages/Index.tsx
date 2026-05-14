@@ -72,6 +72,56 @@ const SCHEMA_FAQ_HOME = {
   ],
 };
 
+const SCHEMA_SOFTWARE_APPLICATION = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'AIfacilitator',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: 'https://aifacilitator.ai/',
+  description: 'AIfacilitator is an AI-powered workshop facilitation platform for design sprints, agile retrospectives, strategic planning, brainstorming, team alignment, and remote workshops.',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'EUR',
+    availability: 'https://schema.org/InStock',
+    url: 'https://aifacilitator.ai/pricing',
+  },
+  featureList: [
+    'AI-guided workshop facilitation',
+    'Design sprint facilitation',
+    'Agile retrospective facilitation',
+    'Strategic planning workshops',
+    'Participant invitation links',
+    'Session reports and action items',
+    'Remote and hybrid team workshops',
+  ],
+  audience: {
+    '@type': 'Audience',
+    audienceType: 'Product managers, agile teams, Scrum Masters, innovation teams, consultants, facilitators, HR teams, and remote teams',
+  },
+};
+
+const SCHEMA_ORGANIZATION = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'AIfacilitator',
+  url: 'https://aifacilitator.ai/',
+  logo: 'https://aifacilitator.ai/og-image.png',
+  sameAs: [
+    'https://www.producthunt.com/products/aifacilitator',
+    'https://www.g2.com/products/aifacilitator',
+  ],
+};
+
+const SCHEMA_WEBSITE = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'AIfacilitator',
+  url: 'https://aifacilitator.ai/',
+  description: 'AI-powered workshop facilitation for teams that need structured conversations, better decisions, and clear action items.',
+};
+
 const Index = () => {
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
@@ -83,10 +133,10 @@ const Index = () => {
     return (
         <div className="min-h-screen bg-white">
             <PageHead
-                title="AIfacilitator - AI-Powered Workshop Facilitation"
-                description="Transform your meetings into engaging, productive sessions with AI-powered workshop facilitation."
+                title="AI Workshop Facilitation Software for Teams"
+                description="AIfacilitator is an AI-powered workshop facilitation platform for design sprints, agile retrospectives, strategic planning, brainstorming and remote team workshops."
                 canonical="https://aifacilitator.ai/"
-                jsonLd={[SCHEMA_FAQ_HOME]}
+                jsonLd={[SCHEMA_SOFTWARE_APPLICATION, SCHEMA_ORGANIZATION, SCHEMA_WEBSITE, SCHEMA_FAQ_HOME]}
             />
 
             {/* ── Hero Section ─────────────────────────────────────────── */}

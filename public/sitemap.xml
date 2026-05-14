@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Core pages -->
-  <url><loc>https://aifacilitator.ai/</loc><lastmod>2026-05-07</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://aifacilitator.ai/about</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://aifacilitator.ai/pricing</loc><lastmod>2026-05-07</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://aifacilitator.ai/faqs</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://aifacilitator.ai/contact</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://aifacilitator.ai/</loc><lastmod>2026-05-14</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://aifacilitator.ai/about</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aifacilitator.ai/pricing</loc><lastmod>2026-05-14</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://aifacilitator.ai/faqs</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aifacilitator.ai/contact</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <!-- Use Case pages (MOFU) -->
-  <url><loc>https://aifacilitator.ai/use-cases/design-sprint</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://aifacilitator.ai/use-cases/retrospective</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://aifacilitator.ai/use-cases/strategic-planning</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://aifacilitator.ai/use-cases/design-sprint</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://aifacilitator.ai/use-cases/retrospective</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://aifacilitator.ai/use-cases/strategic-planning</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
   <!-- Comparison pages (BOFU) -->
-  <url><loc>https://aifacilitator.ai/compare/aifacilitator-vs-sessionlab</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://aifacilitator.ai/compare/aifacilitator-vs-miro</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aifacilitator.ai/compare/aifacilitator-vs-sessionlab</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aifacilitator.ai/compare/aifacilitator-vs-miro</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <!-- Blog (TOFU) -->
-  <url><loc>https://aifacilitator.ai/blog</loc><lastmod>2026-05-07</lastmod><changefreq>weekly</changefreq><priority>0.75</priority></url>
-  <url><loc>https://aifacilitator.ai/blog/how-to-use-ai-for-workshop-facilitation</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://aifacilitator.ai/blog/ai-tools-for-remote-teams</loc><lastmod>2026-05-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aifacilitator.ai/blog</loc><lastmod>2026-05-14</lastmod><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://aifacilitator.ai/blog/how-to-use-ai-for-workshop-facilitation</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aifacilitator.ai/blog/ai-tools-for-remote-teams</loc><lastmod>2026-05-14</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <!-- Legal -->
-  <url><loc>https://aifacilitator.ai/privacy</loc><lastmod>2026-05-07</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://aifacilitator.ai/terms</loc><lastmod>2026-05-07</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://aifacilitator.ai/privacy</loc><lastmod>2026-05-14</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://aifacilitator.ai/terms</loc><lastmod>2026-05-14</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>

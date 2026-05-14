@@ -479,7 +479,7 @@ export const SystemSettings = () => {
                                     <Button
                                         className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
                                         onClick={() => saveMutation.mutate()}
-                                        disabled={saveMutation.isPending || !isDirty}
+                                        disabled={saveMutation.isPending || (!isDirty && activeSection !== "contact")}
                                     >
                                         {saveMutation.isPending
                                             ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>

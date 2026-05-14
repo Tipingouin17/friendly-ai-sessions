@@ -44,7 +44,7 @@ export const OrderSummary = ({ plan, onCouponApplied }: OrderSummaryProps) => {
   const [promoError, setPromoError] = useState<string | null>(null);
 
   // Format price with correct currency symbol using Intl
-  const formatPrice = (price: number, currency: string = 'USD') => {
+  const formatPrice = (price: number, currency: string = 'EUR') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
@@ -55,7 +55,7 @@ export const OrderSummary = ({ plan, onCouponApplied }: OrderSummaryProps) => {
 
   /**
    * Calculate the discounted price from the coupon details.
-   * Returns the discounted amount in the same unit as plan.price (dollars, not cents).
+   * Returns the discounted amount in the same unit as plan.price (plan currency units, not cents).
    */
   const getDiscountedPrice = (): number | null => {
     if (!coupon?.valid) return null;
@@ -63,7 +63,7 @@ export const OrderSummary = ({ plan, onCouponApplied }: OrderSummaryProps) => {
       return plan.price * (1 - coupon.percentOff / 100);
     }
     if (coupon.amountOff) {
-      // amountOff from Stripe is in cents; plan.price is in dollars
+      // amountOff from Stripe is in cents; plan.price is in plan currency units
       return Math.max(0, plan.price - coupon.amountOff / 100);
     }
     return null;
@@ -129,7 +129,7 @@ export const OrderSummary = ({ plan, onCouponApplied }: OrderSummaryProps) => {
   const originalPrice = plan.price;
   const discountedPrice = getDiscountedPrice();
   const finalPrice = discountedPrice ?? originalPrice;
-  const currency = plan.currency || 'USD';
+  const currency = plan.currency || 'EUR';
 
   return (
     <div className="sticky top-24">

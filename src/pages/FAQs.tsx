@@ -230,6 +230,7 @@ const FAQs = () => {
         title="FAQ — AI Workshop Facilitation, Design Sprints and Retrospectives"
         description="Answers about AIfacilitator, AI workshop facilitation, design sprints, agile retrospectives, strategic planning, pricing, security and participant experience."
         canonical="https://aifacilitator.ai/faqs"
+        breadcrumbs={[{ name: 'FAQs', item: 'https://aifacilitator.ai/faqs' }]}
         jsonLd={[faqPageSchema]}
       />
 
@@ -255,6 +256,16 @@ const FAQs = () => {
 
       {/* FAQ Content */}
       <div className="max-w-3xl mx-auto px-4 pb-24">
+        <section className="mb-10 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900 mb-3">Quick answer: what does AIfacilitator do?</h2>
+          <p className="text-gray-600 text-sm leading-relaxed mb-3">
+            AIfacilitator is an AI workshop facilitation platform that helps teams turn unstructured discussion into clear decisions, alignment, and action items. It guides design sprints, retrospectives, strategic planning, brainstorming, and remote team workshops in real time.
+          </p>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            Teams use AIfacilitator when they need a neutral facilitator, repeatable workshop structure, equal participation, post-session summaries, and a faster path from conversation to next steps.
+          </p>
+        </section>
+
         {isLoading ? (
           <LoadingState />
         ) : error ? (

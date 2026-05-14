@@ -15,7 +15,7 @@ interface PlanDetailsProps {
 
 export const PlanDetails = ({ plan }: PlanDetailsProps) => {
   // Format price with correct currency symbol
-  const formatPrice = (price: number, currency: string = 'USD') => {
+  const formatPrice = (price: number, currency: string = 'EUR') => {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
@@ -27,7 +27,7 @@ export const PlanDetails = ({ plan }: PlanDetailsProps) => {
 
   // Get appropriate currency icon
   const CurrencyIcon = () => {
-    const currency = plan.currency?.toUpperCase() || 'USD';
+    const currency = plan.currency?.toUpperCase() || 'EUR';
     switch (currency) {
       case 'EUR':
         return <Euro className="h-5 w-5 text-primary mr-1" />;

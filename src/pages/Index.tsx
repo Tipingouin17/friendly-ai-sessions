@@ -82,10 +82,12 @@ const SCHEMA_SOFTWARE_APPLICATION = {
   description: 'AIfacilitator is an AI-powered workshop facilitation platform for design sprints, agile retrospectives, strategic planning, brainstorming, team alignment, and remote workshops.',
   offers: {
     '@type': 'Offer',
+    name: 'AIfacilitator Free plan',
     price: '0',
     priceCurrency: 'EUR',
     availability: 'https://schema.org/InStock',
     url: 'https://aifacilitator.ai/pricing',
+    description: 'Free plan available; paid AIfacilitator plans start at €19 per month.',
   },
   featureList: [
     'AI-guided workshop facilitation',
@@ -109,6 +111,8 @@ const SCHEMA_ORGANIZATION = {
   url: 'https://aifacilitator.ai/',
   logo: 'https://aifacilitator.ai/og-image.png',
   sameAs: [
+    'https://www.linkedin.com/company/aifacilitator',
+    'https://twitter.com/aifacilitator',
     'https://www.producthunt.com/products/aifacilitator',
     'https://www.g2.com/products/aifacilitator',
   ],
@@ -165,7 +169,7 @@ const Index = () => {
 
                     {/* Subheadline */}
                     <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center px-2">
-                        Expert AI facilitators that guide your team through structured conversations, decisions, and outcomes — every time.
+                        Turn workshop chaos into structured decisions, team alignment, and clear next actions with expert AI facilitators that guide every session in real time.
                     </p>
 
                     {/* CTAs */}

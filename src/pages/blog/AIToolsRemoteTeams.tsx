@@ -87,7 +87,7 @@ const tools: Tool[] = [
     tagline: 'AI-powered live workshop facilitation',
     bestFor: 'Teams who want to run structured workshops without a dedicated facilitator',
     freePlan: true,
-    startingPrice: '$19/month',
+    startingPrice: '€19/month',
     pros: ['Active AI facilitation — not just a canvas', 'Automatic session summaries', 'Anonymous participation', 'No account needed for participants'],
     cons: ['No visual whiteboard', 'Best for structured formats'],
   },

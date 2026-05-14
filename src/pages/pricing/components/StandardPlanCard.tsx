@@ -157,7 +157,7 @@ export const StandardPlanCard = ({
                   {formatDisplayPrice(plan.price)}
                 </span>
                 <span className={`text-2xl font-bold mb-1 ${isPlanPopular ? 'text-indigo-200' : 'text-gray-500'}`}>
-                  {getCurrencySymbol(plan.currency || 'USD')}
+                  {getCurrencySymbol(plan.currency || 'EUR')}
                 </span>
               </div>
               <div className={`text-sm mt-1 text-center ${isPlanPopular ? 'text-indigo-200' : 'text-gray-400'}`}>/month</div>

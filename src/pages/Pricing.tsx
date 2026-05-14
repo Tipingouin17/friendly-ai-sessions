@@ -183,6 +183,94 @@ const FALLBACK_PLANS: Plan[] = [
   },
 ];
 
+const getCurrencySymbol = (currency: string) => {
+  switch (currency.toUpperCase()) {
+    case 'EUR': return '€';
+    case 'GBP': return '£';
+    case 'USD': return '$';
+    default: return currency.toUpperCase();
+  }
+};
+
+const createPricingSchemas = (publicPlans: Plan[]) => {
+  const standardOffers = publicPlans
+    .filter(plan => plan.title !== 'Enterprise')
+    .map(plan => ({
+      '@type': 'Offer',
+      name: `AIfacilitator ${plan.title}`,
+      price: Number(plan.price).toString(),
+      priceCurrency: (plan.currency || 'EUR').toUpperCase(),
+      availability: 'https://schema.org/InStock',
+      url: 'https://aifacilitator.ai/pricing',
+      category: 'subscription',
+      description: `${plan.title} plan for AI-powered workshop facilitation.`,
+    }));
+
+  const enterpriseOffer = publicPlans.find(plan => plan.title === 'Enterprise')
+    ? [{
+        '@type': 'Offer',
+        name: 'AIfacilitator Enterprise',
+        price: '99',
+        priceCurrency: 'EUR',
+        availability: 'https://schema.org/InStock',
+        url: 'https://aifacilitator.ai/contact',
+        category: 'enterprise subscription',
+        description: 'Enterprise plan for teams that need advanced support, custom branding, and dedicated facilitation workflows.',
+      }]
+    : [];
+
+  const startingPaidPlan = publicPlans.find(plan => Number(plan.price) > 0 && plan.title !== 'Enterprise');
+  const startingCurrency = startingPaidPlan?.currency || 'EUR';
+  const startingPrice = startingPaidPlan ? `${getCurrencySymbol(startingCurrency)}${Number(startingPaidPlan.price)}/month` : 'paid plans';
+
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'AIfacilitator',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      url: 'https://aifacilitator.ai/pricing',
+      description: 'AIfacilitator pricing for AI-powered workshop facilitation, including a free plan and paid team plans.',
+      offers: {
+        '@type': 'OfferCatalog',
+        name: 'AIfacilitator pricing plans',
+        itemListElement: [...standardOffers, ...enterpriseOffer],
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: [
+        {
+          '@type': 'Question',
+          name: 'Does AIfacilitator have a free plan?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'Yes. AIfacilitator includes a free plan for teams that want to start running AI-facilitated workshops without a credit card.',
+          },
+        },
+        {
+          '@type': 'Question',
+          name: 'How much does AIfacilitator cost?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: `AIfacilitator has a free plan, and paid plans start at ${startingPrice}. Pricing is shown in EUR on the public pricing page.`,
+          },
+        },
+        {
+          '@type': 'Question',
+          name: 'What is included in AIfacilitator paid plans?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'Paid AIfacilitator plans add higher facilitator and session limits, more participants, customisable sessions, saved sessions, reports, exports, priority support, and custom branding depending on the selected plan.',
+          },
+        },
+      ],
+    },
+  ];
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Pricing = () => {
@@ -251,6 +339,7 @@ const Pricing = () => {
   // Separate standard plans (Free, Starter, Premium) from Enterprise
   const standardPlans = publicPlans.filter(plan => plan.title !== 'Enterprise');
   const enterprisePlan = publicPlans.find(plan => plan.title === 'Enterprise');
+  const pricingSchemas = createPricingSchemas(publicPlans);
 
   // AppSumo LTD users (plan IDs 101-103) already have a lifetime deal —
   // they should not see the upgrade prompt or be offered standard subscriptions.
@@ -258,7 +347,13 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-white pb-16">
-      <PageHead title="Pricing | AIfacilitator" description="Choose the right plan for your AI-powered workshop facilitation needs." />
+      <PageHead
+        title="Pricing for AI Workshop Facilitation"
+        description="AIfacilitator pricing includes a free plan and EUR-denominated paid plans for AI-guided workshops, retrospectives, design sprints and strategic planning sessions."
+        canonical="https://aifacilitator.ai/pricing"
+        breadcrumbs={[{ name: 'Pricing', item: 'https://aifacilitator.ai/pricing' }]}
+        jsonLd={pricingSchemas}
+      />
 
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white pb-6 md:pb-12 px-4">
@@ -271,7 +366,7 @@ const Pricing = () => {
               Choose the right plan for your team
             </h1>
             <p className="text-base md:text-lg text-gray-500 text-center">
-              Start free, scale as you grow. No hidden fees, cancel anytime.
+              Start free, scale as you grow. Pricing is shown in EUR, with no hidden fees and the flexibility to cancel anytime.
             </p>
           </div>
         </div>

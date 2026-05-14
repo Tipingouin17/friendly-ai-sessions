@@ -36,6 +36,7 @@ const SCHEMA_ORGANIZATION = {
     'https://www.linkedin.com/company/aifacilitator',
     'https://twitter.com/aifacilitator',
     'https://www.producthunt.com/products/aifacilitator',
+    'https://www.g2.com/products/aifacilitator',
   ],
   knowsAbout: [
     'Workshop facilitation',

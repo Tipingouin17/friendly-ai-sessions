@@ -205,7 +205,7 @@ const DesignSprint = () => {
               { title: 'Automatic documentation', description: 'Every response, vote, and decision is captured automatically. At the end of the sprint, you receive a complete session report with insights and action items.' },
               { title: 'Remote-first by design', description: 'AIfacilitator is built for distributed teams. Participants join from anywhere — no physical whiteboard required.' },
               { title: 'Scales to any team size', description: 'From a 4-person startup to a 20-person enterprise team, the AI facilitator adapts its approach to the group size and dynamics.' },
-              { title: 'Fraction of the cost', description: 'A professional design sprint facilitator can cost $5,000–$20,000. AIfacilitator starts at $0 — with premium plans from $19/month.' },
+              { title: 'Fraction of the cost', description: 'A professional design sprint facilitator can cost $5,000–$20,000. AIfacilitator starts at €0 — with premium plans from €19/month.' },
             ].map(b => (
               <div key={b.title} className="flex gap-4">
                 <CheckCircle2 className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-1" />

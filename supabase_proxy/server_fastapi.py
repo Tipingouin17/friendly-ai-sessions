@@ -2050,19 +2050,9 @@ async def delete_own_account(request: Request):
 # ─────────────────────────────────────────────────────────────────────────────
 # GDPR Art. 33-34 — Personal Data Breach Notification
 # ─────────────────────────────────────────────────────────────────────────────
-
-class BreachNotificationRequest(BaseModel):
-    title: str
-    description: str
-    affected_data_categories: list[str]  # e.g. ["email", "session_content"]
-    estimated_affected_users: int
-    discovery_timestamp: str             # ISO 8601
-    severity: str                        # "low" | "medium" | "high" | "critical"
-    internal_reporter: str               # name/email of the person reporting
-
 @app.post("/admin/gdpr/breach-notification")
 @limiter.limit("5/minute")
-async def report_data_breach(request: Request, body: BreachNotificationRequest):
+async def report_data_breach(request: Request):
     """
     GDPR Art. 33-34 — Internal breach notification endpoint.
 
@@ -2085,9 +2075,11 @@ async def report_data_breach(request: Request, body: BreachNotificationRequest):
         if role != "admin":
             raise HTTPException(403, "Admin access required")
 
-        discovery_dt = body.discovery_timestamp
-        severity = body.severity
-        categories_str = ", ".join(body.affected_data_categories)
+        body = await request.json()
+
+        discovery_dt = body.get("discovery_timestamp", "")
+        severity = body.get("severity", "unknown")
+        categories_str = ", ".join(body.get("affected_data_categories", []))
 
         # Log to security_audit_log
         async with get_db_connection() as conn:
@@ -2099,13 +2091,13 @@ async def report_data_breach(request: Request, body: BreachNotificationRequest):
                 """,
                 user_id,
                 {
-                    "title": body.title,
-                    "description": body.description,
-                    "affected_data_categories": body.affected_data_categories,
-                    "estimated_affected_users": body.estimated_affected_users,
+                    "title": body.get("title", ""),
+                    "description": body.get("description", ""),
+                    "affected_data_categories": body.get("affected_data_categories", []),
+                    "estimated_affected_users": body.get("estimated_affected_users", 0),
                     "discovery_timestamp": discovery_dt,
                     "severity": severity,
-                    "internal_reporter": body.internal_reporter,
+                    "internal_reporter": body.get("internal_reporter", "unknown"),
                     "reported_by_user_id": user_id,
                 },
                 request.client.host if request.client else "unknown",
@@ -2113,16 +2105,17 @@ async def report_data_breach(request: Request, body: BreachNotificationRequest):
 
         # Send alert email to DPO
         dpo_email = "privacy@aifacilitator.ai"
-        subject = f"[GDPR BREACH ALERT - {severity.upper()}] {body.title}"
+        breach_title = body.get("title", "")
+        subject = f"[GDPR BREACH ALERT - {severity.upper()}] {breach_title}"
         html_body = f"""
         <h2 style="color:#dc2626;">GDPR Personal Data Breach Notification</h2>
         <p><strong>Severity:</strong> {severity.upper()}</p>
-        <p><strong>Title:</strong> {body.title}</p>
-        <p><strong>Description:</strong> {body.description}</p>
+        <p><strong>Title:</strong> {body.get("title", "")}</p>
+        <p><strong>Description:</strong> {body.get("description", "")}</p>
         <p><strong>Affected data categories:</strong> {categories_str}</p>
-        <p><strong>Estimated affected users:</strong> {body.estimated_affected_users}</p>
+        <p><strong>Estimated affected users:</strong> {body.get("estimated_affected_users", 0)}</p>
         <p><strong>Discovery timestamp:</strong> {discovery_dt}</p>
-        <p><strong>Reported by:</strong> {body.internal_reporter}</p>
+        <p><strong>Reported by:</strong> {body.get("internal_reporter", "unknown")}</p>
         <hr/>
         <p style="color:#6b7280;font-size:12px;">
             Under GDPR Art. 33, you must notify the supervisory authority (CNIL) within
@@ -2138,7 +2131,7 @@ async def report_data_breach(request: Request, body: BreachNotificationRequest):
 
         log_auth.critical(
             "GDPR_BREACH: severity=%s title=%s affected_users=%s categories=%s reporter=%s",
-            severity, body.title, body.estimated_affected_users, categories_str, body.internal_reporter,
+            severity, body.get("title", ""), body.get("estimated_affected_users", 0), categories_str, body.get("internal_reporter", "unknown"),
         )
 
         return {

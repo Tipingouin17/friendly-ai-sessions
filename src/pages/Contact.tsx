@@ -2,15 +2,17 @@
  * Contact
  *
  * Page for the AIfacilitator application.
- * Includes Cloudflare Turnstile anti-spam protection and
- * sends form submissions to Crisp via the backend edge function.
+ * Includes Cloudflare Turnstile anti-spam protection (optional) and
+ * sends form submissions to the backend edge function.
+ * Contact info (email, hours, address) is loaded dynamically from the DB
+ * and can be edited from the Admin > Settings panel.
  */
 import { Mail, MapPin, Clock, ArrowRight, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import api from "@/lib/api";
 import PageHead from "@/components/PageHead";
@@ -22,7 +24,19 @@ interface ContactFormData {
   message: string;
 }
 
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
+interface ContactInfo {
+  contact_email: string;
+  business_hours: string;
+  contact_address: string;
+}
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+
+const DEFAULT_CONTACT_INFO: ContactInfo = {
+  contact_email: "support@aifacilitator.ai",
+  business_hours: "Mon – Fri, 9am – 6pm CET",
+  contact_address: "Europe",
+};
 
 const Contact = () => {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -35,6 +49,30 @@ const Contact = () => {
   const [submitted, setSubmitted] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT_INFO);
+
+  // Load contact info from DB (configurations table)
+  useEffect(() => {
+    const fetchContactInfo = async () => {
+      try {
+        const { data, error } = await api
+          .from("configurations")
+          .select("contact_email, business_hours, contact_address")
+          .limit(1)
+          .single();
+        if (!error && data) {
+          setContactInfo({
+            contact_email: (data as ContactInfo).contact_email || DEFAULT_CONTACT_INFO.contact_email,
+            business_hours: (data as ContactInfo).business_hours || DEFAULT_CONTACT_INFO.business_hours,
+            contact_address: (data as ContactInfo).contact_address || DEFAULT_CONTACT_INFO.contact_address,
+          });
+        }
+      } catch {
+        // Silently fall back to defaults
+      }
+    };
+    fetchContactInfo();
+  }, []);
 
   const handleFormChange = (field: keyof ContactFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -43,7 +81,8 @@ const Contact = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!turnstileToken) {
+    // Only block submission if Turnstile is configured AND token is missing
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
       toast({
         title: "Verification required",
         description: "Please complete the CAPTCHA verification before submitting.",
@@ -55,14 +94,14 @@ const Contact = () => {
     setIsSubmitting(true);
 
     try {
+      const body: Record<string, string> = { ...formData };
+      if (turnstileToken) {
+        body.cf_turnstile_token = turnstileToken;
+      }
+
       const { data, error } = await api.functions.invoke<{ success: boolean; message: string }>(
         "contact-form",
-        {
-          body: {
-            ...formData,
-            cf_turnstile_token: turnstileToken,
-          },
-        }
+        { body }
       );
 
       if (error) {
@@ -131,21 +170,21 @@ const Contact = () => {
                     icon: <Mail className="h-5 w-5 text-indigo-600" />,
                     bg: 'bg-indigo-50',
                     title: 'Email us',
-                    content: 'support@aifacilitator.app',
+                    content: contactInfo.contact_email,
                     sub: 'We reply within 24 hours',
                   },
                   {
                     icon: <Clock className="h-5 w-5 text-violet-600" />,
                     bg: 'bg-violet-50',
                     title: 'Business hours',
-                    content: 'Mon – Fri, 9am – 6pm CET',
+                    content: contactInfo.business_hours,
                     sub: 'Urgent? Use the form anytime',
                   },
                   {
                     icon: <MapPin className="h-5 w-5 text-blue-600" />,
                     bg: 'bg-blue-50',
                     title: 'Headquarters',
-                    content: 'Europe',
+                    content: contactInfo.contact_address,
                     sub: 'Remote-first team',
                   },
                 ].map(({ icon, bg, title, content, sub }) => (
@@ -170,7 +209,7 @@ const Contact = () => {
                 Custom pricing, dedicated support, and white-label options for large organisations.
               </p>
               <a
-                href="mailto:enterprise@aifacilitator.app"
+                href={`mailto:enterprise@aifacilitator.ai`}
                 className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-indigo-200 transition-colors"
               >
                 Talk to our team <ArrowRight className="h-4 w-4" />
@@ -249,7 +288,7 @@ const Contact = () => {
                     />
                   </div>
 
-                  {/* Cloudflare Turnstile widget */}
+                  {/* Cloudflare Turnstile widget — only shown when VITE_TURNSTILE_SITE_KEY is set */}
                   {TURNSTILE_SITE_KEY && (
                     <div className="flex justify-start">
                       <Turnstile

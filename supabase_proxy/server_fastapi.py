@@ -815,6 +815,16 @@ async def run_startup_migrations() -> None:
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         """,
+        # 2026-05-14: Add contact info columns to configurations for editable contact page.
+        # contact_email: displayed on /contact page and used as fallback email recipient.
+        # business_hours: displayed on /contact page (e.g. 'Mon - Fri, 9am - 6pm CET').
+        # contact_address: displayed on /contact page.
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS contact_email TEXT NOT NULL DEFAULT 'support@aifacilitator.ai',
+            ADD COLUMN IF NOT EXISTS business_hours TEXT NOT NULL DEFAULT 'Mon - Fri, 9am - 6pm CET',
+            ADD COLUMN IF NOT EXISTS contact_address TEXT NOT NULL DEFAULT 'Europe';
+        """,
     ]
     try:
         async with _pool.acquire() as conn:
@@ -4902,14 +4912,10 @@ async def edge_function(func_name: str, request: Request):
         # ── Basic validation ──────────────────────────────────────────────
         if not all([fname, lname, email, message]):
             raise HTTPException(400, detail={"error": "All fields are required."})
-        if not cf_token:
-            raise HTTPException(400, detail={"error": "Turnstile token is required."})
 
-        # ── Cloudflare Turnstile verification ─────────────────────────────
+        # ── Cloudflare Turnstile verification (optional — skipped if no token or no secret) ──
         _ts_secret = os.environ.get("TURNSTILE_SECRET_KEY", "")
-        if not _ts_secret:
-            logger.warning("contact-form: TURNSTILE_SECRET_KEY not configured, skipping verification")
-        else:
+        if cf_token and _ts_secret:
             try:
                 async with _httpx.AsyncClient(timeout=10) as _hc:
                     _ts_resp = await _hc.post(
@@ -4925,88 +4931,144 @@ async def edge_function(func_name: str, request: Request):
             except Exception as _ts_err:
                 logger.error("contact-form: Turnstile request error: %s", _ts_err)
                 raise HTTPException(502, detail={"error": "Could not verify CAPTCHA. Please try again."})
+        elif not cf_token and _ts_secret:
+            # Turnstile is configured but no token provided — reject
+            raise HTTPException(400, detail={"error": "CAPTCHA verification is required."})
+        else:
+            logger.info("contact-form: Turnstile not configured, skipping CAPTCHA verification")
+
+        # ── Save to contact_form table ────────────────────────────────────
+        try:
+            async with _pool.acquire() as _cf_conn:
+                await _cf_conn.execute(
+                    "INSERT INTO contact_form (name, email, subject, message) VALUES ($1, $2, $3, $4)",
+                    f"{fname} {lname}", email, f"Contact form: {fname} {lname}", message,
+                )
+        except Exception as _db_err:
+            logger.warning("contact-form: Could not save to DB: %s", _db_err)
+
+        # ── Fetch contact_email from configurations for fallback ──────────
+        _contact_email = "support@aifacilitator.ai"
+        try:
+            async with _pool.acquire() as _cfg_conn:
+                _cfg_row = await _cfg_conn.fetchrow("SELECT contact_email FROM configurations LIMIT 1")
+                if _cfg_row and _cfg_row.get("contact_email"):
+                    _contact_email = _cfg_row["contact_email"]
+        except Exception:
+            pass
 
         # ── Send to Crisp via REST API ─────────────────────────────────────
         _crisp_id  = os.environ.get("CRISP_API_IDENTIFIER", "")
         _crisp_key = os.environ.get("CRISP_API_KEY", "")
         _crisp_ws  = os.environ.get("CRISP_WEBSITE_ID", "2fa7d9e8-136f-4814-a20c-3cd59756b396")
 
-        if not _crisp_id or not _crisp_key:
-            logger.error("contact-form: CRISP_API_IDENTIFIER or CRISP_API_KEY not configured")
-            raise HTTPException(500, detail={"error": "Contact service is not configured."})
-
-        _crisp_auth = _base64.b64encode(f"{_crisp_id}:{_crisp_key}".encode()).decode()
-        _crisp_headers = {
-            "Authorization": f"Basic {_crisp_auth}",
-            "X-Crisp-Tier": "website",
-            "Content-Type": "application/json",
-        }
-        _crisp_msg_content = (
-            f"**Contact Form Submission**\n\n"
-            f"**Name:** {fname} {lname}\n"
-            f"**Email:** {email}\n\n"
-            f"**Message:**\n{message}"
-        )
-        try:
-            async with _httpx.AsyncClient(timeout=15) as _hc:
-                # Step 1: Create a new conversation
-                _conv_resp = await _hc.post(
-                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation",
-                    headers=_crisp_headers,
-                    json={},
-                )
-                if _conv_resp.status_code not in (200, 201):
-                    logger.error(
-                        "contact-form: Crisp create conversation failed: %s %s",
-                        _conv_resp.status_code, _conv_resp.text,
+        if _crisp_id and _crisp_key:
+            _crisp_auth = _base64.b64encode(f"{_crisp_id}:{_crisp_key}".encode()).decode()
+            _crisp_headers = {
+                "Authorization": f"Basic {_crisp_auth}",
+                "X-Crisp-Tier": "website",
+                "Content-Type": "application/json",
+            }
+            _crisp_msg_content = (
+                f"**Contact Form Submission**\n\n"
+                f"**Name:** {fname} {lname}\n"
+                f"**Email:** {email}\n\n"
+                f"**Message:**\n{message}"
+            )
+            try:
+                async with _httpx.AsyncClient(timeout=15) as _hc:
+                    # Step 1: Create a new conversation
+                    _conv_resp = await _hc.post(
+                        f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation",
+                        headers=_crisp_headers,
+                        json={},
                     )
-                    raise HTTPException(502, detail={"error": "Failed to create support conversation."})
-                _conv_data = _conv_resp.json()
-                _session_id = (_conv_data.get("data") or {}).get("session_id")
-                if not _session_id:
-                    logger.error("contact-form: No session_id in Crisp response: %s", _conv_data)
-                    raise HTTPException(502, detail={"error": "Failed to create support conversation."})
+                    if _conv_resp.status_code not in (200, 201):
+                        logger.error(
+                            "contact-form: Crisp create conversation failed: %s %s",
+                            _conv_resp.status_code, _conv_resp.text,
+                        )
+                        raise HTTPException(502, detail={"error": "Failed to create support conversation."})
+                    _conv_data = _conv_resp.json()
+                    _session_id = (_conv_data.get("data") or {}).get("session_id")
+                    if not _session_id:
+                        logger.error("contact-form: No session_id in Crisp response: %s", _conv_data)
+                        raise HTTPException(502, detail={"error": "Failed to create support conversation."})
 
-                # Step 2: Update conversation meta (user email + name)
-                await _hc.patch(
-                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/meta",
-                    headers=_crisp_headers,
-                    json={
-                        "nickname": f"{fname} {lname}",
-                        "email": email,
-                        "subject": f"Contact form: {fname} {lname}",
-                    },
-                )
-
-                # Step 3: Send the message
-                _msg_resp = await _hc.post(
-                    f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/message",
-                    headers=_crisp_headers,
-                    json={
-                        "type": "text",
-                        "from": "user",
-                        "origin": "email",
-                        "content": _crisp_msg_content,
-                        "user": {
+                    # Step 2: Update conversation meta (user email + name)
+                    await _hc.patch(
+                        f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/meta",
+                        headers=_crisp_headers,
+                        json={
                             "nickname": f"{fname} {lname}",
                             "email": email,
+                            "subject": f"Contact form: {fname} {lname}",
                         },
-                    },
-                )
-                if _msg_resp.status_code not in (200, 201):
-                    logger.error(
-                        "contact-form: Crisp send message failed: %s %s",
-                        _msg_resp.status_code, _msg_resp.text,
                     )
-                    raise HTTPException(502, detail={"error": "Failed to send message."})
 
-            logger.info("contact-form: message sent to Crisp session=%s from=%s", _session_id, email)
+                    # Step 3: Send the message
+                    _msg_resp = await _hc.post(
+                        f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/message",
+                        headers=_crisp_headers,
+                        json={
+                            "type": "text",
+                            "from": "user",
+                            "origin": "email",
+                            "content": _crisp_msg_content,
+                            "user": {
+                                "nickname": f"{fname} {lname}",
+                                "email": email,
+                            },
+                        },
+                    )
+                    if _msg_resp.status_code not in (200, 201):
+                        logger.error(
+                            "contact-form: Crisp send message failed: %s %s",
+                            _msg_resp.status_code, _msg_resp.text,
+                        )
+                        raise HTTPException(502, detail={"error": "Failed to send message."})
+
+                logger.info("contact-form: message sent to Crisp session=%s from=%s", _session_id, email)
+                return {"success": True, "message": "Your message has been sent. We will get back to you within 24 hours."}
+            except HTTPException:
+                raise
+            except Exception as _crisp_err:
+                logger.error("contact-form: Crisp API error: %s", _crisp_err, exc_info=True)
+                raise HTTPException(502, detail={"error": "Failed to send your message. Please try again later."})
+        else:
+            # ── Fallback: send email via Resend if Crisp is not configured ────
+            logger.warning("contact-form: Crisp not configured, using Resend email fallback")
+            _resend_key = os.environ.get("RESEND_API_KEY", "")
+            if _resend_key:
+                try:
+                    async with _httpx.AsyncClient(timeout=15) as _hc:
+                        _email_body = (
+                            f"<h2>New Contact Form Submission</h2>"
+                            f"<p><strong>Name:</strong> {fname} {lname}</p>"
+                            f"<p><strong>Email:</strong> {email}</p>"
+                            f"<p><strong>Message:</strong></p>"
+                            f"<p>{message.replace(chr(10), '<br>')}</p>"
+                        )
+                        _resend_resp = await _hc.post(
+                            "https://api.resend.com/emails",
+                            headers={"Authorization": f"Bearer {_resend_key}", "Content-Type": "application/json"},
+                            json={
+                                "from": "AIfacilitator Contact <noreply@aifacilitator.ai>",
+                                "to": [_contact_email],
+                                "reply_to": email,
+                                "subject": f"[Contact Form] {fname} {lname}",
+                                "html": _email_body,
+                            },
+                        )
+                        if _resend_resp.status_code not in (200, 201):
+                            logger.error("contact-form: Resend failed: %s %s", _resend_resp.status_code, _resend_resp.text)
+                        else:
+                            logger.info("contact-form: email sent via Resend to %s from %s", _contact_email, email)
+                except Exception as _resend_err:
+                    logger.error("contact-form: Resend error: %s", _resend_err)
+            else:
+                logger.warning("contact-form: Neither Crisp nor Resend configured; message saved to DB only")
             return {"success": True, "message": "Your message has been sent. We will get back to you within 24 hours."}
-        except HTTPException:
-            raise
-        except Exception as _crisp_err:
-            logger.error("contact-form: Crisp API error: %s", _crisp_err, exc_info=True)
-            raise HTTPException(502, detail={"error": "Failed to send your message. Please try again later."})
 
     raise HTTPException(404, f"Function '{func_name}' not found")
 

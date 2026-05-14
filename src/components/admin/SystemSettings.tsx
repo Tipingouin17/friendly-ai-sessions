@@ -19,7 +19,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff,
+    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff, Mail,
 } from "lucide-react";
 
 interface Config {
@@ -31,6 +31,9 @@ interface Config {
     secret_message: string | null;
     free_plan_message_limit: number | null;
     languages: Record<string, boolean> | null;
+    contact_email: string | null;
+    business_hours: string | null;
+    contact_address: string | null;
 }
 
 const AI_MODEL_OPTIONS = [
@@ -68,6 +71,7 @@ const SECTIONS = [
     { id: "platform", label: "Platform", icon: Globe, color: "blue" },
     { id: "security", label: "Security", icon: Shield, color: "red" },
     { id: "messaging", label: "Messaging", icon: MessageSquare, color: "green" },
+    { id: "contact", label: "Contact Info", icon: Mail, color: "indigo" },
 ];
 
 export const SystemSettings = () => {
@@ -86,6 +90,9 @@ export const SystemSettings = () => {
         secret_message: "",
         free_plan_message_limit: 20,
         languages: { en: true },
+        contact_email: "support@aifacilitator.ai",
+        business_hours: "Mon - Fri, 9am - 6pm CET",
+        contact_address: "Europe",
     });
 
     const { data: config, isLoading, refetch } = useQuery({
@@ -113,6 +120,9 @@ export const SystemSettings = () => {
                 secret_message: config.secret_message ?? "",
                 free_plan_message_limit: config.free_plan_message_limit ?? 20,
                 languages: (config.languages as Record<string, boolean>) ?? { en: true },
+                contact_email: config.contact_email ?? "support@aifacilitator.ai",
+                business_hours: config.business_hours ?? "Mon - Fri, 9am - 6pm CET",
+                contact_address: config.contact_address ?? "Europe",
             });
             setIsDirty(false);
         }
@@ -131,6 +141,9 @@ export const SystemSettings = () => {
                     secret_message: form.secret_message || null,
                     free_plan_message_limit: form.free_plan_message_limit ?? 20,
                     languages: form.languages ?? { en: true },
+                    contact_email: form.contact_email || "support@aifacilitator.ai",
+                    business_hours: form.business_hours || "Mon - Fri, 9am - 6pm CET",
+                    contact_address: form.contact_address || "Europe",
                 })
                 .eq("id", config.id);
             if (error) throw error;
@@ -159,6 +172,7 @@ export const SystemSettings = () => {
         blue: "bg-blue-100 text-blue-600",
         red: "bg-red-100 text-red-600",
         green: "bg-green-100 text-green-600",
+        indigo: "bg-indigo-100 text-indigo-600",
     };
 
     return (
@@ -358,6 +372,51 @@ export const SystemSettings = () => {
                                                     {showCaptcha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                 </button>
                                             </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Contact Info */}
+                                {activeSection === "contact" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.indigo}`}>
+                                                <Mail className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Contact Page Info</h3>
+                                        </div>
+                                        <p className="text-xs text-gray-500 -mt-3 mb-2">These values are displayed on the public /contact page.</p>
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Contact Email</Label>
+                                            <p className="text-xs text-gray-500">Email address shown on the contact page and used as fallback recipient</p>
+                                            <Input
+                                                type="email"
+                                                value={form.contact_email ?? ""}
+                                                onChange={e => handleChange("contact_email", e.target.value)}
+                                                placeholder="support@aifacilitator.ai"
+                                            />
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Business Hours</Label>
+                                            <p className="text-xs text-gray-500">Displayed in the contact info block (e.g. Mon – Fri, 9am – 6pm CET)</p>
+                                            <Input
+                                                type="text"
+                                                value={form.business_hours ?? ""}
+                                                onChange={e => handleChange("business_hours", e.target.value)}
+                                                placeholder="Mon – Fri, 9am – 6pm CET"
+                                            />
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Headquarters / Address</Label>
+                                            <p className="text-xs text-gray-500">Location or address shown on the contact page</p>
+                                            <Input
+                                                type="text"
+                                                value={form.contact_address ?? ""}
+                                                onChange={e => handleChange("contact_address", e.target.value)}
+                                                placeholder="Europe"
+                                            />
                                         </div>
                                     </>
                                 )}

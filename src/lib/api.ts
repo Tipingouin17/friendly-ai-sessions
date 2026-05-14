@@ -381,6 +381,17 @@ export const auth = {
     return { data: { user: res.data }, error: res.error };
   },
 
+  async deleteUser(): Promise<{ error: ApiError | null }> {
+    // RGPD Article 17 — Right to Erasure.
+    // Calls DELETE /auth/v1/user which atomically removes all user data from the DB.
+    const res = await apiFetch<void>("/auth/v1/user", { method: "DELETE" });
+    if (!res.error) {
+      clearSession();
+      notifyAuth("SIGNED_OUT", null);
+    }
+    return { error: res.error };
+  },
+
   async resetPasswordForEmail(email: string, _opts?: { redirectTo?: string }): Promise<{ error: ApiError | null }> {
     const res = await apiFetch("/auth/v1/recover", {
       method: "POST",

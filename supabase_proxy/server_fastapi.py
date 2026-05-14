@@ -1907,6 +1907,133 @@ async def auth_user(request: Request):
         "user_metadata": user_meta,
         "aud": "authenticated",
     }
+@app.delete("/auth/v1/user")
+async def delete_own_account(request: Request):
+    """
+    RGPD / GDPR - Right to Erasure (Article 17).
+    Allows an authenticated user to permanently delete their own account and ALL
+    associated personal data from every table in the database.
+
+    Deletion order (respects FK constraints):
+      1. messages (FK -> conversations)
+      2. session_events (FK -> conversations)
+      3. session_reports (FK -> conversations)
+      4. session_participants (FK -> conversations)
+      5. conversations (FK -> profiles)
+      6. sessions (FK -> profiles via user_id)
+      7. facilitators (FK -> profiles via user_id)
+      8. referrals (FK -> profiles via referrer_id)
+      9. password_reset_tokens (FK -> profiles, CASCADE but explicit)
+     10. email_verification_tokens (FK -> profiles, CASCADE but explicit)
+     11. login_activity (FK -> profiles, CASCADE but explicit)
+     12. user_sessions (FK -> profiles, CASCADE but explicit)
+     13. security_audit_log (FK -> profiles, CASCADE but explicit)
+     14. profiles (root identity record)
+
+    The entire deletion runs inside a single DB transaction so it is atomic:
+    either everything is deleted or nothing is (on error, the transaction rolls back).
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Authentication required")
+    user_id = user.get("sub") or user.get("id")
+    if not user_id:
+        raise HTTPException(401, "Invalid token - no user ID")
+    email = user.get("email", "")
+
+    try:
+        async with _pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. messages linked to user's conversations
+                await conn.execute(
+                    "DELETE FROM messages WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                # 2. session_events linked to user's conversations
+                await conn.execute(
+                    "DELETE FROM session_events WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                # 3. session_reports linked to user's conversations
+                await conn.execute(
+                    "DELETE FROM session_reports WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                # 4. session_participants linked to user's conversations
+                await conn.execute(
+                    "DELETE FROM session_participants WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                # 5. conversations owned by the user
+                await conn.execute(
+                    "DELETE FROM conversations WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                # 6. sessions owned by the user
+                await conn.execute(
+                    "DELETE FROM sessions WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                # 7. facilitators created by the user
+                await conn.execute(
+                    "DELETE FROM facilitators WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                # 8. referrals where user is the referrer
+                await conn.execute(
+                    "DELETE FROM referrals WHERE referrer_id = $1::uuid",
+                    user_id,
+                )
+                # 9-13. tables with ON DELETE CASCADE - explicit for auditability
+                await conn.execute(
+                    "DELETE FROM password_reset_tokens WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM email_verification_tokens WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM login_activity WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM user_sessions WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM security_audit_log WHERE user_id = $1::uuid",
+                    user_id,
+                )
+                # 14. profiles - root identity record (last, to avoid FK violations)
+                await conn.execute(
+                    "DELETE FROM profiles WHERE id = $1::uuid",
+                    user_id,
+                )
+
+        # Clean up in-memory caches
+        _BANNED_USERS_CACHE.pop(user_id, None)
+        if email and email in USERS:
+            del USERS[email]
+
+        log_auth.info(
+            "gdpr_delete: user %s (%s) deleted their own account",
+            user_id, email,
+        )
+        # 204 No Content - frontend interprets this as successful deletion
+        return Response(status_code=204)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("gdpr_delete error for user %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(500, "Account deletion failed. Please contact support.")
+
+
 @app.post("/auth/v1/logout")
 async def auth_logout():
     return Response(status_code=204)

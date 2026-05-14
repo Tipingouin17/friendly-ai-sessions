@@ -122,14 +122,31 @@ const Settings = () => {
     if (!user) return;
     setIsDeletingAccount(true);
     try {
-      const { error } = await api.from('profiles').delete().eq('id', user.id);
-      if (error) throw error;
+      // RGPD Article 17 — Right to Erasure.
+      // DELETE /auth/v1/user atomically removes ALL user data from every table
+      // in a single DB transaction: messages, sessions, facilitators, conversations,
+      // referrals, tokens, audit logs, and the profile itself.
+      const { error } = await api.auth.deleteUser();
+      if (error) throw new Error(error.message);
+
+      // Clear all local state (settings cache, join tokens, participant data)
       const settingsKey = user?.id ? `user_settings_${user.id}` : null;
       if (settingsKey) localStorage.removeItem(settingsKey);
+      // api.auth.deleteUser() already called clearSession() + notifyAuth(SIGNED_OUT)
+      // but we also call logout() to ensure the AuthContext state is reset.
       await logout();
-      toast({ title: 'Account deleted', description: 'Your account data has been removed.' });
-    } catch {
-      toast({ title: 'Error', description: 'Could not delete your account. Please contact support.', variant: 'destructive' });
+
+      toast({
+        title: 'Account permanently deleted',
+        description: 'All your data has been erased in compliance with GDPR Article 17.',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      toast({
+        title: 'Deletion failed',
+        description: msg || 'Could not delete your account. Please contact support.',
+        variant: 'destructive',
+      });
     } finally {
       setIsDeletingAccount(false);
     }
@@ -260,37 +277,72 @@ const Settings = () => {
                     </div>
                   </div>
                 </div>
-                <div className="px-6 py-6">
+                <div className="px-6 py-6 space-y-5">
+                  {/* RGPD notice */}
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                    <Shield size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800">Your right to erasure — GDPR Article 17</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                        You have the right to request the deletion of all your personal data. Deleting your account
+                        will permanently and irreversibly erase everything listed below from our servers.
+                      </p>
+                    </div>
+                  </div>
+                  {/* What gets deleted */}
+                  <div className="px-1">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Data that will be permanently deleted:</p>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                      {[
+                        'Profile & account credentials',
+                        'All AI facilitation sessions',
+                        'All facilitator configurations',
+                        'All conversation messages',
+                        'Login history & activity logs',
+                        'Notification preferences',
+                        'Referral records',
+                        'Authentication tokens',
+                      ].map(item => (
+                        <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {/* Delete button row */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50/30">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Delete Account</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Permanently delete your account and all associated data. This action cannot be undone.
+                        Permanently erase your account and all associated data. This action cannot be undone.
                       </p>
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm" disabled={isDeletingAccount} className="flex-shrink-0 rounded-full">
-                          <Trash2 size={14} className="mr-1.5" />
-                          Delete Account
+                          {isDeletingAccount ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Trash2 size={14} className="mr-1.5" />}
+                          {isDeletingAccount ? 'Deleting…' : 'Delete Account'}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete your account
-                            and remove all of your data from our servers.
+                          <AlertDialogTitle>Permanently delete your account?</AlertDialogTitle>
+                          <AlertDialogDescription asChild>
+                            <div className="space-y-2">
+                              <p>This will immediately and irreversibly erase <strong>all your data</strong> from our servers in compliance with GDPR Article 17 (Right to Erasure).</p>
+                              <p className="text-red-600 font-medium">This action cannot be undone. There is no recovery.</p>
+                            </div>
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>Cancel — keep my account</AlertDialogCancel>
                           <AlertDialogAction
                             className="bg-red-600 hover:bg-red-700"
                             onClick={handleDeleteAccount}
                             disabled={isDeletingAccount}
                           >
-                            {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
+                            {isDeletingAccount ? 'Deleting…' : 'Yes, permanently delete everything'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

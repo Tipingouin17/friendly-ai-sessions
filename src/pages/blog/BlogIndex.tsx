@@ -49,7 +49,7 @@ const BlogIndex = () => {
         breadcrumbs={[{ name: 'Blog', item: 'https://aifacilitator.ai/blog' }]}
       />
 
-      {/* Hero */}
+      {/* Hero — centred (intentional for landing/hero sections) */}
       <section className="pt-28 pb-16 px-4 bg-gradient-to-br from-gray-50 via-white to-indigo-50">
         <div className="container mx-auto max-w-4xl text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
@@ -61,9 +61,10 @@ const BlogIndex = () => {
         </div>
       </section>
 
-      {/* Posts */}
+      {/* Posts — left-aligned content */}
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto max-w-4xl">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">Latest Articles</h2>
           <div className="space-y-8">
             {posts.map(post => (
               <article key={post.slug} className="border border-gray-100 rounded-2xl p-8 hover:border-indigo-200 hover:shadow-sm transition-all">
@@ -100,9 +101,9 @@ const BlogIndex = () => {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* CTA — left-aligned */}
       <section className="py-16 px-4 bg-gray-50">
-        <div className="container mx-auto max-w-3xl text-center">
+        <div className="container mx-auto max-w-4xl">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to run better workshops?</h2>
           <p className="text-gray-500 mb-6">Start with AIfacilitator for free — no credit card required.</p>
           <Link to="/signup">

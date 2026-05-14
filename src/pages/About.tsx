@@ -66,7 +66,7 @@ const About = () => {
         jsonLd={[SCHEMA_ORGANIZATION, SCHEMA_WEBPAGE]}
       />
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      {/* ── Hero (centred — intentional for landing sections) ────────── */}
       <section className="relative pt-28 pb-16 px-4 bg-gradient-to-br from-indigo-50 via-white to-violet-50 overflow-hidden">
         <div className="absolute top-10 right-[10%] w-64 h-64 bg-indigo-200/40 rounded-full blur-3xl pointer-events-none" />
         <div className="container mx-auto max-w-4xl text-center">
@@ -86,10 +86,10 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Identity Block (AEO) ─────────────────────────────────────── */}
+      {/* ── Identity Block (AEO) — left-aligned content ──────────────── */}
       <section className="py-16 md:py-20 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
             What is AIfacilitator?
           </h2>
 
@@ -114,9 +114,9 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Mission ──────────────────────────────────────────────────── */}
+      {/* ── Mission — left-aligned content ───────────────────────────── */}
       <section className="py-16 md:py-20 px-4 bg-gray-50">
-        <div className="container mx-auto max-w-3xl text-center">
+        <div className="container mx-auto max-w-3xl">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Our Mission</h2>
           <p className="text-xl text-gray-600 leading-relaxed mb-6">
             To make world-class workshop facilitation accessible to every team — regardless of budget, location, or experience.
@@ -127,13 +127,13 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── What We Do ───────────────────────────────────────────────── */}
+      {/* ── What We Do — left-aligned section header + grid ─────────── */}
       <section className="py-16 md:py-20 px-4 bg-white">
         <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             What AIfacilitator Does
           </h2>
-          <p className="text-gray-500 text-lg text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-gray-500 text-lg mb-12 max-w-2xl">
             Our AI facilitators handle every aspect of running a structured workshop session.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -181,13 +181,13 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Use Cases ────────────────────────────────────────────────── */}
+      {/* ── Use Cases — left-aligned section header + grid ───────────── */}
       <section className="py-16 md:py-20 px-4 bg-gray-50">
         <div className="container mx-auto max-w-4xl">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             What Teams Use AIfacilitator For
           </h2>
-          <p className="text-gray-500 text-lg text-center mb-10 max-w-2xl mx-auto">
+          <p className="text-gray-500 text-lg mb-10 max-w-2xl">
             AIfacilitator supports a wide range of workshop formats out of the box.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -208,7 +208,7 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Contact / CTA ────────────────────────────────────────────── */}
+      {/* ── CTA (centred — intentional for CTA sections) ─────────────── */}
       <section className="py-16 md:py-20 px-4 bg-gradient-to-br from-indigo-600 to-violet-700">
         <div className="container mx-auto max-w-3xl text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">

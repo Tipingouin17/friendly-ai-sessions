@@ -2,8 +2,12 @@
  * Contact
  *
  * Page for the AIfacilitator application.
- * Includes Cloudflare Turnstile anti-spam protection (optional) and
- * sends form submissions to the backend edge function.
+ * Anti-spam measures:
+ *  - HTML5 required + pattern validation on all fields
+ *  - Minimum message length (20 chars)
+ *  - Honeypot hidden field (bots fill it, humans don't)
+ *  - Frontend rate-limiting (max 3 submissions per 10 minutes)
+ *  - Optional Cloudflare Turnstile CAPTCHA (when VITE_TURNSTILE_SITE_KEY is set)
  * Contact info (email, hours, address) is loaded dynamically from the DB
  * and can be edited from the Admin > Settings panel.
  */
@@ -31,12 +35,18 @@ interface ContactInfo {
 }
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+const MIN_MESSAGE_LENGTH = 20;
+const MAX_SUBMISSIONS_PER_WINDOW = 3;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 
 const DEFAULT_CONTACT_INFO: ContactInfo = {
   contact_email: "support@aifacilitator.ai",
   business_hours: "Mon – Fri, 9am – 6pm CET",
   contact_address: "Europe",
 };
+
+// Simple email regex (RFC 5322 simplified)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const Contact = () => {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -45,9 +55,12 @@ const Contact = () => {
     email: "",
     message: ""
   });
+  // Honeypot field — should remain empty for real users
+  const [honeypot, setHoneypot] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<ContactFormData>>({});
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
   const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT_INFO);
 
@@ -76,12 +89,79 @@ const Contact = () => {
 
   const handleFormChange = (field: keyof ContactFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear field error on change
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Partial<ContactFormData> = {};
+
+    if (!formData.fname.trim() || formData.fname.trim().length < 2) {
+      errors.fname = "First name must be at least 2 characters.";
+    }
+    if (!formData.lname.trim() || formData.lname.trim().length < 2) {
+      errors.lname = "Last name must be at least 2 characters.";
+    }
+    if (!formData.email.trim() || !EMAIL_REGEX.test(formData.email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (!formData.message.trim() || formData.message.trim().length < MIN_MESSAGE_LENGTH) {
+      errors.message = `Message must be at least ${MIN_MESSAGE_LENGTH} characters.`;
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const checkRateLimit = (): boolean => {
+    const key = "contact_submissions";
+    const raw = localStorage.getItem(key);
+    const now = Date.now();
+
+    let submissions: number[] = raw ? JSON.parse(raw) : [];
+    // Remove entries outside the window
+    submissions = submissions.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+
+    if (submissions.length >= MAX_SUBMISSIONS_PER_WINDOW) {
+      const waitMinutes = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - submissions[0])) / 60000);
+      toast({
+        title: "Too many submissions",
+        description: `Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before sending another message.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    submissions.push(now);
+    localStorage.setItem(key, JSON.stringify(submissions));
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Only block submission if Turnstile is configured AND token is missing
+    // Honeypot check — if filled, silently discard (bot detected)
+    if (honeypot) {
+      setSubmitted(true);
+      return;
+    }
+
+    // Frontend validation
+    if (!validateForm()) {
+      toast({
+        title: "Please fix the errors below",
+        description: "Some fields need your attention before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Rate limiting
+    if (!checkRateLimit()) return;
+
+    // Turnstile check — only block if configured AND token is missing
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
       toast({
         title: "Verification required",
@@ -220,7 +300,10 @@ const Contact = () => {
           {/* Right: Form */}
           <div className="md:col-span-3">
             <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Send us a message</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Send us a message</h2>
+              <p className="text-sm text-gray-400 mb-6">
+                Fields marked <span className="text-red-500 font-semibold">*</span> are required.
+              </p>
 
               {submitted ? (
                 <div className="text-center py-12">
@@ -239,53 +322,97 @@ const Contact = () => {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+
+                  {/* Honeypot — hidden from real users, bots fill it */}
+                  <input
+                    type="text"
+                    name="website"
+                    value={honeypot}
+                    onChange={e => setHoneypot(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, width: 0 }}
+                  />
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">First Name</label>
+                      <label className="text-sm font-medium text-gray-700">
+                        First Name <span className="text-red-500">*</span>
+                      </label>
                       <Input
                         type="text"
                         placeholder="Jane"
                         value={formData.fname}
                         onChange={(e) => handleFormChange('fname', e.target.value)}
+                        minLength={2}
                         required
-                        className="rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400"
+                        className={`rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400 ${fieldErrors.fname ? 'border-red-400 focus:border-red-400 focus:ring-red-400' : ''}`}
                       />
+                      {fieldErrors.fname && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.fname}</p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700">Last Name</label>
+                      <label className="text-sm font-medium text-gray-700">
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
                       <Input
                         type="text"
                         placeholder="Smith"
                         value={formData.lname}
                         onChange={(e) => handleFormChange('lname', e.target.value)}
+                        minLength={2}
                         required
-                        className="rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400"
+                        className={`rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400 ${fieldErrors.lname ? 'border-red-400 focus:border-red-400 focus:ring-red-400' : ''}`}
                       />
+                      {fieldErrors.lname && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.lname}</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700">Email address</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Email address <span className="text-red-500">*</span>
+                    </label>
                     <Input
                       type="email"
                       placeholder="jane@company.com"
                       value={formData.email}
                       onChange={(e) => handleFormChange('email', e.target.value)}
                       required
-                      className="rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400"
+                      className={`rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400 ${fieldErrors.email ? 'border-red-400 focus:border-red-400 focus:ring-red-400' : ''}`}
                     />
+                    {fieldErrors.email && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700">Message</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Message <span className="text-red-500">*</span>
+                      <span className="text-gray-400 font-normal ml-2 text-xs">(min. {MIN_MESSAGE_LENGTH} characters)</span>
+                    </label>
                     <Textarea
                       placeholder="Tell us how we can help..."
-                      className="min-h-[140px] rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400 resize-none"
+                      className={`min-h-[140px] rounded-xl border-gray-200 focus:border-indigo-400 focus:ring-indigo-400 resize-none ${fieldErrors.message ? 'border-red-400 focus:border-red-400 focus:ring-red-400' : ''}`}
                       value={formData.message}
                       onChange={(e) => handleFormChange('message', e.target.value)}
+                      minLength={MIN_MESSAGE_LENGTH}
                       required
                     />
+                    <div className="flex justify-between items-center">
+                      {fieldErrors.message ? (
+                        <p className="text-xs text-red-500">{fieldErrors.message}</p>
+                      ) : (
+                        <span />
+                      )}
+                      <span className={`text-xs ml-auto ${formData.message.length < MIN_MESSAGE_LENGTH ? 'text-gray-400' : 'text-green-500'}`}>
+                        {formData.message.length}/{MIN_MESSAGE_LENGTH} min
+                      </span>
+                    </div>
                   </div>
 
                   {/* Cloudflare Turnstile widget — only shown when VITE_TURNSTILE_SITE_KEY is set */}

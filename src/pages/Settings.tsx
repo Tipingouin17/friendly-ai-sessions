@@ -137,8 +137,8 @@ const Settings = () => {
       await logout();
 
       toast({
-        title: 'Account permanently deleted',
-        description: 'All your data has been erased in compliance with GDPR Article 17.',
+        title: 'Account deleted',
+        description: 'Your personal data has been erased and session history anonymised (GDPR Article 17 §3).',
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -282,33 +282,51 @@ const Settings = () => {
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <Shield size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-semibold text-amber-800">Your right to erasure — GDPR Article 17</p>
+                      <p className="text-xs font-semibold text-amber-800">Your right to erasure — GDPR Article 17 §3</p>
                       <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                        You have the right to request the deletion of all your personal data. Deleting your account
-                        will permanently and irreversibly erase everything listed below from our servers.
+                        You have the right to request the erasure of all your personal data. Your account identity
+                        and all personally-identifiable information (PII) will be permanently deleted. Session history
+                        shared with other participants will be anonymised (attributed to "Deleted User") rather than
+                        deleted, as permitted under GDPR Article 17 §3(c) — data necessary for other persons.
                       </p>
                     </div>
                   </div>
-                  {/* What gets deleted */}
-                  <div className="px-1">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">Data that will be permanently deleted:</p>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                      {[
-                        'Profile & account credentials',
-                        'All AI facilitation sessions',
-                        'All facilitator configurations',
-                        'All conversation messages',
-                        'Login history & activity logs',
-                        'Notification preferences',
-                        'Referral records',
-                        'Authentication tokens',
-                      ].map(item => (
-                        <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
+                  {/* What gets erased vs anonymised */}
+                  <div className="px-1 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-red-700 mb-1.5">Permanently deleted (your PII):</p>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                        {[
+                          'Profile & account credentials',
+                          'Email address & password',
+                          'Login history & activity logs',
+                          'Authentication tokens',
+                          'Notification preferences',
+                          'Referral records',
+                        ].map(item => (
+                          <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-1.5">Anonymised (attributed to "Deleted User"):</p>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                        {[
+                          'Session & conversation history',
+                          'AI facilitator configurations',
+                          'Messages & transcripts',
+                          'Session reports',
+                        ].map(item => (
+                          <li key={item} className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                   {/* Delete button row */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50/30">
@@ -330,7 +348,8 @@ const Settings = () => {
                           <AlertDialogTitle>Permanently delete your account?</AlertDialogTitle>
                           <AlertDialogDescription asChild>
                             <div className="space-y-2">
-                              <p>This will immediately and irreversibly erase <strong>all your data</strong> from our servers in compliance with GDPR Article 17 (Right to Erasure).</p>
+                                  <p>This will immediately and permanently erase all your <strong>personal data</strong> (profile, credentials, login history) from our servers, in compliance with <strong>GDPR Article 17 §3</strong> (Right to Erasure).</p>
+                              <p>Session history shared with other participants will be <strong>anonymised</strong> (attributed to "Deleted User") rather than deleted, as permitted under GDPR Article 17 §3(c).</p>
                               <p className="text-red-600 font-medium">This action cannot be undone. There is no recovery.</p>
                             </div>
                           </AlertDialogDescription>

@@ -1910,28 +1910,29 @@ async def auth_user(request: Request):
 @app.delete("/auth/v1/user")
 async def delete_own_account(request: Request):
     """
-    RGPD / GDPR - Right to Erasure (Article 17).
-    Allows an authenticated user to permanently delete their own account and ALL
-    associated personal data from every table in the database.
+    GDPR Article 17 s3 - Right to Erasure with Anonymisation.
 
-    Deletion order (respects FK constraints):
-      1. messages (FK -> conversations)
-      2. session_events (FK -> conversations)
-      3. session_reports (FK -> conversations)
-      4. session_participants (FK -> conversations)
-      5. conversations (FK -> profiles)
-      6. sessions (FK -> profiles via user_id)
-      7. facilitators (FK -> profiles via user_id)
-      8. referrals (FK -> profiles via referrer_id)
-      9. password_reset_tokens (FK -> profiles, CASCADE but explicit)
-     10. email_verification_tokens (FK -> profiles, CASCADE but explicit)
-     11. login_activity (FK -> profiles, CASCADE but explicit)
-     12. user_sessions (FK -> profiles, CASCADE but explicit)
-     13. security_audit_log (FK -> profiles, CASCADE but explicit)
-     14. profiles (root identity record)
+    Strategy: anonymise rather than delete, preserving session history for other
+    participants while removing all personally-identifiable information (PII).
 
-    The entire deletion runs inside a single DB transaction so it is atomic:
-    either everything is deleted or nothing is (on error, the transaction rolls back).
+    ANONYMISED (data needed by other participants - no PII):
+      1. messages            -> user_id = NULL, name = 'Deleted User'
+      2. session_participants -> name = 'Deleted User', avatar_seed = NULL (host rows only)
+      3. session_reports     -> generated_by = 'Deleted User'
+      4. conversations       -> user_id = NULL, join_token = NULL
+      5. sessions            -> user_id = NULL  (title/prompt are NOT PII)
+      6. facilitators        -> user_id = NULL  (title/description are NOT PII)
+
+    DELETED (pure PII, no value to other participants):
+      7. referrals
+      8. password_reset_tokens
+      9. email_verification_tokens
+     10. login_activity
+     11. user_sessions
+     12. security_audit_log
+     13. profiles (email, name, phone, bio, avatar, password hash, Stripe IDs, settings)
+
+    The entire operation runs inside a single DB transaction (atomic).
     """
     user = get_current_user(request)
     if not user:
@@ -1940,55 +1941,68 @@ async def delete_own_account(request: Request):
     if not user_id:
         raise HTTPException(401, "Invalid token - no user ID")
     email = user.get("email", "")
-
     try:
         async with _pool.acquire() as conn:
             async with conn.transaction():
-                # 1. messages linked to user's conversations
+                # ── ANONYMISE (preserve session history for other participants) ──
+
+                # 1. messages: clear user_id and replace name with 'Deleted User'
+                #    so the conversation transcript remains readable for participants.
                 await conn.execute(
-                    "DELETE FROM messages WHERE conversation_id IN "
+                    "UPDATE messages SET user_id = NULL, name = 'Deleted User' "
+                    "WHERE user_id = $1::uuid",
+                    user_id,
+                )
+
+                # 2. session_participants (host rows): anonymise name, clear avatar seed.
+                #    Participant rows are NOT owned by the user so they are untouched.
+                await conn.execute(
+                    "UPDATE session_participants SET name = 'Deleted User', avatar_seed = NULL "
+                    "WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)"
+                    " AND is_host = TRUE",
+                    user_id,
+                )
+
+                # 3. session_reports: replace generated_by with 'Deleted User'.
+                await conn.execute(
+                    "UPDATE session_reports SET generated_by = 'Deleted User' "
+                    "WHERE conversation_id IN "
                     "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
                     user_id,
                 )
-                # 2. session_events linked to user's conversations
+
+                # 4. conversations: detach from user (set user_id = NULL) and
+                #    clear the join_token so no new participants can join.
                 await conn.execute(
-                    "DELETE FROM session_events WHERE conversation_id IN "
-                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    "UPDATE conversations SET user_id = NULL, join_token = NULL "
+                    "WHERE user_id = $1::uuid",
                     user_id,
                 )
-                # 3. session_reports linked to user's conversations
+
+                # 5. sessions (AI session configs): detach from user.
+                #    The session content (title, prompt, objective) is NOT PII.
                 await conn.execute(
-                    "DELETE FROM session_reports WHERE conversation_id IN "
-                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    "UPDATE sessions SET user_id = NULL WHERE user_id = $1::uuid",
                     user_id,
                 )
-                # 4. session_participants linked to user's conversations
+
+                # 6. facilitators: detach from user.
+                #    The facilitator config (title, description, avatar) is NOT PII.
                 await conn.execute(
-                    "DELETE FROM session_participants WHERE conversation_id IN "
-                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    "UPDATE facilitators SET user_id = NULL WHERE user_id = $1::uuid",
                     user_id,
                 )
-                # 5. conversations owned by the user
-                await conn.execute(
-                    "DELETE FROM conversations WHERE user_id = $1::uuid",
-                    user_id,
-                )
-                # 6. sessions owned by the user
-                await conn.execute(
-                    "DELETE FROM sessions WHERE user_id = $1::uuid",
-                    user_id,
-                )
-                # 7. facilitators created by the user
-                await conn.execute(
-                    "DELETE FROM facilitators WHERE user_id = $1::uuid",
-                    user_id,
-                )
-                # 8. referrals where user is the referrer
+
+                # ── DELETE (pure PII with no value to other participants) ──
+
+                # 7. referrals where user is the referrer
                 await conn.execute(
                     "DELETE FROM referrals WHERE referrer_id = $1::uuid",
                     user_id,
                 )
-                # 9-13. tables with ON DELETE CASCADE - explicit for auditability
+
+                # 8-12. auth / security tables
                 await conn.execute(
                     "DELETE FROM password_reset_tokens WHERE user_id = $1::uuid",
                     user_id,
@@ -2009,7 +2023,9 @@ async def delete_own_account(request: Request):
                     "DELETE FROM security_audit_log WHERE user_id = $1::uuid",
                     user_id,
                 )
-                # 14. profiles - root identity record (last, to avoid FK violations)
+
+                # 13. profiles - root identity record (PII: email, name, phone,
+                #     bio, avatar, password hash, Stripe IDs, plan info, settings)
                 await conn.execute(
                     "DELETE FROM profiles WHERE id = $1::uuid",
                     user_id,
@@ -2019,21 +2035,17 @@ async def delete_own_account(request: Request):
         _BANNED_USERS_CACHE.pop(user_id, None)
         if email and email in USERS:
             del USERS[email]
-
         log_auth.info(
-            "gdpr_delete: user %s (%s) deleted their own account",
+            "gdpr_anonymise: user %s (%s) erased PII; session history anonymised (GDPR Art.17 s3)",
             user_id, email,
         )
         # 204 No Content - frontend interprets this as successful deletion
         return Response(status_code=204)
-
     except HTTPException:
         raise
     except Exception as e:
-        log_auth.error("gdpr_delete error for user %s: %s", user_id, e, exc_info=True)
+        log_auth.error("gdpr_anonymise error for user %s: %s", user_id, e, exc_info=True)
         raise HTTPException(500, "Account deletion failed. Please contact support.")
-
-
 @app.post("/auth/v1/logout")
 async def auth_logout():
     return Response(status_code=204)

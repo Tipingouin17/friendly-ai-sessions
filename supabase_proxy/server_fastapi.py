@@ -825,6 +825,13 @@ async def run_startup_migrations() -> None:
             ADD COLUMN IF NOT EXISTS business_hours TEXT NOT NULL DEFAULT 'Mon - Fri, 9am - 6pm CET',
             ADD COLUMN IF NOT EXISTS contact_address TEXT NOT NULL DEFAULT 'Europe';
         """,
+        # 2026-05-14: Seed a default row in configurations if the table is empty.
+        # The admin SystemSettings panel requires at least one row to read/update config.
+        """
+        INSERT INTO configurations (default_ai_model, default_currency, free_plan_message_limit, contact_email, business_hours, contact_address)
+        SELECT 'gpt-4.1-mini', 'EUR', 20, 'support@aifacilitator.ai', 'Mon - Fri, 9am - 6pm CET', 'Europe'
+        WHERE NOT EXISTS (SELECT 1 FROM configurations LIMIT 1);
+        """,
     ]
     try:
         async with _pool.acquire() as conn:

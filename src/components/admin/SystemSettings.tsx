@@ -130,23 +130,32 @@ export const SystemSettings = () => {
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            if (!config) throw new Error("No configuration record found.");
-            const { error } = await api
-                .from("configurations")
-                .update({
-                    default_gpt_token: form.default_gpt_token || null,
-                    default_ai_model: form.default_ai_model || "gpt-4.1-mini",
-                    default_currency: form.default_currency ?? "USD",
-                    google_capcha_key: form.google_capcha_key || null,
-                    secret_message: form.secret_message || null,
-                    free_plan_message_limit: form.free_plan_message_limit ?? 20,
-                    languages: form.languages ?? { en: true },
-                    contact_email: form.contact_email || "support@aifacilitator.ai",
-                    business_hours: form.business_hours || "Mon - Fri, 9am - 6pm CET",
-                    contact_address: form.contact_address || "Europe",
-                })
-                .eq("id", config.id);
-            if (error) throw error;
+            const payload = {
+                default_gpt_token: form.default_gpt_token || null,
+                default_ai_model: form.default_ai_model || "gpt-4.1-mini",
+                default_currency: form.default_currency ?? "EUR",
+                google_capcha_key: form.google_capcha_key || null,
+                secret_message: form.secret_message || null,
+                free_plan_message_limit: form.free_plan_message_limit ?? 20,
+                languages: form.languages ?? { en: true },
+                contact_email: form.contact_email || "support@aifacilitator.ai",
+                business_hours: form.business_hours || "Mon - Fri, 9am - 6pm CET",
+                contact_address: form.contact_address || "Europe",
+            };
+            if (config) {
+                // Row exists — update it
+                const { error } = await api
+                    .from("configurations")
+                    .update(payload)
+                    .eq("id", config.id);
+                if (error) throw error;
+            } else {
+                // Table is empty — insert the first row
+                const { error } = await api
+                    .from("configurations")
+                    .insert(payload);
+                if (error) throw error;
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-system-config"] });

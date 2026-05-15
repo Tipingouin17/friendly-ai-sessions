@@ -2,6 +2,29 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Google Consent Mode defaults: deny optional storage until the user accepts cookies. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied',
+        'analytics_storage': 'denied',
+        'wait_for_update': 500
+      });
+    </script>
+
+    <!-- Google Tag Manager -->
+    <script>
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+      j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+      'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','GTM-NK8ZJFW2');
+    </script>
+    <!-- End Google Tag Manager -->
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
@@ -151,19 +174,14 @@
     </script>
             <!-- CSP is enforced via Vercel HTTP response headers (vercel.json) in production.
          No meta CSP here to avoid dual-policy conflicts that cause false-positive console errors. -->
-
-    <!-- Microsoft Advertising UET Tag -->
-    <script>
-      (function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[],f=function(){var o={ti:"343249109",enableAutoSpaTracking:true};o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")},n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function(){var s=this.readyState;s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)},i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)})(window,document,"script","//bat.bing.com/bat.js","uetq");
-    </script>
-    <!-- End Microsoft Advertising UET Tag -->
   </head>
 
   <body>
-    <!-- Microsoft Advertising UET Tag noscript fallback -->
+    <!-- Google Tag Manager (noscript) -->
     <noscript>
-      <img src="//bat.bing.com/action/0?ti=343249109&Ver=2" height="0" width="0" style="display:none; visibility:hidden;" />
+      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NK8ZJFW2" height="0" width="0" style="display:none;visibility:hidden"></iframe>
     </noscript>
+    <!-- End Google Tag Manager (noscript) -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

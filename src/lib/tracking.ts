@@ -15,7 +15,7 @@
 
 import { getStoredConsent } from "@/components/CookieBanner";
 
-type GtagCommand = 'js' | 'config' | 'event' | 'set';
+type GtagCommand = 'js' | 'config' | 'event' | 'set' | 'consent';
 type GtagArguments = [GtagCommand, ...unknown[]];
 
 declare global {
@@ -44,6 +44,26 @@ const config = {
 let gtagInitialized = false;
 let clarityInitialized = false;
 let uetInitialized = false;
+
+function ensureGtagStub(): void {
+  if (typeof window === 'undefined') return;
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = window.gtag || function gtag(...args: GtagArguments) {
+    window.dataLayer?.push(args);
+  };
+}
+
+function updateGoogleConsent(analyticsConsent: boolean, advertisingConsent: boolean): void {
+  ensureGtagStub();
+
+  window.gtag?.('consent', 'update', {
+    analytics_storage: analyticsConsent ? 'granted' : 'denied',
+    ad_storage: advertisingConsent ? 'granted' : 'denied',
+    ad_user_data: advertisingConsent ? 'granted' : 'denied',
+    ad_personalization: advertisingConsent ? 'granted' : 'denied',
+  });
+}
 
 function hasValue(value?: string): value is string {
   return Boolean(value && value.trim().length > 0 && !value.includes('your_'));
@@ -75,19 +95,16 @@ function initGtag(analyticsConsent: boolean, advertisingConsent: boolean): void 
   const primaryId = loadGa4 ? config.ga4MeasurementId! : config.googleAdsId;
   appendScript('aifacilitator-gtag', `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(primaryId)}`);
 
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = window.gtag || function gtag(...args: GtagArguments) {
-    window.dataLayer?.push(args);
-  };
+  ensureGtagStub();
 
-  window.gtag('js', new Date());
+  window.gtag?.('js', new Date());
 
   if (loadGa4) {
-    window.gtag('config', config.ga4MeasurementId!, { send_page_view: false });
+    window.gtag?.('config', config.ga4MeasurementId!, { send_page_view: false });
   }
 
   if (loadGads) {
-    window.gtag('config', config.googleAdsId, { send_page_view: false });
+    window.gtag?.('config', config.googleAdsId, { send_page_view: false });
   }
 }
 
@@ -138,9 +155,10 @@ export function initializeTracking(): void {
 
   const consent = getStoredConsent();
 
-  // No consent decision yet — do not load any optional scripts.
+  // No consent decision yet — GTM keeps Google Consent Mode defaults denied.
   if (!consent) return;
 
+  updateGoogleConsent(consent.analytics, consent.advertising);
   initGtag(consent.analytics, consent.advertising);
   initClarity(consent.analytics);
   initUet(consent.advertising);

@@ -116,14 +116,19 @@ const Contact = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const checkRateLimit = (): boolean => {
-    const key = "contact_submissions";
+  const getRecentSuccessfulSubmissions = (): number[] => {
+    const key = "contact_successful_submissions";
     const raw = localStorage.getItem(key);
     const now = Date.now();
+    const submissions: number[] = raw ? JSON.parse(raw) : [];
+    const recentSubmissions = submissions.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+    localStorage.setItem(key, JSON.stringify(recentSubmissions));
+    return recentSubmissions;
+  };
 
-    let submissions: number[] = raw ? JSON.parse(raw) : [];
-    // Remove entries outside the window
-    submissions = submissions.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+  const checkRateLimit = (): boolean => {
+    const submissions = getRecentSuccessfulSubmissions();
+    const now = Date.now();
 
     if (submissions.length >= MAX_SUBMISSIONS_PER_WINDOW) {
       const waitMinutes = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - submissions[0])) / 60000);
@@ -135,9 +140,12 @@ const Contact = () => {
       return false;
     }
 
-    submissions.push(now);
-    localStorage.setItem(key, JSON.stringify(submissions));
     return true;
+  };
+
+  const recordSuccessfulSubmission = () => {
+    const key = "contact_successful_submissions";
+    localStorage.setItem(key, JSON.stringify([...getRecentSuccessfulSubmissions(), Date.now()]));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,6 +201,7 @@ const Contact = () => {
       }
 
       setSubmitted(true);
+      recordSuccessfulSubmission();
       trackContactLead('contact_form_submit');
       toast({
         title: "Message sent!",

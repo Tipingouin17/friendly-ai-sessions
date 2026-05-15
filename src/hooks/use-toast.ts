@@ -6,7 +6,6 @@
 
 import * as React from "react";
 import {
-  Toast,
   ToastActionElement,
   ToastProps
 } from "@/components/ui/toast";
@@ -20,28 +19,49 @@ export interface ToastType {
   duration?: number;
 }
 
-// Custom hook for toast functionality
+type ToastFunction = (props: ToastProps) => string;
+type Listener = (toasts: ToastType[]) => void;
+
+let memoryState: ToastType[] = [];
+const listeners: Listener[] = [];
+
+const emit = () => {
+  listeners.forEach((listener) => listener(memoryState));
+};
+
+export const dismiss = (toastId?: string) => {
+  memoryState = toastId
+    ? memoryState.filter((toastItem) => toastItem.id !== toastId)
+    : [];
+  emit();
+};
+
+export const toast: ToastFunction = ({ duration = 5000, ...props }) => {
+  const id = Math.random().toString(36).substring(2, 9);
+  const nextToast = { id, duration, ...props } as ToastType;
+
+  memoryState = [...memoryState, nextToast];
+  emit();
+
+  if (duration > 0) {
+    window.setTimeout(() => dismiss(id), duration);
+  }
+
+  return id;
+};
+
+// Custom hook for toast functionality backed by a shared global store.
 export const useToast = () => {
-  const [toasts, setToasts] = React.useState<ToastType[]>([]);
+  const [toasts, setToasts] = React.useState<ToastType[]>(memoryState);
 
-  const toast = React.useCallback(({ ...props }: ToastProps) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    
-    setToasts((prevToasts) => [
-      ...prevToasts,
-      { id, ...props } as ToastType,
-    ]);
-
-    return id;
-  }, []);
-
-  const dismiss = React.useCallback((toastId?: string) => {
-    setToasts((prevToasts) => {
-      if (toastId) {
-        return prevToasts.filter((toast) => toast.id !== toastId);
+  React.useEffect(() => {
+    listeners.push(setToasts);
+    return () => {
+      const index = listeners.indexOf(setToasts);
+      if (index > -1) {
+        listeners.splice(index, 1);
       }
-      return [];
-    });
+    };
   }, []);
 
   return {
@@ -51,16 +71,5 @@ export const useToast = () => {
   };
 };
 
-// For direct use without the hook
-type ToastFunction = (props: ToastProps) => string;
-
-// Create a global context for toast state
+// Create a global context for toast state.
 export const ToastContext = React.createContext<ReturnType<typeof useToast> | null>(null);
-
-// Create a single instance of the toast function that can be imported directly
-export const toast: ToastFunction = (props) => {
-  // This is a simple implementation that will work without the context
-  // The complete solution would use the context when available
-  const id = Math.random().toString(36).substring(2, 9);
-  return id;
-};

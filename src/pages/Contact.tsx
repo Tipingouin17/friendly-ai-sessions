@@ -11,7 +11,7 @@
  * Contact info (email, hours, address) is loaded dynamically from the DB
  * and can be edited from the Admin > Settings panel.
  */
-import { Mail, MapPin, Clock, ArrowRight, Zap } from "lucide-react";
+import { Mail, MapPin, Clock, ArrowRight, Zap, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +63,7 @@ const Contact = () => {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<ContactFormData>>({});
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
+  const confirmationRef = useRef<HTMLDivElement | null>(null);
   const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT_INFO);
 
   // Load contact info from DB (configurations table)
@@ -87,6 +88,20 @@ const Contact = () => {
     };
     fetchContactInfo();
   }, []);
+
+  useEffect(() => {
+    if (submitted) {
+      confirmationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [submitted]);
+
+  const resetContactForm = () => {
+    setFormData({ fname: "", lname: "", email: "", message: "" });
+    setFieldErrors({});
+    setHoneypot("");
+    setTurnstileToken(null);
+    turnstileRef.current?.reset();
+  };
 
   const handleFormChange = (field: keyof ContactFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -200,6 +215,7 @@ const Contact = () => {
         throw new Error(errMsg);
       }
 
+      resetContactForm();
       setSubmitted(true);
       recordSuccessfulSubmission();
       trackContactLead('contact_form_submit');
@@ -207,9 +223,6 @@ const Contact = () => {
         title: "Message sent!",
         description: data?.message ?? "We'll get back to you within 24 hours.",
       });
-
-      setFormData({ fname: "", lname: "", email: "", message: "" });
-      setTurnstileToken(null);
     } catch (err: unknown) {
       console.error("Error submitting contact form:", err);
       const errMessage =
@@ -317,17 +330,26 @@ const Contact = () => {
               </p>
 
               {submitted ? (
-                <div className="text-center py-12">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
-                    <Mail className="h-8 w-8 text-indigo-600" />
+                <div
+                  ref={confirmationRef}
+                  role="status"
+                  aria-live="polite"
+                  className="text-center py-12 rounded-2xl border border-green-100 bg-green-50/60 px-6"
+                >
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+                    <CheckCircle2 className="h-8 w-8 text-green-600" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Message sent!</h3>
-                  <p className="text-gray-500 text-sm">
-                    Thank you for reaching out. We'll get back to you within 24 hours.
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Message sent successfully</h3>
+                  <p className="text-gray-600 text-sm max-w-md mx-auto">
+                    Thank you for reaching out. Your message has been received and our team will get back to you within 24 hours.
                   </p>
                   <button
-                    onClick={() => setSubmitted(false)}
-                    className="mt-6 text-sm text-indigo-600 hover:underline"
+                    type="button"
+                    onClick={() => {
+                      resetContactForm();
+                      setSubmitted(false);
+                    }}
+                    className="mt-6 text-sm font-semibold text-indigo-600 hover:underline"
                   >
                     Send another message
                   </button>

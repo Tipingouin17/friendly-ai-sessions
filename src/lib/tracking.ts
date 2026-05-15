@@ -25,11 +25,12 @@ declare global {
   }
 }
 
+const DEFAULT_GA4_MEASUREMENT_ID = 'G-9KHM3KVN5Q';
 const DEFAULT_GOOGLE_ADS_ID = 'AW-18162348578';
 const DEFAULT_MICROSOFT_UET_ID = '343249109';
 
 const config = {
-  ga4MeasurementId: import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined,
+  ga4MeasurementId: (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || DEFAULT_GA4_MEASUREMENT_ID,
   googleAdsId: (import.meta.env.VITE_GOOGLE_ADS_ID as string | undefined) || DEFAULT_GOOGLE_ADS_ID,
   googleAdsSignupConversionLabel: import.meta.env.VITE_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL as string | undefined,
   googleAdsContactConversionLabel: import.meta.env.VITE_GOOGLE_ADS_CONTACT_CONVERSION_LABEL as string | undefined,
@@ -286,6 +287,11 @@ export function trackContactLead(source = 'contact_form'): void {
 
   trackGa4Event('contact_form_submit', parameters);
   trackGa4Event('generate_lead', parameters);
+  // GA4 already has qualify_lead configured as a key event for this property.
+  // Emit it after a confirmed contact-form delivery so paid-media optimization has
+  // an immediately usable lead conversion signal while generate_lead remains the
+  // standard GA4 lead event for reporting and future Google Ads imports.
+  trackGa4Event('qualify_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsContactConversionLabel, parameters);
   trackMicrosoftEvent('contact_form_submit', parameters);
   trackMicrosoftEvent('generate_lead', parameters);

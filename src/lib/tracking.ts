@@ -5,9 +5,6 @@
  * CookieBanner component. Consent is stored in localStorage under the key
  * "cookie_consent_v1" (see src/components/CookieBanner.tsx).
  *
- * Strictly necessary tags (Microsoft UET for conversion measurement) are
- * loaded only after advertising consent.
- *
  * This module deliberately keeps all marketing tags behind safe wrappers so
  * application code never fails if a third-party script is blocked, delayed, or
  * not configured in the current environment.
@@ -17,10 +14,11 @@ import { getStoredConsent } from "@/components/CookieBanner";
 
 type GtagCommand = 'js' | 'config' | 'event' | 'set' | 'consent';
 type GtagArguments = [GtagCommand, ...unknown[]];
+type DataLayerItem = GtagArguments | Record<string, unknown>;
 
 declare global {
   interface Window {
-    dataLayer?: unknown[];
+    dataLayer?: DataLayerItem[];
     gtag?: (...args: GtagArguments) => void;
     uetq?: Array<Record<string, unknown>> & { push: (...args: unknown[]) => number };
     clarity?: (...args: unknown[]) => void;
@@ -45,12 +43,19 @@ let gtagInitialized = false;
 let clarityInitialized = false;
 let uetInitialized = false;
 
+function ensureDataLayer(): DataLayerItem[] | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  window.dataLayer = window.dataLayer || [];
+  return window.dataLayer;
+}
+
 function ensureGtagStub(): void {
   if (typeof window === 'undefined') return;
 
-  window.dataLayer = window.dataLayer || [];
+  const dataLayer = ensureDataLayer();
   window.gtag = window.gtag || function gtag(...args: GtagArguments) {
-    window.dataLayer?.push(args);
+    dataLayer?.push(args);
   };
 }
 
@@ -78,6 +83,22 @@ function appendScript(id: string, src: string): void {
   script.async = true;
   script.src = src;
   document.head.appendChild(script);
+}
+
+function sanitizeEventParameters(parameters: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(parameters).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  );
+}
+
+function pushDataLayerEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
+  const dataLayer = ensureDataLayer();
+  if (!dataLayer) return;
+
+  dataLayer.push({
+    event: eventName,
+    ...sanitizeEventParameters(parameters),
+  });
 }
 
 /** Load Google Analytics 4 + Google Ads — requires analytics AND advertising consent. */
@@ -126,14 +147,12 @@ function initUet(advertisingConsent: boolean): void {
 
   uetInitialized = true;
 
-  // Inject the UET inline bootstrap (same as the snippet in index.html but deferred)
   if (!window.uetq) {
     window.uetq = [] as typeof window.uetq;
   }
 
-  appendScript('aifacilitator-uet', `https://bat.bing.com/bat.js`);
+  appendScript('aifacilitator-uet', 'https://bat.bing.com/bat.js');
 
-  // Configure UET after script loads
   const uetId = config.microsoftUetId;
   const uetScript = document.createElement('script');
   uetScript.id = 'aifacilitator-uet-config';
@@ -180,28 +199,26 @@ export function trackPageView(path: string, title = document.title): void {
   if (!consent) return;
 
   const pageLocation = `${window.location.origin}${path}`;
+  const parameters = {
+    page_title: title,
+    page_location: pageLocation,
+    page_path: path,
+  };
+
+  if (consent.analytics) {
+    pushDataLayerEvent('page_view', parameters);
+  }
 
   if (consent.analytics && hasValue(config.ga4MeasurementId) && window.gtag) {
-    window.gtag('event', 'page_view', {
-      page_title: title,
-      page_location: pageLocation,
-      page_path: path,
-    });
+    window.gtag('event', 'page_view', parameters);
   }
 
   if (consent.advertising && hasValue(config.googleAdsId) && window.gtag) {
-    window.gtag('config', config.googleAdsId, {
-      page_title: title,
-      page_location: pageLocation,
-      page_path: path,
-    });
+    window.gtag('config', config.googleAdsId, parameters);
   }
 
   if (consent.advertising && window.uetq) {
-    window.uetq.push('event', 'page_view', {
-      page_path: path,
-      page_location: pageLocation,
-    });
+    window.uetq.push('event', 'page_view', parameters);
   }
 }
 
@@ -210,8 +227,14 @@ function trackGa4Event(eventName: string, parameters: Record<string, unknown> = 
   if (!consent?.analytics) return;
   initializeTracking();
 
+  const sanitizedParameters = sanitizeEventParameters(parameters);
+
+  // Always push a GTM-style event. This keeps events measurable even when GA4 is
+  // configured in GTM rather than injected through Vite environment variables.
+  pushDataLayerEvent(eventName, sanitizedParameters);
+
   if (hasValue(config.ga4MeasurementId) && window.gtag) {
-    window.gtag('event', eventName, parameters);
+    window.gtag('event', eventName, sanitizedParameters);
   }
 }
 
@@ -224,7 +247,7 @@ function trackGoogleAdsConversion(label?: string, parameters: Record<string, unk
 
   window.gtag('event', 'conversion', {
     send_to: `${config.googleAdsId}/${label}`,
-    ...parameters,
+    ...sanitizeEventParameters(parameters),
   });
 }
 
@@ -235,7 +258,7 @@ function trackMicrosoftEvent(eventName: string, parameters: Record<string, unkno
 
   window.uetq.push('event', eventName, {
     event_category: 'acquisition',
-    ...parameters,
+    ...sanitizeEventParameters(parameters),
   });
 }
 
@@ -244,11 +267,14 @@ export function trackSignup(method = 'email'): void {
     method,
     event_category: 'acquisition',
     event_label: 'account_created',
+    lead_source: 'signup',
   };
 
   trackGa4Event('sign_up', parameters);
+  trackGa4Event('generate_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsSignupConversionLabel, parameters);
   trackMicrosoftEvent('sign_up', parameters);
+  trackMicrosoftEvent('generate_lead', parameters);
 }
 
 export function trackContactLead(source = 'contact_form'): void {
@@ -258,8 +284,10 @@ export function trackContactLead(source = 'contact_form'): void {
     lead_source: source,
   };
 
+  trackGa4Event('contact_form_submit', parameters);
   trackGa4Event('generate_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsContactConversionLabel, parameters);
+  trackMicrosoftEvent('contact_form_submit', parameters);
   trackMicrosoftEvent('generate_lead', parameters);
 }
 
@@ -283,6 +311,7 @@ export function trackCtaClick(label: string, destination: string, location = 'pu
     destination,
   };
 
+  trackGa4Event('cta_click', parameters);
   trackGa4Event('select_content', {
     ...parameters,
     content_type: 'cta',

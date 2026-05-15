@@ -11,7 +11,9 @@ if [ "$BRANCH" = "main" ]; then
   # Override API URL to point to production Railway backend
   export VITE_API_URL=https://friendly-ai-sessions-production.up.railway.app
   npm run build
+  node scripts/generate-seo-pages.mjs
 else
   echo "Using development build"
   npm run build:dev
+  node scripts/generate-seo-pages.mjs
 fi

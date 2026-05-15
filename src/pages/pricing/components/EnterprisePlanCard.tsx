@@ -7,6 +7,7 @@
 import { Check, Users, Calendar, UserPlus, MessageSquare, Wand2, Save, BarChart3, Download, Headphones, Palette, Building2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { trackCtaClick, trackLeadIntent } from "@/lib/tracking";
 
 interface EnterprisePlanCardProps {
   onContactClick: () => void;
@@ -14,6 +15,18 @@ interface EnterprisePlanCardProps {
 
 export const EnterprisePlanCard = ({ onContactClick }: EnterprisePlanCardProps) => {
   const navigate = useNavigate();
+
+  const handleContactSales = () => {
+    trackCtaClick('enterprise_contact_sales', '/contact', 'pricing_enterprise_card');
+    trackLeadIntent('enterprise_contact_sales', '/contact');
+    onContactClick();
+  };
+
+  const handleScheduleDemo = () => {
+    trackCtaClick('enterprise_schedule_demo', '/contact', 'pricing_enterprise_card');
+    trackLeadIntent('enterprise_schedule_demo', '/contact');
+    navigate('/contact');
+  };
 
   const enterpriseFeatures = [
     { icon: <Users className="h-4 w-4" />, text: "Unlimited facilitators" },
@@ -53,7 +66,7 @@ export const EnterprisePlanCard = ({ onContactClick }: EnterprisePlanCardProps) 
           <div className="flex flex-col sm:flex-row gap-3 mt-8">
             <Button
               className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-semibold shadow-sm shadow-indigo-500/20 px-6"
-              onClick={onContactClick}
+              onClick={handleContactSales}
             >
               Contact Sales
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -61,7 +74,7 @@ export const EnterprisePlanCard = ({ onContactClick }: EnterprisePlanCardProps) 
             <Button
               variant="outline"
               className="rounded-xl border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-semibold px-6"
-              onClick={() => navigate('/contact')}
+              onClick={handleScheduleDemo}
             >
               Schedule a Demo
             </Button>

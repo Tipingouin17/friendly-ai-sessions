@@ -251,15 +251,55 @@ export function trackSignup(method = 'email'): void {
   trackMicrosoftEvent('sign_up', parameters);
 }
 
-export function trackContactLead(): void {
+export function trackContactLead(source = 'contact_form'): void {
   const parameters = {
     event_category: 'acquisition',
-    event_label: 'contact_form',
+    event_label: source,
+    lead_source: source,
   };
 
   trackGa4Event('generate_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsContactConversionLabel, parameters);
   trackMicrosoftEvent('generate_lead', parameters);
+}
+
+export function trackLeadIntent(source: string, destination: string): void {
+  const parameters = {
+    event_category: 'acquisition',
+    event_label: source,
+    lead_source: source,
+    destination,
+  };
+
+  trackGa4Event('generate_lead_intent', parameters);
+  trackMicrosoftEvent('generate_lead_intent', parameters);
+}
+
+export function trackCtaClick(label: string, destination: string, location = 'public_site'): void {
+  const parameters = {
+    event_category: 'engagement',
+    event_label: label,
+    cta_location: location,
+    destination,
+  };
+
+  trackGa4Event('select_content', {
+    ...parameters,
+    content_type: 'cta',
+    item_id: label,
+  });
+  trackMicrosoftEvent('cta_click', parameters);
+}
+
+export function trackPricingView(source = 'pricing_page'): void {
+  const parameters = {
+    event_category: 'acquisition',
+    event_label: source,
+    source,
+  };
+
+  trackGa4Event('view_pricing', parameters);
+  trackMicrosoftEvent('view_pricing', parameters);
 }
 
 export function trackBeginCheckout(planName?: string, value?: number, currency = 'EUR'): void {

@@ -193,7 +193,7 @@ const Contact = () => {
       }
 
       setSubmitted(true);
-      trackContactLead();
+      trackContactLead('contact_form_submit');
       toast({
         title: "Message sent!",
         description: data?.message ?? "We'll get back to you within 24 hours.",

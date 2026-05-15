@@ -11,6 +11,7 @@ import PageHead from '@/components/PageHead';
 import SectionHeading from '@/components/SectionHeading';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { trackCtaClick, trackLeadIntent } from '@/lib/tracking';
 import {
     Users, MessageSquare, BarChart3, Sparkles, ArrowRight,
     Clock, TrendingUp, Globe, Settings, CheckCircle2,
@@ -134,6 +135,18 @@ const Index = () => {
     const primaryCtaHref = isAuthenticated ? '/my-facilitators' : '/signup';
     const primaryCtaLabel = isAuthenticated ? 'Go to My Facilitators' : 'Get Started Free';
 
+    const handlePrimaryCta = (location: string) => {
+        trackCtaClick('home_primary_cta', primaryCtaHref, location);
+        if (!isAuthenticated) {
+            trackLeadIntent('home_signup_intent', primaryCtaHref);
+        }
+    };
+
+    const handlePricingCta = (location: string) => {
+        trackCtaClick('home_pricing_cta', '/pricing', location);
+        trackLeadIntent('home_pricing_intent', '/pricing');
+    };
+
     return (
         <div className="min-h-screen bg-white">
             <PageHead
@@ -174,7 +187,7 @@ const Index = () => {
 
                     {/* CTAs */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10 px-4 sm:px-0">
-                        <Link to={primaryCtaHref} className="w-full sm:w-auto">
+                        <Link to={primaryCtaHref} className="w-full sm:w-auto" onClick={() => handlePrimaryCta('home_hero')}>
                             <Button
                                 size="lg"
                                 className="w-full sm:w-auto text-base font-semibold px-8 py-6 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all rounded-xl"
@@ -183,7 +196,7 @@ const Index = () => {
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
-                        <Link to="/pricing" className="w-full sm:w-auto">
+                        <Link to="/pricing" className="w-full sm:w-auto" onClick={() => handlePricingCta('home_hero')}>
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -331,7 +344,7 @@ const Index = () => {
                             : 'Join thousands of teams already running more effective, engaging sessions with AIfacilitator.'}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 px-4 sm:px-0">
-                        <Link to={primaryCtaHref} className="w-full sm:w-auto">
+                        <Link to={primaryCtaHref} className="w-full sm:w-auto" onClick={() => handlePrimaryCta('home_bottom_cta')}>
                             <Button
                                 size="lg"
                                 className="w-full sm:w-auto text-base font-semibold px-10 py-6 bg-white text-indigo-700 hover:bg-indigo-50 border-0 shadow-xl shadow-indigo-900/30 transition-colors rounded-xl"
@@ -341,7 +354,7 @@ const Index = () => {
                             </Button>
                         </Link>
                         {!isAuthenticated && (
-                            <Link to="/pricing" className="w-full sm:w-auto">
+                            <Link to="/pricing" className="w-full sm:w-auto" onClick={() => handlePricingCta('home_bottom_cta')}>
                                 <Button
                                     size="lg"
                                     className="w-full sm:w-auto text-base font-semibold px-10 py-6 bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 transition-colors rounded-xl"

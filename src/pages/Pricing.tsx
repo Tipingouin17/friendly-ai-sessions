@@ -30,6 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { Quote } from 'lucide-react';
 import PageHead from '@/components/PageHead';
+import { trackPricingView } from '@/lib/tracking';
 
 // ─── Cache helpers ────────────────────────────────────────────────────────────
 
@@ -44,6 +45,24 @@ const CACHE_ENABLED = !String(import.meta.env.VITE_API_URL ?? '').includes('loca
 interface PlanCache {
   data: Plan[];
   cachedAt: number;
+}
+
+type PlanRestrictions = NonNullable<Plan['plan_table_details']>;
+
+interface RawPlan {
+  id: number;
+  title: string;
+  price: number | string;
+  plan_type: string;
+  plan_restrictions?: PlanRestrictions | PlanRestrictions[] | null;
+  is_popular?: boolean | null;
+  stripe_plan_id?: string | null;
+  currency?: string | null;
+}
+
+interface PlanQueryResponse {
+  data: RawPlan[] | null;
+  error: unknown;
 }
 
 function readCache(): Plan[] | null {
@@ -72,8 +91,8 @@ function writeCache(data: Plan[]): void {
   }
 }
 
-function mapPlans(raw: any[]): Plan[] {
-  return raw.map((p: any) => {
+function mapPlans(raw: RawPlan[]): Plan[] {
+  return raw.map((p) => {
     const restrictions = Array.isArray(p.plan_restrictions)
       ? p.plan_restrictions[0] || {}
       : p.plan_restrictions || {};
@@ -284,6 +303,10 @@ const Pricing = () => {
   const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
+    trackPricingView('pricing_page_visit');
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setIsFetching(true);
 
@@ -291,7 +314,7 @@ const Pricing = () => {
       .from('plans')
       .select('*, plan_restrictions(*)')
       .order('id', { ascending: true })
-      .then(({ data, error }: { data: any; error: any }) => {
+      .then(({ data, error }: PlanQueryResponse) => {
         if (cancelled) return;
         setIsFetching(false);
         if (error) {

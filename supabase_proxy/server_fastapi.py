@@ -5357,7 +5357,7 @@ async def edge_function(func_name: str, request: Request):
                         headers=_crisp_headers,
                         json={},
                     )
-                    if _conv_resp.status_code not in (200, 201):
+                    if not (200 <= _conv_resp.status_code < 300):
                         logger.error(
                             "contact-form: Crisp create conversation failed: %s %s",
                             _conv_resp.status_code, _conv_resp.text,
@@ -5369,8 +5369,11 @@ async def edge_function(func_name: str, request: Request):
                         logger.error("contact-form: No session_id in Crisp response: %s", _conv_data)
                         raise HTTPException(502, detail={"error": "Failed to create support conversation."})
 
-                    # Step 2: Update conversation meta (user email + name)
-                    await _hc.patch(
+                    # Step 2: Update conversation meta (user email + name).
+                    # Crisp may accept the message while returning non-200 codes on
+                    # secondary metadata operations, so metadata failures are logged
+                    # but do not turn a delivered lead into a user-visible 502.
+                    _meta_resp = await _hc.patch(
                         f"https://api.crisp.chat/v1/website/{_crisp_ws}/conversation/{_session_id}/meta",
                         headers=_crisp_headers,
                         json={
@@ -5379,6 +5382,11 @@ async def edge_function(func_name: str, request: Request):
                             "subject": f"Contact form: {fname} {lname}",
                         },
                     )
+                    if not (200 <= _meta_resp.status_code < 300):
+                        logger.warning(
+                            "contact-form: Crisp meta update failed but continuing: %s %s",
+                            _meta_resp.status_code, _meta_resp.text,
+                        )
 
                     # Step 3: Send the message
                     _msg_resp = await _hc.post(
@@ -5395,7 +5403,7 @@ async def edge_function(func_name: str, request: Request):
                             },
                         },
                     )
-                    if _msg_resp.status_code not in (200, 201):
+                    if not (200 <= _msg_resp.status_code < 300):
                         logger.error(
                             "contact-form: Crisp send message failed: %s %s",
                             _msg_resp.status_code, _msg_resp.text,

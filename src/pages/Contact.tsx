@@ -67,6 +67,7 @@ const Contact = () => {
   const formRef = useRef<HTMLFormElement | null>(null);
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
   const confirmationRef = useRef<HTMLDivElement | null>(null);
+  const submitInFlightRef = useRef(false);
   const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT_INFO);
 
   // Load contact info from DB (configurations table)
@@ -179,6 +180,10 @@ const Contact = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (submitInFlightRef.current || isSubmitting) {
+      return;
+    }
+
     // Honeypot check — if filled, silently discard (bot detected)
     if (honeypot) {
       setSubmitted(true);
@@ -208,6 +213,7 @@ const Contact = () => {
       return;
     }
 
+    submitInFlightRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -228,7 +234,11 @@ const Contact = () => {
         throw new Error(errMsg);
       }
 
-      const messageSent = data?.message ?? "We'll get back to you within 24 hours.";
+      if (!data?.success) {
+        throw new Error(data?.message || "Please try again later.");
+      }
+
+      const messageSent = data.message ?? "We'll get back to you within 24 hours.";
       resetContactForm();
       setSuccessMessage(messageSent);
       setSubmitted(true);
@@ -251,6 +261,7 @@ const Contact = () => {
       turnstileRef.current?.reset();
       setTurnstileToken(null);
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };

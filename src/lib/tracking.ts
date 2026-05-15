@@ -263,6 +263,15 @@ function trackMicrosoftEvent(eventName: string, parameters: Record<string, unkno
   });
 }
 
+function createClientEventId(prefix: string): string {
+  const randomValue =
+    typeof window !== 'undefined' && window.crypto && 'randomUUID' in window.crypto
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return `${prefix}-${randomValue}`;
+}
+
 export function trackSignup(method = 'email'): void {
   const parameters = {
     method,
@@ -279,18 +288,20 @@ export function trackSignup(method = 'email'): void {
 }
 
 export function trackContactLead(source = 'contact_form'): void {
+  const eventId = createClientEventId('contact-lead');
   const parameters = {
     event_category: 'acquisition',
     event_label: source,
     lead_source: source,
+    event_id: eventId,
+    transaction_id: eventId,
   };
 
   trackGa4Event('contact_form_submit', parameters);
   trackGa4Event('generate_lead', parameters);
   // GA4 already has qualify_lead configured as a key event for this property.
-  // Emit it after a confirmed contact-form delivery so paid-media optimization has
-  // an immediately usable lead conversion signal while generate_lead remains the
-  // standard GA4 lead event for reporting and future Google Ads imports.
+  // Emit it only when this function is called after confirmed contact-form delivery
+  // so paid-media optimization receives a clean lead signal rather than page views.
   trackGa4Event('qualify_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsContactConversionLabel, parameters);
   trackMicrosoftEvent('contact_form_submit', parameters);

@@ -27,13 +27,16 @@ declare global {
 
 const DEFAULT_GA4_MEASUREMENT_ID = 'G-9KHM3KVN5Q';
 const DEFAULT_GOOGLE_ADS_ID = 'AW-18162348578';
+const DEFAULT_GOOGLE_ADS_CONTACT_CONVERSION_LABEL = '4PthCKTk6q0cEKLkvdRD';
 const DEFAULT_MICROSOFT_UET_ID = '343249109';
 
 const config = {
   ga4MeasurementId: (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || DEFAULT_GA4_MEASUREMENT_ID,
   googleAdsId: (import.meta.env.VITE_GOOGLE_ADS_ID as string | undefined) || DEFAULT_GOOGLE_ADS_ID,
   googleAdsSignupConversionLabel: import.meta.env.VITE_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL as string | undefined,
-  googleAdsContactConversionLabel: import.meta.env.VITE_GOOGLE_ADS_CONTACT_CONVERSION_LABEL as string | undefined,
+  googleAdsContactConversionLabel:
+    (import.meta.env.VITE_GOOGLE_ADS_CONTACT_CONVERSION_LABEL as string | undefined) ||
+    DEFAULT_GOOGLE_ADS_CONTACT_CONVERSION_LABEL,
   googleAdsBeginCheckoutConversionLabel: import.meta.env.VITE_GOOGLE_ADS_BEGIN_CHECKOUT_CONVERSION_LABEL as string | undefined,
   googleAdsPurchaseConversionLabel: import.meta.env.VITE_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL as string | undefined,
   microsoftUetId: (import.meta.env.VITE_MICROSOFT_UET_ID as string | undefined) || DEFAULT_MICROSOFT_UET_ID,

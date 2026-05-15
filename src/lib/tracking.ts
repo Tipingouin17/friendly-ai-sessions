@@ -244,7 +244,7 @@ export function trackContactLead(): void {
   trackMicrosoftEvent('generate_lead', parameters);
 }
 
-export function trackBeginCheckout(planName?: string, value?: number, currency = 'USD'): void {
+export function trackBeginCheckout(planName?: string, value?: number, currency = 'EUR'): void {
   const parameters = {
     event_category: 'monetization',
     event_label: planName || 'pricing_checkout',
@@ -257,7 +257,7 @@ export function trackBeginCheckout(planName?: string, value?: number, currency =
   trackMicrosoftEvent('begin_checkout', parameters);
 }
 
-export function trackPurchase(transactionId: string, value?: number, currency = 'USD'): void {
+export function trackPurchase(transactionId: string, value?: number, currency = 'EUR'): void {
   const parameters = {
     transaction_id: transactionId,
     currency,

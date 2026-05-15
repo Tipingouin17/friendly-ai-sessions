@@ -60,8 +60,11 @@ const Contact = () => {
   const [honeypot, setHoneypot] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<ContactFormData>>({});
+  const [formResetKey, setFormResetKey] = useState(0);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
   const confirmationRef = useRef<HTMLDivElement | null>(null);
   const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT_INFO);
@@ -95,15 +98,25 @@ const Contact = () => {
     }
   }, [submitted]);
 
-  const resetContactForm = () => {
+  const resetContactForm = (clearSuccess = false) => {
     setFormData({ fname: "", lname: "", email: "", message: "" });
     setFieldErrors({});
     setHoneypot("");
     setTurnstileToken(null);
+    formRef.current?.reset();
+    setFormResetKey((key) => key + 1);
     turnstileRef.current?.reset();
+    if (clearSuccess) {
+      setSubmitted(false);
+      setSuccessMessage("");
+    }
   };
 
   const handleFormChange = (field: keyof ContactFormData, value: string) => {
+    if (submitted) {
+      setSubmitted(false);
+      setSuccessMessage("");
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear field error on change
     if (fieldErrors[field]) {
@@ -215,13 +228,15 @@ const Contact = () => {
         throw new Error(errMsg);
       }
 
+      const messageSent = data?.message ?? "We'll get back to you within 24 hours.";
       resetContactForm();
+      setSuccessMessage(messageSent);
       setSubmitted(true);
       recordSuccessfulSubmission();
       trackContactLead('contact_form_submit');
       toast({
         title: "Message sent!",
-        description: data?.message ?? "We'll get back to you within 24 hours.",
+        description: messageSent,
       });
     } catch (err: unknown) {
       console.error("Error submitting contact form:", err);
@@ -329,33 +344,31 @@ const Contact = () => {
                 Fields marked <span className="text-red-500 font-semibold">*</span> are required.
               </p>
 
-              {submitted ? (
+              {submitted && (
                 <div
                   ref={confirmationRef}
                   role="status"
                   aria-live="polite"
-                  className="text-center py-12 rounded-2xl border border-green-100 bg-green-50/60 px-6"
+                  className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 shadow-sm"
                 >
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-                    <CheckCircle2 className="h-8 w-8 text-green-600" />
+                  <div className="flex gap-3 items-start">
+                    <div className="flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100">
+                      <CheckCircle2 className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-green-950">Message sent successfully</h3>
+                      <p className="text-sm text-green-800 mt-1">
+                        {successMessage || "Thank you for reaching out. Your message has been received and our team will get back to you within 24 hours."}
+                      </p>
+                      <p className="text-xs text-green-700 mt-2">
+                        The form below has been reset and is ready if you need to send another message.
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Message sent successfully</h3>
-                  <p className="text-gray-600 text-sm max-w-md mx-auto">
-                    Thank you for reaching out. Your message has been received and our team will get back to you within 24 hours.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetContactForm();
-                      setSubmitted(false);
-                    }}
-                    className="mt-6 text-sm font-semibold text-indigo-600 hover:underline"
-                  >
-                    Send another message
-                  </button>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+              )}
+
+              <form ref={formRef} key={formResetKey} onSubmit={handleSubmit} className="space-y-5" noValidate>
 
                   {/* Honeypot — hidden from real users, bots fill it */}
                   <input
@@ -470,8 +483,7 @@ const Contact = () => {
                     {isSubmitting ? "Sending..." : "Send Message"}
                     {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
                   </Button>
-                </form>
-              )}
+              </form>
             </div>
           </div>
         </div>

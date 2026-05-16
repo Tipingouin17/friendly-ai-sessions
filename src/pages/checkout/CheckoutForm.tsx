@@ -17,6 +17,7 @@ import { CheckoutActions } from './components/CheckoutActions';
 import { useCheckoutFormValidation } from './hooks/useCheckoutFormValidation';
 import { updateUserSubscription } from './utils/subscriptionUtils';
 import { createSubscription, confirmPayment, confirmSubscription } from './services/paymentService';
+import { trackPurchase } from '@/lib/tracking';
 import { Loader2 } from 'lucide-react';
 
 interface ExtendedCheckoutFormProps extends CheckoutFormProps {
@@ -95,6 +96,7 @@ export const CheckoutForm = ({
       if (import.meta.env.DEV || !stripe || !elements || !plan.stripe_plan_id) {
         
         await updateUserSubscription(user.id, plan.id);
+        trackPurchase(`dev-${plan.id}-${Date.now()}`, Number(plan.price), plan.currency || 'EUR');
         
         toast({
           title: "Success",
@@ -145,6 +147,7 @@ export const CheckoutForm = ({
         plan.id,
         paymentIntent?.id
       );
+      trackPurchase(paymentIntent?.id || subscriptionId, Number(plan.price), plan.currency || 'EUR');
 
       toast({
         title: "Success",

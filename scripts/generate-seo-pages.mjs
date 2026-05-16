@@ -81,6 +81,25 @@ const pages = [
     description: 'Compare AIfacilitator and Miro for guided workshops, AI facilitation, decision-making and structured team sessions.',
     keywords: 'AIfacilitator vs Miro, Miro alternative, AI workshop tool, workshop facilitation software comparison',
     schemaType: 'WebPage',
+    staticContent: {
+      h1: 'AIfacilitator vs Miro: AI workshop facilitation alternative',
+      intro: 'AIfacilitator and Miro solve different workshop problems. Miro is a flexible visual collaboration whiteboard; AIfacilitator is built to actively guide live workshops, retrospectives, design sprints, brainstorming sessions and strategic planning with AI facilitation.',
+      sections: [
+        {
+          h2: 'When AIfacilitator is the better fit',
+          body: 'Choose AIfacilitator when the team needs a structured AI facilitator that guides participants through a session, asks questions, keeps discussion moving, captures outputs, and helps turn workshop activity into decisions and follow-up actions.',
+        },
+        {
+          h2: 'When Miro is the better fit',
+          body: 'Choose Miro when the primary need is an open-ended visual canvas for mapping, sticky notes, diagrams and asynchronous collaboration. Miro can complement AIfacilitator as a visual workspace, but it is not primarily an autonomous workshop facilitator.',
+        },
+        {
+          h2: 'Best use cases',
+          body: 'AIfacilitator is designed for AI-guided retrospectives, design sprints, brainstorming, remote workshops, strategic planning and team alignment sessions. Teams can start free without a credit card and upgrade when they need larger sessions, more facilitators or more advanced workflow support.',
+        },
+      ],
+      cta: 'Start free with AIfacilitator to run AI-guided workshops without a credit card.',
+    },
   },
   {
     route: '/blog',
@@ -121,6 +140,15 @@ const pages = [
 
 const escapeAttr = (value) => String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const escapeJson = (value) => String(value).replaceAll('</script', '<\\/script');
+
+function renderStaticFallback(page) {
+  if (!page.staticContent) return '';
+
+  const { h1, intro, sections = [], cta } = page.staticContent;
+  const sectionHtml = sections.map((section) => `        <section>\n          <h2>${escapeAttr(section.h2)}</h2>\n          <p>${escapeAttr(section.body)}</p>\n        </section>`).join('\n');
+
+  return `\n    <noscript>\n      <main id="static-seo-content">\n        <h1>${escapeAttr(h1)}</h1>\n        <p>${escapeAttr(intro)}</p>\n${sectionHtml}\n        <p><strong>${escapeAttr(cta)}</strong></p>\n      </main>\n    </noscript>`;
+}
 
 function replaceMeta(html, page) {
   const url = `${site}${page.route === '/' ? '/' : page.route}`;
@@ -166,6 +194,11 @@ function replaceMeta(html, page) {
   const marker = '    <!-- Structured Data (JSON-LD) - Schema.org / AEO-optimised -->';
   const routeSchema = `    <script type="application/ld+json" data-static-route-schema>\n    ${escapeJson(JSON.stringify(schema, null, 2)).split('\n').join('\n    ')}\n    </script>`;
   updated = updated.replace(marker, `${routeSchema}\n${marker}`);
+
+  const fallback = renderStaticFallback(page);
+  if (fallback) {
+    updated = updated.replace('</body>', `${fallback}\n  </body>`);
+  }
 
   return updated;
 }

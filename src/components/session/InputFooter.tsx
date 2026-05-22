@@ -39,6 +39,7 @@ interface InputFooterProps {
   showResponseStats?: boolean;
   conversationId?: number | null;
   onParticipantStatusChange?: (participantId: number, status: 'active' | 'paused' | 'skipped') => void;
+  speechLanguage?: string | null;
 }
 
 const InputFooter = ({
@@ -61,6 +62,7 @@ const InputFooter = ({
   showResponseStats = false,
   conversationId = null,
   onParticipantStatusChange,
+  speechLanguage = null,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -168,6 +170,7 @@ const InputFooter = ({
                 placeholder="Type your response…"
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
+                speechLanguage={speechLanguage}
               />
             )}
           </>

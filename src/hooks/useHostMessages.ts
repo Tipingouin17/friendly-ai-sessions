@@ -52,7 +52,7 @@ export const useHostMessages = ({
 
   // Track paused/skipped participants for response counting.
   // lastAssistantMessageId resets all 'skipped' statuses when a new AI question arrives.
-  const { excludedParticipantIds, skippedParticipantIds } = useParticipantStatusTracker({
+  const { excludedParticipantIds, pausedParticipantIds, skippedParticipantIds } = useParticipantStatusTracker({
     conversationId,
     lastAssistantMessageId,
   });
@@ -65,6 +65,12 @@ export const useHostMessages = ({
     participants.length > 0
       ? participants.length
       : (conversationState?.current_participants ?? 1);
+
+  const participantStatusSummary = {
+    pausedCount: pausedParticipantIds.size,
+    skippedCount: skippedParticipantIds.size,
+    activeParticipantCount: Math.max(effectiveTotalParticipants - pausedParticipantIds.size, 0),
+  };
 
   const {
     messages: fetchedMessages,
@@ -298,6 +304,7 @@ export const useHostMessages = ({
     isGeneratingWelcome,
     isGeneratingResponse,
     isProcessingAutoStart,
-    forceRecovery
+    forceRecovery,
+    participantStatusSummary
   };
 };

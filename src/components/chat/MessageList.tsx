@@ -44,6 +44,7 @@ const MessageList = ({
   const { ref, scrollToBottom, isNearBottom } = useScrollToBottom<HTMLDivElement>(
     [messages, isWaitingForResponse, isWaitingForResponses]
   );
+  const speechLanguage = conversationData?.language || conversationData?.sessions?.language || null;
 
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
@@ -134,6 +135,7 @@ const MessageList = ({
               isLastMessageOfGroup={isLastMessageOfGroup}
               currentParticipant={currentParticipant}
               participantInfo={participantInfo}
+              speechLanguage={speechLanguage}
             />
           ))}
 

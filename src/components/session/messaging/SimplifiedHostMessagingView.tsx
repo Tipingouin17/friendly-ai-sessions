@@ -27,6 +27,11 @@ interface SimplifiedHostMessagingViewProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  participantStatusSummary?: {
+    pausedCount: number;
+    skippedCount: number;
+    activeParticipantCount: number;
+  };
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
@@ -47,6 +52,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 0,
+  participantStatusSummary,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
@@ -102,8 +108,11 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const participantMessages = messages.filter(m => m.sender === 'user');
 
   // Derived metrics
-  const responseRate = totalParticipants > 0
-    ? Math.round((responseCount / totalParticipants) * 100)
+  const responseTarget = participantStatusSummary?.activeParticipantCount ?? totalParticipants;
+  const pausedCount = participantStatusSummary?.pausedCount ?? 0;
+  const skippedCount = participantStatusSummary?.skippedCount ?? 0;
+  const responseRate = responseTarget > 0
+    ? Math.round((responseCount / responseTarget) * 100)
     : 0;
   const avgMessagesPerParticipant = currentParticipantCount > 0
     ? (participantMessages.length / currentParticipantCount).toFixed(1)
@@ -235,7 +244,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                   </div>
                   <span className="text-2xl font-bold text-slate-900">{responseRate}%</span>
-                  <span className="text-xs text-slate-400">{responseCount} / {totalParticipants} responded</span>
+                  <span className="text-xs text-slate-400">{responseCount} / {responseTarget} active responded</span>
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-sm">
@@ -266,15 +275,21 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       <span className="text-sm font-semibold text-slate-800">Collecting Responses</span>
                     </div>
                     <span className="text-xs font-medium text-slate-500">
-                      {responseCount} of {totalParticipants}
+                      {responseCount} of {responseTarget} active
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
                     <div
                       className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
-                      style={{ width: totalParticipants > 0 ? `${(responseCount / totalParticipants) * 100}%` : '0%' }}
+                      style={{ width: responseTarget > 0 ? `${Math.min((responseCount / responseTarget) * 100, 100)}%` : '0%' }}
                     />
                   </div>
+                  {(skippedCount > 0 || pausedCount > 0) && (
+                    <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                      {skippedCount > 0 && `${skippedCount} participant${skippedCount === 1 ? '' : 's'} skipped this round and count as ready. `}
+                      {pausedCount > 0 && `${pausedCount} paused participant${pausedCount === 1 ? ' is' : 's are'} excluded until they resume.`}
+                    </p>
+                  )}
                   {onTriggerFacilitatorResponse && (
                     <Button
                       onClick={handleContinueNormal}

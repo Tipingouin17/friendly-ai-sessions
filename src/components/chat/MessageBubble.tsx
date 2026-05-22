@@ -12,7 +12,8 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { EyeOff, Sparkles } from 'lucide-react';
+import { EyeOff, Sparkles, Square, Volume2 } from 'lucide-react';
+import { getSpeechLocale } from '@/utils/speechLocale';
 
 interface MessageBubbleProps {
   content: string;
@@ -24,6 +25,7 @@ interface MessageBubbleProps {
   isAnonymous?: boolean;
   isMobile?: boolean;      // kept for API compat, not used
   isCurrentUser?: boolean;
+  speechLanguage?: string | null;
 }
 
 const MessageBubble = ({
@@ -35,7 +37,38 @@ const MessageBubble = ({
   isFirstMessageOfGroup,
   isAnonymous = false,
   isCurrentUser = false,
+  speechLanguage = null,
 }: MessageBubbleProps) => {
+  const [isSpeaking, setIsSpeaking] = React.useState(false);
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  React.useEffect(() => {
+    return () => {
+      if (isSpeaking && canSpeak) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [canSpeak, isSpeaking]);
+
+  const togglePlayback = () => {
+    if (!canSpeak || !content?.trim()) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(content);
+    utterance.lang = getSpeechLocale(speechLanguage);
+    utterance.rate = 0.95;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.cancel();
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // ─── Admin announcement ────────────────────────────────────────────────────
   if (sender === "admin") {
@@ -82,6 +115,17 @@ const MessageBubble = ({
             <span className="text-[11px] font-semibold tracking-widest uppercase text-indigo-500 select-none">
               Facilitator
             </span>
+            {canSpeak && (
+              <button
+                type="button"
+                onClick={togglePlayback}
+                className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                aria-label={isSpeaking ? "Stop facilitator message playback" : "Listen to facilitator message"}
+              >
+                {isSpeaking ? <Square className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                <span className="hidden sm:inline">{isSpeaking ? 'Stop' : 'Listen'}</span>
+              </button>
+            )}
           </div>
         )}
         <div className="px-4 py-3 text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">

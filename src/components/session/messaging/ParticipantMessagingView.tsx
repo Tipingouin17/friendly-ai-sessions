@@ -93,6 +93,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
+  const speechLanguage = conversationData?.language || conversationData?.sessions?.language || null;
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -181,6 +182,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             messages={messages}
             showResponseStats={showResponseStats}
             conversationId={conversationId}
+            speechLanguage={speechLanguage}
           />
         </div>
       )}

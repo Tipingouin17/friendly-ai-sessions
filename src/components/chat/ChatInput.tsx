@@ -13,6 +13,7 @@ import { Mic, Send, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { SpeechRecognition } from "@/types/chat";
 import { MAX_MESSAGE_LENGTH } from "@/utils/inputValidation";
+import { getSpeechLocale } from "@/utils/speechLocale";
 
 interface ChatInputProps {
   inputMessage: string;
@@ -23,6 +24,7 @@ interface ChatInputProps {
   placeholder?: string;
   disabled?: boolean;
   isMobile?: boolean; // kept for API compat
+  speechLanguage?: string | null;
 }
 
 const ChatInput = ({
@@ -33,6 +35,7 @@ const ChatInput = ({
   setIsRecording = () => { /* no-op */ },
   placeholder = "Type your response…",
   disabled = false,
+  speechLanguage = null,
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -63,7 +66,7 @@ const ChatInput = ({
     recognitionRef.current = new SpeechRecognitionAPI();
     recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'en-US';
+    recognitionRef.current.lang = getSpeechLocale(speechLanguage);
 
     recognitionRef.current.onresult = (event) => {
       const transcript = Array.from(event.results).map(r => r[0].transcript).join('');
@@ -86,7 +89,7 @@ const ChatInput = ({
     recognitionRef.current.onend = () => setIsRecording(false);
 
     return () => { recognitionRef.current?.stop(); };
-  }, [setInputMessage, setIsRecording]);
+  }, [setInputMessage, setIsRecording, speechLanguage]);
 
   const handleStartRecording = () => {
     if (!speechSupported) {

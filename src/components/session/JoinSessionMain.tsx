@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag, WifiOff } from "lucide-react";
+import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag, WifiOff, Headphones, Mic, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import JoinForm from "./JoinForm";
 import SessionFullAlert from "./SessionFullAlert";
@@ -119,7 +119,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
               </div>
             </div>
             <p className="text-center text-xs text-gray-400 mt-4">
-              Powered by AIfacilitator · AI-driven workshop facilitation
+              Powered by AIfacilitator · Voice-first AI workshop facilitation
             </p>
           </div>
         </div>
@@ -243,6 +243,27 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
               )}
             </div>
 
+            <div className="mb-4 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3.5">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                <Headphones className="h-3.5 w-3.5" />
+                Voice-first workshop mode
+              </div>
+              <div className="grid gap-2 text-xs leading-relaxed text-indigo-900 sm:grid-cols-3">
+                <div className="rounded-xl bg-white/80 p-2.5">
+                  <Mic className="mb-1 h-4 w-4 text-indigo-500" />
+                  Speak your answers with the microphone where supported; you can review the transcript before sending.
+                </div>
+                <div className="rounded-xl bg-white/80 p-2.5">
+                  <Headphones className="mb-1 h-4 w-4 text-indigo-500" />
+                  Use Read aloud on facilitator messages to experience the AI as a spoken moderator.
+                </div>
+                <div className="rounded-xl bg-white/80 p-2.5">
+                  <Video className="mb-1 h-4 w-4 text-indigo-500" />
+                  Want live cameras too? Keep your Teams, Zoom, or Meet call open alongside this workshop room.
+                </div>
+              </div>
+            </div>
+
             {/* Error state */}
             {error && (
               <div className="p-3.5 mb-4 border border-red-100 bg-red-50 rounded-xl text-red-700">
@@ -276,7 +297,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-indigo-800">Preparing your session…</p>
-                  <p className="text-xs text-indigo-500 mt-0.5 leading-relaxed">The AI facilitator is creating the first message. Please keep this page open; the chat will open automatically.</p>
+                  <p className="text-xs text-indigo-500 mt-0.5 leading-relaxed">The AI moderator is preparing the first spoken-friendly prompt. Please keep this page open; the workshop room will open automatically.</p>
                 </div>
               </div>
             )}

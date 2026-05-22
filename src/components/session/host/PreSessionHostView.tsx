@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Users, Clock, Target, User, Pencil } from 'lucide-react';
+import { Copy, Check, Users, Clock, Target, User, Pencil, Headphones, Mic, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import api from "@/lib/api";
 import StartSessionButton from './StartSessionButton';
@@ -162,8 +162,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="text-center lg:text-left">
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
+                  Once participants have joined, click "Start Session" to begin the voice-first AI-moderated workshop.
                   {stableParticipantCount === 0 && " You need at least one participant to start."}
+                </p>
+                <p className="mt-2 text-xs md:text-sm text-indigo-700">
+                  If your group wants to see each other, keep a Teams, Zoom, or Meet call open alongside this room. AIfacilitator provides the structured prompts, read-aloud moderator voice, and response capture.
                 </p>
                 
               </div>
@@ -205,6 +208,24 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                     <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-gray-500" />}
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 md:p-4">
+                <h4 className="mb-2 text-sm font-semibold text-indigo-900">How to run this live</h4>
+                <div className="grid gap-2 text-xs leading-relaxed text-indigo-800">
+                  <div className="flex gap-2">
+                    <Mic className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Ask participants to answer with the microphone where supported; typing remains the fallback.
+                  </div>
+                  <div className="flex gap-2">
+                    <Headphones className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Encourage Read aloud on facilitator messages so the AI feels like a spoken moderator.
+                  </div>
+                  <div className="flex gap-2">
+                    <Video className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Use your normal video meeting for cameras while this room structures the workshop.
                   </div>
                 </div>
               </div>

@@ -22,7 +22,7 @@ import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Headphones, Home, Mic, PenLine, Sparkles, Users, VideoOff } from 'lucide-react';
+import { Headphones, Home, Mic, PenLine, Sparkles, Users, Video } from 'lucide-react';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -133,26 +133,26 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <div className="rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-sm">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-indigo-600">
                 <Sparkles className="h-3.5 w-3.5" />
-                Workshop orientation
+                Voice-first workshop room
               </div>
               <h2 className="text-sm font-semibold text-slate-900">{sessionTitle}</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">{sessionObjective}</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
                   <Headphones className="mb-1 h-4 w-4 text-indigo-500" />
-                  Listen to facilitator messages with the read-aloud control.
+                  Use Read aloud to hear the AI moderator speak each facilitator prompt.
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
                   <PenLine className="mb-1 h-4 w-4 text-indigo-500" />
-                  Type your answer when the input is available.
+                  Typing remains available as an accessible fallback whenever the input is open.
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
                   <Mic className="mb-1 h-4 w-4 text-indigo-500" />
-                  Use voice input where your browser supports speech recognition.
+                  Speak your answer with the microphone where your browser supports speech recognition.
                 </div>
               </div>
               <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-                This is a structured AI-facilitated workshop, not a video call. The facilitator may wait for the group before moving on and will first explore the problem before pushing toward ideal solutions.
+                This is a structured, voice-first AI workshop room. For face-to-face video presence, keep your Teams, Zoom, or Meet call open alongside AIfacilitator while the AI moderator guides the discussion here.
               </p>
             </div>
 
@@ -190,8 +190,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
 
               <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                <VideoOff className="h-4 w-4 text-slate-400" />
-                No camera is needed here; the shared context comes from participant responses.
+                <Video className="h-4 w-4 text-slate-400" />
+                Pair with Teams, Zoom, or Meet if your group wants to see each other while AIfacilitator moderates the workshop.
               </div>
             </div>
           </div>

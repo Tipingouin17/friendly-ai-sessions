@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
-import { Copy, CheckCircle } from "lucide-react";
+import { Copy, CheckCircle, Headphones, Mic, Video } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import ParticipantCounter from './ParticipantCounter';
 import StartSessionButton from './admin/StartSessionButton';
@@ -77,7 +77,7 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
               {facilitatorTitle && (
                 <span className="block mb-2">Facilitated by {facilitatorTitle}</span>
               )}
-              Participants can join using the QR code or link below
+              Participants can join the voice-first AI workshop using the QR code or link below
             </p>
           </div>
 
@@ -153,10 +153,19 @@ const AdminQrView: React.FC<AdminQrViewProps> = ({
           {/* Instructions */}
           <div className="bg-blue-50 rounded-lg p-6 mb-8">
             <h3 className="text-lg font-semibold text-blue-900 mb-3">Instructions for Participants</h3>
-            <div className="text-blue-800 space-y-2">
-              <p>📱 <strong>Mobile users:</strong> Scan the QR code with your camera app</p>
-              <p>💻 <strong>Computer users:</strong> Copy and paste the link into your browser</p>
-              <p>✍️ <strong>All participants:</strong> Enter your name when prompted</p>
+            <div className="grid gap-3 text-left text-blue-800 md:grid-cols-3">
+              <div className="rounded-xl bg-white/80 p-3">
+                <Mic className="mb-1 h-4 w-4 text-blue-600" />
+                <strong>Speak first:</strong> participants can use the microphone where supported, then review the transcript before sending.
+              </div>
+              <div className="rounded-xl bg-white/80 p-3">
+                <Headphones className="mb-1 h-4 w-4 text-blue-600" />
+                <strong>Listen:</strong> use Read aloud on facilitator messages for a spoken AI moderator experience.
+              </div>
+              <div className="rounded-xl bg-white/80 p-3">
+                <Video className="mb-1 h-4 w-4 text-blue-600" />
+                <strong>Want cameras?</strong> keep Teams, Zoom, or Meet open alongside this workshop room.
+              </div>
             </div>
           </div>
 

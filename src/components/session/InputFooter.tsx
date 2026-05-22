@@ -105,7 +105,7 @@ const InputFooter = ({
     && !engagement.isPaused
     && !engagement.isSkipped;
   const inputGuidance = shouldAllowAnswer
-    ? "Share your perspective now. You can type, dictate with the microphone, or skip if this question is not relevant."
+    ? "Share your perspective now. For the live-workshop feel, speak with the microphone where supported; typing remains available as a fallback."
     : "Your input is temporarily locked while the facilitator gathers the group or prepares the next question. Your typed draft will stay here.";
 
   // Count how many questions this participant has sent
@@ -180,7 +180,7 @@ const InputFooter = ({
                 onSendMessage={onSendMessage}
                 isRecording={isRecording}
                 setIsRecording={setIsRecording}
-                placeholder="Type your response…"
+                placeholder="Speak with the microphone or type your response…"
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
                   speechLanguage={speechLanguage}

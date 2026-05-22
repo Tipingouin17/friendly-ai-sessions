@@ -31,7 +31,7 @@ const DEFAULT_GOOGLE_ADS_CONTACT_CONVERSION_LABEL = '4PthCKTk6q0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL = 'dFKvCLrn8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_BEGIN_CHECKOUT_CONVERSION_LABEL = 'Y_4DCL3n8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL = 'KEhxCMDn8K0cEKLkvdRD';
-const DEFAULT_MICROSOFT_UET_ID = '343249109';
+const DEFAULT_MICROSOFT_UET_ID = '343251742';
 
 const config = {
   ga4MeasurementId: (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || DEFAULT_GA4_MEASUREMENT_ID,
@@ -316,6 +316,7 @@ export function trackContactLead(source = 'contact_form'): void {
   // so paid-media optimization receives a clean lead signal rather than page views.
   trackGa4Event('qualify_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsContactConversionLabel, parameters);
+  trackMicrosoftEvent('submit_lead_form', parameters);
   trackMicrosoftEvent('contact_form_submit', parameters);
   trackMicrosoftEvent('generate_lead', parameters);
 }

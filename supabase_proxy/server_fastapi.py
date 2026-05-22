@@ -147,6 +147,12 @@ for _o in _CORS_HARDCODED + _cors_extra:
         _cors_seen.add(_o)
         _cors_merged.append(_o)
 ALLOWED_CORS_ORIGINS = _cors_merged
+# Allow Vercel preview origins for this project without opening CORS broadly.
+# This covers both branch aliases such as:
+#   https://aifacilitator-git-tester-feedback-e2abb8-tipingouin17s-projects.vercel.app
+# and immutable deployment URLs such as:
+#   https://aifacilitator-13jfnapva-tipingouin17s-projects.vercel.app
+VERCEL_PREVIEW_ORIGIN_REGEX = r"https://aifacilitator(?:-git-[a-z0-9-]+)?-[a-z0-9]+-tipingouin17s-projects\.vercel\.app"
 
 # ============================================================
 # Database configuration
@@ -911,6 +917,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_CORS_ORIGINS,
+    allow_origin_regex=VERCEL_PREVIEW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=[

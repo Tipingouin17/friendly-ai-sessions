@@ -17,6 +17,8 @@ interface MessagingAreaProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  onTriggerFacilitatorResponse?: (hostInstruction?: string) => Promise<void> | void;
+  isGeneratingResponse?: boolean;
   participants: ParticipantInfo[];
   conversationId: number | null;
   currentParticipantCount: number;
@@ -50,6 +52,8 @@ const MessagingArea = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  onTriggerFacilitatorResponse,
+  isGeneratingResponse = false,
   participants,
   conversationId,
   currentParticipantCount,
@@ -110,6 +114,11 @@ const MessagingArea = ({
         setSearchTerm={setSearchTerm}
         showAnonymous={showAnonymous}
         setShowAnonymous={setShowAnonymous}
+        isWaitingForResponses={isWaitingForResponses}
+        responseCount={responseCount}
+        totalParticipants={totalParticipants}
+        onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+        isGeneratingResponse={isGeneratingResponse}
       />
     );
   }

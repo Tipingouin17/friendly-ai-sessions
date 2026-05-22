@@ -24,6 +24,10 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // This legacy codebase still has many Supabase/API boundary values typed as `any`.
+      // Keep surfacing them during development, but do not fail the entire lint run
+      // until those boundaries are migrated incrementally to shared domain types.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   }
 );

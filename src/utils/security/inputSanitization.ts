@@ -26,7 +26,7 @@ export const sanitizeNavigationPath = (path: string): string => {
     .replace(/\.\.\//g, ''); // Remove directory traversal
   
   // Validate against whitelist of allowed characters
-  if (!/^[a-zA-Z0-9\/_\-\.\?=&]+$/.test(sanitized)) {
+  if (!/^[a-zA-Z0-9/_?=&.-]+$/.test(sanitized)) {
     return '/';
   }
   

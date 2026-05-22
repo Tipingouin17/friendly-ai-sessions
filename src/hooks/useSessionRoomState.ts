@@ -10,6 +10,7 @@ import { ConversationWithSession } from "@/types/database";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
+import { useSessionClosure } from "@/hooks/useSessionClosure";
 
 interface UseSessionRoomStateProps {
   conversationId: number | null;
@@ -31,7 +32,7 @@ export const useSessionRoomState = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const { isClosing: isGeneratingReport, closeSessionAndGenerateReport } = useSessionClosure();
   
   // Get anonymous state
   const anonymousState = useAnonymousState({
@@ -48,12 +49,19 @@ export const useSessionRoomState = ({
     hasAnswered,
     viewMode,
     setViewMode,
-    error: messagesError
+    error: messagesError,
+    isWaitingForResponses,
+    responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse,
+    forceFetchMessages
   } = useSessionMessages({
     conversationId,
     currentUserParticipantId,
     isAdmin,
-    welcomeMessage
+    welcomeMessage,
+    conversation,
+    totalParticipants: participants.length || conversation?.current_participants || 1
   });
   
   // Sync messages from session messages
@@ -63,19 +71,13 @@ export const useSessionRoomState = ({
     }
   }, [sessionMessages]);
   
-  // Handle report generation
+  // Handle report generation through the same validated close-and-report workflow
+  // used by the dedicated host controls. This avoids the previous fake spinner path
+  // and ensures ownership validation, report persistence, cache invalidation, and
+  // post-completion navigation all stay consistent across entry points.
   const handleGenerateReport = async () => {
     if (!conversationId) return;
-    
-    setIsGeneratingReport(true);
-    try {
-      // Placeholder for report generation logic
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setIsGeneratingReport(false);
-    }
+    await closeSessionAndGenerateReport(conversationId);
   };
   
   // Create a type-safe default view mode
@@ -136,6 +138,12 @@ export const useSessionRoomState = ({
     viewMode: sessionState.viewMode, // Use the properly typed viewMode from sessionState
     setViewMode,
     isWaitingForResponse,
+    isWaitingForResponses,
+    responseCount,
+    totalParticipants: participants.length || conversation?.current_participants || 1,
+    generateAggregatedResponse,
+    isGeneratingResponse,
+    forceFetchMessages,
     handleSendMessage,
     anonymousState,
     error

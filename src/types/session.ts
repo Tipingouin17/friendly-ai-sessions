@@ -23,6 +23,12 @@ export interface SessionContextProps {
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     hasAnswered: boolean;
     totalResponses: number;
+    isWaitingForResponses?: boolean;
+    responseCount?: number;
+    totalParticipants?: number;
+    generateAggregatedResponse?: (hostInstruction?: string) => Promise<void>;
+    isGeneratingResponse?: boolean;
+    forceFetchMessages?: () => void;
     viewMode: "participant" | "admin";
     setViewMode: (mode: "participant" | "admin") => void;
     recordResponse: (participantId: number, hasResponded: boolean) => void;

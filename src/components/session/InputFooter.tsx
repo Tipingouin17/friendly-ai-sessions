@@ -13,7 +13,7 @@ import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { Users, Lock } from "lucide-react";
+import { Mic, PenLine, Users, Lock } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import ParticipantEngagementControls from './ParticipantEngagementControls';
@@ -104,6 +104,9 @@ const InputFooter = ({
   const shouldAllowAnswer = (lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered)
     && !engagement.isPaused
     && !engagement.isSkipped;
+  const inputGuidance = shouldAllowAnswer
+    ? "Share your perspective now. You can type, dictate with the microphone, or skip if this question is not relevant."
+    : "Your input is temporarily locked while the facilitator gathers the group or prepares the next question. Your typed draft will stay here.";
 
   // Count how many questions this participant has sent
   const participantKey = String(effectiveParticipantId);
@@ -161,7 +164,17 @@ const InputFooter = ({
 
             {/* Chat input — hidden when paused or skipped */}
             {!engagement.isPaused && !engagement.isSkipped && (
-              <ChatInput
+              <>
+                <div className="border-t border-slate-100 bg-slate-50/80 px-3 py-2 sm:px-4">
+                  <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                    <div className="mt-0.5 flex shrink-0 items-center gap-1 text-indigo-600">
+                      <PenLine className="h-3.5 w-3.5" />
+                      <Mic className="h-3.5 w-3.5" />
+                    </div>
+                    <span>{inputGuidance}</span>
+                  </div>
+                </div>
+                <ChatInput
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 onSendMessage={onSendMessage}
@@ -170,8 +183,9 @@ const InputFooter = ({
                 placeholder="Type your response…"
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
-                speechLanguage={speechLanguage}
-              />
+                  speechLanguage={speechLanguage}
+                />
+              </>
             )}
           </>
         ) : (

@@ -119,11 +119,12 @@ const MessageBubble = ({
               <button
                 type="button"
                 onClick={togglePlayback}
-                className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                aria-label={isSpeaking ? "Stop facilitator message playback" : "Listen to facilitator message"}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                aria-label={isSpeaking ? "Stop facilitator read-aloud" : "Read facilitator message aloud"}
+                title={isSpeaking ? "Stop read-aloud" : "Read this facilitator message aloud"}
               >
                 {isSpeaking ? <Square className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                <span className="hidden sm:inline">{isSpeaking ? 'Stop' : 'Listen'}</span>
+                <span>{isSpeaking ? 'Stop audio' : 'Read aloud'}</span>
               </button>
             )}
           </div>
@@ -131,6 +132,11 @@ const MessageBubble = ({
         <div className="px-4 py-3 text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
           {content}
         </div>
+        {isFirstMessageOfGroup && canSpeak && (
+          <div className="px-4 pb-3 text-[11px] text-slate-400">
+            Prefer listening? Use <span className="font-medium text-slate-500">Read aloud</span> above.
+          </div>
+        )}
         <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-violet-400 to-transparent" />
       </div>
     );

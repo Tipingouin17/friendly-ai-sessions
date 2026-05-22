@@ -22,7 +22,7 @@ import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Users, Home, Sparkles } from 'lucide-react';
+import { Headphones, Home, Mic, PenLine, Sparkles, Users, VideoOff } from 'lucide-react';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -92,8 +92,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   });
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
+  const sessionObjective = conversationData?.sessions?.objective || conversationData?.objective || 'Share perspectives, clarify the problem, and move toward useful next steps together.';
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
+  const facilitatorName = conversationData?.sessions?.facilitator_details?.name || facilitatorTitle || 'AI facilitator';
   const speechLanguage = conversationData?.language || conversationData?.sessions?.language || null;
+  const visibleParticipants = participants.slice(0, 6);
+  const remainingParticipantCount = Math.max(0, currentParticipantCount - visibleParticipants.length);
+  const showOrientationCard = !isSessionEnded && filteredMessages.length <= 2;
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -121,6 +126,77 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           </span>
         </div>
       </div>
+
+      {showOrientationCard && (
+        <div className="shrink-0 border-b border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-4 py-3">
+          <div className="mx-auto grid max-w-5xl gap-3 lg:grid-cols-[1.4fr_1fr]">
+            <div className="rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-indigo-600">
+                <Sparkles className="h-3.5 w-3.5" />
+                Workshop orientation
+              </div>
+              <h2 className="text-sm font-semibold text-slate-900">{sessionTitle}</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{sessionObjective}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                  <Headphones className="mb-1 h-4 w-4 text-indigo-500" />
+                  Listen to facilitator messages with the read-aloud control.
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                  <PenLine className="mb-1 h-4 w-4 text-indigo-500" />
+                  Type your answer when the input is available.
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                  <Mic className="mb-1 h-4 w-4 text-indigo-500" />
+                  Use voice input where your browser supports speech recognition.
+                </div>
+              </div>
+              <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                This is a structured AI-facilitated workshop, not a video call. The facilitator may wait for the group before moving on and will first explore the problem before pushing toward ideal solutions.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Live workshop room</p>
+                  <p className="text-sm font-medium text-slate-900">Facilitated by {facilitatorName}</p>
+                </div>
+                <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                  <Users className="h-3.5 w-3.5" />
+                  {currentParticipantCount}/{maxParticipants}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {visibleParticipants.length > 0 ? visibleParticipants.map((participant) => (
+                  <div key={participant.id} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                      {(participant.name || `P${participant.id}`).slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-slate-800">{participant.name || `Participant ${participant.id}`}</p>
+                      <p className="text-[11px] text-slate-500">In the room</p>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded-2xl bg-slate-50 px-3 py-3 text-xs text-slate-500">Participants will appear here as they join.</div>
+                )}
+                {remainingParticipantCount > 0 && (
+                  <div className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                    +{remainingParticipantCount} more participant{remainingParticipantCount === 1 ? '' : 's'} in the room
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <VideoOff className="h-4 w-4 text-slate-400" />
+                No camera is needed here; the shared context comes from participant responses.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Message list (flex-1 = fills all remaining space, scrolls) ─── */}
       <div className="flex-1 min-h-0">

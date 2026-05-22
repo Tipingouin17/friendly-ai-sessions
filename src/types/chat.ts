@@ -44,6 +44,7 @@ export interface SpeechRecognition extends EventTarget {
   stop(): void;
   onresult: (event: SpeechRecognitionEvent) => void;
   onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: (() => void) | null;
 }
 
 export interface SpeechRecognitionEvent {

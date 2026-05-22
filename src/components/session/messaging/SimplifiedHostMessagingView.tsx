@@ -303,7 +303,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600" />
                           Generating…
                         </span>
-                      ) : 'Continue without waiting'}
+                      ) : 'Ask AI to continue now'}
                     </Button>
                   )}
                 </div>
@@ -337,7 +337,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       <p className={`text-sm font-semibold ${isInstructionExpanded ? 'text-indigo-900' : 'text-slate-800'}`}>
                         Steer the AI Facilitator
                       </p>
-                      <p className="text-xs text-slate-500">Participants won't see your instruction</p>
+                      <p className="text-xs text-slate-500">Use this to recover from a stalled moment or guide the next facilitator response. Participants will not see your instruction.</p>
                     </div>
                   </div>
                   {isInstructionExpanded
@@ -375,8 +375,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-indigo-600">
                         {hostInstruction.trim()
-                          ? 'AI will use your instruction for its next response'
-                          : 'Select a preset or write a custom instruction above'}
+                          ? 'The AI will use your instruction for its next response.'
+                          : 'Select a preset or write a custom instruction above, then ask the AI to respond.'}
                       </span>
                       <Button
                         onClick={handleSendWithInstruction}

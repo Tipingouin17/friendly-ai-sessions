@@ -158,9 +158,9 @@ export const SessionProviderErrorFallback = ({
 
   // Persistent failure (circuit breaker open or too many retries): error phase
   const persistentErrorMessage = isCircuitBreakerOpen
-    ? "Multiple connection attempts failed. Please wait a moment before trying again."
+    ? "We could not reconnect after several attempts. Please wait a moment, then retry. If it still does not work, ask the host to share the session link again."
     : isConnectionLostError
-    ? "Lost connection to the session. This might be temporary."
+    ? "The connection to the session was interrupted. Please retry; you will rejoin the same session when the connection is restored."
     : errorMessage;
 
   return (

@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { BadgeCheck, Mail } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 
 const VerifyEmailSent: React.FC = () => {
@@ -38,13 +38,25 @@ const VerifyEmailSent: React.FC = () => {
           <strong>24&nbsp;hours</strong>.
         </p>
 
-        <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700 text-left mb-8 space-y-1">
+        <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700 text-left mb-6 space-y-1">
           <p className="font-semibold mb-1">Didn't receive the email?</p>
           <ul className="list-disc list-inside space-y-1 text-indigo-600">
             <li>Check your spam or junk folder</li>
             <li>Make sure you entered the correct email address</li>
             <li>Wait a few minutes and refresh your inbox</li>
           </ul>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-800 text-left mb-8">
+          <div className="flex items-start gap-2">
+            <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <div>
+              <p className="font-semibold">Next step for your 3-month tester trial</p>
+              <p className="mt-1 text-emerald-700">
+                After verifying your email, contact Julia with <strong>{email}</strong>. She will manually upgrade your AIfacilitator access for free.
+              </p>
+            </div>
+          </div>
         </div>
 
         <Link

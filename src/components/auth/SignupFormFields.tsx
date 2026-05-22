@@ -177,9 +177,12 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
             Creating account...
           </>
         ) : (
-          'Sign up'
+          'Create account & request trial'
         )}
       </Button>
+      <p className="text-center text-xs text-gray-500">
+        After registration, contact Julia with this email address so your 3-month tester access can be activated manually.
+      </p>
     </div>
   );
 };

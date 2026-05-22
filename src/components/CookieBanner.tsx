@@ -118,12 +118,12 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
       role="dialog"
       aria-modal="true"
       aria-label="Cookie consent"
-      className="fixed bottom-0 left-0 right-0 z-[9999] p-4 sm:p-6 pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-[9999] p-3 sm:p-4 pointer-events-none"
     >
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-100 pointer-events-auto overflow-hidden">
+      <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-100 pointer-events-auto overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
+        <div className="flex items-start justify-between gap-4 px-4 pt-4 pb-2">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-indigo-50 rounded-lg">
               <Shield size={16} className="text-indigo-600" />
@@ -140,10 +140,9 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
         </div>
 
         {/* Body */}
-        <div className="px-5 pb-4">
+        <div className="px-4 pb-3">
           <p className="text-xs text-gray-600 leading-relaxed">
-            We use strictly necessary cookies to operate the service and, with your consent, optional cookies for analytics and advertising.
-            You can accept all, reject all, or manage your preferences below.
+            We use essential cookies to run the service. Optional analytics and advertising cookies help us improve AIfacilitator and measure campaigns.
             See our{" "}
             <Link to="/privacy" className="text-indigo-600 hover:underline" onClick={close}>
               Privacy Policy
@@ -205,7 +204,7 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
         </div>
 
         {/* Footer buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 px-5 pb-5">
+        <div className="flex flex-col sm:flex-row gap-2 px-4 pb-4">
           {showDetails ? (
             <>
               <Button

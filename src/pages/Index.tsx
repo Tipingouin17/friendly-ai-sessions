@@ -15,7 +15,7 @@ import { trackCtaClick, trackLeadIntent } from '@/lib/tracking';
 import {
     Users, MessageSquare, BarChart3, Sparkles, ArrowRight,
     Clock, TrendingUp, Globe, Settings, CheckCircle2,
-    Zap, Shield, Star,
+    Zap, Shield, Star, Gift, BadgeCheck,
 } from 'lucide-react';
 
 const SCHEMA_FAQ_HOME = {
@@ -133,7 +133,7 @@ const Index = () => {
 
     /** Primary CTA destination — logged-in users go straight to their facilitators. */
     const primaryCtaHref = isAuthenticated ? '/my-facilitators' : '/signup';
-    const primaryCtaLabel = isAuthenticated ? 'Go to My Facilitators' : 'Get Started Free';
+    const primaryCtaLabel = isAuthenticated ? 'Go to My Facilitators' : 'Claim 3-Month Free Trial';
 
     const handlePrimaryCta = (location: string) => {
         trackCtaClick('home_primary_cta', primaryCtaHref, location);
@@ -168,21 +168,21 @@ const Index = () => {
                     {/* Badge */}
                     <span className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold tracking-wide border border-indigo-200">
                         <Zap className="h-3.5 w-3.5" />
-                        AI-Powered Facilitation Platform
+                        Tester-only launch offer: 3 months free
                     </span>
 
                     {/* Headline */}
                     <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-[1.1] tracking-tight text-center">
-                        <span className="text-gray-900">Run Better</span>
+                        <span className="text-gray-900">Automate Workshop</span>
                         <br />
                         <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent">
-                            Workshops with AI
+                            Documentation with AI
                         </span>
                     </h1>
 
                     {/* Subheadline */}
                     <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center px-2">
-                        Turn workshop chaos into structured decisions, team alignment, and clear next actions with expert AI facilitators that guide every session in real time.
+                        Capture decisions, action items, and team alignment in real time so innovation leads, agile coaches, and product managers can facilitate instead of taking notes.
                     </p>
 
                     {/* CTAs */}
@@ -209,7 +209,29 @@ const Index = () => {
 
                     {/* Trust signals — only shown to anonymous visitors */}
                     {!isAuthenticated && (
-                        <p className="text-sm text-gray-400 mb-8">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Cancel anytime</p>
+                        <div className="mb-8 mx-auto max-w-3xl rounded-2xl border border-indigo-100 bg-white/90 p-4 text-left shadow-sm backdrop-blur">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 rounded-xl bg-indigo-100 p-2 text-indigo-600">
+                                        <Gift className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">Exclusive tester access: 3 months free</p>
+                                        <p className="mt-1 text-sm text-gray-500">
+                                            Register now, then contact Julia with your account email and we will activate your extended free trial manually.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="grid gap-1 text-xs font-medium text-gray-500 sm:min-w-44">
+                                    {['No credit card required', 'Tester-only activation', 'Built for live workshops'].map(item => (
+                                        <span key={item} className="flex items-center gap-1.5">
+                                            <BadgeCheck className="h-3.5 w-3.5 text-indigo-500" />
+                                            {item}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* Social proof stats — 2×2 on mobile, 4-column on sm+ */}
@@ -341,7 +363,7 @@ const Index = () => {
                     <p className="text-base md:text-lg text-indigo-200 mb-10 max-w-xl mx-auto text-center px-2">
                         {isAuthenticated
                             ? 'Head to your facilitators and kick off a session in seconds.'
-                            : 'Join thousands of teams already running more effective, engaging sessions with AIfacilitator.'}
+                            : 'Register today, contact Julia after sign-up, and get your tester-only 3-month AIfacilitator trial activated for free.'}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 px-4 sm:px-0">
                         <Link to={primaryCtaHref} className="w-full sm:w-auto" onClick={() => handlePrimaryCta('home_bottom_cta')}>
@@ -366,7 +388,7 @@ const Index = () => {
                     </div>
                     {!isAuthenticated && (
                         <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm text-indigo-200">
-                            {['Free plan available', 'No credit card required', 'Cancel anytime'].map(item => (
+                            {['3 months free for testers', 'No credit card required', 'Manual activation after registration'].map(item => (
                                 <span key={item} className="flex items-center gap-1.5">
                                     <CheckCircle2 className="h-4 w-4 text-indigo-300" />
                                     {item}

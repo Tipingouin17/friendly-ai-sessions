@@ -64,7 +64,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     isWaitingForMessage,
     messageReady,
     timeoutReached,
-    waitForWelcomeMessage
+    waitForWelcomeMessage,
+    forceGenerateWelcomeMessage
   } = useWelcomeMessageGate({
     conversationId: props.currentConversationId,
     isAdmin,
@@ -263,7 +264,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         currentParticipantCount={props.conversation?.current_participants || 0}
         maxParticipants={props.conversation?.participants || 0}
-        onRetryGeneration={timeoutReached ? waitForWelcomeMessage : undefined}
+        onRetryGeneration={timeoutReached ? forceGenerateWelcomeMessage : undefined}
       />
     );
   }

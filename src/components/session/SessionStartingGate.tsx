@@ -27,6 +27,7 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
   timeoutReached,
   currentParticipantCount,
   maxParticipants,
+  onForceGeneration,
 }) => {
   const [retryCount, setRetryCount] = useState(0);
 
@@ -43,6 +44,11 @@ const SessionStartingGate: React.FC<SessionStartingGateProps> = ({
   const handleRetryGeneration = async () => {
     setRetryCount(prev => prev + 1);
     try {
+      if (onForceGeneration) {
+        await onForceGeneration();
+        return;
+      }
+
       await api.functions.invoke('handle-facilitator-response', {
         body: {
           messages: [],

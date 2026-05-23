@@ -160,11 +160,6 @@ const ChatInput = ({
 
   return (
     <div className="px-3 py-3 sm:px-4 sm:py-3.5 bg-white border-t border-slate-200">
-      <div className="mb-2 flex flex-col gap-1 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-xs text-indigo-800 sm:flex-row sm:items-center sm:justify-between">
-        <span className="font-medium">Speak first when possible: tap the microphone, answer naturally, then review the transcript before sending.</span>
-        <span className="text-indigo-600">Typing is still available; when the box is locked, the AI moderator is gathering the group or preparing the next prompt.</span>
-      </div>
-
       <div className="flex items-end gap-2">
         {/* Textarea */}
         <div className="flex-1 relative">

@@ -5,7 +5,6 @@
  */
 
 import { useRef, useEffect } from 'react';
-import { useToast } from "@/components/ui/use-toast";
 
 interface UseSessionProviderInitializationProps {
   onInitialized: () => void;
@@ -25,8 +24,6 @@ export const useSessionProviderInitialization = ({
   const initializeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializationAttempted = useRef(false);
   const forcedInitialization = useRef(false);
-  const { toast } = useToast();
-
   useEffect(() => {
     if (initializationAttempted.current) return;
     initializationAttempted.current = true;
@@ -40,13 +37,7 @@ export const useSessionProviderInitialization = ({
       forcedInitialization.current = true;
       onInitialized();
       
-      // Only show toast for non-admin participants with significant delays
-      if (!(isAdmin || forceAdmin) && Date.now() - performance.now() > 4000) {
-        toast({
-          title: "Session initialization taking longer than expected",
-          description: "We're still trying to connect to the session."
-        });
-      }
+      // Participant loading feedback stays inline in SessionConnecting; avoid stacking toast cards over the room.
     }, initialTimeout);
     
     // Shorter critical timeout for participants
@@ -59,14 +50,7 @@ export const useSessionProviderInitialization = ({
       onInitialized();
       onLoading(false); // Force loading state to false
       
-      // Only show toast for non-admin participants with significant delays
-      if (!(isAdmin || forceAdmin) && Date.now() - performance.now() > 5000) {
-        toast({
-          title: "Session initialization taking longer than expected",
-          description: "Please wait a moment while we complete setup.",
-          variant: "destructive"
-        });
-      }
+      // Participant loading feedback stays inline in SessionConnecting; avoid stacking toast cards over the room.
     }, criticalTimeout);
     
     return () => {
@@ -76,7 +60,7 @@ export const useSessionProviderInitialization = ({
       }
       clearTimeout(criticalTimeoutId);
     };
-  }, [onInitialized, sessionMountedRef, toast, onLoading, isAdmin, forceAdmin]);
+  }, [onInitialized, sessionMountedRef, onLoading, isAdmin, forceAdmin]);
 
   return {
     initializeTimeoutRef,

@@ -132,11 +132,6 @@ const MessageBubble = ({
         <div className="px-4 py-3 text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
           {content}
         </div>
-        {isFirstMessageOfGroup && canSpeak && (
-          <div className="px-4 pb-3 text-[11px] text-slate-400">
-            Prefer listening? Use <span className="font-medium text-slate-500">Read aloud</span> above.
-          </div>
-        )}
         <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-violet-400 to-transparent" />
       </div>
     );

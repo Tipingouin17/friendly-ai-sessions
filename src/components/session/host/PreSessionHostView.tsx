@@ -162,11 +162,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="text-center lg:text-left">
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  Once participants have joined, click "Start Session" to begin the voice-first AI-moderated workshop.
+                  Share the room link, wait for participants, then start the AI-moderated workshop.
                   {stableParticipantCount === 0 && " You need at least one participant to start."}
                 </p>
                 <p className="mt-2 text-xs md:text-sm text-indigo-700">
-                  If your group wants to see each other, keep a Teams, Zoom, or Meet call open alongside this room. AIfacilitator provides the structured prompts, read-aloud moderator voice, and response capture.
+                  AIfacilitator runs the prompts and response capture; keep your usual video call open only if the group needs face-to-face presence.
                 </p>
                 
               </div>
@@ -180,38 +180,20 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
         </Card>
 
 
-        <Card className="mb-4 overflow-hidden border-slate-200 bg-slate-950 text-white shadow-lg md:mb-6">
-          <CardContent className="p-4 md:p-6">
-            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <Card className="mb-4 border-indigo-100 bg-white/90 shadow-sm md:mb-6">
+          <CardContent className="flex flex-col gap-3 p-4 text-sm text-slate-700 md:flex-row md:items-center md:justify-between md:p-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-indigo-50 p-2 text-indigo-600">
+                <MonitorPlay className="h-4 w-4" />
+              </div>
               <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
-                  <MonitorPlay className="h-3.5 w-3.5" />
-                  P2 media-room setup preview
-                </div>
-                <h3 className="text-lg font-semibold md:text-xl">Prepare an in-app audio/video workshop room</h3>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-                  This development interface previews the next room model: participant camera tiles, spoken turns, AI moderator audio, live captions, and a reliable text fallback. Real media provider connection will follow after UX validation.
+                <p className="font-semibold text-slate-900">Audio/video preview is not connected yet</p>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 md:text-sm">
+                  This room currently runs through structured prompts, read-aloud audio, speech input where supported, and text fallback. Camera tiles are a product preview only.
                 </p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white/10 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold"><Mic className="h-4 w-4 text-emerald-200" /> Spoken participation</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">Participants understand that voice is the primary mode and typing stays available.</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold"><Camera className="h-4 w-4 text-sky-200" /> Camera presence</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">The room layout is ready for embedded video tiles once infrastructure is connected.</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold"><Captions className="h-4 w-4 text-violet-200" /> Live captions</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">Caption and transcript areas are visible before real-time speech streaming is attached.</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-amber-200" /> Privacy posture</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-300">Permissions should be explicit, reversible, and never requested before participant intent.</p>
-                </div>
-              </div>
             </div>
+            <Badge variant="secondary" className="w-fit bg-slate-100 text-slate-600">Preview only</Badge>
           </CardContent>
         </Card>
 
@@ -249,21 +231,10 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               </div>
 
               <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 md:p-4">
-                <h4 className="mb-2 text-sm font-semibold text-indigo-900">How to run this live</h4>
-                <div className="grid gap-2 text-xs leading-relaxed text-indigo-800">
-                  <div className="flex gap-2">
-                    <Mic className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    Ask participants to answer with the microphone where supported; typing remains the fallback.
-                  </div>
-                  <div className="flex gap-2">
-                    <Headphones className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    Encourage Read aloud on facilitator messages so the AI feels like a spoken moderator.
-                  </div>
-                  <div className="flex gap-2">
-                    <Video className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    Use your normal video meeting for cameras while this room structures the workshop.
-                  </div>
-                </div>
+                <h4 className="mb-1 text-sm font-semibold text-indigo-900">Run it simply</h4>
+                <p className="text-xs leading-relaxed text-indigo-800">
+                  Let participants listen with Read aloud, answer by voice where supported, or type when they prefer. Use an external video call only when faces are needed.
+                </p>
               </div>
 
               {/* Participant Status */}

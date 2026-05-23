@@ -85,12 +85,9 @@ export function useSessionPageState() {
       return;
     }
 
+    // Room readiness is visible in the page header/status; avoid adding a floating toast that competes with the workshop prompt.
     stateRef.current.hasShownSessionFullToast = true;
-    toast({
-      title: "Workshop room is ready",
-      description: "The expected participants have joined. The AI moderator will begin when the host starts the workshop.",
-    });
-  }, [toast]);
+  }, []);
   
   // Retry connection handler
   const retryConnection = useCallback(() => {

@@ -272,111 +272,48 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
               </div>
 
 
-              {/* P2 Audio/Video Control Center */}
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
-                <div className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 p-4 text-white">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              {/* P2 Audio/Video Preview Note */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-slate-100 p-2 text-slate-500">
+                      <MonitorPlay className="h-4 w-4" />
+                    </div>
                     <div>
-                      <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
-                        <Radio className="h-3.5 w-3.5" />
-                        P2 media shell preview
+                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Preview only
                       </div>
-                      <h3 className="text-base font-semibold">Audio/video readiness preview</h3>
-                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
-                        Review the proposed in-app camera-room layout, spoken-turn cues, captions, AI moderator audio states, and privacy posture while the current text facilitator workflow remains the live workshop channel.
+                      <h3 className="mt-2 text-sm font-semibold text-slate-900">Future audio/video room</h3>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                        Camera tiles and moderator audio are represented as a design preview. The live workshop still runs through facilitator messages, read-aloud, speech input where supported, and text responses.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setHostMicArmed((value) => !value)}
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostMicArmed ? 'bg-emerald-400 text-emerald-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
-                      >
-                        <Mic className="h-3.5 w-3.5" />
-                        {hostMicArmed ? 'Mic state previewed' : 'Preview mic state'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHostCameraPreview((value) => !value)}
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostCameraPreview ? 'bg-sky-300 text-sky-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
-                      >
-                        {hostCameraPreview ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
-                        {hostCameraPreview ? 'Camera state previewed' : 'Preview camera state'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCaptionsVisible((value) => !value)}
-                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
-                      >
-                        <Captions className="h-3.5 w-3.5" />
-                        Captions {captionsVisible ? 'visible' : 'hidden'}
-                      </button>
-                    </div>
                   </div>
-                </div>
-
-                <div className="grid gap-0 lg:grid-cols-[1.4fr_0.6fr]">
-                  <div className="p-4">
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      <div className="relative min-h-[150px] overflow-hidden rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-500/25 to-indigo-500/20 p-4 text-white">
-                        <div className="absolute right-3 top-3 flex gap-1.5">
-                          <span className="rounded-full bg-emerald-400 p-1.5 text-emerald-950"><Mic className="h-3 w-3" /></span>
-                          <span className="rounded-full bg-violet-300 p-1.5 text-violet-950"><Volume2 className="h-3 w-3" /></span>
-                        </div>
-                        <div className="flex h-full flex-col justify-between gap-6">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/10">
-                            <Sparkles className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">AI moderator</p>
-                            <p className="text-xs text-slate-300">Planned spoken prompt and caption anchor</p>
-                            <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Preview: ready to guide next turn</p>
-                          </div>
-                        </div>
-                      </div>
-                      {visibleMediaParticipants.map((participant) => (
-                        <div key={participant.id} className="relative min-h-[150px] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 p-4 text-white">
-                          <div className="absolute right-3 top-3 flex gap-1.5">
-                            <span className="rounded-full bg-slate-800 p-1.5 text-slate-400"><Mic className="h-3 w-3" /></span>
-                            <span className="rounded-full bg-slate-800 p-1.5 text-slate-400"><CameraOff className="h-3 w-3" /></span>
-                          </div>
-                          <div className="flex h-full flex-col justify-between gap-6">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold ring-1 ring-white/10">
-                              {(participant.name || `P${participant.id}`).slice(0, 1).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold">{participant.name || `Participant ${participant.id}`}</p>
-                              <p className="text-xs text-slate-300">Planned participant media tile</p>
-                              <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Preview: listening or preparing response</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {hiddenMediaParticipantCount > 0 && (
-                      <p className="mt-3 text-xs text-slate-400">+{hiddenMediaParticipantCount} more participant{hiddenMediaParticipantCount === 1 ? '' : 's'} would continue in the media grid.</p>
-                    )}
-                  </div>
-
-                  <div className="border-t border-white/10 bg-white/[0.04] p-4 lg:border-l lg:border-t-0">
-                    <div className="space-y-3">
-                      <div className="rounded-2xl bg-white/10 p-3 text-white">
-                        <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-emerald-200" /> Permission posture</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-300">Device access will be opt-in, visible, and reversible. Text response fallback remains available for accessibility and reliability.</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/10 p-3 text-white">
-                        <div className="flex items-center gap-2 text-sm font-semibold"><Video className="h-4 w-4 text-sky-200" /> Room readiness</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-300">Live media transport, token minting, and server-side recording policy are intentionally not connected in this preview shell.</p>
-                      </div>
-                      <div className="rounded-2xl bg-slate-900/80 p-3 text-white">
-                        <div className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-violet-200" /> Moderator transcript</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-300">
-                          {captionsVisible
-                            ? 'Preview placeholder: captions and speaker turns will stream here once the media backend is connected.'
-                            : 'Caption rail hidden for this host preview state.'}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setHostMicArmed((value) => !value)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostMicArmed ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      <Mic className="h-3.5 w-3.5" />
+                      {hostMicArmed ? 'Mic preview on' : 'Mic preview'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHostCameraPreview((value) => !value)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostCameraPreview ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      {hostCameraPreview ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+                      {hostCameraPreview ? 'Camera preview on' : 'Camera preview'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaptionsVisible((value) => !value)}
+                      className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-200"
+                    >
+                      <Captions className="h-3.5 w-3.5" />
+                      Captions {captionsVisible ? 'shown' : 'hidden'}
+                    </button>
                   </div>
                 </div>
               </div>

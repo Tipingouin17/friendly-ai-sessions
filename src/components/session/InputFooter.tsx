@@ -105,8 +105,8 @@ const InputFooter = ({
     && !engagement.isPaused
     && !engagement.isSkipped;
   const inputGuidance = shouldAllowAnswer
-    ? "Share your perspective now. For the live-workshop feel, speak with the microphone where supported; typing remains available as a fallback."
-    : "Your input is temporarily locked while the facilitator gathers the group or prepares the next question. Your typed draft will stay here.";
+    ? "Your turn: speak or type a short response."
+    : "Waiting for the facilitator’s next prompt. Your draft stays here.";
 
   // Count how many questions this participant has sent
   const participantKey = String(effectiveParticipantId);

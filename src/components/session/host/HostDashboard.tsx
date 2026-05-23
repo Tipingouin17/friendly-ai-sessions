@@ -12,6 +12,7 @@ import { EngagementStatsPanel } from "./EngagementStatsPanel";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
+import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 
 interface HostDashboardProps {
   conversation: ConversationWithSession | null;
@@ -32,6 +33,14 @@ interface HostDashboardProps {
   enabledTools?: FacilitatorToolAssignment[];
   isLoadingToolbox?: boolean;
   toolboxError?: string | null;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onEndMode?: (reason?: string) => Promise<void>;
+  onRejectMode?: (reason?: string) => Promise<void>;
   
   // Session start props
   isSessionStarted?: boolean;
@@ -63,6 +72,14 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   enabledTools = [],
   isLoadingToolbox = false,
   toolboxError = null,
+  enabledModes = [],
+  activeMode = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  onStartMode,
+  onEndMode,
+  onRejectMode,
   isSessionStarted = false,
   onSessionStarted,
   isAutoStarting = false,
@@ -108,6 +125,14 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         enabledTools={enabledTools}
         isLoadingToolbox={isLoadingToolbox}
         toolboxError={toolboxError}
+        enabledModes={enabledModes}
+        activeMode={activeMode}
+        recentModeEvents={recentModeEvents}
+        isLoadingModes={isLoadingModes}
+        modeError={modeError}
+        onStartMode={onStartMode}
+        onEndMode={onEndMode}
+        onRejectMode={onRejectMode}
         isSessionStarted={isSessionStarted}
         onSessionStarted={onSessionStarted}
         isAutoStarting={isAutoStarting}

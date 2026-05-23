@@ -11,6 +11,7 @@ import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
 import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
+import { useFacilitationModeOrchestrator } from "@/hooks/useFacilitationModeOrchestrator";
 
 interface UseSessionRoomStateProps {
   conversationId: number | null;
@@ -34,6 +35,10 @@ export const useSessionRoomState = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const toolbox = useFacilitatorToolbox(conversation);
+  const modeOrchestrator = useFacilitationModeOrchestrator(conversation, {
+    conversationId,
+    participantId: currentUserParticipantId,
+  });
   
   // Get anonymous state
   const anonymousState = useAnonymousState({
@@ -144,6 +149,16 @@ export const useSessionRoomState = ({
     enabledTools: toolbox.enabledTools,
     isLoadingToolbox: toolbox.isLoadingToolbox,
     toolboxError: toolbox.toolboxError,
-    toolboxInstruction: toolbox.toolboxInstruction
+    toolboxInstruction: toolbox.toolboxInstruction,
+    enabledModes: modeOrchestrator.enabledModes,
+    activeMode: modeOrchestrator.activeMode,
+    participantModeState: modeOrchestrator.participantModeState,
+    isLoadingModes: modeOrchestrator.isLoadingModes,
+    modeError: modeOrchestrator.modeError,
+    modeInstruction: modeOrchestrator.modeInstruction,
+    startMode: modeOrchestrator.startMode,
+    endMode: modeOrchestrator.endMode,
+    rejectMode: modeOrchestrator.rejectMode,
+    submitModeInput: modeOrchestrator.submitInput
   };
 };

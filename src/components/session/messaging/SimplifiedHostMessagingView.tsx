@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Message, ParticipantInfo } from '@/types/chat';
+import type { ConversationWithSession } from '@/types/database';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
+import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Users, Wand2, SendHorizonal,
@@ -24,7 +26,7 @@ interface SimplifiedHostMessagingViewProps {
   messages: Message[];
   participantColors: { [key: string]: string };
   currentParticipantCount: number;
-  conversationData: any;
+  conversationData: ConversationWithSession | null;
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
@@ -41,6 +43,14 @@ interface SimplifiedHostMessagingViewProps {
   enabledTools?: FacilitatorToolAssignment[];
   isLoadingToolbox?: boolean;
   toolboxError?: string | null;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onEndMode?: (reason?: string) => Promise<void>;
+  onRejectMode?: (reason?: string) => Promise<void>;
 }
 
 const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = ({
@@ -64,10 +74,21 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   enabledTools = [],
   isLoadingToolbox = false,
   toolboxError = null,
+  enabledModes = [],
+  activeMode = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  onStartMode,
+  onEndMode,
+  onRejectMode,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
+  const [selectedModeKey, setSelectedModeKey] = useState<string>('');
+  const [modePrompt, setModePrompt] = useState('');
+  const [isModeBusy, setIsModeBusy] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
 
@@ -135,6 +156,41 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
       await onTriggerFacilitatorResponse();
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const selectedMode = enabledModes.find((mode) => mode.mode_key === selectedModeKey) || enabledModes[0] || null;
+  const activeModeDefinition = activeMode?.facilitation_mode;
+
+  const handleStartSelectedMode = async () => {
+    if (!selectedMode || !onStartMode) return;
+    setIsModeBusy(true);
+    try {
+      await onStartMode(selectedMode, modePrompt.trim() || undefined);
+      setModePrompt('');
+      setSelectedModeKey(selectedMode.mode_key);
+    } finally {
+      setIsModeBusy(false);
+    }
+  };
+
+  const handleEndActiveMode = async () => {
+    if (!onEndMode) return;
+    setIsModeBusy(true);
+    try {
+      await onEndMode('Host ended the active facilitation mode.');
+    } finally {
+      setIsModeBusy(false);
+    }
+  };
+
+  const handleRejectActiveMode = async () => {
+    if (!onRejectMode) return;
+    setIsModeBusy(true);
+    try {
+      await onRejectMode('Host rejected the recommended facilitation mode.');
+    } finally {
+      setIsModeBusy(false);
     }
   };
 
@@ -342,6 +398,108 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 )}
                 {!isLoadingToolbox && enabledTools.length === 0 && !toolboxError && (
                   <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">No active tools are assigned to this facilitator yet.</p>
+                )}
+              </div>
+
+              {/* Facilitation Mode Orchestrator */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Facilitation modes</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Start a structured mode that changes participant input rules and gives the facilitator an explicit lifecycle.</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeMode ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {isLoadingModes ? 'Loading…' : activeMode ? activeMode.status : `${enabledModes.length} available`}
+                  </span>
+                </div>
+
+                {modeError && (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{modeError}</p>
+                )}
+
+                {recentModeEvents.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Recent mode events</p>
+                    <div className="mt-1 space-y-1">
+                      {recentModeEvents.slice(0, 3).map((event) => (
+                        <div key={event.id} className="flex items-center justify-between gap-3 text-xs text-violet-700">
+                          <span className="truncate">{event.event_type.replace(/_/g, ' ')}</span>
+                          <span className="shrink-0 text-[11px] text-violet-500">
+                            {event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeMode ? (
+                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-900">Active: {activeModeDefinition?.display_name || 'Facilitation mode'}</p>
+                        <p className="mt-1 text-xs text-emerald-700">{activeMode.prompt || activeModeDefinition?.composer_copy || 'Participants are guided by this mode until the host ends it.'}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        {(activeMode.status === 'recommended' || activeMode.status === 'pending_host_confirmation') && (
+                          <Button
+                            onClick={handleRejectActiveMode}
+                            variant="outline"
+                            size="sm"
+                            disabled={isModeBusy}
+                            className="h-8 border-emerald-300 text-xs text-emerald-800 hover:bg-white"
+                          >
+                            Reject
+                          </Button>
+                        )}
+                        <Button
+                          onClick={handleEndActiveMode}
+                          size="sm"
+                          disabled={isModeBusy}
+                          className="h-8 bg-emerald-700 text-xs text-white hover:bg-emerald-800"
+                        >
+                          End mode
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {enabledModes.map((mode) => (
+                        <button
+                          key={mode.access_id || mode.id}
+                          type="button"
+                          onClick={() => setSelectedModeKey(mode.mode_key)}
+                          className={`rounded-lg border px-3 py-2 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}
+                        >
+                          <p className="text-xs font-semibold text-slate-800">{mode.display_name}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{mode.purpose}</p>
+                        </button>
+                      ))}
+                    </div>
+                    {!isLoadingModes && enabledModes.length === 0 && !modeError && (
+                      <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">No active facilitation modes are assigned to this facilitator yet.</p>
+                    )}
+                    {enabledModes.length > 0 && (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={modePrompt}
+                          onChange={(event) => setModePrompt(event.target.value)}
+                          placeholder="Optional mode prompt for participants… e.g. 'Vote on the most important risk.'"
+                          className="min-h-[64px] resize-none text-sm"
+                        />
+                        <Button
+                          onClick={handleStartSelectedMode}
+                          size="sm"
+                          disabled={!selectedMode || !onStartMode || isModeBusy}
+                          className="h-8 bg-indigo-600 text-xs text-white hover:bg-indigo-700"
+                        >
+                          {isModeBusy ? 'Starting…' : `Start ${selectedMode?.display_name || 'mode'}`}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

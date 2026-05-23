@@ -41,6 +41,14 @@ const SessionHost = () => {
     enabledTools,
     isLoadingToolbox,
     toolboxError,
+    enabledModes,
+    activeMode,
+    recentModeEvents,
+    isLoadingModes,
+    modeError,
+    startMode,
+    endMode,
+    rejectMode,
     handleSessionStarted,
     refresh
   } = useSessionHostLogic();
@@ -88,6 +96,14 @@ const SessionHost = () => {
       enabledTools={enabledTools}
       isLoadingToolbox={isLoadingToolbox}
       toolboxError={toolboxError}
+      enabledModes={enabledModes}
+      activeMode={activeMode}
+      recentModeEvents={recentModeEvents}
+      isLoadingModes={isLoadingModes}
+      modeError={modeError}
+      onStartMode={startMode}
+      onEndMode={endMode}
+      onRejectMode={rejectMode}
       isSessionStarted={isSessionStarted}
       onSessionStarted={handleSessionStarted}
       isAutoStarting={isAutoStarting}

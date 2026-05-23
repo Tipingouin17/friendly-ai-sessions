@@ -19,6 +19,7 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
+import type { ConversationWithSession } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
@@ -26,6 +27,7 @@ import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Users, Home, Sparkles } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
+import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -40,7 +42,7 @@ interface ParticipantMessagingViewProps {
   currentParticipantCount: number;
   maxParticipants: number;
   isMobile: boolean;
-  conversationData?: any;
+  conversationData?: ConversationWithSession | null;
   inputMessage?: string;
   setInputMessage?: (message: string) => void;
   onSendMessage?: () => void;
@@ -57,6 +59,17 @@ interface ParticipantMessagingViewProps {
   facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
   enabledTools?: FacilitatorToolAssignment[];
   isLoadingToolbox?: boolean;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  participantModeState?: ModeParticipantState | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  submitModeInput?: (params: {
+    inputType: string;
+    content: Record<string, unknown>;
+    visibility?: ModeInput["visibility"];
+  }) => Promise<unknown>;
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -88,6 +101,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   facilitatorRuntime,
   enabledTools = [],
   isLoadingToolbox = false,
+  enabledModes = [],
+  activeMode = null,
+  participantModeState = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  submitModeInput,
 }) => {
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
@@ -213,6 +233,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             conversationId={conversationId}
             enabledTools={enabledTools}
             isLoadingToolbox={isLoadingToolbox}
+            enabledModes={enabledModes}
+            activeMode={activeMode}
+            participantModeState={participantModeState}
+            recentModeEvents={recentModeEvents}
+            isLoadingModes={isLoadingModes}
+            modeError={modeError}
+            submitModeInput={submitModeInput}
           />
         </div>
       )}

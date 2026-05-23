@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
+import { useFacilitationModeOrchestrator } from "@/hooks/useFacilitationModeOrchestrator";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -44,6 +45,9 @@ export function useSessionHostLogic() {
         error: conversationError
     } = useConversation(currentConversationId);
     const toolbox = useFacilitatorToolbox(conversationData);
+    const modeOrchestrator = useFacilitationModeOrchestrator(conversationData, {
+        conversationId: currentConversationId,
+    });
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
@@ -223,12 +227,24 @@ export function useSessionHostLogic() {
         toggleSessionState,
         handleSendHostMessage,
         triggerFacilitatorResponse: (hostInstruction?: string) => {
-            const finalInstruction = [toolbox.toolboxInstruction, hostInstruction].filter(Boolean).join("\n\n");
+            const finalInstruction = [
+                toolbox.toolboxInstruction,
+                modeOrchestrator.modeInstruction,
+                hostInstruction,
+            ].filter(Boolean).join("\n\n");
             return triggerFacilitatorResponse(finalInstruction || undefined);
         },
         enabledTools: toolbox.enabledTools,
         isLoadingToolbox: toolbox.isLoadingToolbox,
         toolboxError: toolbox.toolboxError,
+        enabledModes: modeOrchestrator.enabledModes,
+        activeMode: modeOrchestrator.activeMode,
+        recentModeEvents: modeOrchestrator.recentModeEvents,
+        isLoadingModes: modeOrchestrator.isLoadingModes,
+        modeError: modeOrchestrator.modeError,
+        startMode: modeOrchestrator.startMode,
+        endMode: modeOrchestrator.endMode,
+        rejectMode: modeOrchestrator.rejectMode,
         handleSessionStarted,
         refresh,
 

@@ -8,6 +8,7 @@ import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
+import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 
 export interface SessionContextProps {
   isLoading: boolean;
@@ -33,6 +34,27 @@ export interface SessionContextProps {
     isLoadingToolbox: boolean;
     toolboxError: string | null;
     toolboxInstruction?: string;
+    enabledModes: FacilitatorModeAssignment[];
+    activeMode: SessionActiveMode | null;
+    participantModeState: ModeParticipantState | null;
+    recentModeEvents: SessionModeEvent[];
+    isLoadingModes: boolean;
+    modeError: string | null;
+    modeInstruction?: string;
+    startMode: (params: {
+      modeId: number;
+      prompt?: string;
+      options?: Record<string, unknown>;
+      policy?: Record<string, unknown>;
+      timerSeconds?: number;
+    }) => Promise<unknown>;
+    endMode: (reason?: string) => Promise<unknown>;
+    rejectMode: (reason?: string) => Promise<unknown>;
+    submitModeInput: (params: {
+      inputType: string;
+      content: Record<string, unknown>;
+      visibility?: ModeInput["visibility"];
+    }) => Promise<unknown>;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };
@@ -69,4 +91,25 @@ export interface SessionContextProps {
   isLoadingToolbox?: boolean;
   toolboxError?: string | null;
   toolboxInstruction?: string;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+    participantModeState?: ModeParticipantState | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  modeInstruction?: string;
+  startMode?: (params: {
+    modeId: number;
+    prompt?: string;
+    options?: Record<string, unknown>;
+    policy?: Record<string, unknown>;
+    timerSeconds?: number;
+  }) => Promise<unknown>;
+  endMode?: (reason?: string) => Promise<unknown>;
+  rejectMode?: (reason?: string) => Promise<unknown>;
+  submitModeInput?: (params: {
+    inputType: string;
+    content: Record<string, unknown>;
+    visibility?: ModeInput["visibility"];
+  }) => Promise<unknown>;
 }

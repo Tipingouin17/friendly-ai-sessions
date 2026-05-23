@@ -960,6 +960,181 @@ async def run_startup_migrations() -> None:
         WHERE t.slug IN ('open_discussion', 'structured_round', 'brainstorm', 'consensus_check', 'silent_reflection')
         ON CONFLICT (facilitator_id, tool_id) DO NOTHING;
         """,
+
+        # 2026-05-23: Explicit facilitation mode orchestrator tables.
+        # These tables promote toolbox options into backend-owned mode lifecycle
+        # records with event logs, participant state, and structured inputs.
+        """
+        CREATE TABLE IF NOT EXISTS facilitation_modes (
+            id                         BIGSERIAL PRIMARY KEY,
+            mode_key                   TEXT NOT NULL UNIQUE,
+            display_name               TEXT NOT NULL,
+            purpose                    TEXT NOT NULL,
+            primary_input              TEXT NOT NULL,
+            composer_component         TEXT NOT NULL,
+            composer_copy              TEXT NOT NULL,
+            floor_rules                JSONB NOT NULL DEFAULT '{}'::jsonb,
+            privacy_model              TEXT NOT NULL,
+            ai_responsibilities        JSONB NOT NULL DEFAULT '[]'::jsonb,
+            entry_conditions           JSONB NOT NULL DEFAULT '[]'::jsonb,
+            exit_conditions            JSONB NOT NULL DEFAULT '[]'::jsonb,
+            candidate_transitions      JSONB NOT NULL DEFAULT '[]'::jsonb,
+            success_metrics            JSONB NOT NULL DEFAULT '[]'::jsonb,
+            default_timer_seconds      INTEGER NOT NULL DEFAULT 300 CHECK (default_timer_seconds >= 0),
+            requires_host_confirmation BOOLEAN NOT NULL DEFAULT TRUE,
+            is_active                  BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_facilitation_modes_active_key
+            ON facilitation_modes(is_active, mode_key);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_mode_access (
+            id              BIGSERIAL PRIMARY KEY,
+            facilitator_id  INTEGER NOT NULL REFERENCES facilitators(id) ON DELETE CASCADE,
+            mode_id         BIGINT NOT NULL REFERENCES facilitation_modes(id) ON DELETE CASCADE,
+            enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+            policy_override JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT facilitator_mode_access_unique UNIQUE (facilitator_id, mode_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_fma_facilitator_id
+            ON facilitator_mode_access(facilitator_id);
+        CREATE INDEX IF NOT EXISTS idx_fma_mode_id
+            ON facilitator_mode_access(mode_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS session_active_modes (
+            id                 BIGSERIAL PRIMARY KEY,
+            conversation_id    BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            mode_id            BIGINT NOT NULL REFERENCES facilitation_modes(id) ON DELETE RESTRICT,
+            status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('recommended', 'pending_host_confirmation', 'active', 'ending', 'ended', 'rejected')),
+            started_at         TIMESTAMPTZ,
+            ended_at           TIMESTAMPTZ,
+            timer_seconds      INTEGER NOT NULL DEFAULT 300 CHECK (timer_seconds >= 0),
+            floor_rules        JSONB NOT NULL DEFAULT '{}'::jsonb,
+            privacy_model      TEXT NOT NULL,
+            composer_component TEXT NOT NULL,
+            composer_copy      TEXT NOT NULL,
+            prompt             TEXT,
+            state              JSONB NOT NULL DEFAULT '{}'::jsonb,
+            metrics            JSONB NOT NULL DEFAULT '{}'::jsonb,
+            started_by         UUID,
+            host_approved_by   UUID,
+            created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS session_active_modes_one_current_idx
+            ON session_active_modes(conversation_id)
+            WHERE status IN ('recommended', 'pending_host_confirmation', 'active', 'ending');
+        CREATE INDEX IF NOT EXISTS idx_sam_conversation
+            ON session_active_modes(conversation_id, updated_at DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS session_mode_events (
+            id                    BIGSERIAL PRIMARY KEY,
+            conversation_id       BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            active_mode_id        BIGINT REFERENCES session_active_modes(id) ON DELETE SET NULL,
+            mode_id               BIGINT REFERENCES facilitation_modes(id) ON DELETE SET NULL,
+            participant_id        BIGINT REFERENCES session_participants(id) ON DELETE SET NULL,
+            event_type            TEXT NOT NULL CHECK (event_type IN ('mode.recommended', 'mode.started', 'participant.state.updated', 'mode.input.submitted', 'mode.synthesis.ready', 'mode.ended', 'mode.rejected')),
+            payload               JSONB NOT NULL DEFAULT '{}'::jsonb,
+            reason                TEXT,
+            confidence            NUMERIC(5,4) CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+            requires_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+            trigger_signals       JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_by            UUID,
+            created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_sme_conversation
+            ON session_mode_events(conversation_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_sme_event_type
+            ON session_mode_events(event_type, created_at DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS mode_participant_states (
+            id                 BIGSERIAL PRIMARY KEY,
+            active_mode_id     BIGINT NOT NULL REFERENCES session_active_modes(id) ON DELETE CASCADE,
+            conversation_id    BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            participant_id     BIGINT NOT NULL REFERENCES session_participants(id) ON DELETE CASCADE,
+            can_speak          BOOLEAN NOT NULL DEFAULT TRUE,
+            is_current_speaker BOOLEAN NOT NULL DEFAULT FALSE,
+            is_next            BOOLEAN NOT NULL DEFAULT FALSE,
+            can_submit         BOOLEAN NOT NULL DEFAULT TRUE,
+            remaining_time     INTEGER,
+            allowed_actions    JSONB NOT NULL DEFAULT '[]'::jsonb,
+            state              JSONB NOT NULL DEFAULT '{}'::jsonb,
+            updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT mode_participant_states_unique UNIQUE (active_mode_id, participant_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mps_conversation
+            ON mode_participant_states(conversation_id, updated_at DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS mode_inputs (
+            id                    BIGSERIAL PRIMARY KEY,
+            active_mode_id        BIGINT NOT NULL REFERENCES session_active_modes(id) ON DELETE CASCADE,
+            conversation_id       BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            mode_id               BIGINT NOT NULL REFERENCES facilitation_modes(id) ON DELETE RESTRICT,
+            participant_id        BIGINT REFERENCES session_participants(id) ON DELETE SET NULL,
+            input_type            TEXT NOT NULL,
+            visibility            TEXT NOT NULL DEFAULT 'private_until_synthesis' CHECK (visibility IN ('private', 'private_until_synthesis', 'anonymous_aggregate', 'attributed', 'public')),
+            content               JSONB NOT NULL DEFAULT '{}'::jsonb,
+            included_in_synthesis BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_mode_inputs_active_mode
+            ON mode_inputs(active_mode_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_mode_inputs_conversation
+            ON mode_inputs(conversation_id, created_at DESC);
+        """,
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS mode_orchestrator_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS mode_host_confirmation_required BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS mode_default_timer_seconds INTEGER NOT NULL DEFAULT 300;
+        """,
+        """
+        INSERT INTO facilitation_modes (
+            mode_key, display_name, purpose, primary_input, composer_component, composer_copy,
+            floor_rules, privacy_model, ai_responsibilities, entry_conditions, exit_conditions,
+            candidate_transitions, success_metrics, default_timer_seconds, requires_host_confirmation, is_active
+        )
+        VALUES
+            ('open_discussion', 'Open Discussion', 'Allow natural group exchange while the AI monitors process quality.', 'voice', 'LiveListeningState', 'You are live — speak freely. AI is listening.', '{"speaking":"participants_may_speak_freely","interruptions":"allowed_but_monitored","ai_floor_control":"low"}'::jsonb, 'public_voice_transcript_with_session_retention_policy', '["track_speakers","track_topic_drift","detect_circular_debate","detect_exclusion_or_dominance","summarize_when_useful","intervene_only_when_process_quality_drops"]'::jsonb, '["session_opening","post_synthesis_discussion","host_command"]'::jsonb, '["timebox_expired","decision_ready","participation_imbalance","topic_drift","host_command"]'::jsonb, '["round_robin","silent_individual_response","voting_rating","reflection_checkin","debate_panel"]'::jsonb, '["balanced_participation","low_topic_drift","new_information_rate","decision_progress"]'::jsonb, 0, FALSE, TRUE),
+            ('round_robin', 'Round-Robin', 'Guarantee equal airtime through structured turn-taking.', 'voice', 'TurnCountdownComposer', 'Your turn is next / You are up.', '{"speaking":"only_current_speaker_has_floor","interruptions":"not_allowed_except_host_or_safety","ai_floor_control":"high"}'::jsonb, 'public_voice_transcript_with_speaker_attribution', '["call_participants_in_sequence","enforce_time_windows","show_next_speaker","summarize_patterns_after_round","prevent_interruption"]'::jsonb, '["participation_imbalance","stakeholder_input_required","host_command"]'::jsonb, '["all_participants_spoken","host_command","timebox_expired"]'::jsonb, '["open_discussion","silent_individual_response","voting_rating"]'::jsonb, '["participation_coverage","time_per_speaker_variance","interruption_rate"]'::jsonb, 300, TRUE, TRUE),
+            ('silent_individual_response', 'Silent Individual Response', 'Collect independent written thinking before social influence shapes answers.', 'text', 'PrivateTextComposer', 'Write privately. The AI will synthesize responses for the group.', '{"speaking":"room_silent_or_optional_background_music","interruptions":"not_applicable","ai_floor_control":"medium"}'::jsonb, 'private_until_synthesis_configurable_anonymity', '["pose_question","collect_private_responses","cluster_themes","preserve_anonymity_rules","surface_minority_views","read_back_synthesis"]'::jsonb, '["brainstorming","sensitive_feedback","dominant_voices","low_idea_diversity","host_command"]'::jsonb, '["timer_expired","all_responses_submitted","host_command"]'::jsonb, '["open_discussion","voting_rating","round_robin"]'::jsonb, '["response_completion_rate","idea_diversity","minority_view_capture","synthesis_acceptance"]'::jsonb, 300, TRUE, TRUE),
+            ('voting_rating', 'Voting / Rating', 'Convert options, priorities, confidence, or sentiment into aggregate signal.', 'tap_or_click', 'VotingWidget', 'Vote now. Your response will be aggregated according to session rules.', '{"speaking":"optional_host_or_ai_narration","interruptions":"not_applicable","ai_floor_control":"medium"}'::jsonb, 'anonymous_or_attributed_aggregate_configurable', '["present_options","enforce_vote_limits","aggregate_results","show_or_hide_results_by_policy","narrate_implications","recommend_next_step"]'::jsonb, '["options_identified","decision_readiness","confidence_check_needed","prioritization_needed","host_command"]'::jsonb, '["vote_closed","quorum_reached","host_command","timer_expired"]'::jsonb, '["open_discussion","decision_capture","reflection_checkin"]'::jsonb, '["vote_completion_rate","decision_confidence","consensus_strength","time_to_decision"]'::jsonb, 180, TRUE, TRUE),
+            ('reflection_checkin', 'Reflection / Check-in', 'Rapidly sense emotional temperature, readiness, confidence, or engagement.', 'quick_pick_or_word', 'QuickPickGrid', 'Choose one word or quick signal that reflects where you are right now.', '{"speaking":"not_required","interruptions":"not_applicable","ai_floor_control":"low"}'::jsonb, 'aggregate_by_default_individual_visibility_configurable', '["ask_low_stakes_prompt","aggregate_room_temperature","detect_risk_signals","adjust_pace_or_tone","recommend_follow_up_mode"]'::jsonb, '["session_opening","session_closing","energy_drop","conflict_recovery","before_major_decision","host_command"]'::jsonb, '["all_or_quorum_submitted","timer_expired","host_command"]'::jsonb, '["open_discussion","round_robin","human_controlled_mode"]'::jsonb, '["checkin_completion_rate","risk_signal_detection","participant_readiness","pace_adjustment_quality"]'::jsonb, 120, TRUE, TRUE),
+            ('debate_panel', 'Debate / Panel Moderation', 'Structure expert exchange while preserving fairness, relevance, time discipline, and audience value.', 'raise_hand_and_controlled_voice_floor', 'RaiseHandQueue', 'Raise your hand to request the floor.', '{"speaking":"only_called_speaker_has_floor","interruptions":"not_allowed_except_moderator_or_safety","ai_floor_control":"high"}'::jsonb, 'public_voice_transcript_with_speaker_attribution', '["manage_speaker_queue","enforce_time_limits","ask_follow_up_questions","summarize_positions","connect_points_between_panelists","deescalate_repetition_or_conflict"]'::jsonb, '["expert_panel","structured_disagreement","q_and_a","host_command","debate_format_required"]'::jsonb, '["agenda_item_complete","timebox_expired","repetition_without_new_information","host_command"]'::jsonb, '["voting_rating","open_discussion","reflection_checkin","human_controlled_mode"]'::jsonb, '["queue_fairness","time_limit_adherence","audience_value","new_information_rate","repetition_rate"]'::jsonb, 600, TRUE, TRUE)
+        ON CONFLICT (mode_key) DO UPDATE SET
+            display_name = EXCLUDED.display_name,
+            purpose = EXCLUDED.purpose,
+            primary_input = EXCLUDED.primary_input,
+            composer_component = EXCLUDED.composer_component,
+            composer_copy = EXCLUDED.composer_copy,
+            floor_rules = EXCLUDED.floor_rules,
+            privacy_model = EXCLUDED.privacy_model,
+            ai_responsibilities = EXCLUDED.ai_responsibilities,
+            entry_conditions = EXCLUDED.entry_conditions,
+            exit_conditions = EXCLUDED.exit_conditions,
+            candidate_transitions = EXCLUDED.candidate_transitions,
+            success_metrics = EXCLUDED.success_metrics,
+            default_timer_seconds = EXCLUDED.default_timer_seconds,
+            requires_host_confirmation = EXCLUDED.requires_host_confirmation,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW();
+        """,
+        """
+        INSERT INTO facilitator_mode_access (facilitator_id, mode_id, enabled, policy_override)
+        SELECT f.id, m.id, TRUE, '{}'::jsonb
+        FROM facilitators f
+        CROSS JOIN facilitation_modes m
+        WHERE m.mode_key IN ('open_discussion', 'silent_individual_response', 'voting_rating', 'reflection_checkin')
+        ON CONFLICT (facilitator_id, mode_id) DO NOTHING;
+        """,
     ]
     try:
         async with _pool.acquire() as conn:
@@ -1255,6 +1430,21 @@ FK_MAP: Dict[str, tuple] = {
     "facilitator_plan_access_plan_id_fkey": ("facilitator_plan_access", "plan_id", "plans", "id"),
     "facilitator_tool_access_facilitator_id_fkey": ("facilitator_tool_access", "facilitator_id", "facilitators", "id"),
     "facilitator_tool_access_tool_id_fkey": ("facilitator_tool_access", "tool_id", "facilitator_tools", "id"),
+    "facilitator_mode_access_facilitator_id_fkey": ("facilitator_mode_access", "facilitator_id", "facilitators", "id"),
+    "facilitator_mode_access_mode_id_fkey": ("facilitator_mode_access", "mode_id", "facilitation_modes", "id"),
+    "session_active_modes_conversation_id_fkey": ("session_active_modes", "conversation_id", "conversations", "id"),
+    "session_active_modes_mode_id_fkey": ("session_active_modes", "mode_id", "facilitation_modes", "id"),
+    "session_mode_events_conversation_id_fkey": ("session_mode_events", "conversation_id", "conversations", "id"),
+    "session_mode_events_active_mode_id_fkey": ("session_mode_events", "active_mode_id", "session_active_modes", "id"),
+    "session_mode_events_mode_id_fkey": ("session_mode_events", "mode_id", "facilitation_modes", "id"),
+    "session_mode_events_participant_id_fkey": ("session_mode_events", "participant_id", "session_participants", "id"),
+    "mode_participant_states_active_mode_id_fkey": ("mode_participant_states", "active_mode_id", "session_active_modes", "id"),
+    "mode_participant_states_conversation_id_fkey": ("mode_participant_states", "conversation_id", "conversations", "id"),
+    "mode_participant_states_participant_id_fkey": ("mode_participant_states", "participant_id", "session_participants", "id"),
+    "mode_inputs_active_mode_id_fkey": ("mode_inputs", "active_mode_id", "session_active_modes", "id"),
+    "mode_inputs_conversation_id_fkey": ("mode_inputs", "conversation_id", "conversations", "id"),
+    "mode_inputs_mode_id_fkey": ("mode_inputs", "mode_id", "facilitation_modes", "id"),
+    "mode_inputs_participant_id_fkey": ("mode_inputs", "participant_id", "session_participants", "id"),
 }
 
 TABLE_PK: Dict[str, str] = {
@@ -1266,6 +1456,12 @@ TABLE_PK: Dict[str, str] = {
     "facilitator_plan_access": "facilitator_id",  # composite PK — use facilitator_id as representative
     "facilitator_tools": "id",
     "facilitator_tool_access": "id",
+    "facilitation_modes": "id",
+    "facilitator_mode_access": "id",
+    "session_active_modes": "id",
+    "session_mode_events": "id",
+    "mode_participant_states": "id",
+    "mode_inputs": "id",
 }
 
 
@@ -2302,14 +2498,25 @@ async def rpc_call(func_name: str, request: Request):
 #   - Participants may read conversations for their session via
 #     X-Join-Token (needed to display session info during the session).
 # ============================================================
-SECURE_CONV_TABLES = {"messages", "session_participants"}
+SECURE_CONV_TABLES = {"messages", "session_participants", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
 SECURE_REPORT_TABLES = {"session_reports"}
 # referrals is filtered by referrer_id (the owner column) just like user_id tables
 SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log"}
 # Tables participants may read with a valid join token (no auth required)
-PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
+PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
 # Toolbox tables are publicly readable through the proxy for runtime UX, but mutations are admin-only.
 TOOLBOX_TABLES = {"facilitator_tools", "facilitator_tool_access"}
+MODE_ADMIN_TABLES = {"facilitation_modes", "facilitator_mode_access"}
+MODE_SESSION_TABLES = {"session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
+MODE_EVENT_TYPES = {
+    "mode.recommended",
+    "mode.started",
+    "participant.state.updated",
+    "mode.input.submitted",
+    "mode.synthesis.ready",
+    "mode.ended",
+    "mode.rejected",
+}
 
 
 async def _validate_join_token(token: str, conversation_id: str | int | None, conn=None) -> bool:
@@ -3364,6 +3571,22 @@ async def rest_table(table: str, request: Request):
             status_code=403,
         )
 
+    if request.method in ("POST", "PATCH", "DELETE") and table in MODE_ADMIN_TABLES and not is_admin_user:
+        log_req.warning(
+            "REST %s /%s -> 403 (mode catalog mutation requires admin) origin=%s",
+            request.method,
+            table,
+            request.headers.get("origin", "-"),
+        )
+        return JSONResponse(
+            content={
+                "error": "Admin access required",
+                "message": "Only administrators can manage facilitation mode catalog and access configuration",
+                "code": "PGRST403",
+            },
+            status_code=403,
+        )
+
     if request.method in ("GET", "HEAD"):
         # session_reports: authenticated hosts only, no participant bypass
         if table in SECURE_REPORT_TABLES:
@@ -3669,6 +3892,19 @@ async def rest_table(table: str, request: Request):
                         asyncio.create_task(manager.broadcast(conv_id, {
                             "event": "INSERT", "table": table, "new": results[0]
                         }))
+                    elif table in MODE_SESSION_TABLES and results:
+                        conv_id = str(results[0].get("conversation_id", ""))
+                        if conv_id:
+                            asyncio.create_task(manager.broadcast(conv_id, {
+                                "event": "INSERT",
+                                "payload": {
+                                    "eventType": "INSERT",
+                                    "new": results[0],
+                                    "old": {},
+                                    "table": table,
+                                    "schema": "public",
+                                },
+                            }))
                     return JSONResponse(content=results, status_code=201)
                 else:
                     cols = ", ".join([f'"{k}"' for k in data.keys()])
@@ -3697,6 +3933,19 @@ async def rest_table(table: str, request: Request):
                                 "schema": "public",
                             },
                         }))
+                    elif table in MODE_SESSION_TABLES and result:
+                        conv_id = str(result.get("conversation_id", ""))
+                        if conv_id:
+                            asyncio.create_task(manager.broadcast(conv_id, {
+                                "event": "INSERT",
+                                "payload": {
+                                    "eventType": "INSERT",
+                                    "new": result,
+                                    "old": {},
+                                    "table": table,
+                                    "schema": "public",
+                                },
+                            }))
                         if table == "session_participants" and conv_id:
                             asyncio.create_task(_maybe_generate_welcome_message(int(conv_id)))
                         # Auto-trigger AI facilitator response when a participant posts a message.
@@ -3763,6 +4012,19 @@ async def rest_table(table: str, request: Request):
                             "schema": "public",
                         },
                     }))
+                elif table in MODE_SESSION_TABLES and rows:
+                    conv_id = str(rows[0].get("conversation_id", ""))
+                    if conv_id:
+                        asyncio.create_task(manager.broadcast(conv_id, {
+                            "event": "UPDATE",
+                            "payload": {
+                                "eventType": "UPDATE",
+                                "new": rows[0],
+                                "old": {},
+                                "table": table,
+                                "schema": "public",
+                            },
+                        }))
                 return rows[0] if len(rows) == 1 else rows
 
             if request.method == "DELETE":
@@ -4348,6 +4610,231 @@ async def edge_function(func_name: str, request: Request):
     # ── generate-ai-welcome (stub) ─────────────────────────────
     elif func_name == "generate-ai-welcome":
         return {"message": "Welcome to the session! I'm excited to facilitate our discussion today.", "success": True}
+
+
+    # ── facilitator-mode-event ────────────────────────────────────
+    elif func_name == "facilitator-mode-event":
+        conv_id = data.get("conversationId") or data.get("conversation_id")
+        mode_key = data.get("modeKey") or data.get("mode_key")
+        mode_id = data.get("modeId") if "modeId" in data else data.get("mode_id")
+        active_mode_id = data.get("activeModeId") if "activeModeId" in data else data.get("active_mode_id")
+        participant_id = data.get("participantId") if "participantId" in data else data.get("participant_id")
+        event_type = (data.get("eventType") or data.get("event_type") or "").strip()
+        payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+        reason = data.get("reason")
+        confidence = data.get("confidence")
+        trigger_signals = data.get("triggerSignals") if isinstance(data.get("triggerSignals"), list) else data.get("trigger_signals")
+        if not isinstance(trigger_signals, list):
+            trigger_signals = []
+        requires_confirmation = bool(data.get("requiresConfirmation") if "requiresConfirmation" in data else data.get("requires_confirmation", False))
+
+        try:
+            conv_id = int(conv_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_conversation", "message": "conversationId is required"})
+        if event_type not in MODE_EVENT_TYPES:
+            raise HTTPException(400, detail={"code": "invalid_mode_event_type", "message": "Unsupported facilitation mode event type"})
+        try:
+            mode_id = int(mode_id) if mode_id is not None else None
+            active_mode_id = int(active_mode_id) if active_mode_id is not None else None
+            participant_id = int(participant_id) if participant_id is not None else None
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_identifier", "message": "modeId, activeModeId, and participantId must be numeric when provided"})
+        try:
+            confidence_value = float(confidence) if confidence is not None else None
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_confidence", "message": "confidence must be numeric"})
+        if confidence_value is not None and not (0 <= confidence_value <= 1):
+            raise HTTPException(400, detail={"code": "invalid_confidence", "message": "confidence must be between 0 and 1"})
+
+        _jwt_user = get_current_user(request)
+        _jwt_user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        _jwt_role = (_jwt_user.get("role") or "") if _jwt_user else ""
+        _join_token = request.headers.get("x-join-token", "").strip()
+
+        if not _jwt_user_id and not _join_token:
+            raise HTTPException(401, detail={"code": "auth_required", "message": "A host JWT or participant join token is required"})
+
+        try:
+            async with _pool.acquire() as conn:
+                conv_row = await conn.fetchrow(
+                    "SELECT c.id, c.user_id, c.sessions_id, c.is_session_ended, s.facilitator "
+                    "FROM conversations c "
+                    "LEFT JOIN sessions s ON s.id = c.sessions_id "
+                    "WHERE c.id = $1",
+                    conv_id,
+                )
+                if not conv_row:
+                    raise HTTPException(404, detail={"code": "conversation_not_found", "message": "Conversation not found"})
+
+                authorized = False
+                is_admin = False
+                auth_mode = "none"
+                if _jwt_user_id:
+                    is_admin = _jwt_role == "admin"
+                    if not is_admin:
+                        admin_row = await conn.fetchrow("SELECT role FROM profiles WHERE id = $1::uuid", _jwt_user_id)
+                        is_admin = bool(admin_row and admin_row["role"] == "admin")
+                    if str(conv_row["user_id"]) == str(_jwt_user_id) or is_admin:
+                        authorized = True
+                        auth_mode = "jwt"
+                if not authorized and _join_token:
+                    authorized = await _validate_join_token(_join_token, conv_id)
+                    auth_mode = "join_token" if authorized else auth_mode
+                if not authorized:
+                    raise HTTPException(403, detail={"code": "forbidden", "message": "You are not allowed to write mode events for this session"})
+
+                host_only_events = {"mode.recommended", "mode.started", "mode.synthesis.ready", "mode.ended", "mode.rejected"}
+                if auth_mode == "join_token" and event_type in host_only_events:
+                    raise HTTPException(403, detail={"code": "host_required", "message": "Only the host or an administrator can change facilitation mode lifecycle"})
+
+                mode_row = None
+                if mode_id is not None:
+                    mode_row = await conn.fetchrow("SELECT * FROM facilitation_modes WHERE id = $1 AND is_active = TRUE", mode_id)
+                elif mode_key:
+                    mode_row = await conn.fetchrow("SELECT * FROM facilitation_modes WHERE mode_key = $1 AND is_active = TRUE", str(mode_key))
+                    if mode_row:
+                        mode_id = mode_row["id"]
+                elif active_mode_id is not None:
+                    mode_row = await conn.fetchrow(
+                        "SELECT m.* FROM session_active_modes sam JOIN facilitation_modes m ON m.id = sam.mode_id WHERE sam.id = $1",
+                        active_mode_id,
+                    )
+                    if mode_row:
+                        mode_id = mode_row["id"]
+
+                if event_type in ("mode.recommended", "mode.started") and not mode_row:
+                    raise HTTPException(400, detail={"code": "mode_required", "message": "A valid modeKey or modeId is required"})
+
+                active_row = None
+                event_payload = dict(payload)
+                async with conn.transaction():
+                    if event_type in ("mode.recommended", "mode.started"):
+                        status = "pending_host_confirmation" if event_type == "mode.recommended" or requires_confirmation else "active"
+                        if event_type == "mode.started":
+                            status = "active"
+                        active_row = await conn.fetchrow(
+                            "INSERT INTO session_active_modes "
+                            "(conversation_id, mode_id, status, started_at, timer_seconds, floor_rules, privacy_model, composer_component, composer_copy, prompt, state, started_by, host_approved_by) "
+                            "VALUES ($1, $2, $3, CASE WHEN $3 = 'active' THEN NOW() ELSE NULL END, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11::uuid, CASE WHEN $3 = 'active' THEN $11::uuid ELSE NULL END) "
+                            "RETURNING *",
+                            conv_id,
+                            mode_id,
+                            status,
+                            int(event_payload.get("timerSeconds") or event_payload.get("timer_seconds") or mode_row["default_timer_seconds"]),
+                            json.dumps(event_payload.get("floorRules") or event_payload.get("floor_rules") or mode_row["floor_rules"] or {}),
+                            event_payload.get("privacyModel") or event_payload.get("privacy_model") or mode_row["privacy_model"],
+                            event_payload.get("composerComponent") or event_payload.get("composer_component") or mode_row["composer_component"],
+                            event_payload.get("composerCopy") or event_payload.get("composer_copy") or mode_row["composer_copy"],
+                            event_payload.get("prompt") or data.get("prompt"),
+                            json.dumps(event_payload.get("state") if isinstance(event_payload.get("state"), dict) else {}),
+                            _jwt_user_id,
+                        )
+                        active_mode_id = active_row["id"]
+                    elif event_type in ("mode.ended", "mode.rejected"):
+                        if active_mode_id is None:
+                            active_row = await conn.fetchrow(
+                                "SELECT * FROM session_active_modes WHERE conversation_id = $1 AND status IN ('recommended', 'pending_host_confirmation', 'active', 'ending') ORDER BY updated_at DESC LIMIT 1",
+                                conv_id,
+                            )
+                            active_mode_id = active_row["id"] if active_row else None
+                        status = "rejected" if event_type == "mode.rejected" else "ended"
+                        if active_mode_id is not None:
+                            active_row = await conn.fetchrow(
+                                "UPDATE session_active_modes SET status = $1, ended_at = NOW(), metrics = $2::jsonb, updated_at = NOW() WHERE id = $3 RETURNING *",
+                                status,
+                                json.dumps(event_payload.get("metrics") if isinstance(event_payload.get("metrics"), dict) else {}),
+                                active_mode_id,
+                            )
+                            if active_row and mode_id is None:
+                                mode_id = active_row["mode_id"]
+                    elif event_type == "participant.state.updated" and active_mode_id is not None and participant_id is not None:
+                        state_body = event_payload.get("state") if isinstance(event_payload.get("state"), dict) else event_payload
+                        await conn.execute(
+                            "INSERT INTO mode_participant_states "
+                            "(active_mode_id, conversation_id, participant_id, can_speak, is_current_speaker, is_next, can_submit, remaining_time, allowed_actions, state, updated_at) "
+                            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, NOW()) "
+                            "ON CONFLICT (active_mode_id, participant_id) DO UPDATE SET "
+                            "can_speak = EXCLUDED.can_speak, is_current_speaker = EXCLUDED.is_current_speaker, is_next = EXCLUDED.is_next, can_submit = EXCLUDED.can_submit, "
+                            "remaining_time = EXCLUDED.remaining_time, allowed_actions = EXCLUDED.allowed_actions, state = EXCLUDED.state, updated_at = NOW()",
+                            active_mode_id,
+                            conv_id,
+                            participant_id,
+                            bool(event_payload.get("canSpeak", event_payload.get("can_speak", True))),
+                            bool(event_payload.get("isCurrentSpeaker", event_payload.get("is_current_speaker", False))),
+                            bool(event_payload.get("isNext", event_payload.get("is_next", False))),
+                            bool(event_payload.get("canSubmit", event_payload.get("can_submit", True))),
+                            event_payload.get("remainingTime", event_payload.get("remaining_time")),
+                            json.dumps(event_payload.get("allowedActions") if isinstance(event_payload.get("allowedActions"), list) else event_payload.get("allowed_actions") if isinstance(event_payload.get("allowed_actions"), list) else []),
+                            json.dumps(state_body),
+                        )
+                    elif event_type == "mode.input.submitted":
+                        if active_mode_id is None:
+                            raise HTTPException(400, detail={"code": "active_mode_required", "message": "activeModeId is required for mode input submissions"})
+                        input_content = event_payload.get("content") if isinstance(event_payload.get("content"), dict) else event_payload
+                        input_type = event_payload.get("inputType") or event_payload.get("input_type") or "response"
+                        visibility = event_payload.get("visibility") or "private_until_synthesis"
+                        if mode_id is None:
+                            mode_lookup = await conn.fetchrow("SELECT mode_id FROM session_active_modes WHERE id = $1", active_mode_id)
+                            mode_id = mode_lookup["mode_id"] if mode_lookup else None
+                        await conn.execute(
+                            "INSERT INTO mode_inputs (active_mode_id, conversation_id, mode_id, participant_id, input_type, visibility, content) "
+                            "VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)",
+                            active_mode_id,
+                            conv_id,
+                            mode_id,
+                            participant_id,
+                            input_type,
+                            visibility,
+                            json.dumps(input_content),
+                        )
+
+                    event_row = await conn.fetchrow(
+                        "INSERT INTO session_mode_events "
+                        "(conversation_id, active_mode_id, mode_id, participant_id, event_type, payload, reason, confidence, requires_confirmation, trigger_signals, created_by) "
+                        "VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10::jsonb, $11::uuid) RETURNING *",
+                        conv_id,
+                        active_mode_id,
+                        mode_id,
+                        participant_id,
+                        event_type,
+                        json.dumps(event_payload),
+                        reason,
+                        confidence_value,
+                        requires_confirmation,
+                        json.dumps(trigger_signals),
+                        _jwt_user_id,
+                    )
+
+                event_result = serialize_row(dict(event_row)) if event_row else {}
+                active_result = serialize_row(dict(active_row)) if active_row else None
+                asyncio.create_task(manager.broadcast(str(conv_id), {
+                    "event": "INSERT",
+                    "payload": {
+                        "eventType": "INSERT",
+                        "new": event_result,
+                        "old": {},
+                        "table": "session_mode_events",
+                        "schema": "public",
+                    },
+                }))
+                if active_result:
+                    asyncio.create_task(manager.broadcast(str(conv_id), {
+                        "event": "UPDATE" if event_type in ("mode.ended", "mode.rejected") else "INSERT",
+                        "payload": {
+                            "eventType": "UPDATE" if event_type in ("mode.ended", "mode.rejected") else "INSERT",
+                            "new": active_result,
+                            "old": {},
+                            "table": "session_active_modes",
+                            "schema": "public",
+                        },
+                    }))
+                return {"success": True, "event": event_result, "activeMode": active_result}
+        except HTTPException:
+            raise
+        except Exception as e:
+            log_session.error("facilitator-mode-event error: %s", e, exc_info=True)
+            raise HTTPException(500, detail={"code": "mode_event_failed", "message": str(e)})
 
     # ── facilitator-ingest-stream-event ────────────────────────
     elif func_name == "facilitator-ingest-stream-event":

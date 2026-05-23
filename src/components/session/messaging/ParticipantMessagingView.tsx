@@ -129,10 +129,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string; profile_picture?: string | null } | undefined;
   const facilitatorId = facilitatorDetails?.id ?? null;
-  const { data: phase3Settings } = usePhase3RuntimeSettings(conversationData?.language);
-  const speechStackEnabled = Boolean(phase3Settings?.speech_stack_enabled);
-  const ttsAvatarEnabled = Boolean(phase3Settings?.tts_avatar_enabled);
-  const analyticsPersistenceEnabled = Boolean(phase3Settings?.facilitation_analytics_enabled);
+  const { data: phase3Settings, isPlaceholderData: isPhase3SettingsPending } = usePhase3RuntimeSettings(conversationData?.language);
+  const phase3RuntimeReady = !isPhase3SettingsPending;
+  const speechStackEnabled = Boolean(phase3RuntimeReady && phase3Settings?.speech_stack_enabled);
+  const ttsAvatarEnabled = Boolean(phase3RuntimeReady && phase3Settings?.tts_avatar_enabled);
+  const analyticsPersistenceEnabled = Boolean(phase3RuntimeReady && phase3Settings?.facilitation_analytics_enabled);
   const voiceRuntime = useFacilitatorVoice({
     conversationId,
     facilitatorId,
@@ -152,7 +153,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [messages]);
 
   React.useEffect(() => {
-    if (!ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
+    if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
     if (lastSpokenAssistantMessageRef.current === lastAssistantMessage.id) return;
     lastSpokenAssistantMessageRef.current = lastAssistantMessage.id;
     void voiceRuntime.speak({
@@ -160,7 +161,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       messageId: lastAssistantMessage.id,
       metadata: { source: 'participant_messaging_view' },
     });
-  }, [conversationId, lastAssistantMessage, ttsAvatarEnabled, voiceRuntime]);
+  }, [conversationId, lastAssistantMessage, phase3RuntimeReady, ttsAvatarEnabled, voiceRuntime]);
 
   const handleSpeechInterim = React.useCallback((payload: { transcript: string; confidence: number | null }) => {
     if (!speechStackEnabled) return;

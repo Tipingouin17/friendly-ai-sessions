@@ -133,12 +133,33 @@ const ChatInput = ({
       recordingStartedMsRef.current = null;
     };
 
-    return () => { recognitionRef.current?.stop(); };
+    return () => {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // Browser recognition implementations can throw if already stopped.
+      }
+    };
   }, [onSpeechFinal, onSpeechInterim, setInputMessage, setIsRecording, speechLanguage]);
+
+  useEffect(() => {
+    if (!speechEnabled && isRecording) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // Ignore stop races when settings change while recognition is ending.
+      }
+      setIsRecording(false);
+    }
+  }, [isRecording, setIsRecording, speechEnabled]);
 
   const handleStartRecording = () => {
     if (!speechEnabled) {
       toast.info("Voice input is disabled for this session by the host settings.");
+      return;
+    }
+    if (speechSupported === null) {
+      toast.info("Preparing voice input — please try again in a moment.");
       return;
     }
     if (!speechSupported) {
@@ -163,7 +184,11 @@ const ChatInput = ({
   };
 
   const handleStopRecording = () => {
-    recognitionRef.current?.stop();
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // Ignore stop races when the browser already ended recognition.
+    }
     setIsRecording(false);
   };
 
@@ -219,7 +244,9 @@ const ChatInput = ({
         <button
           type="button"
           onClick={isRecording ? handleStopRecording : handleStartRecording}
-          disabled={disabled || !speechEnabled}
+          disabled={disabled || !speechEnabled || speechSupported === false}
+          aria-pressed={isRecording}
+          aria-label={isRecording ? "Stop voice input" : "Start voice input"}
           title={isRecording ? "Stop recording" : !speechEnabled ? "Voice input disabled for this session" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
           className={`shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
             isRecording

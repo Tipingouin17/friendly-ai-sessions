@@ -109,7 +109,17 @@ const InputFooter = ({
     `Participant ${currentParticipant}`;
 
   // Engagement controls
-  const engagement = useParticipantEngagement({
+  const {
+    status,
+    isPaused,
+    isSkipped,
+    skipQuestion,
+    resetSkip,
+    togglePause,
+    sendMessageToHost,
+    isSendingHostMessage,
+    hostMessageSent,
+  } = useParticipantEngagement({
     conversationId,
     participantId: currentUserParticipantId ?? currentParticipant,
     participantName,
@@ -118,8 +128,8 @@ const InputFooter = ({
   // Notify parent when status changes (so response counting can exclude paused/skipped)
   const effectiveParticipantId = currentUserParticipantId ?? currentParticipant;
   React.useEffect(() => {
-    onParticipantStatusChange?.(effectiveParticipantId, engagement.status);
-  }, [engagement.status, effectiveParticipantId, onParticipantStatusChange]);
+    onParticipantStatusChange?.(effectiveParticipantId, status);
+  }, [status, effectiveParticipantId, onParticipantStatusChange]);
 
   // Reset skip when a new facilitator message arrives
   const lastAssistantMessageId = React.useMemo(() => {
@@ -127,8 +137,8 @@ const InputFooter = ({
     return assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1].id : null;
   }, [messages]);
   React.useEffect(() => {
-    engagement.resetSkip();
-  }, [lastAssistantMessageId, engagement.resetSkip]);
+    resetSkip();
+  }, [lastAssistantMessageId, resetSkip]);
 
   // Safely determine if this is a new session with just a welcome message
   const isNewSession = Array.isArray(messages) && messages.length <= 1 &&
@@ -137,8 +147,8 @@ const InputFooter = ({
   // Check if the most recent message is from the facilitator
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const shouldAllowAnswer = (lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered)
-    && !engagement.isPaused
-    && !engagement.isSkipped;
+    && !isPaused
+    && !isSkipped;
 
   // Count how many questions this participant has sent
   const participantKey = String(effectiveParticipantId);
@@ -149,7 +159,7 @@ const InputFooter = ({
 
   const activeModeDefinition = activeMode?.facilitation_mode;
   const activeModeKey = activeModeDefinition?.mode_key ?? null;
-  const activeModeOptions = activeMode?.options ?? {};
+  const activeModeOptions = React.useMemo(() => activeMode?.options ?? {}, [activeMode?.options]);
   const configuredChoices = React.useMemo(() => {
     const options = activeModeOptions.choices ?? activeModeOptions.options;
     return Array.isArray(options) ? options.map(String) : [];
@@ -234,17 +244,17 @@ const InputFooter = ({
           <>
             {/* Engagement controls: skip / pause / message host */}
             <ParticipantEngagementControls
-              status={engagement.status}
-              onSkip={engagement.skipQuestion}
-              onTogglePause={engagement.togglePause}
-              onSendHostMessage={engagement.sendMessageToHost}
-              isSendingHostMessage={engagement.isSendingHostMessage}
-              hostMessageSent={engagement.hostMessageSent}
+              status={status}
+              onSkip={skipQuestion}
+              onTogglePause={togglePause}
+              onSendHostMessage={sendMessageToHost}
+              isSendingHostMessage={isSendingHostMessage}
+              hostMessageSent={hostMessageSent}
               hasAnswered={hasAnswered}
               isMobile={isMobile}
             />
 
-            {isParticipantContext && (enabledTools.length > 0 || isLoadingToolbox || enabledModes.length > 0 || isLoadingModes || activeMode || modeError) && !engagement.isPaused && !engagement.isSkipped && (
+            {isParticipantContext && (enabledTools.length > 0 || isLoadingToolbox || enabledModes.length > 0 || isLoadingModes || activeMode || modeError) && !isPaused && !isSkipped && (
               <div className="space-y-2 px-3 pb-2">
                 {(enabledTools.length > 0 || isLoadingToolbox) && (
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-xs text-indigo-800">
@@ -379,7 +389,7 @@ const InputFooter = ({
             )}
 
             {/* Chat input — hidden when paused or skipped */}
-            {!engagement.isPaused && !engagement.isSkipped && (
+            {!isPaused && !isSkipped && (
               <ChatInput
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}

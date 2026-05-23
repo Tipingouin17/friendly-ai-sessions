@@ -70,7 +70,37 @@ assert.equal(disabledPlan.avatar.status, 'disabled');
 assert.equal(disabledPlan.analytics.status, 'disabled');
 assert.equal(disabledPlan.snapshotSchedule.enabled, false);
 assert.equal(disabledPlan.snapshotSchedule.cadence, 'manual');
-assert.equal(disabledPlan.avatar.capabilities.join(','), 'state_cues');
+assert.equal(disabledPlan.avatar.capabilities.length, 0, 'disabled avatar provider should not advertise active capabilities');
+
+const providerPlan = providerAdapters.buildPhase3RuntimeAdapterPlan({
+  speechStackEnabled: true,
+  ttsAvatarEnabled: true,
+  lipSyncEnabled: true,
+  analyticsEnabled: true,
+  providerConfig: {
+    sttProvider: 'server',
+    ttsProvider: 'server',
+    avatarProvider: 'external',
+    sttEndpoint: 'https://stt.example.test/stream',
+    ttsEndpoint: 'https://tts.example.test/synthesize',
+    avatarEndpoint: 'https://avatar.example.test/render',
+    analyticsEndpoint: 'https://analytics.example.test/snapshots',
+    snapshotIntervalSeconds: 300,
+  },
+});
+assert.equal(providerPlan.stt.status, 'available', 'configured provider STT should be deployment-available');
+assert.equal(providerPlan.stt.kind, 'server');
+assert.equal(providerPlan.tts.status, 'available', 'configured provider TTS should be deployment-available');
+assert.equal(providerPlan.avatar.kind, 'external');
+assert.equal(providerPlan.analytics.kind, 'server');
+assert.equal(providerPlan.snapshotSchedule.cadence, 'interval');
+assert.equal(providerPlan.snapshotSchedule.intervalSeconds, 300);
+
+const unconfiguredProviderPlan = providerAdapters.buildPhase3RuntimeAdapterPlan({
+  speechStackEnabled: true,
+  providerConfig: { sttProvider: 'server' },
+});
+assert.equal(unconfiguredProviderPlan.stt.status, 'unconfigured', 'server provider without endpoint should surface deployment misconfiguration');
 
 const runtimeSettingsSource = fs.readFileSync(
   path.join(root, 'src/hooks/facilitator/usePhase3RuntimeSettings.ts'),
@@ -86,8 +116,19 @@ const participantViewSource = fs.readFileSync(
   'utf8'
 );
 assert.match(participantViewSource, /usePhase3RuntimeSettings/, 'participant runtime should load Phase 3 admin settings');
+assert.match(participantViewSource, /phase3RuntimeReady = !isPhase3SettingsPending/, 'participant runtime should wait for settings before enabling Phase 3 features');
 assert.match(participantViewSource, /enabled:\s*viewMode === 'participant' && ttsAvatarEnabled/, 'voice runtime should be gated by normalized settings');
 assert.match(participantViewSource, /speechEnabled=\{speechStackEnabled\}/, 'visible speech capture should be gated by normalized settings');
+
+const envExampleSource = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
+for (const expected of [
+  'VITE_PHASE3_STT_PROVIDER',
+  'VITE_PHASE3_TTS_PROVIDER',
+  'VITE_PHASE3_AVATAR_PROVIDER',
+  'PHASE3_ANALYTICS_SNAPSHOT_INTERVAL_SECONDS',
+]) {
+  assert.match(envExampleSource, new RegExp(expected), `.env.example should document ${expected}`);
+}
 
 const analyticsSource = fs.readFileSync(path.join(root, 'src/hooks/useFacilitationAnalytics.ts'), 'utf8');
 for (const expected of [

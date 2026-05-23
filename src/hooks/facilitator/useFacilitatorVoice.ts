@@ -82,6 +82,10 @@ export function useFacilitatorVoice({
 
   React.useEffect(() => cancel, [cancel]);
 
+  React.useEffect(() => {
+    if (!enabled) cancel();
+  }, [cancel, enabled]);
+
   const speak = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
     const trimmed = text.trim();
     if (!enabled || !trimmed || !conversationId) return;
@@ -161,7 +165,24 @@ export function useFacilitatorVoice({
       activeEventIdRef.current = undefined;
     };
 
-    synth.speak(utterance);
+    try {
+      synth.speak(utterance);
+    } catch (error) {
+      setIsSpeaking(false);
+      setAvatarState('error');
+      utteranceRef.current = null;
+      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+        metadata: {
+          ...metadata,
+          characterCount: trimmed.length,
+          voiceName: selectedVoice?.name ?? null,
+          lipSyncEnabled,
+          error: error instanceof Error ? error.message : 'speech_synthesis_start_failed',
+        },
+      });
+      activeEventIdRef.current = undefined;
+      toast.error('Could not start facilitator voice playback.');
+    }
   }, [conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, persistEvents]);
 
   return {

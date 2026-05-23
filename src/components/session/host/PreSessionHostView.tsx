@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Users, Clock, Target, User, Pencil } from 'lucide-react';
+import { Camera, Captions, Copy, Check, Users, Clock, Target, User, Pencil, Headphones, Mic, MonitorPlay, ShieldCheck, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import api from "@/lib/api";
 import StartSessionButton from './StartSessionButton';
@@ -162,8 +162,11 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="text-center lg:text-left">
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
+                  Share the room link, wait for participants, then start the AI-moderated workshop.
                   {stableParticipantCount === 0 && " You need at least one participant to start."}
+                </p>
+                <p className="mt-2 text-xs md:text-sm text-indigo-700">
+                  AIfacilitator runs the prompts and response capture; keep your usual video call open only if the group needs face-to-face presence.
                 </p>
                 
               </div>
@@ -173,6 +176,24 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                 <StartSessionButton onStartSession={handleSessionStart} participantCount={stableParticipantCount} isSessionStarted={false} isAutoStarting={isAutoStarting} autoStartCountdown={autoStartCountdown} onCancelAutoStart={onCancelAutoStart} />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+
+        <Card className="mb-4 border-indigo-100 bg-white/90 shadow-sm md:mb-6">
+          <CardContent className="flex flex-col gap-3 p-4 text-sm text-slate-700 md:flex-row md:items-center md:justify-between md:p-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-indigo-50 p-2 text-indigo-600">
+                <MonitorPlay className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Audio/video preview is not connected yet</p>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 md:text-sm">
+                  This room currently runs through structured prompts, read-aloud audio, speech input where supported, and text fallback. Camera tiles are a product preview only.
+                </p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="w-fit bg-slate-100 text-slate-600">Preview only</Badge>
           </CardContent>
         </Card>
 
@@ -207,6 +228,13 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 md:p-4">
+                <h4 className="mb-1 text-sm font-semibold text-indigo-900">Run it simply</h4>
+                <p className="text-xs leading-relaxed text-indigo-800">
+                  Let participants listen with Read aloud, answer by voice where supported, or type when they prefer. Use an external video call only when faces are needed.
+                </p>
               </div>
 
               {/* Participant Status */}

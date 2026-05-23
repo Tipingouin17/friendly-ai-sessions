@@ -44,6 +44,11 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       currentParticipant={props.sessionState.currentParticipant}
       handleSendMessage={props.handleSendMessage} // fixed: match prop name with SessionContainerProps
       isWaitingForResponse={props.isWaitingForResponse}
+      isWaitingForResponses={props.sessionState.isWaitingForResponses}
+      responseCount={props.sessionState.responseCount}
+      totalParticipants={props.sessionState.totalParticipants}
+      onTriggerFacilitatorResponse={props.sessionState.generateAggregatedResponse}
+      isGeneratingResponse={props.sessionState.isGeneratingResponse}
       onGenerateReport={props.sessionState.handleGenerateReport}
       isGeneratingReport={props.sessionState.isGeneratingReport}
       setIsRecording={props.sessionState.setIsRecording}

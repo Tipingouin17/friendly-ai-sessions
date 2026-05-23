@@ -40,7 +40,7 @@ interface ParticipantLoadingShellProps {
 
 const PHASE_CONFIG: Record<
   ParticipantLoadingPhase,
-  { icon: React.ReactNode; title: string; subtitle: string }
+  { icon: React.ReactNode; title: string; subtitle: string; detail?: string; retryLabel?: string }
 > = {
   connecting: {
     icon: (
@@ -51,8 +51,10 @@ const PHASE_CONFIG: Record<
         </svg>
       </div>
     ),
-    title: 'Connecting to session…',
-    subtitle: 'Please wait a moment',
+    title: 'Connecting to your session…',
+    subtitle: 'We are checking the secure session link and reconnecting if needed.',
+    detail: 'If the service is waking up or your network is unstable, this can take a little longer. Please keep this page open.',
+    retryLabel: 'Retry connection',
   },
   waiting_host: {
     icon: (
@@ -60,8 +62,9 @@ const PHASE_CONFIG: Record<
         <Clock className="w-7 h-7 text-indigo-600" />
       </div>
     ),
-    title: 'Waiting for the session to begin',
-    subtitle: 'The host will start the session shortly. Please stay on this page.',
+    title: 'Waiting for the host to start',
+    subtitle: 'You are in the waiting room. The session will open automatically when the host starts it.',
+    detail: 'There is nothing else to do for now. You can keep this tab open while other participants join.',
   },
   ai_generating: {
     icon: (
@@ -72,8 +75,9 @@ const PHASE_CONFIG: Record<
         </svg>
       </div>
     ),
-    title: 'The AI facilitator is getting ready…',
-    subtitle: 'Preparing your personalised welcome message',
+    title: 'The AI facilitator is preparing…',
+    subtitle: 'Creating the first message for this session.',
+    detail: 'This may take a short moment after the host starts the workshop. Please keep this page open; you will enter the chat automatically.',
   },
   message_ready: {
     icon: (
@@ -82,7 +86,7 @@ const PHASE_CONFIG: Record<
       </div>
     ),
     title: 'Welcome message ready',
-    subtitle: 'Loading your session…',
+    subtitle: 'Opening your session…',
   },
   error: {
     icon: (
@@ -90,8 +94,10 @@ const PHASE_CONFIG: Record<
         <AlertCircle className="w-7 h-7 text-red-500" />
       </div>
     ),
-    title: 'Unable to connect',
-    subtitle: 'Please check your connection and try again.',
+    title: 'We could not reconnect yet',
+    subtitle: 'Your session is still safe. Please retry, or ask the host for a fresh link if the problem continues.',
+    detail: 'Temporary connection interruptions or a cold start can cause this message. Retrying usually resolves it.',
+    retryLabel: 'Retry connection',
   },
   timeout: {
     icon: (
@@ -99,8 +105,10 @@ const PHASE_CONFIG: Record<
         <WifiOff className="w-7 h-7 text-yellow-500" />
       </div>
     ),
-    title: 'Taking longer than expected',
-    subtitle: 'The AI is still working on your welcome message.',
+    title: 'The AI is taking longer than expected',
+    subtitle: 'The first facilitator message has not arrived yet.',
+    detail: 'You can ask the AI facilitator to try again. This will not remove your place in the session.',
+    retryLabel: 'Ask AI to try again',
   },
 };
 
@@ -156,9 +164,14 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
           {/* Title + subtitle */}
           <div>
             <p className="text-gray-900 font-semibold text-lg">{config.title}</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-gray-500 text-sm mt-1 leading-relaxed">
               {phase === 'error' && errorMessage ? errorMessage : config.subtitle}
             </p>
+            {config.detail && (
+              <p className="text-gray-400 text-xs mt-2 leading-relaxed">
+                {config.detail}
+              </p>
+            )}
           </div>
 
           {/* Participant counter — shown when relevant */}
@@ -188,7 +201,7 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
                   ) : (
                     <>
                       <RefreshCw className="w-4 h-4" />
-                      Try Again
+                      {config.retryLabel ?? 'Try Again'}
                     </>
                   )}
                 </button>

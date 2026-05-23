@@ -179,6 +179,42 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
     }, 300);
   };
 
+  const handleExportMarkdown = () => {
+    if (!canDownloadPDF || !reportData) {
+      toast({
+        title: "Premium Feature",
+        description: "Markdown export is available for premium users. Please upgrade your plan.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const filename = `${sanitizeFileName(getSessionTitle(reportData.conversation))}-report.md`;
+    downloadTextFile(filename, buildReportMarkdown(reportData), 'text/markdown;charset=utf-8');
+    toast({
+      title: "Report exported",
+      description: "The Markdown report has been downloaded.",
+    });
+  };
+
+  const handleExportJSON = () => {
+    if (!canDownloadPDF || !reportData) {
+      toast({
+        title: "Premium Feature",
+        description: "JSON export is available for premium users. Please upgrade your plan.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const filename = `${sanitizeFileName(getSessionTitle(reportData.conversation))}-report.json`;
+    downloadTextFile(filename, buildReportJSON(reportData), 'application/json;charset=utf-8');
+    toast({
+      title: "Report exported",
+      description: "The structured JSON report has been downloaded.",
+    });
+  };
+
   const handleRetry = () => {
     refetch();
   };
@@ -290,19 +326,19 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
                 <p className="text-gray-600 text-sm truncate max-w-[200px] sm:max-w-none">{conversation.sessions?.title || 'Untitled Session'}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 pl-11 sm:pl-0">
-              {canDownloadPDF && (
-                <Button onClick={handleDownloadPDF} variant="outline" size="sm" className="h-8 sm:h-9">
-                  <Download className="h-4 w-4 mr-1.5" />
-                  <span className="hidden xs:inline">Download </span>PDF
-                </Button>
-              )}
-              {!canDownloadPDF && (
-                <Button onClick={handleDownloadPDF} variant="outline" size="sm" className="opacity-60 h-8 sm:h-9">
-                  <Download className="h-4 w-4 mr-1.5" />
-                  <span className="hidden xs:inline">PDF </span>(Premium)
-                </Button>
-              )}
+            <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
+              <Button onClick={handleDownloadPDF} variant="outline" size="sm" className={!canDownloadPDF ? "opacity-60 h-8 sm:h-9" : "h-8 sm:h-9"}>
+                <Download className="h-4 w-4 mr-1.5" />
+                <span className="hidden xs:inline">Download </span>{canDownloadPDF ? 'PDF' : 'PDF (Premium)'}
+              </Button>
+              <Button onClick={handleExportMarkdown} variant="outline" size="sm" className={!canDownloadPDF ? "opacity-60 h-8 sm:h-9" : "h-8 sm:h-9"}>
+                <Download className="h-4 w-4 mr-1.5" />
+                Markdown
+              </Button>
+              <Button onClick={handleExportJSON} variant="outline" size="sm" className={!canDownloadPDF ? "opacity-60 h-8 sm:h-9" : "h-8 sm:h-9"}>
+                <Download className="h-4 w-4 mr-1.5" />
+                JSON
+              </Button>
             </div>
           </div>
         </div>
@@ -356,6 +392,21 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
                 <div>
                   <h4 className="font-medium mb-2">Objective</h4>
                   <p className="text-gray-700">{conversation.sessions?.objective || 'No objective specified'}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Generated Report */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Generated Report</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-700 leading-relaxed">
+                  {getReportContent(report) || 'No generated report content is available yet.'}
                 </div>
               </CardContent>
             </Card>
@@ -476,6 +527,140 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
 };
 
 // Helper functions
+function getSessionTitle(conversation: any): string {
+  return conversation?.sessions?.title || `Session ${conversation?.id || 'report'}`;
+}
+
+function getReportContent(report: any): string {
+  return String(
+    report?.report_content ||
+    report?.content ||
+    report?.summary ||
+    report?.reportContent ||
+    ''
+  ).trim();
+}
+
+function sanitizeFileName(value: string): string {
+  const sanitized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return sanitized || 'session-report';
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function getMessageText(message: any): string {
+  const content = message?.content;
+
+  if (!content) return '';
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content);
+      return parsed?.text || parsed?.message || content;
+    } catch {
+      return content;
+    }
+  }
+
+  if (typeof content === 'object') {
+    return content.text || content.message || JSON.stringify(content);
+  }
+
+  return String(content);
+}
+
+function getParticipantLabel(participant: any, index: number): string {
+  return participant?.name || participant?.display_name || participant?.participant_name || `Participant ${participant?.participant_number || index + 1}`;
+}
+
+function buildReportMarkdown(reportData: any): string {
+  const { conversation, report, messages, participants, highlights, keyMoments, participationStats } = reportData;
+  const title = getSessionTitle(conversation);
+  const generatedContent = getReportContent(report);
+  const generatedAt = report?.generated_at || report?.created_at || new Date().toISOString();
+
+  const lines = [
+    `# ${title} — Session Report`,
+    '',
+    `Generated: ${new Date(generatedAt).toLocaleString()}`,
+    `Conversation ID: ${conversation?.id || 'Unknown'}`,
+    `Session type: ${conversation?.sessions?.session_type || 'Discussion'}`,
+    `Objective: ${conversation?.sessions?.objective || 'No objective specified'}`,
+    '',
+    '## Overview',
+    '',
+    `- Participants: ${participationStats.totalParticipants}`,
+    `- Active participants: ${participationStats.activeParticipants}`,
+    `- Participant messages: ${participationStats.totalMessages}`,
+    `- Messages per participant: ${participationStats.avgMessagesPerPerson}`,
+    `- Duration: ${conversation?.session_duration_minutes || 0} minutes`,
+    `- Engagement score: ${conversation?.participant_engagement_score?.toFixed?.(1) || '0.0'}`,
+    '',
+    '## Generated Report',
+    '',
+    generatedContent || 'No generated report content is available yet.',
+    '',
+    '## Key Highlights',
+    '',
+    ...(highlights || []).map((highlight: string) => `- ${highlight}`),
+    '',
+    '## Key Moments',
+    '',
+    ...(keyMoments || []).map((moment: { time: string; description: string }) => `- **${moment.time}:** ${moment.description}`),
+    '',
+    '## Participants',
+    '',
+    ...(participants || []).map((participant: any, index: number) => `- ${getParticipantLabel(participant, index)}${participant.status ? ` (${participant.status})` : ''}`),
+    '',
+    '## Conversation Transcript',
+    '',
+    ...(messages || []).map((message: any) => {
+      const timestamp = message.created_at ? new Date(message.created_at).toLocaleString() : 'Unknown time';
+      const speaker = message.name || message.role || 'message';
+      return `### ${speaker} — ${timestamp}\n\n${getMessageText(message)}`;
+    }),
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
+function buildReportJSON(reportData: any): string {
+  const { conversation, report, messages, participants, highlights, keyMoments, participationStats } = reportData;
+
+  return JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    conversationId: conversation?.id,
+    title: getSessionTitle(conversation),
+    objective: conversation?.sessions?.objective || null,
+    sessionType: conversation?.sessions?.session_type || null,
+    generatedReport: getReportContent(report),
+    report,
+    participationStats,
+    highlights,
+    keyMoments,
+    participants,
+    messages: (messages || []).map((message: any) => ({
+      ...message,
+      text: getMessageText(message),
+    })),
+  }, null, 2);
+}
+
 function extractHighlights(messages: any[]): string[] {
   const userMessages = messages.filter(m => m.role === 'user');
   

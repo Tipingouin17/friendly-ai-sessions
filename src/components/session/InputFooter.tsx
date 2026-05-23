@@ -13,7 +13,7 @@ import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { Users, Lock } from "lucide-react";
+import { Mic, PenLine, Users, Lock } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import ParticipantEngagementControls from './ParticipantEngagementControls';
@@ -39,6 +39,7 @@ interface InputFooterProps {
   showResponseStats?: boolean;
   conversationId?: number | null;
   onParticipantStatusChange?: (participantId: number, status: 'active' | 'paused' | 'skipped') => void;
+  speechLanguage?: string | null;
 }
 
 const InputFooter = ({
@@ -61,6 +62,7 @@ const InputFooter = ({
   showResponseStats = false,
   conversationId = null,
   onParticipantStatusChange,
+  speechLanguage = null,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -102,6 +104,9 @@ const InputFooter = ({
   const shouldAllowAnswer = (lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered)
     && !engagement.isPaused
     && !engagement.isSkipped;
+  const inputGuidance = shouldAllowAnswer
+    ? "Your turn: speak or type a short response."
+    : "Waiting for the facilitator’s next prompt. Your draft stays here.";
 
   // Count how many questions this participant has sent
   const participantKey = String(effectiveParticipantId);
@@ -159,16 +164,28 @@ const InputFooter = ({
 
             {/* Chat input — hidden when paused or skipped */}
             {!engagement.isPaused && !engagement.isSkipped && (
-              <ChatInput
+              <>
+                <div className="border-t border-slate-100 bg-slate-50/80 px-3 py-2 sm:px-4">
+                  <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                    <div className="mt-0.5 flex shrink-0 items-center gap-1 text-indigo-600">
+                      <PenLine className="h-3.5 w-3.5" />
+                      <Mic className="h-3.5 w-3.5" />
+                    </div>
+                    <span>{inputGuidance}</span>
+                  </div>
+                </div>
+                <ChatInput
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 onSendMessage={onSendMessage}
                 isRecording={isRecording}
                 setIsRecording={setIsRecording}
-                placeholder="Type your response…"
+                placeholder="Speak with the microphone or type your response…"
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
-              />
+                  speechLanguage={speechLanguage}
+                />
+              </>
             )}
           </>
         ) : (

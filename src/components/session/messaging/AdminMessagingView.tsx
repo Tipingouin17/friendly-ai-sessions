@@ -11,8 +11,9 @@ import AdminMessageFilters from './AdminMessageFilters';
 import AdminMessageGroup from './AdminMessageGroup';
 import MessageEmptyState from './MessageEmptyState';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart2, MessageSquare, BarChart4, List, Users, MessageCircle, TrendingUp, Award } from 'lucide-react';
+import { BarChart2, MessageSquare, BarChart4, List, Users, MessageCircle, TrendingUp, Award, Clock } from 'lucide-react';
 
 interface AdminMessagingViewProps {
   messages: Message[];
@@ -22,6 +23,11 @@ interface AdminMessagingViewProps {
   setSearchTerm: (term: string) => void;
   showAnonymous: boolean;
   setShowAnonymous: (show: boolean) => void;
+  isWaitingForResponses?: boolean;
+  responseCount?: number;
+  totalParticipants?: number;
+  onTriggerFacilitatorResponse?: (hostInstruction?: string) => Promise<void> | void;
+  isGeneratingResponse?: boolean;
 }
 
 // ── Insights sub-components ──────────────────────────────────────────────────
@@ -83,7 +89,12 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
   searchTerm,
   setSearchTerm,
   showAnonymous,
-  setShowAnonymous
+  setShowAnonymous,
+  isWaitingForResponses = false,
+  responseCount = 0,
+  totalParticipants = 1,
+  onTriggerFacilitatorResponse,
+  isGeneratingResponse = false
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
   
@@ -165,6 +176,8 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
   }, [messages, showAnonymous, searchTerm]);
 
   const totalResponses = groupedMessages.reduce((acc, group) => acc + group.responses.length, 0);
+  const responseTarget = Math.max(totalParticipants, currentParticipantCount, 1);
+  const responseProgress = Math.min(responseCount / responseTarget, 1);
   
   const uniqueParticipants = useMemo(() => {
     const participantSet = new Set<string>();
@@ -262,6 +275,40 @@ const AdminMessagingView: React.FC<AdminMessagingViewProps> = ({
             </div>
           </div>
           
+          {isWaitingForResponses && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    Waiting for participant responses
+                  </div>
+                  <p className="mt-1 text-xs text-amber-800">
+                    {responseCount} of {responseTarget} active participant{responseTarget === 1 ? '' : 's'} are ready. If the discussion is stalled, ask the AI facilitator to continue with the responses already collected.
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                      style={{ width: `${Math.round(responseProgress * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {onTriggerFacilitatorResponse && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isGeneratingResponse}
+                    onClick={() => onTriggerFacilitatorResponse()}
+                    className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                  >
+                    {isGeneratingResponse ? 'Generating…' : 'Ask AI to continue now'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <AdminMessageFilters
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}

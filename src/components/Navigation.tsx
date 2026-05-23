@@ -29,11 +29,6 @@ export const Navigation = () => {
   const isAdminPage = location.pathname.includes('admin');
 
   const adminPageClass = isAdminPage ? 'bg-transparent border-transparent z-30' : 'bg-white/90 backdrop-blur-md border-gray-100';
-
-  if (isMobile && isSessionPage) {
-    return null;
-  }
-
   const userDisplayName = getUserDisplayName(user);
 
   const navLinkClass = (path: string) =>
@@ -52,6 +47,10 @@ export const Navigation = () => {
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
+
+  if (isMobile && isSessionPage) {
+    return null;
+  }
 
   /** Wraps a Link so it closes the menu and scrolls to top on click. */
   const MobileLink = ({

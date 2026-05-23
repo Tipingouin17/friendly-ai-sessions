@@ -17,12 +17,12 @@
  * - Session info accessible via a compact top bar (no sidebar)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Users, Home, Sparkles } from 'lucide-react';
+import { Camera, CameraOff, Captions, Headphones, Home, Mic, MonitorPlay, Sparkles, Users } from 'lucide-react';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -81,18 +81,29 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   showResponseStats = false,
 }) => {
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
+  const routeParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const routeParticipantId = Number(routeParams?.get('participantId'));
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
+  const resolvedParticipantId = effectiveParticipantId > 0
+    ? effectiveParticipantId
+    : (Number.isFinite(routeParticipantId) && routeParticipantId > 0 ? routeParticipantId : 1);
 
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant",
     participants,
     participantNames,
-    currentParticipant: effectiveParticipantId
+    currentParticipant: resolvedParticipantId
   });
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
+  const sessionObjective = conversationData?.sessions?.objective || conversationData?.objective || 'Share perspectives, clarify the problem, and move toward useful next steps together.';
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
+  const speechLanguage = conversationData?.language || conversationData?.sessions?.language || null;
+  const showOrientationCard = !isSessionEnded && filteredMessages.length <= 2;
+  const [isMicPreviewOn, setIsMicPreviewOn] = useState(false);
+  const [isCameraPreviewOn, setIsCameraPreviewOn] = useState(false);
+  const [showLiveCaptionPreview, setShowLiveCaptionPreview] = useState(true);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -120,6 +131,71 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           </span>
         </div>
       </div>
+
+      {showOrientationCard && (
+        <div className="shrink-0 border-b border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-4 py-3">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-indigo-600">
+                <Sparkles className="h-3.5 w-3.5" />
+                Your workshop room
+              </div>
+              <h2 className="truncate text-sm font-semibold text-slate-900">{sessionTitle}</h2>
+              <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{sessionObjective}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 md:justify-end">
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1.5 font-medium text-indigo-700">
+                <Headphones className="h-3.5 w-3.5" /> Listen
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-600">
+                <Mic className="h-3.5 w-3.5" /> Speak or type
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-600">
+                <Users className="h-3.5 w-3.5" /> {currentParticipantCount}/{maxParticipants}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {!isSessionEnded && (
+        <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <MonitorPlay className="h-4 w-4 text-slate-500" />
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Preview only</span>
+              <span className="font-medium text-slate-700">Mic and camera are UI previews; the live channel is the conversation below.</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMicPreviewOn((value) => !value)}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${isMicPreviewOn ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100'}`}
+              >
+                <Mic className="h-3.5 w-3.5" />
+                {isMicPreviewOn ? 'Mic preview on' : 'Mic preview'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCameraPreviewOn((value) => !value)}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${isCameraPreviewOn ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100'}`}
+              >
+                {isCameraPreviewOn ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+                {isCameraPreviewOn ? 'Camera preview on' : 'Camera preview'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLiveCaptionPreview((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-100"
+              >
+                <Captions className="h-3.5 w-3.5" />
+                Captions {showLiveCaptionPreview ? 'shown' : 'hidden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Message list (flex-1 = fills all remaining space, scrolls) ─── */}
       <div className="flex-1 min-h-0">
@@ -181,6 +257,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             messages={messages}
             showResponseStats={showResponseStats}
             conversationId={conversationId}
+            speechLanguage={speechLanguage}
           />
         </div>
       )}

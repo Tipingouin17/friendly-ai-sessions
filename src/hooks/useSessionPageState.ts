@@ -22,6 +22,7 @@ export function useSessionPageState() {
     error: null as string | null,
     noSessionFound: false,
     hasShownToast: false,
+    hasShownSessionFullToast: false,
     pageLoadTime: typeof window !== 'undefined' ? Date.now() : 0 // Initialize synchronously
   });
   
@@ -79,12 +80,14 @@ export function useSessionPageState() {
   // Session full handler
   const handleSessionFull = useCallback(() => {
     setSessionStarted(true);
-    
-    toast({
-      title: "Session is full",
-      description: "The maximum number of participants has joined. Starting session automatically.",
-    });
-  }, [toast]);
+
+    if (stateRef.current.hasShownSessionFullToast) {
+      return;
+    }
+
+    // Room readiness is visible in the page header/status; avoid adding a floating toast that competes with the workshop prompt.
+    stateRef.current.hasShownSessionFullToast = true;
+  }, []);
   
   // Retry connection handler
   const retryConnection = useCallback(() => {

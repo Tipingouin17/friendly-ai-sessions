@@ -13,6 +13,7 @@ import { Mic, Send, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { SpeechRecognition } from "@/types/chat";
 import { MAX_MESSAGE_LENGTH } from "@/utils/inputValidation";
+import { getSpeechLocale } from "@/utils/speechLocale";
 
 interface ChatInputProps {
   inputMessage: string;
@@ -23,6 +24,7 @@ interface ChatInputProps {
   placeholder?: string;
   disabled?: boolean;
   isMobile?: boolean; // kept for API compat
+  speechLanguage?: string | null;
 }
 
 const ChatInput = ({
@@ -33,10 +35,12 @@ const ChatInput = ({
   setIsRecording = () => { /* no-op */ },
   placeholder = "Type your response…",
   disabled = false,
+  speechLanguage = null,
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const preRecordingTextRef = useRef<string>('');
+  const latestTranscriptRef = useRef<string>('');
   const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
 
   const charCount = inputMessage.length;
@@ -63,14 +67,21 @@ const ChatInput = ({
     recognitionRef.current = new SpeechRecognitionAPI();
     recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'en-US';
+    recognitionRef.current.lang = getSpeechLocale(speechLanguage);
 
     recognitionRef.current.onresult = (event) => {
-      const transcript = Array.from(event.results).map(r => r[0].transcript).join('');
+      const transcript = Array.from(event.results)
+        .map(result => result[0]?.transcript ?? '')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      latestTranscriptRef.current = transcript;
       const combined = preRecordingTextRef.current
-        ? preRecordingTextRef.current.trimEnd() + ' ' + transcript
+        ? `${preRecordingTextRef.current.trimEnd()} ${transcript}`.trim()
         : transcript;
-      // Truncate voice input to the UI limit
+
+      // Keep interim and final speech text visible, but never exceed the UI limit.
       setInputMessage(combined.slice(0, MAX_MESSAGE_LENGTH));
     };
 
@@ -78,27 +89,46 @@ const ChatInput = ({
       setIsRecording(false);
       if (event.error === 'not-allowed') {
         toast.error("Microphone access denied — please allow it in your browser settings.");
-      } else if (event.error !== 'no-speech') {
-        toast.error("Voice input error — please try again.");
+      } else if (event.error === 'no-speech') {
+        toast.info("I did not catch speech yet — you can try the microphone again or type your answer.");
+      } else {
+        toast.error("Voice input error — your typed text was kept. Please try again.");
       }
     };
 
-    recognitionRef.current.onend = () => setIsRecording(false);
+    recognitionRef.current.onend = () => {
+      const hadTranscript = latestTranscriptRef.current.length > 0;
+      if (!hadTranscript) {
+        preRecordingTextRef.current = preRecordingTextRef.current.trimEnd();
+      }
+      setIsRecording(false);
+    };
 
     return () => { recognitionRef.current?.stop(); };
-  }, [setInputMessage, setIsRecording]);
+  }, [setInputMessage, setIsRecording, speechLanguage]);
+
+  useEffect(() => {
+    if (!disabled || !isRecording) return;
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+  }, [disabled, isRecording, setIsRecording]);
 
   const handleStartRecording = () => {
     if (!speechSupported) {
       toast.error("Voice input is not supported in this browser. Try Chrome or Edge.");
       return;
     }
+    if (disabled) {
+      toast.info("Please wait for the facilitator's next question before responding.");
+      return;
+    }
     if (recognitionRef.current) {
       preRecordingTextRef.current = inputMessage;
+      latestTranscriptRef.current = '';
       try {
         recognitionRef.current.start();
         setIsRecording(true);
-        toast.info("Listening… speak now, then press Stop or Enter to send.");
+        toast.info("Listening… speak naturally, then press Stop. Review the transcript before sending.");
       } catch {
         toast.error("Could not start voice input — check your microphone permissions.");
       }
@@ -138,7 +168,7 @@ const ChatInput = ({
             value={inputMessage}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder={disabled ? "Waiting for the next question…" : placeholder}
+            placeholder={disabled ? "Waiting for the facilitator or other participants…" : placeholder}
             disabled={disabled}
             rows={2}
             className={`w-full resize-none rounded-2xl border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow ${
@@ -163,6 +193,7 @@ const ChatInput = ({
           type="button"
           onClick={isRecording ? handleStopRecording : handleStartRecording}
           disabled={disabled}
+          aria-label={isRecording ? "Stop voice input" : "Start voice input"}
           title={isRecording ? "Stop recording" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
           className={`shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
             isRecording

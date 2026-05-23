@@ -47,15 +47,8 @@ export function useSessionPageEffects({
       if (sessionMountedRef.current && !stateRef.current.hasShownToast) {
         
         if (isLoading && !hasInitializedProvider) {
+          // Keep participant loading feedback inline in SessionConnecting instead of stacking toast cards over the workshop room.
           stateRef.current.hasShownToast = true;
-          
-          // Skip toast for admin
-          if (!isOnAdminPath && !isAdmin) {
-            toast({
-              title: "Loading your session",
-              description: "Please wait while we connect you to the session.",
-            });
-          }
         }
       }
     }, initialTimeout);

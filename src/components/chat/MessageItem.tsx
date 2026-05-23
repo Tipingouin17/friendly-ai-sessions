@@ -19,6 +19,7 @@ interface MessageItemProps {
   currentParticipant?: string;
   participantInfo?: ParticipantInfo | null;
   isMobile?: boolean; // kept for API compat
+  speechLanguage?: string | null;
 }
 
 const MessageItem = ({
@@ -27,6 +28,7 @@ const MessageItem = ({
   isLastMessageOfGroup,
   currentParticipant,
   participantInfo,
+  speechLanguage = null,
 }: MessageItemProps) => {
   const isAnonymous = message.isAnonymous && message.sender === "user";
 
@@ -62,6 +64,7 @@ const MessageItem = ({
           isFirstMessageOfGroup={isFirstMessageOfGroup}
           isAnonymous={isAnonymous}
           isCurrentUser={isCurrentUser}
+          speechLanguage={speechLanguage}
         />
       </div>
     );
@@ -98,6 +101,7 @@ const MessageItem = ({
         isFirstMessageOfGroup={isFirstMessageOfGroup}
         isAnonymous={isAnonymous}
         isCurrentUser={isCurrentUser}
+        speechLanguage={speechLanguage}
       />
 
       {/* Right avatar (participant) */}

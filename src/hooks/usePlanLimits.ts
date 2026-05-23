@@ -11,7 +11,6 @@ const log = createLogger('usePlanLimits', 'plan');
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { useUserPlan } from "./useUserPlan";
-import { useToast } from "@/components/ui/use-toast";
 
 export interface PlanLimits {
   hasReachedFacilitatorLimit: boolean;
@@ -35,8 +34,6 @@ export interface PlanLimits {
 export const usePlanLimits = (): PlanLimits => {
   const { user } = useAuth();
   const { planRestrictions, plan, isLoading: planLoading } = useUserPlan();
-  const { toast } = useToast();
-
   const { data: counts, isLoading: countsLoading } = useQuery({
     queryKey: ['userUsage', user?.id],
     staleTime: 5 * 60 * 1000, // 5 minutes — counts don't change often
@@ -54,18 +51,16 @@ export const usePlanLimits = (): PlanLimits => {
         api.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', startOfMonth)
       ]);
 
-      if (facilitatorResult.error) {
-        toast({ title: "Error", description: "Failed to fetch facilitator count", variant: "destructive" });
-        throw facilitatorResult.error;
-      }
-      if (sessionResult.error) {
-        toast({ title: "Error", description: "Failed to fetch session count", variant: "destructive" });
-        throw sessionResult.error;
+      if (facilitatorResult.error || sessionResult.error) {
+        log.warn('Usage counts unavailable; falling back to zero without interrupting the active room', {
+          facilitatorError: facilitatorResult.error,
+          sessionError: sessionResult.error,
+        });
       }
 
       return {
-        facilitatorCount: facilitatorResult.count || 0,
-        sessionCount: sessionResult.count || 0
+        facilitatorCount: facilitatorResult.error ? 0 : facilitatorResult.count || 0,
+        sessionCount: sessionResult.error ? 0 : sessionResult.count || 0
       };
     },
     enabled: !!user && !planLoading,

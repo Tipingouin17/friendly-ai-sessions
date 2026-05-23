@@ -39,6 +39,18 @@ export const useWelcomeMessageGate = ({
   // component briefly re-mounts during a backend reconnection.
   const messageReadyForConversationRef = useRef<number | null>(null);
 
+  const clearPendingWait = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (channelRef.current) {
+      api.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, []);
+
   const checkForWelcomeMessage = useCallback(async (): Promise<boolean> => {
     if (!conversationId) return false;
 
@@ -97,6 +109,7 @@ export const useWelcomeMessageGate = ({
     }
 
     // Message not ready yet — now set isWaitingForMessage=true to show the loading UI
+    clearPendingWait();
     setState(prev => ({ 
       ...prev, 
       isWaitingForMessage: true, 
@@ -204,21 +217,62 @@ export const useWelcomeMessageGate = ({
     });
   // BUG #3 FIX: Removed state.messageReady and state.timeoutReached from deps
   // to prevent new function references on every state change.
-  }, [conversationId, sessionStarted, checkForWelcomeMessage]);
+  }, [conversationId, sessionStarted, checkForWelcomeMessage, clearPendingWait]);
+
+  const forceGenerateWelcomeMessage = useCallback(async (): Promise<boolean> => {
+    if (!conversationId || !sessionStarted) return false;
+
+    clearPendingWait();
+    setState(prev => ({
+      ...prev,
+      isWaitingForMessage: true,
+      messageReady: false,
+      error: null,
+      timeoutReached: false,
+    }));
+
+    try {
+      await api
+        .from('conversations')
+        .update({
+          welcome_message_status: 'pending',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+
+      const { error } = await api.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: [],
+          conversationId,
+          sessionStart: true,
+          generateReport: false,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return waitForWelcomeMessage();
+    } catch (error) {
+      console.error('[WelcomeMessageGate] Failed to force welcome message generation:', error);
+      setState(prev => ({
+        ...prev,
+        isWaitingForMessage: false,
+        messageReady: false,
+        timeoutReached: true,
+        error: 'The AI facilitator could not prepare the welcome message yet.',
+      }));
+      return false;
+    }
+  }, [conversationId, sessionStarted, clearPendingWait, waitForWelcomeMessage]);
 
   // Clean up on unmount or conversation change
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      if (channelRef.current) {
-        api.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      clearPendingWait();
     };
-  }, [conversationId]);
+  }, [conversationId, clearPendingWait]);
 
   // BUG #3 FIX: Only reset state when conversation ID actually changes to a
   // DIFFERENT session. If the same conversation ID re-renders (e.g., after a
@@ -251,6 +305,7 @@ export const useWelcomeMessageGate = ({
   return {
     ...state,
     waitForWelcomeMessage,
+    forceGenerateWelcomeMessage,
     checkForWelcomeMessage
   };
 };

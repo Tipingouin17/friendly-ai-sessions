@@ -27,6 +27,11 @@ interface HostDashboardProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  participantStatusSummary?: {
+    pausedCount: number;
+    skippedCount: number;
+    activeParticipantCount: number;
+  };
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   
   // Session start props
@@ -55,6 +60,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  participantStatusSummary,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
@@ -97,6 +103,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isWaitingForResponses={isWaitingForResponses}
         responseCount={responseCount}
         totalParticipants={totalParticipants}
+        participantStatusSummary={participantStatusSummary}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         isSessionStarted={isSessionStarted}
         onSessionStarted={onSessionStarted}

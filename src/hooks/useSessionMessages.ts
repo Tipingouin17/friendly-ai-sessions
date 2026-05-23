@@ -4,8 +4,9 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Message } from '@/types/chat';
+import api from '@/lib/api';
 import { useResponseTracking } from './session-messages/useResponseTracking';
 import { useViewMode } from './session-messages/useViewMode';
 import { useEnhancedSessionMessages } from './useEnhancedSessionMessages';
@@ -27,6 +28,8 @@ export const useSessionMessages = ({
   conversation,
   totalParticipants = 1
 }: UseSessionMessagesProps) => {
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+
   // Use enhanced message fetching with improved reliability
   const {
     messages,
@@ -75,6 +78,71 @@ export const useSessionMessages = ({
     }
   };
 
+  const responseSnapshot = useMemo(() => {
+    let lastAssistantIndex = -1;
+
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === 'assistant') {
+        lastAssistantIndex = i;
+        break;
+      }
+    }
+
+    if (lastAssistantIndex === -1 || conversation?.is_session_ended) {
+      return {
+        isWaitingForResponses: false,
+        responseCount: 0,
+      };
+    }
+
+    const respondents = new Set<string>();
+    messages.slice(lastAssistantIndex + 1).forEach(message => {
+      if (message.sender !== 'user') return;
+      respondents.add(message.participant || message.name || message.id);
+    });
+
+    return {
+      isWaitingForResponses: true,
+      responseCount: respondents.size,
+    };
+  }, [conversation?.is_session_ended, messages]);
+
+  const generateAggregatedResponse = useCallback(async (hostInstruction?: string) => {
+    if (!conversationId || isGeneratingResponse || conversation?.is_session_ended) return;
+
+    setIsGeneratingResponse(true);
+
+    try {
+      const contextMessages = messages
+        .filter(message => !message.isPrivateToHost)
+        .map(message => ({
+          role: message.sender === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        }));
+
+      const { error: invokeError } = await api.functions.invoke('handle-facilitator-response', {
+        body: {
+          messages: contextMessages,
+          conversationId,
+          sessionStart: false,
+          generateReport: false,
+          ...(hostInstruction?.trim() ? { hostInstruction: hostInstruction.trim() } : {}),
+        },
+      });
+
+      if (invokeError) {
+        throw invokeError;
+      }
+
+      await forceFetchMessages();
+    } catch (generationError) {
+      console.error('Error generating facilitator response:', generationError);
+      throw generationError;
+    } finally {
+      setIsGeneratingResponse(false);
+    }
+  }, [conversation?.is_session_ended, conversationId, forceFetchMessages, isGeneratingResponse, messages]);
+
   // Log connection status for debugging
   useEffect(() => {
     if (conversationId) { /* no-op */ }
@@ -92,10 +160,10 @@ export const useSessionMessages = ({
     setViewMode,
     isGeneratingWelcome: isLoading,
     handleNewMessage,
-    isWaitingForResponses: false, // Not implemented in enhanced version yet
-    responseCount: 0, // Not implemented in enhanced version yet
-    generateAggregatedResponse: async () => { /* no-op */ }, // Not implemented in enhanced version yet
-    isGeneratingResponse: false, // Not implemented in enhanced version yet
+    isWaitingForResponses: responseSnapshot.isWaitingForResponses,
+    responseCount: responseSnapshot.responseCount,
+    generateAggregatedResponse,
+    isGeneratingResponse,
     forceFetchMessages,
     
     // Enhanced reliability features

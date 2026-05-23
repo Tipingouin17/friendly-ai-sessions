@@ -25,6 +25,8 @@ interface SessionContainerProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  onTriggerFacilitatorResponse?: (hostInstruction?: string) => Promise<void> | void;
+  isGeneratingResponse?: boolean;
   setIsRecording: (isRecording: boolean) => void;
   isRecording: boolean;
   participantColors: { [key: string]: string };
@@ -59,6 +61,8 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  onTriggerFacilitatorResponse,
+  isGeneratingResponse = false,
   setIsRecording,
   isRecording,
   participantColors,
@@ -108,6 +112,8 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           isWaitingForResponses={isWaitingForResponses}
           responseCount={responseCount}
           totalParticipants={totalParticipants}
+          onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+          isGeneratingResponse={isGeneratingResponse}
           participants={participants}
           conversationId={conversationId}
           currentParticipantCount={currentParticipantCount}

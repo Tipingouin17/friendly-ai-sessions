@@ -16,7 +16,7 @@ import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Users, Wand2, SendHorizonal,
   ChevronDown, ChevronUp, Zap, TrendingUp, BarChart2,
-  Activity, CheckCircle2, Clock, Sparkles
+  Activity, CheckCircle2, Clock, Sparkles, Camera, CameraOff, Captions, Mic, MonitorPlay, Radio, ShieldCheck, Video, Volume2
 } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -27,6 +27,11 @@ interface SimplifiedHostMessagingViewProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  participantStatusSummary?: {
+    pausedCount: number;
+    skippedCount: number;
+    activeParticipantCount: number;
+  };
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
@@ -47,6 +52,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 0,
+  participantStatusSummary,
   onTriggerFacilitatorResponse,
   isSessionStarted = false,
   onSessionStarted,
@@ -63,6 +69,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
+  const [hostMicArmed, setHostMicArmed] = useState(false);
+  const [hostCameraPreview, setHostCameraPreview] = useState(false);
+  const [captionsVisible, setCaptionsVisible] = useState(true);
 
   // Inactivity timer — purely indicative, never auto-triggers anything
   const { elapsedSeconds, isInactive, pendingCount, resetTimer } = useInactivityTimer({
@@ -102,12 +111,17 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const participantMessages = messages.filter(m => m.sender === 'user');
 
   // Derived metrics
-  const responseRate = totalParticipants > 0
-    ? Math.round((responseCount / totalParticipants) * 100)
+  const responseTarget = participantStatusSummary?.activeParticipantCount ?? totalParticipants;
+  const pausedCount = participantStatusSummary?.pausedCount ?? 0;
+  const skippedCount = participantStatusSummary?.skippedCount ?? 0;
+  const responseRate = responseTarget > 0
+    ? Math.round((responseCount / responseTarget) * 100)
     : 0;
   const avgMessagesPerParticipant = currentParticipantCount > 0
     ? (participantMessages.length / currentParticipantCount).toFixed(1)
     : '0';
+  const visibleMediaParticipants = participants.slice(0, 6);
+  const hiddenMediaParticipantCount = Math.max(0, currentParticipantCount - visibleMediaParticipants.length);
 
   const handleSendWithInstruction = async () => {
     if (!onTriggerFacilitatorResponse) return;
@@ -235,7 +249,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                   </div>
                   <span className="text-2xl font-bold text-slate-900">{responseRate}%</span>
-                  <span className="text-xs text-slate-400">{responseCount} / {totalParticipants} responded</span>
+                  <span className="text-xs text-slate-400">{responseCount} / {responseTarget} active responded</span>
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-sm">
@@ -257,6 +271,53 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 </div>
               </div>
 
+
+              {/* P2 Audio/Video Preview Note */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-slate-100 p-2 text-slate-500">
+                      <MonitorPlay className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Preview only
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-slate-900">Future audio/video room</h3>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                        Camera tiles and moderator audio are represented as a design preview. The live workshop still runs through facilitator messages, read-aloud, speech input where supported, and text responses.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setHostMicArmed((value) => !value)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostMicArmed ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      <Mic className="h-3.5 w-3.5" />
+                      {hostMicArmed ? 'Mic preview on' : 'Mic preview'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHostCameraPreview((value) => !value)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostCameraPreview ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      {hostCameraPreview ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+                      {hostCameraPreview ? 'Camera preview on' : 'Camera preview'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaptionsVisible((value) => !value)}
+                      className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-200"
+                    >
+                      <Captions className="h-3.5 w-3.5" />
+                      Captions {captionsVisible ? 'shown' : 'hidden'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Response Collection Progress */}
               {isWaitingForResponses && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -266,15 +327,21 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       <span className="text-sm font-semibold text-slate-800">Collecting Responses</span>
                     </div>
                     <span className="text-xs font-medium text-slate-500">
-                      {responseCount} of {totalParticipants}
+                      {responseCount} of {responseTarget} active
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
                     <div
                       className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
-                      style={{ width: totalParticipants > 0 ? `${(responseCount / totalParticipants) * 100}%` : '0%' }}
+                      style={{ width: responseTarget > 0 ? `${Math.min((responseCount / responseTarget) * 100, 100)}%` : '0%' }}
                     />
                   </div>
+                  {(skippedCount > 0 || pausedCount > 0) && (
+                    <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                      {skippedCount > 0 && `${skippedCount} participant${skippedCount === 1 ? '' : 's'} skipped this round and count as ready. `}
+                      {pausedCount > 0 && `${pausedCount} paused participant${pausedCount === 1 ? ' is' : 's are'} excluded until they resume.`}
+                    </p>
+                  )}
                   {onTriggerFacilitatorResponse && (
                     <Button
                       onClick={handleContinueNormal}
@@ -288,7 +355,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600" />
                           Generating…
                         </span>
-                      ) : 'Continue without waiting'}
+                      ) : 'Ask AI to continue now'}
                     </Button>
                   )}
                 </div>
@@ -322,7 +389,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       <p className={`text-sm font-semibold ${isInstructionExpanded ? 'text-indigo-900' : 'text-slate-800'}`}>
                         Steer the AI Facilitator
                       </p>
-                      <p className="text-xs text-slate-500">Participants won't see your instruction</p>
+                      <p className="text-xs text-slate-500">Use this to recover from a stalled moment or guide the next facilitator response. Participants will not see your instruction.</p>
                     </div>
                   </div>
                   {isInstructionExpanded
@@ -360,8 +427,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-indigo-600">
                         {hostInstruction.trim()
-                          ? 'AI will use your instruction for its next response'
-                          : 'Select a preset or write a custom instruction above'}
+                          ? 'The AI will use your instruction for its next response.'
+                          : 'Select a preset or write a custom instruction above, then ask the AI to respond.'}
                       </span>
                       <Button
                         onClick={handleSendWithInstruction}

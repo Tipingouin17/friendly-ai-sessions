@@ -4175,6 +4175,243 @@ async def edge_function(func_name: str, request: Request):
     elif func_name == "generate-ai-welcome":
         return {"message": "Welcome to the session! I'm excited to facilitate our discussion today.", "success": True}
 
+    # ── facilitator-ingest-stream-event ────────────────────────
+    elif func_name == "facilitator-ingest-stream-event":
+        # Feature-flagged runtime orchestration endpoint used by the dev-only
+        # stream-aware facilitator. It records partial stream events without
+        # generating AI text, advances the rolling meeting snapshot when the
+        # caller provides a newer snapshot, and mirrors avatar-state events to
+        # the existing WebSocket realtime shim.
+        conv_id = data.get("conversationId") or data.get("conversation_id")
+        facilitator_id = data.get("facilitatorId") if "facilitatorId" in data else data.get("facilitator_id")
+        participant_id = data.get("participantId") if "participantId" in data else data.get("participant_id")
+        event_type = (data.get("eventType") or data.get("event_type") or "").strip()
+        payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+        snapshot = data.get("snapshot") if isinstance(data.get("snapshot"), dict) else payload.get("snapshot")
+        memory_patch = (
+            data.get("memoryPatch") if isinstance(data.get("memoryPatch"), dict)
+            else data.get("memory_patch") if isinstance(data.get("memory_patch"), dict)
+            else payload.get("memoryPatch") if isinstance(payload.get("memoryPatch"), dict)
+            else payload.get("memory_patch") if isinstance(payload.get("memory_patch"), dict)
+            else None
+        )
+
+        try:
+            conv_id = int(conv_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_conversation", "message": "conversationId is required"})
+
+        if not event_type:
+            raise HTTPException(400, detail={"code": "invalid_event_type", "message": "eventType is required"})
+
+        try:
+            sequence_raw = data.get("sequence")
+            sequence = int(sequence_raw) if sequence_raw is not None else None
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_sequence", "message": "sequence must be an integer"})
+
+        try:
+            facilitator_id = int(facilitator_id) if facilitator_id is not None else None
+            participant_id = int(participant_id) if participant_id is not None else None
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_identifier", "message": "facilitatorId and participantId must be numeric when provided"})
+
+        _jwt_user = get_current_user(request)
+        _jwt_user_id = (_jwt_user.get("sub") or _jwt_user.get("id")) if _jwt_user else None
+        _jwt_role = (_jwt_user.get("role") or "") if _jwt_user else ""
+        _join_token = request.headers.get("x-join-token", "").strip()
+
+        log_session.info(
+            "facilitator-ingest-stream-event received: conv=%s event=%s seq=%s facilitator=%s participant=%s jwt_present=%s join_token_present=%s snapshot=%s memory_patch=%s payload_keys=%s",
+            conv_id,
+            event_type,
+            sequence,
+            facilitator_id,
+            participant_id,
+            bool(_jwt_user_id),
+            bool(_join_token),
+            isinstance(snapshot, dict),
+            isinstance(memory_patch, dict),
+            sorted(payload.keys()),
+        )
+
+        if not _jwt_user_id and not _join_token:
+            log_session.warning(
+                "facilitator-ingest-stream-event rejected without auth: conv=%s event=%s seq=%s",
+                conv_id,
+                event_type,
+                sequence,
+            )
+            raise HTTPException(401, detail={"code": "auth_required", "message": "A host JWT or participant join token is required"})
+
+        try:
+            async with _pool.acquire() as conn:
+                conv_row = await conn.fetchrow(
+                    "SELECT c.id, c.user_id, c.sessions_id, c.is_session_ended, s.facilitator "
+                    "FROM conversations c "
+                    "LEFT JOIN sessions s ON s.id = c.sessions_id "
+                    "WHERE c.id = $1",
+                    conv_id,
+                )
+                if not conv_row:
+                    raise HTTPException(404, detail={"code": "conversation_not_found", "message": "Conversation not found"})
+
+                # JWT path: host/owner/admin authorization. Participant path:
+                # valid X-Join-Token for this conversation. If both are present,
+                # a non-owner JWT may still proceed only with a matching join token.
+                authorized = False
+                auth_mode = "none"
+                if _jwt_user_id:
+                    is_admin = _jwt_role == "admin"
+                    if not is_admin:
+                        admin_row = await conn.fetchrow(
+                            "SELECT role FROM profiles WHERE id = $1::uuid",
+                            _jwt_user_id,
+                        )
+                        is_admin = bool(admin_row and admin_row["role"] == "admin")
+                    if str(conv_row["user_id"]) == str(_jwt_user_id) or is_admin:
+                        authorized = True
+                        auth_mode = "jwt"
+
+                if not authorized and _join_token:
+                    authorized = await _validate_join_token(_join_token, conv_id)
+                    auth_mode = "join_token" if authorized else auth_mode
+
+                if not authorized:
+                    log_session.warning(
+                        "facilitator-ingest-stream-event forbidden: conv=%s event=%s seq=%s jwt_user=%s join_token_present=%s",
+                        conv_id,
+                        event_type,
+                        sequence,
+                        _jwt_user_id,
+                        bool(_join_token),
+                    )
+                    raise HTTPException(403, detail={"code": "forbidden", "message": "You are not allowed to write runtime events for this session"})
+
+                log_session.info(
+                    "facilitator-ingest-stream-event authorized: conv=%s event=%s seq=%s auth=%s facilitator=%s participant=%s",
+                    conv_id,
+                    event_type,
+                    sequence,
+                    auth_mode,
+                    facilitator_id,
+                    participant_id,
+                )
+
+                if facilitator_id is not None and conv_row["facilitator"] is not None and facilitator_id != conv_row["facilitator"]:
+                    log_session.warning(
+                        "facilitator-ingest-stream-event facilitator mismatch: conv=%s event=%s requested_facilitator=%s session_facilitator=%s",
+                        conv_id,
+                        event_type,
+                        facilitator_id,
+                        conv_row["facilitator"],
+                    )
+                    raise HTTPException(403, detail={"code": "facilitator_mismatch", "message": "facilitatorId does not match this session"})
+                if facilitator_id is None:
+                    facilitator_id = conv_row["facilitator"]
+
+                snapshot_sequence = sequence
+                if isinstance(snapshot, dict):
+                    snapshot_sequence = snapshot.get("lastSequence", snapshot.get("last_sequence", snapshot_sequence))
+                    try:
+                        snapshot_sequence = int(snapshot_sequence) if snapshot_sequence is not None else 0
+                    except (TypeError, ValueError):
+                        snapshot_sequence = sequence or 0
+                elif snapshot_sequence is None:
+                    snapshot_sequence = 0
+
+                async with conn.transaction():
+                    event_row = await conn.fetchrow(
+                        "INSERT INTO facilitator_runtime_events "
+                        "(conversation_id, facilitator_id, participant_id, event_type, sequence, payload) "
+                        "VALUES ($1, $2, $3, $4, $5, $6::jsonb) "
+                        "RETURNING id, conversation_id, facilitator_id, participant_id, event_type, sequence, payload, created_at",
+                        conv_id,
+                        facilitator_id,
+                        participant_id,
+                        event_type,
+                        sequence,
+                        payload,
+                    )
+
+                    snapshot_row = None
+                    if isinstance(snapshot, dict):
+                        snapshot_row = await conn.fetchrow(
+                            "INSERT INTO facilitator_meeting_snapshots "
+                            "(conversation_id, facilitator_id, snapshot, memory_patch, last_sequence, updated_at) "
+                            "VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, NOW()) "
+                            "ON CONFLICT (conversation_id) DO UPDATE SET "
+                            "facilitator_id = COALESCE(EXCLUDED.facilitator_id, facilitator_meeting_snapshots.facilitator_id), "
+                            "snapshot = EXCLUDED.snapshot, "
+                            "memory_patch = EXCLUDED.memory_patch, "
+                            "last_sequence = GREATEST(facilitator_meeting_snapshots.last_sequence, EXCLUDED.last_sequence), "
+                            "updated_at = NOW() "
+                            "WHERE facilitator_meeting_snapshots.last_sequence <= EXCLUDED.last_sequence "
+                            "RETURNING id, last_sequence",
+                            conv_id,
+                            facilitator_id,
+                            snapshot,
+                            memory_patch,
+                            snapshot_sequence,
+                        )
+
+                event_result = serialize_row(dict(event_row)) if event_row else {}
+                snapshot_updated = snapshot_row is not None
+                log_session.info(
+                    "facilitator-ingest-stream-event persisted: conv=%s event_id=%s event=%s seq=%s snapshot_updated=%s snapshot_seq=%s",
+                    conv_id,
+                    event_result.get("id"),
+                    event_type,
+                    sequence,
+                    snapshot_updated,
+                    snapshot_sequence,
+                )
+
+                # The frontend subscribes to facilitator_runtime_events through
+                # the same Supabase-compatible realtime payload shape used by
+                # messages/session_participants. Broadcast only lightweight state
+                # changes; plain stream chunks remain persisted but not fanned out.
+                avatar_state = payload.get("avatarState") or payload.get("avatar_state")
+                if event_type in ("avatar_state_changed", "avatar_state_change") or avatar_state:
+                    log_session.info(
+                        "facilitator-ingest-stream-event broadcasting avatar state: conv=%s event_id=%s event=%s seq=%s avatar_state=%s",
+                        conv_id,
+                        event_result.get("id"),
+                        event_type,
+                        sequence,
+                        avatar_state,
+                    )
+                    asyncio.create_task(manager.broadcast(str(conv_id), {
+                        "event": "INSERT",
+                        "payload": {
+                            "eventType": "INSERT",
+                            "new": event_result,
+                            "old": {},
+                            "table": "facilitator_runtime_events",
+                            "schema": "public",
+                        },
+                    }))
+
+                log_session.info(
+                    "facilitator-ingest-stream-event: conv=%s event=%s seq=%s auth=%s snapshot_updated=%s",
+                    conv_id,
+                    event_type,
+                    sequence,
+                    auth_mode,
+                    snapshot_updated,
+                )
+                return {
+                    "success": True,
+                    "eventId": event_result.get("id"),
+                    "snapshotUpdated": snapshot_updated,
+                    "lastSequence": snapshot_sequence if snapshot_updated else None,
+                }
+        except HTTPException:
+            raise
+        except Exception as e:
+            log_session.error("facilitator-ingest-stream-event error for conv=%s: %s", conv_id, e, exc_info=True)
+            raise HTTPException(500, detail={"code": "stream_ingest_failed", "message": "Could not persist facilitator runtime event"})
+
     # ── close-session-and-generate-report ─────────────────────
     elif func_name == "close-session-and-generate-report":
         # ── Security: extract user from JWT, not from untrusted request body ──

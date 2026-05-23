@@ -1,4 +1,5 @@
 import api, { RealtimePayload } from "@/lib/api";
+import { createLogger } from "@/utils/debugLogger";
 import {
   DEFAULT_FACILITATOR_BEHAVIOR_PROFILE,
   FacilitatorAvatarState,
@@ -9,6 +10,8 @@ import {
   StreamInterpretationSnapshot,
   getFacilitatorRuntimeFeatureFlags
 } from "@/types/facilitatorRuntime";
+
+const log = createLogger("facilitatorRuntimeService", "session");
 
 export interface FacilitatorBehaviorRow {
   id: number;
@@ -42,6 +45,27 @@ export interface FacilitatorMeetingSnapshotRow {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface FacilitatorIngestStreamEventRequest {
+  conversationId: number;
+  facilitatorId?: number | null;
+  participantId?: number | null;
+  eventType: string;
+  sequence?: number | null;
+  payload: Record<string, unknown>;
+  snapshot?: StreamInterpretationSnapshot;
+  memoryPatch?: MeetingMemoryPatch | null;
+}
+
+export interface FacilitatorIngestStreamEventResponse {
+  success: boolean;
+  eventId?: number | string | null;
+  snapshotUpdated?: boolean;
+  lastSequence?: number | null;
+  skipped?: boolean;
+  error?: string;
+}
+
 
 export interface LoadBehaviorOptions {
   facilitatorId?: number | null;
@@ -77,15 +101,65 @@ export async function loadFacilitatorBehaviorProfile(
   return DEFAULT_FACILITATOR_BEHAVIOR_PROFILE;
 }
 
+export async function ingestFacilitatorStreamEvent(
+  event: FacilitatorIngestStreamEventRequest,
+  flags: FacilitatorRuntimeFeatureFlags = getFacilitatorRuntimeFeatureFlags()
+): Promise<FacilitatorIngestStreamEventResponse> {
+  if (!flags.persistRuntimeEvents) return { success: false, skipped: true };
+
+  log.log("ingest request", {
+    conversationId: event.conversationId,
+    facilitatorId: event.facilitatorId ?? null,
+    participantId: event.participantId ?? null,
+    eventType: event.eventType,
+    sequence: event.sequence ?? null,
+    hasSnapshot: Boolean(event.snapshot),
+    hasMemoryPatch: Boolean(event.memoryPatch),
+    payloadKeys: Object.keys(event.payload ?? {})
+  });
+
+  const { data, error } = await api.functions.invoke<FacilitatorIngestStreamEventResponse>(
+    "facilitator-ingest-stream-event",
+    { body: event }
+  );
+
+  if (error) {
+    log.warn("ingest failed", {
+      conversationId: event.conversationId,
+      eventType: event.eventType,
+      sequence: event.sequence ?? null,
+      error: error.message
+    });
+    return { success: false, error: error.message };
+  }
+
+  log.log("ingest response", {
+    conversationId: event.conversationId,
+    eventType: event.eventType,
+    sequence: event.sequence ?? null,
+    eventId: data?.eventId ?? null,
+    snapshotUpdated: data?.snapshotUpdated ?? false,
+    lastSequence: data?.lastSequence ?? null,
+    skipped: data?.skipped ?? false
+  });
+
+  return data ?? { success: true };
+}
+
 export async function persistFacilitatorRuntimeEvent(
   event: FacilitatorRuntimeEventRow,
   flags: FacilitatorRuntimeFeatureFlags = getFacilitatorRuntimeFeatureFlags()
 ): Promise<void> {
   if (!flags.persistRuntimeEvents) return;
 
-  await api
-    .from<FacilitatorRuntimeEventRow>("facilitator_runtime_events")
-    .insert(event);
+  await ingestFacilitatorStreamEvent({
+    conversationId: event.conversation_id,
+    facilitatorId: event.facilitator_id ?? null,
+    participantId: event.participant_id ?? null,
+    eventType: event.event_type,
+    sequence: event.sequence ?? null,
+    payload: event.payload
+  }, flags);
 }
 
 export async function persistStreamChunkEvent(
@@ -116,16 +190,22 @@ export async function persistMeetingSnapshot(
 ): Promise<void> {
   if (!flags.persistRuntimeEvents) return;
 
-  await api
-    .from<FacilitatorMeetingSnapshotRow>("facilitator_meeting_snapshots")
-    .upsert({
-      conversation_id: snapshot.conversationId,
-      facilitator_id: facilitatorId ?? null,
-      snapshot,
-      memory_patch: memoryPatch,
-      last_sequence: snapshot.lastSequence,
-      updated_at: new Date().toISOString()
-    }, { onConflict: "conversation_id" });
+  await ingestFacilitatorStreamEvent({
+    conversationId: snapshot.conversationId,
+    facilitatorId: facilitatorId ?? null,
+    participantId: snapshot.participantId ?? null,
+    eventType: "meeting_snapshot_updated",
+    sequence: snapshot.lastSequence,
+    payload: {
+      turnBoundary: snapshot.turnBoundary,
+      tokenBudgetRisk: snapshot.tokenBudgetRisk,
+      signalCount: snapshot.detectedSignals.length,
+      shouldConsiderIntervention: snapshot.shouldConsiderIntervention,
+      updatedAt: snapshot.updatedAt
+    },
+    snapshot,
+    memoryPatch
+  }, flags);
 }
 
 export async function persistAvatarStateChangedEvent(

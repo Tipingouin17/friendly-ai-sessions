@@ -814,6 +814,44 @@ async def run_startup_migrations() -> None:
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         """,
+        # 2026-05-23: Facilitator stream runtime persistence tables.
+        # These tables back the feature-flagged stream-aware facilitator runtime.
+        # Events are append-only diagnostics/state changes, while snapshots store
+        # the latest meeting memory for a conversation with sequence guarding.
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_runtime_events (
+            id              BIGSERIAL PRIMARY KEY,
+            conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            facilitator_id  INTEGER REFERENCES facilitators(id) ON DELETE SET NULL,
+            participant_id  INTEGER REFERENCES session_participants(id) ON DELETE SET NULL,
+            event_type      TEXT NOT NULL,
+            sequence        BIGINT NOT NULL DEFAULT 0,
+            payload         JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_fre_conversation_sequence
+            ON facilitator_runtime_events(conversation_id, sequence, id);
+        CREATE INDEX IF NOT EXISTS idx_fre_conversation_event_type
+            ON facilitator_runtime_events(conversation_id, event_type, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_fre_participant_id
+            ON facilitator_runtime_events(participant_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_meeting_snapshots (
+            id              BIGSERIAL PRIMARY KEY,
+            conversation_id INTEGER NOT NULL UNIQUE REFERENCES conversations(id) ON DELETE CASCADE,
+            facilitator_id  INTEGER REFERENCES facilitators(id) ON DELETE SET NULL,
+            snapshot        JSONB NOT NULL DEFAULT '{}'::jsonb,
+            memory_patch    JSONB,
+            last_sequence   BIGINT NOT NULL DEFAULT 0,
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_fms_facilitator_id
+            ON facilitator_meeting_snapshots(facilitator_id);
+        CREATE INDEX IF NOT EXISTS idx_fms_updated_at
+            ON facilitator_meeting_snapshots(updated_at DESC);
+        """,
     ]
     try:
         async with _pool.acquire() as conn:

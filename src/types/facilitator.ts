@@ -120,3 +120,70 @@ export interface ToolboxTokenSettings {
   toolbox_default_token_budget: number;
   toolbox_overage_policy: string;
 }
+
+export type SpeechSpeakerRole = 'participant' | 'facilitator' | 'host' | 'system';
+export type SpeechTurnSource = 'browser_speech_recognition' | 'manual' | 'tts_loopback' | 'imported';
+
+export interface SessionSpeechTurn {
+  id?: number;
+  conversation_id: number;
+  facilitator_id?: number | null;
+  participant_id?: number | null;
+  speaker_role: SpeechSpeakerRole;
+  transcript: string;
+  confidence?: number | null;
+  language: string;
+  is_final: boolean;
+  source: SpeechTurnSource;
+  duration_ms?: number | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  metrics?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export type FacilitatorAvatarState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'celebrating' | 'paused' | 'error';
+export type FacilitatorTtsStatus = 'queued' | 'speaking' | 'completed' | 'cancelled' | 'failed';
+
+export interface FacilitatorTtsEvent {
+  id?: number;
+  conversation_id: number;
+  facilitator_id?: number | null;
+  message_id?: string | null;
+  provider: string;
+  voice_id?: string | null;
+  text_excerpt?: string | null;
+  status: FacilitatorTtsStatus;
+  avatar_state: FacilitatorAvatarState | string;
+  audio_duration_ms?: number | null;
+  lip_sync_markers?: Array<Record<string, unknown>>;
+  metadata?: Record<string, unknown>;
+  started_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+}
+
+export interface SessionFacilitationAnalyticsSnapshot {
+  id?: number;
+  conversation_id: number;
+  facilitator_id?: number | null;
+  analytics_version: string;
+  speech_turn_count: number;
+  tts_event_count: number;
+  participant_balance?: number | null;
+  participation_coverage?: number | null;
+  topic_drift_score?: number | null;
+  facilitation_health_score?: number | null;
+  snapshot: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Phase3RuntimeSettings {
+  speech_stack_enabled?: boolean;
+  speech_default_language?: string;
+  tts_avatar_enabled?: boolean;
+  tts_default_voice_id?: string | null;
+  tts_lip_sync_enabled?: boolean;
+  facilitation_analytics_enabled?: boolean;
+}

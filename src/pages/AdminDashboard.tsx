@@ -15,6 +15,7 @@ import { ToolboxManagement } from "@/components/admin/ToolboxManagement";
 import { SessionMonitoring } from "@/components/admin/SessionMonitoring";
 import { SystemSettings } from "@/components/admin/SystemSettings";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
+import { FacilitationAnalyticsDashboard } from "@/components/admin/FacilitationAnalyticsDashboard";
 import { RevenueDashboard } from "@/components/admin/RevenueDashboard";
 import { CostRevenueDashboard } from "@/components/admin/CostRevenueDashboard";
 import { AlertsMonitoring } from "@/components/admin/AlertsMonitoring";
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
         label: "Overview",
         items: [
             { id: "analytics", label: "Analytics", icon: TrendingUp, description: "Platform growth & engagement" },
+            { id: "facilitation-analytics", label: "Facilitation AI", icon: Activity, description: "Speech, avatar & process analytics" },
             { id: "revenue", label: "Revenue", icon: DollarSign, description: "Subscriptions & billing" },
             { id: "costs", label: "Cost & Margin", icon: BarChart3, description: "LLM costs, margins & session economics" },
             { id: "alerts", label: "Alerts", icon: Bell, description: "System & business alerts" },
@@ -65,6 +67,7 @@ const NAV_GROUPS = [
 
 const CONTENT_MAP: Record<string, React.ReactNode> = {
     analytics: <AnalyticsDashboard />,
+    "facilitation-analytics": <FacilitationAnalyticsDashboard />,
     revenue: <RevenueDashboard />,
     costs: <CostRevenueDashboard />,
     alerts: <AlertsMonitoring />,
@@ -80,6 +83,7 @@ const CONTENT_MAP: Record<string, React.ReactNode> = {
 
 const LABEL_MAP: Record<string, string> = {
     analytics: "Analytics",
+    "facilitation-analytics": "Facilitation AI",
     revenue: "Revenue",
     costs: "Cost & Margin",
     alerts: "Alerts",

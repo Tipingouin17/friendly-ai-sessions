@@ -24,12 +24,16 @@ import {
   Quote,
   AlertCircle,
   RefreshCw,
-  Lock
+  Lock,
+  Mic,
+  Volume2,
+  Activity
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from "@/lib/api";
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { useToast } from '@/hooks/use-toast';
+import { useFacilitationAnalytics } from '@/hooks/useFacilitationAnalytics';
 
 interface SessionReportViewProps {
   conversationId?: number;
@@ -42,6 +46,14 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
   const reportConversationId = conversationId || parseInt(params.id || '0');
   // canExportData covers planRestrictions?.data_export — no separate useUserPlan call needed
   const { canGenerateReports, canExportData } = usePlanLimits();
+  const {
+    analytics: facilitationAnalytics,
+    summary: facilitationSummary,
+  } = useFacilitationAnalytics({
+    conversationId: reportConversationId || null,
+    realtime: false,
+    persist: false,
+  });
   
   // Fetch session report data
   const { data: reportData, isLoading, error, refetch } = useQuery({
@@ -360,6 +372,70 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
               </CardContent>
             </Card>
 
+            {/* Phase 3 facilitation analytics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Activity className="h-5 w-5" />
+                  <span>Facilitation Intelligence</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {facilitationAnalytics && facilitationSummary ? (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center space-x-1 text-indigo-600 mb-1">
+                          <Activity className="h-4 w-4" />
+                          <span className="font-semibold">{facilitationSummary.healthPercent}%</span>
+                        </div>
+                        <p className="text-xs text-gray-500">Facilitation health</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center space-x-1 text-emerald-600 mb-1">
+                          <Mic className="h-4 w-4" />
+                          <span className="font-semibold">{facilitationAnalytics.speechTurnCount}</span>
+                        </div>
+                        <p className="text-xs text-gray-500">Speech turns</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center space-x-1 text-purple-600 mb-1">
+                          <Volume2 className="h-4 w-4" />
+                          <span className="font-semibold">{facilitationAnalytics.ttsEventCount}</span>
+                        </div>
+                        <p className="text-xs text-gray-500">TTS events</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center space-x-1 text-orange-600 mb-1">
+                          <TrendingUp className="h-4 w-4" />
+                          <span className="font-semibold">{facilitationSummary.balancePercent}%</span>
+                        </div>
+                        <p className="text-xs text-gray-500">Voice balance</p>
+                      </div>
+                    </div>
+                    {facilitationAnalytics.participantMetrics.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Voice participation by speaker</h4>
+                        {facilitationAnalytics.participantMetrics.slice(0, 5).map((metric) => (
+                          <div key={`${metric.participantId}-${metric.label}`}>
+                            <div className="mb-1 flex justify-between text-xs text-gray-500">
+                              <span>{metric.label}</span>
+                              <span>{metric.turnCount} turns · {Math.round(metric.share * 100)}%</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(4, metric.share * 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">No speech or avatar analytics were persisted for this session.</p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Key Highlights */}
             <Card>
               <CardHeader>
@@ -476,7 +552,18 @@ const SessionReportView: React.FC<SessionReportViewProps> = ({ conversationId })
 };
 
 // Helper functions
-function extractHighlights(messages: any[]): string[] {
+interface ReportMessage {
+  role?: string;
+  content?: string | null;
+  created_at?: string;
+  participant?: string | number | null;
+}
+
+interface ReportParticipant {
+  id?: string | number;
+}
+
+function extractHighlights(messages: ReportMessage[]): string[] {
   const userMessages = messages.filter(m => m.role === 'user');
   
   if (userMessages.length === 0) return ['No participant contributions to highlight'];
@@ -490,7 +577,7 @@ function extractHighlights(messages: any[]): string[] {
   return highlights.length > 0 ? highlights : ['Session included valuable participant contributions'];
 }
 
-function extractKeyMoments(messages: any[]): { time: string, description: string }[] {
+function extractKeyMoments(messages: ReportMessage[]): { time: string, description: string }[] {
   const moments = [];
   
   if (messages.length > 0) {
@@ -521,7 +608,7 @@ function extractKeyMoments(messages: any[]): { time: string, description: string
   return moments;
 }
 
-function calculateParticipationStats(messages: any[], participants: any[]) {
+function calculateParticipationStats(messages: ReportMessage[], participants: ReportParticipant[]) {
   const userMessages = messages.filter(m => m.role === 'user');
   const totalParticipants = participants.length;
   const totalMessages = userMessages.length;
@@ -529,7 +616,7 @@ function calculateParticipationStats(messages: any[], participants: any[]) {
   // Count messages per participant
   const messageCounts: {[key: string]: number} = { /* no-op */ };
   userMessages.forEach(msg => {
-    const participantId = msg.participant || 'unknown';
+    const participantId = String(msg.participant || 'unknown');
     messageCounts[participantId] = (messageCounts[participantId] || 0) + 1;
   });
   

@@ -1135,7 +1135,86 @@ async def run_startup_migrations() -> None:
         WHERE m.mode_key IN ('open_discussion', 'silent_individual_response', 'voting_rating', 'reflection_checkin')
         ON CONFLICT (facilitator_id, mode_id) DO NOTHING;
         """,
+
+        # 2026-05-23: Phase 3 speech stack, avatar/TTS events, and analytics snapshots.
+        """
+        CREATE TABLE IF NOT EXISTS session_speech_turns (
+            id              BIGSERIAL PRIMARY KEY,
+            conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            facilitator_id  BIGINT REFERENCES facilitators(id) ON DELETE SET NULL,
+            participant_id  BIGINT REFERENCES session_participants(id) ON DELETE SET NULL,
+            speaker_role    TEXT NOT NULL DEFAULT 'participant' CHECK (speaker_role IN ('participant', 'facilitator', 'host', 'system')),
+            transcript      TEXT NOT NULL,
+            confidence      NUMERIC(5,4),
+            language        TEXT NOT NULL DEFAULT 'en-US',
+            is_final        BOOLEAN NOT NULL DEFAULT TRUE,
+            source          TEXT NOT NULL DEFAULT 'browser_speech_recognition' CHECK (source IN ('browser_speech_recognition', 'manual', 'tts_loopback', 'imported')),
+            duration_ms     INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
+            started_at      TIMESTAMPTZ,
+            ended_at        TIMESTAMPTZ,
+            metrics         JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_speech_turns_conversation
+            ON session_speech_turns(conversation_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_session_speech_turns_participant
+            ON session_speech_turns(participant_id, created_at DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_tts_events (
+            id                BIGSERIAL PRIMARY KEY,
+            conversation_id   BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            facilitator_id    BIGINT REFERENCES facilitators(id) ON DELETE SET NULL,
+            message_id        TEXT,
+            provider          TEXT NOT NULL DEFAULT 'browser_speech_synthesis',
+            voice_id          TEXT,
+            text_excerpt      TEXT,
+            status            TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'speaking', 'completed', 'cancelled', 'failed')),
+            avatar_state      TEXT NOT NULL DEFAULT 'speaking',
+            audio_duration_ms INTEGER CHECK (audio_duration_ms IS NULL OR audio_duration_ms >= 0),
+            lip_sync_markers  JSONB NOT NULL DEFAULT '[]'::jsonb,
+            metadata          JSONB NOT NULL DEFAULT '{}'::jsonb,
+            started_at        TIMESTAMPTZ,
+            completed_at      TIMESTAMPTZ,
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_facilitator_tts_events_conversation
+            ON facilitator_tts_events(conversation_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_facilitator_tts_events_status
+            ON facilitator_tts_events(status, created_at DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS session_facilitation_analytics (
+            id                          BIGSERIAL PRIMARY KEY,
+            conversation_id             BIGINT NOT NULL UNIQUE REFERENCES conversations(id) ON DELETE CASCADE,
+            facilitator_id              BIGINT REFERENCES facilitators(id) ON DELETE SET NULL,
+            analytics_version           TEXT NOT NULL DEFAULT 'phase3.v1',
+            speech_turn_count           INTEGER NOT NULL DEFAULT 0 CHECK (speech_turn_count >= 0),
+            tts_event_count             INTEGER NOT NULL DEFAULT 0 CHECK (tts_event_count >= 0),
+            participant_balance         NUMERIC(5,4),
+            participation_coverage      NUMERIC(5,4),
+            topic_drift_score           NUMERIC(5,4),
+            facilitation_health_score   NUMERIC(5,4),
+            snapshot                    JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_sfa_facilitator_id
+            ON session_facilitation_analytics(facilitator_id);
+        CREATE INDEX IF NOT EXISTS idx_sfa_health_score
+            ON session_facilitation_analytics(facilitation_health_score DESC NULLS LAST);
+        """,
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS speech_stack_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS speech_default_language TEXT NOT NULL DEFAULT 'en-US',
+            ADD COLUMN IF NOT EXISTS tts_avatar_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS tts_default_voice_id TEXT,
+            ADD COLUMN IF NOT EXISTS tts_lip_sync_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS facilitation_analytics_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+        """,
     ]
+
     try:
         async with _pool.acquire() as conn:
             for sql in migrations:

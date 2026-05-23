@@ -27,6 +27,8 @@ import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Users, Home, Sparkles } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
+import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
+import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
@@ -122,10 +124,69 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
-  const facilitatorName = conversationData?.sessions?.facilitator_details?.name || facilitatorTitle || 'Facilitator';
+  const facilitatorName = facilitatorTitle || 'Facilitator';
   const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
-  const runtimeAvatarState = facilitatorRuntime?.avatarState ?? null;
-  const showRuntimeAvatarState = Boolean(facilitatorRuntime?.isEnabled && runtimeAvatarState);
+  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string; profile_picture?: string | null } | undefined;
+  const facilitatorId = facilitatorDetails?.id ?? null;
+  const voiceRuntime = useFacilitatorVoice({
+    conversationId,
+    facilitatorId,
+    enabled: viewMode === 'participant',
+    persistEvents: true,
+  });
+  const runtimeAvatarState = voiceRuntime.isSpeaking
+    ? voiceRuntime.runtimeAvatarState
+    : facilitatorRuntime?.avatarState ?? null;
+  const showRuntimeAvatarState = Boolean((facilitatorRuntime?.enabled && runtimeAvatarState) || voiceRuntime.isSpeaking);
+
+  const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
+  const lastAssistantMessage = React.useMemo(() => {
+    return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
+  }, [messages]);
+
+  React.useEffect(() => {
+    if (!lastAssistantMessage || !conversationId) return;
+    if (lastSpokenAssistantMessageRef.current === lastAssistantMessage.id) return;
+    lastSpokenAssistantMessageRef.current = lastAssistantMessage.id;
+    void voiceRuntime.speak({
+      text: lastAssistantMessage.content,
+      messageId: lastAssistantMessage.id,
+      metadata: { source: 'participant_messaging_view' },
+    });
+  }, [conversationId, lastAssistantMessage, voiceRuntime]);
+
+  const handleSpeechInterim = React.useCallback((payload: { transcript: string; confidence: number | null }) => {
+    facilitatorRuntime?.pushStreamChunk({
+      modality: 'speech',
+      status: 'partial',
+      text: payload.transcript,
+      confidence: payload.confidence ?? undefined,
+    });
+  }, [facilitatorRuntime]);
+
+  const handleSpeechFinal = React.useCallback((payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => {
+    if (!conversationId) return;
+    facilitatorRuntime?.pushStreamChunk({
+      modality: 'speech',
+      status: 'final',
+      text: payload.transcript,
+      confidence: payload.confidence ?? undefined,
+    });
+    void recordSpeechTurn({
+      conversationId,
+      facilitatorId,
+      participantId: effectiveParticipantId,
+      speakerRole: 'participant',
+      transcript: payload.transcript,
+      confidence: payload.confidence,
+      language: conversationData?.language || 'en-US',
+      source: 'browser_speech_recognition',
+      durationMs: payload.durationMs,
+      startedAt: payload.startedAt,
+      endedAt: payload.endedAt,
+      metrics: { composer: 'participant_chat_input' },
+    });
+  }, [conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -153,13 +214,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           {facilitatorTitle && (
             <p className="text-xs text-slate-400 truncate">Facilitated by {facilitatorTitle}</p>
           )}
-          {showRuntimeAvatarState && (
-            <p className="text-[11px] text-indigo-500 truncate capitalize" aria-live="polite">
-              {runtimeAvatarState?.state === 'intervening'
-                ? 'Ready to guide the group'
-                : `AI facilitator is ${runtimeAvatarState?.state}`}
-            </p>
-          )}
+              {showRuntimeAvatarState && (
+                <p className="text-[11px] text-indigo-500 truncate capitalize" aria-live="polite">
+                  {voiceRuntime.isSpeaking
+                    ? 'AI facilitator is speaking'
+                    : runtimeAvatarState?.reason || 'AI facilitator is monitoring the discussion'}
+                </p>
+              )}
         </div>
 
         {/* Participant count */}
@@ -240,6 +301,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             isLoadingModes={isLoadingModes}
             modeError={modeError}
             submitModeInput={submitModeInput}
+            speechLanguage={conversationData?.language || 'en-US'}
+            onSpeechInterim={handleSpeechInterim}
+            onSpeechFinal={handleSpeechFinal}
           />
         </div>
       )}

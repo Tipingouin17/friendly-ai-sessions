@@ -20,7 +20,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff,
+    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff, Mic, Volume2, Activity,
 } from "lucide-react";
 
 interface Config {
@@ -34,6 +34,12 @@ interface Config {
     toolbox_token_accounting_enabled: boolean;
     toolbox_default_token_budget: number;
     toolbox_overage_policy: string;
+    speech_stack_enabled: boolean;
+    speech_default_language: string;
+    tts_avatar_enabled: boolean;
+    tts_default_voice_id: string | null;
+    tts_lip_sync_enabled: boolean;
+    facilitation_analytics_enabled: boolean;
     languages: Record<string, boolean> | null;
 }
 
@@ -72,6 +78,7 @@ const SECTIONS = [
     { id: "platform", label: "Platform", icon: Globe, color: "blue" },
     { id: "security", label: "Security", icon: Shield, color: "red" },
     { id: "messaging", label: "Messaging", icon: MessageSquare, color: "green" },
+    { id: "voice", label: "Speech & Avatar", icon: Mic, color: "indigo" },
 ];
 
 export const SystemSettings = () => {
@@ -92,6 +99,12 @@ export const SystemSettings = () => {
         toolbox_token_accounting_enabled: true,
         toolbox_default_token_budget: 6000,
         toolbox_overage_policy: "warn",
+        speech_stack_enabled: true,
+        speech_default_language: "en-US",
+        tts_avatar_enabled: true,
+        tts_default_voice_id: "",
+        tts_lip_sync_enabled: true,
+        facilitation_analytics_enabled: true,
         languages: { en: true },
     });
 
@@ -122,6 +135,12 @@ export const SystemSettings = () => {
                 toolbox_token_accounting_enabled: config.toolbox_token_accounting_enabled ?? true,
                 toolbox_default_token_budget: config.toolbox_default_token_budget ?? 6000,
                 toolbox_overage_policy: config.toolbox_overage_policy ?? "warn",
+                speech_stack_enabled: config.speech_stack_enabled ?? true,
+                speech_default_language: config.speech_default_language ?? "en-US",
+                tts_avatar_enabled: config.tts_avatar_enabled ?? true,
+                tts_default_voice_id: config.tts_default_voice_id ?? "",
+                tts_lip_sync_enabled: config.tts_lip_sync_enabled ?? true,
+                facilitation_analytics_enabled: config.facilitation_analytics_enabled ?? true,
                 languages: (config.languages as Record<string, boolean>) ?? { en: true },
             });
             setIsDirty(false);
@@ -143,6 +162,12 @@ export const SystemSettings = () => {
                     toolbox_token_accounting_enabled: form.toolbox_token_accounting_enabled ?? true,
                     toolbox_default_token_budget: Number(form.toolbox_default_token_budget ?? 6000),
                     toolbox_overage_policy: form.toolbox_overage_policy ?? "warn",
+                    speech_stack_enabled: form.speech_stack_enabled ?? true,
+                    speech_default_language: form.speech_default_language || "en-US",
+                    tts_avatar_enabled: form.tts_avatar_enabled ?? true,
+                    tts_default_voice_id: form.tts_default_voice_id || null,
+                    tts_lip_sync_enabled: form.tts_lip_sync_enabled ?? true,
+                    facilitation_analytics_enabled: form.facilitation_analytics_enabled ?? true,
                     languages: form.languages ?? { en: true },
                 })
                 .eq("id", config.id);
@@ -172,6 +197,7 @@ export const SystemSettings = () => {
         blue: "bg-blue-100 text-blue-600",
         red: "bg-red-100 text-red-600",
         green: "bg-green-100 text-green-600",
+        indigo: "bg-indigo-100 text-indigo-600",
     };
 
     return (
@@ -413,6 +439,84 @@ export const SystemSettings = () => {
                                                 >
                                                     {showCaptcha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                 </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Speech & Avatar */}
+                                {activeSection === "voice" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.indigo}`}>
+                                                <Mic className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Speech, Avatar & Analytics</h3>
+                                        </div>
+                                        <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable browser speech stack</p>
+                                                    <p className="text-xs text-gray-500">Allows participants to dictate responses and persist final speech turns for facilitation analytics.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.speech_stack_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("speech_stack_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Default speech language</Label>
+                                                <Input
+                                                    value={form.speech_default_language ?? "en-US"}
+                                                    onChange={e => handleChange("speech_default_language", e.target.value)}
+                                                    placeholder="en-US"
+                                                />
+                                                <p className="text-xs text-gray-500">BCP-47 language code used by browser speech recognition unless a session overrides it.</p>
+                                            </div>
+                                            <Separator />
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div className="flex items-start gap-3">
+                                                    <Volume2 className="mt-0.5 h-4 w-4 text-indigo-500" />
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-800">Enable avatar TTS playback</p>
+                                                        <p className="text-xs text-gray-500">Lets the AI facilitator speak browser-synthesized responses and emit avatar speaking states.</p>
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={form.tts_avatar_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("tts_avatar_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Preferred TTS voice ID</Label>
+                                                <Input
+                                                    value={form.tts_default_voice_id ?? ""}
+                                                    onChange={e => handleChange("tts_default_voice_id", e.target.value)}
+                                                    placeholder="Browser voice name or provider voice id"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable lip-sync cues</p>
+                                                    <p className="text-xs text-gray-500">Stores lightweight marker metadata for future embodied-avatar providers.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.tts_lip_sync_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("tts_lip_sync_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div className="flex items-start gap-3">
+                                                    <Activity className="mt-0.5 h-4 w-4 text-indigo-500" />
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-800">Enable facilitation analytics snapshots</p>
+                                                        <p className="text-xs text-gray-500">Persists health, balance, coverage, topic-drift, speech, and TTS summary metrics.</p>
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={form.facilitation_analytics_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("facilitation_analytics_enabled", checked)}
+                                                />
                                             </div>
                                         </div>
                                     </>

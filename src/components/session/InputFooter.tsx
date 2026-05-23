@@ -13,7 +13,8 @@ import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { Users, Lock } from "lucide-react";
+import { Users, Lock, Wrench } from "lucide-react";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import ParticipantEngagementControls from './ParticipantEngagementControls';
@@ -39,6 +40,8 @@ interface InputFooterProps {
   showResponseStats?: boolean;
   conversationId?: number | null;
   onParticipantStatusChange?: (participantId: number, status: 'active' | 'paused' | 'skipped') => void;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
 }
 
 const InputFooter = ({
@@ -61,6 +64,8 @@ const InputFooter = ({
   showResponseStats = false,
   conversationId = null,
   onParticipantStatusChange,
+  enabledTools = [],
+  isLoadingToolbox = false,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -156,6 +161,31 @@ const InputFooter = ({
               hasAnswered={hasAnswered}
               isMobile={isMobile}
             />
+
+            {isParticipantContext && (enabledTools.length > 0 || isLoadingToolbox) && !engagement.isPaused && !engagement.isSkipped && (
+              <div className="px-3 pb-2">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-xs text-indigo-800">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <Wrench className="h-3.5 w-3.5" />
+                    Facilitator toolbox
+                  </div>
+                  <p className="mt-1 text-indigo-700/80">
+                    {isLoadingToolbox
+                      ? 'Loading the facilitator\'s available tools…'
+                      : `This facilitator can choose from ${enabledTools.length} assigned tool${enabledTools.length === 1 ? '' : 's'} during the discussion.`}
+                  </p>
+                  {!isLoadingToolbox && enabledTools.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {enabledTools.slice(0, 4).map((tool) => (
+                        <span key={tool.access_id || tool.id} className="rounded-full border border-indigo-200 bg-white px-2 py-0.5 font-medium text-indigo-700">
+                          {tool.effective_config?.composerLabel || tool.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Chat input — hidden when paused or skipped */}
             {!engagement.isPaused && !engagement.isSkipped && (

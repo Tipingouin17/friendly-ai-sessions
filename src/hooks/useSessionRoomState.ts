@@ -10,6 +10,7 @@ import { ConversationWithSession } from "@/types/database";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useAnonymousState } from "@/hooks/useAnonymousState";
 import { useSessionInteractions } from "@/hooks/useSessionInteractions";
+import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
 
 interface UseSessionRoomStateProps {
   conversationId: number | null;
@@ -32,6 +33,7 @@ export const useSessionRoomState = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const toolbox = useFacilitatorToolbox(conversation);
   
   // Get anonymous state
   const anonymousState = useAnonymousState({
@@ -138,6 +140,10 @@ export const useSessionRoomState = ({
     isWaitingForResponse,
     handleSendMessage,
     anonymousState,
-    error
+    error,
+    enabledTools: toolbox.enabledTools,
+    isLoadingToolbox: toolbox.isLoadingToolbox,
+    toolboxError: toolbox.toolboxError,
+    toolboxInstruction: toolbox.toolboxInstruction
   };
 };

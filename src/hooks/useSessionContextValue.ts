@@ -62,7 +62,11 @@ export function useSessionContextValue({
     viewMode: "participant",
     setViewMode: () => { /* no-op */ },
     recordResponse: () => { /* no-op */ },
-    error: null
+    error: null,
+    enabledTools: [],
+    isLoadingToolbox: false,
+    toolboxError: null,
+    toolboxInstruction: undefined
   }, [roomState]);
 
   // Create session state object separately to avoid re-creating on every render
@@ -81,7 +85,11 @@ export function useSessionContextValue({
     viewMode: safeRoomState.viewMode || "participant",
     setViewMode: safeRoomState.setViewMode || (() => { /* no-op */ }),
     recordResponse: safeRoomState.recordResponse || (() => { /* no-op */ }),
-    error: safeRoomState.error || null
+    error: safeRoomState.error || null,
+    enabledTools: safeRoomState.enabledTools || [],
+    isLoadingToolbox: safeRoomState.isLoadingToolbox || false,
+    toolboxError: safeRoomState.toolboxError || null,
+    toolboxInstruction: safeRoomState.toolboxInstruction
   }), [safeRoomState]);
 
   // Create anonymous state object separately
@@ -164,6 +172,10 @@ export function useSessionContextValue({
     refetch,
     error: providerError,
     facilitatorRuntime,
+    enabledTools: safeRoomState.enabledTools || [],
+    isLoadingToolbox: safeRoomState.isLoadingToolbox || false,
+    toolboxError: safeRoomState.toolboxError || null,
+    toolboxInstruction: safeRoomState.toolboxInstruction,
     ...connectionProps
   }), [
     isLoading,
@@ -172,6 +184,10 @@ export function useSessionContextValue({
     sessionState,
     participants,
     safeRoomState.isWaitingForResponse,
+    safeRoomState.enabledTools,
+    safeRoomState.isLoadingToolbox,
+    safeRoomState.toolboxError,
+    safeRoomState.toolboxInstruction,
     isWaitingForFirstMessage,
     isWaitingForOtherParticipants,
     handleStartSession,

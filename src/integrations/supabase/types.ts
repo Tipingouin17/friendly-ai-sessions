@@ -99,6 +99,9 @@ export type Database = {
           google_capcha_key: string | null
           secret_message: string | null
           free_plan_message_limit: number | null
+          toolbox_token_accounting_enabled: boolean
+          toolbox_default_token_budget: number
+          toolbox_overage_policy: string
         }
         Insert: {
           id: number
@@ -109,6 +112,9 @@ export type Database = {
           google_capcha_key?: string | null
           secret_message?: string | null
           free_plan_message_limit?: number | null
+          toolbox_token_accounting_enabled?: boolean
+          toolbox_default_token_budget?: number
+          toolbox_overage_policy?: string
         }
         Update: {
           id?: number
@@ -119,6 +125,9 @@ export type Database = {
           google_capcha_key?: string | null
           secret_message?: string | null
           free_plan_message_limit?: number | null
+          toolbox_token_accounting_enabled?: boolean
+          toolbox_default_token_budget?: number
+          toolbox_overage_policy?: string
         }
         Relationships: []
       }
@@ -329,6 +338,90 @@ export type Database = {
           config_history?: Json | null
         }
         Relationships: []
+      }
+      facilitator_tools: {
+        Row: {
+          id: number
+          name: string
+          slug: string
+          description: string | null
+          category: string
+          config: Json
+          token_cost_per_use: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          slug: string
+          description?: string | null
+          category?: string
+          config?: Json
+          token_cost_per_use?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          slug?: string
+          description?: string | null
+          category?: string
+          config?: Json
+          token_cost_per_use?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      facilitator_tool_access: {
+        Row: {
+          id: number
+          facilitator_id: number
+          tool_id: number
+          enabled: boolean
+          config_override: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          facilitator_id: number
+          tool_id: number
+          enabled?: boolean
+          config_override?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          facilitator_id?: number
+          tool_id?: number
+          enabled?: boolean
+          config_override?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facilitator_tool_access_facilitator_id_fkey"
+            columns: ["facilitator_id"]
+            isOneToOne: false
+            referencedRelation: "facilitators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facilitator_tool_access_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "facilitator_tools"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       faqs: {
         Row: {

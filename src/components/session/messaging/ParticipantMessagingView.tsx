@@ -25,6 +25,7 @@ import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Users, Home, Sparkles } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
+import type { FacilitatorToolAssignment } from '@/types/facilitator';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -54,6 +55,8 @@ interface ParticipantMessagingViewProps {
   currentUserParticipantId?: number | null;
   showResponseStats?: boolean;
   facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -83,6 +86,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   currentUserParticipantId = null,
   showResponseStats = false,
   facilitatorRuntime,
+  enabledTools = [],
+  isLoadingToolbox = false,
 }) => {
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
@@ -206,6 +211,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             messages={messages}
             showResponseStats={showResponseStats}
             conversationId={conversationId}
+            enabledTools={enabledTools}
+            isLoadingToolbox={isLoadingToolbox}
           />
         </div>
       )}

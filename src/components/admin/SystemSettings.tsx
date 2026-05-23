@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,9 @@ interface Config {
     google_capcha_key: string | null;
     secret_message: string | null;
     free_plan_message_limit: number | null;
+    toolbox_token_accounting_enabled: boolean;
+    toolbox_default_token_budget: number;
+    toolbox_overage_policy: string;
     languages: Record<string, boolean> | null;
 }
 
@@ -85,6 +89,9 @@ export const SystemSettings = () => {
         google_capcha_key: "",
         secret_message: "",
         free_plan_message_limit: 20,
+        toolbox_token_accounting_enabled: true,
+        toolbox_default_token_budget: 6000,
+        toolbox_overage_policy: "warn",
         languages: { en: true },
     });
 
@@ -112,6 +119,9 @@ export const SystemSettings = () => {
                 google_capcha_key: config.google_capcha_key ?? "",
                 secret_message: config.secret_message ?? "",
                 free_plan_message_limit: config.free_plan_message_limit ?? 20,
+                toolbox_token_accounting_enabled: config.toolbox_token_accounting_enabled ?? true,
+                toolbox_default_token_budget: config.toolbox_default_token_budget ?? 6000,
+                toolbox_overage_policy: config.toolbox_overage_policy ?? "warn",
                 languages: (config.languages as Record<string, boolean>) ?? { en: true },
             });
             setIsDirty(false);
@@ -130,6 +140,9 @@ export const SystemSettings = () => {
                     google_capcha_key: form.google_capcha_key || null,
                     secret_message: form.secret_message || null,
                     free_plan_message_limit: form.free_plan_message_limit ?? 20,
+                    toolbox_token_accounting_enabled: form.toolbox_token_accounting_enabled ?? true,
+                    toolbox_default_token_budget: Number(form.toolbox_default_token_budget ?? 6000),
+                    toolbox_overage_policy: form.toolbox_overage_policy ?? "warn",
                     languages: form.languages ?? { en: true },
                 })
                 .eq("id", config.id);
@@ -272,6 +285,49 @@ export const SystemSettings = () => {
                                                 >
                                                     {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                 </button>
+                                            </div>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-4 rounded-xl border border-purple-100 bg-purple-50/50 p-4">
+                                            <div>
+                                                <Label className="font-semibold">Toolbox token consumption</Label>
+                                                <p className="text-xs text-gray-500">Controls how facilitator tool usage is accounted for after the new database-backed toolbox is enabled.</p>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable per-tool token accounting</p>
+                                                    <p className="text-xs text-gray-500">When enabled, each tool contributes its configured token cost to session economics.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.toolbox_token_accounting_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("toolbox_token_accounting_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label>Default session tool budget</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        value={form.toolbox_default_token_budget ?? 6000}
+                                                        onChange={e => handleChange("toolbox_default_token_budget", Number(e.target.value))}
+                                                    />
+                                                    <p className="text-xs text-gray-500">Fallback token budget used when a session has no stricter plan or prompt budget.</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label>Overage policy</Label>
+                                                    <Select
+                                                        value={form.toolbox_overage_policy ?? "warn"}
+                                                        onValueChange={v => handleChange("toolbox_overage_policy", v)}
+                                                    >
+                                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="warn">Warn facilitator only</SelectItem>
+                                                            <SelectItem value="soft_limit">Soft limit with throttling</SelectItem>
+                                                            <SelectItem value="hard_limit">Hard stop at budget</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
                                             </div>
                                         </div>
                                     </>

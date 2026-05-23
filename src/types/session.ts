@@ -7,6 +7,7 @@
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
 import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
 
 export interface SessionContextProps {
   isLoading: boolean;
@@ -28,6 +29,10 @@ export interface SessionContextProps {
     setViewMode: (mode: "participant" | "admin") => void;
     recordResponse: (participantId: number, hasResponded: boolean) => void;
     error: string | null;
+    enabledTools: FacilitatorToolAssignment[];
+    isLoadingToolbox: boolean;
+    toolboxError: string | null;
+    toolboxInstruction?: string;
   };
   participants: ParticipantInfo[];
   participantColors: { [key: string]: string };
@@ -60,4 +65,8 @@ export interface SessionContextProps {
   // existing session consumers remain compatible while the dev-only avatar
   // facilitator foundation is validated.
   facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  toolboxError?: string | null;
+  toolboxInstruction?: string;
 }

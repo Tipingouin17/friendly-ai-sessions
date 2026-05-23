@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
 import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import AdminMessagingView from "./messaging/AdminMessagingView";
 import ParticipantMessagingView from "./messaging/ParticipantMessagingView";
 
@@ -42,6 +43,8 @@ interface MessagingAreaProps {
   // Add conversationData prop to pass session info
   conversationData?: any;
   facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
 }
 
 const MessagingArea = ({
@@ -75,7 +78,9 @@ const MessagingArea = ({
   
   // Session data
   conversationData,
-  facilitatorRuntime
+  facilitatorRuntime,
+  enabledTools = [],
+  isLoadingToolbox = false
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);
@@ -149,6 +154,8 @@ const MessagingArea = ({
       currentUserParticipantId={currentUserParticipantId}
       showResponseStats={false}
       facilitatorRuntime={facilitatorRuntime}
+      enabledTools={enabledTools}
+      isLoadingToolbox={isLoadingToolbox}
     />
   );
 };

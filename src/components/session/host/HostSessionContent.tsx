@@ -8,6 +8,7 @@ import React from "react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import { Message, ParticipantInfo } from "@/types/chat";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -23,6 +24,9 @@ interface HostSessionContentProps {
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  toolboxError?: string | null;
   
   // Session start props
   isSessionStarted?: boolean;
@@ -50,6 +54,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   responseCount = 0,
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  toolboxError = null,
   isSessionStarted = false,
   onSessionStarted,
   isAutoStarting = false,
@@ -74,6 +81,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           responseCount={responseCount}
           totalParticipants={totalParticipants}
           onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+          enabledTools={enabledTools}
+          isLoadingToolbox={isLoadingToolbox}
+          toolboxError={toolboxError}
           isSessionStarted={isSessionStarted}
           onSessionStarted={onSessionStarted}
           participants={participants}

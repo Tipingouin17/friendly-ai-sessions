@@ -5,6 +5,7 @@
  */
 
 import api from "@/lib/api";
+import type { FacilitatorTool, FacilitatorToolAssignment, FacilitatorToolConfig } from "@/types/facilitator";
 
 export const fetchFacilitators = async () => {
   const { data, error } = await api
@@ -103,4 +104,67 @@ export const createConversation = async (params: {
     
   if (error) throw error;
   return data;
+};
+
+
+const normalizeToolConfig = (value: unknown): FacilitatorToolConfig => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as FacilitatorToolConfig;
+};
+
+const mergeToolConfig = (base: unknown, override: unknown): FacilitatorToolConfig => ({
+  ...normalizeToolConfig(base),
+  ...normalizeToolConfig(override),
+});
+
+export const fetchToolboxTools = async (): Promise<FacilitatorTool[]> => {
+  const { data, error } = await api
+    .from('facilitator_tools')
+    .select('*')
+    .order('category', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+
+  return ((data ?? []) as FacilitatorTool[]).map((tool) => ({
+    ...tool,
+    config: normalizeToolConfig(tool.config),
+  }));
+};
+
+export const fetchFacilitatorToolAssignments = async (facilitatorId: number): Promise<FacilitatorToolAssignment[]> => {
+  const { data, error } = await api
+    .from('facilitator_tool_access')
+    .select('*, facilitator_tool:facilitator_tools!inner(*)')
+    .eq('facilitator_id', facilitatorId)
+    .order('enabled', { ascending: false });
+
+  if (error) throw error;
+
+  return ((data ?? []) as Array<{
+    id: number;
+    facilitator_id: number;
+    tool_id: number;
+    enabled: boolean;
+    config_override: unknown;
+    facilitator_tool?: FacilitatorTool | null;
+  }>).map((assignment) => {
+    const tool = assignment.facilitator_tool;
+    if (!tool) return null;
+    const configOverride = normalizeToolConfig(assignment.config_override);
+    return {
+      ...tool,
+      access_id: assignment.id,
+      facilitator_id: assignment.facilitator_id,
+      enabled: assignment.enabled,
+      config: normalizeToolConfig(tool.config),
+      config_override: configOverride,
+      effective_config: mergeToolConfig(tool.config, configOverride),
+    } as FacilitatorToolAssignment;
+  }).filter(Boolean) as FacilitatorToolAssignment[];
+};
+
+export const fetchEnabledFacilitatorTools = async (facilitatorId: number): Promise<FacilitatorToolAssignment[]> => {
+  const assignments = await fetchFacilitatorToolAssignments(facilitatorId);
+  return assignments.filter((tool) => tool.enabled && tool.is_active);
 };

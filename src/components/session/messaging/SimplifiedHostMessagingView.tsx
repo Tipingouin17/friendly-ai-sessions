@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Message, ParticipantInfo } from '@/types/chat';
+import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Users, Wand2, SendHorizonal,
@@ -37,6 +38,9 @@ interface SimplifiedHostMessagingViewProps {
   onCancelAutoStart?: () => void;
   isSessionEnded?: boolean;
   isSessionPaused?: boolean;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  toolboxError?: string | null;
 }
 
 const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = ({
@@ -57,6 +61,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   onCancelAutoStart,
   isSessionEnded = false,
   isSessionPaused = false,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  toolboxError = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
   const [hostInstruction, setHostInstruction] = useState('');
@@ -303,6 +310,40 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   onDismiss={handleDismissInactivity}
                 />
               )}
+
+              {/* Facilitator Toolbox */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Facilitator toolbox</p>
+                    <p className="text-xs text-slate-500 mt-0.5">The AI facilitator can choose among its assigned tools when generating the next response.</p>
+                  </div>
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                    {isLoadingToolbox ? 'Loading…' : `${enabledTools.length} active`}
+                  </span>
+                </div>
+                {toolboxError && (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{toolboxError}</p>
+                )}
+                {!isLoadingToolbox && enabledTools.length > 0 && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {enabledTools.map((tool) => (
+                      <div key={tool.access_id || tool.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-slate-800">{tool.name}</p>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">{tool.category}</span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                          {String(tool.effective_config?.hostCue || tool.description || 'Available for this facilitator')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!isLoadingToolbox && enabledTools.length === 0 && !toolboxError && (
+                  <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">No active tools are assigned to this facilitator yet.</p>
+                )}
+              </div>
 
               {/* Steer the AI Facilitator */}
               <div className={`rounded-xl border shadow-sm overflow-hidden transition-all ${

@@ -5,12 +5,13 @@
 import { useState } from "react";
 import {
     Shield, Settings, Users, FileText, BarChart3, TrendingUp, DollarSign,
-    Bell, MessageSquare, ArrowLeft, Bot, Activity, ChevronRight, Menu, X,
+    Bell, MessageSquare, ArrowLeft, Bot, Activity, ChevronRight, Menu, X, Wrench,
 } from "lucide-react";
 import { PromptManagement } from "@/components/admin/PromptManagement";
 import { PlanManagement } from "@/components/admin/PlanManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { FacilitatorManagement } from "@/components/admin/FacilitatorManagement";
+import { ToolboxManagement } from "@/components/admin/ToolboxManagement";
 import { SessionMonitoring } from "@/components/admin/SessionMonitoring";
 import { SystemSettings } from "@/components/admin/SystemSettings";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
@@ -42,6 +43,7 @@ const NAV_GROUPS = [
         items: [
             { id: "users", label: "Users", icon: Users, description: "User accounts & plans" },
             { id: "facilitators", label: "Facilitators", icon: Bot, description: "AI facilitator profiles" },
+            { id: "toolbox", label: "Toolbox", icon: Wrench, description: "Facilitator tools & access" },
             { id: "plans", label: "Plans", icon: Settings, description: "Subscription plans & pricing" },
             { id: "prompts", label: "Prompts & AI", icon: FileText, description: "Session AI configuration" },
         ],
@@ -68,6 +70,7 @@ const CONTENT_MAP: Record<string, React.ReactNode> = {
     alerts: <AlertsMonitoring />,
     users: <UserManagement />,
     facilitators: <FacilitatorManagement />,
+    toolbox: <ToolboxManagement />,
     plans: <PlanManagement />,
     prompts: <PromptManagement />,
     monitoring: <SessionMonitoring />,
@@ -82,6 +85,7 @@ const LABEL_MAP: Record<string, string> = {
     alerts: "Alerts",
     users: "Users",
     facilitators: "Facilitators",
+    toolbox: "Toolbox",
     plans: "Plans",
     prompts: "Prompts & AI",
     monitoring: "Sessions",

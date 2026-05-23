@@ -11,6 +11,7 @@ import WaitingParticipantsBanner from "./WaitingParticipantsBanner";
 import { EngagementStatsPanel } from "./EngagementStatsPanel";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
 
 interface HostDashboardProps {
   conversation: ConversationWithSession | null;
@@ -28,6 +29,9 @@ interface HostDashboardProps {
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  toolboxError?: string | null;
   
   // Session start props
   isSessionStarted?: boolean;
@@ -56,6 +60,9 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   responseCount = 0,
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  toolboxError = null,
   isSessionStarted = false,
   onSessionStarted,
   isAutoStarting = false,
@@ -98,6 +105,9 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         responseCount={responseCount}
         totalParticipants={totalParticipants}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+        enabledTools={enabledTools}
+        isLoadingToolbox={isLoadingToolbox}
+        toolboxError={toolboxError}
         isSessionStarted={isSessionStarted}
         onSessionStarted={onSessionStarted}
         isAutoStarting={isAutoStarting}

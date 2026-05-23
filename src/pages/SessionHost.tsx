@@ -38,6 +38,9 @@ const SessionHost = () => {
     toggleSessionState,
     handleSendHostMessage,
     triggerFacilitatorResponse,
+    enabledTools,
+    isLoadingToolbox,
+    toolboxError,
     handleSessionStarted,
     refresh
   } = useSessionHostLogic();
@@ -82,6 +85,9 @@ const SessionHost = () => {
       responseCount={responseCount}
       totalParticipants={participantCount}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
+      enabledTools={enabledTools}
+      isLoadingToolbox={isLoadingToolbox}
+      toolboxError={toolboxError}
       isSessionStarted={isSessionStarted}
       onSessionStarted={handleSessionStarted}
       isAutoStarting={isAutoStarting}

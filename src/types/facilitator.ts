@@ -71,3 +71,52 @@ export interface PlanRestriction {
   data_export?: boolean;
   plan_id?: number;
 }
+
+export interface FacilitatorToolConfig {
+  composerLabel?: string;
+  hostCue?: string;
+  participantPrompt?: string;
+  runtimeBehavior?: string;
+  visualAccent?: string;
+  supportsAnonymousInput?: boolean;
+  supportsVoting?: boolean;
+  [key: string]: unknown;
+}
+
+export interface FacilitatorTool {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string;
+  config: FacilitatorToolConfig;
+  token_cost_per_use: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FacilitatorToolAccess {
+  id: number;
+  facilitator_id: number;
+  tool_id: number;
+  enabled: boolean;
+  config_override: FacilitatorToolConfig;
+  created_at?: string;
+  updated_at?: string;
+  facilitator_tool?: FacilitatorTool | null;
+}
+
+export interface FacilitatorToolAssignment extends FacilitatorTool {
+  access_id?: number;
+  facilitator_id?: number;
+  enabled: boolean;
+  config_override: FacilitatorToolConfig;
+  effective_config: FacilitatorToolConfig;
+}
+
+export interface ToolboxTokenSettings {
+  toolbox_token_accounting_enabled: boolean;
+  toolbox_default_token_budget: number;
+  toolbox_overage_policy: string;
+}

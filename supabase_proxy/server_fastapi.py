@@ -852,6 +852,114 @@ async def run_startup_migrations() -> None:
         CREATE INDEX IF NOT EXISTS idx_fms_updated_at
             ON facilitator_meeting_snapshots(updated_at DESC);
         """,
+        # 2026-05-23: Database-backed facilitator toolbox and mode access matrix.
+        # The catalogue is administrator-extensible; facilitator_tool_access controls
+        # which tools a facilitator can choose from at runtime.
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_tools (
+            id                 BIGSERIAL PRIMARY KEY,
+            name               TEXT NOT NULL,
+            slug               TEXT NOT NULL UNIQUE,
+            description        TEXT,
+            category           TEXT NOT NULL DEFAULT 'facilitation',
+            config             JSONB NOT NULL DEFAULT '{}'::jsonb,
+            token_cost_per_use INTEGER NOT NULL DEFAULT 0 CHECK (token_cost_per_use >= 0),
+            is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_facilitator_tools_category
+            ON facilitator_tools(category);
+        CREATE INDEX IF NOT EXISTS idx_facilitator_tools_active_slug
+            ON facilitator_tools(is_active, slug);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS facilitator_tool_access (
+            id              BIGSERIAL PRIMARY KEY,
+            facilitator_id  INTEGER NOT NULL REFERENCES facilitators(id) ON DELETE CASCADE,
+            tool_id         BIGINT NOT NULL REFERENCES facilitator_tools(id) ON DELETE CASCADE,
+            enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+            config_override JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT facilitator_tool_access_unique UNIQUE (facilitator_id, tool_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_fta_facilitator_id
+            ON facilitator_tool_access(facilitator_id);
+        CREATE INDEX IF NOT EXISTS idx_fta_tool_id
+            ON facilitator_tool_access(tool_id);
+        """,
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS toolbox_token_accounting_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS toolbox_default_token_budget INTEGER NOT NULL DEFAULT 6000,
+            ADD COLUMN IF NOT EXISTS toolbox_overage_policy TEXT NOT NULL DEFAULT 'warn';
+        """,
+        """
+        INSERT INTO facilitator_tools (name, slug, description, category, config, token_cost_per_use, is_active)
+        VALUES
+            (
+                'Open Discussion',
+                'open_discussion',
+                'Keeps a lightweight conversational flow while nudging the group toward balanced participation and clear next steps.',
+                'discussion',
+                '{"composerLabel":"Open response","hostCue":"Invite perspectives and let the conversation breathe.","participantPrompt":"Share your perspective in your own words.","runtimeBehavior":"balanced_moderator","visualAccent":"indigo","supportsAnonymousInput":false,"supportsVoting":false}'::jsonb,
+                120,
+                TRUE
+            ),
+            (
+                'Structured Round',
+                'structured_round',
+                'Guides participants through an ordered round so every voice is invited before synthesis begins.',
+                'participation',
+                '{"composerLabel":"Round response","hostCue":"Move participant by participant and protect airtime equity.","participantPrompt":"Contribute your turn for this round.","runtimeBehavior":"active_coach","visualAccent":"purple","supportsAnonymousInput":false,"supportsVoting":false}'::jsonb,
+                180,
+                TRUE
+            ),
+            (
+                'Brainstorm',
+                'brainstorm',
+                'Encourages high-volume idea generation, clusters emerging themes, and delays evaluation until the group is ready.',
+                'ideation',
+                '{"composerLabel":"Add an idea","hostCue":"Generate options first, evaluate later.","participantPrompt":"Add one idea, possibility, or experiment.","runtimeBehavior":"energetic_ideation","visualAccent":"blue","supportsAnonymousInput":true,"supportsVoting":false}'::jsonb,
+                220,
+                TRUE
+            ),
+            (
+                'Consensus Check',
+                'consensus_check',
+                'Tests alignment with lightweight temperature checks and highlights unresolved objections before commitment.',
+                'decision',
+                '{"composerLabel":"Share agreement level","hostCue":"Check alignment and surface objections before deciding.","participantPrompt":"State your level of agreement and any important concern.","runtimeBehavior":"decision_readiness","visualAccent":"emerald","supportsAnonymousInput":false,"supportsVoting":true}'::jsonb,
+                200,
+                TRUE
+            ),
+            (
+                'Silent Reflection',
+                'silent_reflection',
+                'Creates reflective space before discussion, helping participants compose thoughtful responses without immediate social pressure.',
+                'reflection',
+                '{"composerLabel":"Private reflection","hostCue":"Give participants quiet thinking time before sharing.","participantPrompt":"Write your reflection; the facilitator will help summarize patterns.","runtimeBehavior":"calm_reflection","visualAccent":"slate","supportsAnonymousInput":true,"supportsVoting":false}'::jsonb,
+                100,
+                TRUE
+            )
+        ON CONFLICT (slug) DO UPDATE SET
+            name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            category = EXCLUDED.category,
+            config = EXCLUDED.config,
+            token_cost_per_use = EXCLUDED.token_cost_per_use,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW();
+        """,
+        """
+        INSERT INTO facilitator_tool_access (facilitator_id, tool_id, enabled, config_override)
+        SELECT f.id, t.id, TRUE, '{}'::jsonb
+        FROM facilitators f
+        CROSS JOIN facilitator_tools t
+        WHERE t.slug IN ('open_discussion', 'structured_round', 'brainstorm', 'consensus_check', 'silent_reflection')
+        ON CONFLICT (facilitator_id, tool_id) DO NOTHING;
+        """,
     ]
     try:
         async with _pool.acquire() as conn:
@@ -1145,6 +1253,8 @@ FK_MAP: Dict[str, tuple] = {
     "plan_restrictions_plan_id_fkey": ("plan_restrictions", "plan_id", "plans", "id"),
     "facilitator_plan_access_facilitator_id_fkey": ("facilitator_plan_access", "facilitator_id", "facilitators", "id"),
     "facilitator_plan_access_plan_id_fkey": ("facilitator_plan_access", "plan_id", "plans", "id"),
+    "facilitator_tool_access_facilitator_id_fkey": ("facilitator_tool_access", "facilitator_id", "facilitators", "id"),
+    "facilitator_tool_access_tool_id_fkey": ("facilitator_tool_access", "tool_id", "facilitator_tools", "id"),
 }
 
 TABLE_PK: Dict[str, str] = {
@@ -1154,6 +1264,8 @@ TABLE_PK: Dict[str, str] = {
     "session_reports": "id", "faqs": "id",
     "plan_restrictions": "id",
     "facilitator_plan_access": "facilitator_id",  # composite PK — use facilitator_id as representative
+    "facilitator_tools": "id",
+    "facilitator_tool_access": "id",
 }
 
 
@@ -2196,6 +2308,8 @@ SECURE_REPORT_TABLES = {"session_reports"}
 SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log"}
 # Tables participants may read with a valid join token (no auth required)
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations"}
+# Toolbox tables are publicly readable through the proxy for runtime UX, but mutations are admin-only.
+TOOLBOX_TABLES = {"facilitator_tools", "facilitator_tool_access"}
 
 
 async def _validate_join_token(token: str, conversation_id: str | int | None, conn=None) -> bool:
@@ -3234,6 +3348,22 @@ async def rest_table(table: str, request: Request):
     is_admin_user = requesting_user_role == "admin"
     join_token_header = request.headers.get("x-join-token", "").strip()
 
+    if request.method in ("POST", "PATCH", "DELETE") and table in TOOLBOX_TABLES and not is_admin_user:
+        log_req.warning(
+            "REST %s /%s -> 403 (toolbox mutation requires admin) origin=%s",
+            request.method,
+            table,
+            request.headers.get("origin", "-"),
+        )
+        return JSONResponse(
+            content={
+                "error": "Admin access required",
+                "message": "Only administrators can manage facilitator toolbox configuration",
+                "code": "PGRST403",
+            },
+            status_code=403,
+        )
+
     if request.method in ("GET", "HEAD"):
         # session_reports: authenticated hosts only, no participant bypass
         if table in SECURE_REPORT_TABLES:
@@ -3597,7 +3727,13 @@ async def rest_table(table: str, request: Request):
                 sc = ", ".join(set_parts)
                 # Coerce body values so datetime strings become datetime objects
                 # and UUID strings become uuid.UUID objects for asyncpg.
-                data_vals = [_coerce_value(v) if isinstance(v, str) else v for v in data.values()]
+                def _adapt_patch_val(v):
+                    if isinstance(v, dict):
+                        return json.dumps(v)
+                    if isinstance(v, str):
+                        return _coerce_value(v)
+                    return v
+                data_vals = [_adapt_patch_val(v) for v in data.values()]
                 # Renumber WHERE clause params starting after data params
                 offset = len(data_vals)
                 new_wc_parts = []

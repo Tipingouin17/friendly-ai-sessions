@@ -20,6 +20,7 @@ import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
+import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -42,6 +43,7 @@ export function useSessionHostLogic() {
         isLoading: isConversationLoading,
         error: conversationError
     } = useConversation(currentConversationId);
+    const toolbox = useFacilitatorToolbox(conversationData);
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
@@ -220,7 +222,13 @@ export function useSessionHostLogic() {
         // Actions
         toggleSessionState,
         handleSendHostMessage,
-        triggerFacilitatorResponse,
+        triggerFacilitatorResponse: (hostInstruction?: string) => {
+            const finalInstruction = [toolbox.toolboxInstruction, hostInstruction].filter(Boolean).join("\n\n");
+            return triggerFacilitatorResponse(finalInstruction || undefined);
+        },
+        enabledTools: toolbox.enabledTools,
+        isLoadingToolbox: toolbox.isLoadingToolbox,
+        toolboxError: toolbox.toolboxError,
         handleSessionStarted,
         refresh,
 

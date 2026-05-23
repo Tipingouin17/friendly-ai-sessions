@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+const root = process.cwd();
+
+function loadTsExports(relativePath) {
+  const absolutePath = path.join(root, relativePath);
+  const source = fs.readFileSync(absolutePath, 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+  }).outputText;
+
+  const exports = {};
+  const context = vm.createContext({
+    exports,
+    module: { exports },
+    require: (specifier) => {
+      throw new Error(`Unexpected runtime import while testing ${relativePath}: ${specifier}`);
+    },
+    console,
+  });
+  vm.runInContext(output, context, { filename: relativePath });
+  return context.module.exports;
+}
+
+const providerAdapters = loadTsExports('src/services/facilitator/phase3ProviderAdapters.ts');
+
+const markers = providerAdapters.estimateLipSyncMarkers('Alpha rhythm sync', true);
+assert.equal(markers.length, 3, 'lip-sync marker estimation should create one bounded marker per word');
+assert.equal(
+  providerAdapters.estimateLipSyncMarkers('Alpha rhythm sync', false).length,
+  0,
+  'lip-sync marker estimation should respect disabled lip-sync settings'
+);
+
+const synthesis = providerAdapters.buildBrowserTtsSynthesisResult({
+  text: 'Hello team',
+  voiceId: 'voice-a',
+  lipSyncEnabled: true,
+  metadata: { messageId: 'm-1' },
+});
+assert.equal(synthesis.provider, 'browser_speech_synthesis');
+assert.equal(synthesis.status, 'queued');
+assert.equal(synthesis.voiceId, 'voice-a');
+assert.equal(synthesis.metadata.providerMode, 'browser_mvp');
+assert.ok(synthesis.audioDurationMs >= 700, 'browser fallback should estimate a usable duration');
+assert.ok(synthesis.lipSyncMarkers.length > 0, 'browser fallback should expose estimated lip-sync markers when enabled');
+
+const cue = providerAdapters.buildAvatarPlaybackCue(synthesis);
+assert.equal(cue.avatarState, 'speaking');
+assert.equal(cue.intensity, 'high');
+assert.ok(cue.lipSyncMarkers.length > 0, 'avatar cue should carry lip-sync markers forward');
+
+const disabledPlan = providerAdapters.buildPhase3RuntimeAdapterPlan({
+  speechStackEnabled: false,
+  ttsAvatarEnabled: false,
+  lipSyncEnabled: false,
+  analyticsEnabled: false,
+});
+assert.equal(disabledPlan.stt.status, 'disabled');
+assert.equal(disabledPlan.tts.status, 'disabled');
+assert.equal(disabledPlan.avatar.status, 'disabled');
+assert.equal(disabledPlan.analytics.status, 'disabled');
+assert.equal(disabledPlan.snapshotSchedule.enabled, false);
+assert.equal(disabledPlan.snapshotSchedule.cadence, 'manual');
+assert.equal(disabledPlan.avatar.capabilities.join(','), 'state_cues');
+
+const runtimeSettingsSource = fs.readFileSync(
+  path.join(root, 'src/hooks/facilitator/usePhase3RuntimeSettings.ts'),
+  'utf8'
+);
+assert.match(runtimeSettingsSource, /export function normalizePhase3RuntimeSettings/, 'runtime settings should export a pure normalizer for testability');
+assert.match(runtimeSettingsSource, /row\?\.speech_stack_enabled \?\?/, 'speech stack flag should preserve explicit false settings');
+assert.match(runtimeSettingsSource, /row\?\.tts_avatar_enabled \?\?/, 'TTS/avatar flag should preserve explicit false settings');
+assert.match(runtimeSettingsSource, /row\?\.facilitation_analytics_enabled[\s\S]*\?\?/, 'analytics flag should preserve explicit false settings');
+
+const participantViewSource = fs.readFileSync(
+  path.join(root, 'src/components/session/messaging/ParticipantMessagingView.tsx'),
+  'utf8'
+);
+assert.match(participantViewSource, /usePhase3RuntimeSettings/, 'participant runtime should load Phase 3 admin settings');
+assert.match(participantViewSource, /enabled:\s*viewMode === 'participant' && ttsAvatarEnabled/, 'voice runtime should be gated by normalized settings');
+assert.match(participantViewSource, /speechEnabled=\{speechStackEnabled\}/, 'visible speech capture should be gated by normalized settings');
+
+const analyticsSource = fs.readFileSync(path.join(root, 'src/hooks/useFacilitationAnalytics.ts'), 'utf8');
+for (const expected of [
+  'timelineBuckets',
+  'estimatedSilenceGapCount',
+  'facilitatorResponsivenessScore',
+  'insightFlags',
+]) {
+  assert.match(analyticsSource, new RegExp(expected), `analytics hook should expose ${expected}`);
+}
+
+console.log('Phase 3 hardening tests passed.');

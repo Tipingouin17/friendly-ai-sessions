@@ -29,6 +29,7 @@ import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
+import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
@@ -128,11 +129,17 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string; profile_picture?: string | null } | undefined;
   const facilitatorId = facilitatorDetails?.id ?? null;
+  const { data: phase3Settings } = usePhase3RuntimeSettings(conversationData?.language);
+  const speechStackEnabled = Boolean(phase3Settings?.speech_stack_enabled);
+  const ttsAvatarEnabled = Boolean(phase3Settings?.tts_avatar_enabled);
+  const analyticsPersistenceEnabled = Boolean(phase3Settings?.facilitation_analytics_enabled);
   const voiceRuntime = useFacilitatorVoice({
     conversationId,
     facilitatorId,
-    enabled: viewMode === 'participant',
-    persistEvents: true,
+    enabled: viewMode === 'participant' && ttsAvatarEnabled,
+    defaultVoiceId: phase3Settings?.tts_default_voice_id ?? null,
+    lipSyncEnabled: phase3Settings?.tts_lip_sync_enabled ?? true,
+    persistEvents: analyticsPersistenceEnabled,
   });
   const runtimeAvatarState = voiceRuntime.isSpeaking
     ? voiceRuntime.runtimeAvatarState
@@ -145,7 +152,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [messages]);
 
   React.useEffect(() => {
-    if (!lastAssistantMessage || !conversationId) return;
+    if (!ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
     if (lastSpokenAssistantMessageRef.current === lastAssistantMessage.id) return;
     lastSpokenAssistantMessageRef.current = lastAssistantMessage.id;
     void voiceRuntime.speak({
@@ -153,25 +160,27 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       messageId: lastAssistantMessage.id,
       metadata: { source: 'participant_messaging_view' },
     });
-  }, [conversationId, lastAssistantMessage, voiceRuntime]);
+  }, [conversationId, lastAssistantMessage, ttsAvatarEnabled, voiceRuntime]);
 
   const handleSpeechInterim = React.useCallback((payload: { transcript: string; confidence: number | null }) => {
+    if (!speechStackEnabled) return;
     facilitatorRuntime?.pushStreamChunk({
       modality: 'speech',
       status: 'partial',
       text: payload.transcript,
       confidence: payload.confidence ?? undefined,
     });
-  }, [facilitatorRuntime]);
+  }, [facilitatorRuntime, speechStackEnabled]);
 
   const handleSpeechFinal = React.useCallback((payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => {
-    if (!conversationId) return;
+    if (!conversationId || !speechStackEnabled) return;
     facilitatorRuntime?.pushStreamChunk({
       modality: 'speech',
       status: 'final',
       text: payload.transcript,
       confidence: payload.confidence ?? undefined,
     });
+    if (!analyticsPersistenceEnabled) return;
     void recordSpeechTurn({
       conversationId,
       facilitatorId,
@@ -179,14 +188,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       speakerRole: 'participant',
       transcript: payload.transcript,
       confidence: payload.confidence,
-      language: conversationData?.language || 'en-US',
+      language: phase3Settings?.speech_default_language || conversationData?.language || 'en-US',
       source: 'browser_speech_recognition',
       durationMs: payload.durationMs,
       startedAt: payload.startedAt,
       endedAt: payload.endedAt,
       metrics: { composer: 'participant_chat_input' },
     });
-  }, [conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime]);
+  }, [analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, phase3Settings?.speech_default_language, speechStackEnabled]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -301,7 +310,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             isLoadingModes={isLoadingModes}
             modeError={modeError}
             submitModeInput={submitModeInput}
-            speechLanguage={conversationData?.language || 'en-US'}
+            speechEnabled={speechStackEnabled}
+            speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
             onSpeechInterim={handleSpeechInterim}
             onSpeechFinal={handleSpeechFinal}
           />

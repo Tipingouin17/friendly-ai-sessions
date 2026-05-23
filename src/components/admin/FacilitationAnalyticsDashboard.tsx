@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, BarChart3, Mic, RefreshCw, Volume2 } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, Clock, Gauge, Mic, RefreshCw, Volume2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useFacilitationAnalytics } from '@/hooks/useFacilitationAnalytics';
 import type { SessionFacilitationAnalyticsSnapshot } from '@/types/facilitator';
@@ -114,6 +114,49 @@ export const FacilitationAnalyticsDashboard = () => {
                 <MetricCard label="Speech turns" value={String(analytics.speechTurnCount)} detail={`${analytics.spokenWordCount} recognized participant words.`} icon={Mic} />
                 <MetricCard label="Avatar/TTS" value={String(analytics.ttsEventCount)} detail={`${formatPercent(analytics.completedTtsRate)} completed voice playback rate.`} icon={Volume2} />
                 <MetricCard label="Topic drift" value={`${summary.driftPercent}%`} detail="Higher values suggest recent speech vocabulary diverged from earlier discussion." icon={BarChart3} />
+                <MetricCard label="Response coverage" value={`${summary.responsivenessPercent}%`} detail={`${analytics.facilitatorResponseCount} completed/speaking facilitator voice responses.`} icon={Gauge} />
+                <MetricCard label="Silence gaps" value={String(analytics.estimatedSilenceGapCount)} detail={analytics.longestSilenceGapMs ? `Longest detected gap ${Math.round(analytics.longestSilenceGapMs / 1000)}s.` : 'No long speech gaps detected.'} icon={Clock} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+                  <h4 className="text-sm font-bold text-slate-900">Facilitation timeline</h4>
+                  <div className="mt-4 space-y-3">
+                    {analytics.timelineBuckets.length === 0 ? (
+                      <p className="text-sm text-slate-500">No timestamped speech or TTS events are available yet.</p>
+                    ) : analytics.timelineBuckets.slice(-10).map((bucket) => {
+                      const maxWords = Math.max(1, ...analytics.timelineBuckets.map((item) => item.spokenWords));
+                      return (
+                        <div key={bucket.label}>
+                          <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                            <span className="font-medium text-slate-700">{bucket.label}</span>
+                            <span>{bucket.speechTurns} speech · {bucket.ttsEvents} TTS · {bucket.spokenWords} words</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-violet-500" style={{ width: `${Math.max(4, (bucket.spokenWords / maxWords) * 100)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h4 className="text-sm font-bold text-slate-900">Operational flags</h4>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(analytics.insightFlags).every(([, flagged]) => !flagged) ? (
+                      <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">No facilitation risk flags detected.</p>
+                    ) : Object.entries(analytics.insightFlags).filter(([, flagged]) => flagged).map(([flag]) => (
+                      <div key={flag} className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{flag.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase())}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                    Average speech duration: {analytics.averageSpeechDurationMs ? `${Math.round(analytics.averageSpeechDurationMs / 1000)}s` : '—'} · Average words/turn: {analytics.averageWordsPerTurn} · Failed/cancelled TTS: {formatPercent(analytics.failedTtsRate)}
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

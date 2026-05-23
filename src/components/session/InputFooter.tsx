@@ -54,6 +54,7 @@ interface InputFooterProps {
     content: Record<string, unknown>;
     visibility?: ModeInput["visibility"];
   }) => Promise<unknown>;
+  speechEnabled?: boolean;
   speechLanguage?: string;
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
   onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
@@ -88,6 +89,7 @@ const InputFooter = ({
   isLoadingModes = false,
   modeError = null,
   submitModeInput,
+  speechEnabled = true,
   speechLanguage = 'en-US',
   onSpeechInterim,
   onSpeechFinal,
@@ -387,6 +389,7 @@ const InputFooter = ({
                 placeholder="Type your response…"
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
+                speechEnabled={speechEnabled}
                 speechLanguage={speechLanguage}
                 onSpeechInterim={onSpeechInterim}
                 onSpeechFinal={onSpeechFinal}

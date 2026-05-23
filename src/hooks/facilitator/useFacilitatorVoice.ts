@@ -3,12 +3,14 @@ import { toast } from 'sonner';
 import type { FacilitatorAvatarState as RuntimeAvatarState } from '@/types/facilitatorRuntime';
 import type { FacilitatorAvatarState } from '@/types/facilitator';
 import { recordTtsEvent, updateTtsEventStatus } from '@/services/facilitator/phase3RuntimeService';
+import { buildBrowserTtsSynthesisResult } from '@/services/facilitator/phase3ProviderAdapters';
 
 interface UseFacilitatorVoiceParams {
   conversationId?: number | null;
   facilitatorId?: number | null;
   enabled?: boolean;
   defaultVoiceId?: string | null;
+  lipSyncEnabled?: boolean;
   persistEvents?: boolean;
 }
 
@@ -57,6 +59,7 @@ export function useFacilitatorVoice({
   facilitatorId,
   enabled = true,
   defaultVoiceId = null,
+  lipSyncEnabled = true,
   persistEvents = true,
 }: UseFacilitatorVoiceParams): FacilitatorVoiceRuntime {
   const [avatarState, setAvatarState] = React.useState<FacilitatorAvatarState>('idle');
@@ -93,17 +96,26 @@ export function useFacilitatorVoice({
     setAvatarState('thinking');
     startedAtRef.current = performance.now();
 
+    const synthesisPlan = buildBrowserTtsSynthesisResult({
+      text: trimmed,
+      voiceId: defaultVoiceId,
+      lipSyncEnabled,
+      metadata,
+    });
+
     const queuedEvent = persistEvents
       ? await recordTtsEvent({
           conversationId,
           facilitatorId,
           messageId,
-          provider: 'browser_speech_synthesis',
-          voiceId: defaultVoiceId,
+          provider: synthesisPlan.provider,
+          voiceId: synthesisPlan.voiceId ?? defaultVoiceId,
           textExcerpt: trimmed,
-          status: 'queued',
+          status: synthesisPlan.status,
           avatarState: 'thinking',
-          metadata: { ...metadata, characterCount: trimmed.length },
+          lipSyncMarkers: synthesisPlan.lipSyncMarkers,
+          audioDurationMs: synthesisPlan.audioDurationMs,
+          metadata: synthesisPlan.metadata,
         })
       : null;
     activeEventIdRef.current = queuedEvent?.id;
@@ -123,7 +135,7 @@ export function useFacilitatorVoice({
       setIsSpeaking(true);
       setAvatarState('speaking');
       void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
       });
     };
 
@@ -134,7 +146,7 @@ export function useFacilitatorVoice({
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
         audio_duration_ms: durationMs,
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
@@ -144,13 +156,13 @@ export function useFacilitatorVoice({
       setAvatarState('error');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
 
     synth.speak(utterance);
-  }, [conversationId, defaultVoiceId, enabled, facilitatorId, persistEvents]);
+  }, [conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, persistEvents]);
 
   return {
     isSupported,

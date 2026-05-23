@@ -23,6 +23,7 @@ interface ChatInputProps {
   placeholder?: string;
   disabled?: boolean;
   isMobile?: boolean; // kept for API compat
+  speechEnabled?: boolean;
   speechLanguage?: string;
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
   onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
@@ -36,6 +37,7 @@ const ChatInput = ({
   setIsRecording = () => { /* no-op */ },
   placeholder = "Type your response…",
   disabled = false,
+  speechEnabled = true,
   speechLanguage = 'en-US',
   onSpeechInterim,
   onSpeechFinal,
@@ -135,6 +137,10 @@ const ChatInput = ({
   }, [onSpeechFinal, onSpeechInterim, setInputMessage, setIsRecording, speechLanguage]);
 
   const handleStartRecording = () => {
+    if (!speechEnabled) {
+      toast.info("Voice input is disabled for this session by the host settings.");
+      return;
+    }
     if (!speechSupported) {
       toast.error("Voice input is not supported in this browser. Try Chrome or Edge.");
       return;
@@ -213,14 +219,16 @@ const ChatInput = ({
         <button
           type="button"
           onClick={isRecording ? handleStopRecording : handleStartRecording}
-          disabled={disabled}
-          title={isRecording ? "Stop recording" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
+          disabled={disabled || !speechEnabled}
+          title={isRecording ? "Stop recording" : !speechEnabled ? "Voice input disabled for this session" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
           className={`shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
             isRecording
               ? "bg-red-100 text-red-600 animate-pulse"
               : speechSupported === false
                 ? "bg-slate-100 text-slate-300 cursor-not-allowed"
-                : "bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                : !speechEnabled
+                  ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  : "bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
           } disabled:opacity-40`}
         >
           {isRecording

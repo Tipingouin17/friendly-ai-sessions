@@ -15,6 +15,22 @@ export interface ParticipantSpeechMetric {
   share: number;
 }
 
+export interface FacilitationTimelineBucket {
+  label: string;
+  speechTurns: number;
+  spokenWords: number;
+  ttsEvents: number;
+  averageConfidence: number | null;
+}
+
+export interface FacilitationInsightFlags {
+  lowParticipationCoverage: boolean;
+  imbalancedParticipation: boolean;
+  elevatedTopicDrift: boolean;
+  lowTtsCompletion: boolean;
+  longSilenceDetected: boolean;
+}
+
 interface SessionParticipantRosterRow {
   id: number;
 }
@@ -31,6 +47,14 @@ export interface FacilitationAnalytics {
   averageSpeechConfidence: number | null;
   averageSpeechDurationMs: number | null;
   completedTtsRate: number;
+  failedTtsRate: number;
+  averageWordsPerTurn: number;
+  estimatedSilenceGapCount: number;
+  longestSilenceGapMs: number | null;
+  facilitatorResponseCount: number;
+  facilitatorResponsivenessScore: number;
+  timelineBuckets: FacilitationTimelineBucket[];
+  insightFlags: FacilitationInsightFlags;
   participantMetrics: ParticipantSpeechMetric[];
   lastSpeechAt: string | null;
   lastTtsAt: string | null;
@@ -54,6 +78,65 @@ function calculateParticipantBalance(metrics: ParticipantSpeechMetric[]): number
   const totalDeviation = metrics.reduce((sum, metric) => sum + Math.abs(metric.share - idealShare), 0);
   const maxDeviation = 2 * (1 - idealShare);
   return clampScore(1 - totalDeviation / maxDeviation);
+}
+
+function calculateTimelineBuckets(
+  turns: SessionSpeechTurn[],
+  ttsEvents: FacilitatorTtsEvent[],
+  bucketMinutes = 5
+): FacilitationTimelineBucket[] {
+  const bucketMs = bucketMinutes * 60 * 1000;
+  const buckets = new Map<number, { speechTurns: number; spokenWords: number; ttsEvents: number; confidenceTotal: number; confidenceCount: number }>();
+
+  const ensureBucket = (timestamp: string | null | undefined) => {
+    const dateMs = timestamp ? Date.parse(timestamp) : NaN;
+    const bucket = Number.isFinite(dateMs) ? Math.floor(dateMs / bucketMs) * bucketMs : 0;
+    const current = buckets.get(bucket) ?? { speechTurns: 0, spokenWords: 0, ttsEvents: 0, confidenceTotal: 0, confidenceCount: 0 };
+    buckets.set(bucket, current);
+    return current;
+  };
+
+  turns.forEach((turn) => {
+    const bucket = ensureBucket(turn.created_at ?? turn.ended_at);
+    bucket.speechTurns += 1;
+    bucket.spokenWords += countWords(turn.transcript);
+    if (typeof turn.confidence === 'number') {
+      bucket.confidenceTotal += turn.confidence;
+      bucket.confidenceCount += 1;
+    }
+  });
+
+  ttsEvents.forEach((event) => {
+    const bucket = ensureBucket(event.created_at ?? event.started_at);
+    bucket.ttsEvents += 1;
+  });
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([timestamp, bucket]) => ({
+      label: timestamp > 0 ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unscheduled',
+      speechTurns: bucket.speechTurns,
+      spokenWords: bucket.spokenWords,
+      ttsEvents: bucket.ttsEvents,
+      averageConfidence: bucket.confidenceCount > 0 ? clampScore(bucket.confidenceTotal / bucket.confidenceCount) : null,
+    }));
+}
+
+function calculateSilenceGaps(turns: SessionSpeechTurn[], thresholdMs = 45_000): { count: number; longestMs: number | null } {
+  const sorted = [...turns]
+    .map((turn) => Date.parse(turn.ended_at ?? turn.created_at ?? ''))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (sorted.length < 2) return { count: 0, longestMs: null };
+
+  let count = 0;
+  let longestMs = 0;
+  for (let index = 1; index < sorted.length; index += 1) {
+    const gap = sorted[index] - sorted[index - 1];
+    if (gap >= thresholdMs) count += 1;
+    longestMs = Math.max(longestMs, gap);
+  }
+  return { count, longestMs: longestMs > 0 ? longestMs : null };
 }
 
 function calculateTopicDriftScore(turns: SessionSpeechTurn[]): number {
@@ -127,6 +210,16 @@ function buildAnalytics(
   const completedTtsRate = ttsEvents.length > 0
     ? clampScore(ttsEvents.filter(event => event.status === 'completed').length / ttsEvents.length)
     : 0;
+  const failedTtsRate = ttsEvents.length > 0
+    ? clampScore(ttsEvents.filter(event => event.status === 'failed' || event.status === 'cancelled').length / ttsEvents.length)
+    : 0;
+  const averageWordsPerTurn = turns.length > 0 ? Math.round(spokenWordCount / turns.length) : 0;
+  const silenceGaps = calculateSilenceGaps(turns);
+  const facilitatorResponseCount = ttsEvents.filter(event => event.status === 'completed' || event.status === 'speaking').length;
+  const facilitatorResponsivenessScore = turns.length > 0
+    ? clampScore(Math.min(facilitatorResponseCount, turns.length) / turns.length)
+    : 0;
+  const timelineBuckets = calculateTimelineBuckets(turns, ttsEvents);
   const facilitationHealthScore = clampScore(
     (participantBalance * 0.35) +
     (participationCoverage * 0.25) +
@@ -146,6 +239,20 @@ function buildAnalytics(
     averageSpeechConfidence,
     averageSpeechDurationMs,
     completedTtsRate,
+    failedTtsRate,
+    averageWordsPerTurn,
+    estimatedSilenceGapCount: silenceGaps.count,
+    longestSilenceGapMs: silenceGaps.longestMs,
+    facilitatorResponseCount,
+    facilitatorResponsivenessScore,
+    timelineBuckets,
+    insightFlags: {
+      lowParticipationCoverage: participationCoverage < 0.6,
+      imbalancedParticipation: participantBalance < 0.55,
+      elevatedTopicDrift: topicDriftScore > 0.55,
+      lowTtsCompletion: ttsEvents.length > 0 && completedTtsRate < 0.8,
+      longSilenceDetected: silenceGaps.count > 0,
+    },
     participantMetrics,
     lastSpeechAt: turns[0]?.created_at ?? null,
     lastTtsAt: ttsEvents[0]?.created_at ?? null,
@@ -219,6 +326,14 @@ export function useFacilitationAnalytics({
             averageSpeechConfidence: nextAnalytics.averageSpeechConfidence,
             averageSpeechDurationMs: nextAnalytics.averageSpeechDurationMs,
             completedTtsRate: nextAnalytics.completedTtsRate,
+            failedTtsRate: nextAnalytics.failedTtsRate,
+            averageWordsPerTurn: nextAnalytics.averageWordsPerTurn,
+            estimatedSilenceGapCount: nextAnalytics.estimatedSilenceGapCount,
+            longestSilenceGapMs: nextAnalytics.longestSilenceGapMs,
+            facilitatorResponseCount: nextAnalytics.facilitatorResponseCount,
+            facilitatorResponsivenessScore: nextAnalytics.facilitatorResponsivenessScore,
+            timelineBuckets: nextAnalytics.timelineBuckets,
+            insightFlags: nextAnalytics.insightFlags,
             participantMetrics: nextAnalytics.participantMetrics,
             lastSpeechAt: nextAnalytics.lastSpeechAt,
             lastTtsAt: nextAnalytics.lastTtsAt,
@@ -255,6 +370,8 @@ export function useFacilitationAnalytics({
       balancePercent: Math.round(analytics.participantBalance * 100),
       coveragePercent: Math.round(analytics.participationCoverage * 100),
       driftPercent: Math.round(analytics.topicDriftScore * 100),
+      ttsCompletionPercent: Math.round(analytics.completedTtsRate * 100),
+      responsivenessPercent: Math.round(analytics.facilitatorResponsivenessScore * 100),
     };
   }, [analytics]);
 

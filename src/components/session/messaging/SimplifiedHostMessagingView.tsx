@@ -16,7 +16,7 @@ import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Users, Wand2, SendHorizonal,
   ChevronDown, ChevronUp, Zap, TrendingUp, BarChart2,
-  Activity, CheckCircle2, Clock, Sparkles
+  Activity, CheckCircle2, Clock, Sparkles, Camera, CameraOff, Captions, Mic, MonitorPlay, Radio, ShieldCheck, Video, Volume2
 } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -69,6 +69,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
+  const [hostMicArmed, setHostMicArmed] = useState(false);
+  const [hostCameraPreview, setHostCameraPreview] = useState(false);
+  const [captionsVisible, setCaptionsVisible] = useState(true);
 
   // Inactivity timer — purely indicative, never auto-triggers anything
   const { elapsedSeconds, isInactive, pendingCount, resetTimer } = useInactivityTimer({
@@ -117,6 +120,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const avgMessagesPerParticipant = currentParticipantCount > 0
     ? (participantMessages.length / currentParticipantCount).toFixed(1)
     : '0';
+  const visibleMediaParticipants = participants.slice(0, 6);
+  const hiddenMediaParticipantCount = Math.max(0, currentParticipantCount - visibleMediaParticipants.length);
 
   const handleSendWithInstruction = async () => {
     if (!onTriggerFacilitatorResponse) return;
@@ -263,6 +268,116 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   </div>
                   <span className="text-2xl font-bold text-slate-900">{avgMessagesPerParticipant}</span>
                   <span className="text-xs text-slate-400">per participant</span>
+                </div>
+              </div>
+
+
+              {/* P2 Audio/Video Control Center */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
+                <div className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 p-4 text-white">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
+                        <Radio className="h-3.5 w-3.5" />
+                        P2 host media control center
+                      </div>
+                      <h3 className="text-base font-semibold">Audio/video workshop cockpit</h3>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
+                        Monitor the future in-app camera room, spoken turns, captions, AI moderator audio, and privacy states while keeping the current facilitator orchestration intact.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHostMicArmed((value) => !value)}
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostMicArmed ? 'bg-emerald-400 text-emerald-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
+                      >
+                        <Mic className="h-3.5 w-3.5" />
+                        {hostMicArmed ? 'Host mic armed' : 'Arm host mic'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHostCameraPreview((value) => !value)}
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostCameraPreview ? 'bg-sky-300 text-sky-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
+                      >
+                        {hostCameraPreview ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+                        {hostCameraPreview ? 'Host camera preview' : 'Camera off'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCaptionsVisible((value) => !value)}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+                      >
+                        <Captions className="h-3.5 w-3.5" />
+                        Captions {captionsVisible ? 'visible' : 'hidden'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-0 lg:grid-cols-[1.4fr_0.6fr]">
+                  <div className="p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="relative min-h-[150px] overflow-hidden rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-500/25 to-indigo-500/20 p-4 text-white">
+                        <div className="absolute right-3 top-3 flex gap-1.5">
+                          <span className="rounded-full bg-emerald-400 p-1.5 text-emerald-950"><Mic className="h-3 w-3" /></span>
+                          <span className="rounded-full bg-violet-300 p-1.5 text-violet-950"><Volume2 className="h-3 w-3" /></span>
+                        </div>
+                        <div className="flex h-full flex-col justify-between gap-6">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/10">
+                            <Sparkles className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">AI moderator</p>
+                            <p className="text-xs text-slate-300">Spoken prompt and caption anchor</p>
+                            <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Ready to guide next turn</p>
+                          </div>
+                        </div>
+                      </div>
+                      {visibleMediaParticipants.map((participant) => (
+                        <div key={participant.id} className="relative min-h-[150px] overflow-hidden rounded-3xl border border-white/10 bg-slate-900 p-4 text-white">
+                          <div className="absolute right-3 top-3 flex gap-1.5">
+                            <span className="rounded-full bg-slate-800 p-1.5 text-slate-400"><Mic className="h-3 w-3" /></span>
+                            <span className="rounded-full bg-slate-800 p-1.5 text-slate-400"><CameraOff className="h-3 w-3" /></span>
+                          </div>
+                          <div className="flex h-full flex-col justify-between gap-6">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold ring-1 ring-white/10">
+                              {(participant.name || `P${participant.id}`).slice(0, 1).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">{participant.name || `Participant ${participant.id}`}</p>
+                              <p className="text-xs text-slate-300">Participant media tile</p>
+                              <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Listening or preparing response</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {hiddenMediaParticipantCount > 0 && (
+                      <p className="mt-3 text-xs text-slate-400">+{hiddenMediaParticipantCount} more participant{hiddenMediaParticipantCount === 1 ? '' : 's'} would continue in the media grid.</p>
+                    )}
+                  </div>
+
+                  <div className="border-t border-white/10 bg-white/[0.04] p-4 lg:border-l lg:border-t-0">
+                    <div className="space-y-3">
+                      <div className="rounded-2xl bg-white/10 p-3 text-white">
+                        <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-emerald-200" /> Permission posture</div>
+                        <p className="mt-2 text-xs leading-5 text-slate-300">Device access will be opt-in, visible, and reversible. Text response fallback remains available for accessibility and reliability.</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-3 text-white">
+                        <div className="flex items-center gap-2 text-sm font-semibold"><Video className="h-4 w-4 text-sky-200" /> Room readiness</div>
+                        <p className="mt-2 text-xs leading-5 text-slate-300">LiveKit-style SFU connection, token minting, and server-side recording policy are intentionally not connected in this UI shell.</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-900/80 p-3 text-white">
+                        <div className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-violet-200" /> Moderator transcript</div>
+                        <p className="mt-2 text-xs leading-5 text-slate-300">
+                          {captionsVisible
+                            ? 'Captions and speaker turns will stream here once the media backend is connected.'
+                            : 'Caption rail hidden for this host preview state.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

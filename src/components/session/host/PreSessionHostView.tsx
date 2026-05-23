@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Users, Clock, Target, User, Pencil, Headphones, Mic, Video } from 'lucide-react';
+import { Camera, Captions, Copy, Check, Users, Clock, Target, User, Pencil, Headphones, Mic, MonitorPlay, ShieldCheck, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import api from "@/lib/api";
 import StartSessionButton from './StartSessionButton';
@@ -174,6 +174,42 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               pointerEvents: 'auto'
             }}>
                 <StartSessionButton onStartSession={handleSessionStart} participantCount={stableParticipantCount} isSessionStarted={false} isAutoStarting={isAutoStarting} autoStartCountdown={autoStartCountdown} onCancelAutoStart={onCancelAutoStart} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+
+        <Card className="mb-4 overflow-hidden border-slate-200 bg-slate-950 text-white shadow-lg md:mb-6">
+          <CardContent className="p-4 md:p-6">
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
+                  <MonitorPlay className="h-3.5 w-3.5" />
+                  P2 media-room setup preview
+                </div>
+                <h3 className="text-lg font-semibold md:text-xl">Prepare an in-app audio/video workshop room</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  This development interface previews the next room model: participant camera tiles, spoken turns, AI moderator audio, live captions, and a reliable text fallback. Real media provider connection will follow after UX validation.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white/10 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold"><Mic className="h-4 w-4 text-emerald-200" /> Spoken participation</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">Participants understand that voice is the primary mode and typing stays available.</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold"><Camera className="h-4 w-4 text-sky-200" /> Camera presence</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">The room layout is ready for embedded video tiles once infrastructure is connected.</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold"><Captions className="h-4 w-4 text-violet-200" /> Live captions</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">Caption and transcript areas are visible before real-time speech streaming is attached.</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-amber-200" /> Privacy posture</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">Permissions should be explicit, reversible, and never requested before participant intent.</p>
+                </div>
               </div>
             </div>
           </CardContent>

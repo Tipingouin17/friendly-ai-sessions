@@ -4358,7 +4358,21 @@ async def edge_function(func_name: str, request: Request):
                 elif snapshot_sequence is None:
                     snapshot_sequence = 0
 
-                payload_json = json.dumps(payload)
+                # `participantId` in participant-facing URLs is the per-session
+                # slot stored on session_participants.participant_id, not a stable
+                # foreign-key target for the runtime-event participant_id column.
+                # Some deployed schemas constrain facilitator_runtime_events.participant_id
+                # to a historical participant row table or to session_participants.id.
+                # Persisting the URL slot there can therefore reject otherwise valid
+                # participant-authenticated stream events. Keep the slot in JSONB for
+                # consumers and leave the nullable FK column unset for compatibility.
+                event_payload = dict(payload)
+                if participant_id is not None:
+                    event_payload.setdefault("participantId", participant_id)
+                    event_payload.setdefault("participant_id", participant_id)
+                event_participant_id = None
+
+                payload_json = json.dumps(event_payload)
                 snapshot_json = json.dumps(snapshot) if isinstance(snapshot, dict) else None
                 memory_patch_json = json.dumps(memory_patch) if isinstance(memory_patch, dict) else None
 
@@ -4370,7 +4384,7 @@ async def edge_function(func_name: str, request: Request):
                         "RETURNING id, conversation_id, facilitator_id, participant_id, event_type, sequence, payload, created_at",
                         conv_id,
                         facilitator_id,
-                        participant_id,
+                        event_participant_id,
                         event_type,
                         sequence,
                         payload_json,
@@ -4418,7 +4432,7 @@ async def edge_function(func_name: str, request: Request):
                 # the same Supabase-compatible realtime payload shape used by
                 # messages/session_participants. Broadcast only lightweight state
                 # changes; plain stream chunks remain persisted but not fanned out.
-                avatar_state = payload.get("avatarState") or payload.get("avatar_state")
+                avatar_state = event_payload.get("avatarState") or event_payload.get("avatar_state")
                 if event_type in ("avatar_state_changed", "avatar_state_change") or avatar_state:
                     log_session.info(
                         "facilitator-ingest-stream-event broadcasting avatar state: conv=%s event_id=%s event=%s seq=%s avatar_state=%s",

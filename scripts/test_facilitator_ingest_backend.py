@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -201,6 +202,10 @@ async def main():
 
     host_result = await invoke(base_body, host_headers())
     assert host_result == {"success": True, "eventId": 1, "snapshotUpdated": True, "lastSequence": 10}
+    assert db.events[0]["participant_id"] is None
+    persisted_payload = json.loads(db.events[0]["payload"])
+    assert persisted_payload["participantId"] == PARTICIPANT_ID
+    assert persisted_payload["participant_id"] == PARTICIPANT_ID
     assert db.snapshot_last_sequence == 10
 
     older_snapshot = {**base_body, "sequence": 9, "snapshot": {"lastSequence": 9, "themes": ["older"]}}

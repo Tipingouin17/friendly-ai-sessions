@@ -128,6 +128,31 @@ export async function persistMeetingSnapshot(
     }, { onConflict: "conversation_id" });
 }
 
+export async function persistAvatarStateChangedEvent(
+  snapshot: StreamInterpretationSnapshot,
+  avatarState: FacilitatorAvatarState,
+  facilitatorId?: number | null,
+  flags: FacilitatorRuntimeFeatureFlags = getFacilitatorRuntimeFeatureFlags()
+): Promise<void> {
+  if (!flags.avatarStateEnabled || !flags.persistRuntimeEvents) return;
+
+  await persistFacilitatorRuntimeEvent({
+    conversation_id: snapshot.conversationId,
+    facilitator_id: facilitatorId ?? null,
+    participant_id: snapshot.participantId ?? null,
+    event_type: "avatar_state_changed",
+    sequence: snapshot.lastSequence,
+    payload: {
+      avatarState,
+      turnBoundary: snapshot.turnBoundary,
+      tokenBudgetRisk: snapshot.tokenBudgetRisk,
+      shouldConsiderIntervention: snapshot.shouldConsiderIntervention,
+      interventionRationale: snapshot.interventionRationale ?? null,
+      updatedAt: snapshot.updatedAt
+    }
+  }, flags);
+}
+
 export function subscribeToFacilitatorAvatarState(
   conversationId: number,
   onAvatarState: (state: FacilitatorAvatarState) => void

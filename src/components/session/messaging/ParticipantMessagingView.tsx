@@ -19,10 +19,12 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
+import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Users, Home, Sparkles } from 'lucide-react';
+import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -51,6 +53,7 @@ interface ParticipantMessagingViewProps {
   participantNames?: { [key: number]: string };
   currentUserParticipantId?: number | null;
   showResponseStats?: boolean;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }
 
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
@@ -79,6 +82,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   participantNames = {},
   currentUserParticipantId = null,
   showResponseStats = false,
+  facilitatorRuntime,
 }) => {
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
@@ -93,6 +97,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
+  const facilitatorName = conversationData?.sessions?.facilitator_details?.name || facilitatorTitle || 'Facilitator';
+  const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
+  const runtimeAvatarState = facilitatorRuntime?.avatarState ?? null;
+  const showRuntimeAvatarState = Boolean(facilitatorRuntime?.isEnabled && runtimeAvatarState);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -100,15 +108,32 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       {/* ── Session info bar (sticky top) ──────────────────────────────── */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
         {/* Facilitator avatar / icon */}
-        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
-          <Sparkles className="h-4 w-4 text-white" />
-        </div>
+        {showRuntimeAvatarState ? (
+          <FacilitatorAvatar
+            avatarUrl={facilitatorAvatarUrl}
+            name={facilitatorName}
+            size="md"
+            runtimeState={runtimeAvatarState}
+            enableRuntimeAnimation
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
+            <Sparkles className="h-4 w-4 text-white" />
+          </div>
+        )}
 
         {/* Title + facilitator */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{sessionTitle}</p>
           {facilitatorTitle && (
             <p className="text-xs text-slate-400 truncate">Facilitated by {facilitatorTitle}</p>
+          )}
+          {showRuntimeAvatarState && (
+            <p className="text-[11px] text-indigo-500 truncate capitalize" aria-live="polite">
+              {runtimeAvatarState?.state === 'intervening'
+                ? 'Ready to guide the group'
+                : `AI facilitator is ${runtimeAvatarState?.state}`}
+            </p>
           )}
         </div>
 

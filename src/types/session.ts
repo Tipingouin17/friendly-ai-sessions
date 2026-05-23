@@ -6,6 +6,7 @@
 
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 
 export interface SessionContextProps {
   isLoading: boolean;
@@ -54,4 +55,9 @@ export interface SessionContextProps {
   
   // Admin message function
   onSendAdminMessage?: (message: string) => void;
+
+  // Feature-flagged stream-aware facilitator runtime. Optional by design so
+  // existing session consumers remain compatible while the dev-only avatar
+  // facilitator foundation is validated.
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }

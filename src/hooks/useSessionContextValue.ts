@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import { SessionContextProps } from "@/types/session";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 import { participantColors } from "@/utils/sessionHelpers";
 
 interface UseSessionContextValueProps {
@@ -24,6 +25,7 @@ interface UseSessionContextValueProps {
   connection: any;
   handleStartSession: () => void;
   effectiveAdmin: boolean;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }
 
 export function useSessionContextValue({
@@ -41,7 +43,8 @@ export function useSessionContextValue({
   providerError,
   connection,
   handleStartSession,
-  effectiveAdmin
+  effectiveAdmin,
+  facilitatorRuntime
 }: UseSessionContextValueProps): SessionContextProps {
   // Create safe defaults for any potentially undefined values
   const safeRoomState = useMemo(() => roomState || {
@@ -160,6 +163,7 @@ export function useSessionContextValue({
     isSessionStartedInDB,
     refetch,
     error: providerError,
+    facilitatorRuntime,
     ...connectionProps
   }), [
     isLoading,
@@ -180,6 +184,7 @@ export function useSessionContextValue({
     providerError,
     connectionProps,
     refetch,
-    effectiveAdmin
+    effectiveAdmin,
+    facilitatorRuntime
   ]);
 }

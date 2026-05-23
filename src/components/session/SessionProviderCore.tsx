@@ -141,7 +141,7 @@ export const SessionProviderCore = ({
   // mounted near the provider boundary, where conversation/session/participant
   // identifiers and the live draft input are available, but it does not alter the
   // visible UX unless explicitly enabled in the dev environment.
-  useStreamingFacilitatorRuntime({
+  const facilitatorRuntime = useStreamingFacilitatorRuntime({
     conversationId: currentConversationId,
     facilitatorId: conversation?.sessions?.facilitator ?? null,
     sessionId: conversation?.sessions?.id ?? null,
@@ -167,7 +167,8 @@ export const SessionProviderCore = ({
     providerError,
     connection,
     handleStartSession: enhancedHandleStartSession,
-    effectiveAdmin
+    effectiveAdmin,
+    facilitatorRuntime
   });
 
   // Memoize the error component to prevent re-renders

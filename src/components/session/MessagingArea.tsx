@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 import AdminMessagingView from "./messaging/AdminMessagingView";
 import ParticipantMessagingView from "./messaging/ParticipantMessagingView";
 
@@ -40,6 +41,7 @@ interface MessagingAreaProps {
   
   // Add conversationData prop to pass session info
   conversationData?: any;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }
 
 const MessagingArea = ({
@@ -72,7 +74,8 @@ const MessagingArea = ({
   currentUserParticipantId = null,
   
   // Session data
-  conversationData
+  conversationData,
+  facilitatorRuntime
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);
@@ -145,6 +148,7 @@ const MessagingArea = ({
       participantNames={participantNames}
       currentUserParticipantId={currentUserParticipantId}
       showResponseStats={false}
+      facilitatorRuntime={facilitatorRuntime}
     />
   );
 };

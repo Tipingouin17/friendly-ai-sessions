@@ -13,6 +13,7 @@ import {
 } from "@/services/facilitator/streamInterpreter";
 import {
   loadFacilitatorBehaviorProfile,
+  persistAvatarStateChangedEvent,
   persistMeetingSnapshot,
   persistStreamChunkEvent,
   subscribeToFacilitatorAvatarState
@@ -28,7 +29,7 @@ interface UseStreamingFacilitatorRuntimeArgs {
   isAdmin?: boolean;
 }
 
-interface UseStreamingFacilitatorRuntimeResult {
+export interface UseStreamingFacilitatorRuntimeResult {
   enabled: boolean;
   behaviorProfile: FacilitatorBehaviorProfile | null;
   snapshot: StreamInterpretationSnapshot | null;
@@ -56,6 +57,7 @@ export function useStreamingFacilitatorRuntime({
   const sequenceRef = useRef(0);
   const lastInputRef = useRef(EMPTY_INPUT);
   const debounceRef = useRef<number | null>(null);
+  const lastPersistedAvatarStateRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -83,8 +85,13 @@ export function useStreamingFacilitatorRuntime({
     setAvatarState(nextSnapshot.recommendedAvatarState);
 
     const memoryPatch = createMeetingMemoryPatch(nextSnapshot);
+    const avatarStateKey = JSON.stringify(nextSnapshot.recommendedAvatarState);
     void persistStreamChunkEvent(chunk, facilitatorId);
     void persistMeetingSnapshot(nextSnapshot, memoryPatch, facilitatorId);
+    if (avatarStateKey !== lastPersistedAvatarStateRef.current) {
+      lastPersistedAvatarStateRef.current = avatarStateKey;
+      void persistAvatarStateChangedEvent(nextSnapshot, nextSnapshot.recommendedAvatarState, facilitatorId);
+    }
   }, [behaviorProfile, enabled, facilitatorId]);
 
   const pushStreamChunk = useCallback<UseStreamingFacilitatorRuntimeResult["pushStreamChunk"]>((partial) => {

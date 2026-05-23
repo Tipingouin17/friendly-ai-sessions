@@ -7,6 +7,7 @@
 import React, { useEffect } from "react";
 import MessagingArea from "./MessagingArea";
 import { Message, ParticipantInfo } from "@/types/chat";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 import { getParticipantColor } from "@/utils/sessionHelpers";
 import InputFooter from "./InputFooter";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -43,6 +44,7 @@ interface SessionContainerProps {
   onSendAdminMessage?: (message: string) => void;
   isAnonymous?: boolean;
   toggleAnonymous?: () => void;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }
 
 const SessionContainer: React.FC<SessionContainerProps> = ({
@@ -76,7 +78,8 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isAdmin,
   onSendAdminMessage,
   isAnonymous = false,
-  toggleAnonymous = () => { /* no-op */ }
+  toggleAnonymous = () => { /* no-op */ },
+  facilitatorRuntime
 }) => {
   const mobileState = useIsMobile();
   const isMobile = mobileState === true;
@@ -129,6 +132,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           totalResponses={totalResponses}
           participantNames={allParticipantNames}
           currentUserParticipantId={currentUserParticipantId}
+          facilitatorRuntime={facilitatorRuntime}
         />
       </div>
     </div>

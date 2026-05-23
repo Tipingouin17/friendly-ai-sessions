@@ -22,6 +22,7 @@ export function useSessionPageState() {
     error: null as string | null,
     noSessionFound: false,
     hasShownToast: false,
+    hasShownSessionFullToast: false,
     pageLoadTime: typeof window !== 'undefined' ? Date.now() : 0 // Initialize synchronously
   });
   
@@ -79,10 +80,15 @@ export function useSessionPageState() {
   // Session full handler
   const handleSessionFull = useCallback(() => {
     setSessionStarted(true);
-    
+
+    if (stateRef.current.hasShownSessionFullToast) {
+      return;
+    }
+
+    stateRef.current.hasShownSessionFullToast = true;
     toast({
-      title: "Session is full",
-      description: "The maximum number of participants has joined. Starting session automatically.",
+      title: "Workshop room is ready",
+      description: "The expected participants have joined. The AI moderator will begin when the host starts the workshop.",
     });
   }, [toast]);
   

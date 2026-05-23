@@ -79,8 +79,8 @@ export function useSessionHostLogic() {
     } = useHostParticipantManager({
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
-        onSessionFull: () => {
-            triggerAutoStart(currentCount);
+        onSessionFull: (freshCurrentCount, freshMaxCount) => {
+            triggerAutoStart(freshCurrentCount, freshMaxCount);
         }
     });
 
@@ -203,7 +203,7 @@ export function useSessionHostLogic() {
 
         // Participants
         participants,
-        participantCount: participants.length,
+        participantCount: currentCount > 0 ? currentCount : participants.length,
         isLoadingParticipants: !isDataLoaded,
 
         // Session Status

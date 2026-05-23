@@ -81,14 +81,20 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   showResponseStats = false,
 }) => {
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
+  const routeParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const routeParticipantId = Number(routeParams?.get('participantId'));
+  const routeParticipantName = routeParams?.get('name') ? decodeURIComponent(routeParams.get('name') || '') : '';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
+  const resolvedParticipantId = effectiveParticipantId > 0
+    ? effectiveParticipantId
+    : (Number.isFinite(routeParticipantId) && routeParticipantId > 0 ? routeParticipantId : 1);
 
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant",
     participants,
     participantNames,
-    currentParticipant: effectiveParticipantId
+    currentParticipant: resolvedParticipantId
   });
 
   const sessionTitle = conversationData?.sessions?.title || 'Session';
@@ -96,16 +102,19 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
   const facilitatorName = conversationData?.sessions?.facilitator_details?.name || facilitatorTitle || 'AI facilitator';
   const speechLanguage = conversationData?.language || conversationData?.sessions?.language || null;
-  const visibleParticipants = participants.slice(0, 6);
+  const currentParticipantRecord = participants.find((participant) => participant.id === resolvedParticipantId);
+  const currentParticipantName = currentParticipantRecord?.name || participantNames[resolvedParticipantId] || routeParticipantName || `Participant ${resolvedParticipantId}`;
+  const visibleParticipants = participants.length > 0
+    ? participants.slice(0, 6)
+    : (currentParticipantCount > 0 ? [{ id: resolvedParticipantId, name: currentParticipantName } as ParticipantInfo] : []);
   const remainingParticipantCount = Math.max(0, currentParticipantCount - visibleParticipants.length);
   const showOrientationCard = !isSessionEnded && filteredMessages.length <= 2;
   const [isMicPreviewOn, setIsMicPreviewOn] = useState(false);
   const [isCameraPreviewOn, setIsCameraPreviewOn] = useState(false);
   const [showLiveCaptionPreview, setShowLiveCaptionPreview] = useState(true);
   const nearbyParticipants = participants
-    .filter((participant) => participant.id !== effectiveParticipantId)
+    .filter((participant) => participant.id !== resolvedParticipantId)
     .slice(0, 4);
-  const currentParticipantName = participantNames[effectiveParticipantId] || `Participant ${effectiveParticipantId}`;
   const mediaTileParticipants = [
     {
       id: 'ai-moderator',
@@ -117,10 +126,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       micOn: true,
     },
     {
-      id: `participant-${effectiveParticipantId}`,
+      id: `participant-${resolvedParticipantId}`,
       name: currentParticipantName,
       role: 'You',
-      status: isMicPreviewOn ? 'Mic armed for spoken response' : 'Muted until your turn',
+      status: isMicPreviewOn ? 'Preview: mic state on' : 'Preview: muted until your turn',
       isAi: false,
       cameraOn: isCameraPreviewOn,
       micOn: isMicPreviewOn,
@@ -129,7 +138,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       id: `participant-${participant.id}`,
       name: participant.name || `Participant ${participant.id}`,
       role: 'Participant',
-      status: 'Listening',
+      status: 'Preview: listening',
       isAi: false,
       cameraOn: false,
       micOn: false,
@@ -243,11 +252,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 <div>
                   <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
                     <Radio className="h-3.5 w-3.5" />
-                    P2 audio/video room shell
+                    P2 media shell preview
                   </div>
-                  <h2 className="text-base font-semibold text-white">Live AI-moderated workshop</h2>
+                  <h2 className="text-base font-semibold text-white">AI-moderated media preview</h2>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-300">
-                    This validation layout prepares the in-app camera room, spoken turns, captions, AI moderator presence, and text fallback before connecting real media infrastructure.
+                    This validation layout previews the planned in-app camera room, spoken-turn cues, captions, AI moderator presence, and text fallback before any real media infrastructure is connected.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -257,7 +266,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${isMicPreviewOn ? 'bg-emerald-400 text-emerald-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                   >
                     <Mic className="h-3.5 w-3.5" />
-                    {isMicPreviewOn ? 'Mic ready' : 'Try mic'}
+                    {isMicPreviewOn ? 'Mic state previewed' : 'Preview mic state'}
                   </button>
                   <button
                     type="button"
@@ -265,7 +274,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${isCameraPreviewOn ? 'bg-sky-300 text-sky-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                   >
                     {isCameraPreviewOn ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
-                    {isCameraPreviewOn ? 'Camera preview' : 'Camera off'}
+                    {isCameraPreviewOn ? 'Camera state previewed' : 'Preview camera state'}
                   </button>
                   <button
                     type="button"
@@ -311,7 +320,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   Moderator audio plan
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-300">
-                  The AI moderator tile is designed for spoken prompts, captions, and read-aloud playback. Real-time voice-agent connection remains the next infrastructure step.
+                  The AI moderator tile previews spoken prompts, captions, and read-aloud playback. Real-time voice-agent connection remains the next infrastructure step.
                 </p>
               </div>
               <div className="rounded-2xl bg-white/10 p-3">
@@ -320,7 +329,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   Privacy first
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-300">
-                  Camera and microphone states are explicit. Participants keep typing available, and device permissions should be requested only after a clear user action.
+                  Camera and microphone states are explicit preview states. Participants keep typing available, and device permissions should be requested only after a clear user action.
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-900/70 p-3">
@@ -330,7 +339,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 </div>
                 {showLiveCaptionPreview ? (
                   <p className="mt-2 text-xs leading-5 text-slate-300">
-                    Preview: spoken responses will appear here as captions before being submitted to the facilitator flow.
+                    Preview placeholder: spoken responses will appear here as captions before being submitted to the facilitator flow once media services are connected.
                   </p>
                 ) : (
                   <p className="mt-2 text-xs leading-5 text-slate-500">Captions are hidden in this preview state.</p>

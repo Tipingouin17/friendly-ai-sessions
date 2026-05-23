@@ -279,11 +279,11 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <div>
                       <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
                         <Radio className="h-3.5 w-3.5" />
-                        P2 host media control center
+                        P2 media shell preview
                       </div>
-                      <h3 className="text-base font-semibold">Audio/video workshop cockpit</h3>
+                      <h3 className="text-base font-semibold">Audio/video readiness preview</h3>
                       <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
-                        Monitor the future in-app camera room, spoken turns, captions, AI moderator audio, and privacy states while keeping the current facilitator orchestration intact.
+                        Review the proposed in-app camera-room layout, spoken-turn cues, captions, AI moderator audio states, and privacy posture while the current text facilitator workflow remains the live workshop channel.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -293,7 +293,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostMicArmed ? 'bg-emerald-400 text-emerald-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                       >
                         <Mic className="h-3.5 w-3.5" />
-                        {hostMicArmed ? 'Host mic armed' : 'Arm host mic'}
+                        {hostMicArmed ? 'Mic state previewed' : 'Preview mic state'}
                       </button>
                       <button
                         type="button"
@@ -301,7 +301,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${hostCameraPreview ? 'bg-sky-300 text-sky-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                       >
                         {hostCameraPreview ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
-                        {hostCameraPreview ? 'Host camera preview' : 'Camera off'}
+                        {hostCameraPreview ? 'Camera state previewed' : 'Preview camera state'}
                       </button>
                       <button
                         type="button"
@@ -329,8 +329,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           </div>
                           <div>
                             <p className="text-sm font-semibold">AI moderator</p>
-                            <p className="text-xs text-slate-300">Spoken prompt and caption anchor</p>
-                            <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Ready to guide next turn</p>
+                            <p className="text-xs text-slate-300">Planned spoken prompt and caption anchor</p>
+                            <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Preview: ready to guide next turn</p>
                           </div>
                         </div>
                       </div>
@@ -346,8 +346,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                             </div>
                             <div>
                               <p className="text-sm font-semibold">{participant.name || `Participant ${participant.id}`}</p>
-                              <p className="text-xs text-slate-300">Participant media tile</p>
-                              <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Listening or preparing response</p>
+                              <p className="text-xs text-slate-300">Planned participant media tile</p>
+                              <p className="mt-2 rounded-full bg-black/20 px-2 py-1 text-[11px] text-slate-200">Preview: listening or preparing response</p>
                             </div>
                           </div>
                         </div>
@@ -366,13 +366,13 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       </div>
                       <div className="rounded-2xl bg-white/10 p-3 text-white">
                         <div className="flex items-center gap-2 text-sm font-semibold"><Video className="h-4 w-4 text-sky-200" /> Room readiness</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-300">LiveKit-style SFU connection, token minting, and server-side recording policy are intentionally not connected in this UI shell.</p>
+                        <p className="mt-2 text-xs leading-5 text-slate-300">Live media transport, token minting, and server-side recording policy are intentionally not connected in this preview shell.</p>
                       </div>
                       <div className="rounded-2xl bg-slate-900/80 p-3 text-white">
                         <div className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-violet-200" /> Moderator transcript</div>
                         <p className="mt-2 text-xs leading-5 text-slate-300">
                           {captionsVisible
-                            ? 'Captions and speaker turns will stream here once the media backend is connected.'
+                            ? 'Preview placeholder: captions and speaker turns will stream here once the media backend is connected.'
                             : 'Caption rail hidden for this host preview state.'}
                         </p>
                       </div>

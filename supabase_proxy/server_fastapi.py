@@ -4358,6 +4358,10 @@ async def edge_function(func_name: str, request: Request):
                 elif snapshot_sequence is None:
                     snapshot_sequence = 0
 
+                payload_json = json.dumps(payload)
+                snapshot_json = json.dumps(snapshot) if isinstance(snapshot, dict) else None
+                memory_patch_json = json.dumps(memory_patch) if isinstance(memory_patch, dict) else None
+
                 async with conn.transaction():
                     event_row = await conn.fetchrow(
                         "INSERT INTO facilitator_runtime_events "
@@ -4369,11 +4373,11 @@ async def edge_function(func_name: str, request: Request):
                         participant_id,
                         event_type,
                         sequence,
-                        payload,
+                        payload_json,
                     )
 
                     snapshot_row = None
-                    if isinstance(snapshot, dict):
+                    if snapshot_json is not None:
                         snapshot_row = await conn.fetchrow(
                             "INSERT INTO facilitator_meeting_snapshots "
                             "(conversation_id, facilitator_id, snapshot, memory_patch, last_sequence, updated_at) "
@@ -4388,12 +4392,17 @@ async def edge_function(func_name: str, request: Request):
                             "RETURNING id, last_sequence",
                             conv_id,
                             facilitator_id,
-                            snapshot,
-                            memory_patch,
+                            snapshot_json,
+                            memory_patch_json,
                             snapshot_sequence,
                         )
 
                 event_result = serialize_row(dict(event_row)) if event_row else {}
+                if isinstance(event_result.get("payload"), str):
+                    try:
+                        event_result["payload"] = json.loads(event_result["payload"])
+                    except (TypeError, ValueError):
+                        pass
                 snapshot_updated = snapshot_row is not None
                 log_session.info(
                     "facilitator-ingest-stream-event persisted: conv=%s event_id=%s event=%s seq=%s snapshot_updated=%s snapshot_seq=%s",

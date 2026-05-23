@@ -37,14 +37,19 @@ export const useAutoStartSession = ({
     setAutoStartCountdown(0);
   }, []);
 
-  const triggerAutoStart = useCallback(async (currentParticipantCount: number) => {
+  const triggerAutoStart = useCallback(async (
+    currentParticipantCount: number,
+    maxParticipantsOverride?: number
+  ) => {
     // Don't auto-start if session is already started or starting
     if (isSessionStarted || isAutoStarting) {
       return;
     }
 
-    // Only auto-start if we've reached max capacity
-    if (currentParticipantCount < maxParticipants) {
+    const capacity = maxParticipantsOverride ?? maxParticipants;
+
+    // Only auto-start if we've reached a known max capacity
+    if (capacity <= 0 || currentParticipantCount < capacity) {
       return;
     }
 
@@ -54,7 +59,7 @@ export const useAutoStartSession = ({
     // Show toast notification
     toast({
       title: "Session Full",
-      description: `Maximum capacity reached (${maxParticipants} participants). Auto-starting in 3 seconds...`,
+      description: `Maximum capacity reached (${capacity} participants). Auto-starting in 3 seconds...`,
     });
 
     // Start countdown

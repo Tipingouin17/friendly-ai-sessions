@@ -79,8 +79,8 @@ export function useSessionHostLogic() {
     } = useHostParticipantManager({
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
-        onSessionFull: () => {
-            triggerAutoStart(currentCount);
+        onSessionFull: (fullCount, maxCount) => {
+            triggerAutoStart(fullCount, maxCount);
         }
     });
 

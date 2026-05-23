@@ -20,7 +20,7 @@ interface UseEnhancedHostParticipantManagerProps {
   onMaxParticipantsChange?: (max: number) => void;
   onParticipantsChange?: (participants: ParticipantInfo[]) => void;
   onSessionStarted?: () => void;
-  onSessionFull?: () => void;
+  onSessionFull?: (currentCount: number, maxCount: number) => void;
   enabled?: boolean;
 }
 
@@ -140,7 +140,7 @@ export function useHostParticipantManager({
           setError('Using polling updates (real-time unavailable)');
           onParticipantCountChangeRef.current?.(cur);
           onMaxParticipantsChangeRef.current?.(max);
-          if (max > 0 && cur >= max && !started) onSessionFullRef.current?.();
+          if (max > 0 && cur >= max && !started) onSessionFullRef.current?.(cur, max);
           await fetchParticipantList();
         }
       } catch (e) {
@@ -180,7 +180,7 @@ export function useHostParticipantManager({
             onParticipantCountChangeRef.current?.(cur);
             onMaxParticipantsChangeRef.current?.(max);
             if (started) onSessionStartedRef.current?.();
-            if (max > 0 && cur >= max && !started) onSessionFullRef.current?.();
+            if (max > 0 && cur >= max && !started) onSessionFullRef.current?.(cur, max);
           }
         })
         .on('postgres_changes', {
@@ -242,6 +242,7 @@ export function useHostParticipantManager({
         setIsSessionStarted(started);
         onParticipantCountChangeRef.current?.(cur);
         onMaxParticipantsChangeRef.current?.(max);
+        if (max > 0 && cur >= max && !started) onSessionFullRef.current?.(cur, max);
       }
       await fetchParticipantList();
     } catch (e) {

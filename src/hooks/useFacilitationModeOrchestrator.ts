@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ConversationWithSession } from "@/types/database";
 import {
+  approveFacilitationMode,
   endFacilitationMode,
   fetchActiveSessionMode,
   fetchEnabledFacilitatorModes,
@@ -204,6 +205,18 @@ export const useFacilitationModeOrchestrator = (
     return response;
   }, [applyResponse, conversationId, facilitatorId]);
 
+  const approveMode = useCallback(async (reason?: string) => {
+    if (!conversationId || !activeMode) throw new Error("No pending facilitation mode is available to approve.");
+    const response = await approveFacilitationMode({
+      conversationId,
+      activeModeId: activeMode.id,
+      facilitatorId: facilitatorId ?? undefined,
+      reason,
+    });
+    applyResponse(response);
+    return response;
+  }, [activeMode, applyResponse, conversationId, facilitatorId]);
+
   const endMode = useCallback(async (reason?: string) => {
     if (!conversationId || !activeMode) throw new Error("No active facilitation mode is available to end.");
     const response = await endFacilitationMode({
@@ -262,6 +275,7 @@ export const useFacilitationModeOrchestrator = (
     refreshActiveMode,
     refreshRecentEvents,
     startMode,
+    approveMode,
     endMode,
     rejectMode,
     submitInput,

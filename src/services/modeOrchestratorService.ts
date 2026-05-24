@@ -290,6 +290,7 @@ export const startFacilitationMode = async (params: {
   conversationId: number;
   modeId: number;
   facilitatorId?: number;
+  activeModeId?: number;
   prompt?: string;
   options?: Record<string, unknown>;
   policy?: Record<string, unknown>;
@@ -298,11 +299,25 @@ export const startFacilitationMode = async (params: {
   conversation_id: params.conversationId,
   event_type: "mode.started",
   mode_id: params.modeId,
+  active_mode_id: params.activeModeId,
   facilitator_id: params.facilitatorId,
   prompt: params.prompt,
   options: params.options,
   policy: params.policy,
   timer_seconds: params.timerSeconds,
+});
+
+export const approveFacilitationMode = async (params: {
+  conversationId: number;
+  activeModeId: number;
+  facilitatorId?: number;
+  reason?: string;
+}): Promise<ModeEventResponse> => sendModeEvent({
+  conversation_id: params.conversationId,
+  event_type: "mode.started",
+  active_mode_id: params.activeModeId,
+  facilitator_id: params.facilitatorId,
+  reason: params.reason,
 });
 
 export const recommendFacilitationMode = async (params: {

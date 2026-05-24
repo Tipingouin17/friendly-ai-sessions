@@ -39,6 +39,7 @@ interface HostDashboardProps {
   isLoadingModes?: boolean;
   modeError?: string | null;
   onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onApproveMode?: (reason?: string) => Promise<void>;
   onEndMode?: (reason?: string) => Promise<void>;
   onRejectMode?: (reason?: string) => Promise<void>;
   
@@ -78,6 +79,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isLoadingModes = false,
   modeError = null,
   onStartMode,
+  onApproveMode,
   onEndMode,
   onRejectMode,
   isSessionStarted = false,
@@ -131,6 +133,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isLoadingModes={isLoadingModes}
         modeError={modeError}
         onStartMode={onStartMode}
+        onApproveMode={onApproveMode}
         onEndMode={onEndMode}
         onRejectMode={onRejectMode}
         isSessionStarted={isSessionStarted}

@@ -48,6 +48,7 @@ export interface SessionContextProps {
       policy?: Record<string, unknown>;
       timerSeconds?: number;
     }) => Promise<unknown>;
+    approveMode: (reason?: string) => Promise<unknown>;
     endMode: (reason?: string) => Promise<unknown>;
     rejectMode: (reason?: string) => Promise<unknown>;
     submitModeInput: (params: {
@@ -105,6 +106,7 @@ export interface SessionContextProps {
     policy?: Record<string, unknown>;
     timerSeconds?: number;
   }) => Promise<unknown>;
+  approveMode?: (reason?: string) => Promise<unknown>;
   endMode?: (reason?: string) => Promise<unknown>;
   rejectMode?: (reason?: string) => Promise<unknown>;
   submitModeInput?: (params: {

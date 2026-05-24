@@ -244,6 +244,7 @@ export function useSessionHostLogic() {
         isLoadingModes: modeOrchestrator.isLoadingModes,
         modeError: modeOrchestrator.modeError,
         startMode: modeOrchestrator.startMode,
+        approveMode: modeOrchestrator.approveMode,
         endMode: modeOrchestrator.endMode,
         rejectMode: modeOrchestrator.rejectMode,
         handleSessionStarted,

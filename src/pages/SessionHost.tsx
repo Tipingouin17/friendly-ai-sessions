@@ -47,6 +47,7 @@ const SessionHost = () => {
     isLoadingModes,
     modeError,
     startMode,
+    approveMode,
     endMode,
     rejectMode,
     handleSessionStarted,
@@ -102,6 +103,7 @@ const SessionHost = () => {
       isLoadingModes={isLoadingModes}
       modeError={modeError}
       onStartMode={startMode}
+      onApproveMode={approveMode}
       onEndMode={endMode}
       onRejectMode={rejectMode}
       isSessionStarted={isSessionStarted}

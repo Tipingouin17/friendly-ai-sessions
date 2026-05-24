@@ -19,7 +19,7 @@ import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Users, Wand2, SendHorizonal,
   ChevronDown, ChevronUp, Zap, TrendingUp, BarChart2,
-  Activity, CheckCircle2, Clock, Sparkles
+  Activity, CheckCircle2, Clock, Sparkles, ShieldCheck
 } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -49,6 +49,7 @@ interface SimplifiedHostMessagingViewProps {
   isLoadingModes?: boolean;
   modeError?: string | null;
   onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onApproveMode?: (reason?: string) => Promise<void>;
   onEndMode?: (reason?: string) => Promise<void>;
   onRejectMode?: (reason?: string) => Promise<void>;
 }
@@ -80,6 +81,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   isLoadingModes = false,
   modeError = null,
   onStartMode,
+  onApproveMode,
   onEndMode,
   onRejectMode,
 }) => {
@@ -161,6 +163,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 
   const selectedMode = enabledModes.find((mode) => mode.mode_key === selectedModeKey) || enabledModes[0] || null;
   const activeModeDefinition = activeMode?.facilitation_mode;
+  const isPendingHostApproval = activeMode?.status === 'recommended' || activeMode?.status === 'pending_host_confirmation';
 
   const handleStartSelectedMode = async () => {
     if (!selectedMode || !onStartMode) return;
@@ -169,6 +172,16 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
       await onStartMode(selectedMode, modePrompt.trim() || undefined);
       setModePrompt('');
       setSelectedModeKey(selectedMode.mode_key);
+    } finally {
+      setIsModeBusy(false);
+    }
+  };
+
+  const handleApproveActiveMode = async () => {
+    if (!onApproveMode) return;
+    setIsModeBusy(true);
+    try {
+      await onApproveMode('Host approved the recommended facilitation mode.');
     } finally {
       setIsModeBusy(false);
     }
@@ -441,16 +454,27 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                         <p className="mt-1 text-xs text-emerald-700">{activeMode.prompt || activeModeDefinition?.composer_copy || 'Participants are guided by this mode until the host ends it.'}</p>
                       </div>
                       <div className="flex shrink-0 gap-2">
-                        {(activeMode.status === 'recommended' || activeMode.status === 'pending_host_confirmation') && (
-                          <Button
-                            onClick={handleRejectActiveMode}
-                            variant="outline"
-                            size="sm"
-                            disabled={isModeBusy}
-                            className="h-8 border-emerald-300 text-xs text-emerald-800 hover:bg-white"
-                          >
-                            Reject
-                          </Button>
+                        {isPendingHostApproval && (
+                          <>
+                            <Button
+                              onClick={handleApproveActiveMode}
+                              size="sm"
+                              disabled={!onApproveMode || isModeBusy}
+                              className="h-8 bg-emerald-700 text-xs text-white hover:bg-emerald-800"
+                            >
+                              <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={handleRejectActiveMode}
+                              variant="outline"
+                              size="sm"
+                              disabled={isModeBusy}
+                              className="h-8 border-emerald-300 text-xs text-emerald-800 hover:bg-white"
+                            >
+                              Reject
+                            </Button>
+                          </>
                         )}
                         <Button
                           onClick={handleEndActiveMode}
@@ -458,7 +482,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           disabled={isModeBusy}
                           className="h-8 bg-emerald-700 text-xs text-white hover:bg-emerald-800"
                         >
-                          End mode
+                          {isPendingHostApproval ? 'Dismiss' : 'End mode'}
                         </Button>
                       </div>
                     </div>

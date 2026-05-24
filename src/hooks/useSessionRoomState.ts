@@ -157,6 +157,7 @@ export const useSessionRoomState = ({
     modeError: modeOrchestrator.modeError,
     modeInstruction: modeOrchestrator.modeInstruction,
     startMode: modeOrchestrator.startMode,
+    approveMode: modeOrchestrator.approveMode,
     endMode: modeOrchestrator.endMode,
     rejectMode: modeOrchestrator.rejectMode,
     submitModeInput: modeOrchestrator.submitInput

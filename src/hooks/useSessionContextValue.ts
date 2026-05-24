@@ -88,6 +88,7 @@ export function useSessionContextValue({
     modeInstruction: undefined,
     recentModeEvents: [],
     startMode: async () => Promise.resolve(),
+    approveMode: async () => Promise.resolve(),
     endMode: async () => Promise.resolve(),
     rejectMode: async () => Promise.resolve(),
     submitModeInput: async () => Promise.resolve()
@@ -122,6 +123,7 @@ export function useSessionContextValue({
     modeInstruction: safeRoomState.modeInstruction,
     recentModeEvents: safeRoomState.recentModeEvents || [],
     startMode: safeRoomState.startMode || (async () => Promise.resolve()),
+    approveMode: safeRoomState.approveMode || (async () => Promise.resolve()),
     endMode: safeRoomState.endMode || (async () => Promise.resolve()),
     rejectMode: safeRoomState.rejectMode || (async () => Promise.resolve()),
     submitModeInput: safeRoomState.submitModeInput || (async () => Promise.resolve())
@@ -219,6 +221,7 @@ export function useSessionContextValue({
     modeInstruction: safeRoomState.modeInstruction,
     recentModeEvents: safeRoomState.recentModeEvents || [],
     startMode: safeRoomState.startMode,
+    approveMode: safeRoomState.approveMode,
     endMode: safeRoomState.endMode,
     rejectMode: safeRoomState.rejectMode,
     submitModeInput: safeRoomState.submitModeInput,
@@ -242,6 +245,7 @@ export function useSessionContextValue({
     safeRoomState.modeInstruction,
     safeRoomState.recentModeEvents,
     safeRoomState.startMode,
+    safeRoomState.approveMode,
     safeRoomState.endMode,
     safeRoomState.rejectMode,
     safeRoomState.submitModeInput,

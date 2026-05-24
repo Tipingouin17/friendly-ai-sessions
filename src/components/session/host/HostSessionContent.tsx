@@ -35,6 +35,7 @@ interface HostSessionContentProps {
   isLoadingModes?: boolean;
   modeError?: string | null;
   onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onApproveMode?: (reason?: string) => Promise<void>;
   onEndMode?: (reason?: string) => Promise<void>;
   onRejectMode?: (reason?: string) => Promise<void>;
   
@@ -73,6 +74,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isLoadingModes = false,
   modeError = null,
   onStartMode,
+  onApproveMode,
   onEndMode,
   onRejectMode,
   isSessionStarted = false,
@@ -108,6 +110,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           isLoadingModes={isLoadingModes}
           modeError={modeError}
           onStartMode={onStartMode}
+          onApproveMode={onApproveMode}
           onEndMode={onEndMode}
           onRejectMode={onRejectMode}
           isSessionStarted={isSessionStarted}

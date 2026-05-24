@@ -5175,13 +5175,27 @@ async def edge_function(func_name: str, request: Request):
                     raise HTTPException(400, detail={"code": "mode_required", "message": "A valid modeKey or modeId is required"})
 
                 active_row = None
+                approving_existing_mode = event_type == "mode.started" and active_mode_id is not None
                 event_payload = dict(payload)
                 async with conn.transaction():
                     if event_type in ("mode.recommended", "mode.started"):
-                        status = "pending_host_confirmation" if event_type == "mode.recommended" or requires_confirmation else "active"
-                        if event_type == "mode.started":
-                            status = "active"
-                        active_row = await conn.fetchrow(
+                        if approving_existing_mode:
+                            active_row = await conn.fetchrow(
+                                "UPDATE session_active_modes "
+                                "SET status = 'active', started_at = COALESCE(started_at, NOW()), host_approved_by = $1::uuid, updated_at = NOW() "
+                                "WHERE id = $2 AND conversation_id = $3 AND status IN ('recommended', 'pending_host_confirmation') RETURNING *",
+                                _jwt_user_id,
+                                active_mode_id,
+                                conv_id,
+                            )
+                            if not active_row:
+                                raise HTTPException(400, detail={"code": "pending_mode_required", "message": "A pending facilitation mode is required for host approval"})
+                            mode_id = active_row["mode_id"]
+                        else:
+                            status = "pending_host_confirmation" if event_type == "mode.recommended" or requires_confirmation else "active"
+                            if event_type == "mode.started":
+                                status = "active"
+                            active_row = await conn.fetchrow(
                             "INSERT INTO session_active_modes "
                             "(conversation_id, mode_id, status, started_at, timer_seconds, floor_rules, privacy_model, composer_component, composer_copy, prompt, state, started_by, host_approved_by) "
                             "VALUES ($1, $2, $3, CASE WHEN $3 = 'active' THEN NOW() ELSE NULL END, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11::uuid, CASE WHEN $3 = 'active' THEN $11::uuid ELSE NULL END) "
@@ -5197,8 +5211,8 @@ async def edge_function(func_name: str, request: Request):
                             event_payload.get("prompt") or data.get("prompt"),
                             json.dumps(event_payload.get("state") if isinstance(event_payload.get("state"), dict) else {}),
                             _jwt_user_id,
-                        )
-                        active_mode_id = active_row["id"]
+                            )
+                            active_mode_id = active_row["id"]
                     elif event_type in ("mode.ended", "mode.rejected"):
                         if active_mode_id is None:
                             active_row = await conn.fetchrow(
@@ -5288,9 +5302,9 @@ async def edge_function(func_name: str, request: Request):
                 }))
                 if active_result:
                     asyncio.create_task(manager.broadcast(str(conv_id), {
-                        "event": "UPDATE" if event_type in ("mode.ended", "mode.rejected") else "INSERT",
+                        "event": "UPDATE" if event_type in ("mode.ended", "mode.rejected") or approving_existing_mode else "INSERT",
                         "payload": {
-                            "eventType": "UPDATE" if event_type in ("mode.ended", "mode.rejected") else "INSERT",
+                            "eventType": "UPDATE" if event_type in ("mode.ended", "mode.rejected") or approving_existing_mode else "INSERT",
                             "new": active_result,
                             "old": {},
                             "table": "session_active_modes",

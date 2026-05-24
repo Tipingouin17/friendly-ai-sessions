@@ -68,6 +68,21 @@ const Profile = () => {
     refetchOnWindowFocus: false,
   });
 
+  const { data: mfaFactors, refetch: refetchMfaFactors } = useQuery({
+    queryKey: ['profileMfaFactors', user?.id],
+    queryFn: async () => {
+      const { data, error } = await api.auth.mfa.listFactors();
+      if (error) return [];
+      return data?.totp ?? [];
+    },
+    enabled: !!user && activeTab === 'security',
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const hasVerifiedMfa = (mfaFactors ?? []).some((factor) => factor.status === 'verified');
+
   const getInitials = (name: string) =>
     name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 
@@ -252,11 +267,11 @@ const Profile = () => {
             <SecurityRow
               icon={<Lock size={18} className="text-indigo-500" />}
               title="Two-Factor Authentication"
-              description="Add an extra layer of security with 2FA"
-              badge="Recommended"
-              badgeColor="indigo"
+              description={hasVerifiedMfa ? "Authenticator app verification is enabled for your account" : "Add an extra layer of security with 2FA"}
+              badge={hasVerifiedMfa ? "Enabled" : "Recommended"}
+              badgeColor={hasVerifiedMfa ? "emerald" : "indigo"}
               onClick={() => setIsTwoFactorModalOpen(true)}
-              action="Set Up"
+              action={hasVerifiedMfa ? "Manage" : "Set Up"}
             />
             <SecurityRow
               icon={<Activity size={18} className="text-indigo-500" />}
@@ -287,7 +302,7 @@ const Profile = () => {
       <AvatarUploadModal isOpen={isAvatarModalOpen} onClose={() => setIsAvatarModalOpen(false)} userId={user?.id || ''} currentAvatarUrl={meta?.avatar_url} userName={userDisplayName} />
       <EditProfileModal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)} user={user} />
       <ChangePasswordModal isOpen={isChangePasswordModalOpen} onClose={() => setIsChangePasswordModalOpen(false)} />
-      <TwoFactorSetupModal isOpen={isTwoFactorModalOpen} onClose={() => setIsTwoFactorModalOpen(false)} />
+      <TwoFactorSetupModal isOpen={isTwoFactorModalOpen} onClose={() => setIsTwoFactorModalOpen(false)} onStatusChange={() => refetchMfaFactors()} />
       <LoginActivityModal isOpen={isLoginActivityModalOpen} onClose={() => setIsLoginActivityModalOpen(false)} />
       <SessionManagementModal isOpen={isSessionManagementModalOpen} onClose={() => setIsSessionManagementModalOpen(false)} />
     </div>
@@ -328,8 +343,13 @@ const SecurityRow = ({
   icon, title, description, badge, badgeColor, onClick, action
 }: {
   icon: React.ReactNode; title: string; description: string;
-  badge?: string; badgeColor?: string; onClick: () => void; action: string;
-}) => (
+  badge?: string; badgeColor?: 'indigo' | 'emerald'; onClick: () => void; action: string;
+}) => {
+  const badgeClass = badgeColor === 'emerald'
+    ? 'bg-emerald-100 text-emerald-700'
+    : 'bg-indigo-100 text-indigo-700';
+
+  return (
   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div className="flex items-start gap-4">
       <div className="p-2.5 bg-indigo-50 rounded-xl flex-shrink-0">{icon}</div>
@@ -337,7 +357,7 @@ const SecurityRow = ({
         <div className="flex items-center gap-2 mb-0.5">
           <p className="text-sm font-semibold text-gray-900">{title}</p>
           {badge && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium bg-${badgeColor}-100 text-${badgeColor}-700`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass}`}>
               {badge}
             </span>
           )}
@@ -349,6 +369,7 @@ const SecurityRow = ({
       {action}
     </Button>
   </div>
-);
+  );
+};
 
 export default Profile;

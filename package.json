@@ -13,9 +13,10 @@
     "test:generate-ai-welcome": "python3.11 scripts/test_generate_ai_welcome_backend.py",
     "test:auth-resend": "python3.11 scripts/test_auth_resend_backend.py",
     "test:phase3-hardening": "node scripts/run-phase3-hardening-test.mjs",
-    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:generate-ai-welcome && pnpm test:auth-resend && pnpm test:auth-mfa && pnpm test:phase3-hardening",
+    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:generate-ai-welcome && pnpm test:auth-resend && pnpm test:auth-mfa && pnpm test:auth-mfa-management && pnpm test:phase3-hardening",
     "preview": "vite preview",
-    "test:auth-mfa": "python3.11 scripts/test_auth_mfa_backend.py"
+    "test:auth-mfa": "python3.11 scripts/test_auth_mfa_backend.py",
+    "test:auth-mfa-management": "python3.11 scripts/test_auth_mfa_management_backend.py"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

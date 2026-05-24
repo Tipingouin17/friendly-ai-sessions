@@ -53,6 +53,23 @@ export interface ApiResponse<T> {
   count?: number | null;
 }
 
+export interface MfaFactor {
+  id: string;
+  type: "totp";
+  factor_type?: "totp";
+  friendly_name?: string | null;
+  status: "unverified" | "verified";
+  created_at?: string | null;
+  updated_at?: string | null;
+  verified_at?: string | null;
+}
+
+export interface MfaFactorsResponse {
+  all: MfaFactor[];
+  totp: MfaFactor[];
+  phone: MfaFactor[];
+}
+
 export type RealtimeEvent = "INSERT" | "UPDATE" | "DELETE" | "*";
 
 export interface RealtimePayload<T = Record<string, unknown>> {
@@ -411,6 +428,26 @@ export const auth = {
           body: JSON.stringify(params),
         },
       );
+      return { data: res.data, error: res.error };
+    },
+
+    async listFactors(): Promise<{
+      data: MfaFactorsResponse | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<MfaFactorsResponse>("/auth/v1/mfa/factors", {
+        method: "GET",
+      });
+      return { data: res.data, error: res.error };
+    },
+
+    async unenroll(params: { factorId: string }): Promise<{
+      data: { success: boolean; factor_id: string } | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<{ success: boolean; factor_id: string }>(`/auth/v1/mfa/factors/${encodeURIComponent(params.factorId)}`, {
+        method: "DELETE",
+      });
       return { data: res.data, error: res.error };
     },
 

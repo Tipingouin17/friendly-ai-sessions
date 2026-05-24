@@ -2653,7 +2653,7 @@ async def auth_mfa_factors(request: Request):
             "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at or ""),
             "updated_at": verified_at.isoformat() if hasattr(verified_at, "isoformat") else str(verified_at or created_at or ""),
         })
-    return {"totp": totp, "phone": []}
+    return {"all": totp, "totp": totp, "phone": []}
 
 
 @app.post("/auth/v1/mfa/enroll")
@@ -2694,6 +2694,31 @@ async def auth_mfa_enroll(request: Request):
         "status": "unverified",
         "totp": {"qr_code": uri, "secret": secret, "uri": uri},
     }
+
+
+@app.delete("/auth/v1/mfa/factors/{factor_id}")
+@limiter.limit("10/minute")
+async def auth_mfa_unenroll(factor_id: str, request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    factor_id = str(factor_id or "").strip()
+    if not factor_id:
+        raise HTTPException(400, detail={"code": "missing_factor", "message": "MFA factor id is required"})
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "DELETE FROM auth_mfa_factors WHERE id = $1::uuid AND user_id = $2::uuid RETURNING id",
+                factor_id,
+                user_id,
+            )
+            if not row:
+                raise HTTPException(404, detail={"code": "factor_not_found", "message": "MFA factor not found"})
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("mfa unenroll ERROR: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not disable MFA factor"})
+    return {"success": True, "factor_id": factor_id}
 
 
 @app.post("/auth/v1/mfa/challenge")

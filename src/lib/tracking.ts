@@ -164,8 +164,6 @@ function initUet(advertisingConsent: boolean): void {
     window.uetq = [] as typeof window.uetq;
   }
 
-  appendScript('aifacilitator-uet', 'https://bat.bing.com/bat.js');
-
   const uetId = config.microsoftUetId;
   const uetScript = document.createElement('script');
   uetScript.id = 'aifacilitator-uet-config';

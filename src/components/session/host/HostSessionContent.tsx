@@ -9,13 +9,14 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Activity, Brain, Clock3, MessageSquare, Sparkles, Users } from "lucide-react";
+import { Activity, Brain, Clock3, LayoutGrid, MessageSquare, MonitorUp, Sparkles, Users } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import { Message, ParticipantInfo } from "@/types/chat";
 import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
+import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -60,6 +61,16 @@ interface HostSessionContentProps {
 
 const formatEventLabel = (eventType: string): string => eventType.replace(/^mode\./, '').replace(/_/g, ' ');
 
+const formatParticipantInitials = (participant: ParticipantInfo): string => {
+  const source = participant.name?.trim() || `P${participant.id}`;
+  return source
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+};
+
 const HostSessionContent: React.FC<HostSessionContentProps> = ({
   sessionMessages,
   participantColors,
@@ -92,6 +103,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isSessionEnded = false,
   isSessionPaused = false,
 }) => {
+  const [videoLayout, setVideoLayout] = React.useState<'spotlight' | 'gallery'>('spotlight');
+  const [pinnedTileId, setPinnedTileId] = React.useState<string | null>(null);
   const actualParticipantCount = participants.length;
   const responseTotal = Math.max(totalParticipants, actualParticipantCount, 1);
   const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
@@ -99,6 +112,37 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
+  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
+  const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
+  const respondedParticipantIds = new Set(
+    sessionMessages
+      .filter((message) => message.sender === "user" && message.participant)
+      .map((message) => String(message.participant))
+  );
+  const hostVideoParticipants: SessionVideoParticipant[] = [
+    {
+      id: 'ai-facilitator',
+      name: facilitatorDetails?.title || 'AI Facilitator',
+      initials: 'AI',
+      avatarUrl: facilitatorDetails?.profile_picture,
+      isAI: true,
+      isMuted: false,
+      isSpeaking: latestSessionMessage?.sender === 'assistant',
+      accentColor: 'rgb(217 119 6)',
+    },
+    ...participants.map((participant) => ({
+      id: String(participant.id),
+      name: participant.name || `Participant ${participant.id}`,
+      initials: formatParticipantInitials(participant),
+      avatarUrl: participant.avatar,
+      accentColor: participantColors[String(participant.id)] || undefined,
+      isMuted: true,
+      hasResponded: respondedParticipantIds.has(String(participant.id)),
+    })),
+  ];
+  const featuredVideoParticipant = hostVideoParticipants.find((participant) => participant.id === pinnedTileId)
+    || hostVideoParticipants[0];
+  const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 p-3 text-slate-950">
@@ -152,8 +196,62 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         </PanelResizeHandle>
 
         <Panel defaultSize={52} minSize={38} className="min-h-0">
-          <div className="h-full min-h-0 overflow-hidden border-y border-slate-200 bg-white shadow-2xl shadow-slate-200/80 [&_.bg-white]:bg-white [&_.bg-slate-100]:bg-slate-50">
-            <SimplifiedHostMessagingView
+          <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-2xl shadow-slate-200/80 [&_.bg-white]:bg-white [&_.bg-slate-100]:bg-slate-50">
+            <section className="shrink-0 border-b border-slate-200 bg-slate-50/80 p-3" aria-label="Host multi-video gallery">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-700">Video room</p>
+                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery.</p>
+                </div>
+                <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setVideoLayout('spotlight')}
+                    className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${videoLayout === 'spotlight' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+                  >
+                    <MonitorUp className="h-3.5 w-3.5" />
+                    Spotlight
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoLayout('gallery')}
+                    className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${videoLayout === 'gallery' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    Gallery
+                  </button>
+                </div>
+              </div>
+
+              {videoLayout === 'gallery' ? (
+                <SessionVideoGrid
+                  participants={hostVideoParticipants}
+                  variant="host-gallery"
+                  showResponseStatus
+                  onPin={setPinnedTileId}
+                  className="max-h-[360px] overflow-y-auto pr-1"
+                />
+              ) : (
+                <div>
+                  <SessionVideoTile
+                    participant={featuredVideoParticipant}
+                    variant="spotlight"
+                    showResponseStatus
+                    className="max-h-[300px]"
+                  />
+                  <SessionVideoGrid
+                    participants={videoStripParticipants}
+                    variant="host-strip"
+                    showResponseStatus
+                    onPin={setPinnedTileId}
+                    emptyLabel="Participant thumbnails will appear here as people join."
+                    className="mt-3"
+                  />
+                </div>
+              )}
+            </section>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}
               currentParticipantCount={actualParticipantCount}
@@ -182,8 +280,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               autoStartCountdown={autoStartCountdown}
               onCancelAutoStart={onCancelAutoStart}
               isSessionEnded={isSessionEnded}
-              isSessionPaused={isSessionPaused}
-            />
+                isSessionPaused={isSessionPaused}
+              />
+            </div>
           </div>
         </Panel>
 

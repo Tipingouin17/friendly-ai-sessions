@@ -186,12 +186,28 @@
     }
 }
 
+@keyframes reactionPop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -6px) scale(0.88);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+
 .animate-ai-speaking {
     animation: aiSpeakingPulse 1.8s ease-in-out infinite;
 }
 
 .animate-sound-bar {
     animation: soundBar 900ms ease-in-out infinite;
+}
+
+.animate-reaction-pop {
+    animation: reactionPop 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 /* Light UX session shell utilities */

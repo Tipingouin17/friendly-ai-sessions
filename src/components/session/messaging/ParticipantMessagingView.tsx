@@ -15,6 +15,7 @@ import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
+import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
@@ -179,7 +180,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     return [...responseWindow]
       .reverse()
-      .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || message.participant === participantKey)) ?? null;
+      .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || String(message.participant) === participantKey)) ?? null;
   }, [effectiveParticipantId, filteredMessages]);
   const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
   const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
@@ -187,6 +188,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const activeParticipants = participants.length > 0
     ? participants
     : Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
+  const orderedVideoParticipants = [...activeParticipants].sort((first, second) => {
+    if (first.id === effectiveParticipantId) return -1;
+    if (second.id === effectiveParticipantId) return 1;
+    return first.id - second.id;
+  });
+  const participantVideoTiles: SessionVideoParticipant[] = orderedVideoParticipants.map((participant) => ({
+    id: String(participant.id),
+    name: participant.id === effectiveParticipantId ? `${participant.name || 'You'} (You)` : participant.name || `Participant ${participant.id}`,
+    initials: formatParticipantInitials(participant),
+    avatarUrl: participant.avatar,
+    accentColor: participantColors[String(participant.id)] || undefined,
+    isYou: participant.id === effectiveParticipantId,
+    isMuted: participant.id !== effectiveParticipantId || !isRecording,
+    isSpeaking: participant.id === effectiveParticipantId && isRecording,
+  }));
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
@@ -432,30 +448,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
           {sidebarTab === 'people' ? (
             <div className="flex min-h-0 flex-1 flex-col p-3">
-              <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1">
-                {activeParticipants.map((participant) => {
-                  const isYou = participant.id === effectiveParticipantId;
-                  const participantAccent = participantColors[String(participant.id)] || 'rgba(99, 102, 241, 0.45)';
-                  return (
-                    <div key={participant.id} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2" style={{ boxShadow: `inset 0 0 0 1px ${participantAccent}` }}>
-                      <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-100">
-                        {participant.avatar ? (
-                          <img src={participant.avatar} alt={participant.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-100 to-slate-200 text-sm font-bold text-indigo-700">
-                            {formatParticipantInitials(participant)}
-                          </div>
-                        )}
-                        {isYou && <span className="absolute left-1.5 top-1.5 rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">You</span>}
-                      </div>
-                      <div className="mt-2 min-w-0">
-                        <p className="truncate text-xs font-semibold text-slate-950">{participant.name || `Participant ${participant.id}`}</p>
-                        <p className="truncate text-[11px] text-slate-500">{formatLastActive(participant)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <SessionVideoGrid
+                participants={participantVideoTiles}
+                variant="participant-sidebar"
+                emptyLabel="Video tiles will appear as participants join the session."
+              />
               <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs text-slate-700">
                 <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
                 <span className="text-slate-500"> · Muted</span>

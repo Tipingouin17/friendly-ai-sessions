@@ -20,7 +20,7 @@ import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
-import { useWebRTCSession } from '@/hooks/useWebRTCSession';
+import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
@@ -67,6 +67,34 @@ interface ParticipantMessagingViewProps {
 }
 
 type SidebarTab = 'people' | 'chat';
+type TileConnectionStatus = NonNullable<SessionVideoParticipant['connectionStatus']>;
+
+const getPeerTileConnectionStatus = (peerStatus: WebRTCPeerStatus | undefined, hasStream: boolean): TileConnectionStatus => {
+  if (hasStream || peerStatus?.hasRemoteStream) return 'connected';
+  if (!peerStatus) return 'connecting';
+  if (peerStatus.connectionState === 'failed' || peerStatus.iceConnectionState === 'failed') return 'failed';
+  if (peerStatus.connectionState === 'disconnected' || peerStatus.iceConnectionState === 'disconnected') return 'disconnected';
+  if (peerStatus.connectionState === 'closed') return 'idle';
+  return 'connecting';
+};
+
+const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
+  if (status === 'connected') return 'Live video';
+  if (status === 'failed') return 'Reconnect needed';
+  if (status === 'disconnected') return 'Reconnecting';
+  if (status === 'unsupported') return 'Unsupported';
+  if (status === 'idle') return 'Camera off';
+  return 'Connecting';
+};
+
+const formatRoomConnectionLabel = (status: WebRTCConnectionStatus): string => {
+  if (status === 'connected') return 'video room connected';
+  if (status === 'failed') return 'video reconnect needed';
+  if (status === 'disconnected') return 'video reconnecting';
+  if (status === 'unsupported') return 'video unsupported';
+  if (status === 'idle') return 'video room idle';
+  return 'connecting video room';
+};
 
 const formatParticipantInitials = (participant: ParticipantInfo): string => {
   const source = participant.name?.trim() || `P${participant.id}`;
@@ -257,7 +285,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (second.id === effectiveParticipantId) return 1;
     return first.id - second.id;
   });
-  const { remoteStreams, isSignalingConnected } = useWebRTCSession({
+  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
     conversationId,
     role: 'participant',
     participantId: effectiveParticipantId,
@@ -265,19 +293,29 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     localStream: localCameraStream,
     enabled: !isSessionEnded,
   });
-  const participantVideoTiles: SessionVideoParticipant[] = orderedVideoParticipants.map((participant) => ({
-    id: String(participant.id),
-    name: participant.id === effectiveParticipantId ? `${participant.name || 'You'} (You)` : participant.name || `Participant ${participant.id}`,
-    initials: formatParticipantInitials(participant),
-    avatarUrl: participant.avatar,
-    accentColor: participantColors[String(participant.id)] || undefined,
-    mediaStream: participant.id === effectiveParticipantId ? localCameraStream : remoteStreams[String(participant.id)] ?? null,
-    isYou: participant.id === effectiveParticipantId,
-    isMuted: participant.id !== effectiveParticipantId || !isRecording,
-    isSpeaking: participant.id === effectiveParticipantId && isRecording,
-  }));
+  const participantVideoTiles: SessionVideoParticipant[] = orderedVideoParticipants.map((participant) => {
+    const isCurrentUser = participant.id === effectiveParticipantId;
+    const remoteStream = remoteStreams[String(participant.id)] ?? null;
+    const peerStatus = peerStatuses[`participant-${participant.id}`];
+    const tileConnectionStatus = isCurrentUser ? undefined : getPeerTileConnectionStatus(peerStatus, Boolean(remoteStream));
+
+    return {
+      id: String(participant.id),
+      name: isCurrentUser ? `${participant.name || 'You'} (You)` : participant.name || `Participant ${participant.id}`,
+      initials: formatParticipantInitials(participant),
+      avatarUrl: participant.avatar,
+      accentColor: participantColors[String(participant.id)] || undefined,
+      mediaStream: isCurrentUser ? localCameraStream : remoteStream,
+      isYou: isCurrentUser,
+      isMuted: !isCurrentUser || !isRecording,
+      isSpeaking: isCurrentUser && isRecording,
+      connectionStatus: tileConnectionStatus,
+      connectionStatusLabel: tileConnectionStatus ? formatPeerTileStatusLabel(tileConnectionStatus) : undefined,
+    };
+  });
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream);
+  const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);
   const cameraStatusLabel = cameraStatus === 'starting'
     ? 'Starting camera…'
     : cameraStatus === 'on'
@@ -564,7 +602,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     {cameraIsOn ? 'Camera off' : 'Camera on'}
                   </button>
                 </div>
-                <span className="text-slate-500">Muted · {cameraStatusLabel} · {isSignalingConnected ? 'video room connected' : 'connecting video room'}</span>
+                <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
                 {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
               </div>
             </div>

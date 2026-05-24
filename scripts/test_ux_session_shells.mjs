@@ -37,7 +37,9 @@ assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEac
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
 assertContains(participantView, 'useWebRTCSession({', 'participant initializes WebRTC signaling for remote video tiles');
 assertContains(participantView, "role: 'participant'", 'participant WebRTC hook runs in participant role');
-assertContains(participantView, "mediaStream: participant.id === effectiveParticipantId ? localCameraStream : remoteStreams[String(participant.id)] ?? null", 'participant self tile uses local stream and remote tiles use peer streams');
+assertContains(participantView, 'mediaStream: isCurrentUser ? localCameraStream : remoteStream', 'participant self tile uses local stream and remote tiles use peer streams');
+assertContains(participantView, 'roomConnectionLabel', 'participant exposes WebRTC room connection status for live QA');
+assertContains(participantView, 'connectionStatusLabel', 'participant remote tiles expose peer connection labels');
 assertContains(participantView, 'Camera access was blocked', 'participant camera permission feedback');
 assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
@@ -56,7 +58,9 @@ assertContains(hostContent, 'variant="host-strip"', 'host participant thumbnail 
 assertContains(hostContent, 'showResponseStatus', 'host response status badges on video tiles');
 assertContains(hostContent, 'useWebRTCSession({', 'host initializes WebRTC signaling for participant cameras');
 assertContains(hostContent, "role: 'host'", 'host WebRTC hook runs in receive-only host role');
-assertContains(hostContent, 'mediaStream: remoteStreams[String(participant.id)] ?? null', 'host participant video tiles consume remote MediaStreams');
+assertContains(hostContent, 'mediaStream: remoteStream', 'host participant video tiles consume remote MediaStreams');
+assertContains(hostContent, 'videoRoomStatusLabel', 'host video room exposes WebRTC room connection status for live QA');
+assertContains(hostContent, 'connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus)', 'host participant tiles expose peer connection labels');
 assertContains(hostContent, 'onApproveMode={onApproveMode}', 'host mode approval plumbing');
 assertNotContains(hostContent, "UX handoff's dark", 'host design documentation');
 assertNotContains(participantView, 'Precision Dark', 'participant design documentation');
@@ -73,6 +77,8 @@ assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile acces
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');
 assertContains(videoGrid, "data-video-tile-variant", 'video tile variant semantic marker');
 assertContains(videoGrid, "variant?: 'participant-sidebar' | 'host-strip' | 'host-gallery'", 'video grid supported layout variants');
+assertContains(videoGrid, 'data-connection-status={participant.connectionStatus}', 'video tile exposes peer connection status for smoke tests');
+assertContains(videoGrid, 'connectionStatusLabel', 'video tile renders human-readable connection status labels');
 assertContains(webRTCSessionHook, "event_type: WEBRTC_EVENT_TYPE", 'WebRTC signaling persists as session_events rows');
 assertContains(webRTCSessionHook, "signalType: 'offer'", 'WebRTC hook sends SDP offers');
 assertContains(webRTCSessionHook, "signalType: 'answer'", 'WebRTC hook sends SDP answers');
@@ -80,6 +86,11 @@ assertContains(webRTCSessionHook, "signalType: 'ice-candidate'", 'WebRTC hook se
 assertContains(webRTCSessionHook, "signalType: 'camera-ready'", 'WebRTC hook supports camera-ready renegotiation hints');
 assertContains(webRTCSessionHook, "signalType: 'camera-stopped'", 'WebRTC hook tears down remote streams when a camera stops');
 assertContains(webRTCSessionHook, "filter: `conversation_id=eq.${conversationId}`", 'WebRTC realtime channel is scoped to the active conversation');
+assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_RETENTION_MS', 'WebRTC hook defines stale signaling retention');
+assertContains(webRTCSessionHook, ".delete()\n      .eq('conversation_id', conversationId)\n      .eq('event_type', WEBRTC_EVENT_TYPE)\n      .lt('created_at', cutoff)", 'WebRTC hook deletes stale session_events signals');
+assertContains(webRTCSessionHook, 'VITE_WEBRTC_TURN_URLS', 'WebRTC hook supports deploy-time TURN server configuration');
+assertContains(webRTCSessionHook, 'connectionStatus', 'WebRTC hook returns room-level connection status');
+assertContains(webRTCSessionHook, 'peerStatuses', 'WebRTC hook returns per-peer connection status');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

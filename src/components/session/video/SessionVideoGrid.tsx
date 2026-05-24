@@ -25,6 +25,8 @@ export interface SessionVideoParticipant {
   isSpeaking?: boolean;
   hasResponded?: boolean;
   reaction?: string | null;
+  connectionStatus?: 'idle' | 'unsupported' | 'connecting' | 'connected' | 'disconnected' | 'failed';
+  connectionStatusLabel?: string;
 }
 
 interface SessionVideoTileProps {
@@ -49,6 +51,15 @@ const variantClasses: Record<SessionVideoTileVariant, string> = {
   self: 'border-indigo-200 bg-indigo-50',
   remote: 'border-slate-200 bg-slate-50',
   spotlight: 'border-amber-200 bg-white min-h-[240px]',
+};
+
+const connectionStatusClasses: Record<NonNullable<SessionVideoParticipant['connectionStatus']>, string> = {
+  idle: 'border-slate-200 bg-white/85 text-slate-500',
+  unsupported: 'border-amber-200 bg-amber-50/90 text-amber-700',
+  connecting: 'border-indigo-200 bg-indigo-50/90 text-indigo-700',
+  connected: 'border-emerald-200 bg-emerald-50/90 text-emerald-700',
+  disconnected: 'border-amber-200 bg-amber-50/90 text-amber-700',
+  failed: 'border-rose-200 bg-rose-50/90 text-rose-700',
 };
 
 const getTileShadow = (participant: SessionVideoParticipant): string => {
@@ -102,6 +113,7 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
       style={{ borderColor: participant.isSpeaking ? accentColor : undefined }}
       data-video-tile-variant={variant}
       data-participant-id={participant.id}
+      data-connection-status={participant.connectionStatus}
     >
       {hasLiveStream && participant.mediaStream ? (
         <StreamVideo stream={participant.mediaStream} name={participant.name} muted={Boolean(participant.isYou || participant.isMuted)} />
@@ -141,6 +153,12 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
       {participant.reaction && (
         <div className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-white/70 bg-white/90 px-2 py-1 text-sm font-bold shadow-lg shadow-slate-200/80 animate-reaction-pop">
           {participant.reaction}
+        </div>
+      )}
+
+      {participant.connectionStatus && !participant.isAI && !participant.isYou && (
+        <div className={`absolute bottom-9 left-2 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm backdrop-blur ${connectionStatusClasses[participant.connectionStatus]}`}>
+          {participant.connectionStatusLabel || participant.connectionStatus}
         </div>
       )}
 

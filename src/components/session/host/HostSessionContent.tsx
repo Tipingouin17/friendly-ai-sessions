@@ -17,7 +17,7 @@ import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
-import { useWebRTCSession } from "@/hooks/useWebRTCSession";
+import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from "@/hooks/useWebRTCSession";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -61,6 +61,35 @@ interface HostSessionContentProps {
 }
 
 const formatEventLabel = (eventType: string): string => eventType.replace(/^mode\./, '').replace(/_/g, ' ');
+
+type TileConnectionStatus = NonNullable<SessionVideoParticipant['connectionStatus']>;
+
+const getPeerTileConnectionStatus = (peerStatus: WebRTCPeerStatus | undefined, hasStream: boolean): TileConnectionStatus => {
+  if (hasStream || peerStatus?.hasRemoteStream) return 'connected';
+  if (!peerStatus) return 'connecting';
+  if (peerStatus.connectionState === 'failed' || peerStatus.iceConnectionState === 'failed') return 'failed';
+  if (peerStatus.connectionState === 'disconnected' || peerStatus.iceConnectionState === 'disconnected') return 'disconnected';
+  if (peerStatus.connectionState === 'closed') return 'idle';
+  return 'connecting';
+};
+
+const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
+  if (status === 'connected') return 'Live video';
+  if (status === 'failed') return 'Reconnect needed';
+  if (status === 'disconnected') return 'Reconnecting';
+  if (status === 'unsupported') return 'Unsupported';
+  if (status === 'idle') return 'Camera off';
+  return 'Connecting';
+};
+
+const formatRoomConnectionLabel = (status: WebRTCConnectionStatus): string => {
+  if (status === 'connected') return 'video room connected';
+  if (status === 'failed') return 'video reconnect needed';
+  if (status === 'disconnected') return 'video reconnecting';
+  if (status === 'unsupported') return 'video unsupported';
+  if (status === 'idle') return 'video room idle';
+  return 'connecting video room';
+};
 
 const formatParticipantInitials = (participant: ParticipantInfo): string => {
   const source = participant.name?.trim() || `P${participant.id}`;
@@ -113,7 +142,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
-  const { remoteStreams, isSignalingConnected } = useWebRTCSession({
+  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
@@ -138,20 +167,30 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       isSpeaking: latestSessionMessage?.sender === 'assistant',
       accentColor: 'rgb(217 119 6)',
     },
-    ...participants.map((participant) => ({
-      id: String(participant.id),
-      name: participant.name || `Participant ${participant.id}`,
-      initials: formatParticipantInitials(participant),
-      avatarUrl: participant.avatar,
-      accentColor: participantColors[String(participant.id)] || undefined,
-      mediaStream: remoteStreams[String(participant.id)] ?? null,
-      isMuted: true,
-      hasResponded: respondedParticipantIds.has(String(participant.id)),
-    })),
+    ...participants.map((participant) => {
+      const remoteStream = remoteStreams[String(participant.id)] ?? null;
+      const peerStatus = peerStatuses[`participant-${participant.id}`];
+      const tileConnectionStatus = getPeerTileConnectionStatus(peerStatus, Boolean(remoteStream));
+
+      return {
+        id: String(participant.id),
+        name: participant.name || `Participant ${participant.id}`,
+        initials: formatParticipantInitials(participant),
+        avatarUrl: participant.avatar,
+        accentColor: participantColors[String(participant.id)] || undefined,
+        mediaStream: remoteStream,
+        isMuted: true,
+        hasResponded: respondedParticipantIds.has(String(participant.id)),
+        connectionStatus: tileConnectionStatus,
+        connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus),
+      };
+    }),
   ];
   const featuredVideoParticipant = hostVideoParticipants.find((participant) => participant.id === pinnedTileId)
     || hostVideoParticipants[0];
   const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
+  const liveCameraCount = hostVideoParticipants.filter((participant) => participant.mediaStream).length;
+  const videoRoomStatusLabel = `${formatRoomConnectionLabel(connectionStatus)} · ${liveCameraCount} live camera${liveCameraCount === 1 ? '' : 's'} · ${activePeerCount} peer${activePeerCount === 1 ? '' : 's'}`;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 p-3 text-slate-950">
@@ -210,7 +249,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-700">Video room</p>
-                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery · {isSignalingConnected ? 'video room connected' : 'connecting video room'}.</p>
+                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery · {videoRoomStatusLabel}.</p>
                 </div>
                 <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
                   <button

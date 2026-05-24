@@ -184,7 +184,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [effectiveParticipantId, filteredMessages]);
   const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
   const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
-  const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
+  const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
+  const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const activeParticipants = participants.length > 0
     ? participants
     : Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
@@ -348,7 +349,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
                   <div className="h-full rounded-full bg-indigo-400 transition-all duration-700" style={{ width: `${responseProgress}%` }} />
                 </div>
-                <span className="shrink-0 font-mono text-xs text-slate-500">{responseCount}/{responseTotal} responded</span>
+                <span className="shrink-0 font-mono text-xs text-slate-500">{effectiveResponseCount}/{responseTotal} responded</span>
               </div>
             </div>
 

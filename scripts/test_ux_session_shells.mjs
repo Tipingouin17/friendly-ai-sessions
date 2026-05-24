@@ -24,6 +24,8 @@ assertContains(participantView, 'Current question', 'participant current-questio
 assertContains(participantView, 'latestOwnParticipantMessage', 'participant registered-response derivation');
 assertContains(participantView, 'String(message.participant) === participantKey', 'participant response registration tolerates numeric participant ids');
 assertContains(participantView, 'Your response is registered', 'participant visible response confirmation');
+assertContains(participantView, 'effectiveResponseCount', 'participant response counter uses local registration fallback');
+assertContains(participantView, 'Math.max(responseCount, hasRegisteredResponse ? 1 : 0)', 'participant local response counter does not remain at zero after own reply registers');
 assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');

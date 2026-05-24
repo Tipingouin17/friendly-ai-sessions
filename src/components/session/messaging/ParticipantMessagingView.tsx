@@ -1,30 +1,19 @@
 /**
- * ParticipantMessagingView — World-class responsive redesign
+ * ParticipantMessagingView — Signal & Clarity light integration slice
  *
- * Layout:
- *   ┌─────────────────────────────────────┐
- *   │  Session header bar (sticky)        │
- *   ├─────────────────────────────────────┤
- *   │  Message list (flex-1, scrollable)  │
- *   ├─────────────────────────────────────┤
- *   │  Engagement controls                │
- *   │  Chat input                         │
- *   └─────────────────────────────────────┘
- *
- * - No separate mobile/desktop layouts — one unified responsive design
- * - The message area fills all available space and scrolls independently
- * - The input footer is always visible at the bottom (sticky)
- * - Session info accessible via a compact top bar (no sidebar)
+ * This component adopts the UX handoff's role-aware participant shell while
+ * preserving the existing session runtime, transcript, speech, and InputFooter
+ * behavior. The page now prioritizes the AI spotlight, current prompt progress,
+ * and a People/Chat side surface instead of a transcript-first layout.
  */
 
 import React from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import type { ConversationWithSession } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
-import MessageList from '@/components/chat/MessageList';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Users, Home, Sparkles } from 'lucide-react';
+import { Captions, Home, MessageSquare, Mic, Sparkles, Users, Video } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
@@ -75,6 +64,34 @@ interface ParticipantMessagingViewProps {
   }) => Promise<unknown>;
 }
 
+type SidebarTab = 'people' | 'chat';
+
+const formatParticipantInitials = (participant: ParticipantInfo): string => {
+  const source = participant.name?.trim() || `P${participant.id}`;
+  return source
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+};
+
+const formatLastActive = (participant: ParticipantInfo): string => {
+  if (!participant.lastActive) return 'Active now';
+  const minutes = Math.max(0, Math.round((Date.now() - participant.lastActive.getTime()) / 60000));
+  if (minutes <= 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
+};
+
+const getMessageTime = (message: Message): string => {
+  const rawTimestamp = message.created_at || message.timestamp;
+  if (!rawTimestamp) return '';
+  const timestamp = rawTimestamp instanceof Date ? rawTimestamp : new Date(rawTimestamp);
+  if (Number.isNaN(timestamp.getTime())) return '';
+  return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   messages,
   participantColors,
@@ -112,6 +129,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   modeError = null,
   submitModeInput,
 }) => {
+  const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
 
@@ -146,6 +164,20 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     ? voiceRuntime.runtimeAvatarState
     : facilitatorRuntime?.avatarState ?? null;
   const showRuntimeAvatarState = Boolean((facilitatorRuntime?.enabled && runtimeAvatarState) || voiceRuntime.isSpeaking);
+  const aiIsSpeaking = Boolean(voiceRuntime.isSpeaking || runtimeAvatarState?.state === 'speaking');
+  const modeLabel = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || 'Open Discussion';
+  const latestAssistantMessage = React.useMemo(() => {
+    return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
+  }, [messages]);
+  const latestParticipantMessages = React.useMemo(() => {
+    return [...filteredMessages].reverse().filter((message) => message.sender !== 'assistant').slice(0, 4).reverse();
+  }, [filteredMessages]);
+  const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
+  const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
+  const activeParticipants = participants.length > 0
+    ? participants
+    : Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
+  const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
   const lastAssistantMessage = React.useMemo(() => {
@@ -199,125 +231,240 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, phase3Settings?.speech_default_language, speechStackEnabled]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
-
-      {/* ── Session info bar (sticky top) ──────────────────────────────── */}
-      <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
-        {/* Facilitator avatar / icon */}
-        {showRuntimeAvatarState ? (
-          <FacilitatorAvatar
-            avatarUrl={facilitatorAvatarUrl}
-            name={facilitatorName}
-            size="md"
-            runtimeState={runtimeAvatarState}
-            enableRuntimeAnimation
-          />
-        ) : (
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
-            <Sparkles className="h-4 w-4 text-white" />
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-950">
+      <div className="shrink-0 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-2xl shadow-slate-200/80 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/25 bg-indigo-500/15 text-indigo-700">
+            <Sparkles className="h-5 w-5" />
           </div>
-        )}
-
-        {/* Title + facilitator */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{sessionTitle}</p>
-          {facilitatorTitle && (
-            <p className="text-xs text-slate-400 truncate">Facilitated by {facilitatorTitle}</p>
-          )}
-              {showRuntimeAvatarState && (
-                <p className="text-[11px] text-indigo-500 truncate capitalize" aria-live="polite">
-                  {voiceRuntime.isSpeaking
-                    ? 'AI facilitator is speaking'
-                    : runtimeAvatarState?.reason || 'AI facilitator is monitoring the discussion'}
-                </p>
-              )}
-        </div>
-
-        {/* Participant count */}
-        <div className="shrink-0 flex items-center gap-1.5 bg-slate-100 rounded-full px-2.5 py-1">
-          <Users className="h-3.5 w-3.5 text-slate-500" />
-          <span className="text-xs font-medium text-slate-600">
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-base font-bold tracking-tight text-slate-950">{sessionTitle}</p>
+            <p className="truncate text-xs text-slate-500">Facilitated by {facilitatorName}</p>
+          </div>
+          <div className="hidden items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300 sm:flex">
+            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,0.8)]" />
+            Live
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800">
+            <Users className="h-3.5 w-3.5 text-slate-500" />
             {currentParticipantCount}/{maxParticipants}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Message list (flex-1 = fills all remaining space, scrolls) ─── */}
-      <div className="flex-1 min-h-0">
-        <MessageList
-          messages={filteredMessages}
-          participantColors={participantColors}
-          currentParticipant={String(effectiveParticipantId)}
-          isWaitingForResponse={isWaitingForResponse}
-          isWaitingForResponses={isWaitingForResponses}
-          responseCount={responseCount}
-          totalParticipants={totalParticipants}
-          participants={participants}
-          conversationData={conversationData}
-        />
-      </div>
-
-      {/* ── Footer ─────────────────────────────────────────────────────── */}
-      {isSessionEnded ? (
-        /* Session ended banner */
-        <div className="shrink-0 bg-amber-50 border-t border-amber-200 px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-amber-900">This session has ended</p>
-              <p className="text-xs text-amber-600">Thank you for your participation!</p>
-            </div>
           </div>
-          <button
-            onClick={() => window.location.href = '/'}
-            className="shrink-0 inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-sm font-medium px-4 py-2 rounded-xl transition-all"
-          >
-            <Home className="h-4 w-4" />
-            Return Home
-          </button>
+          <div className="hidden items-center gap-1 md:flex">
+            {[Mic, Video, Captions].map((Icon, index) => (
+              <button
+                key={index}
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+                aria-label={index === 0 ? 'Microphone status' : index === 1 ? 'Camera status' : 'Captions status'}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
         </div>
-      ) : (
-        /* Active input footer */
-        <div className="shrink-0">
-          <InputFooter
-            participantCount={maxParticipants}
-            currentParticipant={effectiveParticipantId}
-            participantNames={participantNames}
-            participants={participants}
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            onSendMessage={onSendMessage}
-            isRecording={isRecording}
-            setIsRecording={setIsRecording}
-            currentUserParticipantId={effectiveParticipantId}
-            isAnonymous={isAnonymous}
-            toggleAnonymous={toggleAnonymous}
-            hasAnswered={hasAnswered}
-            totalResponses={totalResponses}
-            viewMode={viewMode}
-            messages={messages}
-            showResponseStats={showResponseStats}
-            conversationId={conversationId}
-            enabledTools={enabledTools}
-            isLoadingToolbox={isLoadingToolbox}
-            enabledModes={enabledModes}
-            activeMode={activeMode}
-            participantModeState={participantModeState}
-            recentModeEvents={recentModeEvents}
-            isLoadingModes={isLoadingModes}
-            modeError={modeError}
-            submitModeInput={submitModeInput}
-            speechEnabled={speechStackEnabled}
-            speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
-            onSpeechInterim={handleSpeechInterim}
-            onSpeechFinal={handleSpeechFinal}
-          />
-        </div>
-      )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 gap-3 p-3">
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80">
+          <section className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+            <div
+              className={`relative flex h-[min(52vh,420px)] min-h-[260px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.18),rgba(255,255,255,0.92)_45%,rgba(241,245,249,0.9))] ${aiIsSpeaking ? 'border-amber-300/70 shadow-[0_0_40px_rgba(245,158,11,0.22)] animate-ai-speaking' : 'border-slate-200'}`}
+            >
+              <div className="absolute left-4 top-4 z-10 rounded-full border border-amber-300/35 bg-amber-300/10 px-3 py-1 text-xs font-bold text-amber-700">
+                AI
+              </div>
+              <div className="absolute right-4 top-4 z-10 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
+                {aiIsSpeaking ? 'AI speaking' : runtimeAvatarState?.reason || 'AI monitoring'}
+              </div>
+              {facilitatorAvatarUrl ? (
+                <img
+                  src={facilitatorAvatarUrl}
+                  alt={facilitatorName}
+                  className="h-full w-full object-contain object-top p-4"
+                />
+              ) : showRuntimeAvatarState ? (
+                <FacilitatorAvatar
+                  avatarUrl={facilitatorAvatarUrl}
+                  name={facilitatorName}
+                  size="xl"
+                  runtimeState={runtimeAvatarState}
+                  enableRuntimeAnimation
+                />
+              ) : (
+                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-amber-300/30 bg-amber-300/10 text-amber-700 shadow-2xl shadow-amber-200/70">
+                  <Sparkles className="h-16 w-16" />
+                </div>
+              )}
+              {aiIsSpeaking && (
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1 rounded-full border border-amber-300/25 bg-white/85 px-3 py-2 backdrop-blur">
+                  {[0, 1, 2, 3, 4].map((bar) => (
+                    <span
+                      key={bar}
+                      className="block w-1.5 origin-bottom rounded-full bg-amber-300 animate-sound-bar"
+                      style={{ height: `${10 + (bar % 3) * 5}px`, animationDelay: `${bar * 90}ms` }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-50 p-4 shadow-lg shadow-slate-200/70">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">Current question</span>
+                <span className="rounded-full border border-indigo-300/25 bg-indigo-400/10 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                  {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : modeLabel}
+                </span>
+              </div>
+              <p className="text-sm font-medium leading-relaxed text-slate-900 md:text-base">
+                {latestAssistantMessage?.content || 'The AI facilitator is preparing the next question for the room.'}
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-indigo-400 transition-all duration-700" style={{ width: `${responseProgress}%` }} />
+                </div>
+                <span className="shrink-0 font-mono text-xs text-slate-500">{responseCount}/{responseTotal} responded</span>
+              </div>
+            </div>
+          </section>
+
+          {isSessionEnded ? (
+            <div className="shrink-0 border-t border-amber-300/20 bg-amber-300/10 px-4 py-4">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-950">This session has ended</p>
+                  <p className="text-xs text-amber-700">Thank you for your participation.</p>
+                </div>
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400 active:scale-95"
+                >
+                  <Home className="h-4 w-4" />
+                  Return Home
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="shrink-0 border-t border-slate-200 bg-white">
+              <InputFooter
+                participantCount={maxParticipants}
+                currentParticipant={effectiveParticipantId}
+                participantNames={participantNames}
+                participants={participants}
+                inputMessage={inputMessage}
+                setInputMessage={setInputMessage}
+                onSendMessage={onSendMessage}
+                isRecording={isRecording}
+                setIsRecording={setIsRecording}
+                currentUserParticipantId={effectiveParticipantId}
+                isAnonymous={isAnonymous}
+                toggleAnonymous={toggleAnonymous}
+                hasAnswered={hasAnswered}
+                totalResponses={totalResponses}
+                viewMode={viewMode}
+                messages={messages}
+                showResponseStats={showResponseStats}
+                conversationId={conversationId}
+                enabledTools={enabledTools}
+                isLoadingToolbox={isLoadingToolbox}
+                enabledModes={enabledModes}
+                activeMode={activeMode}
+                participantModeState={participantModeState}
+                recentModeEvents={recentModeEvents}
+                isLoadingModes={isLoadingModes}
+                modeError={modeError}
+                submitModeInput={submitModeInput}
+                speechEnabled={speechStackEnabled}
+                speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
+                onSpeechInterim={handleSpeechInterim}
+                onSpeechFinal={handleSpeechFinal}
+              />
+            </div>
+          )}
+        </main>
+
+        <aside className="hidden w-[292px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 md:flex">
+          <div className="flex border-b border-slate-200 p-2">
+            <button
+              type="button"
+              onClick={() => setSidebarTab('people')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/70' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+            >
+              <Users className="h-4 w-4" />
+              People
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('chat')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/70' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Chat
+            </button>
+          </div>
+
+          {sidebarTab === 'people' ? (
+            <div className="flex min-h-0 flex-1 flex-col p-3">
+              <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1">
+                {activeParticipants.map((participant) => {
+                  const isYou = participant.id === effectiveParticipantId;
+                  const participantAccent = participantColors[String(participant.id)] || 'rgba(99, 102, 241, 0.45)';
+                  return (
+                    <div key={participant.id} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2" style={{ boxShadow: `inset 0 0 0 1px ${participantAccent}` }}>
+                      <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-100">
+                        {participant.avatar ? (
+                          <img src={participant.avatar} alt={participant.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-100 to-slate-200 text-sm font-bold text-indigo-700">
+                            {formatParticipantInitials(participant)}
+                          </div>
+                        )}
+                        {isYou && <span className="absolute left-1.5 top-1.5 rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">You</span>}
+                      </div>
+                      <div className="mt-2 min-w-0">
+                        <p className="truncate text-xs font-semibold text-slate-950">{participant.name || `Participant ${participant.id}`}</p>
+                        <p className="truncate text-[11px] text-slate-500">{formatLastActive(participant)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs text-slate-700">
+                <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
+                <span className="text-slate-500"> · Muted</span>
+              </div>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {latestParticipantMessages.length > 0 ? (
+                <div className="space-y-3">
+                  {latestParticipantMessages.map((message) => (
+                    <div key={message.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-semibold text-indigo-700">{message.name || message.participant || 'Participant'}</span>
+                        <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
+                      </div>
+                      <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                  Participant messages will appear here during the session.
+                </div>
+              )}
+            </div>
+          )}
+        </aside>
+      </div>
+
+      <div className="grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white p-2 md:hidden">
+        <button type="button" onClick={() => setSidebarTab('people')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800">
+          <Users className="h-4 w-4" /> People
+        </button>
+        <button type="button" onClick={() => setSidebarTab('chat')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800">
+          <MessageSquare className="h-4 w-4" /> Chat
+        </button>
+      </div>
     </div>
   );
 };

@@ -10,11 +10,16 @@ import re
 import json
 import uuid
 import time
+import hmac
+import base64
 import hashlib
+import secrets
+import struct
 import traceback
 import asyncio
 import logging
 import sys
+from urllib.parse import quote
 import bcrypt as _bcrypt
 from datetime import datetime
 
@@ -549,6 +554,26 @@ async def run_startup_migrations() -> None:
         # The account is deleted by the 2026-05-01 migration below.
         # jerome.gauvin@gmail.com is now the admin account.
         "SELECT 1; -- admin seed replaced",
+        # 2026-05-24: Store Supabase-compatible TOTP MFA factors.
+        # Unverified factors are created during enrollment and activated only after
+        # the user proves possession with a valid authenticator code.
+        """
+        CREATE TABLE IF NOT EXISTS auth_mfa_factors (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+            factor_type TEXT NOT NULL DEFAULT 'totp',
+            secret TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'unverified',
+            friendly_name TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            verified_at TIMESTAMPTZ,
+            last_challenged_at TIMESTAMPTZ
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_auth_mfa_factors_user_id
+            ON auth_mfa_factors(user_id);
+        """,
         # 2026-04-10: Create password_reset_tokens table for secure forgot-password flow.
         # token: a 64-char hex secret sent to the user's email.
         # expires_at: 1 hour from creation.
@@ -1482,6 +1507,50 @@ def _check_not_banned(user: dict | None) -> None:
     # The cache is invalidated when ban/unban is applied via the REST endpoint.
     if _BANNED_USERS_CACHE.get(user_id):
         raise HTTPException(401, detail={"code": "account_banned", "message": "Your account has been suspended."})
+
+
+def _require_current_user(request: Request) -> dict:
+    """Return the authenticated JWT payload or raise a Supabase-style 401."""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, detail={"code": "not_authenticated", "message": "Authentication required"})
+    _check_not_banned(user)
+    return user
+
+
+def _generate_totp_secret() -> str:
+    """Generate a Base32 TOTP secret suitable for authenticator apps."""
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def _totp_code(secret: str, for_time: int | None = None, period: int = 30, digits: int = 6) -> str:
+    """Compute an RFC 6238-compatible TOTP code using HMAC-SHA1."""
+    timestamp = int(time.time() if for_time is None else for_time)
+    counter = timestamp // period
+    padded_secret = secret.upper() + ("=" * ((8 - len(secret) % 8) % 8))
+    key = base64.b32decode(padded_secret, casefold=True)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    code_int = struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF
+    return str(code_int % (10 ** digits)).zfill(digits)
+
+
+def _verify_totp_code(secret: str, code: str, window: int = 1) -> bool:
+    """Verify a six-digit TOTP code, allowing one step of clock skew."""
+    normalized = re.sub(r"\D", "", str(code or ""))
+    if len(normalized) != 6:
+        return False
+    now = int(time.time())
+    return any(
+        hmac.compare_digest(_totp_code(secret, now + (offset * 30)), normalized)
+        for offset in range(-window, window + 1)
+    )
+
+
+def _totp_uri(email: str, secret: str) -> str:
+    issuer = "AIFacilitator"
+    label = quote(f"{issuer}:{email or 'account'}")
+    return f"otpauth://totp/{label}?secret={secret}&issuer={quote(issuer)}&algorithm=SHA1&digits=6&period=30"
 
 
 # In-memory banned-users cache: {user_id: True}.
@@ -2558,23 +2627,144 @@ async def auth_stub():
 
 
 @app.get("/auth/v1/mfa/factors")
-async def auth_mfa_factors():
-    return {"totp": [], "phone": []}
+async def auth_mfa_factors(request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    try:
+        async with _pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, factor_type, status, friendly_name, created_at, verified_at "
+                "FROM auth_mfa_factors WHERE user_id = $1::uuid ORDER BY created_at DESC",
+                user_id,
+            )
+    except Exception as e:
+        log_auth.error("mfa factors ERROR: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not load MFA factors"})
+
+    totp = []
+    for row in rows:
+        created_at = row.get("created_at")
+        verified_at = row.get("verified_at")
+        totp.append({
+            "id": str(row["id"]),
+            "type": row.get("factor_type") or "totp",
+            "status": row.get("status") or "unverified",
+            "friendly_name": row.get("friendly_name") or "Authenticator app",
+            "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at or ""),
+            "updated_at": verified_at.isoformat() if hasattr(verified_at, "isoformat") else str(verified_at or created_at or ""),
+        })
+    return {"totp": totp, "phone": []}
 
 
 @app.post("/auth/v1/mfa/enroll")
-async def auth_mfa_enroll():
-    return {"id": str(uuid.uuid4()), "type": "totp", "totp": {"qr_code": "", "secret": "", "uri": ""}}
+@limiter.limit("5/minute")
+async def auth_mfa_enroll(request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    email = user.get("email") or "account"
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    factor_type = (data.get("factorType") or data.get("factor_type") or "totp").lower()
+    if factor_type != "totp":
+        raise HTTPException(400, detail={"code": "unsupported_factor_type", "message": "Only TOTP MFA factors are supported"})
+
+    secret = _generate_totp_secret()
+    friendly_name = data.get("friendlyName") or data.get("friendly_name") or "Authenticator app"
+    factor_id = str(uuid.uuid4())
+    try:
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO auth_mfa_factors (id, user_id, factor_type, secret, status, friendly_name) "
+                "VALUES ($1::uuid, $2::uuid, 'totp', $3, 'unverified', $4)",
+                factor_id,
+                user_id,
+                secret,
+                friendly_name,
+            )
+    except Exception as e:
+        log_auth.error("mfa enroll ERROR: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not start MFA enrollment"})
+
+    uri = _totp_uri(email, secret)
+    return {
+        "id": factor_id,
+        "type": "totp",
+        "status": "unverified",
+        "totp": {"qr_code": uri, "secret": secret, "uri": uri},
+    }
 
 
 @app.post("/auth/v1/mfa/challenge")
-async def auth_mfa_challenge():
-    return {"id": str(uuid.uuid4())}
+@limiter.limit("10/minute")
+async def auth_mfa_challenge(request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    factor_id = str(data.get("factorId") or data.get("factor_id") or "").strip()
+    if not factor_id:
+        raise HTTPException(400, detail={"code": "missing_factor", "message": "MFA factor id is required"})
+    challenge_id = str(uuid.uuid4())
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id FROM auth_mfa_factors WHERE id = $1::uuid AND user_id = $2::uuid",
+                factor_id,
+                user_id,
+            )
+            if not row:
+                raise HTTPException(404, detail={"code": "factor_not_found", "message": "MFA factor not found"})
+            await conn.execute(
+                "UPDATE auth_mfa_factors SET last_challenged_at = NOW() WHERE id = $1::uuid",
+                factor_id,
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("mfa challenge ERROR: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not create MFA challenge"})
+    return {"id": challenge_id, "factor_id": factor_id, "expires_at": int(time.time()) + 300}
 
 
 @app.post("/auth/v1/mfa/verify")
-async def auth_mfa_verify():
-    return {"success": True}
+@limiter.limit("10/minute")
+async def auth_mfa_verify(request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    factor_id = str(data.get("factorId") or data.get("factor_id") or "").strip()
+    code = str(data.get("code") or data.get("otp") or "").strip()
+    if not factor_id or not code:
+        raise HTTPException(400, detail={"code": "missing_fields", "message": "MFA factor id and verification code are required"})
+
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, secret FROM auth_mfa_factors WHERE id = $1::uuid AND user_id = $2::uuid",
+                factor_id,
+                user_id,
+            )
+            if not row:
+                raise HTTPException(404, detail={"code": "factor_not_found", "message": "MFA factor not found"})
+            if not _verify_totp_code(row["secret"], code):
+                raise HTTPException(400, detail={"code": "invalid_totp", "message": "Invalid verification code"})
+            await conn.execute(
+                "UPDATE auth_mfa_factors SET status = 'verified', verified_at = NOW() WHERE id = $1::uuid",
+                factor_id,
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("mfa verify ERROR: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "server_error", "message": "Could not verify MFA code"})
+    return {"success": True, "factor_id": factor_id}
 
 
 # ============================================================

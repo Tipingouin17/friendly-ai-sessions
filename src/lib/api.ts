@@ -400,11 +400,35 @@ export const auth = {
   },
 
   mfa: {
-    async enroll(_p: unknown): Promise<{ data: null; error: ApiError }> {
-      return { data: null, error: { message: "MFA not supported on this backend" } };
+    async enroll(params: { factorType?: "totp"; factor_type?: "totp"; friendlyName?: string } = {}): Promise<{
+      data: { id: string; type: string; status: string; totp: { qr_code: string; secret: string; uri: string } } | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<{ id: string; type: string; status: string; totp: { qr_code: string; secret: string; uri: string } }>(
+        "/auth/v1/mfa/enroll",
+        {
+          method: "POST",
+          body: JSON.stringify(params),
+        },
+      );
+      return { data: res.data, error: res.error };
     },
-    async challengeAndVerify(_p: unknown): Promise<{ data: null; error: ApiError }> {
-      return { data: null, error: { message: "MFA not supported on this backend" } };
+
+    async challengeAndVerify(params: { factorId: string; code: string }): Promise<{
+      data: { success: boolean; factor_id: string } | null;
+      error: ApiError | null;
+    }> {
+      const challenge = await apiFetch<{ id: string }>("/auth/v1/mfa/challenge", {
+        method: "POST",
+        body: JSON.stringify({ factorId: params.factorId }),
+      });
+      if (challenge.error) return { data: null, error: challenge.error };
+
+      const verification = await apiFetch<{ success: boolean; factor_id: string }>("/auth/v1/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({ factorId: params.factorId, code: params.code }),
+      });
+      return { data: verification.data, error: verification.error };
     },
   },
 };

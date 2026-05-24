@@ -5,14 +5,33 @@
  * inbox and click the verification link before they can log in.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import PageHead from '@/components/PageHead';
+import { api } from '@/lib/api';
 
 const VerifyEmailSent: React.FC = () => {
   const location = useLocation();
   const email = (location.state as { email?: string } | null)?.email ?? 'your email address';
+  const canResend = email !== 'your email address';
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+
+  const handleResendVerification = async () => {
+    if (!canResend || resending) return;
+    setResending(true);
+    setResendMessage(null);
+    setResendError(null);
+    const { error } = await api.auth.resendVerificationEmail(email);
+    setResending(false);
+    if (error) {
+      setResendError(error.message || 'We could not resend the verification email. Please try again.');
+      return;
+    }
+    setResendMessage('If this account is still awaiting verification, a new link has been sent.');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
@@ -38,7 +57,7 @@ const VerifyEmailSent: React.FC = () => {
           <strong>24&nbsp;hours</strong>.
         </p>
 
-        <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700 text-left mb-8 space-y-1">
+        <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700 text-left mb-6 space-y-1">
           <p className="font-semibold mb-1">Didn't receive the email?</p>
           <ul className="list-disc list-inside space-y-1 text-indigo-600">
             <li>Check your spam or junk folder</li>
@@ -46,6 +65,27 @@ const VerifyEmailSent: React.FC = () => {
             <li>Wait a few minutes and refresh your inbox</li>
           </ul>
         </div>
+
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={!canResend || resending}
+          className="mb-4 inline-block w-full py-3 px-6 rounded-full border border-indigo-200 text-indigo-700 font-semibold text-sm hover:bg-indigo-50 transition disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {resending ? 'Sending...' : 'Resend verification email'}
+        </button>
+
+        {resendMessage && (
+          <p className="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+            {resendMessage}
+          </p>
+        )}
+
+        {resendError && (
+          <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">
+            {resendError}
+          </p>
+        )}
 
         <Link
           to="/login"

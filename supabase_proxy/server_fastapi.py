@@ -2480,10 +2480,75 @@ async def verify_email(token: str = Query(...)):
     return _make_user_response(USERS[email], jwt_token)
 
 
+@app.post("/auth/v1/resend")
+@limiter.limit("3/minute")
+async def auth_resend(request: Request):
+    """Resend an email-verification link for unverified signup accounts.
+
+    This implements the Supabase-compatible /auth/v1/resend surface used by
+    hosted auth clients while preserving account-enumeration safety: callers get
+    the same success response whether the email is unknown, already verified, or
+    newly resent. Operational failures are logged but do not reveal account
+    state to the requester.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    email = (data.get("email") or "").lower().strip()
+    resend_type = (data.get("type") or "signup").lower().strip()
+    if not email:
+        raise HTTPException(400, detail={"code": "missing_email", "message": "Email is required"})
+    if resend_type not in {"signup", "email_change"}:
+        raise HTTPException(400, detail={"code": "unsupported_resend_type", "message": "Only signup verification resend is supported"})
+
+    response = {
+        "message": "If an unverified account exists, a new verification email has been sent.",
+        "email": email,
+    }
+
+    try:
+        async with _pool.acquire() as conn:
+            profile = await conn.fetchrow(
+                "SELECT id, email, full_name, email_verified FROM profiles WHERE email = $1",
+                email,
+            )
+            if not profile:
+                log_auth.info("resend verification: no account found for %s — returning 200 silently", email)
+                return response
+            if bool(profile.get("email_verified")):
+                log_auth.info("resend verification: account already verified for %s — returning 200 silently", email)
+                return response
+
+            user_id = str(profile["id"])
+            token = str(uuid.uuid4())
+            await conn.execute(
+                "UPDATE email_verification_tokens SET used = TRUE WHERE user_id = $1::uuid AND used = FALSE",
+                user_id,
+            )
+            await conn.execute(
+                "INSERT INTO email_verification_tokens (token, user_id, email, expires_at) "
+                "VALUES ($1, $2::uuid, $3, NOW() + INTERVAL '24 hours')",
+                token,
+                user_id,
+                email,
+            )
+            try:
+                send_verification_email(email, profile.get("full_name") or email, token)
+                log_auth.info("resend verification: verification email sent to %s", email)
+            except Exception as _email_err:
+                log_auth.warning("resend verification email failed (non-fatal): %s", _email_err)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("resend verification ERROR: %s", e, exc_info=True)
+    return response
+
+
 # Stub endpoints for Supabase auth compatibility
 @app.get("/auth/v1/callback")
 @app.post("/auth/v1/callback")
-@app.post("/auth/v1/resend")
 @app.post("/auth/v1/verify")
 @app.post("/auth/v1/otp")
 @app.get("/auth/v1/authorize")

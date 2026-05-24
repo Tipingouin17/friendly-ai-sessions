@@ -390,6 +390,15 @@ export const auth = {
     return { error: res.error };
   },
 
+  async resendVerificationEmail(email: string): Promise<{ error: ApiError | null }> {
+    const res = await apiFetch("/auth/v1/resend", {
+      method: "POST",
+      body: JSON.stringify({ type: "signup", email }),
+      headers: {},
+    });
+    return { error: res.error };
+  },
+
   mfa: {
     async enroll(_p: unknown): Promise<{ data: null; error: ApiError }> {
       return { data: null, error: { message: "MFA not supported on this backend" } };

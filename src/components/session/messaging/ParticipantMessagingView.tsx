@@ -13,7 +13,7 @@ import type { ConversationWithSession } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Captions, Home, MessageSquare, Mic, Sparkles, Users, Video } from 'lucide-react';
+import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
@@ -172,6 +172,16 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const latestParticipantMessages = React.useMemo(() => {
     return [...filteredMessages].reverse().filter((message) => message.sender !== 'assistant').slice(0, 4).reverse();
   }, [filteredMessages]);
+  const latestOwnParticipantMessage = React.useMemo(() => {
+    const participantKey = String(effectiveParticipantId);
+    const latestAssistantIndex = filteredMessages.map((message) => message.sender).lastIndexOf('assistant');
+    const responseWindow = latestAssistantIndex >= 0 ? filteredMessages.slice(latestAssistantIndex + 1) : filteredMessages;
+
+    return [...responseWindow]
+      .reverse()
+      .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || message.participant === participantKey)) ?? null;
+  }, [effectiveParticipantId, filteredMessages]);
+  const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
   const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
   const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
   const activeParticipants = participants.length > 0
@@ -325,6 +335,24 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 <span className="shrink-0 font-mono text-xs text-slate-500">{responseCount}/{responseTotal} responded</span>
               </div>
             </div>
+
+            {hasRegisteredResponse && (
+              <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-lg shadow-emerald-100/80">
+                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Your response is registered
+                </div>
+                {latestOwnParticipantMessage ? (
+                  <blockquote className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800">
+                    {latestOwnParticipantMessage.content}
+                  </blockquote>
+                ) : (
+                  <p className="text-sm leading-relaxed text-emerald-800">
+                    Your answer has been submitted. Waiting for the rest of the room before the facilitator continues.
+                  </p>
+                )}
+              </div>
+            )}
           </section>
 
           {isSessionEnded ? (

@@ -20,6 +20,8 @@ const assertNotContains = (source, needle, label) => {
 assertContains(participantView, 'AI spotlight', 'participant view documentation');
 assertContains(participantView, 'bg-slate-50 text-slate-950', 'participant light shell surface');
 assertContains(participantView, 'Current question', 'participant current-question card');
+assertContains(participantView, 'latestOwnParticipantMessage', 'participant registered-response derivation');
+assertContains(participantView, 'Your response is registered', 'participant visible response confirmation');
 assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
 assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');

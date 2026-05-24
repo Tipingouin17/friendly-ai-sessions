@@ -10,8 +10,9 @@
     "lint": "eslint .",
     "test:stream-interpreter": "node scripts/run-stream-interpreter-test.mjs",
     "test:facilitator-ingest": "python3.11 scripts/test_facilitator_ingest_backend.py",
+    "test:generate-ai-welcome": "python3.11 scripts/test_generate_ai_welcome_backend.py",
     "test:phase3-hardening": "node scripts/run-phase3-hardening-test.mjs",
-    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:phase3-hardening",
+    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:generate-ai-welcome && pnpm test:phase3-hardening",
     "preview": "vite preview"
   },
   "dependencies": {

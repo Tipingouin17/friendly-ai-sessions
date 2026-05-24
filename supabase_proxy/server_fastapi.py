@@ -4686,9 +4686,118 @@ async def edge_function(func_name: str, request: Request):
 
         return {"content": txt, "id": str(msg_id) if msg_id else str(uuid.uuid4()), "success": True}
 
-    # ── generate-ai-welcome (stub) ─────────────────────────────
+    # ── generate-ai-welcome ───────────────────────────────────────
+    # Compatibility endpoint for callers that still invoke the legacy
+    # welcome-generation edge function directly. The primary session-start
+    # path uses handle-facilitator-response with sessionStart=True, while
+    # participant joins trigger _maybe_generate_welcome_message server-side.
+    # This branch now reuses that same idempotent backend generation path
+    # instead of returning a static placeholder string.
     elif func_name == "generate-ai-welcome":
-        return {"message": "Welcome to the session! I'm excited to facilitate our discussion today.", "success": True}
+        conv_id_raw = (
+            data.get("conversationId")
+            or data.get("conversation_id")
+            or data.get("conversation")
+        )
+
+        def _fallback_welcome(
+            session_title: str | None = None,
+            objective: str | None = None,
+            facilitator_name: str | None = None,
+        ) -> str:
+            title = (session_title or data.get("sessionTitle") or data.get("title") or "this session")
+            facilitator = (
+                facilitator_name
+                or data.get("facilitatorName")
+                or data.get("facilitator")
+                or "your AI facilitator"
+            )
+            objective_text = objective or data.get("objective") or data.get("sessionObjective")
+            if objective_text:
+                return (
+                    f'Welcome to "{title}"! I\'m {facilitator}, and I\'m glad to facilitate our conversation today.\n\n'
+                    f"Our objective is: {objective_text}\n\n"
+                    "To get us started, what perspective, question, or experience would you like to bring into the discussion?"
+                )
+            return (
+                f'Welcome to "{title}"! I\'m {facilitator}, and I\'m glad to facilitate our conversation today.\n\n'
+                "To get us started, what are you hoping to explore or accomplish together in this session?"
+            )
+
+        if not conv_id_raw:
+            message = _fallback_welcome()
+            return {
+                "message": message,
+                "content": message,
+                "success": True,
+                "generated": False,
+                "status": "fallback_no_conversation",
+            }
+
+        try:
+            conv_id_int = int(conv_id_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"error": "invalid_conversation_id", "message": "conversationId must be an integer"})
+
+        # Reuse the production welcome helper. It is intentionally idempotent:
+        # if a welcome/message already exists, it exits without double-writing.
+        await _maybe_generate_welcome_message(conv_id_int)
+
+        try:
+            async with _pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """
+                    SELECT m.id, m.content, m.role, m.name, m.created_at,
+                           s.title, s.objective,
+                           f.title as facilitator_name
+                    FROM conversations c
+                    LEFT JOIN sessions s ON s.id = c.sessions_id
+                    LEFT JOIN facilitators f ON f.id = s.facilitator
+                    LEFT JOIN messages m ON m.conversation_id = c.id AND m.role = 'assistant'
+                    WHERE c.id = $1
+                    ORDER BY m.created_at DESC NULLS LAST, m.id DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    conv_id_int,
+                )
+        except Exception as e:
+            log_session.error("generate-ai-welcome: DB lookup failed for conv=%s: %s", conv_id_int, e, exc_info=True)
+            raise HTTPException(500, detail={"error": "welcome_lookup_failed", "message": "Could not load the generated welcome message"})
+
+        if not row:
+            raise HTTPException(404, detail={"error": "conversation_not_found", "message": "Conversation not found"})
+
+        row_dict = dict(row)
+        content = row_dict.get("content") or {}
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except Exception:
+                content = {"text": content}
+        if not isinstance(content, dict):
+            content = {"text": str(content)}
+
+        message = content.get("text") if row_dict.get("id") else None
+        generated = bool(message)
+        if not message:
+            # If generation was skipped because the conversation already had
+            # non-assistant messages or the model/provider failed before insert,
+            # return a contextual fallback rather than a static placeholder.
+            message = _fallback_welcome(
+                row_dict.get("title"),
+                row_dict.get("objective"),
+                row_dict.get("facilitator_name"),
+            )
+
+        return {
+            "message": message,
+            "content": message,
+            "id": str(row_dict.get("id")) if row_dict.get("id") else str(uuid.uuid4()),
+            "avatar": content.get("avatar"),
+            "success": True,
+            "generated": generated,
+            "status": "ai_ready" if generated else "fallback_ready",
+        }
 
 
     # ── facilitator-mode-event ────────────────────────────────────

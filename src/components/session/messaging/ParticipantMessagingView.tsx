@@ -20,6 +20,7 @@ import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
+import { useWebRTCSession } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
@@ -256,13 +257,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (second.id === effectiveParticipantId) return 1;
     return first.id - second.id;
   });
+  const { remoteStreams, isSignalingConnected } = useWebRTCSession({
+    conversationId,
+    role: 'participant',
+    participantId: effectiveParticipantId,
+    participants: activeParticipants,
+    localStream: localCameraStream,
+    enabled: !isSessionEnded,
+  });
   const participantVideoTiles: SessionVideoParticipant[] = orderedVideoParticipants.map((participant) => ({
     id: String(participant.id),
     name: participant.id === effectiveParticipantId ? `${participant.name || 'You'} (You)` : participant.name || `Participant ${participant.id}`,
     initials: formatParticipantInitials(participant),
     avatarUrl: participant.avatar,
     accentColor: participantColors[String(participant.id)] || undefined,
-    mediaStream: participant.id === effectiveParticipantId ? localCameraStream : null,
+    mediaStream: participant.id === effectiveParticipantId ? localCameraStream : remoteStreams[String(participant.id)] ?? null,
     isYou: participant.id === effectiveParticipantId,
     isMuted: participant.id !== effectiveParticipantId || !isRecording,
     isSpeaking: participant.id === effectiveParticipantId && isRecording,
@@ -555,7 +564,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     {cameraIsOn ? 'Camera off' : 'Camera on'}
                   </button>
                 </div>
-                <span className="text-slate-500">Muted · {cameraStatusLabel}</span>
+                <span className="text-slate-500">Muted · {cameraStatusLabel} · {isSignalingConnected ? 'video room connected' : 'connecting video room'}</span>
                 {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
               </div>
             </div>

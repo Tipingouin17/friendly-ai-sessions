@@ -9,6 +9,7 @@ const participantView = read('src/components/session/messaging/ParticipantMessag
 const hostContent = read('src/components/session/host/HostSessionContent.tsx');
 const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
+const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
 const vercelConfig = read('vercel.json');
 
 const assertContains = (source, needle, label) => {
@@ -34,7 +35,9 @@ assertContains(participantView, 'participantVideoTiles', 'participant data-drive
 assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'participant local camera permission request');
 assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
-assertContains(participantView, 'mediaStream: participant.id === effectiveParticipantId ? localCameraStream : null', 'participant self tile receives local preview stream');
+assertContains(participantView, 'useWebRTCSession({', 'participant initializes WebRTC signaling for remote video tiles');
+assertContains(participantView, "role: 'participant'", 'participant WebRTC hook runs in participant role');
+assertContains(participantView, "mediaStream: participant.id === effectiveParticipantId ? localCameraStream : remoteStreams[String(participant.id)] ?? null", 'participant self tile uses local stream and remote tiles use peer streams');
 assertContains(participantView, 'Camera access was blocked', 'participant camera permission feedback');
 assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
@@ -51,6 +54,9 @@ assertContains(hostContent, "videoLayout === 'gallery'", 'host gallery-mode togg
 assertContains(hostContent, '<SessionVideoTile', 'host spotlight video tile');
 assertContains(hostContent, 'variant="host-strip"', 'host participant thumbnail strip');
 assertContains(hostContent, 'showResponseStatus', 'host response status badges on video tiles');
+assertContains(hostContent, 'useWebRTCSession({', 'host initializes WebRTC signaling for participant cameras');
+assertContains(hostContent, "role: 'host'", 'host WebRTC hook runs in receive-only host role');
+assertContains(hostContent, 'mediaStream: remoteStreams[String(participant.id)] ?? null', 'host participant video tiles consume remote MediaStreams');
 assertContains(hostContent, 'onApproveMode={onApproveMode}', 'host mode approval plumbing');
 assertNotContains(hostContent, "UX handoff's dark", 'host design documentation');
 assertNotContains(participantView, 'Precision Dark', 'participant design documentation');
@@ -67,6 +73,13 @@ assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile acces
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');
 assertContains(videoGrid, "data-video-tile-variant", 'video tile variant semantic marker');
 assertContains(videoGrid, "variant?: 'participant-sidebar' | 'host-strip' | 'host-gallery'", 'video grid supported layout variants');
+assertContains(webRTCSessionHook, "event_type: WEBRTC_EVENT_TYPE", 'WebRTC signaling persists as session_events rows');
+assertContains(webRTCSessionHook, "signalType: 'offer'", 'WebRTC hook sends SDP offers');
+assertContains(webRTCSessionHook, "signalType: 'answer'", 'WebRTC hook sends SDP answers');
+assertContains(webRTCSessionHook, "signalType: 'ice-candidate'", 'WebRTC hook sends ICE candidates');
+assertContains(webRTCSessionHook, "signalType: 'camera-ready'", 'WebRTC hook supports camera-ready renegotiation hints');
+assertContains(webRTCSessionHook, "signalType: 'camera-stopped'", 'WebRTC hook tears down remote streams when a camera stops');
+assertContains(webRTCSessionHook, "filter: `conversation_id=eq.${conversationId}`", 'WebRTC realtime channel is scoped to the active conversation');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

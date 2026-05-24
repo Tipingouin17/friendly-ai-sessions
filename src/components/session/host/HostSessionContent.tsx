@@ -17,6 +17,7 @@ import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
+import { useWebRTCSession } from "@/hooks/useWebRTCSession";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -112,6 +113,13 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
+  const { remoteStreams, isSignalingConnected } = useWebRTCSession({
+    conversationId: currentConversationId,
+    role: 'host',
+    participants,
+    localStream: null,
+    enabled: !isSessionEnded,
+  });
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
   const respondedParticipantIds = new Set(
@@ -136,6 +144,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       initials: formatParticipantInitials(participant),
       avatarUrl: participant.avatar,
       accentColor: participantColors[String(participant.id)] || undefined,
+      mediaStream: remoteStreams[String(participant.id)] ?? null,
       isMuted: true,
       hasResponded: respondedParticipantIds.has(String(participant.id)),
     })),
@@ -201,7 +210,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-700">Video room</p>
-                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery.</p>
+                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery · {isSignalingConnected ? 'video room connected' : 'connecting video room'}.</p>
                 </div>
                 <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
                   <button

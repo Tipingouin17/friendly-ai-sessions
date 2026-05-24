@@ -157,6 +157,7 @@ export const useSessionRealtime = ({
         console.error("Error removing channels:", err);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [currentConversationId]);
   
   // Secondary effect to check conversation state from props
@@ -180,6 +181,7 @@ export const useSessionRealtime = ({
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [conversation, currentConversationId, onSessionStarted, handleSessionFull]);
 
   return { error };

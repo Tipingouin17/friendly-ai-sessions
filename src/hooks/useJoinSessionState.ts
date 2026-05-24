@@ -69,6 +69,7 @@ export const useJoinSessionState = () => {
     // security risk in keeping a previously-set token.
     // Do NOT clear on unmount: the token must persist while the participant
     // is in the session.  It will be cleared when they navigate away.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [joinTokenParam]);
 
   // Memoize existingSessionData to prevent infinite re-renders

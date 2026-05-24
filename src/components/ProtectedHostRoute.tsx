@@ -59,20 +59,20 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
         const { data, error } = await api.rpc('is_session_host', {
           conversation_id: parseInt(conversationId)
         });
-        
+
         if (error) {
           console.error('Error checking host status:', error);
           logSecurityViolationRef.current('host_check_failed', { error: error.message });
           setIsHost(false);
         } else {
           setIsHost(data || false);
-          
+
           if (data) {
             // Log successful host access
             logSensitiveActionRef.current('host_route_access', location.pathname);
           } else {
             // Log unauthorized access attempt
-            logSecurityViolationRef.current('unauthorized_host_access', { 
+            logSecurityViolationRef.current('unauthorized_host_access', {
               userId: user.id,
               path: location.pathname,
               conversationId
@@ -91,7 +91,7 @@ export const ProtectedHostRoute: React.FC<ProtectedHostRouteProps> = ({ children
     checkHostStatus();
     // logSecurityViolation and logSensitiveAction are accessed via refs — exclude
     // them from the dependency array to prevent infinite re-renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user, isAuthenticated, authLoading, location.pathname, location.search]);
 
   // Show a single unified loading screen that covers both the auth check

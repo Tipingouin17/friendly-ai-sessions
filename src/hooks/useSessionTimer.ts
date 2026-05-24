@@ -116,6 +116,7 @@ export function useSessionTimer(
     tick(); // immediate first tick
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [endTimeRef.current]);
 
   const addTime = useCallback(

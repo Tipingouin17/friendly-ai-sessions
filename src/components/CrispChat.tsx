@@ -33,7 +33,6 @@ declare global {
   interface Window {
     // Before Crisp loads: $crisp is an array used to queue commands.
     // After Crisp loads: $crisp is replaced by the real Crisp SDK object.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $crisp: any;
     CRISP_WEBSITE_ID: string;
     CRISP_READY_TRIGGER: (() => void) | undefined;

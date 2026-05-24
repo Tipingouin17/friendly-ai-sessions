@@ -132,7 +132,6 @@ const AIfacilitators = () => {
   // facilitator row as `workshop.facilitator` (PostgREST alias). We cast it
   // to access plan_id and lock fields.
   const workshops = rawWorkshops.filter((workshop) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fac = workshop.facilitator as any;
     if (!fac || typeof fac !== 'object') return true; // no join data → show it
     const facPlanId: number | null = fac.plan_id ?? null;

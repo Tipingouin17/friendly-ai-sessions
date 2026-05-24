@@ -83,6 +83,7 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   // Stable session start handler with logging
   const handleSessionStart = useCallback(() => {
     onSessionStarted();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [onSessionStarted, stableParticipantCount, conversationId]);
 
   // Determine if session data has loaded

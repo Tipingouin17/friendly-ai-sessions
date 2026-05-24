@@ -10,7 +10,7 @@
  */
 
 import React from "react";
-import { Clock, Plus, Infinity } from "lucide-react";
+import { Clock, Plus, Infinity as InfinityIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -37,7 +37,7 @@ const SessionTimerBadge: React.FC<SessionTimerBadgeProps> = ({
     return (
       <div className="flex items-center gap-1.5">
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-mono font-semibold bg-slate-50 text-slate-500 border-slate-200">
-          <Infinity className="h-3 w-3 text-slate-400" />
+          <InfinityIcon className="h-3 w-3 text-slate-400" />
           No limit
         </div>
         {showAddTime && (

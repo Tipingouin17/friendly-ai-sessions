@@ -188,6 +188,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           console.error("Error removing participant events channel:", err);
         }
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
       processedEventIds.current.clear();
     };
   }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);

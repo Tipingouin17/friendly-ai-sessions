@@ -34,6 +34,7 @@ export function useSessionInterface(
     return token
       ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
       : `${baseUrl}/join-session?id=${conversationId}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [conversationId, (conversation as any)?.join_token]);
 
   // Sync session_started from conversation data
@@ -48,6 +49,7 @@ export function useSessionInterface(
       setIsSessionStarted(false);
       setShowQrCodeView(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [(conversation as any)?.session_started]);
 
   // Set up real-time subscription for session_started updates

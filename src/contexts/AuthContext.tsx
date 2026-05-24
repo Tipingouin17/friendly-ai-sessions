@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Empty dependency array: this effect runs only once on mount.
     // Logging callbacks are accessed via refs so they are always current
     // without causing the effect to re-run.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   const login = async (email: string, password: string) => {

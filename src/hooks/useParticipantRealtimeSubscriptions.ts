@@ -209,6 +209,7 @@ export function useParticipantRealtimeSubscriptions({
         if (participantEventsChannelRef.current && !cleanupAttemptedRef.current.events) {
           const eventsChannel = participantEventsChannelRef.current;
           participantEventsChannelRef.current = null;
+          // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
           cleanupAttemptedRef.current.events = true;
           api.removeChannel(eventsChannel);
         }

@@ -91,13 +91,13 @@ export const useEnhancedSessionMessages = ({
 
       setMessages(prev => {
         // Only update if messages have actually changed
-        if (prev.length !== deduped.length || 
+        if (prev.length !== deduped.length ||
             prev.some((msg, i) => msg.id !== deduped[i]?.id)) {
           return deduped;
         }
         return prev;
       });
-      
+
       lastFetchTimeRef.current = now;
       setLastFetchTime(now);
     } catch (err) {
@@ -106,7 +106,7 @@ export const useEnhancedSessionMessages = ({
     } finally {
       setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [conversationId]); // lastFetchTime intentionally excluded — use ref to avoid stale closure recreation
 
   // Stable callbacks — must be wrapped in useCallback so their reference only
@@ -132,11 +132,11 @@ export const useEnhancedSessionMessages = ({
   });
 
   // Message delivery tracking
-  const { 
-    deliveryStatus, 
-    getDeliveryStats, 
+  const {
+    deliveryStatus,
+    getDeliveryStats,
     forceCheck: forceDeliveryCheck,
-    isTracking 
+    isTracking
   } = useMessageDeliveryTracker({
     conversationId,
     onMessageReceived: (messageId) => {
@@ -172,13 +172,13 @@ export const useEnhancedSessionMessages = ({
 
   // Enhanced message handler
   const handleNewMessage = useCallback((message: Message) => {
-    
+
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
         return prev;
       }
-      
+
       const updated = [...prev, message];
       return updated;
     });

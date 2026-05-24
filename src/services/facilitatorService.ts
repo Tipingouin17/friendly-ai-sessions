@@ -35,7 +35,6 @@ export const fetchWorkshops = async (facilitatorId: number | null) => {
   const { data, error } = await query;
   if (error) throw error;
   // Filter out admin-locked sessions client-side (lock === true means locked)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data as any[])?.filter((s: any) => s.lock !== true) ?? [];
 };
 
@@ -67,7 +66,6 @@ export const createConversation = async (params: {
   }
 
   // Check facilitator plan-tier lock
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const facilitatorData = session?.facilitator as any;
   if (facilitatorData && typeof facilitatorData === 'object' && facilitatorData.lock === true) {
     // Resolve user's plan tier from their profile

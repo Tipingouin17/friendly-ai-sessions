@@ -13,7 +13,7 @@ import type { ConversationWithSession } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video } from 'lucide-react';
+import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video, VideoOff } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
@@ -131,6 +131,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   submitModeInput,
 }) => {
   const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
+  const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
+  const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
+  const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const localCameraStreamRef = React.useRef<MediaStream | null>(null);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
 
@@ -186,6 +190,64 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
+  const stopLocalCamera = React.useCallback(() => {
+    if (localCameraStreamRef.current) {
+      localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      localCameraStreamRef.current = null;
+    }
+    setLocalCameraStream(null);
+    setCameraStatus('off');
+  }, []);
+
+  const startLocalCamera = React.useCallback(async () => {
+    if (cameraStatus === 'starting') return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus('unsupported');
+      setCameraError('Camera preview is not supported in this browser.');
+      return;
+    }
+
+    setCameraStatus('starting');
+    setCameraError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
+        audio: false,
+      });
+
+      if (localCameraStreamRef.current) {
+        localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      localCameraStreamRef.current = stream;
+      setLocalCameraStream(stream);
+      setCameraStatus('on');
+    } catch (error) {
+      console.error('Error accessing participant camera:', error);
+      setLocalCameraStream(null);
+      localCameraStreamRef.current = null;
+      setCameraStatus('blocked');
+      setCameraError('Camera access was blocked. Allow camera permission in your browser to show your preview.');
+    }
+  }, [cameraStatus]);
+
+  const toggleLocalCamera = React.useCallback(() => {
+    if (localCameraStreamRef.current) {
+      stopLocalCamera();
+      return;
+    }
+    void startLocalCamera();
+  }, [startLocalCamera, stopLocalCamera]);
+
+  React.useEffect(() => {
+    return () => {
+      if (localCameraStreamRef.current) {
+        localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        localCameraStreamRef.current = null;
+      }
+    };
+  }, []);
+
   const activeParticipants = participants.length > 0
     ? participants
     : Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
@@ -200,11 +262,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     initials: formatParticipantInitials(participant),
     avatarUrl: participant.avatar,
     accentColor: participantColors[String(participant.id)] || undefined,
+    mediaStream: participant.id === effectiveParticipantId ? localCameraStream : null,
     isYou: participant.id === effectiveParticipantId,
     isMuted: participant.id !== effectiveParticipantId || !isRecording,
     isSpeaking: participant.id === effectiveParticipantId && isRecording,
   }));
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
+  const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream);
+  const cameraStatusLabel = cameraStatus === 'starting'
+    ? 'Starting camera…'
+    : cameraStatus === 'on'
+    ? 'Camera on'
+    : cameraStatus === 'blocked'
+    ? 'Camera blocked'
+    : cameraStatus === 'unsupported'
+    ? 'Camera unsupported'
+    : 'Camera off';
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
   const lastAssistantMessage = React.useMemo(() => {
@@ -277,16 +350,31 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             {currentParticipantCount}/{maxParticipants}
           </div>
           <div className="hidden items-center gap-1 md:flex">
-            {[Mic, Video, Captions].map((Icon, index) => (
-              <button
-                key={index}
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
-                aria-label={index === 0 ? 'Microphone status' : index === 1 ? 'Camera status' : 'Captions status'}
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            ))}
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+              aria-label="Microphone status"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleLocalCamera}
+              disabled={cameraStatus === 'starting'}
+              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 ${cameraIsOn ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-200 hover:text-slate-950'}`}
+              aria-label={cameraIsOn ? 'Turn camera off' : 'Turn camera on'}
+              title={cameraStatusLabel}
+              data-camera-toggle="participant-local-preview"
+            >
+              {cameraIsOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+              aria-label="Captions status"
+            >
+              <Captions className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -455,8 +543,20 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 emptyLabel="Video tiles will appear as participants join the session."
               />
               <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs text-slate-700">
-                <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
-                <span className="text-slate-500"> · Muted</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
+                  <button
+                    type="button"
+                    onClick={toggleLocalCamera}
+                    disabled={cameraStatus === 'starting'}
+                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70"
+                    data-camera-toggle="participant-sidebar-preview"
+                  >
+                    {cameraIsOn ? 'Camera off' : 'Camera on'}
+                  </button>
+                </div>
+                <span className="text-slate-500">Muted · {cameraStatusLabel}</span>
+                {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
               </div>
             </div>
           ) : (

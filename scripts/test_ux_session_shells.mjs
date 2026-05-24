@@ -9,6 +9,7 @@ const participantView = read('src/components/session/messaging/ParticipantMessag
 const hostContent = read('src/components/session/host/HostSessionContent.tsx');
 const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
+const vercelConfig = read('vercel.json');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -30,6 +31,11 @@ assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'particip
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');
 assertContains(participantView, 'participantVideoTiles', 'participant data-driven video tile mapping');
+assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'participant local camera permission request');
+assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
+assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
+assertContains(participantView, 'mediaStream: participant.id === effectiveParticipantId ? localCameraStream : null', 'participant self tile receives local preview stream');
+assertContains(participantView, 'Camera access was blocked', 'participant camera permission feedback');
 assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
 assertContains(participantView, 'submitModeInput={submitModeInput}', 'participant mode input plumbing');
@@ -56,8 +62,11 @@ assertContains(stylesheet, '@keyframes reactionPop', 'video reaction badge anima
 
 assertContains(videoGrid, 'mediaStream?: MediaStream | null', 'video tile optional live stream support');
 assertContains(videoGrid, 'srcObject = stream', 'video tile MediaStream binding');
+assertContains(videoGrid, 'srcObject = null', 'video tile MediaStream detaches on unmount');
+assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile accessible live preview label');
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');
 assertContains(videoGrid, "data-video-tile-variant", 'video tile variant semantic marker');
 assertContains(videoGrid, "variant?: 'participant-sidebar' | 'host-strip' | 'host-gallery'", 'video grid supported layout variants');
+assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

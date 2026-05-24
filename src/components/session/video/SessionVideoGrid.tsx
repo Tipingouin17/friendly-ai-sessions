@@ -65,8 +65,12 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   React.useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.srcObject = stream;
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    videoElement.srcObject = stream;
+    return () => {
+      videoElement.srcObject = null;
+    };
   }, [stream]);
 
   return (

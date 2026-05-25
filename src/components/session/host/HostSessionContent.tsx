@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Activity, Brain, Clock3, LayoutGrid, MessageSquare, MonitorUp, Sparkles, Users } from "lucide-react";
+import { Activity, Brain, Clock3, LayoutGrid, MessageSquare, MonitorUp, Sparkles, Users, Video, VideoOff } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -135,6 +135,12 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 }) => {
   const [videoLayout, setVideoLayout] = React.useState<'spotlight' | 'gallery'>('spotlight');
   const [pinnedTileId, setPinnedTileId] = React.useState<string | null>(null);
+  const [hostCameraStream, setHostCameraStream] = React.useState<MediaStream | null>(null);
+  const [hostCameraStatus, setHostCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
+  const [hostCameraError, setHostCameraError] = React.useState<string | null>(null);
+  const hostCameraStreamRef = React.useRef<MediaStream | null>(null);
+  const hostCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
+  const hostCameraRequestIdRef = React.useRef(0);
   const actualParticipantCount = participants.length;
   const responseTotal = Math.max(totalParticipants, actualParticipantCount, 1);
   const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
@@ -142,12 +148,97 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
+  const stopHostCamera = React.useCallback(() => {
+    hostCameraRequestIdRef.current += 1;
+    hostCameraStartPromiseRef.current = null;
+    if (hostCameraStreamRef.current) {
+      hostCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      hostCameraStreamRef.current = null;
+    }
+    setHostCameraStream(null);
+    setHostCameraStatus('off');
+  }, []);
+
+  const startHostCamera = React.useCallback(async () => {
+    if (hostCameraStreamRef.current) {
+      setHostCameraStatus('on');
+      return hostCameraStreamRef.current;
+    }
+    if (hostCameraStartPromiseRef.current) return hostCameraStartPromiseRef.current;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setHostCameraStatus('unsupported');
+      setHostCameraError('Camera is not supported in this browser.');
+      return null;
+    }
+
+    const requestId = hostCameraRequestIdRef.current + 1;
+    hostCameraRequestIdRef.current = requestId;
+    setHostCameraStatus('starting');
+    setHostCameraError(null);
+
+    const startPromise = navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 } },
+      audio: false,
+    }).then((stream) => {
+      if (hostCameraRequestIdRef.current !== requestId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return null;
+      }
+      if (hostCameraStreamRef.current && hostCameraStreamRef.current !== stream) {
+        hostCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      hostCameraStreamRef.current = stream;
+      setHostCameraStream(stream);
+      setHostCameraStatus('on');
+      return stream;
+    }).catch((error) => {
+      if (hostCameraRequestIdRef.current !== requestId) return null;
+      console.error('Error accessing host camera:', error);
+      hostCameraStreamRef.current = null;
+      setHostCameraStream(null);
+      setHostCameraStatus('blocked');
+      setHostCameraError('Camera access was blocked. Allow camera permission in your browser to appear on video.');
+      return null;
+    }).finally(() => {
+      if (hostCameraStartPromiseRef.current === startPromise) {
+        hostCameraStartPromiseRef.current = null;
+      }
+    });
+
+    hostCameraStartPromiseRef.current = startPromise;
+    return startPromise;
+  }, []);
+
+  const toggleHostCamera = React.useCallback(() => {
+    if (hostCameraStreamRef.current) {
+      stopHostCamera();
+      return;
+    }
+    if (hostCameraStartPromiseRef.current) return;
+    void startHostCamera();
+  }, [startHostCamera, stopHostCamera]);
+
+  React.useEffect(() => {
+    return () => {
+      hostCameraRequestIdRef.current += 1;
+      hostCameraStartPromiseRef.current = null;
+      if (hostCameraStreamRef.current) {
+        hostCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        hostCameraStreamRef.current = null;
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (isSessionEnded) stopHostCamera();
+  }, [isSessionEnded, stopHostCamera]);
+
   const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;
   const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
-    localStream: null,
+    localStream: hostCameraStream,
     enabled: shouldEnableHostVideoRoom,
   });
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
@@ -167,6 +258,18 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       isMuted: false,
       isSpeaking: latestSessionMessage?.sender === 'assistant',
       accentColor: 'rgb(217 119 6)',
+    },
+    {
+      id: 'host-self',
+      name: 'Host (You)',
+      initials: 'H',
+      mediaStream: hostCameraStream,
+      isYou: true,
+      isMuted: true,
+      isSpeaking: hostCameraStatus === 'on',
+      connectionStatus: hostCameraStatus === 'blocked' ? 'failed' : hostCameraStatus === 'unsupported' ? 'unsupported' : hostCameraStatus === 'starting' ? 'connecting' : hostCameraStatus === 'off' ? 'idle' : undefined,
+      connectionStatusLabel: hostCameraStatus === 'blocked' ? 'Camera blocked' : hostCameraStatus === 'unsupported' ? 'Camera unsupported' : hostCameraStatus === 'starting' ? 'Starting camera…' : hostCameraStatus === 'off' ? 'Camera off' : undefined,
+      accentColor: 'rgb(79 70 229)',
     },
     ...participants.map((participant) => {
       const remoteStream = remoteStreams[String(participant.id)] ?? null;
@@ -253,7 +356,17 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Video room</p>
                   <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery · {videoRoomStatusLabel}.</p>
                 </div>
-                <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleHostCamera}
+                    disabled={hostCameraStatus === 'starting'}
+                    className={`session-control-button inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${hostCameraStream ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'} disabled:cursor-wait disabled:opacity-70`}
+                  >
+                    {hostCameraStream ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+                    {hostCameraStatus === 'starting' ? 'Starting…' : hostCameraStream ? 'Camera on' : 'Camera off'}
+                  </button>
+                  <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
                   <button
                     type="button"
                     onClick={() => setVideoLayout('spotlight')}
@@ -270,8 +383,13 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                     <LayoutGrid className="h-3.5 w-3.5" />
                     Gallery
                   </button>
+                  </div>
                 </div>
               </div>
+
+              {hostCameraError && (
+                <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{hostCameraError}</p>
+              )}
 
               {videoLayout === 'gallery' ? (
                 <div>

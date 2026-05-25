@@ -121,6 +121,7 @@ interface PeerNegotiationOptions {
 }
 
 const WEBRTC_EVENT_TYPE = 'webrtc_signal';
+export const HOST_VIDEO_STREAM_KEY = 'host';
 const HOST_PEER_ID = 'host';
 const WEBRTC_SIGNAL_RETENTION_MS = 30 * 60 * 1000;
 const WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -347,7 +348,7 @@ export function useWebRTCSession({
     preferredStream?: MediaStream | null,
   ): boolean => {
     const sourceParticipantId = record.participantId;
-    if (sourceParticipantId === null) return false;
+    const streamKey = sourceParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(sourceParticipantId);
 
     const receiverTracks = record.connection.getReceivers()
       .map((receiver) => receiver.track)
@@ -368,9 +369,8 @@ export function useWebRTCSession({
 
     record.remoteStream = stream;
     setRemoteStreams((previous) => {
-      const key = String(sourceParticipantId);
-      if (previous[key] === stream) return previous;
-      return { ...previous, [key]: stream };
+      if (previous[streamKey] === stream) return previous;
+      return { ...previous, [streamKey]: stream };
     });
     updatePeerStatus(record, true);
     return true;
@@ -378,9 +378,8 @@ export function useWebRTCSession({
 
   const removeRemoteStream = useCallback((peerId: string) => {
     const remoteParticipantId = parseParticipantIdFromPeerId(peerId);
-    if (remoteParticipantId === null) return;
+    const key = remoteParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(remoteParticipantId);
     setRemoteStreams((previous) => {
-      const key = String(remoteParticipantId);
       if (!previous[key]) return previous;
       const next = { ...previous };
       delete next[key];

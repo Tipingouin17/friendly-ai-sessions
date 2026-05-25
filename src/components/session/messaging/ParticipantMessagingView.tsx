@@ -21,7 +21,7 @@ import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
-import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
+import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
 interface ParticipantMessagingViewProps {
@@ -394,7 +394,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     localStream: localCameraStream,
     enabled: !isSessionEnded,
   });
-  const participantVideoTiles: SessionVideoParticipant[] = orderedVideoParticipants.map((participant) => {
+  const hostRemoteStream = remoteStreams[HOST_VIDEO_STREAM_KEY] ?? null;
+  const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
+  const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
+  const hostVideoTile: SessionVideoParticipant = {
+    id: HOST_VIDEO_STREAM_KEY,
+    name: 'Host',
+    initials: 'H',
+    mediaStream: hostRemoteStream,
+    isMuted: true,
+    isSpeaking: Boolean(hostRemoteStream),
+    connectionStatus: hostTileConnectionStatus,
+    connectionStatusLabel: formatPeerTileStatusLabel(hostTileConnectionStatus),
+    accentColor: 'rgb(79 70 229)',
+  };
+
+  const participantVideoTiles: SessionVideoParticipant[] = [hostVideoTile, ...orderedVideoParticipants.map((participant) => {
     const isCurrentUser = participant.id === effectiveParticipantId;
     const remoteStream = remoteStreams[String(participant.id)] ?? null;
     const peerStatus = peerStatuses[`participant-${participant.id}`];
@@ -413,7 +428,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       connectionStatus: tileConnectionStatus,
       connectionStatusLabel: tileConnectionStatus ? formatPeerTileStatusLabel(tileConnectionStatus) : undefined,
     };
-  });
+  })];
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream);
   const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);

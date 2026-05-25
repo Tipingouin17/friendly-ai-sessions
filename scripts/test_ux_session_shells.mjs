@@ -125,6 +125,7 @@ assertContains(webRTCSessionHook, 'remoteCandidateTypes', 'WebRTC hook captures 
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
 assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');
+assertContains(webRTCSessionHook, 'if (!isLocalOffererForPeer(peerId)) return;', 'WebRTC createOffer is guarded so non-offerer reconnect paths cannot create glare');
 assertContains(participantView, 'resolvePositiveParticipantId', 'Participant video shell rejects participant-0 identity fallbacks');
 assertContains(participantView, 'getParticipantIdFromUrl', 'Participant video shell can recover the joined participant id from the URL');
 assertContains(participantView, 'firstKnownParticipantId', 'Participant video shell falls back to the known participant record when identity is delayed');

@@ -568,6 +568,7 @@ export function useWebRTCSession({
   }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, syncLocalStreamToPeer]);
 
   const createOffer = useCallback(async (peerId: string, options: PeerNegotiationOptions = {}) => {
+    if (!isLocalOffererForPeer(peerId)) return;
     const record = getOrCreatePeer(peerId);
     if (!record || record.connection.signalingState !== 'stable') return;
     if (record.offerInProgress) {
@@ -603,7 +604,7 @@ export function useWebRTCSession({
         schedulePeerRenegotiation(peerId, queuedRenegotiation);
       }
     }
-  }, [getOrCreatePeer, isCurrentPeerRecord, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
+  }, [getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
 
   useEffect(() => {
     renegotiatePeerRef.current = createOffer;

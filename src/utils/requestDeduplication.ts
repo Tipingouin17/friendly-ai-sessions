@@ -49,10 +49,19 @@ class RequestDeduplicator {
       });
     }
 
-    // Clean up after completion (success or failure)
-    promise.finally(() => {
-      this.pendingRequests.delete(key);
-    });
+    // Clean up after completion (success or failure) without creating a
+    // secondary rejected promise from Promise.prototype.finally.  The caller
+    // already awaits/handles `promise`; attaching `finally` directly can still
+    // surface an unhandled rejection when the original operation is cancelled
+    // during participant join/unmount.
+    void promise.then(
+      () => {
+        this.pendingRequests.delete(key);
+      },
+      () => {
+        this.pendingRequests.delete(key);
+      }
+    );
 
     return promise;
   }

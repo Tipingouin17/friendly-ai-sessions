@@ -16,6 +16,7 @@ const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService
 const apiClient = read('src/lib/api.ts');
 const vercelConfig = read('vercel.json');
 const realtimeHelpers = read('src/utils/realtimeHelpers.ts');
+const requestDeduplication = read('src/utils/requestDeduplication.ts');
 const fastApiServer = read('supabase_proxy/server_fastapi.py');
 
 const assertContains = (source, needle, label) => {
@@ -166,5 +167,7 @@ assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-produ
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 assertContains(realtimeHelpers, 'void Promise.resolve(channel.unsubscribe()).catch(swallowExpectedRemovalError)', 'realtime helper catches async unsubscribe abort rejections');
 assertContains(realtimeHelpers, 'void Promise.resolve(api.removeChannel(channel)).catch(swallowExpectedRemovalError)', 'realtime helper catches async removeChannel abort rejections');
+assertContains(requestDeduplication, 'void promise.then(', 'request deduplication cleanup handles rejected participant-load promises without creating unhandled finally rejections');
+assertNotContains(requestDeduplication, 'promise.finally(', 'request deduplication must not attach bare finally cleanup to abortable participant-load promises');
 
 console.log('UX session shell regression checks passed.');

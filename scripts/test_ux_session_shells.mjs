@@ -103,7 +103,7 @@ assertContains(webRTCSessionHook, 'WEBRTC_CAMERA_READY_BURST_COUNT', 'WebRTC hoo
 assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS', 'WebRTC hook polls recent persisted signals to recover missed realtime inserts');
 assertContains(webRTCSessionHook, 'catchUpRecentSignals', 'WebRTC hook has a missed-signal catch-up path for late host/participant tabs');
 assertContains(webRTCSessionHook, 'rememberSignal', 'WebRTC hook deduplicates realtime and catch-up signaling events');
-assertContains(webRTCSessionHook, "connection.addTransceiver('video', { direction: 'recvonly' })", 'WebRTC hook creates receive-only video negotiation for host and non-camera peers');
+assertContains(webRTCSessionHook, "connection.addTransceiver('video', { direction: videoTrack ? 'sendrecv' : 'recvonly' })", 'WebRTC hook creates stable video negotiation for camera-on and non-camera peers');
 assertContains(webRTCSessionHook, ".delete()\n      .eq('conversation_id', conversationId)\n      .eq('event_type', WEBRTC_EVENT_TYPE)\n      .lt('created_at', cutoff)", 'WebRTC hook deletes stale session_events signals');
 assertContains(webRTCSessionHook, 'VITE_WEBRTC_TURN_URLS', 'WebRTC hook supports deploy-time TURN server configuration');
 assertContains(webRTCSessionHook, 'connectionStatus', 'WebRTC hook returns room-level connection status');

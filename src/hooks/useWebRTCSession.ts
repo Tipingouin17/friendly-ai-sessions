@@ -259,15 +259,6 @@ export function useWebRTCSession({
     }
   }, [updatePeerStatus]);
 
-  useEffect(() => {
-    localStreamRef.current = localStream;
-    peersRef.current.forEach((record, peerId) => {
-      void syncLocalStreamToPeer(record, localStream).then(() => {
-        if (isLocalOffererForPeer(peerId)) schedulePeerRenegotiation(peerId);
-      });
-    });
-  }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, syncLocalStreamToPeer]);
-
   const removeRemoteStream = useCallback((peerId: string) => {
     const remoteParticipantId = parseParticipantIdFromPeerId(peerId);
     if (remoteParticipantId === null) return;
@@ -474,6 +465,15 @@ export function useWebRTCSession({
     if (!localPeerId) return false;
     return localPeerId.localeCompare(peerId) < 0;
   }, [localPeerId]);
+
+  useEffect(() => {
+    localStreamRef.current = localStream;
+    peersRef.current.forEach((record, peerId) => {
+      void syncLocalStreamToPeer(record, localStream).then(() => {
+        if (isLocalOffererForPeer(peerId)) schedulePeerRenegotiation(peerId);
+      });
+    });
+  }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, syncLocalStreamToPeer]);
 
   const createOffer = useCallback(async (peerId: string, options: PeerNegotiationOptions = {}) => {
     const record = getOrCreatePeer(peerId);

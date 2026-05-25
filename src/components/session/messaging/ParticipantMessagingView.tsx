@@ -124,6 +124,89 @@ const getParticipantIdFromUrl = (): number | null => {
 
 const PARTICIPANT_CAMERA_INTENT_PREFIX = 'participantCameraEnabled';
 
+type LegacyActiveModeFields = {
+  name?: string | null;
+  mode_key?: string | null;
+  mode_slug?: string | null;
+};
+
+type LegacyEnabledModeFields = {
+  name?: string | null;
+  mode_slug?: string | null;
+};
+
+type ModeChoice = {
+  id: string;
+  label: string;
+  description?: string;
+  value: unknown;
+};
+
+const titleizeModeKey = (modeKey: string | null | undefined): string => {
+  if (!modeKey) return 'Open Discussion';
+  return modeKey
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+};
+
+const stringifyModeChoice = (choice: unknown): string => {
+  if (choice === null || choice === undefined) return '';
+  if (typeof choice === 'string' || typeof choice === 'number' || typeof choice === 'boolean') return String(choice);
+  if (typeof choice === 'object') {
+    const record = choice as Record<string, unknown>;
+    const label = record.label ?? record.title ?? record.name ?? record.choice ?? record.value ?? record.id;
+    return stringifyModeChoice(label);
+  }
+  return '';
+};
+
+const normalizeModeChoices = (options: Record<string, unknown> | unknown): ModeChoice[] => {
+  const optionRecord = options && typeof options === 'object' && !Array.isArray(options) ? options as Record<string, unknown> : null;
+  const rawChoices = Array.isArray(options)
+    ? options
+    : [optionRecord?.choices, optionRecord?.options, optionRecord?.items, optionRecord?.vote_options]
+      .find((candidate): candidate is unknown[] => Array.isArray(candidate));
+
+  if (!rawChoices) return [];
+
+  return rawChoices
+    .map((choice, index) => {
+      const label = stringifyModeChoice(choice).trim();
+      if (!label) return null;
+      const record = typeof choice === 'object' && choice !== null ? choice as Record<string, unknown> : null;
+      const id = stringifyModeChoice(record?.id ?? record?.value ?? label).trim() || `${index}`;
+      const description = stringifyModeChoice(record?.description ?? record?.help_text ?? record?.subtitle).trim() || undefined;
+      return { id, label, description, value: choice } satisfies ModeChoice;
+    })
+    .filter((choice): choice is ModeChoice => Boolean(choice));
+};
+
+const getParticipantModeInstruction = (modeKey: string, composerCopy?: string | null): string => {
+  if (composerCopy?.trim()) return composerCopy.trim();
+  if (modeKey === 'voting') return 'Choose the option that best represents your view.';
+  if (modeKey === 'round_robin') return 'The facilitator is guiding participants through turns.';
+  if (modeKey === 'reflection' || modeKey === 'silent_response') return 'Take a quiet moment to write your response before the group continues.';
+  return 'Share your response when you are ready.';
+};
+
+const getModePlaceholder = (modeKey: string, composerCopy?: string | null): string => {
+  if (composerCopy?.trim()) return composerCopy.trim();
+  if (modeKey === 'round_robin') return 'Your turn will open when the facilitator calls on you…';
+  if (modeKey === 'reflection') return 'Write a thoughtful reflection…';
+  if (modeKey === 'silent_response') return 'Write your quiet response…';
+  if (modeKey === 'voting') return 'Add optional context for your vote…';
+  return 'Type your response…';
+};
+
+const formatRemainingTime = (seconds: number | null | undefined): string | null => {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return null;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
 const getParticipantCameraIntentKey = (conversationId: number | null, participantId: number): string | null => {
   if (!conversationId || !participantId) return null;
   return `${PARTICIPANT_CAMERA_INTENT_PREFIX}:${conversationId}:${participantId}`;
@@ -204,6 +287,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const [submittingChoiceId, setSubmittingChoiceId] = React.useState<string | null>(null);
+  const [submittedChoiceId, setSubmittedChoiceId] = React.useState<string | null>(null);
+  const [modeInputError, setModeInputError] = React.useState<string | null>(null);
   const localCameraStreamRef = React.useRef<MediaStream | null>(null);
   const localCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
   const localCameraRequestIdRef = React.useRef(0);
@@ -263,7 +349,28 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     : facilitatorRuntime?.avatarState ?? null;
   const showRuntimeAvatarState = Boolean((facilitatorRuntime?.enabled && runtimeAvatarState) || voiceRuntime.isSpeaking);
   const aiIsSpeaking = Boolean(voiceRuntime.isSpeaking || runtimeAvatarState?.state === 'speaking');
-  const modeLabel = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || 'Open Discussion';
+  const legacyActiveMode = activeMode as (SessionActiveMode & LegacyActiveModeFields) | null;
+  const modeKey = activeMode?.facilitation_mode?.mode_key
+    ?? legacyActiveMode?.mode_key
+    ?? legacyActiveMode?.mode_slug
+    ?? 'open_discussion';
+  const enabledModeDefinition = enabledModes.find((mode) => {
+    const legacyMode = mode as FacilitatorModeAssignment & LegacyEnabledModeFields;
+    return mode.mode_key === modeKey || legacyMode.mode_slug === modeKey;
+  });
+  const modeLabel = activeMode?.facilitation_mode?.display_name
+    ?? legacyActiveMode?.name
+    ?? enabledModeDefinition?.display_name
+    ?? (enabledModeDefinition as (FacilitatorModeAssignment & LegacyEnabledModeFields) | undefined)?.name
+    ?? titleizeModeKey(modeKey);
+  const modeComposerCopy = activeMode?.facilitation_mode?.composer_copy ?? null;
+  const modeInstruction = getParticipantModeInstruction(modeKey, modeComposerCopy);
+  const modePlaceholder = getModePlaceholder(modeKey, modeComposerCopy);
+  const modeChoices = React.useMemo(() => normalizeModeChoices(activeMode?.options ?? {}), [activeMode?.options]);
+  const remainingTimeLabel = formatRemainingTime(participantModeState?.remaining_time);
+  const modeCanSubmit = participantModeState?.can_submit ?? true;
+  const isVotingMode = modeKey === 'voting';
+  const isRoundRobinMode = modeKey === 'round_robin';
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
@@ -283,6 +390,34 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
+  const hasSubmittedModeChoice = Boolean(submittedChoiceId);
+  const modeComposerDisabled = Boolean(activeMode && (!modeCanSubmit || hasRegisteredResponse || hasSubmittedModeChoice || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
+  const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice) => {
+    if (!submitModeInput || !modeCanSubmit || hasRegisteredResponse || hasSubmittedModeChoice) return;
+    setModeInputError(null);
+    setSubmittingChoiceId(choice.id);
+    try {
+      await submitModeInput({
+        inputType: 'vote',
+        content: {
+          choice: choice.label,
+          value: choice.value,
+          modeKey,
+        },
+        visibility: 'anonymous_aggregate',
+      });
+      setSubmittedChoiceId(choice.id);
+    } catch (error) {
+      console.error('Failed to submit voting choice:', error);
+      setModeInputError('We could not submit that choice. Please try again.');
+    } finally {
+      setSubmittingChoiceId(null);
+    }
+  }, [hasRegisteredResponse, hasSubmittedModeChoice, modeCanSubmit, modeKey, submitModeInput]);
+  React.useEffect(() => {
+    setSubmittedChoiceId(null);
+    setModeInputError(null);
+  }, [activeMode?.id]);
   const stopLocalCamera = React.useCallback(() => {
     localCameraRequestIdRef.current += 1;
     localCameraStartPromiseRef.current = null;
@@ -624,8 +759,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 </span>
               </div>
               <p className="text-sm font-medium leading-relaxed text-slate-700 md:text-base">
-                {latestAssistantMessage?.content || 'The AI facilitator is preparing the next question for the room.'}
+                {latestAssistantMessage?.content || activeMode?.prompt || 'The AI facilitator is preparing the next question for the room.'}
               </p>
+              {activeMode && (
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                  {modeInstruction}
+                </p>
+              )}
               <div className="mt-4 flex items-center gap-3">
                 <div className="session-progress-track h-1.5 flex-1 overflow-hidden rounded-full">
                   <div className="session-progress-fill h-full rounded-full transition-all duration-700" style={{ width: `${responseProgress}%` }} />
@@ -649,6 +789,82 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     Your answer has been submitted. Waiting for the rest of the room before the facilitator continues.
                   </p>
                 )}
+              </div>
+            )}
+
+            {activeMode && (!hasRegisteredResponse || hasSubmittedModeChoice) && (
+              <div className="session-soft-panel mt-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm md:p-4">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-500">Response mode</p>
+                    <h3 className="mt-1 text-sm font-bold text-slate-950">{modeLabel}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{modeInstruction}</p>
+                  </div>
+                  {remainingTimeLabel && (
+                    <span className="session-chip w-fit border-amber-200 bg-amber-50 text-amber-700">
+                      {remainingTimeLabel} left
+                    </span>
+                  )}
+                </div>
+
+                {isVotingMode ? (
+                  <div className="space-y-3">
+                    {hasSubmittedModeChoice ? (
+                      <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Your vote is registered.
+                      </div>
+                    ) : modeChoices.length > 0 ? (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {modeChoices.map((choice) => {
+                          const isSubmittingThisChoice = submittingChoiceId === choice.id;
+                          const disableChoice = !submitModeInput || !modeCanSubmit || hasRegisteredResponse || Boolean(submittingChoiceId);
+                          return (
+                            <button
+                              key={choice.id}
+                              type="button"
+                              onClick={() => void handleSubmitModeChoice(choice)}
+                              disabled={disableChoice}
+                              className="session-control-button rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <span className="block text-sm font-bold text-slate-900">{isSubmittingThisChoice ? 'Submitting…' : choice.label}</span>
+                              {choice.description && <span className="mt-1 block text-xs leading-relaxed text-slate-500">{choice.description}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        Voting is active, but no choice list has been provided yet. Use the response box below if the facilitator asks for written input.
+                      </p>
+                    )}
+                    {!modeCanSubmit && !hasSubmittedModeChoice && (
+                      <p className="text-xs font-medium text-slate-500">Voting is not open for you at this moment.</p>
+                    )}
+                  </div>
+                ) : isRoundRobinMode ? (
+                  <div className={`rounded-2xl border px-3 py-3 ${participantModeState?.is_current_speaker ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : participantModeState?.is_next ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                    <p className="text-sm font-bold">
+                      {participantModeState?.is_current_speaker ? 'Your turn' : participantModeState?.is_next ? "You're next" : 'Waiting for your turn'}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed">
+                      {participantModeState?.is_current_speaker
+                        ? 'The composer is open for your response.'
+                        : participantModeState?.is_next
+                        ? 'Get ready; the facilitator will invite you shortly.'
+                        : 'The composer will unlock when it is your turn to contribute.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {modeKey === 'reflection' || modeKey === 'silent_response' ? 'Quiet response' : 'Open response'}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{modePlaceholder}</p>
+                  </div>
+                )}
+
+                {modeInputError && <p className="mt-3 text-xs font-semibold text-rose-600">{modeInputError}</p>}
               </div>
             )}
           </section>
@@ -684,7 +900,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 currentUserParticipantId={effectiveParticipantId}
                 isAnonymous={isAnonymous}
                 toggleAnonymous={toggleAnonymous}
-                hasAnswered={hasAnswered}
+                hasAnswered={hasAnswered || hasRegisteredResponse || hasSubmittedModeChoice}
                 totalResponses={totalResponses}
                 viewMode={viewMode}
                 messages={messages}
@@ -694,6 +910,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
                 onSpeechInterim={handleSpeechInterim}
                 onSpeechFinal={handleSpeechFinal}
+                placeholder={modePlaceholder}
+                disabled={modeComposerDisabled}
               />
             </div>
           )}

@@ -43,6 +43,8 @@ interface InputFooterProps {
   speechLanguage?: string;
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
   onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
+  placeholder?: string;
+  disabled?: boolean;
 }
 
 const InputFooter = ({
@@ -69,6 +71,8 @@ const InputFooter = ({
   speechLanguage = 'en-US',
   onSpeechInterim,
   onSpeechFinal,
+  placeholder = "Type your response…",
+  disabled = false,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -119,7 +123,8 @@ const InputFooter = ({
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const shouldAllowAnswer = (lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered)
     && !isPaused
-    && !isSkipped;
+    && !isSkipped
+    && !disabled;
 
   // Count how many questions this participant has sent
   const participantKey = String(effectiveParticipantId);
@@ -184,7 +189,7 @@ const InputFooter = ({
                 onSendMessage={onSendMessage}
                 isRecording={isRecording}
                 setIsRecording={setIsRecording}
-                placeholder="Type your response…"
+                placeholder={placeholder}
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
                 speechEnabled={speechEnabled}

@@ -17,6 +17,7 @@ import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
+import WebRTCDiagnosticsPanel from "@/components/session/video/WebRTCDiagnosticsPanel";
 import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from "@/hooks/useWebRTCSession";
 
 interface HostSessionContentProps {
@@ -143,7 +144,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
   const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;
-  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
+  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount, diagnostics } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
@@ -274,13 +275,22 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               </div>
 
               {videoLayout === 'gallery' ? (
-                <SessionVideoGrid
-                  participants={hostVideoParticipants}
-                  variant="host-gallery"
-                  showResponseStatus
-                  onPin={setPinnedTileId}
-                  className="max-h-[360px] overflow-y-auto pr-1"
-                />
+                <div>
+                  <SessionVideoGrid
+                    participants={hostVideoParticipants}
+                    variant="host-gallery"
+                    showResponseStatus
+                    onPin={setPinnedTileId}
+                    className="max-h-[360px] overflow-y-auto pr-1"
+                  />
+                  <WebRTCDiagnosticsPanel
+                    diagnostics={diagnostics}
+                    peerStatuses={peerStatuses}
+                    connectionStatus={connectionStatus}
+                    activePeerCount={activePeerCount}
+                    className="mt-3"
+                  />
+                </div>
               ) : (
                 <div>
                   <SessionVideoTile
@@ -295,6 +305,13 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                     showResponseStatus
                     onPin={setPinnedTileId}
                     emptyLabel="Participant thumbnails will appear here as people join."
+                    className="mt-3"
+                  />
+                  <WebRTCDiagnosticsPanel
+                    diagnostics={diagnostics}
+                    peerStatuses={peerStatuses}
+                    connectionStatus={connectionStatus}
+                    activePeerCount={activePeerCount}
                     className="mt-3"
                   />
                 </div>

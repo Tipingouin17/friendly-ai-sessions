@@ -28,8 +28,38 @@ export interface WebRTCPeerStatus {
   connectionState: RTCPeerConnectionState;
   iceConnectionState: RTCIceConnectionState;
   signalingState: RTCSignalingState;
+  iceGatheringState: RTCIceGatheringState;
   hasRemoteStream: boolean;
+  localCandidateTypes: string[];
+  remoteCandidateTypes: string[];
+  pendingRemoteCandidateCount: number;
+  lastSignalAt: string | null;
+  lastIceCandidateAt: string | null;
   updatedAt: string;
+}
+
+export interface WebRTCIceServerDiagnostic {
+  urls: string[];
+  hasUsername: boolean;
+  hasCredential: boolean;
+}
+
+export interface WebRTCStreamDiagnostic {
+  hasStream: boolean;
+  active: boolean;
+  videoTracks: number;
+  audioTracks: number;
+  trackStates: string[];
+}
+
+export interface WebRTCDiagnostics {
+  localPeerId: string | null;
+  remotePeerIds: string[];
+  hasRealtimeSupport: boolean;
+  isSignalingConnected: boolean;
+  localStream: WebRTCStreamDiagnostic;
+  remoteStreamCount: number;
+  iceServers: WebRTCIceServerDiagnostic[];
 }
 
 interface WebRTCSignalPayload {
@@ -68,6 +98,7 @@ interface UseWebRTCSessionResult {
   connectionStatus: WebRTCConnectionStatus;
   peerStatuses: Record<string, WebRTCPeerStatus>;
   activePeerCount: number;
+  diagnostics: WebRTCDiagnostics;
 }
 
 interface PeerRecord {
@@ -77,6 +108,10 @@ interface PeerRecord {
   videoTransceiver?: RTCRtpTransceiver;
   offerInProgress?: boolean;
   queuedRenegotiation?: PeerNegotiationOptions;
+  localCandidateTypes: Set<string>;
+  remoteCandidateTypes: Set<string>;
+  lastSignalAt: string | null;
+  lastIceCandidateAt: string | null;
 }
 
 interface PeerNegotiationOptions {
@@ -124,6 +159,28 @@ const buildIceServers = (): RTCIceServer[] => {
 
 const ICE_CONFIGURATION: RTCConfiguration = {
   iceServers: buildIceServers(),
+};
+
+const describeIceServers = (servers: RTCIceServer[] | undefined): WebRTCIceServerDiagnostic[] => {
+  return (servers ?? []).map((server) => ({
+    urls: Array.isArray(server.urls) ? server.urls : [server.urls],
+    hasUsername: Boolean(server.username),
+    hasCredential: Boolean(server.credential),
+  }));
+};
+
+const summarizeStream = (stream: MediaStream | null): WebRTCStreamDiagnostic => ({
+  hasStream: Boolean(stream),
+  active: Boolean(stream?.active),
+  videoTracks: stream?.getVideoTracks().length ?? 0,
+  audioTracks: stream?.getAudioTracks().length ?? 0,
+  trackStates: stream?.getTracks().map((track) => `${track.kind}:${track.readyState}${track.enabled ? ':enabled' : ':disabled'}`) ?? [],
+});
+
+const extractCandidateType = (candidate: RTCIceCandidateInit | RTCIceCandidate): string | null => {
+  const candidateText = typeof candidate.candidate === 'string' ? candidate.candidate : '';
+  const typeMatch = candidateText.match(/ typ ([a-z0-9-]+)/i);
+  return typeMatch?.[1] ?? null;
 };
 
 const isSignalPayload = (value: unknown): value is WebRTCSignalPayload => {
@@ -208,7 +265,13 @@ export function useWebRTCSession({
         connectionState: connection.connectionState,
         iceConnectionState: connection.iceConnectionState,
         signalingState: connection.signalingState,
+        iceGatheringState: connection.iceGatheringState,
         hasRemoteStream: hasRemoteStream ?? previous[peerId]?.hasRemoteStream ?? false,
+        localCandidateTypes: Array.from(record.localCandidateTypes).sort(),
+        remoteCandidateTypes: Array.from(record.remoteCandidateTypes).sort(),
+        pendingRemoteCandidateCount: pendingCandidatesRef.current.get(peerId)?.length ?? 0,
+        lastSignalAt: record.lastSignalAt,
+        lastIceCandidateAt: record.lastIceCandidateAt,
         updatedAt: new Date().toISOString(),
       },
     }));
@@ -378,6 +441,11 @@ export function useWebRTCSession({
     }
   }, [conversationId, localPeerId, participantId, role]);
 
+  const isLocalOffererForPeer = useCallback((peerId: string): boolean => {
+    if (!localPeerId) return false;
+    return localPeerId.localeCompare(peerId) < 0;
+  }, [localPeerId]);
+
   const flushPendingCandidates = useCallback(async (peerId: string, connection: RTCPeerConnection) => {
     if (!connection.remoteDescription) return;
     const pending = pendingCandidatesRef.current.get(peerId) ?? [];
@@ -400,18 +468,34 @@ export function useWebRTCSession({
 
     const connection = new RTCPeerConnection(ICE_CONFIGURATION);
     const remoteParticipantId = parseParticipantIdFromPeerId(peerId);
-    const record: PeerRecord = { peerId, participantId: remoteParticipantId, connection };
+    const record: PeerRecord = {
+      peerId,
+      participantId: remoteParticipantId,
+      connection,
+      localCandidateTypes: new Set<string>(),
+      remoteCandidateTypes: new Set<string>(),
+      lastSignalAt: null,
+      lastIceCandidateAt: null,
+    };
     peersRef.current.set(peerId, record);
     updatePeerStatus(record);
 
-    void syncLocalStreamToPeer(record, localStreamRef.current);
+    if (isLocalOffererForPeer(peerId)) {
+      void syncLocalStreamToPeer(record, localStreamRef.current);
+    }
 
     connection.onicecandidate = (event) => {
       if (event.candidate) {
+        const candidateType = extractCandidateType(event.candidate);
+        if (candidateType) record.localCandidateTypes.add(candidateType);
+        record.lastIceCandidateAt = new Date().toISOString();
+        updatePeerStatus(record);
         void sendSignal(peerId, {
           signalType: 'ice-candidate',
           candidate: event.candidate.toJSON(),
         });
+      } else {
+        updatePeerStatus(record);
       }
     };
 
@@ -449,7 +533,7 @@ export function useWebRTCSession({
     connection.onsignalingstatechange = () => updatePeerStatus(record);
 
     return record;
-  }, [armIceStallTimer, clearPeerTimers, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
+  }, [armIceStallTimer, clearPeerTimers, isLocalOffererForPeer, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
 
   const closePeer = useCallback((peerId: string) => {
     const record = peersRef.current.get(peerId);
@@ -471,11 +555,6 @@ export function useWebRTCSession({
     });
     removeRemoteStream(peerId);
   }, [clearPeerTimers, removeRemoteStream]);
-
-  const isLocalOffererForPeer = useCallback((peerId: string): boolean => {
-    if (!localPeerId) return false;
-    return localPeerId.localeCompare(peerId) < 0;
-  }, [localPeerId]);
 
   useEffect(() => {
     localStreamRef.current = localStream;
@@ -562,7 +641,10 @@ export function useWebRTCSession({
           }
         }
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        record.lastSignalAt = new Date().toISOString();
         await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        await syncLocalStreamToPeer(record, localStreamRef.current);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
         await flushPendingCandidates(signal.fromPeerId, record.connection);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
@@ -582,6 +664,7 @@ export function useWebRTCSession({
 
       if (signal.signalType === 'answer' && signal.sdp) {
         if (record.connection.signalingState === 'have-local-offer' || !record.connection.currentRemoteDescription) {
+          record.lastSignalAt = new Date().toISOString();
           await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
           await flushPendingCandidates(signal.fromPeerId, record.connection);
@@ -592,6 +675,9 @@ export function useWebRTCSession({
       }
 
       if (signal.signalType === 'ice-candidate' && signal.candidate) {
+        const candidateType = extractCandidateType(signal.candidate);
+        if (candidateType) record.remoteCandidateTypes.add(candidateType);
+        record.lastSignalAt = new Date().toISOString();
         if (record.connection.remoteDescription) {
           await record.connection.addIceCandidate(new RTCIceCandidate(signal.candidate));
           if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
@@ -600,13 +686,14 @@ export function useWebRTCSession({
           const pending = pendingCandidatesRef.current.get(signal.fromPeerId) ?? [];
           pending.push(signal.candidate);
           pendingCandidatesRef.current.set(signal.fromPeerId, pending);
+          updatePeerStatus(record);
         }
       }
     } catch (error) {
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, updatePeerStatus]);
+  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;
@@ -745,12 +832,23 @@ export function useWebRTCSession({
     return summarizeConnectionStatus(enabled, hasRealtimeSupport, isSignalingConnected, peerStatuses);
   }, [enabled, hasRealtimeSupport, isSignalingConnected, peerStatuses]);
 
+  const diagnostics = useMemo<WebRTCDiagnostics>(() => ({
+    localPeerId,
+    remotePeerIds,
+    hasRealtimeSupport,
+    isSignalingConnected,
+    localStream: summarizeStream(localStream),
+    remoteStreamCount: Object.keys(remoteStreams).length,
+    iceServers: describeIceServers(ICE_CONFIGURATION.iceServers),
+  }), [hasRealtimeSupport, isSignalingConnected, localPeerId, localStream, remotePeerIds, remoteStreams]);
+
   return {
     remoteStreams,
     isSignalingConnected,
     connectionStatus,
     peerStatuses,
     activePeerCount: Object.keys(peerStatuses).length,
+    diagnostics,
   };
 }
 

@@ -118,6 +118,10 @@ assertContains(webRTCSessionHook, ".delete()\n      .eq('conversation_id', conve
 assertContains(webRTCSessionHook, 'VITE_WEBRTC_TURN_URLS', 'WebRTC hook supports deploy-time TURN server configuration');
 assertContains(webRTCSessionHook, 'connectionStatus', 'WebRTC hook returns room-level connection status');
 assertContains(webRTCSessionHook, 'peerStatuses', 'WebRTC hook returns per-peer connection status');
+assertContains(webRTCSessionHook, 'diagnostics', 'WebRTC hook returns browser-visible diagnostics for video troubleshooting');
+assertContains(webRTCSessionHook, 'localCandidateTypes', 'WebRTC hook captures local ICE candidate types for diagnostics');
+assertContains(webRTCSessionHook, 'remoteCandidateTypes', 'WebRTC hook captures remote ICE candidate types for diagnostics');
+assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(facilitatorVoice, 'waitForVoices', 'facilitator voice waits for async browser voice loading');
 assertContains(facilitatorVoice, 'NATURAL_VOICE_KEYWORDS', 'facilitator voice prefers higher quality browser voices');
 assertContains(facilitatorVoice, 'selectBestVoice', 'facilitator voice uses scored voice selection');
@@ -134,6 +138,10 @@ assertContains(apiClient, 'buildRealtimeSseUrl(topic, token)', 'SSE subscription
 assertContains(apiClient, 'new EventSource(url)', 'Realtime manager opens EventSource using the CORS-safe URL');
 assertContains(apiClient, 'private normalizeFilterValue(col: string, val: unknown): unknown', 'API query builder centralizes table-specific filter serialization');
 assertContains(apiClient, "this.s.table === 'facilitator_tts_events' && col === 'message_id'", 'API query builder serializes facilitator TTS message_id filters as strings');
+assertContains(apiClient, 'private normalizeMutationBody(value: unknown): unknown', 'API query builder normalizes facilitator TTS mutation bodies');
+assertContains(apiClient, 'next.message_id = String(next.message_id)', 'API query builder serializes facilitator TTS message_id mutation bodies as strings');
+assertContains(apiClient, 'filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }', 'Mutation builder serializes generic message_id filters as strings');
+assertContains(apiClient, 'match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${this.normalizeFilterValue(k, v)}`])); return this; }', 'Mutation builder serializes message_id match filters as strings');
 assertContains(vercelConfig, '"source": "/__railway_dev/(.*)"', 'Vercel rewrites development realtime proxy before the SPA catch-all');
 assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-development.up.railway.app/$1"', 'Vercel development proxy targets Railway dev backend');
 assertContains(vercelConfig, '"source": "/__railway_prod/(.*)"', 'Vercel rewrites production realtime proxy before the SPA catch-all');

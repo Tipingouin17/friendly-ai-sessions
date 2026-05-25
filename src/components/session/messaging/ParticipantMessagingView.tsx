@@ -16,6 +16,7 @@ import { useMessageProcessor } from '@/hooks/useMessageProcessor';
 import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video, VideoOff } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
+import WebRTCDiagnosticsPanel from '@/components/session/video/WebRTCDiagnosticsPanel';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
@@ -317,7 +318,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (second.id === effectiveParticipantId) return 1;
     return first.id - second.id;
   });
-  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
+  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount, diagnostics } = useWebRTCSession({
     conversationId,
     role: 'participant',
     participantId: effectiveParticipantId,
@@ -667,6 +668,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
                 {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
               </div>
+              <WebRTCDiagnosticsPanel
+                diagnostics={diagnostics}
+                peerStatuses={peerStatuses}
+                connectionStatus={connectionStatus}
+                activePeerCount={activePeerCount}
+                className="mt-3"
+              />
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto p-3">

@@ -728,23 +728,23 @@ class MutationBuilder<T = Record<string, unknown>> {
   maybeSingle(): this { this.maybeSingleFlag = true; return this; }
   abortSignal(signal: AbortSignal): this { this.abortSignalRef = signal; return this; }
 
-  // Filter methods (same as QueryBuilder) — needed for .update().eq(...) patterns
-  eq(col: string, val: unknown): this {
-    const normalizedValue = this.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
-    this.filters.push([col, `eq.${normalizedValue}`]);
-    return this;
+  private normalizeFilterValue(col: string, val: unknown): unknown {
+    return this.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
   }
-  neq(col: string, val: unknown): this { this.filters.push([col, `neq.${val}`]); return this; }
+
+  // Filter methods (same as QueryBuilder) — needed for .update().eq(...) patterns
+  eq(col: string, val: unknown): this { this.filters.push([col, `eq.${this.normalizeFilterValue(col, val)}`]); return this; }
+  neq(col: string, val: unknown): this { this.filters.push([col, `neq.${this.normalizeFilterValue(col, val)}`]); return this; }
   gt(col: string, val: unknown): this { this.filters.push([col, `gt.${val}`]); return this; }
   gte(col: string, val: unknown): this { this.filters.push([col, `gte.${val}`]); return this; }
   lt(col: string, val: unknown): this { this.filters.push([col, `lt.${val}`]); return this; }
   lte(col: string, val: unknown): this { this.filters.push([col, `lte.${val}`]); return this; }
   like(col: string, p: string): this { this.filters.push([col, `like.${p}`]); return this; }
   ilike(col: string, p: string): this { this.filters.push([col, `ilike.${p}`]); return this; }
-  in(col: string, vals: unknown[]): this { this.filters.push([col, `in.(${vals.join(",")})`]); return this; }
+  in(col: string, vals: unknown[]): this { this.filters.push([col, `in.(${vals.map((val) => this.normalizeFilterValue(col, val)).join(",")})`]); return this; }
   is(col: string, val: null | boolean): this { this.filters.push([col, `is.${val}`]); return this; }
-  filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${val}`]); return this; }
-  match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${v}`])); return this; }
+  filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }
+  match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${this.normalizeFilterValue(k, v)}`])); return this; }
 
   private async exec(): Promise<ApiResponse<T | T[]>> {
     const p = new URLSearchParams();

@@ -74,6 +74,9 @@ interface PeerRecord {
   peerId: string;
   participantId: number | null;
   connection: RTCPeerConnection;
+  videoTransceiver?: RTCRtpTransceiver;
+  offerInProgress?: boolean;
+  queuedRenegotiation?: PeerNegotiationOptions;
 }
 
 interface PeerNegotiationOptions {
@@ -90,6 +93,7 @@ const WEBRTC_CAMERA_READY_BURST_COUNT = 6;
 const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
 const WEBRTC_ICE_RENEGOTIATION_DELAY_MS = 750;
 const WEBRTC_ICE_STALL_TIMEOUT_MS = 12_000;
+const WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS = 45_000;
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 const participantPeerId = (participantId: number): string => `participant-${participantId}`;
@@ -237,9 +241,12 @@ export function useWebRTCSession({
     if (connection.signalingState === 'closed' || connection.connectionState === 'closed') return;
 
     const videoTrack = stream?.getVideoTracks()[0] ?? null;
-    let videoTransceiver = connection.getTransceivers().find((transceiver) => {
-      return transceiver.sender.track?.kind === 'video' || transceiver.receiver.track?.kind === 'video';
-    });
+    let videoTransceiver = record.videoTransceiver;
+    if (!videoTransceiver || videoTransceiver.stopped) {
+      videoTransceiver = connection.getTransceivers().find((transceiver) => {
+        return !transceiver.stopped && (transceiver.sender.track?.kind === 'video' || transceiver.receiver.track?.kind === 'video');
+      });
+    }
 
     if (!videoTransceiver) {
       try {
@@ -249,10 +256,14 @@ export function useWebRTCSession({
         return;
       }
     }
+    record.videoTransceiver = videoTransceiver;
 
     try {
       await videoTransceiver.sender.replaceTrack(videoTrack);
-      videoTransceiver.direction = videoTrack ? 'sendrecv' : 'recvonly';
+      const nextDirection: RTCRtpTransceiverDirection = videoTrack ? 'sendrecv' : 'recvonly';
+      if (!videoTransceiver.stopped && videoTransceiver.direction !== nextDirection) {
+        videoTransceiver.direction = nextDirection;
+      }
       updatePeerStatus(record);
     } catch (error) {
       console.warn('Unable to sync local camera track to WebRTC peer:', error);
@@ -478,10 +489,16 @@ export function useWebRTCSession({
   const createOffer = useCallback(async (peerId: string, options: PeerNegotiationOptions = {}) => {
     const record = getOrCreatePeer(peerId);
     if (!record || record.connection.signalingState !== 'stable') return;
+    if (record.offerInProgress) {
+      record.queuedRenegotiation = { ...record.queuedRenegotiation, ...options };
+      return;
+    }
+
+    record.offerInProgress = true;
     try {
+      await syncLocalStreamToPeer(record, localStreamRef.current);
+      if (!isCurrentPeerRecord(peerId, record) || record.connection.signalingState !== 'stable') return;
       const offer = await record.connection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
         ...(options.iceRestart ? { iceRestart: true } : {}),
       });
       if (!isCurrentPeerRecord(peerId, record)) return;
@@ -496,9 +513,16 @@ export function useWebRTCSession({
       }
     } catch (error) {
       console.warn('Unable to create WebRTC offer:', error);
-      if (isCurrentPeerRecord(peerId, record)) closePeer(peerId);
+      if (isCurrentPeerRecord(peerId, record)) updatePeerStatus(record);
+    } finally {
+      record.offerInProgress = false;
+      const queuedRenegotiation = record.queuedRenegotiation;
+      record.queuedRenegotiation = undefined;
+      if (queuedRenegotiation && isCurrentPeerRecord(peerId, record)) {
+        schedulePeerRenegotiation(peerId, queuedRenegotiation);
+      }
     }
-  }, [closePeer, getOrCreatePeer, isCurrentPeerRecord, sendSignal, updatePeerStatus]);
+  }, [getOrCreatePeer, isCurrentPeerRecord, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
 
   useEffect(() => {
     renegotiatePeerRef.current = createOffer;
@@ -516,8 +540,10 @@ export function useWebRTCSession({
     }
 
     if (signal.signalType === 'camera-ready') {
+      const signalAgeMs = Date.now() - Date.parse(signal.timestamp);
+      if (Number.isFinite(signalAgeMs) && signalAgeMs > WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS) return;
       if (isLocalOffererForPeer(signal.fromPeerId)) {
-        void createOffer(signal.fromPeerId);
+        schedulePeerRenegotiation(signal.fromPeerId);
       }
       return;
     }
@@ -580,7 +606,7 @@ export function useWebRTCSession({
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [conversationId, createOffer, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, sendSignal, updatePeerStatus]);
+  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, updatePeerStatus]);
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;

@@ -633,18 +633,29 @@ class QueryBuilder<T = Record<string, unknown>> {
     }
   }
 
+  private normalizeMutationBody(value: unknown): unknown {
+    if (this.s.table !== 'facilitator_tts_events') return value;
+    const normalizeRow = (row: unknown): unknown => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+      const next = { ...(row as Record<string, unknown>) };
+      if (next.message_id !== undefined && next.message_id !== null) next.message_id = String(next.message_id);
+      return next;
+    };
+    return Array.isArray(value) ? value.map(normalizeRow) : normalizeRow(value);
+  }
+
   insert(rows: Partial<T> | Partial<T>[]): MutationBuilder<T> {
-    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters);
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(this.normalizeMutationBody(rows)), this.s.filters);
   }
 
   update(patch: Partial<T>): MutationBuilder<T> {
-    return new MutationBuilder<T>(this.s.table, "PATCH", JSON.stringify(patch), this.s.filters);
+    return new MutationBuilder<T>(this.s.table, "PATCH", JSON.stringify(this.normalizeMutationBody(patch)), this.s.filters);
   }
 
   upsert(rows: Partial<T> | Partial<T>[], opts?: { onConflict?: string }): MutationBuilder<T> {
     const extra: Record<string, string> = { Prefer: "resolution=merge-duplicates,return=representation" };
     if (opts?.onConflict) extra["on_conflict"] = opts.onConflict;
-    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters, extra);
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(this.normalizeMutationBody(rows)), this.s.filters, extra);
   }
 
   delete(): MutationBuilder<T> {
@@ -684,7 +695,11 @@ class MutationBuilder<T = Record<string, unknown>> {
   abortSignal(signal: AbortSignal): this { this.abortSignalRef = signal; return this; }
 
   // Filter methods (same as QueryBuilder) — needed for .update().eq(...) patterns
-  eq(col: string, val: unknown): this { this.filters.push([col, `eq.${val}`]); return this; }
+  eq(col: string, val: unknown): this {
+    const normalizedValue = this.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
+    this.filters.push([col, `eq.${normalizedValue}`]);
+    return this;
+  }
   neq(col: string, val: unknown): this { this.filters.push([col, `neq.${val}`]); return this; }
   gt(col: string, val: unknown): this { this.filters.push([col, `gt.${val}`]); return this; }
   gte(col: string, val: unknown): this { this.filters.push([col, `gte.${val}`]); return this; }

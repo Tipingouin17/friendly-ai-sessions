@@ -142,6 +142,7 @@ export function useFacilitatorVoice({
 
   const speak = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
     const trimmed = text.trim();
+    const serializedMessageId = messageId != null ? String(messageId) : null;
     if (!enabled || !trimmed || !conversationId) return;
 
     const synth = getSpeechSynthesis();
@@ -165,7 +166,7 @@ export function useFacilitatorVoice({
       ? await recordTtsEvent({
           conversationId,
           facilitatorId,
-          messageId,
+          messageId: serializedMessageId,
           provider: synthesisPlan.provider,
           voiceId: synthesisPlan.voiceId ?? defaultVoiceId,
           textExcerpt: trimmed,

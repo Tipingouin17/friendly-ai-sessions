@@ -122,6 +122,11 @@ assertContains(webRTCSessionHook, 'peerStatuses', 'WebRTC hook returns per-peer 
 assertContains(webRTCSessionHook, 'diagnostics', 'WebRTC hook returns browser-visible diagnostics for video troubleshooting');
 assertContains(webRTCSessionHook, 'localCandidateTypes', 'WebRTC hook captures local ICE candidate types for diagnostics');
 assertContains(webRTCSessionHook, 'remoteCandidateTypes', 'WebRTC hook captures remote ICE candidate types for diagnostics');
+assertContains(webRTCSessionHook, 'receiverTrackStates', 'WebRTC hook exposes receiver tracks in diagnostics when ICE connects without visible media');
+assertContains(webRTCSessionHook, 'syncRemoteReceiverStream', 'WebRTC hook synthesizes remote streams from receiver tracks when ontrack stream payloads are missing');
+assertContains(webRTCSessionHook, 'record.connection.getReceivers()', 'WebRTC hook inspects receiver tracks when ICE connects without a visible media stream');
+assertContains(webRTCSessionHook, 'stream.addTrack(track);', 'WebRTC hook builds a fallback MediaStream from received remote tracks');
+assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT', 'WebRTC hook retries critical SDP offer and answer inserts so participants do not remain stuck in have-local-offer');
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
 assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');

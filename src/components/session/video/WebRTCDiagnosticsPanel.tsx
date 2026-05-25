@@ -69,6 +69,7 @@ export function WebRTCDiagnosticsPanel({
                 <div className="font-sans text-[11px] font-bold text-slate-950">{peer.peerId}{peer.hasRemoteStream ? ' · stream received' : ''}</div>
                 <div>pc={peer.connectionState} ice={peer.iceConnectionState} gather={peer.iceGatheringState} sig={peer.signalingState}</div>
                 <div>local ICE={formatList(peer.localCandidateTypes)} · remote ICE={formatList(peer.remoteCandidateTypes)} · queued={peer.pendingRemoteCandidateCount}</div>
+                <div>receivers={formatList(peer.receiverTrackStates)}</div>
                 <div>last signal={peer.lastSignalAt ? new Date(peer.lastSignalAt).toLocaleTimeString() : 'none'} · updated={new Date(peer.updatedAt).toLocaleTimeString()}</div>
               </div>
             ))}

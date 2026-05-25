@@ -33,6 +33,7 @@ export interface WebRTCPeerStatus {
   localCandidateTypes: string[];
   remoteCandidateTypes: string[];
   pendingRemoteCandidateCount: number;
+  receiverTrackStates: string[];
   lastSignalAt: string | null;
   lastIceCandidateAt: string | null;
   updatedAt: string;
@@ -112,6 +113,7 @@ interface PeerRecord {
   remoteCandidateTypes: Set<string>;
   lastSignalAt: string | null;
   lastIceCandidateAt: string | null;
+  remoteStream?: MediaStream;
 }
 
 interface PeerNegotiationOptions {
@@ -129,6 +131,8 @@ const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
 const WEBRTC_ICE_RENEGOTIATION_DELAY_MS = 750;
 const WEBRTC_ICE_STALL_TIMEOUT_MS = 12_000;
 const WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS = 45_000;
+const WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT = 3;
+const WEBRTC_SIGNAL_CRITICAL_RETRY_DELAY_MS = 300;
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 const participantPeerId = (participantId: number): string => `participant-${participantId}`;
@@ -270,6 +274,10 @@ export function useWebRTCSession({
         localCandidateTypes: Array.from(record.localCandidateTypes).sort(),
         remoteCandidateTypes: Array.from(record.remoteCandidateTypes).sort(),
         pendingRemoteCandidateCount: pendingCandidatesRef.current.get(peerId)?.length ?? 0,
+        receiverTrackStates: connection.getReceivers()
+          .map((receiver) => receiver.track)
+          .filter((track): track is MediaStreamTrack => Boolean(track))
+          .map((track) => `${track.kind}:${track.readyState}${track.enabled ? ':enabled' : ':disabled'}`),
         lastSignalAt: record.lastSignalAt,
         lastIceCandidateAt: record.lastIceCandidateAt,
         updatedAt: new Date().toISOString(),
@@ -331,6 +339,41 @@ export function useWebRTCSession({
     } catch (error) {
       console.warn('Unable to sync local camera track to WebRTC peer:', error);
     }
+  }, [updatePeerStatus]);
+
+  const syncRemoteReceiverStream = useCallback((
+    record: PeerRecord,
+    incomingTrack?: MediaStreamTrack | null,
+    preferredStream?: MediaStream | null,
+  ): boolean => {
+    const sourceParticipantId = record.participantId;
+    if (sourceParticipantId === null) return false;
+
+    const receiverTracks = record.connection.getReceivers()
+      .map((receiver) => receiver.track)
+      .filter((track): track is MediaStreamTrack => Boolean(track) && track.readyState !== 'ended');
+    const remoteTracks = [
+      ...receiverTracks,
+      ...(incomingTrack && incomingTrack.readyState !== 'ended' ? [incomingTrack] : []),
+    ];
+
+    if (remoteTracks.length === 0) return false;
+
+    const stream = preferredStream ?? record.remoteStream ?? new MediaStream();
+    remoteTracks.forEach((track) => {
+      if (!stream.getTracks().some((existingTrack) => existingTrack.id === track.id)) {
+        stream.addTrack(track);
+      }
+    });
+
+    record.remoteStream = stream;
+    setRemoteStreams((previous) => {
+      const key = String(sourceParticipantId);
+      if (previous[key] === stream) return previous;
+      return { ...previous, [key]: stream };
+    });
+    updatePeerStatus(record, true);
+    return true;
   }, [updatePeerStatus]);
 
   const removeRemoteStream = useCallback((peerId: string) => {
@@ -417,8 +460,8 @@ export function useWebRTCSession({
     }
   }, [conversationId]);
 
-  const sendSignal = useCallback(async (toPeerId: string, signal: Omit<WebRTCSignalPayload, 'kind' | 'version' | 'conversationId' | 'fromPeerId' | 'fromParticipantId' | 'toPeerId' | 'timestamp'>) => {
-    if (!conversationId || !localPeerId) return;
+  const sendSignal = useCallback(async (toPeerId: string, signal: Omit<WebRTCSignalPayload, 'kind' | 'version' | 'conversationId' | 'fromPeerId' | 'fromParticipantId' | 'toPeerId' | 'timestamp'>): Promise<boolean> => {
+    if (!conversationId || !localPeerId) return false;
     const payload: WebRTCSignalPayload = {
       kind: 'webrtc_signal',
       version: 1,
@@ -430,15 +473,26 @@ export function useWebRTCSession({
       ...signal,
     };
 
-    const { error } = await api.from('session_events').insert({
-      conversation_id: conversationId,
-      event_type: WEBRTC_EVENT_TYPE,
-      data: payload,
-    });
+    const isCriticalSignal = signal.signalType === 'offer' || signal.signalType === 'answer';
+    const maxAttempts = isCriticalSignal ? WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT : 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const { error } = await api.from('session_events').insert({
+        conversation_id: conversationId,
+        event_type: WEBRTC_EVENT_TYPE,
+        data: payload,
+      });
 
-    if (error) {
-      console.warn('Unable to send WebRTC signal:', error.message);
+      if (!error) return true;
+      if (attempt >= maxAttempts) {
+        console.warn('Unable to send WebRTC signal:', error.message);
+        return false;
+      }
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, WEBRTC_SIGNAL_CRITICAL_RETRY_DELAY_MS * attempt);
+      });
     }
+
+    return false;
   }, [conversationId, localPeerId, participantId, role]);
 
   const isLocalOffererForPeer = useCallback((peerId: string): boolean => {
@@ -502,20 +556,13 @@ export function useWebRTCSession({
     };
 
     connection.ontrack = (event) => {
-      const sourceParticipantId = remoteParticipantId;
-      if (sourceParticipantId === null) return;
-      const [stream] = event.streams;
-      if (!stream) return;
-      setRemoteStreams((previous) => {
-        const key = String(sourceParticipantId);
-        if (previous[key] === stream) return previous;
-        return { ...previous, [key]: stream };
-      });
-      updatePeerStatus(record, true);
+      const [providedStream] = event.streams;
+      syncRemoteReceiverStream(record, event.track, providedStream ?? null);
     };
 
     const handleConnectionStateChange = () => {
-      updatePeerStatus(record);
+      const hasReceiverStream = syncRemoteReceiverStream(record);
+      if (!hasReceiverStream) updatePeerStatus(record);
       if (connection.connectionState === 'connected' || connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
         clearPeerTimers(peerId);
         return;
@@ -532,10 +579,13 @@ export function useWebRTCSession({
 
     connection.onconnectionstatechange = handleConnectionStateChange;
     connection.oniceconnectionstatechange = handleConnectionStateChange;
-    connection.onsignalingstatechange = () => updatePeerStatus(record);
+    connection.onsignalingstatechange = () => {
+      const hasReceiverStream = syncRemoteReceiverStream(record);
+      if (!hasReceiverStream) updatePeerStatus(record);
+    };
 
     return record;
-  }, [armIceStallTimer, clearPeerTimers, isLocalOffererForPeer, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
+  }, [armIceStallTimer, clearPeerTimers, isLocalOffererForPeer, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
 
   const closePeer = useCallback((peerId: string) => {
     const record = peersRef.current.get(peerId);
@@ -647,6 +697,7 @@ export function useWebRTCSession({
         record.lastSignalAt = new Date().toISOString();
         await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        syncRemoteReceiverStream(record);
         await syncLocalStreamToPeer(record, localStreamRef.current);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
         await flushPendingCandidates(signal.fromPeerId, record.connection);
@@ -655,6 +706,7 @@ export function useWebRTCSession({
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
         await record.connection.setLocalDescription(answer);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        syncRemoteReceiverStream(record);
         updatePeerStatus(record);
         if (record.connection.localDescription) {
           await sendSignal(signal.fromPeerId, {
@@ -670,6 +722,7 @@ export function useWebRTCSession({
           record.lastSignalAt = new Date().toISOString();
           await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+          syncRemoteReceiverStream(record);
           await flushPendingCandidates(signal.fromPeerId, record.connection);
           if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
           updatePeerStatus(record);
@@ -696,7 +749,7 @@ export function useWebRTCSession({
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
+  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;

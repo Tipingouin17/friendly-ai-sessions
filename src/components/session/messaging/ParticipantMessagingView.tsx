@@ -268,6 +268,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     void startLocalCamera();
   }, [startLocalCamera, stopLocalCamera]);
 
+  const handleToggleLocalCameraClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleLocalCamera();
+  }, [toggleLocalCamera]);
+
   React.useEffect(() => {
     return () => {
       if (localCameraStreamRef.current) {
@@ -406,7 +412,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={toggleLocalCamera}
+              onClick={handleToggleLocalCameraClick}
               disabled={cameraStatus === 'starting'}
               className={`flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 ${cameraIsOn ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-200 hover:text-slate-950'}`}
               aria-label={cameraIsOn ? 'Turn camera off' : 'Turn camera on'}
@@ -594,7 +600,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
                   <button
                     type="button"
-                    onClick={toggleLocalCamera}
+                    onClick={handleToggleLocalCameraClick}
                     disabled={cameraStatus === 'starting'}
                     className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70"
                     data-camera-toggle="participant-sidebar-preview"

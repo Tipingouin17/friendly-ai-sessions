@@ -7,6 +7,8 @@ const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath)
 
 const participantView = read('src/components/session/messaging/ParticipantMessagingView.tsx');
 const hostContent = read('src/components/session/host/HostSessionContent.tsx');
+const preSessionHostView = read('src/components/session/host/PreSessionHostView.tsx');
+const facilitatorVoice = read('src/hooks/facilitator/useFacilitatorVoice.ts');
 const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
 const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
@@ -35,6 +37,9 @@ assertContains(participantView, 'participantVideoTiles', 'participant data-drive
 assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'participant local camera permission request');
 assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
+assertContains(participantView, 'handleToggleLocalCameraClick', 'participant camera toggles use a guarded click handler');
+assertContains(participantView, 'event.preventDefault();', 'participant camera toggle prevents accidental form submission or navigation');
+assertContains(participantView, 'event.stopPropagation();', 'participant camera toggle avoids parent click side effects');
 assertContains(participantView, 'useWebRTCSession({', 'participant initializes WebRTC signaling for remote video tiles');
 assertContains(participantView, "role: 'participant'", 'participant WebRTC hook runs in participant role');
 assertContains(participantView, 'mediaStream: isCurrentUser ? localCameraStream : remoteStream', 'participant self tile uses local stream and remote tiles use peer streams');
@@ -62,6 +67,9 @@ assertContains(hostContent, 'mediaStream: remoteStream', 'host participant video
 assertContains(hostContent, 'videoRoomStatusLabel', 'host video room exposes WebRTC room connection status for live QA');
 assertContains(hostContent, 'connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus)', 'host participant tiles expose peer connection labels');
 assertContains(hostContent, 'onApproveMode={onApproveMode}', 'host mode approval plumbing');
+assertContains(preSessionHostView, 'const isSessionStarted = Boolean(conversationData?.session_started);', 'pre-session host view derives live state from conversation data');
+assertContains(preSessionHostView, 'isSessionStarted={isSessionStarted}', 'pre-session host start button reflects active sessions');
+assertNotContains(preSessionHostView, 'isSessionStarted={false}', 'pre-session host start button must not be hard-coded inactive');
 assertNotContains(hostContent, "UX handoff's dark", 'host design documentation');
 assertNotContains(participantView, 'Precision Dark', 'participant design documentation');
 
@@ -87,10 +95,16 @@ assertContains(webRTCSessionHook, "signalType: 'camera-ready'", 'WebRTC hook sup
 assertContains(webRTCSessionHook, "signalType: 'camera-stopped'", 'WebRTC hook tears down remote streams when a camera stops');
 assertContains(webRTCSessionHook, "filter: `conversation_id=eq.${conversationId}`", 'WebRTC realtime channel is scoped to the active conversation');
 assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_RETENTION_MS', 'WebRTC hook defines stale signaling retention');
+assertContains(webRTCSessionHook, 'WEBRTC_CAMERA_READY_BURST_COUNT', 'WebRTC hook repeats camera-ready hints to recover missed realtime inserts');
+assertContains(webRTCSessionHook, "connection.addTransceiver('video', { direction: 'recvonly' })", 'WebRTC hook creates receive-only video negotiation for host and non-camera peers');
 assertContains(webRTCSessionHook, ".delete()\n      .eq('conversation_id', conversationId)\n      .eq('event_type', WEBRTC_EVENT_TYPE)\n      .lt('created_at', cutoff)", 'WebRTC hook deletes stale session_events signals');
 assertContains(webRTCSessionHook, 'VITE_WEBRTC_TURN_URLS', 'WebRTC hook supports deploy-time TURN server configuration');
 assertContains(webRTCSessionHook, 'connectionStatus', 'WebRTC hook returns room-level connection status');
 assertContains(webRTCSessionHook, 'peerStatuses', 'WebRTC hook returns per-peer connection status');
+assertContains(facilitatorVoice, 'waitForVoices', 'facilitator voice waits for async browser voice loading');
+assertContains(facilitatorVoice, 'NATURAL_VOICE_KEYWORDS', 'facilitator voice prefers higher quality browser voices');
+assertContains(facilitatorVoice, 'selectBestVoice', 'facilitator voice uses scored voice selection');
+assertContains(facilitatorVoice, 'utterance.rate = 0.92', 'facilitator voice uses a calmer speaking rate');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

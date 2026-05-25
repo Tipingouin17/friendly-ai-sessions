@@ -54,6 +54,60 @@ const getSpeechSynthesis = (): SpeechSynthesis | null => {
   return window.speechSynthesis ?? null;
 };
 
+const NATURAL_VOICE_KEYWORDS = [
+  'neural',
+  'natural',
+  'enhanced',
+  'premium',
+  'google',
+  'microsoft',
+  'samantha',
+  'ava',
+  'aria',
+  'jenny',
+  'sonia',
+  'daniel',
+  'serena',
+];
+
+const waitForVoices = async (synth: SpeechSynthesis): Promise<SpeechSynthesisVoice[]> => {
+  const initialVoices = synth.getVoices();
+  if (initialVoices.length > 0) return initialVoices;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      synth.removeEventListener?.('voiceschanged', finish);
+      resolve(synth.getVoices());
+    };
+
+    synth.addEventListener?.('voiceschanged', finish, { once: true });
+    window.setTimeout(finish, 350);
+  });
+};
+
+const scoreVoice = (voice: SpeechSynthesisVoice): number => {
+  const searchable = `${voice.name} ${voice.voiceURI}`.toLowerCase();
+  const languageScore = voice.lang?.toLowerCase().startsWith('en') ? 60 : 0;
+  const qualityScore = NATURAL_VOICE_KEYWORDS.reduce((score, keyword) => searchable.includes(keyword) ? score + 18 : score, 0);
+  const localPenalty = voice.localService ? 0 : 4;
+  return languageScore + qualityScore - localPenalty;
+};
+
+const selectBestVoice = (voices: SpeechSynthesisVoice[], defaultVoiceId?: string | null): SpeechSynthesisVoice | undefined => {
+  if (defaultVoiceId) {
+    const configuredVoice = voices.find((voice) => voice.voiceURI === defaultVoiceId || voice.name === defaultVoiceId);
+    if (configuredVoice) return configuredVoice;
+  }
+
+  return [...voices]
+    .filter((voice) => voice.lang?.toLowerCase().startsWith('en'))
+    .sort((first, second) => scoreVoice(second) - scoreVoice(first))[0]
+    ?? [...voices].sort((first, second) => scoreVoice(second) - scoreVoice(first))[0];
+};
+
 export function useFacilitatorVoice({
   conversationId,
   facilitatorId,
@@ -125,13 +179,12 @@ export function useFacilitatorVoice({
     activeEventIdRef.current = queuedEvent?.id;
 
     const utterance = new SpeechSynthesisUtterance(trimmed);
-    const voices = synth.getVoices();
-    const selectedVoice = defaultVoiceId
-      ? voices.find((voice) => voice.voiceURI === defaultVoiceId || voice.name === defaultVoiceId)
-      : voices.find((voice) => voice.lang?.startsWith('en')) ?? voices[0];
+    const voices = await waitForVoices(synth);
+    const selectedVoice = selectBestVoice(voices, defaultVoiceId);
     if (selectedVoice) utterance.voice = selectedVoice;
-    utterance.rate = 0.98;
-    utterance.pitch = 1;
+    utterance.lang = selectedVoice?.lang || 'en-US';
+    utterance.rate = 0.92;
+    utterance.pitch = 0.98;
     utterance.volume = 1;
     utteranceRef.current = utterance;
 

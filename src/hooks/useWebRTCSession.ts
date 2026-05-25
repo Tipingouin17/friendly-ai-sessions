@@ -80,6 +80,8 @@ const WEBRTC_EVENT_TYPE = 'webrtc_signal';
 const HOST_PEER_ID = 'host';
 const WEBRTC_SIGNAL_RETENTION_MS = 30 * 60 * 1000;
 const WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const WEBRTC_CAMERA_READY_BURST_COUNT = 6;
+const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 const participantPeerId = (participantId: number): string => `participant-${participantId}`;
@@ -288,9 +290,17 @@ export function useWebRTCSession({
     peersRef.current.set(peerId, record);
     updatePeerStatus(record);
 
-    localStreamRef.current?.getTracks().forEach((track) => {
-      connection.addTrack(track, localStreamRef.current as MediaStream);
-    });
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        connection.addTrack(track, localStreamRef.current as MediaStream);
+      });
+    } else {
+      try {
+        connection.addTransceiver('video', { direction: 'recvonly' });
+      } catch (error) {
+        console.warn('Unable to add receive-only WebRTC video transceiver:', error);
+      }
+    }
 
     connection.onicecandidate = (event) => {
       if (event.candidate) {
@@ -478,13 +488,28 @@ export function useWebRTCSession({
   useEffect(() => {
     if (!enabled || !conversationId || !localPeerId || !localStream || !hasRealtimeSupport) return;
 
-    remotePeerIds.forEach((peerId) => {
-      if (isLocalOffererForPeer(peerId)) {
-        void createOffer(peerId);
-      } else {
-        void sendSignal(peerId, { signalType: 'camera-ready' });
+    let readyBurstsSent = 0;
+    const announceCameraReady = () => {
+      readyBurstsSent += 1;
+      remotePeerIds.forEach((peerId) => {
+        if (isLocalOffererForPeer(peerId)) {
+          void createOffer(peerId);
+        } else {
+          void sendSignal(peerId, { signalType: 'camera-ready' });
+        }
+      });
+    };
+
+    announceCameraReady();
+    const readyTimer = window.setInterval(() => {
+      if (readyBurstsSent >= WEBRTC_CAMERA_READY_BURST_COUNT) {
+        window.clearInterval(readyTimer);
+        return;
       }
-    });
+      announceCameraReady();
+    }, WEBRTC_CAMERA_READY_BURST_INTERVAL_MS);
+
+    return () => window.clearInterval(readyTimer);
   }, [conversationId, createOffer, enabled, hasRealtimeSupport, isLocalOffererForPeer, localPeerId, localStream, remotePeerIds, sendSignal]);
 
   useEffect(() => {

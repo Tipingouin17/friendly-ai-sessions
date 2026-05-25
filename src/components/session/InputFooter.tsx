@@ -13,11 +13,20 @@ import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Users } from "lucide-react";
+import { CheckCircle2, Lock, Users } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import ParticipantEngagementControls from './ParticipantEngagementControls';
 import { useParticipantEngagement } from '@/hooks/useParticipantEngagement';
+
+interface ModeComposerContext {
+  label: string;
+  instruction: string;
+  component?: string | null;
+  modeKey?: string | null;
+  stateLabel?: string;
+  isComplete?: boolean;
+}
 
 interface InputFooterProps {
   participantCount: number;
@@ -44,7 +53,9 @@ interface InputFooterProps {
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
   onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
   placeholder?: string;
+  disabledPlaceholder?: string;
   disabled?: boolean;
+  modeContext?: ModeComposerContext;
 }
 
 const InputFooter = ({
@@ -72,7 +83,9 @@ const InputFooter = ({
   onSpeechInterim,
   onSpeechFinal,
   placeholder = "Type your response…",
+  disabledPlaceholder,
   disabled = false,
+  modeContext,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -134,6 +147,23 @@ const InputFooter = ({
   const hasReachedQuestionLimit = maxQuestionsPerSession !== Infinity && userMessageCount >= maxQuestionsPerSession;
 
 
+  const modeAccentClass = React.useMemo(() => {
+    if (!modeContext) return 'border-slate-200 bg-white text-slate-700';
+    if (modeContext.isComplete) return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    if (modeContext.modeKey === 'voting_rating') return 'border-indigo-200 bg-indigo-50 text-indigo-800';
+    if (modeContext.modeKey === 'round_robin') return 'border-amber-200 bg-amber-50 text-amber-800';
+    if (modeContext.modeKey === 'silent_individual_response') return 'border-violet-200 bg-violet-50 text-violet-800';
+    if (modeContext.modeKey === 'reflection_checkin') return 'border-sky-200 bg-sky-50 text-sky-800';
+    return 'border-slate-200 bg-slate-50 text-slate-700';
+  }, [modeContext]);
+
+  const modeComponentLabel = React.useMemo(() => {
+    if (!modeContext?.component) return null;
+    return modeContext.component
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ');
+  }, [modeContext?.component]);
+
   // Enhanced participant detection logic
   const urlParams = new URLSearchParams(window.location.search);
   const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
@@ -169,6 +199,28 @@ const InputFooter = ({
           </div>
         ) : isParticipantContext ? (
           <>
+            {modeContext && (
+              <div className="px-3 pt-3 sm:px-4">
+                <div className={`rounded-2xl border px-3 py-3 shadow-sm ${modeAccentClass}`}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-70">
+                        {modeComponentLabel || 'Facilitation composer'}
+                      </p>
+                      <p className="mt-1 text-sm font-bold">{modeContext.label}</p>
+                    </div>
+                    {modeContext.stateLabel && (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full border border-current/20 bg-white/70 px-2.5 py-1 text-xs font-semibold">
+                        {modeContext.isComplete && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {modeContext.stateLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed opacity-80">{modeContext.instruction}</p>
+                </div>
+              </div>
+            )}
+
             {/* Engagement controls: skip / pause / message host */}
             <ParticipantEngagementControls
               status={status}
@@ -189,7 +241,7 @@ const InputFooter = ({
                 onSendMessage={onSendMessage}
                 isRecording={isRecording}
                 setIsRecording={setIsRecording}
-                placeholder={placeholder}
+                placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder}
                 disabled={!shouldAllowAnswer}
                 isMobile={isMobile}
                 speechEnabled={speechEnabled}

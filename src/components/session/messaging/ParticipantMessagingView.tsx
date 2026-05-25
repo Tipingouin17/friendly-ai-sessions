@@ -183,20 +183,31 @@ const normalizeModeChoices = (options: Record<string, unknown> | unknown): ModeC
     .filter((choice): choice is ModeChoice => Boolean(choice));
 };
 
+const normalizeFacilitationModeKey = (modeKey: string | null | undefined): string => {
+  const normalized = (modeKey || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
+  if (normalized === 'voting') return 'voting_rating';
+  if (normalized === 'reflection') return 'reflection_checkin';
+  if (normalized === 'silent_response') return 'silent_individual_response';
+  return normalized;
+};
+
 const getParticipantModeInstruction = (modeKey: string, composerCopy?: string | null): string => {
   if (composerCopy?.trim()) return composerCopy.trim();
-  if (modeKey === 'voting') return 'Choose the option that best represents your view.';
+  if (modeKey === 'voting_rating') return 'Choose the option or signal that best represents your view.';
   if (modeKey === 'round_robin') return 'The facilitator is guiding participants through turns.';
-  if (modeKey === 'reflection' || modeKey === 'silent_response') return 'Take a quiet moment to write your response before the group continues.';
+  if (modeKey === 'reflection_checkin') return 'Choose a quick signal or write a short check-in so the facilitator can sense the room.';
+  if (modeKey === 'silent_individual_response') return 'Take a quiet moment to write privately before the group continues.';
+  if (modeKey === 'open_discussion') return 'You are live — speak freely or add written context when useful.';
   return 'Share your response when you are ready.';
 };
 
 const getModePlaceholder = (modeKey: string, composerCopy?: string | null): string => {
   if (composerCopy?.trim()) return composerCopy.trim();
   if (modeKey === 'round_robin') return 'Your turn will open when the facilitator calls on you…';
-  if (modeKey === 'reflection') return 'Write a thoughtful reflection…';
-  if (modeKey === 'silent_response') return 'Write your quiet response…';
-  if (modeKey === 'voting') return 'Add optional context for your vote…';
+  if (modeKey === 'reflection_checkin') return 'Add a quick check-in or one-word reflection…';
+  if (modeKey === 'silent_individual_response') return 'Write your private response…';
+  if (modeKey === 'voting_rating') return 'Add optional context for your vote…';
+  if (modeKey === 'open_discussion') return 'Add a thought to the live discussion…';
   return 'Type your response…';
 };
 
@@ -350,13 +361,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const showRuntimeAvatarState = Boolean((facilitatorRuntime?.enabled && runtimeAvatarState) || voiceRuntime.isSpeaking);
   const aiIsSpeaking = Boolean(voiceRuntime.isSpeaking || runtimeAvatarState?.state === 'speaking');
   const legacyActiveMode = activeMode as (SessionActiveMode & LegacyActiveModeFields) | null;
-  const modeKey = activeMode?.facilitation_mode?.mode_key
+  const rawModeKey = activeMode?.facilitation_mode?.mode_key
     ?? legacyActiveMode?.mode_key
     ?? legacyActiveMode?.mode_slug
     ?? 'open_discussion';
+  const modeKey = normalizeFacilitationModeKey(rawModeKey);
   const enabledModeDefinition = enabledModes.find((mode) => {
     const legacyMode = mode as FacilitatorModeAssignment & LegacyEnabledModeFields;
-    return mode.mode_key === modeKey || legacyMode.mode_slug === modeKey;
+    return normalizeFacilitationModeKey(mode.mode_key) === modeKey || normalizeFacilitationModeKey(legacyMode.mode_slug) === modeKey;
   });
   const modeLabel = activeMode?.facilitation_mode?.display_name
     ?? legacyActiveMode?.name
@@ -369,8 +381,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const modeChoices = React.useMemo(() => normalizeModeChoices(activeMode?.options ?? {}), [activeMode?.options]);
   const remainingTimeLabel = formatRemainingTime(participantModeState?.remaining_time);
   const modeCanSubmit = participantModeState?.can_submit ?? true;
-  const isVotingMode = modeKey === 'voting';
+  const modeComposerComponent = activeMode?.composer_component ?? activeMode?.facilitation_mode?.composer_component ?? null;
+  const isVotingMode = modeKey === 'voting_rating';
   const isRoundRobinMode = modeKey === 'round_robin';
+  const isSilentResponseMode = modeKey === 'silent_individual_response';
+  const isReflectionMode = modeKey === 'reflection_checkin';
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
@@ -858,7 +873,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 ) : (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="text-sm font-semibold text-slate-800">
-                      {modeKey === 'reflection' || modeKey === 'silent_response' ? 'Quiet response' : 'Open response'}
+                      {isReflectionMode ? 'Quick check-in' : isSilentResponseMode ? 'Private quiet response' : 'Open response'}
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-slate-500">{modePlaceholder}</p>
                   </div>
@@ -911,7 +926,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 onSpeechInterim={handleSpeechInterim}
                 onSpeechFinal={handleSpeechFinal}
                 placeholder={modePlaceholder}
+                disabledPlaceholder={hasRegisteredResponse || hasSubmittedModeChoice ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
                 disabled={modeComposerDisabled}
+                modeContext={activeMode ? {
+                  label: modeLabel,
+                  instruction: modeInstruction,
+                  component: modeComposerComponent,
+                  modeKey,
+                  stateLabel: hasRegisteredResponse || hasSubmittedModeChoice
+                    ? 'Response registered'
+                    : modeCanSubmit
+                      ? isRoundRobinMode && !participantModeState?.is_current_speaker
+                        ? 'Waiting for your turn'
+                        : 'Ready for your input'
+                      : 'Not open yet',
+                  isComplete: hasRegisteredResponse || hasSubmittedModeChoice,
+                } : undefined}
               />
             </div>
           )}

@@ -22,6 +22,7 @@ interface UseMessageFetchingProps {
 
 // Polling interval in milliseconds
 const POLLING_INTERVAL = 3000;
+const AUTO_CONTINUATION_DELAY_MS = 3500;
 
 export const useMessageFetching = ({
   conversationId,
@@ -381,17 +382,53 @@ export const useMessageFetching = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [isGeneratingResponse, fetchMessagesFromDB]);
 
-  // Auto-advance is now handled server-side via _maybe_generate_facilitator_response.
-  // The server triggers the AI response automatically after each participant message INSERT,
-  // making the cycle fully resilient (host tab does not need to be open).
-  //
-  // The host page remains the entry point for:
-  //   - Manual host instructions (via the instruction input)
-  //   - Session report generation
-  //   - Pausing / skipping participants
-  //
-  // We keep autoAdvanceForMessageIdRef for backward compatibility with any code that reads it.
+  // Server-side auto-advance is the primary path, but the dev backend can miss or
+  // delay the trigger after the final participant response. Keep a guarded client
+  // fallback so the facilitator continues instead of leaving the room stuck.
   const autoAdvanceForMessageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!conversationId || conversation?.is_session_ended || isGeneratingResponse) return;
+    if (messages.length === 0) return;
+
+    const lastAssistantMessage = [...messages].reverse().find(message => message.sender === 'assistant');
+    if (!lastAssistantMessage?.id) return;
+    if (autoAdvanceForMessageIdRef.current === lastAssistantMessage.id) return;
+
+    const expectedResponses = Math.max(1, totalParticipants - excludedCount);
+    if (responseCount < expectedResponses) return;
+    if (messages[messages.length - 1]?.sender === 'assistant') return;
+
+    const timer = setTimeout(async () => {
+      const currentConversationId = conversationIdRef.current;
+      if (!currentConversationId) return;
+      if (autoAdvanceForMessageIdRef.current === lastAssistantMessage.id) return;
+
+      try {
+        const { data: latestMessages, error } = await api
+          .from('messages')
+          .select('id, role')
+          .eq('conversation_id', currentConversationId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error('Auto-continuation duplicate check failed:', error);
+          return;
+        }
+
+        const latestMessage = Array.isArray(latestMessages) ? latestMessages[0] : null;
+        if (latestMessage?.role === 'assistant') return;
+
+        autoAdvanceForMessageIdRef.current = lastAssistantMessage.id;
+        await generateAggregatedResponse();
+      } catch (error) {
+        console.error('Auto-continuation fallback failed:', error);
+      }
+    }, AUTO_CONTINUATION_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [conversation?.is_session_ended, conversationId, excludedCount, generateAggregatedResponse, isGeneratingResponse, messages, responseCount, totalParticipants]);
 
   return {
     messages,

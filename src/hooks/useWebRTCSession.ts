@@ -126,6 +126,7 @@ const HOST_PEER_ID = 'host';
 const WEBRTC_SIGNAL_RETENTION_MS = 30 * 60 * 1000;
 const WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS = 3_000;
+const WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS = 15_000;
 const WEBRTC_SIGNAL_CATCHUP_LIMIT = 80;
 const WEBRTC_CAMERA_READY_BURST_COUNT = 6;
 const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
@@ -188,6 +189,24 @@ const extractCandidateType = (candidate: RTCIceCandidateInit | RTCIceCandidate):
   return typeMatch?.[1] ?? null;
 };
 
+const getSignalAgeMs = (signal: Pick<WebRTCSignalPayload, 'timestamp'>): number | null => {
+  const parsedTimestamp = Date.parse(signal.timestamp);
+  if (!Number.isFinite(parsedTimestamp)) return null;
+  return Date.now() - parsedTimestamp;
+};
+
+const isSignalOlderThan = (signal: Pick<WebRTCSignalPayload, 'timestamp'>, maxAgeMs: number): boolean => {
+  const ageMs = getSignalAgeMs(signal);
+  return ageMs !== null && ageMs > maxAgeMs;
+};
+
+const isIgnorableStaleSignalError = (error: unknown): boolean => {
+  if (!(error instanceof DOMException)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('unknown ufrag')
+    || message.includes('remote description indicates ice restart but offer did not request ice restart');
+};
+
 const isSignalPayload = (value: unknown): value is WebRTCSignalPayload => {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<WebRTCSignalPayload>;
@@ -235,6 +254,7 @@ export function useWebRTCSession({
   const localStreamRef = useRef<MediaStream | null>(localStream);
   const hadLocalStreamRef = useRef(Boolean(localStream));
   const processedSignalKeysRef = useRef<Set<string>>(new Set());
+  const hookStartedAtRef = useRef(Date.now());
   const remotePeerIdsRef = useRef<string[]>([]);
   const hasRealtimeSupport = typeof RTCPeerConnection !== 'undefined';
 
@@ -666,13 +686,13 @@ export function useWebRTCSession({
     if (!rememberSignal(signal, eventId)) return;
 
     if (signal.signalType === 'camera-stopped') {
+      if (isSignalOlderThan(signal, WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS)) return;
       removeRemoteStream(signal.fromPeerId);
       return;
     }
 
     if (signal.signalType === 'camera-ready') {
-      const signalAgeMs = Date.now() - Date.parse(signal.timestamp);
-      if (Number.isFinite(signalAgeMs) && signalAgeMs > WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS) return;
+      if (isSignalOlderThan(signal, WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS)) return;
       if (isLocalOffererForPeer(signal.fromPeerId)) {
         schedulePeerRenegotiation(signal.fromPeerId);
       }
@@ -750,6 +770,10 @@ export function useWebRTCSession({
         }
       }
     } catch (error) {
+      if (isIgnorableStaleSignalError(error)) {
+        console.debug('Ignoring stale WebRTC signal from a previous ICE generation:', error);
+        return;
+      }
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
@@ -757,11 +781,17 @@ export function useWebRTCSession({
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;
+    const catchupCutoff = new Date(Math.max(
+      hookStartedAtRef.current - WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS,
+      Date.now() - WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS,
+    )).toISOString();
+
     const { data, error } = await api
       .from<SessionEventRow>('session_events')
       .select('id,conversation_id,event_type,data,created_at')
       .eq('conversation_id', conversationId)
       .eq('event_type', WEBRTC_EVENT_TYPE)
+      .gte('created_at', catchupCutoff)
       .order('created_at', { ascending: false })
       .limit(WEBRTC_SIGNAL_CATCHUP_LIMIT);
 

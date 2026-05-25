@@ -658,6 +658,36 @@ async def run_startup_migrations() -> None:
             saved_sessions, question_limit, custom_branding, priority_support)
         SELECT 103, 103, 999999, 999999, 100, TRUE, TRUE, TRUE, TRUE, TRUE, 999999, TRUE, FALSE
         WHERE NOT EXISTS (SELECT 1 FROM plan_restrictions WHERE plan_id = 103)""",
+        # 2026-05-25: Backfill users created before the free-plan lookup was made case-insensitive.
+        # Production stores the catalogue value as plan_type='Free', so this must use LOWER(...)
+        # and title/id fallbacks just like the signup path.
+        """
+        UPDATE profiles
+        SET current_plan_id = (
+                SELECT id
+                FROM plans
+                WHERE LOWER(plan_type) = 'free'
+                   OR LOWER(title) = 'free'
+                   OR id = 1
+                ORDER BY CASE
+                  WHEN LOWER(plan_type) = 'free' THEN 0
+                  WHEN LOWER(title) = 'free' THEN 1
+                  WHEN id = 1 THEN 2
+                  ELSE 3
+                END
+                LIMIT 1
+            ),
+            subscription_status = COALESCE(subscription_status, 'free'),
+            updated_at = NOW()
+        WHERE current_plan_id IS NULL
+          AND EXISTS (
+              SELECT 1
+              FROM plans
+              WHERE LOWER(plan_type) = 'free'
+                 OR LOWER(title) = 'free'
+                 OR id = 1
+          );
+        """,
         # 2026-05-01: Promote jerome.gauvin@gmail.com to admin role (replaces admin@myfacilitator.com).
         # Also add appsumo_tier and appsumo_codes_redeemed columns if missing (idempotent).
         """

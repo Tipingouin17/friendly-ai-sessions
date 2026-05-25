@@ -8,12 +8,42 @@ const API_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 const ANON_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 const SESSION_KEY = "mf_session";
 
+const RAILWAY_DEV_PROXY_PREFIX = "/__railway_dev";
+const RAILWAY_PROD_PROXY_PREFIX = "/__railway_prod";
+
 // Named exports for files that import these constants directly
 export const EDGE_FUNCTION_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 export const EDGE_FUNCTION_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 
 if (!API_URL) {
   throw new Error("Missing VITE_API_URL. Set it to your Railway backend URL.");
+}
+
+function isLocalBrowserHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function getRailwayRealtimeProxyPrefix(): string | null {
+  if (typeof window === "undefined" || isLocalBrowserHost(window.location.hostname)) return null;
+  try {
+    const backendHost = new URL(API_URL).hostname;
+    if (!backendHost.endsWith("railway.app")) return null;
+    if (backendHost.includes("development")) return RAILWAY_DEV_PROXY_PREFIX;
+    if (backendHost.includes("production")) return RAILWAY_PROD_PROXY_PREFIX;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function buildRealtimeSseUrl(topic: string, token: string): string {
+  const params = new URLSearchParams({
+    apikey: token,
+    topic,
+  });
+  const proxyPrefix = getRailwayRealtimeProxyPrefix();
+  const baseUrl = proxyPrefix ? `${proxyPrefix}/realtime/v1/sse` : `${API_URL}/realtime/v1/sse`;
+  return `${baseUrl}?${params.toString()}`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -841,7 +871,7 @@ class SharedSSEManager {
   private openSSE(topic: string): void {
     if (this.connections.has(topic)) return;
     const token = getToken() || ANON_KEY;
-    const url = `${API_URL}/realtime/v1/sse?apikey=${encodeURIComponent(token)}&topic=${encodeURIComponent(topic)}`;
+    const url = buildRealtimeSseUrl(topic, token);
     const es = new EventSource(url);
     this.connections.set(topic, es);
 

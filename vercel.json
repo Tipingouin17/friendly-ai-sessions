@@ -2,6 +2,14 @@
   "buildCommand": "bash build.sh",
   "rewrites": [
     {
+      "source": "/__railway_dev/(.*)",
+      "destination": "https://friendly-ai-sessions-development.up.railway.app/$1"
+    },
+    {
+      "source": "/__railway_prod/(.*)",
+      "destination": "https://friendly-ai-sessions-production.up.railway.app/$1"
+    },
+    {
       "source": "/assets/(.*)",
       "destination": "/assets/$1"
     },

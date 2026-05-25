@@ -13,6 +13,7 @@ const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
 const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
 const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService.ts');
+const apiClient = read('src/lib/api.ts');
 const vercelConfig = read('vercel.json');
 
 const assertContains = (source, needle, label) => {
@@ -122,6 +123,15 @@ assertContains(phase3RuntimeService, 'message_id: serializedMessageId', 'TTS per
 assertContains(phase3RuntimeService, 'export async function hasTtsEventForMessage', 'TTS runtime exposes refresh replay guard lookup');
 assertContains(phase3RuntimeService, 'const serializedMessageId = String(messageId);', 'TTS replay guard serializes message ids before lookup');
 assertContains(phase3RuntimeService, ".eq('message_id', serializedMessageId)", 'TTS replay guard queries by serialized message id');
+assertContains(apiClient, 'RAILWAY_DEV_PROXY_PREFIX = "/__railway_dev"', 'API client defines same-origin dev Railway realtime proxy prefix');
+assertContains(apiClient, 'RAILWAY_PROD_PROXY_PREFIX = "/__railway_prod"', 'API client defines same-origin production Railway realtime proxy prefix');
+assertContains(apiClient, 'getRailwayRealtimeProxyPrefix', 'API client selects a same-origin realtime proxy on deployed browser origins');
+assertContains(apiClient, 'buildRealtimeSseUrl(topic, token)', 'SSE subscriptions use centralized realtime URL construction');
+assertContains(apiClient, 'new EventSource(url)', 'Realtime manager opens EventSource using the CORS-safe URL');
+assertContains(vercelConfig, '"source": "/__railway_dev/(.*)"', 'Vercel rewrites development realtime proxy before the SPA catch-all');
+assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-development.up.railway.app/$1"', 'Vercel development proxy targets Railway dev backend');
+assertContains(vercelConfig, '"source": "/__railway_prod/(.*)"', 'Vercel rewrites production realtime proxy before the SPA catch-all');
+assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-production.up.railway.app/$1"', 'Vercel production proxy targets Railway production backend');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

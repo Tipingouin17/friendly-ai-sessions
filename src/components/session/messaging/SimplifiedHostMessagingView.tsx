@@ -298,38 +298,38 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wide">Participants</span>
-                    <Users className="h-3.5 w-3.5 text-indigo-200" />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Participants</span>
+                    <Users className="h-3.5 w-3.5 text-indigo-500" />
                   </div>
-                  <span className="text-2xl font-bold text-white">{currentParticipantCount}</span>
-                  <span className="text-xs text-slate-300">in session</span>
+                  <span className="text-2xl font-bold text-slate-950">{currentParticipantCount}</span>
+                  <span className="text-xs text-slate-500">in session</span>
                 </div>
 
                 <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wide">Response Rate</span>
-                    <TrendingUp className="h-3.5 w-3.5 text-emerald-200" />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Response Rate</span>
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                   </div>
-                  <span className="text-2xl font-bold text-white">{responseRate}%</span>
-                  <span className="text-xs text-slate-300">{responseCount} / {totalParticipants} responded</span>
+                  <span className="text-2xl font-bold text-slate-950">{responseRate}%</span>
+                  <span className="text-xs text-slate-500">{responseCount} / {totalParticipants} responded</span>
                 </div>
 
                 <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wide">AI Exchanges</span>
-                    <Sparkles className="h-3.5 w-3.5 text-violet-200" />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">AI Exchanges</span>
+                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                   </div>
-                  <span className="text-2xl font-bold text-white">{facilitatorMessages.length}</span>
-                  <span className="text-xs text-slate-300">facilitator messages</span>
+                  <span className="text-2xl font-bold text-slate-950">{facilitatorMessages.length}</span>
+                  <span className="text-xs text-slate-500">facilitator messages</span>
                 </div>
 
                 <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wide">Avg Responses</span>
-                    <BarChart2 className="h-3.5 w-3.5 text-sky-200" />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Responses</span>
+                    <BarChart2 className="h-3.5 w-3.5 text-sky-500" />
                   </div>
-                  <span className="text-2xl font-bold text-white">{avgMessagesPerParticipant}</span>
-                  <span className="text-xs text-slate-300">per participant</span>
+                  <span className="text-2xl font-bold text-slate-950">{avgMessagesPerParticipant}</span>
+                  <span className="text-xs text-slate-500">per participant</span>
                 </div>
               </div>
 
@@ -339,7 +339,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-amber-500" />
-                      <span className="text-sm font-semibold text-white">Collecting Responses</span>
+                      <span className="text-sm font-semibold text-slate-900">Collecting Responses</span>
                     </div>
                     <span className="text-xs font-medium text-slate-500">
                       {responseCount} of {totalParticipants}
@@ -357,7 +357,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       variant="outline"
                       size="sm"
                       disabled={isSending}
-                      className="text-xs h-7 border-white/15 text-slate-100 hover:bg-white/10"
+                      className="h-7 border-slate-200 text-xs text-slate-700 hover:bg-slate-100"
                     >
                       {isSending ? (
                         <span className="flex items-center gap-1.5">
@@ -384,25 +384,25 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
               <div className="session-soft-panel rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">Facilitator toolbox</p>
-                    <p className="text-xs text-slate-300 mt-0.5">The AI facilitator can choose among its assigned tools when generating the next response.</p>
+                    <p className="text-sm font-semibold text-slate-900">Facilitator toolbox</p>
+                    <p className="mt-0.5 text-xs text-slate-500">The AI facilitator can choose among its assigned tools when generating the next response.</p>
                   </div>
-                  <span className="session-chip border-indigo-300/30 bg-indigo-400/10 text-indigo-100">
+                  <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">
                     {isLoadingToolbox ? 'Loading…' : `${enabledTools.length} active`}
                   </span>
                 </div>
                 {toolboxError && (
-                  <p className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">{toolboxError}</p>
+                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{toolboxError}</p>
                 )}
                 {!isLoadingToolbox && enabledTools.length > 0 && (
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {enabledTools.map((tool) => (
                       <div key={tool.access_id || tool.id} className="session-soft-panel rounded-xl px-3 py-2">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-white">{tool.name}</p>
-                          <span className="session-chip bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-200">{tool.category}</span>
+                          <p className="text-xs font-semibold text-slate-900">{tool.name}</p>
+                          <span className="session-chip border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">{tool.category}</span>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-300">
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                           {String(tool.effective_config?.hostCue || tool.description || 'Available for this facilitator')}
                         </p>
                       </div>
@@ -418,26 +418,26 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
               <div className="session-soft-panel rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">Facilitation modes</p>
-                    <p className="text-xs text-slate-300 mt-0.5">Start a structured mode that changes participant input rules and gives the facilitator an explicit lifecycle.</p>
+                    <p className="text-sm font-semibold text-slate-900">Facilitation modes</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Start a structured mode that changes participant input rules and gives the facilitator an explicit lifecycle.</p>
                   </div>
-                  <span className={`session-chip px-2.5 py-1 text-xs font-semibold ${activeMode ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100' : 'border-white/10 bg-white/10 text-slate-200'}`}>
+                  <span className={`session-chip px-2.5 py-1 text-xs font-semibold ${activeMode ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
                     {isLoadingModes ? 'Loading…' : activeMode ? activeMode.status : `${enabledModes.length} available`}
                   </span>
                 </div>
 
                 {modeError && (
-                  <p className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">{modeError}</p>
+                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{modeError}</p>
                 )}
 
                 {recentModeEvents.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-violet-300/25 bg-violet-400/10 px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-100">Recent mode events</p>
+                  <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Recent mode events</p>
                     <div className="mt-1 space-y-1">
                       {recentModeEvents.slice(0, 3).map((event) => (
-                        <div key={event.id} className="flex items-center justify-between gap-3 text-xs text-violet-100">
+                        <div key={event.id} className="flex items-center justify-between gap-3 text-xs text-violet-700">
                           <span className="truncate">{event.event_type.replace(/_/g, ' ')}</span>
-                          <span className="shrink-0 text-[11px] text-violet-200">
+                          <span className="shrink-0 text-[11px] text-violet-500">
                             {event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
                           </span>
                         </div>
@@ -447,11 +447,11 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 )}
 
                 {activeMode ? (
-                  <div className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-400/10 px-3 py-3">
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="text-xs font-semibold text-emerald-100">Active: {activeModeDefinition?.display_name || 'Facilitation mode'}</p>
-                        <p className="mt-1 text-xs text-emerald-100/80">{activeMode.prompt || activeModeDefinition?.composer_copy || 'Participants are guided by this mode until the host ends it.'}</p>
+                        <p className="text-xs font-semibold text-emerald-800">Active: {activeModeDefinition?.display_name || 'Facilitation mode'}</p>
+                        <p className="mt-1 text-xs text-emerald-700">{activeMode.prompt || activeModeDefinition?.composer_copy || 'Participants are guided by this mode until the host ends it.'}</p>
                       </div>
                       <div className="flex shrink-0 gap-2">
                         {isPendingHostApproval && (
@@ -470,7 +470,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                               variant="outline"
                               size="sm"
                               disabled={isModeBusy}
-                              className="h-8 border-emerald-300/30 text-xs text-emerald-100 hover:bg-emerald-400/10"
+                              className="h-8 border-emerald-200 text-xs text-emerald-700 hover:bg-emerald-100"
                             >
                               Reject
                             </Button>
@@ -495,10 +495,10 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           key={mode.access_id || mode.id}
                           type="button"
                           onClick={() => setSelectedModeKey(mode.mode_key)}
-                          className={`session-control-button rounded-xl border px-3 py-2 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-300/50 bg-indigo-400/15' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                          className={`session-control-button rounded-xl border px-3 py-2 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                         >
-                          <p className="text-xs font-semibold text-white">{mode.display_name}</p>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-300">{mode.purpose}</p>
+                          <p className="text-xs font-semibold text-slate-900">{mode.display_name}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{mode.purpose}</p>
                         </button>
                       ))}
                     </div>
@@ -511,7 +511,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           value={modePrompt}
                           onChange={(event) => setModePrompt(event.target.value)}
                           placeholder="Optional mode prompt for participants… e.g. 'Vote on the most important risk.'"
-                          className="min-h-[64px] resize-none border-white/10 bg-slate-950/40 text-sm text-white placeholder:text-slate-400"
+                          className="min-h-[64px] resize-none border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400"
                         />
                         <Button
                           onClick={handleStartSelectedMode}
@@ -530,7 +530,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
               {/* Steer the AI Facilitator */}
               <div className={`session-soft-panel rounded-2xl overflow-hidden transition-all ${
                 isInstructionExpanded
-                  ? 'border-indigo-300/35 bg-indigo-400/10'
+                  ? 'border-indigo-200 bg-indigo-50'
                   : ''
               }`}>
                 <button
@@ -538,24 +538,24 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   onClick={() => setIsInstructionExpanded(!isInstructionExpanded)}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className={`p-1.5 rounded-lg ${isInstructionExpanded ? 'bg-indigo-500' : 'bg-white/10'}`}>
-                      <Wand2 className={`h-3.5 w-3.5 ${isInstructionExpanded ? 'text-white' : 'text-slate-300'}`} />
+                    <div className={`p-1.5 rounded-lg ${isInstructionExpanded ? 'bg-indigo-600' : 'bg-slate-100'}`}>
+                      <Wand2 className={`h-3.5 w-3.5 ${isInstructionExpanded ? 'text-white' : 'text-slate-600'}`} />
                     </div>
                     <div>
-                      <p className={`text-sm font-semibold ${isInstructionExpanded ? 'text-indigo-100' : 'text-white'}`}>
+                      <p className={`text-sm font-semibold ${isInstructionExpanded ? 'text-indigo-800' : 'text-slate-900'}`}>
                         Steer the AI Facilitator
                       </p>
-                      <p className="text-xs text-slate-300">Participants won't see your instruction</p>
+                      <p className="text-xs text-slate-500">Participants won't see your instruction</p>
                     </div>
                   </div>
                   {isInstructionExpanded
                     ? <ChevronUp className="h-4 w-4 text-indigo-200" />
-                    : <ChevronDown className="h-4 w-4 text-slate-300" />
+                    : <ChevronDown className="h-4 w-4 text-slate-500" />
                   }
                 </button>
 
                 {isInstructionExpanded && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-white/10">
+                  <div className="space-y-3 border-t border-slate-200 px-4 pb-4">
                     <div className="flex flex-wrap gap-2 pt-3">
                       {quickInstructions.map((qi) => (
                         <button
@@ -563,8 +563,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                           onClick={() => setHostInstruction(qi.instruction)}
                           className={`session-control-button inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                             hostInstruction === qi.instruction
-                              ? 'bg-indigo-500 text-white border-indigo-400'
-                              : 'bg-white/10 text-indigo-100 border-white/10 hover:bg-white/15'
+                              ? 'border-indigo-500 bg-indigo-600 text-white'
+                              : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
                           }`}
                         >
                           <span>{qi.icon}</span>
@@ -577,7 +577,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       value={hostInstruction}
                       onChange={(e) => setHostInstruction(e.target.value)}
                       placeholder="Type a custom instruction… e.g. 'Ask about implementation challenges'"
-                      className="min-h-[72px] resize-none bg-slate-950/40 border-white/10 focus:border-indigo-300 text-sm text-white placeholder:text-slate-400"
+                      className="min-h-[72px] resize-none border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-300"
                     />
 
                     <div className="flex items-center justify-between gap-2">
@@ -611,13 +611,13 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 
               {/* Session Details */}
               <div className="session-soft-panel rounded-2xl p-4">
-                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">Session Details</p>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Session Details</p>
                 <div className="space-y-2.5">
                   <div className="flex items-start gap-2">
                     <Zap className="h-3.5 w-3.5 text-indigo-200 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs text-slate-300">Title</p>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-xs text-slate-500">Title</p>
+                      <p className="text-sm font-medium text-slate-900">
                         {conversationData?.sessions?.title || 'Untitled Session'}
                       </p>
                     </div>
@@ -625,8 +625,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   <div className="flex items-start gap-2">
                     <Sparkles className="h-3.5 w-3.5 text-violet-200 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs text-slate-300">Facilitator</p>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-xs text-slate-500">Facilitator</p>
+                      <p className="text-sm font-medium text-slate-900">
                         {conversationData?.sessions?.facilitator_details?.title || 'Unknown'}
                       </p>
                     </div>
@@ -635,7 +635,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <div className="flex items-start gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-xs text-slate-300">Objective</p>
+                        <p className="text-xs text-slate-500">Objective</p>
                         <p className="text-sm text-slate-200 leading-relaxed">
                           {conversationData.sessions.objective}
                         </p>
@@ -652,12 +652,12 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
           <ScrollArea className="h-full">
             <div className="p-4 space-y-3">
               {messages.length === 0 ? (
-                <div className="text-center py-16 text-slate-200">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 mb-3">
-                    <MessageSquare className="h-5 w-5 text-slate-300" />
+                <div className="py-16 text-center text-slate-500">
+                  <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+                    <MessageSquare className="h-5 w-5 text-slate-500" />
                   </div>
-                  <p className="text-sm font-medium text-slate-100">No messages yet</p>
-                  <p className="text-xs text-slate-300 mt-1">Messages will appear once participants respond.</p>
+                  <p className="text-sm font-medium text-slate-900">No messages yet</p>
+                  <p className="mt-1 text-xs text-slate-500">Messages will appear once participants respond.</p>
                 </div>
               ) : (
                 messages.map((message, index) => {
@@ -674,7 +674,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       </div>
                       <div className={`flex-1 max-w-[85%] ${isAI ? '' : 'flex flex-col items-end'}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-slate-200">
+                          <span className="text-xs font-semibold text-slate-700">
                             {isAI
                               ? (conversationData?.sessions?.facilitator_details?.title || 'AI Facilitator')
                               : message.sender === 'admin'
@@ -682,14 +682,14 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                                 : (participants.find(p => String(p.id) === message.participant)?.name || message.name || 'Participant')
                             }
                           </span>
-                          <span className="text-[10px] text-slate-300">
+                          <span className="text-[10px] text-slate-500">
                             {message.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
                           </span>
                         </div>
                         <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                           isAI
-                            ? 'bg-white/10 border border-white/10 text-slate-100 rounded-tl-sm shadow-sm'
-                            : 'bg-indigo-600 text-white rounded-tr-sm'
+                            ? 'rounded-tl-sm border border-slate-200 bg-slate-100 text-slate-700 shadow-sm'
+                            : 'rounded-tr-sm bg-indigo-600 text-white'
                         }`}>
                           {message.content}
                         </div>

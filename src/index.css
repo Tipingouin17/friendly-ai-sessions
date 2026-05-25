@@ -347,14 +347,14 @@
 
 /* Session pages redesign tokens and utilities */
 :root {
-    --session-ink: 0 0% 100%;
-    --session-muted: 226 31% 78%;
-    --session-bg-start: 229 45% 10%;
-    --session-bg-mid: 233 38% 13%;
-    --session-bg-end: 246 45% 17%;
-    --session-panel: 226 44% 15%;
-    --session-panel-strong: 226 47% 18%;
-    --session-border: 226 44% 92%;
+    --session-ink: 222 47% 11%;
+    --session-muted: 215 16% 47%;
+    --session-bg-start: 210 40% 98%;
+    --session-bg-mid: 220 33% 98%;
+    --session-bg-end: 226 40% 96%;
+    --session-panel: 0 0% 100%;
+    --session-panel-strong: 210 40% 98%;
+    --session-border: 214 32% 91%;
     --session-indigo: 244 83% 67%;
     --session-violet: 263 82% 72%;
     --session-amber: 38 92% 58%;
@@ -365,23 +365,23 @@
 .session-redesign-shell {
     color: hsl(var(--session-ink));
     background:
-        radial-gradient(circle at top left, rgba(99, 102, 241, 0.24), transparent 30rem),
-        radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.22), transparent 32rem),
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.10), transparent 28rem),
+        radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.08), transparent 30rem),
         linear-gradient(135deg, hsl(var(--session-bg-start)), hsl(var(--session-bg-mid)) 48%, hsl(var(--session-bg-end)));
 }
 
 .session-glass-panel {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(15, 23, 42, 0.62);
-    box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35);
-    backdrop-filter: blur(18px);
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(12px);
 }
 
 .session-soft-panel {
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: rgba(30, 41, 59, 0.56);
-    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.26);
-    backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(248, 250, 252, 0.88);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(10px);
 }
 
 .session-chip {
@@ -389,9 +389,9 @@
     align-items: center;
     gap: 0.375rem;
     border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.84);
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(255, 255, 255, 0.86);
+    color: hsl(var(--session-ink));
     padding: 0.25rem 0.625rem;
     font-size: 0.75rem;
     font-weight: 700;
@@ -399,16 +399,16 @@
 
 .session-avatar-stage {
     background:
-        radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.38), rgba(15, 23, 42, 0.88) 45%, rgba(2, 6, 23, 0.96)),
-        linear-gradient(180deg, rgba(30, 41, 59, 0.82), rgba(2, 6, 23, 0.95));
+        radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.22), rgba(238, 242, 255, 0.92) 48%, rgba(255, 255, 255, 0.96)),
+        linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(226, 232, 240, 0.86));
 }
 
 .session-speaking-ring {
-    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.46), 0 0 32px rgba(129, 140, 248, 0.44), inset 0 0 38px rgba(245, 158, 11, 0.10);
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.35), 0 0 28px rgba(129, 140, 248, 0.28), inset 0 0 30px rgba(245, 158, 11, 0.08);
 }
 
 .session-progress-track {
-    background: rgba(148, 163, 184, 0.22);
+    background: rgba(148, 163, 184, 0.24);
 }
 
 .session-progress-fill {

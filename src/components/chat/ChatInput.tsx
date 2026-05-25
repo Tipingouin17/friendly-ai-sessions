@@ -60,9 +60,9 @@ const ChatInput = ({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const lineHeight = 24;
-    const minHeight = lineHeight * 2;
-    const maxHeight = lineHeight * 6;
+    const lineHeight = 22;
+    const minHeight = lineHeight * 1;
+    const maxHeight = lineHeight * 4;
     el.style.height = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight) + 'px';
   }, [inputMessage]);
 
@@ -211,7 +211,7 @@ const ChatInput = ({
   };
 
   return (
-    <div className="px-3 py-3 sm:px-4 sm:py-3.5 bg-white border-t border-slate-200">
+    <div className="border-t border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-3">
       <div className="flex items-end gap-2">
         {/* Textarea */}
         <div className="flex-1 relative">
@@ -222,15 +222,15 @@ const ChatInput = ({
             onKeyDown={handleKeyDown}
             placeholder={disabled ? "Waiting for the next question…" : placeholder}
             disabled={disabled}
-            rows={2}
-            className={`w-full resize-none rounded-2xl border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow ${
+            rows={1}
+            className={`w-full resize-none rounded-2xl border bg-slate-50 px-3.5 py-2.5 text-sm leading-[22px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 ${
               isOverLimit
                 ? "border-red-400 focus:ring-red-400"
                 : isNearLimit
                   ? "border-amber-400 focus:ring-amber-400"
                   : "border-slate-200 focus:ring-indigo-400"
             }`}
-            style={{ minHeight: '48px', maxHeight: '144px', overflowY: 'auto' }}
+            style={{ minHeight: '42px', maxHeight: '104px', overflowY: 'auto' }}
           />
           {isRecording && (
             <div className="absolute bottom-2 left-3 flex items-center gap-1.5 text-xs text-red-500 font-medium pointer-events-none">
@@ -248,7 +248,7 @@ const ChatInput = ({
           aria-pressed={isRecording}
           aria-label={isRecording ? "Stop voice input" : "Start voice input"}
           title={isRecording ? "Stop recording" : !speechEnabled ? "Voice input disabled for this session" : speechSupported === false ? "Voice input not supported" : "Start voice input"}
-          className={`shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition-all sm:h-11 sm:w-11 ${
             isRecording
               ? "bg-red-100 text-red-600 animate-pulse"
               : speechSupported === false
@@ -270,7 +270,7 @@ const ChatInput = ({
           onClick={handleSend}
           disabled={!inputMessage.trim() || disabled || isOverLimit}
           aria-label="Send message"
-          className="shrink-0 h-11 w-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11"
         >
           <Send className="h-5 w-5" />
         </button>

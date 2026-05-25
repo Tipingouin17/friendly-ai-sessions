@@ -2069,13 +2069,37 @@ async def auth_signup(request: Request):
             if existing:
                 raise HTTPException(400, detail={"code": "user_already_exists", "message": "An account with this email already exists"})
 
-            # Fetch the free plan id to assign it at signup
-            free_plan_row = await conn.fetchrow("SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1")
-            free_plan_id = free_plan_row["id"] if free_plan_row else None
+            # Fetch the free plan id to assign it at signup.
+            # Production stores this catalogue value as plan_type='Free' (capital F),
+            # so the lookup must be case-insensitive.  Keep an id/title fallback so
+            # new accounts are never created without a default plan if catalogue text
+            # casing changes again.
+            free_plan_row = await conn.fetchrow(
+                """
+                SELECT id
+                FROM plans
+                WHERE LOWER(plan_type) = 'free'
+                   OR LOWER(title) = 'free'
+                   OR id = 1
+                ORDER BY CASE
+                  WHEN LOWER(plan_type) = 'free' THEN 0
+                  WHEN LOWER(title) = 'free' THEN 1
+                  WHEN id = 1 THEN 2
+                  ELSE 3
+                END
+                LIMIT 1
+                """
+            )
+            if not free_plan_row:
+                raise HTTPException(
+                    500,
+                    detail={"code": "free_plan_missing", "message": "Free plan is not configured"},
+                )
+            free_plan_id = free_plan_row["id"]
             await conn.execute(
                 "INSERT INTO profiles "
-                "(id, email, full_name, role, password_hash, email_verified, current_plan_id, created_at, updated_at) "
-                "VALUES ($1, $2, $3, 'free', $4, FALSE, $5, NOW(), NOW())",
+                "(id, email, full_name, role, password_hash, email_verified, current_plan_id, subscription_status, created_at, updated_at) "
+                "VALUES ($1, $2, $3, 'free', $4, FALSE, $5, 'free', NOW(), NOW())",
                 user_id, email, full_name or None, pw_hash, free_plan_id,
             )
             # Generate a 24-hour email verification token and store it
@@ -3046,7 +3070,17 @@ async def admin_cost_analytics(request: Request):
                     COUNT(*) AS new_paid_subscribers
                 FROM profiles
                 WHERE current_plan_id IS NOT NULL
-                  AND current_plan_id != (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1)
+                  AND current_plan_id != (
+                    SELECT id FROM plans
+                    WHERE LOWER(plan_type) = 'free' OR LOWER(title) = 'free' OR id = 1
+                    ORDER BY CASE
+                      WHEN LOWER(plan_type) = 'free' THEN 0
+                      WHEN LOWER(title) = 'free' THEN 1
+                      WHEN id = 1 THEN 2
+                      ELSE 3
+                    END
+                    LIMIT 1
+                  )
                   AND COALESCE(plan_upgraded_at, updated_at) >= NOW() - INTERVAL '12 months'
                 GROUP BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
                 ORDER BY DATE_TRUNC('month', COALESCE(plan_upgraded_at, updated_at))
@@ -6456,7 +6490,24 @@ async def stripe_webhook(request: Request):
                     sub = event_data
                     customer_id = sub.get("customer")
                     if customer_id:
-                        await conn.execute("UPDATE profiles SET subscription_status = 'canceled', stripe_subscription_id = NULL, current_plan_id = (SELECT id FROM plans WHERE plan_type = 'free' LIMIT 1), updated_at = NOW() WHERE stripe_customer_id = $1", customer_id)
+                        await conn.execute("""
+                            UPDATE profiles
+                            SET subscription_status = 'canceled',
+                                stripe_subscription_id = NULL,
+                                current_plan_id = (
+                                  SELECT id FROM plans
+                                  WHERE LOWER(plan_type) = 'free' OR LOWER(title) = 'free' OR id = 1
+                                  ORDER BY CASE
+                                    WHEN LOWER(plan_type) = 'free' THEN 0
+                                    WHEN LOWER(title) = 'free' THEN 1
+                                    WHEN id = 1 THEN 2
+                                    ELSE 3
+                                  END
+                                  LIMIT 1
+                                ),
+                                updated_at = NOW()
+                            WHERE stripe_customer_id = $1
+                            """, customer_id)
                 elif event_type == "invoice.payment_failed":
                     inv = event_data
                     customer_id = inv.get("customer")

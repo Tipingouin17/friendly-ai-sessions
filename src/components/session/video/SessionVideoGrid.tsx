@@ -78,11 +78,33 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
   React.useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
+
+    let cancelled = false;
+    const playStream = () => {
+      if (cancelled) return;
+      const playPromise = videoElement.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch((error) => {
+          if (!cancelled) console.warn('Unable to autoplay live video stream:', error);
+        });
+      }
+    };
+
+    videoElement.muted = muted;
     videoElement.srcObject = stream;
+    if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      playStream();
+    } else {
+      videoElement.onloadedmetadata = playStream;
+    }
+
     return () => {
+      cancelled = true;
+      videoElement.onloadedmetadata = null;
+      videoElement.pause();
       videoElement.srcObject = null;
     };
-  }, [stream]);
+  }, [muted, stream]);
 
   return (
     <video

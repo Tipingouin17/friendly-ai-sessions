@@ -36,6 +36,9 @@ assertContains(participantView, '<SessionVideoGrid', 'participant People tab mul
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');
 assertContains(participantView, 'participantVideoTiles', 'participant data-driven video tile mapping');
 assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'participant local camera permission request');
+assertContains(participantView, 'localCameraStartPromiseRef', 'participant camera permission requests are single-flight guarded');
+assertContains(participantView, 'localCameraRequestIdRef.current !== requestId', 'participant camera ignores stale permission results');
+assertContains(participantView, 'localCameraStartPromiseRef.current) return', 'participant camera toggle does not launch duplicate permission prompts while starting');
 assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
 assertContains(participantView, 'handleToggleLocalCameraClick', 'participant camera toggles use a guarded click handler');
@@ -84,6 +87,8 @@ assertContains(stylesheet, '@keyframes reactionPop', 'video reaction badge anima
 
 assertContains(videoGrid, 'mediaStream?: MediaStream | null', 'video tile optional live stream support');
 assertContains(videoGrid, 'srcObject = stream', 'video tile MediaStream binding');
+assertContains(videoGrid, 'videoElement.play()', 'video tile explicitly starts MediaStream playback after permission');
+assertContains(videoGrid, 'videoElement.onloadedmetadata = playStream', 'video tile retries playback when stream metadata becomes available');
 assertContains(videoGrid, 'srcObject = null', 'video tile MediaStream detaches on unmount');
 assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile accessible live preview label');
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');
@@ -112,9 +117,11 @@ assertContains(facilitatorVoice, 'waitForVoices', 'facilitator voice waits for a
 assertContains(facilitatorVoice, 'NATURAL_VOICE_KEYWORDS', 'facilitator voice prefers higher quality browser voices');
 assertContains(facilitatorVoice, 'selectBestVoice', 'facilitator voice uses scored voice selection');
 assertContains(facilitatorVoice, 'utterance.rate = 0.92', 'facilitator voice uses a calmer speaking rate');
-assertContains(phase3RuntimeService, 'message_id: input.messageId != null ? String(input.messageId) : null', 'TTS persistence stores message ids as strings to match backend schema');
+assertContains(phase3RuntimeService, 'const serializedMessageId = input.messageId != null ? String(input.messageId) : null', 'TTS persistence serializes message ids before insertion');
+assertContains(phase3RuntimeService, 'message_id: serializedMessageId', 'TTS persistence stores message ids as strings to match backend schema');
 assertContains(phase3RuntimeService, 'export async function hasTtsEventForMessage', 'TTS runtime exposes refresh replay guard lookup');
-assertContains(phase3RuntimeService, ".eq('message_id', String(messageId))", 'TTS replay guard queries by serialized message id');
+assertContains(phase3RuntimeService, 'const serializedMessageId = String(messageId);', 'TTS replay guard serializes message ids before lookup');
+assertContains(phase3RuntimeService, ".eq('message_id', serializedMessageId)", 'TTS replay guard queries by serialized message id');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

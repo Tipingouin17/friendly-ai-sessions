@@ -164,6 +164,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const localCameraStreamRef = React.useRef<MediaStream | null>(null);
+  const localCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
+  const localCameraRequestIdRef = React.useRef(0);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
 
@@ -220,6 +222,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const stopLocalCamera = React.useCallback(() => {
+    localCameraRequestIdRef.current += 1;
+    localCameraStartPromiseRef.current = null;
     if (localCameraStreamRef.current) {
       localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
       localCameraStreamRef.current = null;
@@ -229,42 +233,62 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, []);
 
   const startLocalCamera = React.useCallback(async () => {
-    if (cameraStatus === 'starting') return;
+    if (localCameraStreamRef.current) {
+      setCameraStatus('on');
+      return localCameraStreamRef.current;
+    }
+    if (localCameraStartPromiseRef.current) return localCameraStartPromiseRef.current;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus('unsupported');
       setCameraError('Camera preview is not supported in this browser.');
-      return;
+      return null;
     }
 
+    const requestId = localCameraRequestIdRef.current + 1;
+    localCameraRequestIdRef.current = requestId;
     setCameraStatus('starting');
     setCameraError(null);
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
-        audio: false,
-      });
+    const cameraStartPromise = navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
+      audio: false,
+    }).then((stream) => {
+      if (localCameraRequestIdRef.current !== requestId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return null;
+      }
 
-      if (localCameraStreamRef.current) {
+      if (localCameraStreamRef.current && localCameraStreamRef.current !== stream) {
         localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
       }
       localCameraStreamRef.current = stream;
       setLocalCameraStream(stream);
       setCameraStatus('on');
-    } catch (error) {
+      return stream;
+    }).catch((error) => {
+      if (localCameraRequestIdRef.current !== requestId) return null;
       console.error('Error accessing participant camera:', error);
       setLocalCameraStream(null);
       localCameraStreamRef.current = null;
       setCameraStatus('blocked');
       setCameraError('Camera access was blocked. Allow camera permission in your browser to show your preview.');
-    }
-  }, [cameraStatus]);
+      return null;
+    }).finally(() => {
+      if (localCameraStartPromiseRef.current === cameraStartPromise) {
+        localCameraStartPromiseRef.current = null;
+      }
+    });
+
+    localCameraStartPromiseRef.current = cameraStartPromise;
+    return cameraStartPromise;
+  }, []);
 
   const toggleLocalCamera = React.useCallback(() => {
     if (localCameraStreamRef.current) {
       stopLocalCamera();
       return;
     }
+    if (localCameraStartPromiseRef.current) return;
     void startLocalCamera();
   }, [startLocalCamera, stopLocalCamera]);
 
@@ -276,6 +300,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   React.useEffect(() => {
     return () => {
+      localCameraRequestIdRef.current += 1;
+      localCameraStartPromiseRef.current = null;
       if (localCameraStreamRef.current) {
         localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
         localCameraStreamRef.current = null;

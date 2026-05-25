@@ -98,10 +98,11 @@ export async function recordSpeechTurn(input: SpeechTurnInput): Promise<SessionS
 export async function recordTtsEvent(input: TtsEventInput): Promise<FacilitatorTtsEvent | null> {
   if (!input.conversationId) return null;
 
+  const serializedMessageId = input.messageId != null ? String(input.messageId) : null;
   const row: Partial<FacilitatorTtsEvent> = {
     conversation_id: input.conversationId,
     facilitator_id: input.facilitatorId ?? null,
-    message_id: input.messageId != null ? String(input.messageId) : null,
+    message_id: serializedMessageId,
     provider: input.provider ?? 'browser_speech_synthesis',
     voice_id: input.voiceId ?? null,
     text_excerpt: input.textExcerpt?.slice(0, 500) ?? null,
@@ -131,11 +132,12 @@ export async function recordTtsEvent(input: TtsEventInput): Promise<FacilitatorT
 export async function hasTtsEventForMessage(conversationId: number | null | undefined, messageId: string | number | null | undefined): Promise<boolean> {
   if (!conversationId || messageId == null) return false;
 
+  const serializedMessageId = String(messageId);
   const { data, error } = await api
     .from<FacilitatorTtsEvent>('facilitator_tts_events')
     .select('id')
     .eq('conversation_id', conversationId)
-    .eq('message_id', String(messageId))
+    .eq('message_id', serializedMessageId)
     .limit(1);
 
   if (error) {

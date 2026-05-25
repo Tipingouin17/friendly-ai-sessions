@@ -80,6 +80,8 @@ const WEBRTC_EVENT_TYPE = 'webrtc_signal';
 const HOST_PEER_ID = 'host';
 const WEBRTC_SIGNAL_RETENTION_MS = 30 * 60 * 1000;
 const WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS = 3_000;
+const WEBRTC_SIGNAL_CATCHUP_LIMIT = 80;
 const WEBRTC_CAMERA_READY_BURST_COUNT = 6;
 const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -157,6 +159,7 @@ export function useWebRTCSession({
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(localStream);
   const hadLocalStreamRef = useRef(Boolean(localStream));
+  const processedSignalKeysRef = useRef<Set<string>>(new Set());
   const remotePeerIdsRef = useRef<string[]>([]);
   const hasRealtimeSupport = typeof RTCPeerConnection !== 'undefined';
 
@@ -196,6 +199,28 @@ export function useWebRTCSession({
         updatedAt: new Date().toISOString(),
       },
     }));
+  }, []);
+
+  const rememberSignal = useCallback((signal: WebRTCSignalPayload, eventId?: number | string | null): boolean => {
+    const signalKey = eventId !== undefined && eventId !== null
+      ? `row-${eventId}`
+      : [
+        signal.timestamp,
+        signal.signalType,
+        signal.fromPeerId,
+        signal.toPeerId,
+        signal.sdp?.type,
+        signal.candidate?.candidate,
+      ].filter(Boolean).join('|');
+
+    if (!signalKey) return true;
+    const processedKeys = processedSignalKeysRef.current;
+    if (processedKeys.has(signalKey)) return false;
+    processedKeys.add(signalKey);
+    if (processedKeys.size > 500) {
+      Array.from(processedKeys).slice(0, 100).forEach((key) => processedKeys.delete(key));
+    }
+    return true;
   }, []);
 
   useEffect(() => {
@@ -385,10 +410,11 @@ export function useWebRTCSession({
     }
   }, [closePeer, getOrCreatePeer, sendSignal, updatePeerStatus]);
 
-  const handleSignal = useCallback(async (signal: WebRTCSignalPayload) => {
+  const handleSignal = useCallback(async (signal: WebRTCSignalPayload, eventId?: number | string | null) => {
     if (!conversationId || signal.conversationId !== conversationId || signal.toPeerId !== localPeerId || signal.fromPeerId === localPeerId) {
       return;
     }
+    if (!rememberSignal(signal, eventId)) return;
 
     if (signal.signalType === 'camera-stopped') {
       removeRemoteStream(signal.fromPeerId);
@@ -444,7 +470,30 @@ export function useWebRTCSession({
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [conversationId, createOffer, flushPendingCandidates, getOrCreatePeer, isLocalOffererForPeer, localPeerId, removeRemoteStream, sendSignal, updatePeerStatus]);
+  }, [conversationId, createOffer, flushPendingCandidates, getOrCreatePeer, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, sendSignal, updatePeerStatus]);
+
+  const catchUpRecentSignals = useCallback(async () => {
+    if (!conversationId || !localPeerId) return;
+    const { data, error } = await api
+      .from<SessionEventRow>('session_events')
+      .select('id,conversation_id,event_type,data,created_at')
+      .eq('conversation_id', conversationId)
+      .eq('event_type', WEBRTC_EVENT_TYPE)
+      .order('created_at', { ascending: false })
+      .limit(WEBRTC_SIGNAL_CATCHUP_LIMIT);
+
+    if (error) {
+      console.warn('Unable to catch up WebRTC signals:', error.message);
+      return;
+    }
+
+    const rows = Array.isArray(data) ? [...data].reverse() : [];
+    for (const row of rows) {
+      const signal = row.data;
+      if (!isSignalPayload(signal)) continue;
+      await handleSignal(signal, row.id ?? null);
+    }
+  }, [conversationId, handleSignal, localPeerId]);
 
   useEffect(() => {
     remotePeerIdsRef.current = remotePeerIds;
@@ -460,6 +509,10 @@ export function useWebRTCSession({
     const cleanupTimer = window.setInterval(() => {
       void cleanupStaleSignals();
     }, WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS);
+    void catchUpRecentSignals();
+    const catchupTimer = window.setInterval(() => {
+      void catchUpRecentSignals();
+    }, WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS);
 
     const channel = api
       .channel(`webrtc-signals-${conversationId}-${localPeerId}`)
@@ -472,7 +525,7 @@ export function useWebRTCSession({
         if (payload.new?.event_type !== WEBRTC_EVENT_TYPE) return;
         const data = payload.new.data;
         if (!isSignalPayload(data)) return;
-        void handleSignal(data);
+        void handleSignal(data, payload.new.id ?? null);
       })
       .subscribe((status) => {
         setIsSignalingConnected(status === 'SUBSCRIBED');
@@ -480,10 +533,11 @@ export function useWebRTCSession({
 
     return () => {
       window.clearInterval(cleanupTimer);
+      window.clearInterval(catchupTimer);
       removeChannel(channel);
       setIsSignalingConnected(false);
     };
-  }, [cleanupStaleSignals, conversationId, enabled, handleSignal, hasRealtimeSupport, localPeerId]);
+  }, [catchUpRecentSignals, cleanupStaleSignals, conversationId, enabled, handleSignal, hasRealtimeSupport, localPeerId]);
 
   useEffect(() => {
     if (!enabled || !conversationId || !localPeerId || !localStream || !hasRealtimeSupport) return;

@@ -17,7 +17,7 @@ import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Vide
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
-import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
+import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
@@ -339,14 +339,33 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   React.useEffect(() => {
     if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
-    if (lastSpokenAssistantMessageRef.current === lastAssistantMessage.id) return;
-    lastSpokenAssistantMessageRef.current = lastAssistantMessage.id;
-    void voiceRuntime.speak({
-      text: lastAssistantMessage.content,
-      messageId: lastAssistantMessage.id,
-      metadata: { source: 'participant_messaging_view' },
-    });
-  }, [conversationId, lastAssistantMessage, phase3RuntimeReady, ttsAvatarEnabled, voiceRuntime]);
+    const messageId = String(lastAssistantMessage.id);
+    if (lastSpokenAssistantMessageRef.current === messageId) return;
+
+    let cancelled = false;
+    const maybeSpeakLatestAssistantMessage = async () => {
+      if (analyticsPersistenceEnabled) {
+        const alreadySpoken = await hasTtsEventForMessage(conversationId, messageId);
+        if (cancelled) return;
+        if (alreadySpoken) {
+          lastSpokenAssistantMessageRef.current = messageId;
+          return;
+        }
+      }
+
+      lastSpokenAssistantMessageRef.current = messageId;
+      void voiceRuntime.speak({
+        text: lastAssistantMessage.content,
+        messageId,
+        metadata: { source: 'participant_messaging_view' },
+      });
+    };
+
+    void maybeSpeakLatestAssistantMessage();
+    return () => {
+      cancelled = true;
+    };
+  }, [analyticsPersistenceEnabled, conversationId, lastAssistantMessage, phase3RuntimeReady, ttsAvatarEnabled, voiceRuntime]);
 
   const handleSpeechInterim = React.useCallback((payload: { transcript: string; confidence: number | null }) => {
     if (!speechStackEnabled) return;

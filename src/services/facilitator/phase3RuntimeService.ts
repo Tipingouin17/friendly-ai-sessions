@@ -101,7 +101,7 @@ export async function recordTtsEvent(input: TtsEventInput): Promise<FacilitatorT
   const row: Partial<FacilitatorTtsEvent> = {
     conversation_id: input.conversationId,
     facilitator_id: input.facilitatorId ?? null,
-    message_id: input.messageId ?? null,
+    message_id: input.messageId != null ? String(input.messageId) : null,
     provider: input.provider ?? 'browser_speech_synthesis',
     voice_id: input.voiceId ?? null,
     text_excerpt: input.textExcerpt?.slice(0, 500) ?? null,
@@ -126,6 +126,24 @@ export async function recordTtsEvent(input: TtsEventInput): Promise<FacilitatorT
   }
 
   return (data as FacilitatorTtsEvent | null) ?? null;
+}
+
+export async function hasTtsEventForMessage(conversationId: number | null | undefined, messageId: string | number | null | undefined): Promise<boolean> {
+  if (!conversationId || messageId == null) return false;
+
+  const { data, error } = await api
+    .from<FacilitatorTtsEvent>('facilitator_tts_events')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('message_id', String(messageId))
+    .limit(1);
+
+  if (error) {
+    console.warn('[phase3RuntimeService] Could not check TTS event replay guard:', error.message);
+    return false;
+  }
+
+  return Array.isArray(data) ? data.length > 0 : Boolean(data);
 }
 
 export async function updateTtsEventStatus(

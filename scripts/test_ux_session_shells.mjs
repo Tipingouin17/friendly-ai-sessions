@@ -12,6 +12,7 @@ const facilitatorVoice = read('src/hooks/facilitator/useFacilitatorVoice.ts');
 const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
 const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
+const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService.ts');
 const vercelConfig = read('vercel.json');
 
 const assertContains = (source, needle, label) => {
@@ -50,6 +51,9 @@ assertContains(participantView, 'animate-sound-bar', 'participant AI speaking vi
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
 assertContains(participantView, 'submitModeInput={submitModeInput}', 'participant mode input plumbing');
 assertContains(participantView, 'speechEnabled={speechStackEnabled}', 'participant speech runtime plumbing');
+assertContains(participantView, 'hasTtsEventForMessage', 'participant skips facilitator TTS replay after refresh when a TTS event already exists');
+assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
+assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');
 assertContains(hostContent, 'bg-slate-50 p-3 text-slate-950', 'host light command-center surface');
@@ -108,6 +112,9 @@ assertContains(facilitatorVoice, 'waitForVoices', 'facilitator voice waits for a
 assertContains(facilitatorVoice, 'NATURAL_VOICE_KEYWORDS', 'facilitator voice prefers higher quality browser voices');
 assertContains(facilitatorVoice, 'selectBestVoice', 'facilitator voice uses scored voice selection');
 assertContains(facilitatorVoice, 'utterance.rate = 0.92', 'facilitator voice uses a calmer speaking rate');
+assertContains(phase3RuntimeService, 'message_id: input.messageId != null ? String(input.messageId) : null', 'TTS persistence stores message ids as strings to match backend schema');
+assertContains(phase3RuntimeService, 'export async function hasTtsEventForMessage', 'TTS runtime exposes refresh replay guard lookup');
+assertContains(phase3RuntimeService, ".eq('message_id', String(messageId))", 'TTS replay guard queries by serialized message id');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
 
 console.log('UX session shell regression checks passed.');

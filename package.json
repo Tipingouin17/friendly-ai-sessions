@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/generate-seo-pages.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "test:auth-signup-default-plan": "python3.11 scripts/test_auth_signup_default_plan_backend.py",
     "preview": "vite preview"
   },
   "dependencies": {

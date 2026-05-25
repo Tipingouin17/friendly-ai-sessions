@@ -232,18 +232,41 @@ export function useWebRTCSession({
     return true;
   }, []);
 
+  const syncLocalStreamToPeer = useCallback(async (record: PeerRecord, stream: MediaStream | null): Promise<void> => {
+    const { connection } = record;
+    if (connection.signalingState === 'closed' || connection.connectionState === 'closed') return;
+
+    const videoTrack = stream?.getVideoTracks()[0] ?? null;
+    let videoTransceiver = connection.getTransceivers().find((transceiver) => {
+      return transceiver.sender.track?.kind === 'video' || transceiver.receiver.track?.kind === 'video';
+    });
+
+    if (!videoTransceiver) {
+      try {
+        videoTransceiver = connection.addTransceiver('video', { direction: videoTrack ? 'sendrecv' : 'recvonly' });
+      } catch (error) {
+        console.warn('Unable to prepare WebRTC video transceiver:', error);
+        return;
+      }
+    }
+
+    try {
+      await videoTransceiver.sender.replaceTrack(videoTrack);
+      videoTransceiver.direction = videoTrack ? 'sendrecv' : 'recvonly';
+      updatePeerStatus(record);
+    } catch (error) {
+      console.warn('Unable to sync local camera track to WebRTC peer:', error);
+    }
+  }, [updatePeerStatus]);
+
   useEffect(() => {
     localStreamRef.current = localStream;
-    peersRef.current.forEach((record) => {
-      const { connection } = record;
-      const senders = connection.getSenders().filter((sender) => sender.track);
-      senders.forEach((sender) => connection.removeTrack(sender));
-      if (localStream) {
-        localStream.getTracks().forEach((track) => connection.addTrack(track, localStream));
-      }
-      updatePeerStatus(record);
+    peersRef.current.forEach((record, peerId) => {
+      void syncLocalStreamToPeer(record, localStream).then(() => {
+        if (isLocalOffererForPeer(peerId)) schedulePeerRenegotiation(peerId);
+      });
     });
-  }, [localStream, updatePeerStatus]);
+  }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, syncLocalStreamToPeer]);
 
   const removeRemoteStream = useCallback((peerId: string) => {
     const remoteParticipantId = parseParticipantIdFromPeerId(peerId);
@@ -379,17 +402,7 @@ export function useWebRTCSession({
     peersRef.current.set(peerId, record);
     updatePeerStatus(record);
 
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        connection.addTrack(track, localStreamRef.current as MediaStream);
-      });
-    } else {
-      try {
-        connection.addTransceiver('video', { direction: 'recvonly' });
-      } catch (error) {
-        console.warn('Unable to add receive-only WebRTC video transceiver:', error);
-      }
-    }
+    void syncLocalStreamToPeer(record, localStreamRef.current);
 
     connection.onicecandidate = (event) => {
       if (event.candidate) {
@@ -434,7 +447,7 @@ export function useWebRTCSession({
     connection.onsignalingstatechange = () => updatePeerStatus(record);
 
     return record;
-  }, [armIceStallTimer, clearPeerTimers, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, updatePeerStatus]);
+  }, [armIceStallTimer, clearPeerTimers, localPeerId, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, updatePeerStatus]);
 
   const closePeer = useCallback((peerId: string) => {
     const record = peersRef.current.get(peerId);

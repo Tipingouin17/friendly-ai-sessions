@@ -147,7 +147,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     role: 'host',
     participants,
     localStream: null,
-    enabled: !isSessionEnded,
+    enabled: isSessionStarted && !isSessionEnded,
   });
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
@@ -245,6 +245,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 
         <Panel defaultSize={52} minSize={38} className="min-h-0">
           <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-2xl shadow-slate-200/80 [&_.bg-white]:bg-white [&_.bg-slate-100]:bg-slate-50">
+            {isSessionStarted && (
             <section className="shrink-0 border-b border-slate-200 bg-slate-50/80 p-3" aria-label="Host multi-video gallery">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
@@ -298,7 +299,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                 </div>
               )}
             </section>
-            <div className="min-h-0 flex-1 overflow-hidden">
+            )}
+            <div className={`min-h-0 flex-1 ${isSessionStarted ? 'overflow-hidden' : 'overflow-y-auto'}`}>
               <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}

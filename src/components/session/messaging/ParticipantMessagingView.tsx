@@ -340,20 +340,31 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   React.useEffect(() => {
     if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
     const messageId = String(lastAssistantMessage.id);
+    const browserReplayKey = `facilitator-tts-spoken:${conversationId}:${messageId}`;
     if (lastSpokenAssistantMessageRef.current === messageId) return;
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem(browserReplayKey) === '1') {
+      lastSpokenAssistantMessageRef.current = messageId;
+      return;
+    }
 
     let cancelled = false;
     const maybeSpeakLatestAssistantMessage = async () => {
       if (analyticsPersistenceEnabled) {
-        const alreadySpoken = await hasTtsEventForMessage(conversationId, messageId);
-        if (cancelled) return;
-        if (alreadySpoken) {
-          lastSpokenAssistantMessageRef.current = messageId;
-          return;
+        try {
+          const alreadySpoken = await hasTtsEventForMessage(conversationId, messageId);
+          if (cancelled) return;
+          if (alreadySpoken) {
+            lastSpokenAssistantMessageRef.current = messageId;
+            if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
+            return;
+          }
+        } catch (error) {
+          console.warn('Unable to verify facilitator TTS replay state; using browser-session guard.', error);
         }
       }
 
       lastSpokenAssistantMessageRef.current = messageId;
+      if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
       void voiceRuntime.speak({
         text: lastAssistantMessage.content,
         messageId,

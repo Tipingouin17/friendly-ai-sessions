@@ -142,12 +142,13 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
   const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
+  const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;
   const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
     localStream: null,
-    enabled: isSessionStarted && !isSessionEnded,
+    enabled: shouldEnableHostVideoRoom,
   });
   const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];

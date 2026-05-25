@@ -15,6 +15,7 @@ const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
 const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService.ts');
 const apiClient = read('src/lib/api.ts');
 const vercelConfig = read('vercel.json');
+const realtimeHelpers = read('src/utils/realtimeHelpers.ts');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -72,6 +73,9 @@ assertContains(hostContent, 'showResponseStatus', 'host response status badges o
 assertContains(hostContent, 'useWebRTCSession({', 'host initializes WebRTC signaling for participant cameras');
 assertContains(hostContent, "role: 'host'", 'host WebRTC hook runs in receive-only host role');
 assertContains(hostContent, 'mediaStream: remoteStream', 'host participant video tiles consume remote MediaStreams');
+assertContains(hostContent, 'const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;', 'host WebRTC receiver stays enabled before formal session start so participant camera offers can complete');
+assertContains(hostContent, 'enabled: shouldEnableHostVideoRoom', 'host WebRTC hook uses the pre-start receiver enablement guard');
+assertNotContains(hostContent, 'enabled: isSessionStarted && !isSessionEnded', 'host WebRTC receiver must not stay disabled during pre-start participant camera checks');
 assertContains(hostContent, 'videoRoomStatusLabel', 'host video room exposes WebRTC room connection status for live QA');
 assertContains(hostContent, 'connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus)', 'host participant tiles expose peer connection labels');
 assertContains(hostContent, 'onApproveMode={onApproveMode}', 'host mode approval plumbing');
@@ -128,10 +132,14 @@ assertContains(apiClient, 'RAILWAY_PROD_PROXY_PREFIX = "/__railway_prod"', 'API 
 assertContains(apiClient, 'getRailwayRealtimeProxyPrefix', 'API client selects a same-origin realtime proxy on deployed browser origins');
 assertContains(apiClient, 'buildRealtimeSseUrl(topic, token)', 'SSE subscriptions use centralized realtime URL construction');
 assertContains(apiClient, 'new EventSource(url)', 'Realtime manager opens EventSource using the CORS-safe URL');
+assertContains(apiClient, 'private normalizeFilterValue(col: string, val: unknown): unknown', 'API query builder centralizes table-specific filter serialization');
+assertContains(apiClient, "this.s.table === 'facilitator_tts_events' && col === 'message_id'", 'API query builder serializes facilitator TTS message_id filters as strings');
 assertContains(vercelConfig, '"source": "/__railway_dev/(.*)"', 'Vercel rewrites development realtime proxy before the SPA catch-all');
 assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-development.up.railway.app/$1"', 'Vercel development proxy targets Railway dev backend');
 assertContains(vercelConfig, '"source": "/__railway_prod/(.*)"', 'Vercel rewrites production realtime proxy before the SPA catch-all');
 assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-production.up.railway.app/$1"', 'Vercel production proxy targets Railway production backend');
 assertContains(vercelConfig, 'camera=(self)', 'deployed permissions policy allows same-origin participant camera preview');
+assertContains(realtimeHelpers, 'void Promise.resolve(channel.unsubscribe()).catch(swallowExpectedRemovalError)', 'realtime helper catches async unsubscribe abort rejections');
+assertContains(realtimeHelpers, 'void Promise.resolve(api.removeChannel(channel)).catch(swallowExpectedRemovalError)', 'realtime helper catches async removeChannel abort rejections');
 
 console.log('UX session shell regression checks passed.');

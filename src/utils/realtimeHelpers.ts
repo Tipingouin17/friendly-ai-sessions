@@ -10,19 +10,25 @@ import api from "@/lib/api";
  * Safely removes a Supabase channel subscription
  * @param channel The channel to remove
  */
+const swallowExpectedRemovalError = (err: unknown) => {
+  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  if (/aborted|unsubscribe|closed/i.test(message)) return;
+  console.error("Error removing channel:", err);
+};
+
 export const removeChannel = (channel: any) => {
   if (!channel) return;
   
   try {
     if (typeof channel.unsubscribe === 'function') {
-      channel.unsubscribe();
+      void Promise.resolve(channel.unsubscribe()).catch(swallowExpectedRemovalError);
     }
     
     if (api && typeof api.removeChannel === 'function') {
-      api.removeChannel(channel);
+      void Promise.resolve(api.removeChannel(channel)).catch(swallowExpectedRemovalError);
     }
   } catch (err) {
-    console.error("Error removing channel:", err);
+    swallowExpectedRemovalError(err);
   }
 };
 

@@ -528,8 +528,12 @@ class QueryBuilder<T = Record<string, unknown>> {
     if (opts?.count) this.s.count = opts.count;
     return this;
   }
-  eq(col: string, val: unknown): this { this.s.filters.push([col, `eq.${val}`]); return this; }
-  neq(col: string, val: unknown): this { this.s.filters.push([col, `neq.${val}`]); return this; }
+  private normalizeFilterValue(col: string, val: unknown): unknown {
+    return this.s.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
+  }
+
+  eq(col: string, val: unknown): this { this.s.filters.push([col, `eq.${this.normalizeFilterValue(col, val)}`]); return this; }
+  neq(col: string, val: unknown): this { this.s.filters.push([col, `neq.${this.normalizeFilterValue(col, val)}`]); return this; }
   gt(col: string, val: unknown): this { this.s.filters.push([col, `gt.${val}`]); return this; }
   gte(col: string, val: unknown): this { this.s.filters.push([col, `gte.${val}`]); return this; }
   lt(col: string, val: unknown): this { this.s.filters.push([col, `lt.${val}`]); return this; }
@@ -539,7 +543,7 @@ class QueryBuilder<T = Record<string, unknown>> {
   in(col: string, vals: unknown[]): this { this.s.filters.push([col, `in.(${vals.join(",")})`]); return this; }
   is(col: string, val: null | boolean): this { this.s.filters.push([col, `is.${val}`]); return this; }
   not(col: string, op: string, val: unknown): this { this.s.filters.push([col, `not.${op}.${val}`]); return this; }
-  filter(col: string, op: FilterOp, val: unknown): this { this.s.filters.push([col, `${op}.${val}`]); return this; }
+  filter(col: string, op: FilterOp, val: unknown): this { this.s.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }
   order(col: string, opts?: { ascending?: boolean; nullsFirst?: boolean }): this {
     const dir = opts?.ascending === false ? "desc" : "asc";
     this.s.order.push(`${col}.${dir}${opts?.nullsFirst ? ".nullsfirst" : ""}`);

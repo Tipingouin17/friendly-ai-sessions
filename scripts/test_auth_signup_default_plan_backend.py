@@ -9,6 +9,7 @@ invokes the signup endpoint directly to ensure the backend:
 - looks up the free plan case-insensitively with title/id fallbacks
 - refuses signup if no free plan is configured
 - inserts new profiles with ``current_plan_id`` and ``subscription_status``
+- includes an idempotent startup migration to backfill existing missing plans
 """
 
 from __future__ import annotations
@@ -150,6 +151,12 @@ async def main():
     )
     assert exc.detail["code"] == "free_plan_missing"
     assert missing_plan_db.executed == [], "profile must not be inserted without a default plan"
+
+    server_source = (ROOT / "supabase_proxy" / "server_fastapi.py").read_text(encoding="utf-8")
+    assert "Backfill users created before the free-plan lookup was made case-insensitive" in server_source
+    assert "WHERE current_plan_id IS NULL" in server_source
+    assert "SET current_plan_id = (" in server_source
+    assert "subscription_status = COALESCE(subscription_status, 'free')" in server_source
 
     print("AUTH_SIGNUP_DEFAULT_PLAN_BACKEND_HARNESS_PASS")
     print(f"profile_insert_statements={len(db.executed)} missing_plan_insert_statements={len(missing_plan_db.executed)}")

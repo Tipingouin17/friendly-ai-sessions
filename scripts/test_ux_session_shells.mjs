@@ -16,6 +16,7 @@ const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService
 const apiClient = read('src/lib/api.ts');
 const vercelConfig = read('vercel.json');
 const realtimeHelpers = read('src/utils/realtimeHelpers.ts');
+const fastApiServer = read('supabase_proxy/server_fastapi.py');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -122,6 +123,8 @@ assertContains(webRTCSessionHook, 'diagnostics', 'WebRTC hook returns browser-vi
 assertContains(webRTCSessionHook, 'localCandidateTypes', 'WebRTC hook captures local ICE candidate types for diagnostics');
 assertContains(webRTCSessionHook, 'remoteCandidateTypes', 'WebRTC hook captures remote ICE candidate types for diagnostics');
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
+assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
+assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');
 assertContains(participantView, 'resolvePositiveParticipantId', 'Participant video shell rejects participant-0 identity fallbacks');
 assertContains(participantView, 'getParticipantIdFromUrl', 'Participant video shell can recover the joined participant id from the URL');
 assertContains(participantView, 'firstKnownParticipantId', 'Participant video shell falls back to the known participant record when identity is delayed');
@@ -145,6 +148,10 @@ assertContains(apiClient, 'private normalizeMutationBody(value: unknown): unknow
 assertContains(apiClient, 'next.message_id = String(next.message_id)', 'API query builder serializes facilitator TTS message_id mutation bodies as strings');
 assertContains(apiClient, 'filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }', 'Mutation builder serializes generic message_id filters as strings');
 assertContains(apiClient, 'match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${this.normalizeFilterValue(k, v)}`])); return this; }', 'Mutation builder serializes message_id match filters as strings');
+assertContains(fastApiServer, 'def build_where(params: dict, table: str | None = None):', 'Backend REST filters are table-aware for schema-specific coercion');
+assertContains(fastApiServer, 'table == "facilitator_tts_events" and column == "message_id"', 'Backend REST filters keep facilitator TTS message_id as text');
+assertContains(fastApiServer, 'table == "facilitator_tts_events" and k == "message_id" and v is not None', 'Backend REST writes keep facilitator TTS message_id as text');
+assertContains(fastApiServer, 'wc, wv = build_where(params, table)', 'Backend REST handler passes table context into filter coercion');
 assertContains(vercelConfig, '"source": "/__railway_dev/(.*)"', 'Vercel rewrites development realtime proxy before the SPA catch-all');
 assertContains(vercelConfig, '"destination": "https://friendly-ai-sessions-development.up.railway.app/$1"', 'Vercel development proxy targets Railway dev backend');
 assertContains(vercelConfig, '"source": "/__railway_prod/(.*)"', 'Vercel rewrites production realtime proxy before the SPA catch-all');

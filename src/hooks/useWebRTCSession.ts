@@ -443,8 +443,10 @@ export function useWebRTCSession({
 
   const isLocalOffererForPeer = useCallback((peerId: string): boolean => {
     if (!localPeerId) return false;
+    if (role === 'participant' && peerId === HOST_PEER_ID) return true;
+    if (role === 'host' && peerId !== HOST_PEER_ID) return false;
     return localPeerId.localeCompare(peerId) < 0;
-  }, [localPeerId]);
+  }, [localPeerId, role]);
 
   const flushPendingCandidates = useCallback(async (peerId: string, connection: RTCPeerConnection) => {
     if (!connection.remoteDescription) return;

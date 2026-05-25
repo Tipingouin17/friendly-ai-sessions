@@ -1852,23 +1852,29 @@ def _coerce_value(v: str):
     return v
 
 
-def build_where(params: dict):
+def build_where(params: dict, table: str | None = None):
     wc, wv = [], []
+
+    def _filter_value(column: str, raw_value: str):
+        if table == "facilitator_tts_events" and column == "message_id":
+            return str(raw_value).strip().strip('"').strip("'")
+        return _coerce_value(raw_value)
+
     for key, value in params.items():
         if key in ("select", "order", "limit", "offset", "on_conflict", "columns", "count"):
             continue
         if value.startswith("eq."):
-            wc.append(f'"{key}" = %s'); wv.append(_coerce_value(value[3:]))
+            wc.append(f'"{key}" = %s'); wv.append(_filter_value(key, value[3:]))
         elif value.startswith("neq."):
-            wc.append(f'"{key}" != %s'); wv.append(_coerce_value(value[4:]))
+            wc.append(f'"{key}" != %s'); wv.append(_filter_value(key, value[4:]))
         elif value.startswith("gt."):
-            wc.append(f'"{key}" > %s'); wv.append(_coerce_value(value[3:]))
+            wc.append(f'"{key}" > %s'); wv.append(_filter_value(key, value[3:]))
         elif value.startswith("gte."):
-            wc.append(f'"{key}" >= %s'); wv.append(_coerce_value(value[4:]))
+            wc.append(f'"{key}" >= %s'); wv.append(_filter_value(key, value[4:]))
         elif value.startswith("lt."):
-            wc.append(f'"{key}" < %s'); wv.append(_coerce_value(value[3:]))
+            wc.append(f'"{key}" < %s'); wv.append(_filter_value(key, value[3:]))
         elif value.startswith("lte."):
-            wc.append(f'"{key}" <= %s'); wv.append(_coerce_value(value[4:]))
+            wc.append(f'"{key}" <= %s'); wv.append(_filter_value(key, value[4:]))
         elif value.startswith("like."):
             wc.append(f'"{key}" LIKE %s'); wv.append(value[5:])
         elif value.startswith("ilike."):
@@ -1882,17 +1888,17 @@ def build_where(params: dict):
             elif v == "false":
                 wc.append(f'"{key}" = false')
         elif value.startswith("in."):
-            items = [_coerce_value(i.strip().strip('"').strip("'")) for i in value[3:].strip("()").split(",")]
+            items = [_filter_value(key, i.strip().strip('"').strip("'")) for i in value[3:].strip("()").split(",")]
             wc.append(f'"{key}" IN ({",".join(["%s"] * len(items))})')
             wv.extend(items)
         elif value.startswith("not."):
             rest = value[4:]
             if rest.startswith("eq."):
-                wc.append(f'"{key}" != %s'); wv.append(_coerce_value(rest[3:]))
+                wc.append(f'"{key}" != %s'); wv.append(_filter_value(key, rest[3:]))
             elif rest.startswith("is.null"):
                 wc.append(f'"{key}" IS NOT NULL')
         else:
-            wc.append(f'"{key}" = %s'); wv.append(_coerce_value(value))
+            wc.append(f'"{key}" = %s'); wv.append(_filter_value(key, value))
     return wc, wv
 
 
@@ -4079,7 +4085,7 @@ async def rest_table(table: str, request: Request):
                             extra_fk_cols.append(needed_col)
                 all_cols = base_cols + extra_fk_cols
                 col_str = ", ".join([f'"{c}"' if c != "*" else c for c in all_cols]) if all_cols else "*"
-                wc, wv = build_where(params)
+                wc, wv = build_where(params, table)
                 oc = build_order(params.get("order", ""))
                 lim = params.get("limit", "")
                 off = params.get("offset", "")
@@ -4290,13 +4296,15 @@ async def rest_table(table: str, request: Request):
                     # then rejects when the target column is a real array type.
                     # String values are coerced so that datetime strings become datetime objects
                     # and UUID strings become uuid.UUID objects for asyncpg.
-                    def _adapt_val(v):
+                    def _adapt_val(k, v):
+                        if table == "facilitator_tts_events" and k == "message_id" and v is not None:
+                            return str(v)
                         if isinstance(v, dict):
                             return json.dumps(v)
                         if isinstance(v, str):
                             return _coerce_value(v)
                         return v
-                    return [_adapt_val(v) for v in d.values()]
+                    return [_adapt_val(k, v) for k, v in d.items()]
 
                 if isinstance(data, list):
                     results = []
@@ -4393,19 +4401,21 @@ async def rest_table(table: str, request: Request):
                 data = await request.json()
                 if not data:
                     raise HTTPException(400, "No data")
-                wc, wv = build_where(params)
+                wc, wv = build_where(params, table)
                 # Build SET clause with asyncpg positional params
                 set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(data.keys())]
                 sc = ", ".join(set_parts)
                 # Coerce body values so datetime strings become datetime objects
                 # and UUID strings become uuid.UUID objects for asyncpg.
-                def _adapt_patch_val(v):
+                def _adapt_patch_val(k, v):
+                    if table == "facilitator_tts_events" and k == "message_id" and v is not None:
+                        return str(v)
                     if isinstance(v, dict):
                         return json.dumps(v)
                     if isinstance(v, str):
                         return _coerce_value(v)
                     return v
-                data_vals = [_adapt_patch_val(v) for v in data.values()]
+                data_vals = [_adapt_patch_val(k, v) for k, v in data.items()]
                 # Renumber WHERE clause params starting after data params
                 offset = len(data_vals)
                 new_wc_parts = []
@@ -4451,7 +4461,7 @@ async def rest_table(table: str, request: Request):
                 return rows[0] if len(rows) == 1 else rows
 
             if request.method == "DELETE":
-                wc, wv = build_where(params)
+                wc, wv = build_where(params, table)
                 new_wc_parts = []
                 for i, clause in enumerate(wc):
                     new_clause = re.sub(r'%s|\$__uid__', lambda m, _i=[i]: f'${_i[0]+1}', clause)

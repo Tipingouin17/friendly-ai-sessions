@@ -72,6 +72,12 @@ export function useSessionHostLogic() {
         };
     }, [cleanupAutoStart]);
 
+    const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
+
+    useEffect(() => {
+        setHostSessionStartedOverride(false);
+    }, [currentConversationId]);
+
     // 2. Participant & Session State Management (Single Source of Truth)
     const {
         isConnected,
@@ -85,6 +91,9 @@ export function useSessionHostLogic() {
     } = useHostParticipantManager({
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
+        onSessionStarted: () => {
+            setHostSessionStartedOverride(true);
+        },
         onSessionFull: (fullCount, maxCount) => {
             triggerAutoStart(fullCount, maxCount);
         }
@@ -109,6 +118,20 @@ export function useSessionHostLogic() {
         setMessages: setSessionMessages,
         conversationData
     });
+
+    const hasAssistantOutput = sessionMessages.some(message => message.sender === 'assistant');
+    const effectiveIsSessionStarted = Boolean(
+        hostSessionStartedOverride ||
+        isManagerSessionStarted ||
+        conversationData?.session_started ||
+        hasAssistantOutput
+    );
+
+    useEffect(() => {
+        if ((isManagerSessionStarted || conversationData?.session_started || hasAssistantOutput) && !hostSessionStartedOverride) {
+            setHostSessionStartedOverride(true);
+        }
+    }, [isManagerSessionStarted, conversationData?.session_started, hasAssistantOutput, hostSessionStartedOverride]);
 
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);
@@ -164,8 +187,7 @@ export function useSessionHostLogic() {
     useEffect(() => {
         const { timeRemaining, isExpired } = timer;
         if (timeRemaining === null) return;
-        const isStarted = isManagerSessionStarted || conversationData?.session_started;
-        if (!isStarted || isExpired) return;
+        if (!effectiveIsSessionStarted || isExpired) return;
 
         // 10-minute warning
         if (timeRemaining <= 600 && !wrapUpFiredRef.current.tenMin) {
@@ -188,8 +210,9 @@ export function useSessionHostLogic() {
     // 8. Session Start Handler
     const handleSessionStarted = useCallback(async () => {
         try {
+            setHostSessionStartedOverride(true);
             await handleStartSession();
-            // The manager will pick up the change via realtime
+            // The manager will pick up the change via realtime; the local override keeps the host UI in the active state immediately.
         } catch (error) {
             console.error("Error starting session:", error);
             toast({
@@ -213,7 +236,7 @@ export function useSessionHostLogic() {
         isLoadingParticipants: !isDataLoaded,
 
         // Session Status
-        isSessionStarted: isManagerSessionStarted || conversationData?.session_started,
+        isSessionStarted: effectiveIsSessionStarted,
         isAutoStarting: isAutoStarting || isProcessingAutoStart,
         autoStartCountdown,
         cancelAutoStart,

@@ -122,6 +122,31 @@ const getParticipantIdFromUrl = (): number | null => {
   return Number.isFinite(parsedParticipantId) && parsedParticipantId > 0 ? parsedParticipantId : null;
 };
 
+const PARTICIPANT_CAMERA_INTENT_PREFIX = 'participantCameraEnabled';
+
+const getParticipantCameraIntentKey = (conversationId: number | null, participantId: number): string | null => {
+  if (!conversationId || !participantId) return null;
+  return `${PARTICIPANT_CAMERA_INTENT_PREFIX}:${conversationId}:${participantId}`;
+};
+
+const readPersistedCameraIntent = (key: string | null): boolean => {
+  if (!key || typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const persistCameraIntent = (key: string | null, enabled: boolean): void => {
+  if (!key || typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, enabled ? 'true' : 'false');
+  } catch {
+    // Ignore storage failures; camera state can still work for the current page lifecycle.
+  }
+};
+
 const formatLastActive = (participant: ParticipantInfo): string => {
   if (!participant.lastActive) return 'Active now';
   const minutes = Math.max(0, Math.round((Date.now() - participant.lastActive.getTime()) / 60000));
@@ -182,6 +207,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const localCameraStreamRef = React.useRef<MediaStream | null>(null);
   const localCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
   const localCameraRequestIdRef = React.useRef(0);
+  const autoCameraRestoreKeyRef = React.useRef<string | null>(null);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const activeParticipants = React.useMemo(() => {
     if (participants.length > 0) return participants;
@@ -192,6 +218,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const firstKnownParticipantId = activeParticipants.length === 1 ? activeParticipants[0]?.id : null;
     return resolvePositiveParticipantId(currentUserParticipantId, currentParticipant, urlParticipantId, firstKnownParticipantId) ?? 1;
   }, [activeParticipants, currentParticipant, currentUserParticipantId]);
+
+  const cameraIntentKey = React.useMemo(
+    () => getParticipantCameraIntentKey(conversationId, effectiveParticipantId),
+    [conversationId, effectiveParticipantId]
+  );
 
   const filteredMessages = useMessageProcessor({
     messages,
@@ -254,7 +285,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     }
     setLocalCameraStream(null);
     setCameraStatus('off');
-  }, []);
+    persistCameraIntent(cameraIntentKey, false);
+  }, [cameraIntentKey]);
 
   const startLocalCamera = React.useCallback(async () => {
     if (localCameraStreamRef.current) {
@@ -288,6 +320,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       localCameraStreamRef.current = stream;
       setLocalCameraStream(stream);
       setCameraStatus('on');
+      persistCameraIntent(cameraIntentKey, true);
       return stream;
     }).catch((error) => {
       if (localCameraRequestIdRef.current !== requestId) return null;
@@ -305,7 +338,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     localCameraStartPromiseRef.current = cameraStartPromise;
     return cameraStartPromise;
-  }, []);
+  }, [cameraIntentKey]);
 
   const toggleLocalCamera = React.useCallback(() => {
     if (localCameraStreamRef.current) {
@@ -315,6 +348,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (localCameraStartPromiseRef.current) return;
     void startLocalCamera();
   }, [startLocalCamera, stopLocalCamera]);
+
+  React.useEffect(() => {
+    if (!cameraIntentKey || isSessionEnded || localCameraStreamRef.current || localCameraStartPromiseRef.current) return;
+    if (autoCameraRestoreKeyRef.current === cameraIntentKey) return;
+    if (!readPersistedCameraIntent(cameraIntentKey)) return;
+    autoCameraRestoreKeyRef.current = cameraIntentKey;
+    void startLocalCamera();
+  }, [cameraIntentKey, isSessionEnded, startLocalCamera]);
 
   const handleToggleLocalCameraClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

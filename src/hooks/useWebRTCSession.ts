@@ -824,10 +824,10 @@ export function useWebRTCSession({
   }, [catchUpRecentSignals, cleanupStaleSignals, conversationId, enabled, handleSignal, hasRealtimeSupport, localPeerId]);
 
   useEffect(() => {
-    if (!enabled || !conversationId || !localPeerId || !localStream || !hasRealtimeSupport) return;
+    if (!enabled || !conversationId || !localPeerId || !hasRealtimeSupport) return;
 
     let readyBurstsSent = 0;
-    const announceCameraReady = () => {
+    const announcePeerReady = () => {
       readyBurstsSent += 1;
       remotePeerIds.forEach((peerId) => {
         if (isLocalOffererForPeer(peerId)) {
@@ -838,17 +838,17 @@ export function useWebRTCSession({
       });
     };
 
-    announceCameraReady();
+    announcePeerReady();
     const readyTimer = window.setInterval(() => {
       if (readyBurstsSent >= WEBRTC_CAMERA_READY_BURST_COUNT) {
         window.clearInterval(readyTimer);
         return;
       }
-      announceCameraReady();
+      announcePeerReady();
     }, WEBRTC_CAMERA_READY_BURST_INTERVAL_MS);
 
     return () => window.clearInterval(readyTimer);
-  }, [conversationId, createOffer, enabled, hasRealtimeSupport, isLocalOffererForPeer, localPeerId, localStream, remotePeerIds, sendSignal]);
+  }, [conversationId, createOffer, enabled, hasRealtimeSupport, isLocalOffererForPeer, localPeerId, remotePeerIds, sendSignal]);
 
   useEffect(() => {
     const activeRemotePeers = new Set(remotePeerIds);

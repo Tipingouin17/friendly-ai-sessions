@@ -43,6 +43,10 @@ assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'particip
 assertContains(participantView, 'localCameraStartPromiseRef', 'participant camera permission requests are single-flight guarded');
 assertContains(participantView, 'localCameraRequestIdRef.current !== requestId', 'participant camera ignores stale permission results');
 assertContains(participantView, 'localCameraStartPromiseRef.current) return', 'participant camera toggle does not launch duplicate permission prompts while starting');
+assertContains(participantView, 'getParticipantCameraIntentKey', 'participant camera intent is scoped to the conversation and participant for refresh recovery');
+assertContains(participantView, 'readPersistedCameraIntent(cameraIntentKey)', 'participant refresh restores a previously enabled camera after rejoin');
+assertContains(participantView, 'persistCameraIntent(cameraIntentKey, true)', 'participant camera startup persists camera-on intent for reload recovery');
+assertContains(participantView, 'persistCameraIntent(cameraIntentKey, false)', 'participant explicit camera-off clears reload recovery intent');
 assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
 assertContains(participantView, 'handleToggleLocalCameraClick', 'participant camera toggles use a guarded click handler');
@@ -131,6 +135,8 @@ assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT', 'WebRTC 
 assertContains(webRTCSessionHook, "record.connection.signalingState !== 'have-local-offer'", 'WebRTC hook ignores late or duplicate SDP answers once the peer is already stable');
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
+assertNotContains(webRTCSessionHook, '!localStream || !hasRealtimeSupport', 'WebRTC peer readiness is not blocked by a missing local stream after participant refresh');
+assertContains(webRTCSessionHook, 'const announcePeerReady = () => {', 'WebRTC refresh/rejoin announces peer readiness even before camera restoration completes');
 assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');
 assertContains(webRTCSessionHook, 'if (!isLocalOffererForPeer(peerId)) return;', 'WebRTC createOffer is guarded so non-offerer reconnect paths cannot create glare');
 assertContains(participantView, 'resolvePositiveParticipantId', 'Participant video shell rejects participant-0 identity fallbacks');

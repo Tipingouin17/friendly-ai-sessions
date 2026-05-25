@@ -127,6 +127,7 @@ assertContains(webRTCSessionHook, 'syncRemoteReceiverStream', 'WebRTC hook synth
 assertContains(webRTCSessionHook, 'record.connection.getReceivers()', 'WebRTC hook inspects receiver tracks when ICE connects without a visible media stream');
 assertContains(webRTCSessionHook, 'stream.addTrack(track);', 'WebRTC hook builds a fallback MediaStream from received remote tracks');
 assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT', 'WebRTC hook retries critical SDP offer and answer inserts so participants do not remain stuck in have-local-offer');
+assertContains(webRTCSessionHook, "record.connection.signalingState !== 'have-local-offer'", 'WebRTC hook ignores late or duplicate SDP answers once the peer is already stable');
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
 assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');

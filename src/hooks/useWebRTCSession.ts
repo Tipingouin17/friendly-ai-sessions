@@ -718,15 +718,20 @@ export function useWebRTCSession({
       }
 
       if (signal.signalType === 'answer' && signal.sdp) {
-        if (record.connection.signalingState === 'have-local-offer' || !record.connection.currentRemoteDescription) {
+        if (record.connection.signalingState !== 'have-local-offer') {
           record.lastSignalAt = new Date().toISOString();
-          await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
           syncRemoteReceiverStream(record);
-          await flushPendingCandidates(signal.fromPeerId, record.connection);
-          if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
           updatePeerStatus(record);
+          return;
         }
+
+        record.lastSignalAt = new Date().toISOString();
+        await record.connection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        syncRemoteReceiverStream(record);
+        await flushPendingCandidates(signal.fromPeerId, record.connection);
+        if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        updatePeerStatus(record);
         return;
       }
 

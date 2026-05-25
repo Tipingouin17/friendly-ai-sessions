@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
 import { useFacilitationModeOrchestrator } from "@/hooks/useFacilitationModeOrchestrator";
+import type { FacilitatorModeAssignment } from "@/services/modeOrchestratorService";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -207,6 +208,14 @@ export function useSessionHostLogic() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
     }, [timer.timeRemaining]);
 
+    const handleStartMode = useCallback((mode: FacilitatorModeAssignment, prompt?: string) => {
+        return modeOrchestrator.startMode({
+            modeId: mode.id,
+            prompt,
+            policy: mode.effective_policy,
+        });
+    }, [modeOrchestrator]);
+
     // 8. Session Start Handler
     const handleSessionStarted = useCallback(async () => {
         try {
@@ -266,7 +275,7 @@ export function useSessionHostLogic() {
         recentModeEvents: modeOrchestrator.recentModeEvents,
         isLoadingModes: modeOrchestrator.isLoadingModes,
         modeError: modeOrchestrator.modeError,
-        startMode: modeOrchestrator.startMode,
+        startMode: handleStartMode,
         approveMode: modeOrchestrator.approveMode,
         endMode: modeOrchestrator.endMode,
         rejectMode: modeOrchestrator.rejectMode,

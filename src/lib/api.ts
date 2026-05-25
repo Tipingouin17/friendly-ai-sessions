@@ -274,9 +274,10 @@ export function clearParticipantSessionData(): void {
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit & { headers?: Record<string, string> } = {}
+  options: RequestInit & { headers?: Record<string, string>; timeoutMs?: number } = {}
 ): Promise<ApiResponse<T>> {
   try {
+    const { timeoutMs = 15_000, ...fetchOptions } = options;
     const token = getToken();
     const joinToken = getJoinToken();
     const headers: Record<string, string> = {
@@ -294,10 +295,11 @@ async function apiFetch<T>(
     // can read the session data they are allowed to access.
     if (joinToken && !token) headers["X-Join-Token"] = joinToken;
 
-    // Apply a 15-second timeout so Railway cold-start / network issues fail fast
-    // instead of hanging indefinitely. The caller (React Query) will retry.
+    // Apply a bounded timeout so Railway cold-start / network issues fail fast
+    // instead of hanging indefinitely. Callers with known long-running backend
+    // work (for example conversation creation) may opt into a longer timeout.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const signal = options.signal
       ? (AbortSignal as any).any
         ? (AbortSignal as any).any([options.signal, controller.signal])
@@ -305,7 +307,7 @@ async function apiFetch<T>(
       : controller.signal;
     let res: Response;
     try {
-      res = await fetch(`${API_URL}${path}`, { ...options, headers, signal });
+      res = await fetch(`${API_URL}${path}`, { ...fetchOptions, headers, signal });
     } finally {
       clearTimeout(timeoutId);
     }
@@ -591,9 +593,13 @@ class QueryBuilder<T = Record<string, unknown>> {
     if (token) headers["Authorization"] = `Bearer ${token}`;
     // Always send the join token when present — even for authenticated users.
     if (joinToken) headers["X-Join-Token"] = joinToken;
-    // Apply a 15-second timeout so Railway cold-start / network issues fail fast.
+    // Apply a bounded timeout so Railway cold-start / network issues fail fast.
+    // Session guard queries may legitimately take longer on the development
+    // backend immediately after cold starts, so host session creation gets a
+    // longer window before surfacing a network error.
+    const timeoutMs = this.s.table === 'sessions' ? 60_000 : 15_000;
     const _ctrl = new AbortController();
-    const _tid = setTimeout(() => _ctrl.abort(), 15_000);
+    const _tid = setTimeout(() => _ctrl.abort(), timeoutMs);
     const _sig = this.s.signal
       ? (AbortSignal as any).any
         ? (AbortSignal as any).any([this.s.signal, _ctrl.signal])
@@ -758,7 +764,8 @@ class MutationBuilder<T = Record<string, unknown>> {
     p.set("select", this.selectCols);
     if (this.extra["on_conflict"]) p.set("on_conflict", this.extra["on_conflict"]);
     const url = `/rest/v1/${this.table}?${p.toString()}`;
-    return apiFetch<T | T[]>(url, { method: this.method, body: this.body, headers });
+    const timeoutMs = this.table === 'conversations' && this.method === 'POST' ? 60_000 : undefined;
+    return apiFetch<T | T[]>(url, { method: this.method, body: this.body, headers, timeoutMs });
   }
 
   then<R1 = ApiResponse<T | T[]>, R2 = never>(

@@ -146,7 +146,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
   const assistantMessageCount = sessionMessages.filter((message) => message.sender === "assistant").length;
   const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
-  const modeName = activeMode?.name || enabledModes.find((mode) => mode.mode_slug === activeMode?.mode_slug)?.name || "Open Discussion";
+  const activeModeKey = activeMode?.facilitation_mode?.mode_key;
+  const modeName = activeMode?.facilitation_mode?.display_name
+    || enabledModes.find((mode) => mode.mode_key === activeModeKey)?.display_name
+    || "Open Discussion";
   const latestEvents = recentModeEvents.slice(0, 4);
   const stopHostCamera = React.useCallback(() => {
     hostCameraRequestIdRef.current += 1;

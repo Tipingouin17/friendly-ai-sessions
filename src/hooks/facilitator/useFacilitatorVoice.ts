@@ -2,6 +2,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import type { FacilitatorAvatarState as RuntimeAvatarState } from '@/types/facilitatorRuntime';
 import type { FacilitatorAvatarState } from '@/types/facilitator';
+import type { FacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { recordTtsEvent, updateTtsEventStatus } from '@/services/facilitator/phase3RuntimeService';
 import { buildBrowserTtsSynthesisResult } from '@/services/facilitator/phase3ProviderAdapters';
 
@@ -10,6 +11,7 @@ interface UseFacilitatorVoiceParams {
   facilitatorId?: number | null;
   enabled?: boolean;
   defaultVoiceId?: string | null;
+  voiceGender?: FacilitatorVoiceGender | null;
   lipSyncEnabled?: boolean;
   persistEvents?: boolean;
 }
@@ -70,6 +72,35 @@ const NATURAL_VOICE_KEYWORDS = [
   'serena',
 ];
 
+const FEMININE_VOICE_KEYWORDS = [
+  'samantha',
+  'ava',
+  'aria',
+  'jenny',
+  'sonia',
+  'serena',
+  'zira',
+  'susan',
+  'victoria',
+  'karen',
+  'moira',
+  'tessa',
+  'veena',
+];
+
+const MASCULINE_VOICE_KEYWORDS = [
+  'daniel',
+  'david',
+  'mark',
+  'george',
+  'james',
+  'alex',
+  'fred',
+  'tom',
+  'thomas',
+  'guy',
+];
+
 const waitForVoices = async (synth: SpeechSynthesis): Promise<SpeechSynthesisVoice[]> => {
   const initialVoices = synth.getVoices();
   if (initialVoices.length > 0) return initialVoices;
@@ -88,24 +119,51 @@ const waitForVoices = async (synth: SpeechSynthesis): Promise<SpeechSynthesisVoi
   });
 };
 
-const scoreVoice = (voice: SpeechSynthesisVoice): number => {
+const getVoiceGenderScore = (voice: SpeechSynthesisVoice, voiceGender?: FacilitatorVoiceGender | null): number => {
+  if (!voiceGender) return 0;
+  const searchable = `${voice.name} ${voice.voiceURI}`.toLowerCase();
+  const preferredKeywords = voiceGender === 'female' ? FEMININE_VOICE_KEYWORDS : MASCULINE_VOICE_KEYWORDS;
+  const opposingKeywords = voiceGender === 'female' ? MASCULINE_VOICE_KEYWORDS : FEMININE_VOICE_KEYWORDS;
+  const preferredScore = preferredKeywords.reduce((score, keyword) => searchable.includes(keyword) ? score + 80 : score, 0);
+  const opposingPenalty = opposingKeywords.reduce((score, keyword) => searchable.includes(keyword) ? score + 120 : score, 0);
+  return preferredScore - opposingPenalty;
+};
+
+const scoreVoice = (voice: SpeechSynthesisVoice, voiceGender?: FacilitatorVoiceGender | null): number => {
   const searchable = `${voice.name} ${voice.voiceURI}`.toLowerCase();
   const languageScore = voice.lang?.toLowerCase().startsWith('en') ? 60 : 0;
   const qualityScore = NATURAL_VOICE_KEYWORDS.reduce((score, keyword) => searchable.includes(keyword) ? score + 18 : score, 0);
   const localPenalty = voice.localService ? 0 : 4;
-  return languageScore + qualityScore - localPenalty;
+  return languageScore + qualityScore + getVoiceGenderScore(voice, voiceGender) - localPenalty;
 };
 
-const selectBestVoice = (voices: SpeechSynthesisVoice[], defaultVoiceId?: string | null): SpeechSynthesisVoice | undefined => {
+const voiceMatchesGender = (voice: SpeechSynthesisVoice, voiceGender?: FacilitatorVoiceGender | null): boolean => {
+  return !voiceGender || getVoiceGenderScore(voice, voiceGender) > 0;
+};
+
+const selectBestVoice = (
+  voices: SpeechSynthesisVoice[],
+  defaultVoiceId?: string | null,
+  voiceGender?: FacilitatorVoiceGender | null
+): SpeechSynthesisVoice | undefined => {
   if (defaultVoiceId) {
     const configuredVoice = voices.find((voice) => voice.voiceURI === defaultVoiceId || voice.name === defaultVoiceId);
-    if (configuredVoice) return configuredVoice;
+    if (configuredVoice && voiceMatchesGender(configuredVoice, voiceGender)) return configuredVoice;
   }
 
-  return [...voices]
-    .filter((voice) => voice.lang?.toLowerCase().startsWith('en'))
-    .sort((first, second) => scoreVoice(second) - scoreVoice(first))[0]
-    ?? [...voices].sort((first, second) => scoreVoice(second) - scoreVoice(first))[0];
+  const englishVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith('en'));
+  const genderMatchedEnglishVoices = voiceGender
+    ? englishVoices.filter((voice) => voiceMatchesGender(voice, voiceGender))
+    : englishVoices;
+  const genderMatchedVoices = voiceGender
+    ? voices.filter((voice) => voiceMatchesGender(voice, voiceGender))
+    : voices;
+
+  return [...genderMatchedEnglishVoices]
+    .sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
+    ?? [...englishVoices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
+    ?? [...genderMatchedVoices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
+    ?? [...voices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0];
 };
 
 export function useFacilitatorVoice({
@@ -113,6 +171,7 @@ export function useFacilitatorVoice({
   facilitatorId,
   enabled = true,
   defaultVoiceId = null,
+  voiceGender = null,
   lipSyncEnabled = true,
   persistEvents = true,
 }: UseFacilitatorVoiceParams): FacilitatorVoiceRuntime {
@@ -159,7 +218,7 @@ export function useFacilitatorVoice({
       text: trimmed,
       voiceId: defaultVoiceId,
       lipSyncEnabled,
-      metadata,
+      metadata: { ...metadata, voiceGender },
     });
 
     const queuedEvent = persistEvents
@@ -181,7 +240,7 @@ export function useFacilitatorVoice({
 
     const utterance = new SpeechSynthesisUtterance(trimmed);
     const voices = await waitForVoices(synth);
-    const selectedVoice = selectBestVoice(voices, defaultVoiceId);
+    const selectedVoice = selectBestVoice(voices, defaultVoiceId, voiceGender);
     if (selectedVoice) utterance.voice = selectedVoice;
     utterance.lang = selectedVoice?.lang || 'en-US';
     utterance.rate = 0.92;
@@ -193,7 +252,7 @@ export function useFacilitatorVoice({
       setIsSpeaking(true);
       setAvatarState('speaking');
       void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
       });
     };
 
@@ -204,7 +263,7 @@ export function useFacilitatorVoice({
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
         audio_duration_ms: durationMs,
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
@@ -214,7 +273,7 @@ export function useFacilitatorVoice({
       setAvatarState('error');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, lipSyncEnabled },
+        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
@@ -230,6 +289,7 @@ export function useFacilitatorVoice({
           ...metadata,
           characterCount: trimmed.length,
           voiceName: selectedVoice?.name ?? null,
+          voiceGender,
           lipSyncEnabled,
           error: error instanceof Error ? error.message : 'speech_synthesis_start_failed',
         },
@@ -237,7 +297,7 @@ export function useFacilitatorVoice({
       activeEventIdRef.current = undefined;
       toast.error('Could not start facilitator voice playback.');
     }
-  }, [conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, persistEvents]);
+  }, [conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, persistEvents, voiceGender]);
 
   return {
     isSupported,

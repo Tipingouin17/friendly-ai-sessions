@@ -20,6 +20,7 @@ import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
+import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 
@@ -235,8 +236,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
   const facilitatorName = facilitatorTitle || 'Facilitator';
   const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
-  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string; profile_picture?: string | null } | undefined;
+  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string | null; profile_picture?: string | null; details?: string | null; description?: string | null } | undefined;
   const facilitatorId = facilitatorDetails?.id ?? null;
+  const facilitatorVoiceGender = React.useMemo(() => inferFacilitatorVoiceGender({
+    title: facilitatorDetails?.title ?? facilitatorName,
+    details: facilitatorDetails?.details,
+    description: facilitatorDetails?.description,
+    profilePicture: facilitatorDetails?.profile_picture ?? facilitatorAvatarUrl,
+  }), [facilitatorAvatarUrl, facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title, facilitatorName]);
   const { data: phase3Settings, isPlaceholderData: isPhase3SettingsPending } = usePhase3RuntimeSettings(conversationData?.language);
   const phase3RuntimeReady = !isPhase3SettingsPending;
   const speechStackEnabled = Boolean(phase3RuntimeReady && phase3Settings?.speech_stack_enabled);
@@ -247,6 +254,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     facilitatorId,
     enabled: viewMode === 'participant' && ttsAvatarEnabled,
     defaultVoiceId: phase3Settings?.tts_default_voice_id ?? null,
+    voiceGender: facilitatorVoiceGender,
     lipSyncEnabled: phase3Settings?.tts_lip_sync_enabled ?? true,
     persistEvents: analyticsPersistenceEnabled,
   });

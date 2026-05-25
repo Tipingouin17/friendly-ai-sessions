@@ -107,6 +107,21 @@ const formatParticipantInitials = (participant: ParticipantInfo): string => {
     .toUpperCase();
 };
 
+const resolvePositiveParticipantId = (...candidates: Array<number | null | undefined>): number | null => {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) return candidate;
+  }
+  return null;
+};
+
+const getParticipantIdFromUrl = (): number | null => {
+  if (typeof window === 'undefined') return null;
+  const rawParticipantId = new URLSearchParams(window.location.search).get('participantId');
+  if (!rawParticipantId) return null;
+  const parsedParticipantId = Number(rawParticipantId);
+  return Number.isFinite(parsedParticipantId) && parsedParticipantId > 0 ? parsedParticipantId : null;
+};
+
 const formatLastActive = (participant: ParticipantInfo): string => {
   if (!participant.lastActive) return 'Active now';
   const minutes = Math.max(0, Math.round((Date.now() - participant.lastActive.getTime()) / 60000));
@@ -168,7 +183,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const localCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
   const localCameraRequestIdRef = React.useRef(0);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
-  const effectiveParticipantId = currentUserParticipantId !== null ? currentUserParticipantId : currentParticipant;
+  const activeParticipants = React.useMemo(() => {
+    if (participants.length > 0) return participants;
+    return Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
+  }, [currentParticipantCount, participantNames, participants]);
+  const effectiveParticipantId = React.useMemo(() => {
+    const urlParticipantId = getParticipantIdFromUrl();
+    const firstKnownParticipantId = activeParticipants.length === 1 ? activeParticipants[0]?.id : null;
+    return resolvePositiveParticipantId(currentUserParticipantId, currentParticipant, urlParticipantId, firstKnownParticipantId) ?? 1;
+  }, [activeParticipants, currentParticipant, currentUserParticipantId]);
 
   const filteredMessages = useMessageProcessor({
     messages,
@@ -310,9 +333,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     };
   }, []);
 
-  const activeParticipants = participants.length > 0
-    ? participants
-    : Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
   const orderedVideoParticipants = [...activeParticipants].sort((first, second) => {
     if (first.id === effectiveParticipantId) return -1;
     if (second.id === effectiveParticipantId) return 1;

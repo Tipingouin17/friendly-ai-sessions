@@ -122,6 +122,9 @@ assertContains(webRTCSessionHook, 'diagnostics', 'WebRTC hook returns browser-vi
 assertContains(webRTCSessionHook, 'localCandidateTypes', 'WebRTC hook captures local ICE candidate types for diagnostics');
 assertContains(webRTCSessionHook, 'remoteCandidateTypes', 'WebRTC hook captures remote ICE candidate types for diagnostics');
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
+assertContains(participantView, 'resolvePositiveParticipantId', 'Participant video shell rejects participant-0 identity fallbacks');
+assertContains(participantView, 'getParticipantIdFromUrl', 'Participant video shell can recover the joined participant id from the URL');
+assertContains(participantView, 'firstKnownParticipantId', 'Participant video shell falls back to the known participant record when identity is delayed');
 assertContains(facilitatorVoice, 'waitForVoices', 'facilitator voice waits for async browser voice loading');
 assertContains(facilitatorVoice, 'NATURAL_VOICE_KEYWORDS', 'facilitator voice prefers higher quality browser voices');
 assertContains(facilitatorVoice, 'selectBestVoice', 'facilitator voice uses scored voice selection');

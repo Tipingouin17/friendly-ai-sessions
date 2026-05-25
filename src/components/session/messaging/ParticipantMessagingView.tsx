@@ -502,28 +502,28 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, phase3Settings?.speech_default_language, speechStackEnabled]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-950">
-      <div className="shrink-0 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-2xl shadow-slate-200/80 backdrop-blur">
+    <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-white">
+      <div className="session-glass-panel shrink-0 rounded-b-[1.75rem] border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/25 bg-indigo-500/15 text-indigo-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-300/35 bg-indigo-400/20 text-indigo-100">
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-bold tracking-tight text-slate-950">{sessionTitle}</p>
-            <p className="truncate text-xs text-slate-500">Facilitated by {facilitatorName}</p>
+            <p className="truncate font-display text-base font-bold tracking-tight text-white">{sessionTitle}</p>
+            <p className="truncate text-xs text-slate-300">Facilitated by {facilitatorName}</p>
           </div>
-          <div className="hidden items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300 sm:flex">
+          <div className="session-chip hidden border-emerald-300/30 bg-emerald-400/10 text-emerald-100 sm:flex">
             <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,0.8)]" />
             Live
           </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800">
-            <Users className="h-3.5 w-3.5 text-slate-500" />
+          <div className="session-chip border-white/10 bg-white/10 text-slate-100">
+            <Users className="h-3.5 w-3.5 text-slate-300" />
             {currentParticipantCount}/{maxParticipants}
           </div>
           <div className="hidden items-center gap-1 md:flex">
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+              className="session-control-button flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100 transition hover:bg-white/15 hover:text-white"
               aria-label="Microphone status"
             >
               <Mic className="h-4 w-4" />
@@ -532,7 +532,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               type="button"
               onClick={handleToggleLocalCameraClick}
               disabled={cameraStatus === 'starting'}
-              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 ${cameraIsOn ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-200 hover:text-slate-950'}`}
+              className={`session-control-button flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 ${cameraIsOn ? 'border-emerald-300/35 bg-emerald-400/15 text-emerald-100 hover:bg-emerald-400/25' : 'border-white/10 bg-white/10 text-slate-100 hover:bg-white/15 hover:text-white'}`}
               aria-label={cameraIsOn ? 'Turn camera off' : 'Turn camera on'}
               title={cameraStatusLabel}
               data-camera-toggle="participant-local-preview"
@@ -541,7 +541,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </button>
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+              className="session-control-button flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100 transition hover:bg-white/15 hover:text-white"
               aria-label="Captions status"
             >
               <Captions className="h-4 w-4" />
@@ -551,22 +551,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80">
+        <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[2rem]">
           <section className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
             <div
-              className={`relative flex h-[min(52vh,420px)] min-h-[260px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.18),rgba(255,255,255,0.92)_45%,rgba(241,245,249,0.9))] ${aiIsSpeaking ? 'border-amber-300/70 shadow-[0_0_40px_rgba(245,158,11,0.22)] animate-ai-speaking' : 'border-slate-200'}`}
+              className={`session-avatar-stage relative flex h-[min(52vh,420px)] min-h-[260px] shrink-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/10 ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}
             >
-              <div className="absolute left-4 top-4 z-10 rounded-full border border-amber-300/35 bg-amber-300/10 px-3 py-1 text-xs font-bold text-amber-700">
+              <div className="session-chip absolute left-4 top-4 z-10 border-amber-300/35 bg-amber-300/10 text-amber-100">
                 AI
               </div>
-              <div className="absolute right-4 top-4 z-10 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
+              <div className="session-chip absolute right-4 top-4 z-10 border-white/15 bg-white/10 text-slate-100 backdrop-blur">
                 {aiIsSpeaking ? 'AI speaking' : runtimeAvatarState?.reason || 'AI monitoring'}
               </div>
               {facilitatorAvatarUrl ? (
                 <img
                   src={facilitatorAvatarUrl}
                   alt={facilitatorName}
-                  className="h-full w-full object-contain object-top p-4"
+                  className="h-full w-full object-contain object-[center_20%] p-4"
                 />
               ) : showRuntimeAvatarState ? (
                 <FacilitatorAvatar
@@ -577,12 +577,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   enableRuntimeAnimation
                 />
               ) : (
-                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-amber-300/30 bg-amber-300/10 text-amber-700 shadow-2xl shadow-amber-200/70">
+                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-amber-300/30 bg-amber-300/10 text-amber-100 shadow-2xl shadow-amber-950/30">
                   <Sparkles className="h-16 w-16" />
                 </div>
               )}
               {aiIsSpeaking && (
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1 rounded-full border border-amber-300/25 bg-white/85 px-3 py-2 backdrop-blur">
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1 rounded-full border border-amber-300/25 bg-slate-950/70 px-3 py-2 backdrop-blur">
                   {[0, 1, 2, 3, 4].map((bar) => (
                     <span
                       key={bar}
@@ -594,36 +594,36 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               )}
             </div>
 
-            <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-50 p-4 shadow-lg shadow-slate-200/70">
+            <div className="session-soft-panel mt-3 rounded-2xl p-4">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">Current question</span>
-                <span className="rounded-full border border-indigo-300/25 bg-indigo-400/10 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Current question</span>
+                <span className="session-chip border-indigo-300/30 bg-indigo-400/10 text-indigo-100">
                   {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : modeLabel}
                 </span>
               </div>
-              <p className="text-sm font-medium leading-relaxed text-slate-900 md:text-base">
+              <p className="text-sm font-medium leading-relaxed text-slate-100 md:text-base">
                 {latestAssistantMessage?.content || 'The AI facilitator is preparing the next question for the room.'}
               </p>
               <div className="mt-4 flex items-center gap-3">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full rounded-full bg-indigo-400 transition-all duration-700" style={{ width: `${responseProgress}%` }} />
+                <div className="session-progress-track h-1.5 flex-1 overflow-hidden rounded-full">
+                  <div className="session-progress-fill h-full rounded-full transition-all duration-700" style={{ width: `${responseProgress}%` }} />
                 </div>
-                <span className="shrink-0 font-mono text-xs text-slate-500">{effectiveResponseCount}/{responseTotal} responded</span>
+                <span className="shrink-0 font-mono text-xs text-slate-300">{effectiveResponseCount}/{responseTotal} responded</span>
               </div>
             </div>
 
             {hasRegisteredResponse && (
-              <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-lg shadow-emerald-100/80">
-                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-emerald-800">
+              <div className="session-soft-panel mt-3 rounded-2xl border-emerald-300/25 bg-emerald-400/10 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-emerald-100">
                   <CheckCircle2 className="h-4 w-4" />
                   Your response is registered
                 </div>
                 {latestOwnParticipantMessage ? (
-                  <blockquote className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800">
+                  <blockquote className="rounded-xl border border-emerald-300/20 bg-slate-950/35 px-3 py-2 text-sm leading-relaxed text-slate-100">
                     {latestOwnParticipantMessage.content}
                   </blockquote>
                 ) : (
-                  <p className="text-sm leading-relaxed text-emerald-800">
+                  <p className="text-sm leading-relaxed text-emerald-100">
                     Your answer has been submitted. Waiting for the rest of the room before the facilitator continues.
                   </p>
                 )}
@@ -648,7 +648,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="shrink-0 border-t border-slate-200 bg-white">
+            <div className="shrink-0 border-t border-white/10 bg-slate-950/30">
               <InputFooter
                 participantCount={maxParticipants}
                 currentParticipant={effectiveParticipantId}
@@ -686,12 +686,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           )}
         </main>
 
-        <aside className="hidden w-[292px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 md:flex">
-          <div className="flex border-b border-slate-200 p-2">
+        <aside className="session-glass-panel hidden w-[292px] shrink-0 flex-col overflow-hidden rounded-[2rem] md:flex">
+          <div className="flex border-b border-white/10 p-2">
             <button
               type="button"
               onClick={() => setSidebarTab('people')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/70' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+              className={`session-control-button flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-950/30' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
             >
               <Users className="h-4 w-4" />
               People
@@ -699,7 +699,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <button
               type="button"
               onClick={() => setSidebarTab('chat')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/70' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950'}`}
+              className={`session-control-button flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-950/30' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
             >
               <MessageSquare className="h-4 w-4" />
               Chat
@@ -713,21 +713,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 variant="participant-sidebar"
                 emptyLabel="Video tiles will appear as participants join the session."
               />
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs text-slate-700">
+              <div className="session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-950">{currentParticipantInfo?.name || 'You'}</span>
+                  <span className="font-semibold text-white">{currentParticipantInfo?.name || 'You'}</span>
                   <button
                     type="button"
                     onClick={handleToggleLocalCameraClick}
                     disabled={cameraStatus === 'starting'}
-                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70"
+                    className="session-control-button rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-100 transition hover:bg-white/15 disabled:cursor-wait disabled:opacity-70"
                     data-camera-toggle="participant-sidebar-preview"
                   >
                     {cameraIsOn ? 'Camera off' : 'Camera on'}
                   </button>
                 </div>
-                <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
-                {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
+                <span className="text-slate-300">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
+                {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-200">{cameraError}</p>}
               </div>
               <WebRTCDiagnosticsPanel
                 diagnostics={diagnostics}
@@ -742,17 +742,17 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               {latestParticipantMessages.length > 0 ? (
                 <div className="space-y-3">
                   {latestParticipantMessages.map((message) => (
-                    <div key={message.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div key={message.id} className="session-soft-panel rounded-2xl p-3">
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="truncate text-xs font-semibold text-indigo-700">{message.name || message.participant || 'Participant'}</span>
-                        <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
+                        <span className="truncate text-xs font-semibold text-indigo-200">{message.name || message.participant || 'Participant'}</span>
+                        <span className="font-mono text-[10px] text-slate-300">{getMessageTime(message)}</span>
                       </div>
-                      <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
+                      <p className="line-clamp-4 text-xs leading-relaxed text-slate-200">{message.content}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-slate-300">
                   Participant messages will appear here during the session.
                 </div>
               )}
@@ -761,11 +761,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </aside>
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white p-2 md:hidden">
-        <button type="button" onClick={() => setSidebarTab('people')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800">
+      <div className="grid shrink-0 grid-cols-2 border-t border-white/10 bg-slate-950/50 p-2 md:hidden">
+        <button type="button" onClick={() => setSidebarTab('people')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-100">
           <Users className="h-4 w-4" /> People
         </button>
-        <button type="button" onClick={() => setSidebarTab('chat')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800">
+        <button type="button" onClick={() => setSidebarTab('chat')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-100">
           <MessageSquare className="h-4 w-4" /> Chat
         </button>
       </div>

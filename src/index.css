@@ -344,3 +344,91 @@
         page-break-inside: avoid;
     }
 }
+
+/* Session pages redesign tokens and utilities */
+:root {
+    --session-ink: 0 0% 100%;
+    --session-muted: 226 31% 78%;
+    --session-bg-start: 229 45% 10%;
+    --session-bg-mid: 233 38% 13%;
+    --session-bg-end: 246 45% 17%;
+    --session-panel: 226 44% 15%;
+    --session-panel-strong: 226 47% 18%;
+    --session-border: 226 44% 92%;
+    --session-indigo: 244 83% 67%;
+    --session-violet: 263 82% 72%;
+    --session-amber: 38 92% 58%;
+    --session-emerald: 151 71% 46%;
+    --session-rose: 351 83% 61%;
+}
+
+.session-redesign-shell {
+    color: hsl(var(--session-ink));
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.24), transparent 30rem),
+        radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.22), transparent 32rem),
+        linear-gradient(135deg, hsl(var(--session-bg-start)), hsl(var(--session-bg-mid)) 48%, hsl(var(--session-bg-end)));
+}
+
+.session-glass-panel {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.62);
+    box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35);
+    backdrop-filter: blur(18px);
+}
+
+.session-soft-panel {
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(30, 41, 59, 0.56);
+    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.26);
+    backdrop-filter: blur(14px);
+}
+
+.session-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.84);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.session-avatar-stage {
+    background:
+        radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.38), rgba(15, 23, 42, 0.88) 45%, rgba(2, 6, 23, 0.96)),
+        linear-gradient(180deg, rgba(30, 41, 59, 0.82), rgba(2, 6, 23, 0.95));
+}
+
+.session-speaking-ring {
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.46), 0 0 32px rgba(129, 140, 248, 0.44), inset 0 0 38px rgba(245, 158, 11, 0.10);
+}
+
+.session-progress-track {
+    background: rgba(148, 163, 184, 0.22);
+}
+
+.session-progress-fill {
+    background: linear-gradient(90deg, hsl(var(--session-indigo)), hsl(var(--session-violet)));
+}
+
+.session-control-button {
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.session-control-button:hover {
+    transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .session-control-button,
+    .animate-ai-speaking,
+    .animate-sound-bar,
+    .animate-reaction-pop {
+        animation: none !important;
+        transition: none !important;
+    }
+}

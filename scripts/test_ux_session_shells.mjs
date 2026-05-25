@@ -28,7 +28,8 @@ const assertNotContains = (source, needle, label) => {
 };
 
 assertContains(participantView, 'AI spotlight', 'participant view documentation');
-assertContains(participantView, 'bg-slate-50 text-slate-950', 'participant light shell surface');
+assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-white', 'participant redesigned dark shell surface');
+assertContains(participantView, 'session-avatar-stage', 'participant redesigned AI spotlight stage');
 assertContains(participantView, 'Current question', 'participant current-question card');
 assertContains(participantView, 'latestOwnParticipantMessage', 'participant registered-response derivation');
 assertContains(participantView, 'String(message.participant) === participantKey', 'participant response registration tolerates numeric participant ids');
@@ -67,7 +68,9 @@ assertContains(participantView, 'const messageId = String(lastAssistantMessage.i
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');
-assertContains(hostContent, 'bg-slate-50 p-3 text-slate-950', 'host light command-center surface');
+assertContains(hostContent, 'session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-white', 'host redesigned dark command-center surface');
+assertContains(stylesheet, '.session-glass-panel', 'shared redesign glass-panel utility');
+assertContains(stylesheet, '.session-progress-fill', 'shared redesign progress utility');
 assertContains(hostContent, 'Participant intelligence', 'host participant intelligence rail');
 assertContains(hostContent, 'Session pulse', 'host pulse panel');
 assertContains(hostContent, '<SimplifiedHostMessagingView', 'host preserved control surface');

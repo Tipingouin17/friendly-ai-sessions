@@ -107,6 +107,7 @@ interface PeerRecord {
   participantId: number | null;
   connection: RTCPeerConnection;
   videoTransceiver?: RTCRtpTransceiver;
+  audioTransceiver?: RTCRtpTransceiver;
   offerInProgress?: boolean;
   queuedRenegotiation?: PeerNegotiationOptions;
   localCandidateTypes: Set<string>;
@@ -333,6 +334,7 @@ export function useWebRTCSession({
     if (connection.signalingState === 'closed' || connection.connectionState === 'closed') return;
 
     const videoTrack = stream?.getVideoTracks()[0] ?? null;
+    const audioTrack = stream?.getAudioTracks()[0] ?? null;
     let videoTransceiver = record.videoTransceiver;
     if (!videoTransceiver || videoTransceiver.stopped) {
       videoTransceiver = connection.getTransceivers().find((transceiver) => {
@@ -356,9 +358,33 @@ export function useWebRTCSession({
       if (!videoTransceiver.stopped && videoTransceiver.direction !== nextDirection) {
         videoTransceiver.direction = nextDirection;
       }
+      let audioTransceiver = record.audioTransceiver;
+      if (!audioTransceiver || audioTransceiver.stopped) {
+        audioTransceiver = connection.getTransceivers().find((transceiver) => {
+          return !transceiver.stopped && (transceiver.sender.track?.kind === 'audio' || transceiver.receiver.track?.kind === 'audio');
+        });
+      }
+
+      if (!audioTransceiver) {
+        try {
+          audioTransceiver = connection.addTransceiver('audio', { direction: audioTrack ? 'sendrecv' : 'recvonly' });
+        } catch (error) {
+          console.warn('Unable to prepare WebRTC audio transceiver:', error);
+          updatePeerStatus(record);
+          return;
+        }
+      }
+      record.audioTransceiver = audioTransceiver;
+
+      await audioTransceiver.sender.replaceTrack(audioTrack);
+      const nextAudioDirection: RTCRtpTransceiverDirection = audioTrack ? 'sendrecv' : 'recvonly';
+      if (!audioTransceiver.stopped && audioTransceiver.direction !== nextAudioDirection) {
+        audioTransceiver.direction = nextAudioDirection;
+      }
+
       updatePeerStatus(record);
     } catch (error) {
-      console.warn('Unable to sync local camera track to WebRTC peer:', error);
+      console.warn('Unable to sync local media tracks to WebRTC peer:', error);
     }
   }, [updatePeerStatus]);
 

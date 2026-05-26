@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import AvatarSelector from './AvatarSelector';
+import PreJoinMediaCheck from './PreJoinMediaCheck';
 
 interface JoinFormProps {
   participantName: string;
@@ -21,6 +22,7 @@ interface JoinFormProps {
   isDisabled?: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
+  conversationId: number | null;
 }
 
 const JoinForm: React.FC<JoinFormProps> = ({
@@ -32,7 +34,8 @@ const JoinForm: React.FC<JoinFormProps> = ({
   isJoining,
   isDisabled = false,
   currentParticipantCount,
-  effectiveMaxParticipants
+  effectiveMaxParticipants,
+  conversationId
 }) => {
   const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
 
@@ -42,6 +45,8 @@ const JoinForm: React.FC<JoinFormProps> = ({
         avatarSeed={avatarSeed}
         onAvatarChange={onAvatarChange}
       />
+
+      <PreJoinMediaCheck conversationId={conversationId} disabled={isJoining || isDisabled} />
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">

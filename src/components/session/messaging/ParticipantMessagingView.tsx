@@ -13,7 +13,7 @@ import type { ConversationWithSession } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Captions, CheckCircle2, Home, MessageSquare, Mic, Sparkles, Users, Video, VideoOff } from 'lucide-react';
+import { Captions, CheckCircle2, Home, MessageSquare, Mic, MicOff, Sparkles, Users, Video, VideoOff } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
@@ -23,6 +23,7 @@ import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSe
 import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
+import { persistParticipantMediaPreferences, readParticipantMediaPreferences } from '@/utils/participantMediaPreferences';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -122,8 +123,6 @@ const getParticipantIdFromUrl = (): number | null => {
   return Number.isFinite(parsedParticipantId) && parsedParticipantId > 0 ? parsedParticipantId : null;
 };
 
-const PARTICIPANT_CAMERA_INTENT_PREFIX = 'participantCameraEnabled';
-
 type LegacyActiveModeFields = {
   name?: string | null;
   mode_key?: string | null;
@@ -218,29 +217,6 @@ const formatRemainingTime = (seconds: number | null | undefined): string | null 
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
-const getParticipantCameraIntentKey = (conversationId: number | null, participantId: number): string | null => {
-  if (!conversationId || !participantId) return null;
-  return `${PARTICIPANT_CAMERA_INTENT_PREFIX}:${conversationId}:${participantId}`;
-};
-
-const readPersistedCameraIntent = (key: string | null): boolean => {
-  if (!key || typeof window === 'undefined') return false;
-  try {
-    return window.localStorage.getItem(key) === 'true';
-  } catch {
-    return false;
-  }
-};
-
-const persistCameraIntent = (key: string | null, enabled: boolean): void => {
-  if (!key || typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, enabled ? 'true' : 'false');
-  } catch {
-    // Ignore storage failures; camera state can still work for the current page lifecycle.
-  }
-};
-
 const formatLastActive = (participant: ParticipantInfo): string => {
   if (!participant.lastActive) return 'Active now';
   const minutes = Math.max(0, Math.round((Date.now() - participant.lastActive.getTime()) / 60000));
@@ -297,6 +273,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
+  const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const [submittingChoiceId, setSubmittingChoiceId] = React.useState<string | null>(null);
   const [submittedChoiceId, setSubmittedChoiceId] = React.useState<string | null>(null);
@@ -316,10 +293,17 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return resolvePositiveParticipantId(currentUserParticipantId, currentParticipant, urlParticipantId, firstKnownParticipantId) ?? 1;
   }, [activeParticipants, currentParticipant, currentUserParticipantId]);
 
-  const cameraIntentKey = React.useMemo(
-    () => getParticipantCameraIntentKey(conversationId, effectiveParticipantId),
-    [conversationId, effectiveParticipantId]
+  const persistedMediaPreferences = React.useMemo(
+    () => readParticipantMediaPreferences(conversationId),
+    [conversationId]
   );
+
+  const persistMediaPreferences = React.useCallback((cameraEnabled: boolean, micEnabled: boolean) => {
+    persistParticipantMediaPreferences(conversationId, {
+      cameraEnabled,
+      microphoneEnabled: micEnabled,
+    });
+  }, [conversationId]);
 
   const filteredMessages = useMessageProcessor({
     messages,
@@ -442,8 +426,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     }
     setLocalCameraStream(null);
     setCameraStatus('off');
-    persistCameraIntent(cameraIntentKey, false);
-  }, [cameraIntentKey]);
+    setMicrophoneEnabled(false);
+    persistMediaPreferences(false, false);
+  }, [persistMediaPreferences]);
 
   const startLocalCamera = React.useCallback(async () => {
     if (localCameraStreamRef.current) {
@@ -462,9 +447,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     setCameraStatus('starting');
     setCameraError(null);
 
+    const shouldEnableMicrophone = readParticipantMediaPreferences(conversationId).microphoneEnabled;
     const cameraStartPromise = navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
-      audio: false,
+      audio: shouldEnableMicrophone,
     }).then((stream) => {
       if (localCameraRequestIdRef.current !== requestId) {
         stream.getTracks().forEach((track) => track.stop());
@@ -477,7 +463,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       localCameraStreamRef.current = stream;
       setLocalCameraStream(stream);
       setCameraStatus('on');
-      persistCameraIntent(cameraIntentKey, true);
+      const hasAudioTrack = stream.getAudioTracks().some((track) => track.enabled);
+      setMicrophoneEnabled(hasAudioTrack);
+      persistMediaPreferences(true, hasAudioTrack);
       return stream;
     }).catch((error) => {
       if (localCameraRequestIdRef.current !== requestId) return null;
@@ -495,7 +483,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     localCameraStartPromiseRef.current = cameraStartPromise;
     return cameraStartPromise;
-  }, [cameraIntentKey]);
+  }, [conversationId, persistMediaPreferences]);
 
   const toggleLocalCamera = React.useCallback(() => {
     if (localCameraStreamRef.current) {
@@ -507,18 +495,78 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [startLocalCamera, stopLocalCamera]);
 
   React.useEffect(() => {
-    if (!cameraIntentKey || isSessionEnded || localCameraStreamRef.current || localCameraStartPromiseRef.current) return;
-    if (autoCameraRestoreKeyRef.current === cameraIntentKey) return;
-    if (!readPersistedCameraIntent(cameraIntentKey)) return;
-    autoCameraRestoreKeyRef.current = cameraIntentKey;
+    if (!conversationId || isSessionEnded || localCameraStreamRef.current || localCameraStartPromiseRef.current) return;
+    if (autoCameraRestoreKeyRef.current === String(conversationId)) return;
+    if (!persistedMediaPreferences.cameraEnabled) {
+      setMicrophoneEnabled(persistedMediaPreferences.microphoneEnabled);
+      return;
+    }
+    autoCameraRestoreKeyRef.current = String(conversationId);
     void startLocalCamera();
-  }, [cameraIntentKey, isSessionEnded, startLocalCamera]);
+  }, [conversationId, isSessionEnded, persistedMediaPreferences.cameraEnabled, persistedMediaPreferences.microphoneEnabled, startLocalCamera]);
+
+  const toggleLocalMicrophone = React.useCallback(async () => {
+    const nextMicrophoneEnabled = !microphoneEnabled;
+
+    if (!nextMicrophoneEnabled) {
+      localCameraStreamRef.current?.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+        localCameraStreamRef.current?.removeTrack(track);
+      });
+      setMicrophoneEnabled(false);
+      persistMediaPreferences(cameraStatus === 'on', false);
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Microphone testing is not supported in this browser.');
+      persistMediaPreferences(cameraStatus === 'on', false);
+      return;
+    }
+
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      const audioTrack = audioStream.getAudioTracks()[0];
+      if (!audioTrack) {
+        setCameraError('No microphone was detected.');
+        persistMediaPreferences(cameraStatus === 'on', false);
+        return;
+      }
+
+      if (localCameraStreamRef.current) {
+        localCameraStreamRef.current.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+          track.stop();
+          localCameraStreamRef.current?.removeTrack(track);
+        });
+        localCameraStreamRef.current.addTrack(audioTrack);
+        setLocalCameraStream(new MediaStream(localCameraStreamRef.current.getTracks()));
+      } else {
+        audioTrack.stop();
+      }
+
+      setMicrophoneEnabled(true);
+      persistMediaPreferences(cameraStatus === 'on', true);
+    } catch (error) {
+      console.error('Error accessing participant microphone:', error);
+      setCameraError('Microphone access was blocked. Allow microphone permission in your browser to use audio.');
+      setMicrophoneEnabled(false);
+      persistMediaPreferences(cameraStatus === 'on', false);
+    }
+  }, [cameraStatus, microphoneEnabled, persistMediaPreferences]);
 
   const handleToggleLocalCameraClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     toggleLocalCamera();
   }, [toggleLocalCamera]);
+
+  const handleToggleLocalMicrophoneClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void toggleLocalMicrophone();
+  }, [toggleLocalMicrophone]);
 
   React.useEffect(() => {
     return () => {
@@ -695,10 +743,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           <div className="hidden items-center gap-1 md:flex">
             <button
               type="button"
-              className="session-control-button flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              aria-label="Microphone status"
+              onClick={handleToggleLocalMicrophoneClick}
+              className={`session-control-button flex h-8 w-8 items-center justify-center rounded-xl border transition ${microphoneEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              aria-label={microphoneEnabled ? 'Turn microphone off' : 'Turn microphone on'}
+              title={microphoneEnabled ? 'Microphone on' : 'Microphone off'}
             >
-              <Mic className="h-4 w-4" />
+              {microphoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
             </button>
             <button
               type="button"

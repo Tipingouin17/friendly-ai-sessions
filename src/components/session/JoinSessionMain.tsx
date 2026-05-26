@@ -292,6 +292,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                 isJoining={isJoining}
                 currentParticipantCount={currentParticipantCount}
                 effectiveMaxParticipants={effectiveMaxParticipants}
+                conversationId={conversation?.id ?? null}
               />
             )}
           </div>

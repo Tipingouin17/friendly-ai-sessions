@@ -28,7 +28,7 @@ const assertNotContains = (source, needle, label) => {
 };
 
 assertContains(participantView, 'AI spotlight', 'participant view documentation');
-assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-white', 'participant redesigned dark shell surface');
+assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900', 'participant redesigned light shell surface');
 assertContains(participantView, 'session-avatar-stage', 'participant redesigned AI spotlight stage');
 assertContains(participantView, 'Current question', 'participant current-question card');
 assertContains(participantView, 'latestOwnParticipantMessage', 'participant registered-response derivation');
@@ -37,6 +37,9 @@ assertContains(participantView, 'Your response is registered', 'participant visi
 assertContains(participantView, 'effectiveResponseCount', 'participant response counter uses local registration fallback');
 assertContains(participantView, 'Math.max(responseCount, hasRegisteredResponse ? 1 : 0)', 'participant local response counter does not remain at zero after own reply registers');
 assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
+assertContains(participantView, "aria-pressed={sidebarTab === 'people'}", 'participant mobile People tab exposes active pressed state');
+assertContains(participantView, "aria-pressed={sidebarTab === 'chat'}", 'participant mobile Chat tab exposes active pressed state');
+assertContains(participantView, "{sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}", 'participant mobile tabs render a visible People or Chat panel');
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');
 assertContains(participantView, 'participantVideoTiles', 'participant data-driven video tile mapping');
@@ -44,12 +47,13 @@ assertContains(participantView, 'navigator.mediaDevices.getUserMedia', 'particip
 assertContains(participantView, 'localCameraStartPromiseRef', 'participant camera permission requests are single-flight guarded');
 assertContains(participantView, 'localCameraRequestIdRef.current !== requestId', 'participant camera ignores stale permission results');
 assertContains(participantView, 'localCameraStartPromiseRef.current) return', 'participant camera toggle does not launch duplicate permission prompts while starting');
-assertContains(participantView, 'getParticipantCameraIntentKey', 'participant camera intent is scoped to the conversation and participant for refresh recovery');
-assertContains(participantView, 'readPersistedCameraIntent(cameraIntentKey)', 'participant refresh restores a previously enabled camera after rejoin');
-assertContains(participantView, 'persistCameraIntent(cameraIntentKey, true)', 'participant camera startup persists camera-on intent for reload recovery');
-assertContains(participantView, 'persistCameraIntent(cameraIntentKey, false)', 'participant explicit camera-off clears reload recovery intent');
+assertContains(participantView, 'readParticipantMediaPreferences(conversationId)', 'participant refresh restores previously enabled media preferences after rejoin');
+assertContains(participantView, 'persistMediaPreferences(true, hasAudioTrack)', 'participant camera startup persists camera-on media preference for reload recovery');
+assertContains(participantView, 'persistMediaPreferences(false, false)', 'participant explicit camera-off clears reload recovery preference');
+assertContains(participantView, 'persistParticipantMediaPreferences(conversationId', 'participant media preferences are scoped to the active conversation');
 assertContains(participantView, 'localCameraStreamRef.current.getTracks().forEach((track) => track.stop())', 'participant local camera stream cleanup');
 assertContains(participantView, 'data-camera-toggle="participant-local-preview"', 'participant header camera toggle marker');
+assertContains(participantView, 'data-camera-toggle={`participant-${panelVariant}-preview`}', 'participant shared People panel camera toggle marker covers desktop and mobile');
 assertContains(participantView, 'handleToggleLocalCameraClick', 'participant camera toggles use a guarded click handler');
 assertContains(participantView, 'event.preventDefault();', 'participant camera toggle prevents accidental form submission or navigation');
 assertContains(participantView, 'event.stopPropagation();', 'participant camera toggle avoids parent click side effects');
@@ -61,14 +65,14 @@ assertContains(participantView, 'connectionStatusLabel', 'participant remote til
 assertContains(participantView, 'Camera access was blocked', 'participant camera permission feedback');
 assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
-assertContains(participantView, 'submitModeInput={submitModeInput}', 'participant mode input plumbing');
+assertContains(participantView, 'await submitModeInput({', 'participant mode input plumbing');
 assertContains(participantView, 'speechEnabled={speechStackEnabled}', 'participant speech runtime plumbing');
 assertContains(participantView, 'hasTtsEventForMessage', 'participant skips facilitator TTS replay after refresh when a TTS event already exists');
 assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');
-assertContains(hostContent, 'session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-white', 'host redesigned dark command-center surface');
+assertContains(hostContent, 'session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900', 'host redesigned light command-center surface');
 assertContains(stylesheet, '.session-glass-panel', 'shared redesign glass-panel utility');
 assertContains(stylesheet, '.session-progress-fill', 'shared redesign progress utility');
 assertContains(hostContent, 'Participant intelligence', 'host participant intelligence rail');

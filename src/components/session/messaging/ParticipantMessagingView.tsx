@@ -721,6 +721,64 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     });
   }, [analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, phase3Settings?.speech_default_language, speechStackEnabled]);
 
+  const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile') => {
+    const isMobilePanel = panelVariant === 'mobile';
+
+    return (
+      <div className={isMobilePanel ? 'flex max-h-[36vh] min-h-[180px] flex-col overflow-hidden p-3' : 'flex min-h-0 flex-1 flex-col p-3'}>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <SessionVideoGrid
+            participants={participantVideoTiles}
+            variant="participant-sidebar"
+            emptyLabel="Video tiles will appear as participants join the session."
+          />
+        </div>
+        <div className="session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-slate-900">{currentParticipantInfo?.name || 'You'}</span>
+            <button
+              type="button"
+              onClick={handleToggleLocalCameraClick}
+              disabled={cameraStatus === 'starting'}
+              className="session-control-button min-h-11 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70 md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
+              data-camera-toggle={`participant-${panelVariant}-preview`}
+            >
+              {cameraIsOn ? 'Camera off' : 'Camera on'}
+            </button>
+          </div>
+          <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
+          {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  const renderChatPanel = (panelVariant: 'desktop' | 'mobile') => {
+    const isMobilePanel = panelVariant === 'mobile';
+
+    return (
+      <div className={isMobilePanel ? 'max-h-[36vh] overflow-y-auto p-3' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
+        {latestParticipantMessages.length > 0 ? (
+          <div className="space-y-3">
+            {latestParticipantMessages.map((message) => (
+              <div key={message.id} className="session-soft-panel rounded-2xl p-3">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-semibold text-indigo-600">{message.name || message.participant || 'Participant'}</span>
+                  <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
+                </div>
+                <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-full min-h-[140px] items-center justify-center rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            Participant messages will appear here during the session.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
       <div className="session-glass-panel shrink-0 rounded-b-[1.75rem] border-b border-slate-200 px-4 py-3">
@@ -740,11 +798,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <Users className="h-3.5 w-3.5 text-slate-500" />
             {currentParticipantCount}/{maxParticipants}
           </div>
-          <div className="hidden items-center gap-1 md:flex">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={handleToggleLocalMicrophoneClick}
-              className={`session-control-button flex h-8 w-8 items-center justify-center rounded-xl border transition ${microphoneEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              className={`session-control-button flex h-11 w-11 items-center justify-center rounded-xl border transition md:h-8 md:w-8 ${microphoneEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
               aria-label={microphoneEnabled ? 'Turn microphone off' : 'Turn microphone on'}
               title={microphoneEnabled ? 'Microphone on' : 'Microphone off'}
             >
@@ -754,7 +812,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               type="button"
               onClick={handleToggleLocalCameraClick}
               disabled={cameraStatus === 'starting'}
-              className={`session-control-button flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 ${cameraIsOn ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              className={`session-control-button flex h-11 w-11 items-center justify-center rounded-xl border transition disabled:cursor-wait disabled:opacity-70 md:h-8 md:w-8 ${cameraIsOn ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
               aria-label={cameraIsOn ? 'Turn camera off' : 'Turn camera on'}
               title={cameraStatusLabel}
               data-camera-toggle="participant-local-preview"
@@ -763,7 +821,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </button>
             <button
               type="button"
-              className="session-control-button flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              className="session-control-button hidden h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 md:flex"
               aria-label="Captions status"
             >
               <Captions className="h-4 w-4" />
@@ -1002,7 +1060,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <button
               type="button"
               onClick={() => setSidebarTab('people')}
-              className={`session-control-button flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              className={`session-control-button flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
             >
               <Users className="h-4 w-4" />
               People
@@ -1010,66 +1068,42 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <button
               type="button"
               onClick={() => setSidebarTab('chat')}
-              className={`session-control-button flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              className={`session-control-button flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
             >
               <MessageSquare className="h-4 w-4" />
               Chat
             </button>
           </div>
 
-          {sidebarTab === 'people' ? (
-            <div className="flex min-h-0 flex-1 flex-col p-3">
-              <SessionVideoGrid
-                participants={participantVideoTiles}
-                variant="participant-sidebar"
-                emptyLabel="Video tiles will appear as participants join the session."
-              />
-              <div className="session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-900">{currentParticipantInfo?.name || 'You'}</span>
-                  <button
-                    type="button"
-                    onClick={handleToggleLocalCameraClick}
-                    disabled={cameraStatus === 'starting'}
-                    className="session-control-button rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70"
-                    data-camera-toggle="participant-sidebar-preview"
-                  >
-                    {cameraIsOn ? 'Camera off' : 'Camera on'}
-                  </button>
-                </div>
-                <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
-                {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-200">{cameraError}</p>}
-              </div>
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {latestParticipantMessages.length > 0 ? (
-                <div className="space-y-3">
-                  {latestParticipantMessages.map((message) => (
-                    <div key={message.id} className="session-soft-panel rounded-2xl p-3">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="truncate text-xs font-semibold text-indigo-200">{message.name || message.participant || 'Participant'}</span>
-                        <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
-                      </div>
-                      <p className="line-clamp-4 text-xs leading-relaxed text-slate-200">{message.content}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                  Participant messages will appear here during the session.
-                </div>
-              )}
-            </div>
-          )}
+          {sidebarTab === 'people' ? renderPeoplePanel('desktop') : renderChatPanel('desktop')}
         </aside>
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white/95 p-2 md:hidden">
-        <button type="button" onClick={() => setSidebarTab('people')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-3 py-2 md:hidden">
+        <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50">
+          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+            <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Chat'}</span>
+            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount}/${maxParticipants} present` : `${latestParticipantMessages.length} recent`}</span>
+          </div>
+          {sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}
+        </div>
+      </div>
+
+      <div className="relative z-20 grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white/95 p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarTab('people')}
+          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+          aria-pressed={sidebarTab === 'people'}
+        >
           <Users className="h-4 w-4" /> People
         </button>
-        <button type="button" onClick={() => setSidebarTab('chat')} className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+        <button
+          type="button"
+          onClick={() => setSidebarTab('chat')}
+          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+          aria-pressed={sidebarTab === 'chat'}
+        >
           <MessageSquare className="h-4 w-4" /> Chat
         </button>
       </div>

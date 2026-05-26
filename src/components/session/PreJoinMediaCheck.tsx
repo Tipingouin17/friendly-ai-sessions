@@ -36,6 +36,7 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
   const audioStreamRef = React.useRef<MediaStream | null>(null);
   const analyserRef = React.useRef(createEmptyAnalyser());
   const levelFrameRef = React.useRef<number | null>(null);
+  const previewCleanupRef = React.useRef<(() => void) | null>(null);
 
   const persistPreferences = React.useCallback((nextCameraEnabled: boolean, nextMicrophoneEnabled: boolean) => {
     persistParticipantMediaPreferences(conversationId, {
@@ -45,6 +46,8 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
   }, [conversationId]);
 
   const stopVideoStream = React.useCallback(() => {
+    previewCleanupRef.current?.();
+    previewCleanupRef.current = null;
     videoStreamRef.current?.getTracks().forEach((track) => track.stop());
     videoStreamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -67,9 +70,26 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
     audioStreamRef.current = null;
   }, [stopAudioMeter]);
 
-  const attachVideoPreview = React.useCallback(async (stream: MediaStream) => {
+  const attachVideoPreview = React.useCallback((stream: MediaStream) => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
+
+    previewCleanupRef.current?.();
+    previewCleanupRef.current = null;
+
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    const tryPlay = () => {
+      if (cancelled) return;
+      const playPromise = videoElement.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => undefined);
+      }
+    };
+    const schedulePlaybackRetry = () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(tryPlay, 120);
+    };
 
     videoElement.muted = true;
     videoElement.defaultMuted = true;
@@ -80,9 +100,25 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
     videoElement.srcObject = stream;
     videoElement.load();
 
-    const tryPlay = () => videoElement.play().catch(() => undefined);
-    await tryPlay();
-    window.setTimeout(tryPlay, 120);
+    videoElement.addEventListener('loadedmetadata', tryPlay);
+    videoElement.addEventListener('loadeddata', tryPlay);
+    videoElement.addEventListener('canplay', tryPlay);
+    stream.getVideoTracks().forEach((track) => track.addEventListener('unmute', schedulePlaybackRetry));
+
+    if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      tryPlay();
+    } else {
+      schedulePlaybackRetry();
+    }
+
+    previewCleanupRef.current = () => {
+      cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      videoElement.removeEventListener('loadedmetadata', tryPlay);
+      videoElement.removeEventListener('loadeddata', tryPlay);
+      videoElement.removeEventListener('canplay', tryPlay);
+      stream.getVideoTracks().forEach((track) => track.removeEventListener('unmute', schedulePlaybackRetry));
+    };
   }, []);
 
   const startCamera = React.useCallback(async () => {
@@ -104,7 +140,7 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
       });
       videoStreamRef.current = stream;
       setCameraEnabled(true);
-      await attachVideoPreview(stream);
+      attachVideoPreview(stream);
       setCameraStatus('on');
       persistPreferences(true, microphoneEnabled);
     } catch (error) {

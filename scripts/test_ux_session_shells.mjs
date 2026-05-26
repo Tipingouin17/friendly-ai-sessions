@@ -11,6 +11,7 @@ const preSessionHostView = read('src/components/session/host/PreSessionHostView.
 const facilitatorVoice = read('src/hooks/facilitator/useFacilitatorVoice.ts');
 const stylesheet = read('src/index.css');
 const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
+const preJoinMediaCheck = read('src/components/session/PreJoinMediaCheck.tsx');
 const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
 const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService.ts');
 const apiClient = read('src/lib/api.ts');
@@ -111,6 +112,11 @@ assertContains(videoGrid, "videoElement.addEventListener('canplay', playStream)"
 assertContains(videoGrid, "track.addEventListener('unmute', schedulePlaybackRetry)", 'video tile retries playback when mobile camera tracks unmute after permission');
 assertContains(videoGrid, 'srcObject = null', 'video tile MediaStream detaches on unmount');
 assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile accessible live preview label');
+assertContains(preJoinMediaCheck, 'previewCleanupRef', 'pre-join camera preview owns cleanup for mobile playback listeners');
+assertContains(preJoinMediaCheck, "videoElement.addEventListener('loadedmetadata', tryPlay)", 'pre-join camera preview retries playback when stream metadata becomes available');
+assertContains(preJoinMediaCheck, "videoElement.addEventListener('canplay', tryPlay)", 'pre-join camera preview retries playback when mobile browsers report the stream can play');
+assertContains(preJoinMediaCheck, "track.addEventListener('unmute', schedulePlaybackRetry)", 'pre-join camera preview retries playback when mobile camera tracks unmute after permission');
+assertContains(preJoinMediaCheck, "videoElement.removeEventListener('canplay', tryPlay)", 'pre-join camera preview removes mobile playback retry listeners during cleanup');
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');
 assertContains(videoGrid, "data-video-tile-variant", 'video tile variant semantic marker');
 assertContains(videoGrid, "variant?: 'participant-sidebar' | 'host-strip' | 'host-gallery'", 'video grid supported layout variants');

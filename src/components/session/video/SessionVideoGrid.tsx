@@ -80,6 +80,7 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
     if (!videoElement) return;
 
     let cancelled = false;
+    let retryTimer: number | null = null;
     const playStream = () => {
       if (cancelled) return;
       const playPromise = videoElement.play();
@@ -89,18 +90,38 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
         });
       }
     };
+    const schedulePlaybackRetry = () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(playStream, 120);
+    };
 
     videoElement.muted = muted;
+    videoElement.defaultMuted = muted;
+    videoElement.autoplay = true;
+    videoElement.playsInline = true;
+    videoElement.setAttribute('playsinline', 'true');
+    videoElement.setAttribute('webkit-playsinline', 'true');
     videoElement.srcObject = stream;
+    videoElement.load();
+
+    videoElement.addEventListener('loadedmetadata', playStream);
+    videoElement.addEventListener('loadeddata', playStream);
+    videoElement.addEventListener('canplay', playStream);
+    stream.getVideoTracks().forEach((track) => track.addEventListener('unmute', schedulePlaybackRetry));
+
     if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
       playStream();
     } else {
-      videoElement.onloadedmetadata = playStream;
+      schedulePlaybackRetry();
     }
 
     return () => {
       cancelled = true;
-      videoElement.onloadedmetadata = null;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      videoElement.removeEventListener('loadedmetadata', playStream);
+      videoElement.removeEventListener('loadeddata', playStream);
+      videoElement.removeEventListener('canplay', playStream);
+      stream.getVideoTracks().forEach((track) => track.removeEventListener('unmute', schedulePlaybackRetry));
       videoElement.pause();
       videoElement.srcObject = null;
     };
@@ -114,6 +135,7 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
       autoPlay
       playsInline
       muted={muted}
+      disablePictureInPicture
     />
   );
 };
@@ -127,7 +149,7 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
 }) => {
   const isSpotlight = variant === 'spotlight';
   const accentColor = participant.accentColor || (participant.isAI ? 'rgb(217 119 6)' : 'rgb(79 70 229)');
-  const hasLiveStream = Boolean(participant.mediaStream);
+  const hasLiveStream = Boolean(participant.mediaStream?.getVideoTracks().some((track) => track.readyState === 'live'));
 
   return (
     <article
@@ -136,6 +158,7 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
       data-video-tile-variant={variant}
       data-participant-id={participant.id}
       data-connection-status={participant.connectionStatus}
+      data-has-live-stream={hasLiveStream ? 'true' : 'false'}
     >
       {hasLiveStream && participant.mediaStream ? (
         <StreamVideo stream={participant.mediaStream} name={participant.name} muted={Boolean(participant.isYou || participant.isMuted)} />
@@ -246,7 +269,7 @@ export const SessionVideoGrid: React.FC<SessionVideoGridProps> = ({
     ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
     : variant === 'host-strip'
     ? 'grid auto-cols-[minmax(150px,180px)] grid-flow-col gap-3 overflow-x-auto pb-2'
-    : 'grid grid-cols-2 gap-2 overflow-y-auto pr-1';
+    : 'grid grid-cols-2 gap-2 overflow-y-auto pr-1 data-[session-video-grid=participant-sidebar]:auto-rows-min';
 
   return (
     <div className={`${gridClass} ${className}`} data-session-video-grid={variant}>

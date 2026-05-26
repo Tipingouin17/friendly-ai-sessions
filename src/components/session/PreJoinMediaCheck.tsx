@@ -67,6 +67,24 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
     audioStreamRef.current = null;
   }, [stopAudioMeter]);
 
+  const attachVideoPreview = React.useCallback(async (stream: MediaStream) => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    videoElement.muted = true;
+    videoElement.defaultMuted = true;
+    videoElement.autoplay = true;
+    videoElement.playsInline = true;
+    videoElement.setAttribute('playsinline', 'true');
+    videoElement.setAttribute('webkit-playsinline', 'true');
+    videoElement.srcObject = stream;
+    videoElement.load();
+
+    const tryPlay = () => videoElement.play().catch(() => undefined);
+    await tryPlay();
+    window.setTimeout(tryPlay, 120);
+  }, []);
+
   const startCamera = React.useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus('unsupported');
@@ -85,11 +103,8 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
         audio: false,
       });
       videoStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
-      }
       setCameraEnabled(true);
+      await attachVideoPreview(stream);
       setCameraStatus('on');
       persistPreferences(true, microphoneEnabled);
     } catch (error) {
@@ -100,7 +115,7 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
       setMediaError('Camera access was blocked. Allow camera permission to join with video on.');
       persistPreferences(false, microphoneEnabled);
     }
-  }, [microphoneEnabled, persistPreferences, stopVideoStream]);
+  }, [attachVideoPreview, microphoneEnabled, persistPreferences, stopVideoStream]);
 
   const startMicrophone = React.useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -177,15 +192,22 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Run once for this join page instance; later changes are handled by explicit toggle actions.
   }, []);
 
+  React.useEffect(() => {
+    const currentStream = videoStreamRef.current;
+    if (cameraEnabled && currentStream && videoRef.current?.srcObject !== currentStream) {
+      void attachVideoPreview(currentStream);
+    }
+  }, [attachVideoPreview, cameraEnabled]);
+
   const cameraLabel = cameraStatus === 'starting' ? 'Starting…' : cameraEnabled ? 'Camera on' : 'Camera off';
   const microphoneLabel = microphoneStatus === 'starting' ? 'Testing…' : microphoneEnabled ? 'Mic on' : 'Mic off';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 sm:p-3.5">
+      <div className="mb-2 flex items-start justify-between gap-3 sm:mb-3">
         <div>
           <p className="text-sm font-semibold text-slate-900">Check your camera and microphone</p>
-          <p className="mt-0.5 text-xs text-slate-500">Your choices are remembered for this session before you join.</p>
+          <p className="mt-0.5 text-xs text-slate-500 sm:block">Your choices are remembered for this session before you join.</p>
         </div>
         {(cameraEnabled || microphoneEnabled) && (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
@@ -196,7 +218,7 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
         {cameraEnabled ? (
-          <video ref={videoRef} muted playsInline autoPlay className="aspect-video w-full object-cover" />
+          <video ref={videoRef} muted playsInline autoPlay disablePictureInPicture className="aspect-video w-full object-cover" />
         ) : (
           <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 text-slate-300">
             <CameraOff className="h-8 w-8" />

@@ -211,8 +211,8 @@ const ChatInput = ({
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-3">
-      <div className="flex items-end gap-2">
+    <div className="border-t border-slate-200 bg-white px-2 py-2 sm:px-4 sm:py-3">
+      <div className="flex items-end gap-1.5 sm:gap-2">
         {/* Textarea */}
         <div className="flex-1 relative">
           <textarea
@@ -223,14 +223,14 @@ const ChatInput = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className={`w-full resize-none rounded-2xl border bg-slate-50 px-3.5 py-2.5 text-sm leading-[22px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 ${
+            className={`w-full resize-none rounded-2xl border bg-slate-50 px-3 py-2 text-sm leading-[20px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 sm:leading-[22px] ${
               isOverLimit
                 ? "border-red-400 focus:ring-red-400"
                 : isNearLimit
                   ? "border-amber-400 focus:ring-amber-400"
                   : "border-slate-200 focus:ring-indigo-400"
             }`}
-            style={{ minHeight: '42px', maxHeight: '104px', overflowY: 'auto' }}
+            style={{ minHeight: '38px', maxHeight: '88px', overflowY: 'auto' }}
           />
           {isRecording && (
             <div className="absolute bottom-2 left-3 flex items-center gap-1.5 text-xs text-red-500 font-medium pointer-events-none">

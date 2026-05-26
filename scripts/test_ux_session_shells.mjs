@@ -106,7 +106,9 @@ assertContains(stylesheet, '@keyframes reactionPop', 'video reaction badge anima
 assertContains(videoGrid, 'mediaStream?: MediaStream | null', 'video tile optional live stream support');
 assertContains(videoGrid, 'srcObject = stream', 'video tile MediaStream binding');
 assertContains(videoGrid, 'videoElement.play()', 'video tile explicitly starts MediaStream playback after permission');
-assertContains(videoGrid, 'videoElement.onloadedmetadata = playStream', 'video tile retries playback when stream metadata becomes available');
+assertContains(videoGrid, "videoElement.addEventListener('loadedmetadata', playStream)", 'video tile retries playback when stream metadata becomes available');
+assertContains(videoGrid, "videoElement.addEventListener('canplay', playStream)", 'video tile retries playback when mobile browsers report the stream can play');
+assertContains(videoGrid, "track.addEventListener('unmute', schedulePlaybackRetry)", 'video tile retries playback when mobile camera tracks unmute after permission');
 assertContains(videoGrid, 'srcObject = null', 'video tile MediaStream detaches on unmount');
 assertContains(videoGrid, 'aria-label={`${name} live video`}', 'video tile accessible live preview label');
 assertContains(videoGrid, "data-session-video-grid", 'video grid semantic marker');

@@ -725,7 +725,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const isMobilePanel = panelVariant === 'mobile';
 
     return (
-      <div className={isMobilePanel ? 'flex max-h-[36vh] min-h-[180px] flex-col overflow-hidden p-3' : 'flex min-h-0 flex-1 flex-col p-3'}>
+      <div className={isMobilePanel ? 'flex max-h-[32dvh] min-h-[150px] flex-col overflow-hidden p-2' : 'flex min-h-0 flex-1 flex-col p-3'}>
         <div className="min-h-0 flex-1 overflow-hidden">
           <SessionVideoGrid
             participants={participantVideoTiles}
@@ -733,7 +733,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             emptyLabel="Video tiles will appear as participants join the session."
           />
         </div>
-        <div className="session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200">
+        <div className={isMobilePanel ? 'session-soft-panel mt-2 rounded-2xl px-3 py-2 text-xs text-slate-200' : 'session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200'}>
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-slate-900">{currentParticipantInfo?.name || 'You'}</span>
             <button
@@ -757,7 +757,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const isMobilePanel = panelVariant === 'mobile';
 
     return (
-      <div className={isMobilePanel ? 'max-h-[36vh] overflow-y-auto p-3' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
+      <div className={isMobilePanel ? 'max-h-[32dvh] overflow-y-auto p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
         {latestParticipantMessages.length > 0 ? (
           <div className="space-y-3">
             {latestParticipantMessages.map((message) => (
@@ -781,14 +781,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
-      <div className="session-glass-panel shrink-0 rounded-b-[1.75rem] border-b border-slate-200 px-4 py-3">
+      <div className="session-glass-panel shrink-0 rounded-b-[1.5rem] border-b border-slate-200 px-3 py-2 md:rounded-b-[1.75rem] md:px-4 md:py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600">
+          <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600 sm:flex">
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-bold tracking-tight text-slate-950">{sessionTitle}</p>
-            <p className="truncate text-xs text-slate-500">Facilitated by {facilitatorName}</p>
+            <p className="truncate font-display text-sm font-bold tracking-tight text-slate-950 md:text-base">{sessionTitle}</p>
+            <p className="truncate text-[11px] text-slate-500 md:text-xs">Facilitated by {facilitatorName}</p>
           </div>
           <div className="session-chip hidden border-emerald-200 bg-emerald-50 text-emerald-700 sm:flex">
             <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.45)]" />
@@ -830,11 +830,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[2rem]">
-          <section className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+      <div className="flex min-h-0 flex-1 gap-2 p-2 md:gap-3 md:p-3">
+        <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] md:rounded-[2rem]">
+          <section className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4">
             <div
-              className={`session-avatar-stage relative flex h-[min(46vh,390px)] min-h-[220px] shrink-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-slate-200 ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}
+              className={`session-avatar-stage relative flex h-[clamp(120px,24dvh,260px)] min-h-[120px] shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-slate-200 md:h-[min(46vh,390px)] md:min-h-[220px] md:rounded-[1.75rem] ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}
             >
               <div className="session-chip absolute left-4 top-4 z-10 border-amber-200 bg-amber-50 text-amber-700">
                 AI
@@ -846,7 +846,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 <img
                   src={facilitatorAvatarUrl}
                   alt={facilitatorName}
-                  className="h-full w-full object-contain object-[center_20%] p-4"
+                  className="h-full w-full object-contain object-[center_20%] p-2 md:p-4"
                 />
               ) : showRuntimeAvatarState ? (
                 <FacilitatorAvatar
@@ -874,14 +874,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               )}
             </div>
 
-            <div className="session-soft-panel mt-3 rounded-2xl p-4">
+            <div className="session-soft-panel mt-2 rounded-2xl p-3 md:mt-3 md:p-4">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Current question</span>
                 <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">
                   {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : modeLabel}
                 </span>
               </div>
-              <p className="text-sm font-medium leading-relaxed text-slate-700 md:text-base">
+              <p className="line-clamp-5 text-sm font-medium leading-relaxed text-slate-700 md:line-clamp-none md:text-base">
                 {latestAssistantMessage?.content || activeMode?.prompt || 'The AI facilitator is preparing the next question for the room.'}
               </p>
               {activeMode && (
@@ -1009,7 +1009,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="shrink-0 border-t border-slate-200 bg-white/90">
+            <div className="shrink-0 border-t border-slate-200 bg-white/90 md:block">
               <InputFooter
                 participantCount={maxParticipants}
                 currentParticipant={effectiveParticipantId}
@@ -1079,9 +1079,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </aside>
       </div>
 
-      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-3 py-2 md:hidden">
-        <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50">
-          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-2 py-2 md:hidden">
+        <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/40">
+          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5">
             <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Chat'}</span>
             <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount}/${maxParticipants} present` : `${latestParticipantMessages.length} recent`}</span>
           </div>

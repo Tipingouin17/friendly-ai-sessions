@@ -51,7 +51,7 @@ const Session = () => {
         <SessionMobileNav />
       </div>
 
-      <div className={`flex-1 overflow-hidden ${showMobileNav ? 'pt-16' : ''}`}>
+      <div className={`flex-1 overflow-hidden ${showMobileNav ? 'pt-12 sm:pt-16' : ''}`}>
         <SessionContent
           isLoading={isLoading}
           hasInitializedProvider={hasInitializedProvider}

@@ -107,14 +107,22 @@ const resolveStoredParticipantName = (
   return participantName || mappedName || `Participant ${participant.id}`;
 };
 
-const formatParticipantInitials = (participant: ParticipantInfo): string => {
-  const source = resolveStoredParticipantName(participant, {}) || `P${participant.id}`;
-  return source
+const formatNameInitials = (name: string | null | undefined, fallback = 'P'): string => {
+  const initials = name
+    ?.trim()
     .split(/\s+/)
+    .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  return initials || fallback;
+};
+
+const formatParticipantInitials = (participant: ParticipantInfo): string => {
+  const source = resolveStoredParticipantName(participant, {}) || `P${participant.id}`;
+  return formatNameInitials(source, `P${participant.id}`.slice(0, 2).toUpperCase());
 };
 
 const isHostParticipant = (participant: ParticipantInfo): boolean => {
@@ -763,11 +771,29 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return null;
   }, [currentParticipantAvatarSeed, effectiveParticipantId]);
 
-  const orderedVideoParticipants = [...participantPeers].sort((first, second) => {
-    if (first.id === effectiveParticipantId) return -1;
-    if (second.id === effectiveParticipantId) return 1;
-    return first.id - second.id;
-  });
+  const currentParticipantVideoRecord = React.useMemo<ParticipantInfo>(() => {
+    const knownParticipant = participantPeers.find((participant) => participant.id === effectiveParticipantId);
+    if (knownParticipant) return knownParticipant;
+
+    const mappedName = participantNames[effectiveParticipantId]?.trim();
+    return {
+      id: effectiveParticipantId,
+      name: mappedName && !isGenericParticipantLabel(mappedName) ? mappedName : `Participant ${effectiveParticipantId}`,
+      avatarSeed: currentParticipantAvatarSeed || undefined,
+    } as ParticipantInfo;
+  }, [currentParticipantAvatarSeed, effectiveParticipantId, participantNames, participantPeers]);
+
+  const orderedVideoParticipants = React.useMemo(() => {
+    const participantById = new Map<number, ParticipantInfo>();
+    participantById.set(currentParticipantVideoRecord.id, currentParticipantVideoRecord);
+    participantPeers.forEach((participant) => participantById.set(participant.id, participant));
+
+    return Array.from(participantById.values()).sort((first, second) => {
+      if (first.id === effectiveParticipantId) return -1;
+      if (second.id === effectiveParticipantId) return 1;
+      return first.id - second.id;
+    });
+  }, [currentParticipantVideoRecord, effectiveParticipantId, participantPeers]);
   const { remoteStreams, connectionStatus, peerStatuses } = useWebRTCSession({
     conversationId,
     role: 'participant',
@@ -780,10 +806,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
   const hostDisplayName = resolveHostDisplayName(hostParticipant);
+  const facilitatorVideoTile: SessionVideoParticipant = {
+    id: 'ai-facilitator',
+    name: facilitatorName || 'AI Facilitator',
+    initials: formatNameInitials(facilitatorName, 'AI'),
+    avatarUrl: facilitatorAvatarUrl || undefined,
+    isAI: true,
+    isMuted: false,
+    isSpeaking: aiIsSpeaking,
+    accentColor: 'rgb(245 158 11)',
+  };
+
   const hostVideoTile: SessionVideoParticipant = {
     id: HOST_VIDEO_STREAM_KEY,
     name: hostDisplayName,
-    initials: hostDisplayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'H',
+    initials: formatNameInitials(hostDisplayName, 'H'),
     avatarUrl: hostParticipant?.avatar || undefined,
     avatarSeed: hostParticipant?.avatarSeed || undefined,
     mediaStream: hostRemoteStream,
@@ -794,7 +831,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     accentColor: 'rgb(217 119 6)',
   };
 
-  const participantVideoTiles: SessionVideoParticipant[] = [hostVideoTile, ...orderedVideoParticipants.map((participant) => {
+  const participantVideoTiles: SessionVideoParticipant[] = [facilitatorVideoTile, hostVideoTile, ...orderedVideoParticipants.map((participant) => {
     const isCurrentUser = participant.id === effectiveParticipantId;
     const remoteStream = remoteStreams[String(participant.id)] ?? null;
     const peerStatus = peerStatuses[`participant-${participant.id}`];

@@ -6727,6 +6727,15 @@ async def edge_function(func_name: str, request: Request):
         try:
             async with _pool.acquire() as conn:
                 async with conn.transaction():
+                    # Serialize participant-slot assignment before the statement snapshot is
+                    # taken.  A row lock inside the slot-selection statement is not enough
+                    # under READ COMMITTED because concurrent statements can take their
+                    # snapshots before waiting on the row lock and still choose the same
+                    # candidate participant_id.  The transaction-scoped advisory lock is
+                    # acquired in a separate statement, so the slot-selection query below
+                    # starts only after earlier joins for this conversation have committed.
+                    await conn.execute("SELECT pg_advisory_xact_lock($1::bigint)", int(conversation_id))
+
                     # Keep the conversation row locked for exactly one SQL round trip.
                     # The previous implementation held FOR UPDATE across several remote
                     # database queries; under ten simultaneous joins, later requests could

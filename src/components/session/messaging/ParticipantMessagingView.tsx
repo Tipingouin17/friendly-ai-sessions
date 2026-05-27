@@ -873,6 +873,25 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       text: payload.transcript,
       confidence: payload.confidence ?? undefined,
     });
+
+    if (isOpenDiscussionMode && submitModeInput) {
+      void submitModeInput({
+        inputType: 'voice_transcript',
+        content: {
+          transcript: payload.transcript,
+          confidence: payload.confidence,
+          modeKey,
+          startedAt: payload.startedAt,
+          endedAt: payload.endedAt,
+          durationMs: payload.durationMs,
+          source: 'browser_speech_recognition',
+        },
+        visibility: 'attributed',
+      }).catch((error) => {
+        console.warn('Unable to submit Open Discussion speech turn to mode pipeline:', error);
+      });
+    }
+
     if (!analyticsPersistenceEnabled) return;
     void recordSpeechTurn({
       conversationId,
@@ -886,9 +905,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       durationMs: payload.durationMs,
       startedAt: payload.startedAt,
       endedAt: payload.endedAt,
-      metrics: { composer: 'participant_chat_input' },
+      metrics: {
+        composer: isOpenDiscussionMode ? 'open_discussion_live_listening' : 'participant_chat_input',
+        modeKey,
+        activeModeId: activeMode?.id ?? null,
+      },
     });
-  }, [analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, phase3Settings?.speech_default_language, speechStackEnabled]);
+  }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, modeKey, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
 
   const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile') => {
     const isMobilePanel = panelVariant === 'mobile';
@@ -1073,13 +1096,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 placeholder={modePlaceholder}
                 disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
                 disabled={modeComposerDisabled}
-                modeContext={activeMode ? {
+                modeContext={activeMode || isOpenDiscussionMode ? {
                   label: modeLabel,
                   instruction: modeInstruction,
                   component: modeComposerComponent,
                   modeKey,
                   stateLabel: isOpenDiscussionMode
-                    ? 'Open floor'
+                    ? activeMode
+                      ? 'Open floor'
+                      : 'Default open floor'
                     : hasRegisteredResponse || hasSubmittedModeChoice
                       ? 'Response registered'
                       : modeCanSubmit
@@ -1098,7 +1123,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
                 onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
                 onReaction={(reaction) => {
-                  console.info('Participant quick reaction', { reaction, modeKey });
+                  if (isOpenDiscussionMode && submitModeInput) {
+                    void submitModeInput({
+                      inputType: 'reaction',
+                      content: {
+                        reaction,
+                        modeKey,
+                        source: 'participant_quick_reaction',
+                      },
+                      visibility: 'public',
+                    }).catch((error) => {
+                      console.warn('Unable to submit Open Discussion quick reaction:', error);
+                    });
+                  } else {
+                    console.info('Participant quick reaction', { reaction, modeKey });
+                  }
                 }}
               />
             </div>

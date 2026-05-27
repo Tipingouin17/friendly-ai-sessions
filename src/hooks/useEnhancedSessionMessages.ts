@@ -69,6 +69,9 @@ export const useEnhancedSessionMessages = ({
             if (p && typeof p === 'object' && !Array.isArray(p)) parsedContent = p as Record<string, unknown>;
           } catch { /* plain text string — leave parsedContent null */ }
         }
+        const facilitationTechnique = parsedContent && typeof parsedContent.facilitation_technique === 'object' && parsedContent.facilitation_technique
+          ? parsedContent.facilitation_technique as Message['facilitationTechnique']
+          : null;
         return {
           id: msg.id.toString(),
           content: parsedContent && 'text' in parsedContent ? String(parsedContent.text) : (typeof msg.content === 'string' ? msg.content : ''),
@@ -77,6 +80,7 @@ export const useEnhancedSessionMessages = ({
           participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
           name: msg.name || undefined,
           avatar: parsedContent && 'avatar' in parsedContent ? String(parsedContent.avatar) : undefined,
+          facilitationTechnique,
           role: msg.role || 'user'
         };
       });

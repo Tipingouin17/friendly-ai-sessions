@@ -238,6 +238,27 @@ const isIgnorableStaleSignalError = (error: unknown): boolean => {
     || message.includes('remote description indicates ice restart but offer did not request ice restart');
 };
 
+const isIncompatibleSessionDescriptionError = (error: unknown): boolean => {
+  if (!(error instanceof DOMException)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('answer tried to set recv when offer did not set send')
+    || message.includes('answer tried to set send when offer did not set recv')
+    || message.includes('failed to set remote answer sdp')
+    || message.includes('failed to set local answer sdp');
+};
+
+const buildInactiveTransceiverDirection = (
+  connection: RTCPeerConnection,
+  kind: 'audio' | 'video',
+  hasLocalTrack: boolean,
+): RTCRtpTransceiverDirection => {
+  const remoteOfferDirection = getRemoteOfferMediaDirection(connection, kind);
+  if (remoteOfferDirection === 'recvonly') return hasLocalTrack ? 'sendonly' : 'inactive';
+  if (remoteOfferDirection === 'sendonly') return 'recvonly';
+  if (remoteOfferDirection === 'sendrecv') return hasLocalTrack ? 'sendrecv' : 'recvonly';
+  return hasLocalTrack ? 'sendonly' : 'inactive';
+};
+
 const isSignalPayload = (value: unknown): value is WebRTCSignalPayload => {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<WebRTCSignalPayload>;
@@ -416,6 +437,24 @@ export function useWebRTCSession({
     } catch (error) {
       console.warn('Unable to sync local media tracks to WebRTC peer:', error);
     }
+  }, [updatePeerStatus]);
+
+  const enforceAnswerDirectionsForRemoteOffer = useCallback(async (record: PeerRecord, stream: MediaStream | null): Promise<void> => {
+    const videoTrack = stream?.getVideoTracks()[0] ?? null;
+    const audioTrack = stream?.getAudioTracks()[0] ?? null;
+
+    for (const kind of ['video', 'audio'] as const) {
+      const transceiver = kind === 'video' ? record.videoTransceiver : record.audioTransceiver;
+      const localTrack = kind === 'video' ? videoTrack : audioTrack;
+      if (!transceiver || transceiver.stopped) continue;
+      await transceiver.sender.replaceTrack(localTrack);
+      const nextDirection = buildInactiveTransceiverDirection(record.connection, kind, Boolean(localTrack));
+      if (!transceiver.stopped && transceiver.direction !== nextDirection) {
+        transceiver.direction = nextDirection;
+      }
+    }
+
+    updatePeerStatus(record);
   }, [updatePeerStatus]);
 
   const syncRemoteReceiverStream = useCallback((
@@ -775,6 +814,8 @@ export function useWebRTCSession({
         syncRemoteReceiverStream(record);
         await syncLocalStreamToPeer(record, localStreamRef.current);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
+        await enforceAnswerDirectionsForRemoteOffer(record, localStreamRef.current);
+        if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
         await flushPendingCandidates(signal.fromPeerId, record.connection);
         if (!isCurrentPeerRecord(signal.fromPeerId, record)) return;
         const answer = await record.connection.createAnswer();
@@ -830,10 +871,16 @@ export function useWebRTCSession({
         console.debug('Ignoring stale WebRTC signal from a previous ICE generation:', error);
         return;
       }
+      if (isIncompatibleSessionDescriptionError(error)) {
+        console.warn('Resetting incompatible WebRTC peer after SDP direction mismatch:', error);
+        closePeer(signal.fromPeerId);
+        if (isLocalOffererForPeer(signal.fromPeerId)) schedulePeerRenegotiation(signal.fromPeerId);
+        return;
+      }
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [conversationId, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
+  }, [closePeer, conversationId, enforceAnswerDirectionsForRemoteOffer, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;

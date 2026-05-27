@@ -215,6 +215,23 @@ const normalizeFacilitationModeKey = (modeKey: string | null | undefined): strin
   return normalized;
 };
 
+const normalizeTechniqueKey = (value: string | null | undefined): string => {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+};
+
+const inferModeKeyFromTechnique = (techniqueKey: string): string => {
+  if (!techniqueKey) return 'open_discussion';
+  if (techniqueKey.includes('vote') || techniqueKey.includes('priorit') || techniqueKey.includes('dot')) return 'voting_rating';
+  if (techniqueKey.includes('round') || techniqueKey.includes('turn')) return 'round_robin';
+  if (techniqueKey.includes('silent') || techniqueKey.includes('brainwrit') || techniqueKey.includes('individual')) return 'silent_individual_response';
+  if (techniqueKey.includes('reflect') || techniqueKey.includes('checkin') || techniqueKey.includes('emotion') || techniqueKey.includes('temperature')) return 'reflection_checkin';
+  return 'open_discussion';
+};
+
 const getParticipantModeInstruction = (modeKey: string, composerCopy?: string | null): string => {
   if (composerCopy?.trim()) return composerCopy.trim();
   if (modeKey === 'voting_rating') return 'Choose the option or signal that best represents your view.';
@@ -814,6 +831,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
 
+  const lastFacilitationTechnique = lastAssistantMessage?.facilitationTechnique ?? null;
+  const techniqueModeKey = React.useMemo(() => {
+    const selectedTechnique = lastFacilitationTechnique?.selected || lastFacilitationTechnique?.label || null;
+    return inferModeKeyFromTechnique(normalizeTechniqueKey(selectedTechnique));
+  }, [lastFacilitationTechnique?.label, lastFacilitationTechnique?.selected]);
+  const techniqueModeContext = React.useMemo(() => {
+    if (!lastFacilitationTechnique || activeMode) return null;
+    const label = lastFacilitationTechnique.label || lastFacilitationTechnique.selected || 'Adaptive facilitation';
+    const instruction = lastFacilitationTechnique.expected_participant_input
+      || lastFacilitationTechnique.steering_instruction
+      || lastFacilitationTechnique.divergence_guidance
+      || getParticipantModeInstruction(techniqueModeKey, null);
+    return { label, instruction, modeKey: techniqueModeKey };
+  }, [activeMode, lastFacilitationTechnique, techniqueModeKey]);
+
   React.useEffect(() => {
     if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
     const messageId = String(lastAssistantMessage.id);
@@ -1093,25 +1125,27 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
                 onSpeechInterim={handleSpeechInterim}
                 onSpeechFinal={handleSpeechFinal}
-                placeholder={modePlaceholder}
+                placeholder={techniqueModeContext && !activeMode ? getModePlaceholder(techniqueModeContext.modeKey, techniqueModeContext.instruction) : modePlaceholder}
                 disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
                 disabled={modeComposerDisabled}
-                modeContext={activeMode || isOpenDiscussionMode ? {
-                  label: modeLabel,
-                  instruction: modeInstruction,
-                  component: modeComposerComponent,
-                  modeKey,
-                  stateLabel: isOpenDiscussionMode
-                    ? activeMode
-                      ? 'Open floor'
-                      : 'Default open floor'
-                    : hasRegisteredResponse || hasSubmittedModeChoice
-                      ? 'Response registered'
-                      : modeCanSubmit
-                        ? isRoundRobinMode && !participantModeState?.is_current_speaker
-                          ? 'Waiting for your turn'
-                          : 'Ready for your input'
-                        : 'Not open yet',
+                modeContext={activeMode || isOpenDiscussionMode || techniqueModeContext ? {
+                  label: techniqueModeContext && !activeMode ? techniqueModeContext.label : modeLabel,
+                  instruction: techniqueModeContext && !activeMode ? techniqueModeContext.instruction : modeInstruction,
+                  component: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeComposerComponent,
+                  modeKey: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeKey,
+                  stateLabel: techniqueModeContext && !activeMode
+                    ? 'Selected facilitation technique'
+                    : isOpenDiscussionMode
+                      ? activeMode
+                        ? 'Open floor'
+                        : 'Default open floor'
+                      : hasRegisteredResponse || hasSubmittedModeChoice
+                        ? 'Response registered'
+                        : modeCanSubmit
+                          ? isRoundRobinMode && !participantModeState?.is_current_speaker
+                            ? 'Waiting for your turn'
+                            : 'Ready for your input'
+                          : 'Not open yet',
                   isComplete: !isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice),
                 } : undefined}
                 modeOptions={modeChoices}

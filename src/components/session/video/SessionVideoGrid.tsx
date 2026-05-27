@@ -127,12 +127,14 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
     videoElement.setAttribute('playsinline', 'true');
     videoElement.setAttribute('webkit-playsinline', 'true');
     videoElement.srcObject = stream;
-    videoElement.load();
 
+    const handleTrackActivity = () => schedulePlaybackRetry();
     videoElement.addEventListener('loadedmetadata', playStream);
     videoElement.addEventListener('loadeddata', playStream);
     videoElement.addEventListener('canplay', playStream);
     stream.getVideoTracks().forEach((track) => track.addEventListener('unmute', schedulePlaybackRetry));
+    stream.addEventListener('addtrack', handleTrackActivity);
+    stream.addEventListener('removetrack', handleTrackActivity);
 
     if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
       playStream();
@@ -147,6 +149,8 @@ const StreamVideo: React.FC<{ stream: MediaStream; name: string; muted: boolean 
       videoElement.removeEventListener('loadeddata', playStream);
       videoElement.removeEventListener('canplay', playStream);
       stream.getVideoTracks().forEach((track) => track.removeEventListener('unmute', schedulePlaybackRetry));
+      stream.removeEventListener('addtrack', handleTrackActivity);
+      stream.removeEventListener('removetrack', handleTrackActivity);
       videoElement.pause();
       videoElement.srcObject = null;
     };

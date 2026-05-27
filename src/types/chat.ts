@@ -23,6 +23,14 @@ export interface Message {
   isAIGenerated?: boolean;
   isEnhanced?: boolean;
   isPrivateToHost?: boolean;
+  facilitationTechnique?: {
+    selected?: string | null;
+    label?: string | null;
+    rationale?: string | null;
+    steering_instruction?: string | null;
+    divergence_guidance?: string | null;
+    expected_participant_input?: string | null;
+  } | null;
 }
 
 export interface ParticipantInfo {

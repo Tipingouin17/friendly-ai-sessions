@@ -48,6 +48,7 @@ interface HostHeaderProps {
   isSessionPaused: boolean;
   toggleSessionState: () => void;
   isSessionStarted?: boolean;
+  isWaitingRoomFull?: boolean;
 }
 
 const HostHeader: React.FC<HostHeaderProps> = ({
@@ -55,6 +56,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   isSessionPaused,
   toggleSessionState,
   isSessionStarted: isExplicitSessionStarted,
+  isWaitingRoomFull = false,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -261,6 +263,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                 <SessionStatusBadge
                   isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
                   sessionStarted={isSessionStarted}
+                  isWaitingRoomFull={isWaitingRoomFull}
                   isSessionEnded={isSessionEnded}
                 />
                 {isSessionStarted && !isSessionEnded && (

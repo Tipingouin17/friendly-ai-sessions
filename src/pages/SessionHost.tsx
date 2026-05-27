@@ -27,6 +27,7 @@ const SessionHost = () => {
     isAutoStarting,
     autoStartCountdown,
     cancelAutoStart,
+    isWaitingRoomFull,
 
     // Messages
     sessionMessages,
@@ -111,6 +112,7 @@ const SessionHost = () => {
       isAutoStarting={isAutoStarting}
       autoStartCountdown={autoStartCountdown}
       onCancelAutoStart={cancelAutoStart}
+      isWaitingRoomFull={isWaitingRoomFull}
       isSessionEnded={conversationData?.is_session_ended === true}
     />
   );

@@ -50,6 +50,7 @@ interface HostDashboardProps {
   isAutoStarting?: boolean;
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
+  isWaitingRoomFull?: boolean;
 
   // Session state
   isSessionEnded?: boolean;
@@ -86,6 +87,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isAutoStarting = false,
   autoStartCountdown = 0,
   onCancelAutoStart,
+  isWaitingRoomFull = false,
   isSessionEnded = false,
 }) => {
   return (
@@ -95,6 +97,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
         isSessionStarted={isSessionStarted}
+        isWaitingRoomFull={isWaitingRoomFull}
       />
 
       {/* Waiting participants notification banner */}
@@ -132,6 +135,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isAutoStarting={isAutoStarting}
         autoStartCountdown={autoStartCountdown}
         onCancelAutoStart={onCancelAutoStart}
+        isWaitingRoomFull={isWaitingRoomFull}
         isSessionEnded={isSessionEnded}
         isSessionPaused={isSessionPaused}
       />

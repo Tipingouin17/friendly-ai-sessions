@@ -143,6 +143,17 @@ export function useSessionHostLogic() {
         isManagerSessionStarted
     );
 
+    const waitingRoomParticipantCount = Math.max(
+        currentCount || 0,
+        (participants || []).filter((participant) => !participant.isHost && !participant.isAdmin).length
+    );
+    const waitingRoomCapacity = Math.max(maxCount || 0, conversationData?.participants || 0);
+    const isWaitingRoomFull = Boolean(
+        !effectiveIsSessionStarted &&
+        waitingRoomCapacity > 0 &&
+        waitingRoomParticipantCount >= waitingRoomCapacity
+    );
+
     useEffect(() => {
         if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
@@ -253,6 +264,9 @@ export function useSessionHostLogic() {
         isAutoStarting: isAutoStarting || isProcessingAutoStart,
         autoStartCountdown,
         cancelAutoStart,
+        isWaitingRoomFull,
+        waitingRoomParticipantCount,
+        waitingRoomCapacity,
 
         // Messages
         sessionMessages,

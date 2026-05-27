@@ -58,6 +58,7 @@ interface HostSessionContentProps {
   isAutoStarting?: boolean;
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
+  isWaitingRoomFull?: boolean;
 
   // Session state
   isSessionEnded?: boolean;
@@ -112,6 +113,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isAutoStarting = false,
   autoStartCountdown = 0,
   onCancelAutoStart,
+  isWaitingRoomFull = false,
   isSessionEnded = false,
   isSessionPaused = false,
 }) => {
@@ -295,6 +297,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantListViewportHeight = waitingParticipants.length > 0
     ? Math.min(420, Math.max(84, participantRowsToShow * 72))
     : 156;
+  const hasJoinedParticipants = joinedParticipantCount > 0;
+  const isRoomReadyToStart = Boolean(isWaitingRoomFull || (maxParticipants > 0 && joinedParticipantCount >= maxParticipants));
+  const seatsOpen = Math.max(0, maxParticipants - joinedParticipantCount);
 
   const handleCopyInviteLink = React.useCallback(async () => {
     if (!sessionInviteLink) return;
@@ -314,9 +319,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 text-slate-950">
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
           <section className="mx-auto mb-7 flex w-full max-w-3xl flex-col items-center text-center" style={{ textAlign: 'center' }}>
-            <div className="mb-4 inline-flex items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              Waiting Room
+            <div className={`mb-4 inline-flex items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold shadow-sm ${isRoomReadyToStart ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+              <span className={`h-2 w-2 rounded-full ${isRoomReadyToStart ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              {isRoomReadyToStart ? 'Ready to Start' : 'Waiting Room'}
             </div>
             <h1 className="mx-auto w-full text-center font-display text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{sessionTitle}</h1>
             <p className="mx-auto mt-2 w-full text-center text-base text-slate-500">
@@ -338,7 +343,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 
               <div className="min-w-0 flex-1 text-left">
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Invite participants</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">Scan the QR code or share the link below</p>
+                <p className="mt-2 text-lg font-semibold text-slate-950">{isRoomReadyToStart ? 'All participant seats are filled' : 'Scan the QR code or share the link below'}</p>
                 <button
                   type="button"
                   onClick={handleCopyInviteLink}
@@ -363,7 +368,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                 <span className="inline-flex items-center gap-1.5"><Wifi className="h-4 w-4 text-emerald-600" />{joinedParticipantCount} joined</span>
-                <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-indigo-600" />{Math.max(0, maxParticipants - joinedParticipantCount)} seats open</span>
+                <span className={`inline-flex items-center gap-1.5 ${isRoomReadyToStart ? 'font-medium text-emerald-700' : ''}`}><Check className="h-4 w-4 text-indigo-600" />{isRoomReadyToStart ? 'Session full' : `${seatsOpen} seats open`}</span>
               </div>
             </header>
 
@@ -405,7 +410,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                         </div>
                         <div className="flex shrink-0 items-center gap-3 text-sm">
                           <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700"><Wifi className="h-4 w-4" />Joined</span>
-                          <span className="inline-flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full border border-slate-300" />Waiting</span>
+                          <span className={`inline-flex items-center gap-1.5 ${isRoomReadyToStart ? 'font-medium text-emerald-700' : 'text-slate-500'}`}><span className={`h-2.5 w-2.5 rounded-full border ${isRoomReadyToStart ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'}`} />{isRoomReadyToStart ? 'Ready' : 'Waiting'}</span>
                         </div>
                       </div>
                     );
@@ -427,14 +432,15 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
             <button
               type="button"
               onClick={onSessionStarted}
-              disabled={!onSessionStarted || joinedParticipantCount === 0 || isAutoStarting}
-              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              disabled={!onSessionStarted || !hasJoinedParticipants || isAutoStarting}
+              className={`flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-lg font-bold text-white shadow-lg transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none ${isRoomReadyToStart ? 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700' : 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700'}`}
             >
               <Play className="h-5 w-5 fill-current" />
-              {isAutoStarting ? `Auto-starting in ${autoStartCountdown}s` : 'Start Session'}
+              {isAutoStarting ? `Auto-starting in ${autoStartCountdown}s` : isRoomReadyToStart ? 'Start Ready Session' : 'Start Session'}
             </button>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-500">
               <span>{joinedParticipantCount} of {maxParticipants} participant{maxParticipants === 1 ? '' : 's'} joined</span>
+              {isRoomReadyToStart && !isAutoStarting && <span className="font-medium text-emerald-700">All participants are in. You can start now.</span>}
               {isAutoStarting && onCancelAutoStart && (
                 <button type="button" onClick={onCancelAutoStart} className="font-semibold text-indigo-700 underline-offset-4 hover:underline">Cancel auto-start</button>
               )}

@@ -607,14 +607,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
   const hostVideoTile: SessionVideoParticipant = {
     id: HOST_VIDEO_STREAM_KEY,
-    name: 'Host',
-    initials: 'H',
+    name: facilitatorName,
+    initials: facilitatorName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'AI',
+    avatarUrl: facilitatorAvatarUrl || undefined,
     mediaStream: hostRemoteStream,
-    isMuted: true,
-    isSpeaking: Boolean(hostRemoteStream),
+    isMuted: false,
+    isSpeaking: aiIsSpeaking || Boolean(hostRemoteStream),
     connectionStatus: hostTileConnectionStatus,
-    connectionStatusLabel: formatPeerTileStatusLabel(hostTileConnectionStatus),
-    accentColor: 'rgb(79 70 229)',
+    connectionStatusLabel: aiIsSpeaking ? 'AI speaking' : formatPeerTileStatusLabel(hostTileConnectionStatus),
+    accentColor: 'rgb(217 119 6)',
   };
 
   const participantVideoTiles: SessionVideoParticipant[] = [hostVideoTile, ...orderedVideoParticipants.map((participant) => {
@@ -843,45 +844,21 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       <div className="flex min-h-0 flex-1 gap-2 p-2 md:gap-3 md:p-3">
         <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] md:rounded-[2rem]">
           <section className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4">
-            <div
-              className={`session-avatar-stage relative flex h-[clamp(120px,24dvh,260px)] min-h-[120px] shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-slate-200 md:h-[min(46vh,390px)] md:min-h-[220px] md:rounded-[1.75rem] ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}
-            >
-              <div className="session-chip absolute left-4 top-4 z-10 border-amber-200 bg-amber-50 text-amber-700">
-                AI
-              </div>
-              <div className="session-chip absolute right-4 top-4 z-10 border-slate-200 bg-white/90 text-slate-700 backdrop-blur">
-                {aiIsSpeaking ? 'AI speaking' : runtimeAvatarState?.reason || 'AI monitoring'}
-              </div>
-              {facilitatorAvatarUrl ? (
-                <img
-                  src={facilitatorAvatarUrl}
-                  alt={facilitatorName}
-                  className="h-full w-full object-contain object-[center_20%] p-2 md:p-4"
-                />
-              ) : showRuntimeAvatarState ? (
-                <FacilitatorAvatar
-                  avatarUrl={facilitatorAvatarUrl}
-                  name={facilitatorName}
-                  size="xl"
-                  runtimeState={runtimeAvatarState}
-                  enableRuntimeAnimation
-                />
-              ) : (
-                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-amber-200 bg-amber-50 text-amber-600 shadow-xl shadow-amber-100/70">
-                  <Sparkles className="h-16 w-16" />
+            <div className={`session-soft-panel rounded-[1.25rem] border border-slate-200 p-2 md:rounded-[1.75rem] md:p-3 ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}>
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="session-chip border-amber-200 bg-amber-50 text-amber-700">AI in room</span>
+                  <span className="truncate text-xs font-medium text-slate-500">{runtimeAvatarState?.reason || 'Facilitator tile is shown with everyone else'}</span>
                 </div>
-              )}
-              {aiIsSpeaking && (
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1 rounded-full border border-amber-200 bg-white/85 px-3 py-2 backdrop-blur">
-                  {[0, 1, 2, 3, 4].map((bar) => (
-                    <span
-                      key={bar}
-                      className="block w-1.5 origin-bottom rounded-full bg-amber-300 animate-sound-bar"
-                      style={{ height: `${10 + (bar % 3) * 5}px`, animationDelay: `${bar * 90}ms` }}
-                    />
-                  ))}
-                </div>
-              )}
+                <span className="session-chip border-slate-200 bg-white text-slate-700">{aiIsSpeaking ? 'Speaking' : roomConnectionLabel}</span>
+              </div>
+              <div className="h-[clamp(170px,30dvh,340px)] overflow-hidden rounded-[1rem] md:h-[min(42vh,420px)] md:rounded-[1.35rem]">
+                <SessionVideoGrid
+                  participants={participantVideoTiles}
+                  variant="participant-sidebar"
+                  emptyLabel="Video tiles will appear as participants join the session."
+                />
+              </div>
             </div>
 
             <div className="session-soft-panel mt-2 rounded-2xl p-3 md:mt-3 md:p-4">
@@ -925,81 +902,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             )}
 
-            {activeMode && (isOpenDiscussionMode || !hasRegisteredResponse || hasSubmittedModeChoice) && (
-              <div className="session-soft-panel mt-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm md:p-4">
-                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-500">Response mode</p>
-                    <h3 className="mt-1 text-sm font-bold text-slate-950">{modeLabel}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{modeInstruction}</p>
-                  </div>
-                  {remainingTimeLabel && (
-                    <span className="session-chip w-fit border-amber-200 bg-amber-50 text-amber-700">
-                      {remainingTimeLabel} left
-                    </span>
-                  )}
-                </div>
-
-                {isVotingMode ? (
-                  <div className="space-y-3">
-                    {hasSubmittedModeChoice ? (
-                      <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Your vote is registered.
-                      </div>
-                    ) : modeChoices.length > 0 ? (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {modeChoices.map((choice) => {
-                          const isSubmittingThisChoice = submittingChoiceId === choice.id;
-                          const disableChoice = !submitModeInput || !modeCanSubmit || hasRegisteredResponse || Boolean(submittingChoiceId);
-                          return (
-                            <button
-                              key={choice.id}
-                              type="button"
-                              onClick={() => void handleSubmitModeChoice(choice)}
-                              disabled={disableChoice}
-                              className="session-control-button rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <span className="block text-sm font-bold text-slate-900">{isSubmittingThisChoice ? 'Submitting…' : choice.label}</span>
-                              {choice.description && <span className="mt-1 block text-xs leading-relaxed text-slate-500">{choice.description}</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                        Voting is active, but no choice list has been provided yet. Use the response box below if the facilitator asks for written input.
-                      </p>
-                    )}
-                    {!modeCanSubmit && !hasSubmittedModeChoice && (
-                      <p className="text-xs font-medium text-slate-500">Voting is not open for you at this moment.</p>
-                    )}
-                  </div>
-                ) : isRoundRobinMode ? (
-                  <div className={`rounded-2xl border px-3 py-3 ${participantModeState?.is_current_speaker ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : participantModeState?.is_next ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
-                    <p className="text-sm font-bold">
-                      {participantModeState?.is_current_speaker ? 'Your turn' : participantModeState?.is_next ? "You're next" : 'Waiting for your turn'}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed">
-                      {participantModeState?.is_current_speaker
-                        ? 'The composer is open for your response.'
-                        : participantModeState?.is_next
-                        ? 'Get ready; the facilitator will invite you shortly.'
-                        : 'The composer will unlock when it is your turn to contribute.'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {isReflectionMode ? 'Quick check-in' : isSilentResponseMode ? 'Private quiet response' : 'Open response'}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{modePlaceholder}</p>
-                  </div>
-                )}
-
-                {modeInputError && <p className="mt-3 text-xs font-semibold text-rose-600">{modeInputError}</p>}
-              </div>
-            )}
           </section>
 
           {isSessionEnded ? (

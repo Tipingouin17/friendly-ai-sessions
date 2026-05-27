@@ -123,13 +123,13 @@ const formatModeComponentLabel = (component?: string | null): string => {
 };
 
 const getModeAccent = (modeKey: string, isComplete?: boolean) => {
-  if (isComplete) return { strip: 'border-emerald-200 bg-emerald-50 text-emerald-900', badge: 'bg-emerald-600 text-white', dot: 'bg-emerald-500', panel: 'border-emerald-200 bg-emerald-50/70' };
-  if (modeKey === 'voting_rating') return { strip: 'border-indigo-200 bg-indigo-50 text-indigo-950', badge: 'bg-indigo-600 text-white', dot: 'bg-indigo-500', panel: 'border-indigo-200 bg-indigo-50/70' };
-  if (modeKey === 'round_robin') return { strip: 'border-amber-200 bg-amber-50 text-amber-950', badge: 'bg-amber-500 text-white', dot: 'bg-amber-500', panel: 'border-amber-200 bg-amber-50/70' };
-  if (modeKey === 'silent_individual_response') return { strip: 'border-violet-200 bg-violet-50 text-violet-950', badge: 'bg-violet-600 text-white', dot: 'bg-violet-500', panel: 'border-violet-200 bg-violet-50/70' };
-  if (modeKey === 'reflection_checkin') return { strip: 'border-rose-200 bg-rose-50 text-rose-950', badge: 'bg-rose-500 text-white', dot: 'bg-rose-500', panel: 'border-rose-200 bg-rose-50/70' };
-  if (modeKey === 'debate') return { strip: 'border-orange-200 bg-orange-50 text-orange-950', badge: 'bg-orange-500 text-white', dot: 'bg-orange-500', panel: 'border-orange-200 bg-orange-50/70' };
-  return { strip: 'border-sky-200 bg-sky-50 text-sky-950', badge: 'bg-sky-600 text-white', dot: 'bg-sky-500', panel: 'border-sky-200 bg-sky-50/70' };
+  if (isComplete) return { strip: 'border-emerald-200 bg-emerald-50 text-emerald-900', badge: 'bg-emerald-600 text-white', dot: 'bg-emerald-500', panel: 'border-emerald-200 bg-emerald-50/70', label: 'text-emerald-700', soft: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  if (modeKey === 'voting_rating') return { strip: 'border-emerald-200 bg-emerald-50 text-emerald-950', badge: 'bg-emerald-600 text-white', dot: 'bg-emerald-500', panel: 'border-emerald-200 bg-emerald-50/70', label: 'text-emerald-700', soft: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  if (modeKey === 'round_robin') return { strip: 'border-teal-200 bg-teal-50 text-teal-950', badge: 'bg-teal-600 text-white', dot: 'bg-teal-500', panel: 'border-teal-200 bg-teal-50/70', label: 'text-teal-700', soft: 'bg-teal-50 text-teal-800 border-teal-200' };
+  if (modeKey === 'silent_individual_response') return { strip: 'border-amber-200 bg-amber-50 text-amber-950', badge: 'bg-amber-500 text-white', dot: 'bg-amber-500', panel: 'border-amber-200 bg-amber-50/70', label: 'text-amber-700', soft: 'bg-amber-50 text-amber-800 border-amber-200' };
+  if (modeKey === 'reflection_checkin') return { strip: 'border-rose-200 bg-rose-50 text-rose-950', badge: 'bg-rose-500 text-white', dot: 'bg-rose-500', panel: 'border-rose-200 bg-rose-50/70', label: 'text-rose-700', soft: 'bg-rose-50 text-rose-800 border-rose-200' };
+  if (modeKey === 'debate') return { strip: 'border-red-200 bg-red-50 text-red-950', badge: 'bg-red-500 text-white', dot: 'bg-red-500', panel: 'border-red-200 bg-red-50/70', label: 'text-red-700', soft: 'bg-red-50 text-red-800 border-red-200' };
+  return { strip: 'border-indigo-200 bg-indigo-50 text-indigo-950', badge: 'bg-indigo-600 text-white', dot: 'bg-indigo-500', panel: 'border-indigo-200 bg-indigo-50/70', label: 'text-indigo-700', soft: 'bg-indigo-50 text-indigo-800 border-indigo-200' };
 };
 
 const getVoteEmoji = (label: string, index: number): string => {
@@ -146,6 +146,34 @@ const MicLiveIndicator = ({ isLive, label = 'Mic live' }: { isLive: boolean; lab
     <span className={`h-2 w-2 rounded-full ${isLive ? 'animate-pulse bg-emerald-500 motion-reduce:animate-none' : 'bg-slate-300'}`} />
     <Mic className="h-3.5 w-3.5" />
     {label}
+  </div>
+);
+
+const ModeStageHeader = ({ label, instruction, accent, onOverflow, showOverflow, overflowLabel, overflowState }: {
+  label: string;
+  instruction: string;
+  accent: ReturnType<typeof getModeAccent>;
+  onOverflow: () => void;
+  showOverflow: boolean;
+  overflowLabel: string;
+  overflowState?: string;
+}) => (
+  <div className="flex items-center gap-2 px-3 py-2 sm:px-4">
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black ${accent.soft}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} />{label}
+    </span>
+    <p className="min-w-0 flex-1 truncate text-sm text-slate-600">{instruction}</p>
+    <div className="relative">
+      <button type="button" onClick={onOverflow} aria-expanded={showOverflow} aria-label="More facilitation details" className="session-control-button inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2">
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {showOverflow && (
+        <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs text-slate-600 shadow-xl">
+          <p className="font-bold text-slate-900">{overflowLabel}</p><p className="mt-1 leading-relaxed">{instruction}</p>
+          {overflowState && <p className="mt-2 font-semibold text-slate-700">State: {overflowState}</p>}
+        </div>
+      )}
+    </div>
   </div>
 );
 
@@ -302,46 +330,28 @@ const InputFooter = ({
 
   if (viewMode === "admin" && !isParticipantContext) return null;
 
-  const renderModeStrip = () => modeContext ? (
-    <div className="px-3 pt-3 sm:px-4">
-      <div className={`rounded-2xl border px-3 py-2.5 shadow-sm ${accent.strip}`}>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${accent.badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} />{modeContext.label}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="hidden truncate text-xs font-semibold leading-relaxed opacity-80 md:block">{modeContext.instruction}</p>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-60 md:hidden">{modeComponentLabel}</p>
-          </div>
-          {modeContext.stateLabel && (
-            <span className="hidden shrink-0 items-center gap-1 rounded-full border border-current/20 bg-white/70 px-2.5 py-1 text-xs font-semibold sm:inline-flex">
-              {modeContext.isComplete && <CheckCircle2 className="h-3.5 w-3.5" />}{modeContext.stateLabel}
-            </span>
-          )}
-          <button type="button" onClick={() => void onReaction?.('reactions_opened')} className="session-control-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-current/15 bg-white/70 px-2.5 text-xs font-bold transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2" aria-label="Open quick reactions">
-            <Sparkles className="h-3.5 w-3.5" /><span className="hidden sm:inline">Reactions</span>
-          </button>
-          <div className="relative">
-            <button type="button" onClick={() => setShowOverflow((current) => !current)} aria-expanded={showOverflow} aria-label="More facilitation controls" className="session-control-button inline-flex h-8 w-8 items-center justify-center rounded-full border border-current/15 bg-white/70 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2">
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-            {showOverflow && (
-              <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs text-slate-600 shadow-xl">
-                <p className="font-bold text-slate-900">{modeComponentLabel}</p><p className="mt-1 leading-relaxed">{modeContext.instruction}</p>
-                {modeContext.stateLabel && <p className="mt-2 font-semibold text-slate-700">State: {modeContext.stateLabel}</p>}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+  const renderModeStrip = () => null;
+
+  const renderStageHeader = () => modeContext ? (
+    <ModeStageHeader
+      label={modeContext.label}
+      instruction={modeContext.instruction}
+      accent={accent}
+      onOverflow={() => setShowOverflow((current) => !current)}
+      showOverflow={showOverflow}
+      overflowLabel={modeComponentLabel}
+      overflowState={modeContext.stateLabel}
+    />
   ) : null;
 
   const renderOpenDiscussionPanel = () => (
-    <div className={`mx-3 mt-2 rounded-2xl border p-3 sm:mx-4 ${accent.panel}`}>
+    <div className="mx-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm sm:mx-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="text-sm font-bold text-slate-900">Open Discussion</p><p className="hidden text-xs leading-relaxed text-slate-600 sm:block">Open floor: speak freely, add multiple written thoughts, or signal with a quick reaction.</p></div>
-        {isRecording ? <MicLiveIndicator isLive label="Dictation live" /> : <QuickReactions onReaction={onReaction} compact={isMobile} />}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-600"><Mic className="h-5 w-5" /></div>
+          <div className="min-w-0"><p className="text-sm font-black text-slate-950">You're live — speak freely</p><p className="text-xs leading-relaxed text-slate-600">The AI facilitator is listening to the room. Everyone can speak at the same time.</p></div>
+        </div>
+        <QuickReactions onReaction={onReaction} compact={isMobile} />
       </div>
     </div>
   );
@@ -349,60 +359,73 @@ const InputFooter = ({
   const renderRoundRobinPanel = () => {
     const isCurrent = Boolean(participantModeState?.is_current_speaker);
     const isNext = Boolean(participantModeState?.is_next);
-    const title = isCurrent ? 'Your turn' : isNext ? "You're next" : 'Waiting';
-    const copy = isCurrent ? 'The floor is yours. Speak now or type your response.' : isNext ? 'Get ready; the facilitator will invite you shortly.' : 'The composer unlocks when your turn arrives.';
+    const title = isCurrent ? 'Your turn — speak now' : isNext ? "You're next" : 'Please wait — another participant is speaking';
+    const copy = isCurrent ? 'The floor is yours. Speak now or type your response.' : isNext ? 'Get ready; the facilitator will invite you shortly.' : 'You are in the queue. The AI will call on you shortly.';
+    const speakingOrder = participants.slice(0, 8);
     return (
-      <div className={`mx-3 mt-2 rounded-2xl border p-3 sm:mx-4 ${isCurrent ? 'border-emerald-200 bg-emerald-50' : isNext ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className={`text-sm font-black ${isCurrent ? 'text-emerald-800' : isNext ? 'text-amber-800' : 'text-slate-700'}`}>{title}</p><p className="mt-1 text-xs leading-relaxed text-slate-600">{copy}</p></div>
-          <div className="flex items-center gap-2">{isCurrent && <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor open'} />}{!isCurrent && <QuickReactions onReaction={onReaction} compact={isMobile} />}</div>
+      <div className="mx-3 rounded-2xl border border-slate-200 bg-white shadow-sm sm:mx-4">
+        {speakingOrder.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+            <span className="font-semibold text-slate-600">Speaking order:</span>
+            {speakingOrder.map((participant) => {
+              const isSelf = participant.id === effectiveParticipantId;
+              return <span key={participant.id} className={`rounded-full px-2.5 py-1 font-bold ${isSelf ? 'bg-teal-50 text-teal-700 ring-1 ring-teal-200' : 'bg-slate-100 text-slate-600'}`}>{isSelf ? `${participant.name || 'You'} (you)` : participant.name || `Participant ${participant.id}`}</span>;
+            })}
+          </div>
+        )}
+        <div className="flex items-center gap-3 p-3">
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${isCurrent ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{isCurrent ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-black text-slate-950">{title}</p><p className="text-xs leading-relaxed text-slate-600">{copy}</p></div>
+          {isCurrent ? <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor open'} /> : null}
         </div>
       </div>
     );
   };
 
   const renderSilentResponsePanel = () => (
-    <div className="mx-3 mt-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3 sm:mx-4">
-      <div className="mb-2 flex items-start gap-2 text-violet-900"><Lock className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="text-sm font-black">Private silent response</p><p className="text-xs leading-relaxed text-violet-700">Only the facilitator sees your private response until they choose what to share.</p><p className="sr-only" aria-live="polite">Private response mode is active. Your draft is private and will be sent when you press Submit.</p></div></div>
+    <div className="mx-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mx-4">
       <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-violet-700"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Private draft</span><span>{inputMessage.length}/2000</span></div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700"><span className="inline-flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> AI will combine all answers</span><span>{inputMessage.length}/2000</span></div>
+      <p className="sr-only" aria-live="polite">Silent response mode is active. Your answer is private until the facilitator synthesizes responses.</p>
     </div>
   );
 
   const renderVotingPanel = () => (
-    <div className="mx-3 mt-2 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-3 sm:mx-4">
-      <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-black text-indigo-950">Cast your vote</p><p className="hidden text-xs leading-relaxed text-indigo-700 sm:block">Tap an option to submit. You can change it before results are revealed.</p></div><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Voting options">
+    <div className="mx-3 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3 shadow-sm sm:mx-4">
+      <p className="mb-3 text-sm font-black text-emerald-800">Vote — your choice is private until all votes are in</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Voting options">
         {effectiveVoteOptions.slice(0, 6).map((choice, index) => {
           const isSelected = selectedModeOptionId === choice.id;
           const isSubmitting = submittingModeOptionId === choice.id;
           const canSelect = modeCanSubmit && !isPaused && !isSkipped && !isSubmitting;
-          return <button key={choice.id} type="button" role="radio" aria-checked={isSelected} aria-label={`Vote for ${choice.label}`} onClick={() => canSelect && void onVote?.(choice)} disabled={!canSelect} className={`session-control-button min-h-[52px] rounded-2xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-[1.02] border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50'}`}><span className="flex items-center gap-2 text-sm font-black"><span aria-hidden="true">{getVoteEmoji(choice.label, index)}</span><span className="min-w-0 flex-1 truncate">{isSubmitting ? 'Submitting…' : choice.label}</span>{isSelected && <Check className="h-4 w-4 text-emerald-600" />}</span>{choice.description && <span className="mt-1 block text-xs leading-snug opacity-70">{choice.description}</span>}</button>;
+          return <button key={choice.id} type="button" role="radio" aria-checked={isSelected} aria-label={`Vote for ${choice.label}`} onClick={() => canSelect && void onVote?.(choice)} disabled={!canSelect} className={`session-control-button min-h-[52px] rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-[1.01] border-emerald-400 bg-white text-emerald-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50'}`}><span className="flex items-center gap-3 text-sm font-black"><span aria-hidden="true">{getVoteEmoji(choice.label, index)}</span><span className="min-w-0 flex-1 truncate">{isSubmitting ? 'Submitting…' : choice.label}</span>{isSelected && <Check className="h-4 w-4 text-emerald-600" />}</span>{choice.description && <span className="mt-1 block text-xs leading-snug opacity-70">{choice.description}</span>}</button>;
         })}
       </div>
-      {!modeCanSubmit && <p className="mt-2 text-xs font-semibold text-indigo-700">Voting is not open for you at this moment.</p>}
+      {!modeCanSubmit && <p className="mt-2 text-xs font-semibold text-emerald-700">Voting is not open for you at this moment.</p>}
     </div>
   );
 
   const renderReflectionPanel = () => (
-    <div className="mx-3 mt-2 rounded-2xl border border-rose-200 bg-rose-50/70 p-3 sm:mx-4">
-      <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-black text-rose-950">Pick a reflection word</p><p className="hidden text-xs leading-relaxed text-rose-700 sm:block">Choose the word that best captures where you are right now.</p></div><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
-      <div className="flex max-h-[76px] flex-wrap gap-2 overflow-hidden sm:max-h-none" aria-label="Reflection word choices">
+    <div className="mx-3 rounded-2xl border border-rose-200 bg-rose-50/40 p-3 shadow-sm sm:mx-4">
+      <p className="mb-3 text-sm font-black text-rose-800">How are you feeling right now? Pick one word.</p>
+      <div className="flex max-h-[86px] flex-wrap gap-2 overflow-hidden sm:max-h-none" aria-label="Reflection word choices">
         {visibleReflectionOptions.slice(0, 12).map((choice) => {
           const isSelected = selectedModeOptionId === choice.id;
           const isSubmitting = submittingModeOptionId === choice.id;
           const canSelect = modeCanSubmit && !isPaused && !isSkipped && !isSubmitting;
-          return <button key={choice.id} type="button" aria-pressed={isSelected} onClick={() => canSelect && void onWordPick?.(choice)} disabled={!canSelect} className={`session-control-button rounded-full border px-3 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-105 border-rose-400 bg-rose-100 text-rose-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300 hover:bg-rose-50'}`}>{isSubmitting ? 'Saving…' : choice.label}</button>;
+          return <button key={choice.id} type="button" aria-pressed={isSelected} onClick={() => canSelect && void onWordPick?.(choice)} disabled={!canSelect} className={`session-control-button rounded-full border px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-105 border-rose-400 bg-white text-rose-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300 hover:bg-rose-50'}`}>{isSubmitting ? 'Saving…' : choice.label}</button>;
         })}
       </div>
       {effectiveReflectionOptions.length > visibleReflectionOptions.length && <button type="button" onClick={() => setShowAllReflectionWords(true)} className="mt-2 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2">Show more <ChevronDown className="h-3.5 w-3.5" /></button>}
-      {selectedModeOptionId && <p className="mt-2 text-xs font-semibold text-rose-700">Reflection noted. You can change it before the facilitator moves on.</p>}
     </div>
   );
 
   const renderDebatePanel = () => (
-    <div className="mx-3 mt-2 rounded-2xl border border-orange-200 bg-orange-50/70 p-3 sm:mx-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-black text-orange-950">Debate floor</p><p className="hidden text-xs leading-relaxed text-orange-700 sm:block">Raise your hand to request the floor, then react while others speak.</p></div><div className="flex flex-wrap items-center gap-2"><button type="button" onClick={handleHandRaiseToggle} aria-pressed={handRaised || floorGranted} disabled={floorGranted} className={`session-control-button inline-flex h-10 items-center gap-2 rounded-full border px-3 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none ${floorGranted ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : handRaised ? 'border-orange-400 bg-orange-100 text-orange-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-orange-300 hover:bg-orange-50'}`}><Hand className="h-4 w-4" />{floorGranted ? 'Floor granted' : handRaised ? 'Hand raised' : 'Raise hand'}</button>{floorGranted && <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor granted'} />}<QuickReactions onReaction={onReaction} compact={isMobile} /></div></div>
+    <div className="mx-3 rounded-2xl border border-red-200 bg-red-50/40 p-3 shadow-sm sm:mx-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button type="button" onClick={handleHandRaiseToggle} aria-pressed={handRaised || floorGranted} disabled={floorGranted} className={`session-control-button inline-flex h-12 w-fit items-center gap-2 rounded-2xl border px-4 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none ${floorGranted ? 'border-emerald-300 bg-white text-emerald-800' : handRaised ? 'border-red-400 bg-white text-red-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-red-300 hover:bg-red-50'}`}><Hand className="h-4 w-4" />{floorGranted ? 'Floor granted' : handRaised ? 'Hand raised' : 'Raise hand to speak'}</button>
+        <div className="flex items-center gap-2"><span className="text-xs font-semibold text-slate-500">React:</span><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
+      </div>
     </div>
   );
 
@@ -427,8 +450,8 @@ const InputFooter = ({
         {isParticipantContext && hasReachedQuestionLimit ? (
           <div className="p-3 sm:p-4 flex flex-col items-center justify-center"><div className="mb-2 flex items-center justify-center gap-2 bg-amber-50 px-3 py-2 rounded-md text-amber-700 border border-amber-200 w-full text-sm"><Lock className="h-4 w-4" /><span className="font-medium">Question limit reached ({maxQuestionsPerSession} per session). <a href="/pricing" className="underline hover:text-amber-900">Upgrade your plan</a> for more.</span></div></div>
         ) : isParticipantContext ? (
-          <div className="max-h-[160px] overflow-y-auto overscroll-contain pb-2 md:max-h-none md:overflow-visible">
-            {renderModeStrip()}<div className={`transition-opacity duration-200 motion-reduce:transition-none ${isPanelFading ? 'opacity-0' : 'opacity-100'}`}>{renderModePanel()}</div>
+          <div className="max-h-[260px] overflow-y-auto overscroll-contain pb-2 md:max-h-none md:overflow-visible">
+            {renderStageHeader()}<div className={`transition-opacity duration-200 motion-reduce:transition-none ${isPanelFading ? 'opacity-0' : 'opacity-100'}`}>{renderModePanel()}</div>
             {modeInputError && <p className="mx-3 mt-2 text-xs font-semibold text-rose-600 sm:mx-4">{modeInputError}</p>}
             <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
             {shouldRenderDefaultChatInput && <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />}

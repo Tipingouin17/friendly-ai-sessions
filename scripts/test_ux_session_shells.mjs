@@ -32,9 +32,9 @@ const assertNotContains = (source, needle, label) => {
   assert.ok(!source.includes(needle), `${label} should not include ${needle}`);
 };
 
-assertContains(participantView, 'AI spotlight', 'participant view documentation');
+assertContains(participantView, 'AI in room', 'participant room-gallery documentation');
 assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900', 'participant redesigned light shell surface');
-assertContains(participantView, 'session-avatar-stage', 'participant redesigned AI spotlight stage');
+assertContains(participantView, 'Facilitator tile is shown with everyone else', 'participant renders the AI facilitator as a normal room tile instead of an oversized spotlight');
 assertContains(participantView, 'Current question', 'participant current-question card');
 assertContains(participantView, 'latestOwnParticipantMessage', 'participant registered-response derivation');
 assertContains(participantView, 'String(message.participant) === participantKey', 'participant response registration tolerates numeric participant ids');
@@ -68,7 +68,7 @@ assertContains(participantView, 'mediaStream: isCurrentUser ? localCameraStream 
 assertContains(participantView, 'roomConnectionLabel', 'participant exposes WebRTC room connection status for live QA');
 assertContains(participantView, 'connectionStatusLabel', 'participant remote tiles expose peer connection labels');
 assertContains(participantView, 'Camera access was blocked', 'participant camera permission feedback');
-assertContains(participantView, 'animate-sound-bar', 'participant AI speaking visualization');
+assertContains(participantView, "connectionStatusLabel: aiIsSpeaking ? 'AI speaking'", 'participant AI speaking visualization is surfaced on the facilitator tile');
 assertContains(participantView, '<InputFooter', 'participant preserved composer integration');
 assertContains(participantView, 'await submitModeInput({', 'participant mode input plumbing');
 assertContains(participantView, 'modeOptions={modeChoices}', 'participant passes dynamic vote and reflection options to adaptive footer');
@@ -79,7 +79,7 @@ assertContains(participantView, 'modeBlocksAfterResponse', 'participant only blo
 assertContains(participantView, 'const audioOnlyStream = new MediaStream([audioTrack]);', 'participant microphone can create an audio-only live stream for free speaking');
 assertContains(participantView, "{microphoneEnabled ? 'Mic on' : 'Muted'}", 'participant status reflects live microphone state independently of text dictation');
 assertContains(inputFooter, "isOpenDiscussionMode || lastMessage?.sender === 'assistant'", 'adaptive footer keeps Open Discussion composer available after participant contributions');
-assertContains(inputFooter, 'Open floor: speak freely, add multiple written thoughts', 'adaptive footer explains Open Discussion as a free-speaking mode');
+assertContains(inputFooter, "You're live — speak freely", 'adaptive footer explains Open Discussion as a free-speaking mode');
 assertContains(sessionContent, "key={isAdmin ? connectionAttempts : 'participant-stable'}", 'participant session provider remains mounted during transient retries to avoid refresh-like resets');
 assertContains(sessionPageState, 'shouldPreserveParticipantView', 'participant retry preserves the live room instead of returning to the loading shell');
 assertContains(inputFooter, "modeKey === 'voting_rating'", 'adaptive footer renders voting mode panel');
@@ -88,11 +88,11 @@ assertContains(inputFooter, "modeKey === 'silent_individual_response'", 'adaptiv
 assertContains(inputFooter, "modeKey === 'reflection_checkin'", 'adaptive footer renders reflection word-pick panel');
 assertContains(inputFooter, "modeKey === 'debate'", 'adaptive footer renders debate hand-raise panel');
 assertContains(inputFooter, "return renderOpenDiscussionPanel();", 'adaptive footer defaults to open discussion panel');
-assertContains(inputFooter, 'grid grid-cols-2 gap-2', 'adaptive footer keeps mobile voting grid to two columns');
-assertContains(inputFooter, 'max-h-[160px] overflow-y-auto', 'adaptive footer enforces mobile footer max height with internal scroll');
+assertContains(inputFooter, 'sm:grid-cols-2', 'adaptive footer keeps voting choices responsive across columns');
+assertContains(inputFooter, 'max-h-[260px] overflow-y-auto', 'adaptive footer enforces mobile footer max height with internal scroll');
 assertContains(inputFooter, 'aria-label={`Vote for ${choice.label}`}', 'adaptive footer gives vote buttons accessible labels');
 assertContains(inputFooter, 'aria-pressed={handRaised || floorGranted}', 'adaptive footer exposes debate hand raise pressed state');
-assertContains(inputFooter, 'Private response mode is active', 'adaptive footer announces silent response privacy to screen readers');
+assertContains(inputFooter, 'Silent response mode is active', 'adaptive footer announces silent response privacy to screen readers');
 assertContains(inputFooter, 'Facilitation mode changed. Unsaved draft input was cleared.', 'adaptive footer announces mode transitions and draft clearing');
 assertContains(inputFooter, 'motion-reduce:transition-none', 'adaptive footer respects reduced motion preferences');
 assertContains(participantView, 'speechEnabled={speechStackEnabled}', 'participant speech runtime plumbing');

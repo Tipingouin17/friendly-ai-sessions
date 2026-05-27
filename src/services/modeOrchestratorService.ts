@@ -387,8 +387,8 @@ export const subscribeToModeOrchestrator = (
   onStatus?: (status: string) => void
 ): RealtimeChannel => api
   .channel(`session-mode-${conversationId}`)
-  .on("postgres_changes", { event: "*", schema: "public", table: "session_active_modes" }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "session_mode_events" }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "mode_participant_states" }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "mode_inputs" }, onChange)
+  .on("postgres_changes", { event: "*", schema: "public", table: "session_active_modes", filter: `conversation_id=eq.${conversationId}` }, onChange)
+  .on("postgres_changes", { event: "*", schema: "public", table: "session_mode_events", filter: `conversation_id=eq.${conversationId}` }, onChange)
+  .on("postgres_changes", { event: "*", schema: "public", table: "mode_participant_states", filter: `conversation_id=eq.${conversationId}` }, onChange)
+  .on("postgres_changes", { event: "*", schema: "public", table: "mode_inputs", filter: `conversation_id=eq.${conversationId}` }, onChange)
   .subscribe((status) => onStatus?.(status));

@@ -38,6 +38,7 @@ export const useSessionRoomState = ({
   const modeOrchestrator = useFacilitationModeOrchestrator(conversation, {
     conversationId,
     participantId: currentUserParticipantId,
+    realtime: true,
   });
   
   // Get anonymous state

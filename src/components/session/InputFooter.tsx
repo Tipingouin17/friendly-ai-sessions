@@ -13,13 +13,12 @@ import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import {
   Check,
-  CheckCircle2,
   ChevronDown,
   Hand,
   Lock,
   Mic,
+  MicOff,
   MoreHorizontal,
-  ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -48,6 +47,7 @@ type ParticipantModeTurnState = {
   is_current_speaker?: boolean | null;
   is_next?: boolean | null;
   remaining_time?: number | null;
+  state?: Record<string, unknown> | null;
 };
 
 type HandRaiseState = 'idle' | 'raised' | 'floor_granted';
@@ -95,18 +95,20 @@ interface InputFooterProps {
 
 const REACTIONS = ['✋', '👋', '👍', '❓'] as const;
 const DEFAULT_VOTE_OPTIONS: AdaptiveModeOption[] = [
+  { id: 'strongly-agree', label: 'Strongly Agree', value: 'strongly-agree' },
   { id: 'agree', label: 'Agree', value: 'agree' },
-  { id: 'unsure', label: 'Unsure', value: 'unsure' },
+  { id: 'neutral', label: 'Neutral', value: 'neutral' },
   { id: 'disagree', label: 'Disagree', value: 'disagree' },
-  { id: 'needs-discussion', label: 'Discuss', value: 'needs-discussion' },
 ];
 const DEFAULT_REFLECTION_OPTIONS: AdaptiveModeOption[] = [
-  { id: 'energized', label: 'Energized', value: 'energized' },
+  { id: 'energised', label: 'Energised', value: 'energised' },
   { id: 'curious', label: 'Curious', value: 'curious' },
-  { id: 'unclear', label: 'Unclear', value: 'unclear' },
-  { id: 'aligned', label: 'Aligned', value: 'aligned' },
-  { id: 'concerned', label: 'Concerned', value: 'concerned' },
-  { id: 'ready', label: 'Ready', value: 'ready' },
+  { id: 'uncertain', label: 'Uncertain', value: 'uncertain' },
+  { id: 'focused', label: 'Focused', value: 'focused' },
+  { id: 'inspired', label: 'Inspired', value: 'inspired' },
+  { id: 'overwhelmed', label: 'Overwhelmed', value: 'overwhelmed' },
+  { id: 'hopeful', label: 'Hopeful', value: 'hopeful' },
+  { id: 'confused', label: 'Confused', value: 'confused' },
 ];
 
 const normalizeModeKey = (modeKey?: string | null): string => {
@@ -134,9 +136,10 @@ const getModeAccent = (modeKey: string, isComplete?: boolean) => {
 
 const getVoteEmoji = (label: string, index: number): string => {
   const lower = label.toLowerCase();
+  if (lower.includes('strongly') && (lower.includes('agree') || lower.includes('yes'))) return '💯';
   if (lower.includes('agree') || lower.includes('yes')) return '👍';
+  if (lower.includes('neutral') || lower.includes('unsure') || lower.includes('maybe')) return '🥺';
   if (lower.includes('no') || lower.includes('disagree')) return '👎';
-  if (lower.includes('unsure') || lower.includes('maybe')) return '🤔';
   if (lower.includes('discuss') || lower.includes('question')) return '💬';
   return ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'][index] ?? '•';
 };
@@ -359,8 +362,13 @@ const InputFooter = ({
   const renderRoundRobinPanel = () => {
     const isCurrent = Boolean(participantModeState?.is_current_speaker);
     const isNext = Boolean(participantModeState?.is_next);
-    const title = isCurrent ? 'Your turn — speak now' : isNext ? "You're next" : 'Please wait — another participant is speaking';
-    const copy = isCurrent ? 'The floor is yours. Speak now or type your response.' : isNext ? 'Get ready; the facilitator will invite you shortly.' : 'You are in the queue. The AI will call on you shortly.';
+    const state = participantModeState?.state ?? {};
+    const stateCurrentSpeakerId = typeof state.current_speaker_id === 'number' ? state.current_speaker_id : typeof state.currentSpeakerId === 'number' ? state.currentSpeakerId : null;
+    const currentSpeakerId = isCurrent ? effectiveParticipantId : stateCurrentSpeakerId;
+    const currentSpeakerName = typeof state.current_speaker_name === 'string' ? state.current_speaker_name : typeof state.currentSpeakerName === 'string' ? state.currentSpeakerName : participants.find((participant) => participant.id === currentSpeakerId)?.name;
+    const waitingTitle = currentSpeakerName ? `Please wait — ${currentSpeakerName} is speaking` : 'Please wait — another participant is speaking';
+    const title = isCurrent ? 'Your turn — speak now' : waitingTitle;
+    const copy = isCurrent ? 'The floor is yours. Speak now or type your response.' : isNext ? "You're next in the queue. The AI will call on you shortly." : 'You are in the queue. The AI will call on you shortly.';
     const speakingOrder = participants.slice(0, 8);
     return (
       <div className="mx-3 rounded-2xl border border-slate-200 bg-white shadow-sm sm:mx-4">
@@ -368,8 +376,8 @@ const InputFooter = ({
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
             <span className="font-semibold text-slate-600">Speaking order:</span>
             {speakingOrder.map((participant) => {
-              const isSelf = participant.id === effectiveParticipantId;
-              return <span key={participant.id} className={`rounded-full px-2.5 py-1 font-bold ${isSelf ? 'bg-teal-50 text-teal-700 ring-1 ring-teal-200' : 'bg-slate-100 text-slate-600'}`}>{isSelf ? `${participant.name || 'You'} (you)` : participant.name || `Participant ${participant.id}`}</span>;
+              const isActiveSpeaker = participant.id === currentSpeakerId;
+              return <span key={participant.id} className={`rounded-full px-2.5 py-1 font-bold ${isActiveSpeaker ? 'bg-teal-50 text-teal-700 ring-1 ring-teal-200' : 'bg-slate-100 text-slate-600'}`}>{isActiveSpeaker ? `🎤 ${participant.name || 'You'}` : participant.name || `Participant ${participant.id}`}</span>;
             })}
           </div>
         )}

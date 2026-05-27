@@ -10,6 +10,7 @@ import {
   rejectFacilitationMode,
   startFacilitationMode,
   submitModeInput,
+  subscribeToModeOrchestrator,
   type FacilitatorModeAssignment,
   type ModeEventResponse,
   type ModeInput,
@@ -174,6 +175,39 @@ export const useFacilitationModeOrchestrator = (
       cancelled = true;
     };
   }, [refreshActiveMode]);
+
+  useEffect(() => {
+    if (!options.realtime || !conversationId) return;
+
+    let cancelled = false;
+    let refreshTimer: number | null = null;
+
+    const scheduleRefresh = () => {
+      if (cancelled) return;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        refreshActiveMode().catch((error) => {
+          console.error("[MODE_ORCHESTRATOR] Failed to refresh active mode after realtime update", error);
+          if (!cancelled) setModeError(error instanceof Error ? error.message : "Unable to refresh active mode");
+        });
+      }, 120);
+    };
+
+    const channel = subscribeToModeOrchestrator(
+      conversationId,
+      () => scheduleRefresh(),
+      (status) => {
+        if (status === "SUBSCRIBED") scheduleRefresh();
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void channel.unsubscribe();
+    };
+  }, [conversationId, options.realtime, refreshActiveMode]);
 
   const applyResponse = useCallback((response: ModeEventResponse) => {
     setActiveMode(response.active_mode ?? null);

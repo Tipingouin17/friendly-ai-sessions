@@ -76,27 +76,27 @@ const ParticipantPanelContent: React.FC<{
 }) => (
   <div className={`flex h-full min-h-0 flex-col bg-white ${isHostView ? 'rounded-none' : ''}`}>
     {/* Header */}
-    <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="flex min-w-0 items-center gap-2.5 text-lg font-bold tracking-tight text-slate-950">
+    <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4">
+      <div className="mb-2.5 flex items-center justify-between gap-2.5">
+        <h3 className="flex min-w-0 items-center gap-2 text-base font-bold tracking-tight text-slate-950">
           <Users className="h-4.5 w-4.5 shrink-0 text-indigo-500" />
           <span className="truncate">{title}</span>
         </h3>
         <div className="flex shrink-0 items-center gap-2">
           {waitingCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
               <Hand className="h-3.5 w-3.5" />
               {waitingCount}
             </span>
           )}
-          <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600 shadow-sm shadow-indigo-100">
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600 shadow-sm shadow-indigo-100">
             {actualParticipantCount}/{maxParticipants || "∞"}
           </span>
         </div>
       </div>
 
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center justify-between text-sm text-slate-500">
+      <div className="mb-3 space-y-1.5">
+        <div className="flex items-center justify-between text-xs text-slate-500">
           <span>Response rate</span>
           <span className="font-semibold text-emerald-600">{responseRate}%</span>
         </div>
@@ -110,23 +110,23 @@ const ParticipantPanelContent: React.FC<{
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
         <Input
           placeholder="Search participants..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11 text-base text-slate-700 placeholder:text-slate-400 focus:bg-white"
+          className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm text-slate-700 placeholder:text-slate-400 focus:bg-white"
         />
       </div>
     </div>
 
     {/* List */}
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="px-4 py-4">
+      <div className="px-3 py-3">
         {isLoadingParticipants ? (
           <ParticipantListSkeleton count={actualParticipantCount || 1} />
         ) : filteredParticipants.length > 0 ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {filteredParticipants.map((participant) => (
               <ParticipantListItem
                 key={participant.id}
@@ -152,7 +152,7 @@ const ParticipantPanelContent: React.FC<{
 
     {/* Message Input */}
     {showMessageInput && onSendMessage && (
-      <div className="shrink-0 border-t border-slate-200 bg-white shadow-[0_-10px_28px_rgba(15,23,42,0.04)]">
+      <div className="shrink-0 border-t border-slate-200 bg-white shadow-[0_-8px_22px_rgba(15,23,42,0.04)]">
         <AdminMessageInput
           onSendMessage={onSendMessage}
           participants={effectiveParticipants}

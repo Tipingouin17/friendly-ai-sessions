@@ -56,47 +56,47 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
   const displayName = participant.name || `Participant ${participant.id}`;
 
   return (
-    <div className="group relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-slate-50 sm:px-4">
+    <div className="group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-slate-50 sm:px-3">
       {/* Avatar */}
       <div className="relative shrink-0">
         {participant.isHost ? (
-          <Avatar className="h-11 w-11">
+          <Avatar className="h-9 w-9">
             {participant.avatar && <AvatarImage src={participant.avatar} alt={displayName} />}
             <AvatarFallback className="bg-indigo-100 text-indigo-600">
               <Crown className="h-4 w-4" />
             </AvatarFallback>
           </Avatar>
         ) : participant.avatar ? (
-          <Avatar className="h-11 w-11">
+          <Avatar className="h-9 w-9">
             <AvatarImage src={participant.avatar} alt={displayName} />
-            <AvatarFallback className="p-0 bg-transparent"><InlineAvatar name={displayName} size="lg" /></AvatarFallback>
+            <AvatarFallback className="p-0 bg-transparent"><InlineAvatar name={displayName} size="md" /></AvatarFallback>
           </Avatar>
         ) : (
-          <InlineAvatar name={displayName} size="lg" />
+          <InlineAvatar name={displayName} size="md" />
         )}
         {/* Activity dot */}
-        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${activityDotClass}`} />
+        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${activityDotClass}`} />
       </div>
 
       {/* Name + activity */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-slate-950 sm:text-base">
+          <span className="truncate text-sm font-semibold text-slate-950">
             {displayName}
           </span>
           {participant.isHost && (
             <span className="shrink-0 text-[10px] font-medium text-indigo-500">(Host)</span>
           )}
         </div>
-        <span className="block truncate text-xs text-slate-500 sm:text-sm">{responseLabel}</span>
+        <span className="block truncate text-[11px] leading-4 text-slate-500">{responseLabel}</span>
       </div>
 
       {/* Response status */}
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs ${hasResponded ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-300'}`}>
-              {hasResponded ? <Check className="h-4 w-4" /> : '·'}
+            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] ${hasResponded ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-300'}`}>
+              {hasResponded ? <Check className="h-3.5 w-3.5" /> : '·'}
             </span>
           </TooltipTrigger>
           <TooltipContent side="left">
@@ -113,7 +113,7 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-3 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full p-0 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                className="absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full p-0 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                 onClick={() => !isRemoving && onRemove(participant.id)}
                 disabled={isRemoving}
               >

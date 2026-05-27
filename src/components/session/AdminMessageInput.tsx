@@ -39,9 +39,9 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
 
 
   return (
-    <div className="space-y-3 bg-white px-5 py-4">
+    <div className="space-y-2 bg-white px-4 py-3">
       <Select value={recipient} onValueChange={setRecipient}>
-        <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-white px-4 text-base text-slate-700 shadow-sm">
+        <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm">
           <SelectValue placeholder="Send to everyone" />
         </SelectTrigger>
         <SelectContent className="z-50 rounded-xl border border-slate-200 bg-white shadow-lg">
@@ -54,12 +54,12 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
         </SelectContent>
       </Select>
 
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-2">
         <Textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
           placeholder="Type a message as facilitator…"
-          className="min-h-[72px] max-h-[128px] resize-none rounded-2xl border-slate-200 bg-white px-4 py-3 text-base text-slate-700 shadow-sm placeholder:text-slate-400 focus:bg-white"
+          className="min-h-[58px] max-h-[104px] resize-none rounded-xl border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:bg-white"
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -71,9 +71,9 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
           onClick={handleSend}
           size="sm"
           disabled={!message.trim()}
-          className="h-14 w-14 shrink-0 rounded-full bg-indigo-500 p-0 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-600 disabled:shadow-none"
+          className="h-11 w-11 shrink-0 rounded-full bg-indigo-500 p-0 text-white shadow-md shadow-indigo-200 hover:bg-indigo-600 disabled:shadow-none"
         >
-          <SendHorizonal className="h-6 w-6" />
+          <SendHorizonal className="h-5 w-5" />
         </Button>
       </div>
 

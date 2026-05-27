@@ -446,10 +446,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }
 
   return (
-    <div className="host-session-cockpit session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-100">
-      <PanelGroup direction="horizontal" className="min-h-0 flex-1 gap-0 rounded-3xl">
-        <Panel defaultSize={24} minSize={18} maxSize={34} className="min-h-0">
-          <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-l-[2rem]">
+    <div className="host-session-cockpit session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-2 text-slate-100">
+      <PanelGroup direction="horizontal" className="min-h-0 flex-1 gap-0 rounded-[1.5rem]">
+        <Panel defaultSize={20} minSize={16} maxSize={24} className="min-h-0">
+          <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-l-[1.5rem]">
             <div className="min-h-0 flex-1 overflow-hidden [&>*]:h-full [&>*]:border-0 [&>*]:bg-transparent">
               <HostParticipantList
                 participants={participants || []}
@@ -464,34 +464,34 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           </div>
         </Panel>
 
-        <PanelResizeHandle className="group relative flex w-3 items-center justify-center">
-          <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
+        <PanelResizeHandle className="group relative flex w-2 items-center justify-center">
+          <span className="h-14 w-0.5 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={54} minSize={40} className="min-h-0">
+        <Panel defaultSize={60} minSize={48} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200">
             {isSessionStarted && (
-            <section className="session-avatar-stage flex h-full min-h-0 flex-col p-4" aria-label="Host multi-video gallery">
-              <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+            <section className="session-avatar-stage flex h-full min-h-0 flex-col p-3" aria-label="Host multi-video gallery">
+              <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Video room</p>
                   <p className="truncate text-xs text-slate-500">Spotlight the facilitator or switch to the room gallery.</p>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
                   <button
                     type="button"
                     onClick={toggleHostCamera}
                     disabled={hostCameraStatus === 'starting'}
-                    className={`session-control-button inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${hostCameraStream ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'} disabled:cursor-wait disabled:opacity-70`}
+                    className={`session-control-button inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${hostCameraStream ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'} disabled:cursor-wait disabled:opacity-70`}
                   >
                     {hostCameraStream ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
                     {hostCameraStatus === 'starting' ? 'Starting…' : hostCameraStream ? 'Camera on' : 'Camera off'}
                   </button>
-                  <div className="flex rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold shadow-sm">
+                  <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 text-xs font-semibold shadow-sm">
                   <button
                     type="button"
                     onClick={() => setVideoLayout('spotlight')}
-                    className={`session-control-button inline-flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${videoLayout === 'spotlight' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                    className={`session-control-button inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 transition ${videoLayout === 'spotlight' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                   >
                     <MonitorUp className="h-3.5 w-3.5" />
                     Spotlight
@@ -499,7 +499,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                   <button
                     type="button"
                     onClick={() => setVideoLayout('gallery')}
-                    className={`session-control-button inline-flex items-center gap-1 rounded-xl px-3 py-1.5 transition ${videoLayout === 'gallery' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                    className={`session-control-button inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 transition ${videoLayout === 'gallery' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                   >
                     <LayoutGrid className="h-3.5 w-3.5" />
                     Gallery
@@ -536,7 +536,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                     showResponseStatus
                     onPin={setPinnedTileId}
                     emptyLabel="Participant thumbnails will appear here as people join."
-                    className="mt-3 shrink-0"
+                    className="mt-2 shrink-0"
                   />
                 </div>
               )}
@@ -546,12 +546,12 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           </div>
         </Panel>
 
-        <PanelResizeHandle className="group relative flex w-3 items-center justify-center">
-          <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
+        <PanelResizeHandle className="group relative flex w-2 items-center justify-center">
+          <span className="h-14 w-0.5 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={22} minSize={20} maxSize={32} className="min-h-0">
-          <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[2rem]">
+        <Panel defaultSize={20} minSize={18} maxSize={24} className="min-h-0">
+          <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[1.5rem]">
             <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}

@@ -342,6 +342,9 @@ async function main() {
   const participantIds = joins.map((j) => j?.participant_id).filter(Boolean);
   const uniqueParticipantIds = new Set(participantIds);
   const finalNonHostParticipants = finalParticipants.filter((p) => !p.is_host);
+  const joinedParticipantIdSet = new Set(participantIds.map((id) => String(id)));
+  const finalParticipantMessages = finalMessages.filter((m) => m?.role === 'user' && joinedParticipantIdSet.has(String(m.participant_id)));
+  const finalNonParticipantMessages = finalMessages.filter((m) => !(m?.role === 'user' && joinedParticipantIdSet.has(String(m.participant_id))));
   const sseCrossTalk = api.sseEvents.filter((evt) => {
     const isMessageProbe = evt.label === 'messages';
     const isParticipantProbe = evt.label === 'participants';
@@ -357,7 +360,7 @@ async function main() {
   if (finalParticipants.length !== 11) readinessErrors.push(`Expected 11 persisted participant rows including host, got ${finalParticipants.length}`);
   if (conversation?.current_participants !== 11) readinessErrors.push(`Expected conversation.current_participants to be 11, got ${conversation?.current_participants}`);
   if (messages.filter(Boolean).length !== 10) readinessErrors.push(`Expected 10 inserted messages, got ${messages.filter(Boolean).length}`);
-  if (finalMessages.length !== 10) readinessErrors.push(`Expected 10 final message rows, got ${finalMessages.length}`);
+  if (finalParticipantMessages.length !== 10) readinessErrors.push(`Expected 10 final participant-authored message rows, got ${finalParticipantMessages.length}`);
   if (sseCrossTalk.length > 0) readinessErrors.push(`Detected ${sseCrossTalk.length} SSE table cross-talk sample(s)`);
 
   const endedAt = new Date().toISOString();
@@ -386,6 +389,8 @@ async function main() {
       insertedMessageCount: messages.filter(Boolean).length,
       finalParticipantRows: finalParticipants.length,
       finalMessageRows: finalMessages.length,
+      finalParticipantMessageRows: finalParticipantMessages.length,
+      finalNonParticipantMessageRows: finalNonParticipantMessages.length,
       sseEventSamples: api.sseEvents.length,
       sseResults,
       errorCount: api.errors.length,
@@ -397,6 +402,7 @@ async function main() {
     sseCrossTalkSamples: sseCrossTalk.slice(0, 10),
     joinedParticipants: joins,
     insertedMessages: messages.map((m) => m ? ({ id: m.id, participant_id: m.participant_id, role: m.role, name: m.name }) : null),
+    finalNonParticipantMessages: finalNonParticipantMessages.map((m) => ({ id: m.id, participant_id: m.participant_id, role: m.role, name: m.name, created_at: m.created_at })),
     finalParticipants: finalParticipants.map((p) => ({ participant_id: p.participant_id, name: p.name, is_host: p.is_host, is_anonymous: p.is_anonymous, created_at: p.created_at })),
     sseEventSamples: api.sseEvents.slice(0, 20),
   };

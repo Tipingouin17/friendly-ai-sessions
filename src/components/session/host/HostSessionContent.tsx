@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Activity, Brain, Clock3, LayoutGrid, MessageSquare, MonitorUp, Sparkles, Users, Video, VideoOff } from "lucide-react";
+import { Activity, Brain, Check, Clock3, Copy, LayoutGrid, MessageSquare, MonitorUp, Play, QrCode, Sparkles, UserRound, Users, Video, VideoOff, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import { Message, ParticipantInfo } from "@/types/chat";
@@ -17,6 +17,8 @@ import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
+import { QRCodeSVG } from "qrcode.react";
+import { useToast } from "@/components/ui/use-toast";
 import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from "@/hooks/useWebRTCSession";
 import { inferFacilitatorVoiceGender } from "@/utils/facilitatorVoiceGender";
 
@@ -135,6 +137,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isSessionPaused = false,
 }) => {
   const [videoLayout, setVideoLayout] = React.useState<'spotlight' | 'gallery'>('spotlight');
+  const [hasCopiedInviteLink, setHasCopiedInviteLink] = React.useState(false);
+  const { toast } = useToast();
   const [pinnedTileId, setPinnedTileId] = React.useState<string | null>(null);
   const [hostCameraStream, setHostCameraStream] = React.useState<MediaStream | null>(null);
   const [hostCameraStatus, setHostCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
@@ -306,6 +310,172 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
   const liveCameraCount = hostVideoParticipants.filter((participant) => participant.mediaStream).length;
   const videoRoomStatusLabel = `${formatRoomConnectionLabel(connectionStatus)} · ${liveCameraCount} live camera${liveCameraCount === 1 ? '' : 's'} · ${activePeerCount} peer${activePeerCount === 1 ? '' : 's'}`;
+
+  const sessionTitle = conversationData?.sessions?.title || "Untitled session";
+  const facilitatorName = facilitatorDetails?.title || "AI Facilitator";
+  const maxParticipants = conversationData?.participants || Math.max(actualParticipantCount, 1);
+  const joinedParticipantCount = actualParticipantCount;
+  const joinedProgress = maxParticipants > 0 ? Math.min(100, Math.round((joinedParticipantCount / maxParticipants) * 100)) : 0;
+  const joinToken = (conversationData as any)?.join_token;
+  const sessionInviteLink = React.useMemo(() => {
+    if (!currentConversationId || typeof window === 'undefined') return '';
+    const baseUrl = `${window.location.origin}/join-session?id=${currentConversationId}`;
+    return joinToken ? `${baseUrl}&token=${encodeURIComponent(String(joinToken))}` : baseUrl;
+  }, [currentConversationId, joinToken]);
+  const truncatedInviteLink = sessionInviteLink.length > 54 ? `${sessionInviteLink.slice(0, 51)}…` : sessionInviteLink;
+  const waitingParticipants = participants.filter((participant) => !participant.isHost && !participant.isAdmin);
+
+  const handleCopyInviteLink = React.useCallback(async () => {
+    if (!sessionInviteLink) return;
+    try {
+      await navigator.clipboard.writeText(sessionInviteLink);
+      setHasCopiedInviteLink(true);
+      window.setTimeout(() => setHasCopiedInviteLink(false), 1800);
+      toast({ title: "Invite link copied", description: "Participants can use this link to join the session." });
+    } catch (error) {
+      console.error('Failed to copy invite link:', error);
+      toast({ title: "Copy failed", description: "Could not copy the invite link to the clipboard.", variant: "destructive" });
+    }
+  }, [sessionInviteLink, toast]);
+
+  if (!isSessionStarted && !isSessionEnded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 text-slate-950">
+        <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
+          <section className="mb-7 text-center">
+            <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Waiting Room
+            </div>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{sessionTitle}</h1>
+            <p className="mt-2 text-base text-slate-500">
+              Facilitated by <span className="font-semibold text-amber-700">{facilitatorName}</span>
+            </p>
+          </section>
+
+          <section className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-5">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={handleCopyInviteLink}
+                disabled={!sessionInviteLink}
+                className="group flex h-32 w-full shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 text-indigo-600 transition hover:border-indigo-200 hover:bg-indigo-50 sm:w-32"
+                aria-label="Copy participant invite link"
+              >
+                {sessionInviteLink ? <QRCodeSVG value={sessionInviteLink} size={72} bgColor="transparent" fgColor="currentColor" /> : <QrCode className="h-16 w-16" />}
+              </button>
+
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Invite participants</p>
+                <p className="mt-2 text-lg font-semibold text-slate-950">Scan the QR code or share the link below</p>
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  disabled={!sessionInviteLink}
+                  className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700">{truncatedInviteLink || 'Preparing secure invite link…'}</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700">
+                    {hasCopiedInviteLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {hasCopiedInviteLink ? 'Copied' : 'Copy'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="mx-auto mt-7 flex w-full max-w-3xl min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-indigo-600" />
+                <h2 className="text-base font-semibold text-slate-950">Participants</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <span className="inline-flex items-center gap-1.5"><Wifi className="h-4 w-4 text-emerald-600" />{joinedParticipantCount} joined</span>
+                <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-indigo-600" />{Math.max(0, maxParticipants - joinedParticipantCount)} seats open</span>
+              </div>
+            </header>
+
+            <div className="min-h-[220px] flex-1 overflow-y-auto">
+              {isLoadingParticipants ? (
+                <div className="space-y-3 p-5">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3">
+                      <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-40 animate-pulse rounded bg-slate-200" />
+                        <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : waitingParticipants.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {waitingParticipants.map((participant) => {
+                    const participantId = String(participant.id);
+                    const participantName = participant.name || `Participant ${participant.id}`;
+                    const initials = formatParticipantInitials(participant);
+                    const accentColor = participantColors[participantId] || 'rgb(79 70 229)';
+                    return (
+                      <div key={participantId} className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                          {participant.avatar ? (
+                            <img src={participant.avatar} alt="" className="h-10 w-10 rounded-full object-cover ring-2 ring-white" />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accentColor }}>
+                              {initials || <UserRound className="h-4 w-4" />}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-950">{participantName}</p>
+                            <p className="text-xs text-slate-500">{participant.isAnonymous ? 'Anonymous participant' : 'Participant'}</p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3 text-sm">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700"><Wifi className="h-4 w-4" />Joined</span>
+                          <span className="inline-flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full border border-slate-300" />Waiting</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[220px] flex-col items-center justify-center px-6 py-10 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    <Users className="h-7 w-7" />
+                  </div>
+                  <p className="text-base font-semibold text-slate-950">Waiting for the first participant</p>
+                  <p className="mt-1 max-w-sm text-sm text-slate-500">Share the QR code or invite link. Joined participants will appear here in real time.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <div className="mx-auto mt-7 w-full max-w-3xl">
+            <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-indigo-600 transition-all duration-500" style={{ width: `${joinedProgress}%` }} />
+            </div>
+            <button
+              type="button"
+              onClick={onSessionStarted}
+              disabled={!onSessionStarted || joinedParticipantCount === 0 || isAutoStarting}
+              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            >
+              <Play className="h-5 w-5 fill-current" />
+              {isAutoStarting ? `Starting in ${autoStartCountdown}s` : 'Start Session'}
+            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-500">
+              <span>{joinedParticipantCount} of {maxParticipants} participant{maxParticipants === 1 ? '' : 's'} joined</span>
+              {isAutoStarting && onCancelAutoStart && (
+                <button type="button" onClick={onCancelAutoStart} className="font-semibold text-indigo-700 underline-offset-4 hover:underline">Cancel auto-start</button>
+              )}
+              {!isAutoStarting && joinedParticipantCount === 0 && <span>At least one participant is required to begin.</span>}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900">

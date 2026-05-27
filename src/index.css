@@ -432,3 +432,138 @@
         transition: none !important;
     }
 }
+
+/* Host live-session cockpit: dark immersive orchestration surface. */
+.host-live-header {
+    background: rgba(8, 13, 28, 0.92);
+    border-color: rgba(148, 163, 184, 0.22);
+    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.36);
+    backdrop-filter: blur(18px);
+}
+
+.host-live-header .text-slate-900,
+.host-live-header .text-slate-700,
+.host-live-header .text-slate-600 {
+    color: rgba(248, 250, 252, 0.94) !important;
+}
+
+.host-live-header .text-slate-500,
+.host-live-header .text-slate-400 {
+    color: rgba(203, 213, 225, 0.72) !important;
+}
+
+.host-live-header .border-slate-200,
+.host-live-header .border-slate-100,
+.host-live-analytics-panel {
+    border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.host-live-header .bg-white,
+.host-live-header .bg-slate-50,
+.host-live-header .bg-slate-100,
+.host-live-analytics-panel {
+    background: rgba(15, 23, 42, 0.72) !important;
+}
+
+.host-live-header button:hover {
+    background: rgba(99, 102, 241, 0.18) !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+}
+
+.host-live-header [class*="bg-indigo-50"] {
+    background: rgba(99, 102, 241, 0.18) !important;
+    border-color: rgba(129, 140, 248, 0.34) !important;
+    color: rgba(224, 231, 255, 0.98) !important;
+}
+
+.host-session-cockpit {
+    color: rgba(248, 250, 252, 0.95);
+    background:
+        radial-gradient(circle at 20% 0%, rgba(99, 102, 241, 0.30), transparent 30rem),
+        radial-gradient(circle at 78% 18%, rgba(124, 58, 237, 0.26), transparent 32rem),
+        radial-gradient(circle at 52% 100%, rgba(14, 165, 233, 0.12), transparent 30rem),
+        linear-gradient(135deg, #050816 0%, #0f172a 48%, #111827 100%);
+}
+
+.host-session-cockpit .session-glass-panel {
+    border-color: rgba(226, 232, 240, 0.14);
+    background: rgba(15, 23, 42, 0.68);
+    box-shadow: 0 22px 60px rgba(2, 6, 23, 0.42);
+    backdrop-filter: blur(18px);
+}
+
+.host-session-cockpit .session-soft-panel,
+.host-session-cockpit .rounded-2xl.border,
+.host-session-cockpit .rounded-3xl.border {
+    border-color: rgba(226, 232, 240, 0.14) !important;
+    background: rgba(30, 41, 59, 0.58) !important;
+    box-shadow: 0 16px 42px rgba(2, 6, 23, 0.28);
+}
+
+.host-session-cockpit .session-avatar-stage {
+    background:
+        radial-gradient(circle at 50% 8%, rgba(250, 204, 21, 0.22), transparent 12rem),
+        radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.36), rgba(30, 41, 59, 0.88) 52%, rgba(15, 23, 42, 0.96)),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.96));
+}
+
+.host-session-cockpit .session-chip {
+    border-color: rgba(199, 210, 254, 0.28);
+    background: rgba(15, 23, 42, 0.62);
+    color: rgba(224, 231, 255, 0.96);
+}
+
+.host-session-cockpit .session-progress-track {
+    background: rgba(148, 163, 184, 0.20);
+}
+
+.host-session-cockpit .session-progress-fill {
+    background: linear-gradient(90deg, #818cf8, #a78bfa, #38bdf8);
+}
+
+.host-session-cockpit .text-slate-950,
+.host-session-cockpit .text-slate-900,
+.host-session-cockpit .text-slate-800,
+.host-session-cockpit .text-slate-700 {
+    color: rgba(248, 250, 252, 0.96) !important;
+}
+
+.host-session-cockpit .text-slate-600,
+.host-session-cockpit .text-slate-500,
+.host-session-cockpit .text-slate-400 {
+    color: rgba(203, 213, 225, 0.76) !important;
+}
+
+.host-session-cockpit .border-slate-200,
+.host-session-cockpit .border-slate-300,
+.host-session-cockpit .border-indigo-100 {
+    border-color: rgba(226, 232, 240, 0.14) !important;
+}
+
+.host-session-cockpit .bg-white,
+.host-session-cockpit .bg-white\/80,
+.host-session-cockpit .bg-slate-50,
+.host-session-cockpit .bg-slate-100,
+.host-session-cockpit .bg-indigo-50,
+.host-session-cockpit .from-white,
+.host-session-cockpit .via-indigo-50\/50,
+.host-session-cockpit .to-violet-50\/60 {
+    background: rgba(15, 23, 42, 0.58) !important;
+}
+
+.host-session-cockpit input,
+.host-session-cockpit textarea,
+.host-session-cockpit [role="combobox"] {
+    border-color: rgba(226, 232, 240, 0.16) !important;
+    background: rgba(2, 6, 23, 0.48) !important;
+    color: rgba(248, 250, 252, 0.96) !important;
+}
+
+.host-session-cockpit input::placeholder,
+.host-session-cockpit textarea::placeholder {
+    color: rgba(148, 163, 184, 0.84) !important;
+}
+
+.host-session-cockpit button:hover {
+    border-color: rgba(129, 140, 248, 0.42) !important;
+}

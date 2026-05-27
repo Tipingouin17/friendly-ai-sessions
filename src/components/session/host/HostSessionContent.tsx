@@ -480,7 +480,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }
 
   return (
-    <div className="session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900">
+    <div className="host-session-cockpit session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-100">
       <div className="session-glass-panel mb-3 flex shrink-0 flex-wrap items-center gap-3 rounded-[1.75rem] px-4 py-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600">
           <Brain className="h-5 w-5" />

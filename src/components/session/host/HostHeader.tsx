@@ -232,7 +232,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   return (
     <>
       {/* ── Main header bar ── */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+      <div className="host-live-header sticky top-0 z-10 border-b shadow-sm">
 
         {/* ── Single row on sm+ / two rows on mobile ── */}
         <div className="px-3 sm:px-5">
@@ -343,11 +343,11 @@ const HostHeader: React.FC<HostHeaderProps> = ({
 
         {/* Analytics panel (collapsible) */}
         {conversation?.id && analyticsOpen && (
-          <div className="px-3 sm:px-5 pb-4 border-t border-slate-100 bg-slate-50">
+          <div className="host-live-analytics-panel px-3 sm:px-5 pb-4 border-t">
             <div className="pt-4">
               <SessionAnalyticsDashboard
                 conversationId={conversation.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm"
+                className="rounded-xl border shadow-sm"
               />
             </div>
           </div>

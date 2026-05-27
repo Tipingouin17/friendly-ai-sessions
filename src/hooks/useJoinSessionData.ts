@@ -120,8 +120,9 @@ export function useJoinSessionData(
     // transaction.  A client-side refetch before joining was redundant and
     // added up to 8 s of latency on slow connections.
 
-    // Use only the session-specific max. 0 means no limit.
+    // Use only the session-specific attendee max. 0 means no limit.
     const effectiveMaxParticipants = maxParticipantsForSession;
+    const effectiveCurrentAttendees = Math.max(currentParticipantCount - 1, 0);
 
     if (!participantName.trim()) {
       toast({
@@ -134,8 +135,8 @@ export function useJoinSessionData(
 
     // Skip check if on admin route or admin user - they should always be able to join
     if (!isOnAdminPath && !effectiveIsAdmin) {
-      // Only check if session is full if effectiveMaxParticipants is greater than 0
-      if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
+      // Only check if attendee capacity is full if effectiveMaxParticipants is greater than 0
+      if (effectiveMaxParticipants > 0 && effectiveCurrentAttendees >= effectiveMaxParticipants) {
         toast({
           title: "Session Full",
           description: "This session has reached its maximum capacity of participants.",
@@ -163,15 +164,15 @@ export function useJoinSessionData(
     return result;
   };
 
-  // Use only the session-specific max. 0 means no limit.
+  // Use only the session-specific attendee max. 0 means no limit.
   const effectiveMaxParticipants = maxParticipantsForSession;
+  const effectiveCurrentAttendees = Math.max(currentParticipantCount - 1, 0);
 
-  // Only consider session full if effectiveMaxParticipants is greater than 0
-  // And we're not an admin
+  // Only consider session full if attendee capacity is reached and we're not an admin.
   const isFull = !effectiveIsAdmin &&
     !isOnAdminPath &&
     effectiveMaxParticipants > 0 &&
-    currentParticipantCount >= effectiveMaxParticipants;
+    effectiveCurrentAttendees >= effectiveMaxParticipants;
 
   return {
     participantName,

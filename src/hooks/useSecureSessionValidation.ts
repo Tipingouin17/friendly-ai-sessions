@@ -81,11 +81,21 @@ export const useSecureSessionValidation = () => {
         return { isValid: false, error: 'Session has already started' };
       }
 
-      if (conversation.current_participants >= conversation.participants) {
+      const { data: participantRows } = await api
+        .from('session_participants')
+        .select('is_host')
+        .eq('conversation_id', conversationId);
+
+      const attendeeCount = (participantRows ?? []).filter((participant: any) => !participant.is_host).length;
+
+      const attendeeCapacity = Math.max((conversation.participants || 0) - 1, 0);
+
+      if (attendeeCapacity > 0 && attendeeCount >= attendeeCapacity) {
         logSecurityViolation('session_capacity_exceeded', { 
           conversationId,
           currentParticipants: conversation.current_participants,
-          maxParticipants: conversation.participants
+          attendeeCount,
+          maxParticipants: attendeeCapacity
         });
         return { isValid: false, error: 'Session is at maximum capacity' };
       }

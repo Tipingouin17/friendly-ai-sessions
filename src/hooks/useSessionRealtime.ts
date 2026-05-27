@@ -62,9 +62,12 @@ export const useSessionRealtime = ({
         if (onSessionStarted) onSessionStarted();
       }
       
-      // Check if session is already full
-      if (conversation.current_participants >= (conversation.participants || 0) && 
-          (conversation.participants || 0) > 0 && 
+      // Check if attendee capacity is already full. current_participants and
+      // stored participants both include the host; product capacity is attendees only.
+      const attendeeCount = Math.max(0, (conversation.current_participants || 0) - 1);
+      const attendeeCapacity = Math.max((conversation.participants || 0) - 1, 0);
+      if (attendeeCount >= attendeeCapacity && 
+          attendeeCapacity > 0 && 
           !sessionFullCalled) {
         setSessionFullCalled(true);
         if (handleSessionFull) handleSessionFull();
@@ -84,9 +87,11 @@ export const useSessionRealtime = ({
               if (onSessionStarted) onSessionStarted();
             }
             
-            // Handle session full
-            if (payload.new.current_participants >= (payload.new.participants || 0) && 
-                (payload.new.participants || 0) > 0 && 
+            // Handle session full using non-host attendee capacity.
+            const attendeeCount = Math.max(0, (payload.new.current_participants || 0) - 1);
+            const attendeeCapacity = Math.max((payload.new.participants || 0) - 1, 0);
+            if (attendeeCount >= attendeeCapacity && 
+                attendeeCapacity > 0 && 
                 !sessionFullCalled) {
               setSessionFullCalled(true);
               if (handleSessionFull) handleSessionFull();
@@ -172,9 +177,12 @@ export const useSessionRealtime = ({
         }
       }
       
-      // Check if session is full
-      if (conversation.current_participants >= (conversation.participants || 0) && 
-          (conversation.participants || 0) > 0 && 
+      // Check if attendee capacity is full. current_participants and stored
+      // participants include the host; product capacity is attendees only.
+      const attendeeCount = Math.max(0, (conversation.current_participants || 0) - 1);
+      const attendeeCapacity = Math.max((conversation.participants || 0) - 1, 0);
+      if (attendeeCount >= attendeeCapacity && 
+          attendeeCapacity > 0 && 
           !sessionFullCalled) {
         setSessionFullCalled(true);
         if (handleSessionFull && typeof handleSessionFull === 'function') {

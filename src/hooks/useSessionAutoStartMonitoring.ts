@@ -28,7 +28,8 @@ export const useSessionAutoStartMonitoring = ({
     if (!conversationId || !conversation || sessionStartProcessingRef.current) return;
 
     const currentCount = conversation.current_participants || 0;
-    const maxCount = conversation.participants || 0;
+    const attendeeCount = Math.max(currentCount - 1, 0);
+    const maxCount = Math.max((conversation.participants || 0) - 1, 0);
     const sessionStarted = conversation.session_started;
 
     // Only process if the count has actually changed
@@ -39,7 +40,7 @@ export const useSessionAutoStartMonitoring = ({
     // Reaching full capacity must not invoke host or participant start callbacks,
     // because those callbacks can flip local UI state or generate facilitator output
     // before the host clicks Start Session.
-    if (currentCount >= maxCount && maxCount > 0 && !sessionStarted) {
+    if (attendeeCount >= maxCount && maxCount > 0 && !sessionStarted) {
       return;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.

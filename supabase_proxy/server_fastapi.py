@@ -6770,12 +6770,12 @@ async def edge_function(func_name: str, request: Request):
                                 c.id,
                                 c.status,
                                 c.is_session_ended,
-                                COALESCE(c.participants, 0) AS participant_capacity,
+                                GREATEST(COALESCE(c.participants, 0) - 1, 0) AS participant_capacity,
                                 (($5::boolean = true) OR (COALESCE($7::text, '') <> '' AND c.join_token::text = $7::text)) AS token_valid,
                                 e.participant_id AS existing_participant_id,
                                 s.max_participant_id + 1 AS candidate_participant_id,
                                 s.non_host_count,
-                                (COALESCE(c.participants, 0) > 0 AND s.non_host_count >= COALESCE(c.participants, 0) AND $5::boolean = false) AS is_full
+                                (GREATEST(COALESCE(c.participants, 0) - 1, 0) > 0 AND s.non_host_count >= GREATEST(COALESCE(c.participants, 0) - 1, 0) AND $5::boolean = false) AS is_full
                             FROM conv c
                             CROSS JOIN stats s
                             LEFT JOIN existing e ON true

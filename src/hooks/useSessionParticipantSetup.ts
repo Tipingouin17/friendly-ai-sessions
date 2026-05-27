@@ -259,14 +259,16 @@ export const useSessionParticipantSetup = ({
   // Update participant counts when conversation or participants change
   useEffect(() => {
     if (conversation) {
-      const maxParticipants = conversation.participants || 0;
+      const maxParticipants = Math.max((conversation.participants || 0) - 1, 0);
       const currentCount = conversation.current_participants || 0;
+      const attendeeCount = Math.max(currentCount - 1, 0);
       
       setMaxParticipantsForSession(maxParticipants);
       setCurrentParticipantCount(currentCount);
       
-      // Check if session is full
-      const isFull = maxParticipants > 0 && currentCount >= maxParticipants;
+      // Check if attendee capacity is full. Stored counts include the host,
+      // but the product-facing capacity is non-host attendees only.
+      const isFull = maxParticipants > 0 && attendeeCount >= maxParticipants;
       setIsSessionFull(isFull);
       
       // Call onSessionFull if session is full and not already called

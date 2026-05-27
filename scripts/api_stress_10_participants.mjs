@@ -141,7 +141,9 @@ class ApiHarness {
     const payload = {
       participant_description: 'API-only stress simulation with ten participants; no browser and no voice checks.',
       language: 'English',
-      participants: 10,
+      // Stored capacity is host-inclusive; this readiness test still targets
+      // ten non-host attendees joining alongside one host.
+      participants: 11,
       ...(workshopId ? { sessions_id: workshopId } : {}),
       accept_terms_and_conditions: true,
       is_saved: false,

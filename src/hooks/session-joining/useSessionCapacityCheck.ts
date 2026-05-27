@@ -61,17 +61,22 @@ export async function checkSessionCapacity(
   // Get actual participant count from session_participants table
   const { data: actualParticipants, error: participantsError } = await api
     .from('session_participants')
-    .select('participant_id')
+    .select('participant_id, is_host')
     .eq('conversation_id', conversationId);
     
   if (participantsError) {
     console.error("Error fetching actual participants:", participantsError);
   }
   
-  const actualCount = actualParticipants?.length || 0;
+  const participantRows = actualParticipants ?? [];
+  const attendeeCount = participantRows.filter((participant: any) => !participant.is_host).length;
+  const maxParticipantId = participantRows.reduce(
+    (max: number, participant: any) => Math.max(max, participant.participant_id || 0),
+    0
+  );
   
-  // Calculate the next participant ID
-  const nextParticipantId = actualCount + 1;
+  // Calculate the next participant slot without counting the host against attendee capacity.
+  const nextParticipantId = maxParticipantId + 1;
   
   if (effectiveIsAdmin) {
     return {
@@ -81,12 +86,12 @@ export async function checkSessionCapacity(
     };
   }
   
-  const maxAllowed = latestConversation.participants || 0;
+  const maxAllowed = Math.max((latestConversation.participants || 0) - 1, 0);
   
-  // Use actual count for capacity checks, not the stored current_participants.
-  // A full room should block additional joins without starting the session;
-  // only the host's explicit Start Session action may set session_started.
-  if (maxAllowed > 0 && actualCount >= maxAllowed) {
+  // Use actual attendee count for capacity checks, not the stored current_participants.
+  // current_participants and stored participants include the host; product-facing
+  // capacity is the number of non-host attendees that may join the waiting room.
+  if (maxAllowed > 0 && attendeeCount >= maxAllowed) {
     return {
       canJoin: false,
       latestConversation,

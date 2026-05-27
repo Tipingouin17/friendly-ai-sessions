@@ -89,7 +89,11 @@ export const createConversation = async (params: {
     .insert({
       participant_description: params.description,
       language: params.language,
-      participants: params.participantCount,
+      // Store room capacity as host-inclusive because database-side capacity
+      // enforcement counts the host row as a participant. The product-facing
+      // value remains attendee capacity: a host who asks for 10 participants
+      // should be able to admit 10 non-host attendees.
+      participants: params.participantCount + 1,
       sessions_id: params.workshopId,
       accept_terms_and_conditions: params.agreed,
       is_saved: false,

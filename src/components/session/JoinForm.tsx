@@ -37,7 +37,8 @@ const JoinForm: React.FC<JoinFormProps> = ({
   effectiveMaxParticipants,
   conversationId
 }) => {
-  const isFull = effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants;
+  const currentAttendeeCount = Math.max(currentParticipantCount - 1, 0);
+  const isFull = effectiveMaxParticipants > 0 && currentAttendeeCount >= effectiveMaxParticipants;
 
   return (
     <div className="space-y-4">

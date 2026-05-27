@@ -66,7 +66,10 @@ export const WorkshopSetup = ({
     navigate('/pricing');
   };
   
-  const limitReached = participantCount >= maxParticipants;
+  // Workshop setup collects attendee count; facilitatorService stores attendees + 1 host.
+  const selectedAttendeeCount = participantCount;
+  const planAttendeeLimit = maxParticipants;
+  const limitReached = selectedAttendeeCount >= planAttendeeLimit;
   
   return <div className="space-y-6">
       <div>

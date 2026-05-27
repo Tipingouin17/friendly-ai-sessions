@@ -41,12 +41,15 @@ const JoinSessionDialog = ({
   const { currentConversationId } = useConversationId();
   const [internalJoinUrl, setInternalJoinUrl] = useState('');
 
-  // Auto-close dialog when session is full
+  const currentAttendeeCount = Math.max(currentParticipantCount - 1, 0);
+  const isSessionFull = maxParticipants > 0 && currentAttendeeCount >= maxParticipants;
+
+  // Auto-close dialog when attendee capacity is full
   useEffect(() => {
-    if (isOpen && maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+    if (isOpen && isSessionFull) {
       setIsOpen(false);
     }
-  }, [isOpen, currentParticipantCount, maxParticipants, setIsOpen]);
+  }, [isOpen, isSessionFull, setIsOpen]);
 
   useEffect(() => {
     // Use the provided joinUrl if available, otherwise build one from the conversation ID.
@@ -89,8 +92,8 @@ const JoinSessionDialog = ({
     return `${start}...${end}`;
   };
 
-  // Don't render the dialog trigger or dialog if session is full
-  if (maxParticipants > 0 && currentParticipantCount >= maxParticipants) {
+  // Don't render the dialog trigger or dialog if attendee capacity is full
+  if (isSessionFull) {
     return null;
   }
 

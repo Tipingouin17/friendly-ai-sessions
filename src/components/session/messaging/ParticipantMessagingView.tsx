@@ -21,7 +21,7 @@ import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
-import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from '@/hooks/useWebRTCSession';
+import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCPeerStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 import { persistParticipantMediaPreferences, readParticipantMediaPreferences } from '@/utils/participantMediaPreferences';
 
@@ -89,17 +89,26 @@ const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
   return 'Connecting';
 };
 
-const formatRoomConnectionLabel = (status: WebRTCConnectionStatus): string => {
-  if (status === 'connected') return 'video room connected';
-  if (status === 'failed') return 'video reconnect needed';
-  if (status === 'disconnected') return 'video reconnecting';
-  if (status === 'unsupported') return 'video unsupported';
-  if (status === 'idle') return 'video room idle';
-  return 'connecting video room';
+const isGenericParticipantLabel = (value?: string | null): boolean => {
+  const trimmedValue = value?.trim();
+  return !trimmedValue || /^Participant\s+\d+(?:\s+\(You\))?$/i.test(trimmedValue) || /^P\d+$/i.test(trimmedValue);
+};
+
+const resolveStoredParticipantName = (
+  participant: ParticipantInfo,
+  participantNames: { [key: number]: string }
+): string => {
+  const participantName = participant.name?.trim();
+  if (participantName && !isGenericParticipantLabel(participantName)) return participantName;
+
+  const mappedName = participantNames[participant.id]?.trim();
+  if (mappedName && !isGenericParticipantLabel(mappedName)) return mappedName;
+
+  return participantName || mappedName || `Participant ${participant.id}`;
 };
 
 const formatParticipantInitials = (participant: ParticipantInfo): string => {
-  const source = participant.name?.trim() || `P${participant.id}`;
+  const source = resolveStoredParticipantName(participant, {}) || `P${participant.id}`;
   return source
     .split(/\s+/)
     .map((part) => part[0])
@@ -284,8 +293,20 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const autoCameraRestoreKeyRef = React.useRef<string | null>(null);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
   const activeParticipants = React.useMemo(() => {
-    if (participants.length > 0) return participants;
-    return Array.from({ length: currentParticipantCount }, (_, index) => ({ id: index + 1, name: participantNames[index + 1] || `Participant ${index + 1}` } as ParticipantInfo));
+    if (participants.length > 0) {
+      return participants.map((participant) => ({
+        ...participant,
+        name: resolveStoredParticipantName(participant, participantNames),
+      }));
+    }
+
+    return Array.from({ length: currentParticipantCount }, (_, index) => {
+      const participantId = index + 1;
+      return {
+        id: participantId,
+        name: participantNames[participantId]?.trim() || `Participant ${participantId}`,
+      } as ParticipantInfo;
+    });
   }, [currentParticipantCount, participantNames, participants]);
   const effectiveParticipantId = React.useMemo(() => {
     const urlParticipantId = getParticipantIdFromUrl();
@@ -308,7 +329,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant",
-    participants,
+    participants: activeParticipants,
     participantNames,
     currentParticipant: effectiveParticipantId
   });
@@ -375,6 +396,23 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
+  const resolveParticipantDisplayName = React.useCallback((participantId: number | string | null | undefined, fallbackName?: string | null): string => {
+    const numericParticipantId = Number(participantId);
+    const participant = Number.isFinite(numericParticipantId)
+      ? activeParticipants.find((candidate) => candidate.id === numericParticipantId)
+      : undefined;
+
+    if (participant) return resolveStoredParticipantName(participant, participantNames);
+
+    const mappedName = Number.isFinite(numericParticipantId) ? participantNames[numericParticipantId]?.trim() : undefined;
+    if (mappedName && !isGenericParticipantLabel(mappedName)) return mappedName;
+
+    const cleanedFallback = fallbackName?.trim();
+    if (cleanedFallback && !isGenericParticipantLabel(cleanedFallback) && cleanedFallback !== 'You') return cleanedFallback;
+
+    return Number.isFinite(numericParticipantId) && numericParticipantId > 0 ? `Participant ${numericParticipantId}` : 'Participant';
+  }, [activeParticipants, participantNames]);
+
   const latestParticipantMessages = React.useMemo(() => {
     return [...filteredMessages].reverse().filter((message) => message.sender !== 'assistant').slice(0, 4).reverse();
   }, [filteredMessages]);
@@ -626,7 +664,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     return {
       id: String(participant.id),
-      name: isCurrentUser ? `${participant.name || 'You'} (You)` : participant.name || `Participant ${participant.id}`,
+      name: resolveParticipantDisplayName(participant.id, participant.name),
       initials: formatParticipantInitials(participant),
       avatarUrl: participant.avatar,
       accentColor: participantColors[String(participant.id)] || undefined,
@@ -640,7 +678,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   })];
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
-  const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);
   const cameraStatusLabel = cameraStatus === 'starting'
     ? 'Starting camera…'
     : cameraStatus === 'on'
@@ -757,7 +794,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               {cameraIsOn ? 'Camera off' : 'Camera on'}
             </button>
           </div>
-          <span className="text-slate-500">{microphoneEnabled ? 'Mic on' : 'Muted'} · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
+          <span className="text-slate-500">{microphoneEnabled ? 'Mic on' : 'Muted'} · {cameraStatusLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
           {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
         </div>
       </div>
@@ -774,7 +811,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             {latestParticipantMessages.map((message) => (
               <div key={message.id} className="session-soft-panel rounded-2xl p-3">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-indigo-600">{message.name || message.participant || 'Participant'}</span>
+                  <span className="truncate text-xs font-semibold text-indigo-600">{resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
                   <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
                 </div>
                 <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
@@ -845,13 +882,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] md:rounded-[2rem]">
           <section className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4">
             <div className={`session-soft-panel rounded-[1.25rem] border border-slate-200 p-2 md:rounded-[1.75rem] md:p-3 ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}>
-              <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="session-chip border-amber-200 bg-amber-50 text-amber-700">AI in room</span>
-                  <span className="truncate text-xs font-medium text-slate-500">{runtimeAvatarState?.reason || 'Facilitator tile is shown with everyone else'}</span>
-                </div>
-                <span className="session-chip border-slate-200 bg-white text-slate-700">{aiIsSpeaking ? 'Speaking' : roomConnectionLabel}</span>
-              </div>
               <div className="h-[clamp(170px,30dvh,340px)] overflow-hidden rounded-[1rem] md:h-[min(42vh,420px)] md:rounded-[1.35rem]">
                 <SessionVideoGrid
                   participants={participantVideoTiles}
@@ -926,7 +956,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 participantCount={maxParticipants}
                 currentParticipant={effectiveParticipantId}
                 participantNames={participantNames}
-                participants={participants}
+                participants={activeParticipants}
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 onSendMessage={onSendMessage}

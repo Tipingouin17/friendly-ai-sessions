@@ -13,6 +13,7 @@ export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"
 };
 export type DbSession = Database["public"]["Tables"]["sessions"]["Row"];
 export type DbFacilitator = Database["public"]["Tables"]["facilitators"]["Row"];
+export type DbFacilitatorPersonaConfig = Database["public"]["Tables"]["facilitator_persona_configs"]["Row"];
 
 // Define the exact shape of facilitator details we're selecting in our query
 export interface FacilitatorDetails {

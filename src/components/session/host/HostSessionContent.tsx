@@ -36,6 +36,7 @@ interface HostSessionContentProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  isGeneratingResponse?: boolean;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   enabledTools?: FacilitatorToolAssignment[];
   isLoadingToolbox?: boolean;
@@ -106,6 +107,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  isGeneratingResponse = false,
   onTriggerFacilitatorResponse,
   activeMode = null,
   isSessionStarted = false,
@@ -567,6 +569,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               isWaitingForResponses={isWaitingForResponses}
               responseCount={responseCount}
               totalParticipants={totalParticipants}
+              isGeneratingResponse={isGeneratingResponse}
               onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
               activeMode={activeMode}
               isSessionStarted={isSessionStarted}

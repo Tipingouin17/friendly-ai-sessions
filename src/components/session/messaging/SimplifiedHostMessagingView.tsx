@@ -32,6 +32,7 @@ interface SimplifiedHostMessagingViewProps {
   responseCount?: number;
   totalParticipants?: number;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
+  isGeneratingResponse?: boolean;
   isSessionStarted?: boolean;
   onSessionStarted?: () => void;
   participants?: ParticipantInfo[];
@@ -65,6 +66,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   responseCount = 0,
   totalParticipants = 0,
   onTriggerFacilitatorResponse,
+  isGeneratingResponse = false,
   isSessionStarted = false,
   onSessionStarted,
   participants = [],
@@ -81,6 +83,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
 
   const [isSending, setIsSending] = useState(false);
+  const [isContinuationPending, setIsContinuationPending] = useState(false);
+  const [isPostGenerationCooldown, setIsPostGenerationCooldown] = useState(false);
+  const continuationFallbackTimeoutRef = React.useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
 
   // Inactivity timer — purely indicative, never auto-triggers anything
@@ -92,6 +97,45 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     isSessionEnded,
     thresholdSeconds: 180, // 3 minutes — will be a configurable admin setting later
   });
+
+  const latestAssistantMessageId = React.useMemo(() => {
+    const latestAssistantMessage = [...messages].reverse().find((message) => message.sender === 'assistant');
+    if (!latestAssistantMessage) return null;
+    if (latestAssistantMessage.id !== undefined && latestAssistantMessage.id !== null) {
+      return String(latestAssistantMessage.id);
+    }
+    const timestamp = latestAssistantMessage.timestamp instanceof Date
+      ? latestAssistantMessage.timestamp.getTime()
+      : String(latestAssistantMessage.timestamp || '');
+    return `${timestamp}:${latestAssistantMessage.content}`;
+  }, [messages]);
+
+  const previousAssistantMessageIdRef = React.useRef<string | null>(latestAssistantMessageId);
+
+  React.useEffect(() => {
+    if (!latestAssistantMessageId || latestAssistantMessageId === previousAssistantMessageIdRef.current) return;
+
+    previousAssistantMessageIdRef.current = latestAssistantMessageId;
+    setIsContinuationPending(false);
+    setIsPostGenerationCooldown(true);
+
+    if (continuationFallbackTimeoutRef.current) {
+      window.clearTimeout(continuationFallbackTimeoutRef.current);
+      continuationFallbackTimeoutRef.current = null;
+    }
+
+    const cooldownTimeout = window.setTimeout(() => setIsPostGenerationCooldown(false), 2500);
+    return () => window.clearTimeout(cooldownTimeout);
+  }, [latestAssistantMessageId]);
+
+  React.useEffect(() => () => {
+    if (continuationFallbackTimeoutRef.current) {
+      window.clearTimeout(continuationFallbackTimeoutRef.current);
+    }
+  }, []);
+
+  const isFacilitatorTurnBusy = isSending || isGeneratingResponse || isContinuationPending || isPostGenerationCooldown;
+  const isContinueDisabled = isSessionPaused || isSessionEnded || isFacilitatorTurnBusy;
 
   // Reset dismissed state whenever a new inactivity period starts
   const handleDismissInactivity = () => {
@@ -130,8 +174,18 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   };
 
   const handleContinueNormal = async () => {
-    if (!onTriggerFacilitatorResponse) return;
+    if (!onTriggerFacilitatorResponse || isContinueDisabled) return;
     setIsSending(true);
+    setIsContinuationPending(true);
+
+    if (continuationFallbackTimeoutRef.current) {
+      window.clearTimeout(continuationFallbackTimeoutRef.current);
+    }
+    continuationFallbackTimeoutRef.current = window.setTimeout(() => {
+      setIsContinuationPending(false);
+      continuationFallbackTimeoutRef.current = null;
+    }, 15000);
+
     try {
       await onTriggerFacilitatorResponse();
     } finally {
@@ -247,15 +301,15 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       onClick={handleContinueNormal}
                       variant="outline"
                       size="sm"
-                      disabled={isSending}
-                      className="h-7 rounded-lg border-slate-200 px-2.5 text-[11px] text-slate-700 hover:bg-slate-100"
+                      disabled={isContinueDisabled}
+                      className="h-7 rounded-lg border-slate-200 px-2.5 text-[11px] text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {isSending ? (
+                      {(isSending || isGeneratingResponse || isContinuationPending) ? (
                         <span className="flex items-center gap-1.5">
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-200" />
                           Generating…
                         </span>
-                      ) : 'Continue without waiting'}
+                      ) : isPostGenerationCooldown ? 'Facilitator updated' : 'Continue without waiting'}
                     </Button>
                   )}
                 </div>
@@ -332,10 +386,10 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       <Button
                         onClick={handleSendWithInstruction}
                         size="sm"
-                        disabled={!hostInstruction.trim() || isSending}
-                        className="h-7 shrink-0 bg-indigo-500 px-2.5 text-xs text-white hover:bg-indigo-400"
+                        disabled={!hostInstruction.trim() || isSessionPaused || isSessionEnded || isFacilitatorTurnBusy}
+                        className="h-7 shrink-0 bg-indigo-500 px-2.5 text-xs text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {isSending ? (
+                        {(isSending || isGeneratingResponse || isContinuationPending) ? (
                           <span className="flex items-center gap-1.5">
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
                             Generating…

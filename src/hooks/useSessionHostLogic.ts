@@ -128,6 +128,7 @@ export function useSessionHostLogic() {
         isWaitingForResponses,
         totalParticipants,
         triggerFacilitatorResponse,
+        isGeneratingResponse,
         isProcessingAutoStart
     } = useHostMessages({
         conversationId: currentConversationId,
@@ -277,6 +278,7 @@ export function useSessionHostLogic() {
         isSessionPaused,
         responseCount,
         isWaitingForResponses,
+        isGeneratingResponse,
 
         // Actions
         toggleSessionState,

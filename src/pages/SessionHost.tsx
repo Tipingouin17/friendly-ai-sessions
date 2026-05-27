@@ -34,6 +34,7 @@ const SessionHost = () => {
     isSessionPaused,
     responseCount,
     isWaitingForResponses,
+    isGeneratingResponse,
 
     // Actions
     toggleSessionState,
@@ -94,6 +95,7 @@ const SessionHost = () => {
       isWaitingForResponses={isWaitingForResponses}
       responseCount={responseCount}
       totalParticipants={participantCount}
+      isGeneratingResponse={isGeneratingResponse}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       enabledTools={enabledTools}
       isLoadingToolbox={isLoadingToolbox}

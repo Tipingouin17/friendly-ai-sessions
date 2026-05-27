@@ -28,6 +28,7 @@ const CRISP_WEBSITE_ID = "551eabf6-0021-417e-86fb-d34812d1f6eb";
 const HIDDEN_PATHS = ["/admin", "/session", "/join-session"];
 
 const STYLE_ID = "crisp-visibility-style";
+const SCRIPT_ID = "crisp-sdk-script";
 
 declare global {
   interface Window {
@@ -118,9 +119,20 @@ export function CrispChat() {
   const pathnameRef = useRef(location.pathname);
   useEffect(() => { pathnameRef.current = location.pathname; }, [location.pathname]);
 
-  // Initialise Crisp once on mount
+  // Initialise Crisp only on routes where the support widget is allowed.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const shouldHide = HIDDEN_PATHS.some(p => location.pathname.startsWith(p));
+    if (shouldHide) {
+      setCrispVisibility(true);
+      return;
+    }
+
+    if (document.getElementById(SCRIPT_ID)) {
+      setCrispVisibility(false);
+      return;
+    }
 
     crispReady = false;
     window.$crisp = [];
@@ -132,8 +144,8 @@ export function CrispChat() {
       crispReady = true;
 
       // Apply correct visibility for the current route
-      const shouldHide = HIDDEN_PATHS.some(p => pathnameRef.current.startsWith(p));
-      setCrispVisibility(shouldHide);
+      const shouldHideCurrentRoute = HIDDEN_PATHS.some(p => pathnameRef.current.startsWith(p));
+      setCrispVisibility(shouldHideCurrentRoute);
 
       // Set user identity now that the SDK is fully ready
       const currentUser = userRef.current;
@@ -148,6 +160,7 @@ export function CrispChat() {
     };
 
     const script = document.createElement("script");
+    script.id = SCRIPT_ID;
     script.src = "https://client.crisp.chat/l.js";
     script.async = true;
     document.head.appendChild(script);
@@ -161,7 +174,7 @@ export function CrispChat() {
       const styleEl = document.getElementById(STYLE_ID);
       if (styleEl) styleEl.remove();
     };
-  }, []);
+  }, [location.pathname]);
 
   // Pre-fill user identity whenever the logged-in user changes.
   // Only runs after crispReady = true; the initial identity set is handled

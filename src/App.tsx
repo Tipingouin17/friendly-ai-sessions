@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { CrispChat } from "./components/CrispChat";
+import { MicrosoftUet } from "./components/MicrosoftUet";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
@@ -82,6 +83,7 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <CrispChat />
+          <MicrosoftUet />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Layout><Outlet /></Layout>}>

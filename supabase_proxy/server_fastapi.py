@@ -2365,15 +2365,43 @@ class ConnectionManager:
             if not self._rooms[conversation_id]:
                 self._rooms.pop(conversation_id, None)
 
+    @staticmethod
+    def _topic_table(topic: str) -> Optional[str]:
+        """Extract the table name from Supabase-style realtime topics.
+
+        Expected topics look like `realtime:public:messages:conversation_id=eq.123`.
+        If the topic is custom or malformed, return None and preserve the
+        historical behavior of delivering the event to that subscriber.
+        """
+        if not topic:
+            return None
+        parts = topic.split(":")
+        return parts[2] if len(parts) >= 3 and parts[0] == "realtime" else None
+
+    @staticmethod
+    def _payload_table(payload: dict) -> Optional[str]:
+        payload_body = payload.get("payload") if isinstance(payload, dict) else None
+        if isinstance(payload_body, dict):
+            table = payload_body.get("table")
+            return str(table) if table else None
+        return None
+
     async def broadcast(self, conversation_id: str, payload: dict):
-        """Send a message to all connections in a room.
+        """Send a message to matching connections in a room.
 
         Each message is augmented with the subscriber's topic so the frontend
-        Supabase shim can route it to the correct RealtimeChannelImpl.
+        Supabase shim can route it to the correct RealtimeChannelImpl.  When a
+        subscriber uses a Supabase table topic, only payloads for that table are
+        delivered; this prevents messages streams from receiving participant
+        rows and vice versa.
         """
         room = list(self._rooms.get(conversation_id, []))
+        payload_table = self._payload_table(payload)
         dead = []
         for ws, topic in room:
+            topic_table = self._topic_table(topic)
+            if payload_table and topic_table and payload_table != topic_table:
+                continue
             try:
                 msg = dict(payload)
                 if topic:
@@ -6699,137 +6727,149 @@ async def edge_function(func_name: str, request: Request):
         try:
             async with _pool.acquire() as conn:
                 async with conn.transaction():
-                    # 1. Validate join token & fetch conversation in one query
-                    conv = await conn.fetchrow(
+                    # Keep the conversation row locked for exactly one SQL round trip.
+                    # The previous implementation held FOR UPDATE across several remote
+                    # database queries; under ten simultaneous joins, later requests could
+                    # wait longer than the 10 s statement timeout.  This statement validates
+                    # the token/state, computes the next slot, inserts or updates the row,
+                    # and refreshes current_participants while the lock is held.
+                    join_row = await conn.fetchrow(
                         """
-                        SELECT id, status, is_session_ended, participants,
-                               current_participants, join_token
-                        FROM public.conversations
-                        WHERE id = $1
-                        """,
-                        conversation_id,
-                    )
-                    if not conv:
-                        raise HTTPException(404, "Session not found")
-
-                    # Validate join token (skip for host)
-                    if not is_host:
-                        token_valid = join_token and str(conv["join_token"]) == str(join_token)
-                        if not token_valid:
-                            raise HTTPException(403, "Invalid join token")
-
-                    # Validate session state
-                    if conv["is_session_ended"]:
-                        raise HTTPException(400, "This session has already ended")
-                    if conv["status"] and conv["status"] != "active":
-                        raise HTTPException(400, "This session is not currently active")
-
-                    # 2a. If device_id is provided, check for an existing slot
-                    #     for this device in this conversation.  This allows a
-                    #     participant to rejoin after a page refresh without
-                    #     consuming a new slot.
-                    existing_slot = None
-                    if device_id:
-                        existing_slot = await conn.fetchrow(
-                            """
-                            SELECT participant_id, name, avatar_seed
-                            FROM public.session_participants
-                            WHERE conversation_id = $1 AND device_id = $2
-                            """,
-                            conversation_id, device_id,
-                        )
-
-                    if existing_slot:
-                        # Participant is rejoining — reuse their existing slot.
-                        new_participant_id = existing_slot["participant_id"]
-                        # Update name/avatar in case they changed them.
-                        await conn.execute(
-                            """
-                            UPDATE public.session_participants
-                            SET name = $3, avatar_seed = $4
-                            WHERE conversation_id = $1 AND participant_id = $2
-                            """,
-                            conversation_id, new_participant_id,
-                            participant_name, avatar_seed,
-                        )
-                        log_session.info(
-                            "join-session: REJOIN conv_id=%s participant_id=%s name=%r",
-                            conversation_id, new_participant_id, participant_name,
-                        )
-                    else:
-                        # 2b. New participant — count existing slots and assign next ID.
-                        _cnt = await conn.fetchrow(
-                            """
-                            SELECT COALESCE(MAX(participant_id), 0)
-                            FROM public.session_participants
-                            WHERE conversation_id = $1
-                            """,
-                            conversation_id,
-                        )
-                        max_id = _cnt[0] if _cnt else 0
-                        # Count non-host participants for capacity check
-                        _cnt2 = await conn.fetchrow(
-                            'SELECT COUNT(*) FROM public.session_participants WHERE conversation_id = $1 AND is_host = false',
-                            conversation_id,
-                        )
-                        actual_count = _cnt2[0] if _cnt2 else 0
-                        max_participants = conv["participants"] or 0
-
-                        if max_participants > 0 and actual_count >= max_participants and not is_host:
-                            raise HTTPException(400, "This session is full")
-
-                        # Use MAX(participant_id) + 1 instead of COUNT + 1 to avoid
-                        # reusing IDs of removed participants (was the root cause of BUG-A).
-                        new_participant_id = max_id + 1
-
-                    # 3. Insert (new) or skip (rejoin) + update count + log event atomically
-                    if not existing_slot:
-                        await conn.execute(
-                            """
+                        WITH conv AS (
+                            SELECT id, status, is_session_ended, participants, join_token
+                            FROM public.conversations
+                            WHERE id = $1
+                            FOR UPDATE
+                        ),
+                        existing AS (
+                            SELECT sp.participant_id
+                            FROM public.session_participants sp
+                            WHERE sp.conversation_id = $1
+                              AND $6::text IS NOT NULL
+                              AND sp.device_id = $6::text
+                            LIMIT 1
+                        ),
+                        stats AS (
+                            SELECT
+                                COALESCE(MAX(sp.participant_id), 0) AS max_participant_id,
+                                COUNT(*) FILTER (WHERE sp.is_host = false) AS non_host_count
+                            FROM public.session_participants sp
+                            WHERE sp.conversation_id = $1
+                        ),
+                        decision AS (
+                            SELECT
+                                c.id,
+                                c.status,
+                                c.is_session_ended,
+                                COALESCE(c.participants, 0) AS participant_capacity,
+                                (($5::boolean = true) OR (COALESCE($7::text, '') <> '' AND c.join_token::text = $7::text)) AS token_valid,
+                                e.participant_id AS existing_participant_id,
+                                s.max_participant_id + 1 AS candidate_participant_id,
+                                s.non_host_count,
+                                (COALESCE(c.participants, 0) > 0 AND s.non_host_count >= COALESCE(c.participants, 0) AND $5::boolean = false) AS is_full
+                            FROM conv c
+                            CROSS JOIN stats s
+                            LEFT JOIN existing e ON true
+                        ),
+                        updated_existing AS (
+                            UPDATE public.session_participants sp
+                            SET name = $2, avatar_seed = $3
+                            FROM decision d
+                            WHERE sp.conversation_id = $1
+                              AND sp.participant_id = d.existing_participant_id
+                              AND d.existing_participant_id IS NOT NULL
+                            RETURNING sp.participant_id, true AS is_rejoining
+                        ),
+                        inserted AS (
                             INSERT INTO public.session_participants
                                 (conversation_id, participant_id, name, avatar_seed,
                                  is_anonymous, is_host, device_id)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7)
-                            ON CONFLICT (conversation_id, participant_id) DO NOTHING
-                            """,
-                            conversation_id, new_participant_id, participant_name,
-                            avatar_seed, is_anonymous, is_host, device_id,
+                            SELECT
+                                $1, d.candidate_participant_id, $2, $3, $4, $5, $6
+                            FROM decision d
+                            WHERE d.existing_participant_id IS NULL
+                              AND d.is_session_ended = false
+                              AND (d.status IS NULL OR d.status = 'active')
+                              AND d.token_valid = true
+                              AND d.is_full = false
+                            RETURNING participant_id, false AS is_rejoining
+                        ),
+                        chosen AS (
+                            SELECT participant_id, is_rejoining FROM updated_existing
+                            UNION ALL
+                            SELECT participant_id, is_rejoining FROM inserted
+                            LIMIT 1
+                        ),
+                        updated_conversation AS (
+                            UPDATE public.conversations
+                            SET current_participants = (
+                                SELECT COUNT(*)
+                                FROM public.session_participants
+                                WHERE conversation_id = $1
+                            )
+                            WHERE id = $1 AND EXISTS (SELECT 1 FROM chosen)
+                            RETURNING current_participants
                         )
-
-                    await conn.execute(
-                        """
-                        UPDATE public.conversations
-                        SET current_participants = (
-                            SELECT COUNT(*) FROM public.session_participants
-                            WHERE conversation_id = $1
-                        )
-                        WHERE id = $2
-                        """,
-                        conversation_id, conversation_id,
-                    )
-
-                    await conn.execute(
-                        """
-                        INSERT INTO public.session_events
-                            (conversation_id, event_type, data)
-                        VALUES ($1, 'participant_joined', $2::jsonb)
+                        SELECT
+                            EXISTS (SELECT 1 FROM conv) AS conversation_exists,
+                            (SELECT is_session_ended FROM decision) AS is_session_ended,
+                            (SELECT status FROM decision) AS status,
+                            (SELECT token_valid FROM decision) AS token_valid,
+                            (SELECT is_full FROM decision) AS is_full,
+                            (SELECT participant_id FROM chosen) AS participant_id,
+                            (SELECT is_rejoining FROM chosen) AS is_rejoining,
+                            (SELECT current_participants FROM updated_conversation) AS current_participants
                         """,
                         conversation_id,
-                        json.dumps({
-                            "participant_id": new_participant_id,
-                            "participant_name": participant_name,
-                            "avatar_seed": avatar_seed,
-                            "is_anonymous": is_anonymous,
-                            "is_host": is_host,
-                            "timestamp": datetime.utcnow().isoformat(),
-                        }),
+                        participant_name,
+                        avatar_seed,
+                        is_anonymous,
+                        is_host,
+                        device_id,
+                        join_token,
                     )
+
+                    if not join_row or not join_row["conversation_exists"]:
+                        raise HTTPException(404, "Session not found")
+                    if join_row["is_session_ended"]:
+                        raise HTTPException(400, "This session has already ended")
+                    if join_row["status"] and join_row["status"] != "active":
+                        raise HTTPException(400, "This session is not currently active")
+                    if not join_row["token_valid"]:
+                        raise HTTPException(403, "Invalid join token")
+                    if join_row["is_full"]:
+                        raise HTTPException(400, "This session is full")
+                    if join_row["participant_id"] is None:
+                        raise RuntimeError("Participant slot insert did not return a row")
+
+                    new_participant_id = join_row["participant_id"]
+                    existing_slot = bool(join_row["is_rejoining"])
+
+                # Log the join event after releasing the participant-slot lock.  The
+                # event is useful for audit/debugging but should not delay or block
+                # concurrent joins.
+                await conn.execute(
+                    """
+                    INSERT INTO public.session_events
+                        (conversation_id, event_type, data)
+                    VALUES ($1, 'participant_joined', $2::jsonb)
+                    """,
+                    conversation_id,
+                    json.dumps({
+                        "participant_id": new_participant_id,
+                        "participant_name": participant_name,
+                        "avatar_seed": avatar_seed,
+                        "is_anonymous": is_anonymous,
+                        "is_host": is_host,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }),
+                )
 
             log_session.info(
                 "join-session: SUCCESS conv_id=%s participant_id=%s name=%r is_host=%s",
                 conversation_id, new_participant_id, participant_name, is_host,
             )
-            is_rejoining = existing_slot is not None
+            is_rejoining = bool(existing_slot)
             # Broadcast participant join/rejoin event to all WebSocket subscribers
             # so the host dashboard updates in real-time without polling.
             _participant_broadcast = {
@@ -7151,9 +7191,28 @@ class SSEManager:
             if not self._rooms[conversation_id]:
                 self._rooms.pop(conversation_id, None)
 
+    @staticmethod
+    def _topic_table(topic: str) -> Optional[str]:
+        if not topic:
+            return None
+        parts = topic.split(":")
+        return parts[2] if len(parts) >= 3 and parts[0] == "realtime" else None
+
+    @staticmethod
+    def _payload_table(payload: dict) -> Optional[str]:
+        payload_body = payload.get("payload") if isinstance(payload, dict) else None
+        if isinstance(payload_body, dict):
+            table = payload_body.get("table")
+            return str(table) if table else None
+        return None
+
     async def broadcast(self, conversation_id: str, payload: dict):
         room = list(self._rooms.get(conversation_id, []))
+        payload_table = self._payload_table(payload)
         for q, topic in room:
+            topic_table = self._topic_table(topic)
+            if payload_table and topic_table and payload_table != topic_table:
+                continue
             msg = dict(payload)
             if topic:
                 msg["topic"] = topic

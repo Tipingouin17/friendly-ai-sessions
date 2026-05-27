@@ -95,6 +95,7 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         conversation={conversation}
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
+        isSessionStarted={isSessionStarted}
       />
 
       {/* Waiting participants notification banner */}

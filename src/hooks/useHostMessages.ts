@@ -124,7 +124,7 @@ export const useHostMessages = ({
 
     // The message fetching hook will handle the actual generation
     // We just need to trigger it by updating the conversation state
-    if (conversationState.session_started && !conversationState.welcome_message_status) { /* no-op */ }
+    if (conversationState.session_started && (conversationState as any).session_started_at && !conversationState.welcome_message_status) { /* no-op */ }
   }, [conversationId, conversationState]);
 
   // Handle conversation updates from realtime with enhanced auto-start detection
@@ -136,7 +136,7 @@ export const useHostMessages = ({
       sessionStateRef.current = updatedConversation;
 
       // Enhanced session start detection with immediate AI generation
-      if (payload.new.session_started && !payload.old?.session_started && !autoStartHandledRef.current) {
+      if (payload.new.session_started && (payload.new as any).session_started_at && !payload.old?.session_started_at && !autoStartHandledRef.current) {
         autoStartHandledRef.current = true;
 
         // Trigger immediate AI welcome generation
@@ -205,9 +205,13 @@ export const useHostMessages = ({
     isHost: true
   });
 
+  const hasExplicitStartMarker = Boolean(
+    conversationState?.session_started && (conversationState as any)?.session_started_at
+  );
+
   // Enhanced session start state monitoring for immediate welcome generation
   useEffect(() => {
-    if (conversationState?.session_started && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
+    if (hasExplicitStartMarker && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
 
       // Check if we need to generate welcome message
       if (messages.length === 0) {
@@ -217,7 +221,7 @@ export const useHostMessages = ({
         }, 500);
       }
     }
-  }, [conversationState?.session_started, messages.length, triggerImmediateWelcomeGeneration]);
+  }, [hasExplicitStartMarker, messages.length, triggerImmediateWelcomeGeneration]);
 
   // Reset flags when conversation changes
   useEffect(() => {

@@ -47,12 +47,14 @@ interface HostHeaderProps {
   conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
+  isSessionStarted?: boolean;
 }
 
 const HostHeader: React.FC<HostHeaderProps> = ({
   conversation,
   isSessionPaused,
   toggleSessionState,
+  isSessionStarted: isExplicitSessionStarted,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -117,7 +119,10 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   }, [facilitatorInfo?.profile_picture, facilitatorInfo?.id]);
 
   const isSessionEnded = conversation?.is_session_ended || false;
-  const isSessionStarted = conversation?.session_started || false;
+  const hasExplicitStartMarker = Boolean(
+    conversation?.session_started && (conversation as any)?.session_started_at
+  );
+  const isSessionStarted = isExplicitSessionStarted ?? hasExplicitStartMarker;
   const isBusy = isClosing || isStopping;
 
   /* ── Action buttons (shared between layouts) ── */

@@ -79,7 +79,9 @@ export function useSessionHostLogic() {
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionStarted: () => {
-            setHostSessionStartedOverride(true);
+            // Raw session_started can still be flipped by legacy full-capacity paths.
+            // The host moves live only through the explicit Start Session handler or
+            // through a persisted session_started_at marker from that handler.
         },
         onSessionFull: () => {
             // Intentionally no-op: the host must start the redesigned waiting room manually.
@@ -106,17 +108,19 @@ export function useSessionHostLogic() {
         conversationData
     });
 
+    const hasExplicitStartMarker = Boolean(
+        conversationData?.session_started && (conversationData as any)?.session_started_at
+    );
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
-        isManagerSessionStarted ||
-        conversationData?.session_started
+        hasExplicitStartMarker
     );
 
     useEffect(() => {
-        if ((isManagerSessionStarted || conversationData?.session_started) && !hostSessionStartedOverride) {
+        if (hasExplicitStartMarker && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [isManagerSessionStarted, conversationData?.session_started, hostSessionStartedOverride]);
+    }, [hasExplicitStartMarker, hostSessionStartedOverride]);
 
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);

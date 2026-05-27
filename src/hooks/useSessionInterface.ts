@@ -37,10 +37,11 @@ export function useSessionInterface(
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [conversationId, (conversation as any)?.join_token]);
 
-  // Sync session_started from conversation data
+  // Sync only explicit starts from conversation data. Legacy full-capacity paths can
+  // still flip session_started, so the timestamp marker is the durable host-click signal.
   useEffect(() => {
     if (!conversation) return;
-    const started = (conversation as any).session_started === true;
+    const started = (conversation as any).session_started === true && Boolean((conversation as any).session_started_at);
     if (started && !lastSessionStarted.current) {
       lastSessionStarted.current = true;
       setIsSessionStarted(true);
@@ -50,7 +51,7 @@ export function useSessionInterface(
       setShowQrCodeView(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
-  }, [(conversation as any)?.session_started]);
+  }, [(conversation as any)?.session_started, (conversation as any)?.session_started_at]);
 
   // Set up real-time subscription for session_started updates
   useEffect(() => {
@@ -72,8 +73,9 @@ export function useSessionInterface(
       }, (payload) => {
         if (
           payload.new &&
-          payload.old?.session_started !== payload.new.session_started &&
-          payload.new.session_started === true
+          payload.old?.session_started_at !== payload.new.session_started_at &&
+          payload.new.session_started === true &&
+          Boolean((payload.new as any).session_started_at)
         ) {
           if (!lastSessionStarted.current) {
             lastSessionStarted.current = true;
@@ -81,7 +83,7 @@ export function useSessionInterface(
             setShowQrCodeView(false);
             toast({
               title: "Session Started",
-              description: "The session has been automatically started.",
+              description: "The host has started the session.",
             });
           }
         }
@@ -122,7 +124,10 @@ export function useSessionInterface(
     try {
       const { error } = await api
         .from('conversations')
-        .update({ session_started: true })
+        .update({
+          session_started: true,
+          session_started_at: new Date().toISOString(),
+        })
         .eq('id', conversationId);
 
       if (error) {

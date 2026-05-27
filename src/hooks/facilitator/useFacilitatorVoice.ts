@@ -14,6 +14,11 @@ interface UseFacilitatorVoiceParams {
   voiceGender?: FacilitatorVoiceGender | null;
   lipSyncEnabled?: boolean;
   persistEvents?: boolean;
+  voiceProvider?: string | null;
+  voiceStyle?: string | null;
+  locale?: string | null;
+  speakingBehavior?: Record<string, unknown> | null;
+  animationPreset?: string | null;
 }
 
 interface SpeakParams {
@@ -129,9 +134,21 @@ const getVoiceGenderScore = (voice: SpeechSynthesisVoice, voiceGender?: Facilita
   return preferredScore - opposingPenalty;
 };
 
-const scoreVoice = (voice: SpeechSynthesisVoice, voiceGender?: FacilitatorVoiceGender | null): number => {
+const scoreVoice = (
+  voice: SpeechSynthesisVoice,
+  voiceGender?: FacilitatorVoiceGender | null,
+  locale?: string | null
+): number => {
   const searchable = `${voice.name} ${voice.voiceURI}`.toLowerCase();
-  const languageScore = voice.lang?.toLowerCase().startsWith('en') ? 60 : 0;
+  const voiceLang = voice.lang?.toLowerCase() ?? '';
+  const normalizedLocale = locale?.toLowerCase() ?? '';
+  const languageScore = normalizedLocale && voiceLang === normalizedLocale
+    ? 90
+    : normalizedLocale && voiceLang.startsWith(normalizedLocale.split('-')[0])
+      ? 75
+      : voiceLang.startsWith('en')
+        ? 60
+        : 0;
   const qualityScore = NATURAL_VOICE_KEYWORDS.reduce((score, keyword) => searchable.includes(keyword) ? score + 18 : score, 0);
   const localPenalty = voice.localService ? 0 : 4;
   return languageScore + qualityScore + getVoiceGenderScore(voice, voiceGender) - localPenalty;
@@ -144,14 +161,26 @@ const voiceMatchesGender = (voice: SpeechSynthesisVoice, voiceGender?: Facilitat
 const selectBestVoice = (
   voices: SpeechSynthesisVoice[],
   defaultVoiceId?: string | null,
-  voiceGender?: FacilitatorVoiceGender | null
+  voiceGender?: FacilitatorVoiceGender | null,
+  locale?: string | null
 ): SpeechSynthesisVoice | undefined => {
   if (defaultVoiceId) {
     const configuredVoice = voices.find((voice) => voice.voiceURI === defaultVoiceId || voice.name === defaultVoiceId);
     if (configuredVoice && voiceMatchesGender(configuredVoice, voiceGender)) return configuredVoice;
   }
 
+  const normalizedLocale = locale?.toLowerCase() ?? '';
+  const localeLanguage = normalizedLocale.split('-')[0];
+  const localeVoices = normalizedLocale
+    ? voices.filter((voice) => {
+        const voiceLang = voice.lang?.toLowerCase() ?? '';
+        return voiceLang === normalizedLocale || Boolean(localeLanguage && voiceLang.startsWith(localeLanguage));
+      })
+    : [];
   const englishVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith('en'));
+  const genderMatchedLocaleVoices = voiceGender
+    ? localeVoices.filter((voice) => voiceMatchesGender(voice, voiceGender))
+    : localeVoices;
   const genderMatchedEnglishVoices = voiceGender
     ? englishVoices.filter((voice) => voiceMatchesGender(voice, voiceGender))
     : englishVoices;
@@ -159,11 +188,33 @@ const selectBestVoice = (
     ? voices.filter((voice) => voiceMatchesGender(voice, voiceGender))
     : voices;
 
-  return [...genderMatchedEnglishVoices]
-    .sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
-    ?? [...englishVoices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
-    ?? [...genderMatchedVoices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0]
-    ?? [...voices].sort((first, second) => scoreVoice(second, voiceGender) - scoreVoice(first, voiceGender))[0];
+  return [...genderMatchedLocaleVoices]
+    .sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0]
+    ?? [...localeVoices].sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0]
+    ?? [...genderMatchedEnglishVoices]
+      .sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0]
+    ?? [...englishVoices].sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0]
+    ?? [...genderMatchedVoices].sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0]
+    ?? [...voices].sort((first, second) => scoreVoice(second, voiceGender, locale) - scoreVoice(first, voiceGender, locale))[0];
+};
+
+const clampSpeechNumber = (value: unknown, fallback: number, min: number, max: number): number => {
+  const numeric = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const deriveBrowserSpeechSettings = (speakingBehavior?: Record<string, unknown> | null, voiceStyle?: string | null) => {
+  const behavior = speakingBehavior ?? {};
+  const style = `${voiceStyle ?? ''} ${String(behavior.pacing ?? '')} ${String(behavior.style ?? '')}`.toLowerCase();
+  const baseRate = style.match(/brisk|energetic|upbeat|animated|lively|fast/) ? 0.98 : style.match(/calm|steady|deliberate|reflective|slow/) ? 0.86 : 0.92;
+  const basePitch = style.match(/bright|playful|energetic|warm/) ? 1.04 : style.match(/grounded|authoritative|measured|calm/) ? 0.94 : 0.98;
+
+  return {
+    rate: clampSpeechNumber(behavior.rate ?? behavior.speech_rate ?? behavior.speed, baseRate, 0.6, 1.4),
+    pitch: clampSpeechNumber(behavior.pitch, basePitch, 0.6, 1.6),
+    volume: clampSpeechNumber(behavior.volume, 1, 0, 1),
+  };
 };
 
 export function useFacilitatorVoice({
@@ -174,6 +225,11 @@ export function useFacilitatorVoice({
   voiceGender = null,
   lipSyncEnabled = true,
   persistEvents = true,
+  voiceProvider = null,
+  voiceStyle = null,
+  locale = null,
+  speakingBehavior = null,
+  animationPreset = null,
 }: UseFacilitatorVoiceParams): FacilitatorVoiceRuntime {
   const [avatarState, setAvatarState] = React.useState<FacilitatorAvatarState>('idle');
   const [isSpeaking, setIsSpeaking] = React.useState(false);
@@ -214,11 +270,25 @@ export function useFacilitatorVoice({
     setAvatarState('thinking');
     startedAtRef.current = performance.now();
 
+    const personaSpeechSettings = deriveBrowserSpeechSettings(speakingBehavior, voiceStyle);
+    const personaMetadata = {
+      ...metadata,
+      voiceGender,
+      voiceProvider,
+      voiceStyle,
+      locale,
+      speakingBehavior,
+      animationPreset,
+      speechRate: personaSpeechSettings.rate,
+      speechPitch: personaSpeechSettings.pitch,
+      speechVolume: personaSpeechSettings.volume,
+    };
+
     const synthesisPlan = buildBrowserTtsSynthesisResult({
       text: trimmed,
       voiceId: defaultVoiceId,
       lipSyncEnabled,
-      metadata: { ...metadata, voiceGender },
+      metadata: personaMetadata,
     });
 
     const queuedEvent = persistEvents
@@ -240,19 +310,19 @@ export function useFacilitatorVoice({
 
     const utterance = new SpeechSynthesisUtterance(trimmed);
     const voices = await waitForVoices(synth);
-    const selectedVoice = selectBestVoice(voices, defaultVoiceId, voiceGender);
+    const selectedVoice = selectBestVoice(voices, defaultVoiceId, voiceGender, locale);
     if (selectedVoice) utterance.voice = selectedVoice;
-    utterance.lang = selectedVoice?.lang || 'en-US';
-    utterance.rate = 0.92;
-    utterance.pitch = 0.98;
-    utterance.volume = 1;
+    utterance.lang = selectedVoice?.lang || locale || 'en-US';
+    utterance.rate = personaSpeechSettings.rate;
+    utterance.pitch = personaSpeechSettings.pitch;
+    utterance.volume = personaSpeechSettings.volume;
     utteranceRef.current = utterance;
 
     utterance.onstart = () => {
       setIsSpeaking(true);
       setAvatarState('speaking');
       void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
+        metadata: { ...personaMetadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, selectedVoiceLang: selectedVoice?.lang ?? null, lipSyncEnabled },
       });
     };
 
@@ -263,7 +333,7 @@ export function useFacilitatorVoice({
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
         audio_duration_ms: durationMs,
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
+        metadata: { ...personaMetadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, selectedVoiceLang: selectedVoice?.lang ?? null, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
@@ -273,7 +343,7 @@ export function useFacilitatorVoice({
       setAvatarState('error');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: { ...metadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, voiceGender, lipSyncEnabled },
+        metadata: { ...personaMetadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, selectedVoiceLang: selectedVoice?.lang ?? null, lipSyncEnabled },
       });
       activeEventIdRef.current = undefined;
     };
@@ -286,10 +356,10 @@ export function useFacilitatorVoice({
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
         metadata: {
-          ...metadata,
+          ...personaMetadata,
           characterCount: trimmed.length,
           voiceName: selectedVoice?.name ?? null,
-          voiceGender,
+          selectedVoiceLang: selectedVoice?.lang ?? null,
           lipSyncEnabled,
           error: error instanceof Error ? error.message : 'speech_synthesis_start_failed',
         },
@@ -297,7 +367,7 @@ export function useFacilitatorVoice({
       activeEventIdRef.current = undefined;
       toast.error('Could not start facilitator voice playback.');
     }
-  }, [conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, persistEvents, voiceGender]);
+  }, [animationPreset, conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, locale, persistEvents, speakingBehavior, voiceGender, voiceProvider, voiceStyle]);
 
   return {
     isSupported,

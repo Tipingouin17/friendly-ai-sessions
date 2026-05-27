@@ -41,7 +41,27 @@ const fetchConversation = async (id: number | null) => {
             description,
             expertise_level,
             specialties,
-            languages
+            languages,
+            persona_config:facilitator_persona_configs (
+              id,
+              facilitator_id,
+              display_name,
+              pronouns,
+              gender_presentation,
+              voice_id,
+              voice_provider,
+              voice_style,
+              avatar_style,
+              avatar_asset_url,
+              locale,
+              tone,
+              animation_preset,
+              nonverbal_behavior,
+              speaking_behavior,
+              metadata,
+              created_at,
+              updated_at
+            )
           )
         )
       `)

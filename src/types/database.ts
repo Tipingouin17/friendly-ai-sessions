@@ -22,6 +22,11 @@ export interface FacilitatorDetails {
   title: string | null;
   profile_picture: string | null;
   details: string | null;
+  description?: string | null;
+  expertise_level?: string | null;
+  specialties?: string[] | null;
+  languages?: string[] | null;
+  persona_config?: DbFacilitatorPersonaConfig | DbFacilitatorPersonaConfig[] | null;
 }
 
 export interface ConversationWithSession extends DbConversation {

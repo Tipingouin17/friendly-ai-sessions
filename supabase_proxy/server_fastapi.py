@@ -1603,6 +1603,7 @@ FK_MAP: Dict[str, tuple] = {
     "session_reports_conversation_id_fkey": ("session_reports", "conversation_id", "conversations", "id"),
     "profiles_current_plan_id_fkey": ("profiles", "current_plan_id", "plans", "id"),
     "facilitators_user_id_fkey": ("facilitators", "user_id", "profiles", "id"),
+    "facilitator_persona_configs_facilitator_id_fkey": ("facilitator_persona_configs", "facilitator_id", "facilitators", "id"),
     "plan_restrictions_plan_id_fkey": ("plan_restrictions", "plan_id", "plans", "id"),
     "facilitator_plan_access_facilitator_id_fkey": ("facilitator_plan_access", "facilitator_id", "facilitators", "id"),
     "facilitator_plan_access_plan_id_fkey": ("facilitator_plan_access", "plan_id", "plans", "id"),
@@ -4668,6 +4669,7 @@ async def edge_function(func_name: str, request: Request):
         randomness_cfg = None
         avatar_url = ""
         facilitator_language = None
+        facilitator_persona_config = None
 
         # Map ISO 639-1 language codes to full names for the AI instruction
         LANGUAGE_CODE_MAP = {
@@ -4686,17 +4688,39 @@ async def edge_function(func_name: str, request: Request):
                         "s.title, s.facilitator, s.objective, s.prompt, "
                         "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
                         "f.title as facilitator_name, f.details as facilitator_details, "
-                        "f.profile_picture, f.languages as facilitator_languages "
+                        "f.profile_picture, f.languages as facilitator_languages, "
+                        "fpc.display_name as persona_display_name, fpc.pronouns as persona_pronouns, "
+                        "fpc.gender_presentation as persona_gender_presentation, fpc.voice_id as persona_voice_id, "
+                        "fpc.voice_provider as persona_voice_provider, fpc.voice_style as persona_voice_style, "
+                        "fpc.avatar_style as persona_avatar_style, fpc.avatar_asset_url as persona_avatar_asset_url, "
+                        "fpc.locale as persona_locale, fpc.tone as persona_tone, fpc.animation_preset as persona_animation_preset, "
+                        "fpc.nonverbal_behavior as persona_nonverbal_behavior, fpc.speaking_behavior as persona_speaking_behavior "
                         "FROM conversations c "
                         "LEFT JOIN sessions s ON c.sessions_id = s.id "
                         "LEFT JOIN facilitators f ON s.facilitator = f.id "
+                        "LEFT JOIN facilitator_persona_configs fpc ON fpc.facilitator_id = f.id "
                         "WHERE c.id = $1",
                         conv_id,
                     )
                 if row:
                     session_title = row["title"] or session_title
-                    facilitator_name = row["facilitator_name"] or facilitator_name
+                    facilitator_name = row["persona_display_name"] or row["facilitator_name"] or facilitator_name
                     facilitator_details = row["facilitator_details"] or ""
+                    facilitator_persona_config = {
+                        "display_name": row["persona_display_name"],
+                        "pronouns": row["persona_pronouns"],
+                        "gender_presentation": row["persona_gender_presentation"],
+                        "voice_id": row["persona_voice_id"],
+                        "voice_provider": row["persona_voice_provider"],
+                        "voice_style": row["persona_voice_style"],
+                        "avatar_style": row["persona_avatar_style"],
+                        "avatar_asset_url": row["persona_avatar_asset_url"],
+                        "locale": row["persona_locale"],
+                        "tone": row["persona_tone"],
+                        "animation_preset": row["persona_animation_preset"],
+                        "nonverbal_behavior": row["persona_nonverbal_behavior"],
+                        "speaking_behavior": row["persona_speaking_behavior"],
+                    } if row["persona_display_name"] or row["persona_tone"] or row["persona_voice_style"] else None
                     objective = row["objective"] or objective
                     session_prompt = row["prompt"] or ""
                     welcome_message_template = row["welcome_message"] or ""
@@ -4793,6 +4817,37 @@ async def edge_function(func_name: str, request: Request):
             )
         if facilitator_details:
             system_parts.append(f"Background: {facilitator_details}")
+        if facilitator_persona_config:
+            def _persona_json(value):
+                if value is None:
+                    return ""
+                if isinstance(value, str):
+                    return value
+                try:
+                    return json.dumps(value, ensure_ascii=False)
+                except Exception:
+                    return str(value)
+
+            persona_instruction_lines = [
+                "FACILITATOR PERSONA CONFIGURATION:",
+                "Use these settings as presentation and facilitation style guidance for your generated messages. They are not participant-visible configuration details and must never be quoted as internal settings.",
+            ]
+            if facilitator_persona_config.get("display_name"):
+                persona_instruction_lines.append(f"- Display name: {facilitator_persona_config['display_name']}")
+            if facilitator_persona_config.get("pronouns"):
+                persona_instruction_lines.append(f"- Pronouns: {_persona_json(facilitator_persona_config['pronouns'])}")
+            if facilitator_persona_config.get("gender_presentation"):
+                persona_instruction_lines.append(f"- Avatar presentation: {facilitator_persona_config['gender_presentation']}")
+            if facilitator_persona_config.get("tone"):
+                persona_instruction_lines.append(f"- Tone: {facilitator_persona_config['tone']}")
+            if facilitator_persona_config.get("voice_style"):
+                persona_instruction_lines.append(f"- Spoken voice style: {facilitator_persona_config['voice_style']}")
+            if facilitator_persona_config.get("speaking_behavior"):
+                persona_instruction_lines.append(f"- Speaking behavior: {_persona_json(facilitator_persona_config['speaking_behavior'])}")
+            if facilitator_persona_config.get("nonverbal_behavior"):
+                persona_instruction_lines.append(f"- Nonverbal/avatar cues to imply in concise language when useful: {_persona_json(facilitator_persona_config['nonverbal_behavior'])}")
+            persona_instruction_lines.append("Apply this persona naturally: adapt word choice, pacing, warmth, energy, and questioning style, while still prioritizing the workshop objective, host instructions, safety, and confidentiality rules.")
+            system_parts.append("\n".join(persona_instruction_lines))
         system_parts.append(f"Session objective: {objective}")
         if session_scope:
             system_parts.append(f"Session scope: {session_scope}")
@@ -5000,7 +5055,19 @@ async def edge_function(func_name: str, request: Request):
         msg_id = None
         if conv_id:
             try:
-                content_dict = {"text": txt, **({"avatar": avatar_url} if avatar_url else {})}
+                persona_message_metadata = {}
+                if facilitator_persona_config:
+                    persona_message_metadata = {
+                        "facilitator_persona": {
+                            "voice_id": facilitator_persona_config.get("voice_id"),
+                            "voice_provider": facilitator_persona_config.get("voice_provider"),
+                            "voice_style": facilitator_persona_config.get("voice_style"),
+                            "locale": facilitator_persona_config.get("locale"),
+                            "tone": facilitator_persona_config.get("tone"),
+                            "animation_preset": facilitator_persona_config.get("animation_preset"),
+                        }
+                    }
+                content_dict = {"text": txt, **({"avatar": avatar_url} if avatar_url else {}), **persona_message_metadata}
                 content_json = json.dumps(content_dict)  # for WebSocket broadcast only
                 async with _pool.acquire() as conn:
                     async with conn.transaction():

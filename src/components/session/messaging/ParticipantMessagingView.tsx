@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
-import type { ConversationWithSession } from '@/types/database';
+import type { ConversationWithSession, DbFacilitatorPersonaConfig } from '@/types/database';
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
@@ -232,6 +232,17 @@ const formatRemainingTime = (seconds: number | null | undefined): string | null 
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+const getFacilitatorPersonaConfig = (
+  rawPersonaConfig?: DbFacilitatorPersonaConfig | DbFacilitatorPersonaConfig[] | null
+): DbFacilitatorPersonaConfig | null => {
+  if (Array.isArray(rawPersonaConfig)) return rawPersonaConfig[0] ?? null;
+  return rawPersonaConfig ?? null;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+};
+
 const formatLastActive = (participant: ParticipantInfo): string => {
   if (!participant.lastActive) return 'Active now';
   const minutes = Math.max(0, Math.round((Date.now() - participant.lastActive.getTime()) / 60000));
@@ -345,14 +356,27 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const facilitatorTitle = conversationData?.sessions?.facilitator_details?.title;
   const facilitatorName = facilitatorTitle || 'Facilitator';
   const facilitatorAvatarUrl = conversationData?.sessions?.facilitator_details?.profile_picture || null;
-  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string | null; profile_picture?: string | null; details?: string | null; description?: string | null } | undefined;
+  const facilitatorDetails = conversationData?.sessions?.facilitator_details;
   const facilitatorId = facilitatorDetails?.id ?? null;
-  const facilitatorVoiceGender = React.useMemo(() => inferFacilitatorVoiceGender({
-    title: facilitatorDetails?.title ?? facilitatorName,
-    details: facilitatorDetails?.details,
-    description: facilitatorDetails?.description,
-    profilePicture: facilitatorDetails?.profile_picture ?? facilitatorAvatarUrl,
-  }), [facilitatorAvatarUrl, facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title, facilitatorName]);
+  const facilitatorPersonaConfig = React.useMemo(
+    () => getFacilitatorPersonaConfig(facilitatorDetails?.persona_config),
+    [facilitatorDetails?.persona_config]
+  );
+  const personaSpeakingBehavior = React.useMemo(
+    () => asRecord(facilitatorPersonaConfig?.speaking_behavior),
+    [facilitatorPersonaConfig?.speaking_behavior]
+  );
+  const personaGenderPresentation = facilitatorPersonaConfig?.gender_presentation?.toLowerCase() ?? '';
+  const facilitatorVoiceGender = React.useMemo(() => {
+    if (personaGenderPresentation.includes('feminine')) return 'female';
+    if (personaGenderPresentation.includes('masculine')) return 'male';
+    return inferFacilitatorVoiceGender({
+      title: facilitatorDetails?.title ?? facilitatorName,
+      details: facilitatorDetails?.details,
+      description: facilitatorDetails?.description,
+      profilePicture: facilitatorDetails?.profile_picture ?? facilitatorAvatarUrl,
+    });
+  }, [facilitatorAvatarUrl, facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title, facilitatorName, personaGenderPresentation]);
   const { data: phase3Settings, isPlaceholderData: isPhase3SettingsPending } = usePhase3RuntimeSettings(conversationData?.language);
   const phase3RuntimeReady = !isPhase3SettingsPending;
   const speechStackEnabled = Boolean(phase3RuntimeReady && phase3Settings?.speech_stack_enabled);
@@ -362,10 +386,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     conversationId,
     facilitatorId,
     enabled: viewMode === 'participant' && ttsAvatarEnabled,
-    defaultVoiceId: phase3Settings?.tts_default_voice_id ?? null,
+    defaultVoiceId: facilitatorPersonaConfig?.voice_id ?? phase3Settings?.tts_default_voice_id ?? null,
     voiceGender: facilitatorVoiceGender,
     lipSyncEnabled: phase3Settings?.tts_lip_sync_enabled ?? true,
     persistEvents: analyticsPersistenceEnabled,
+    voiceProvider: facilitatorPersonaConfig?.voice_provider ?? null,
+    voiceStyle: facilitatorPersonaConfig?.voice_style ?? null,
+    locale: facilitatorPersonaConfig?.locale ?? phase3Settings?.speech_default_language ?? conversationData?.language ?? null,
+    speakingBehavior: personaSpeakingBehavior,
+    animationPreset: facilitatorPersonaConfig?.animation_preset ?? null,
   });
   const runtimeAvatarState = voiceRuntime.isSpeaking
     ? voiceRuntime.runtimeAvatarState

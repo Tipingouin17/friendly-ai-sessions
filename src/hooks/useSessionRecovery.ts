@@ -93,9 +93,14 @@ export function useSessionRecovery(isCrossOrigin: boolean, currentConversationId
         if (sessionMountedRef.current) {
           setIsRecovering(false);
           
-          // Force a page refresh for connection recovery on later attempts
+          // Never hard-refresh participant sessions during recovery. A reload drops
+          // the participant's live camera/microphone tracks and looks like the page
+          // refreshed immediately after unrelated runtime events such as narration.
           if (newAttemptCount > 2) {
-            window.location.reload();
+            toast({
+              title: "Reconnecting…",
+              description: "We are restoring the live session without refreshing your page.",
+            });
           }
         }
       }, backoffTime);

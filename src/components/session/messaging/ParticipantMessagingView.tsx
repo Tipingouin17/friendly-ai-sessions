@@ -496,15 +496,37 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const stopLocalCamera = React.useCallback(() => {
     localCameraRequestIdRef.current += 1;
     localCameraStartPromiseRef.current = null;
-    if (localCameraStreamRef.current) {
-      localCameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      localCameraStreamRef.current = null;
+
+    const currentStream = localCameraStreamRef.current;
+    if (!currentStream) {
+      setLocalCameraStream(null);
+      setCameraStatus('off');
+      persistMediaPreferences(false, microphoneEnabled);
+      return;
     }
-    setLocalCameraStream(null);
+
+    currentStream.getVideoTracks().forEach((track) => {
+      track.enabled = false;
+      track.stop();
+      currentStream.removeTrack(track);
+    });
+
+    const remainingTracks = currentStream.getTracks().filter((track) => track.readyState !== 'ended');
+    const hasActiveAudioTrack = remainingTracks.some((track) => track.kind === 'audio');
+
+    if (remainingTracks.length > 0) {
+      const audioOnlyStream = new MediaStream(remainingTracks);
+      localCameraStreamRef.current = audioOnlyStream;
+      setLocalCameraStream(audioOnlyStream);
+    } else {
+      localCameraStreamRef.current = null;
+      setLocalCameraStream(null);
+    }
+
     setCameraStatus('off');
-    setMicrophoneEnabled(false);
-    persistMediaPreferences(false, false);
-  }, [persistMediaPreferences]);
+    setMicrophoneEnabled(hasActiveAudioTrack);
+    persistMediaPreferences(false, hasActiveAudioTrack);
+  }, [microphoneEnabled, persistMediaPreferences]);
 
   const startLocalCamera = React.useCallback(async () => {
     const currentStream = localCameraStreamRef.current;
@@ -576,16 +598,78 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     void startLocalCamera();
   }, [startLocalCamera, stopLocalCamera]);
 
+  const startLocalMicrophone = React.useCallback(async (options: { persistPreference?: boolean } = {}) => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Microphone testing is not supported in this browser.');
+      if (options.persistPreference !== false) {
+        const hasActiveVideoTrack = localCameraStreamRef.current?.getVideoTracks().some((track) => track.readyState !== 'ended') ?? false;
+        persistMediaPreferences(hasActiveVideoTrack || cameraStatus === 'on', false);
+      }
+      return false;
+    }
+
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      const audioTrack = audioStream.getAudioTracks()[0];
+      if (!audioTrack) {
+        setCameraError('No microphone was detected.');
+        if (options.persistPreference !== false) {
+          const hasActiveVideoTrack = localCameraStreamRef.current?.getVideoTracks().some((track) => track.readyState !== 'ended') ?? false;
+          persistMediaPreferences(hasActiveVideoTrack || cameraStatus === 'on', false);
+        }
+        return false;
+      }
+
+      if (localCameraStreamRef.current) {
+        localCameraStreamRef.current.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+          track.stop();
+          localCameraStreamRef.current?.removeTrack(track);
+        });
+        localCameraStreamRef.current.addTrack(audioTrack);
+        setLocalCameraStream(new MediaStream(localCameraStreamRef.current.getTracks()));
+      } else {
+        const audioOnlyStream = new MediaStream([audioTrack]);
+        localCameraStreamRef.current = audioOnlyStream;
+        setLocalCameraStream(audioOnlyStream);
+      }
+
+      setMicrophoneEnabled(true);
+      if (options.persistPreference !== false) {
+        const hasActiveVideoTrack = localCameraStreamRef.current?.getVideoTracks().some((track) => track.readyState !== 'ended') ?? false;
+        persistMediaPreferences(hasActiveVideoTrack || cameraStatus === 'on', true);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error accessing participant microphone:', error);
+      setCameraError('Microphone access was blocked. Allow microphone permission in your browser to use audio.');
+      setMicrophoneEnabled(false);
+      if (options.persistPreference !== false) {
+        const hasActiveVideoTrack = localCameraStreamRef.current?.getVideoTracks().some((track) => track.readyState !== 'ended') ?? false;
+        persistMediaPreferences(hasActiveVideoTrack || cameraStatus === 'on', false);
+      }
+      return false;
+    }
+  }, [cameraStatus, persistMediaPreferences]);
+
   React.useEffect(() => {
     if (!conversationId || isSessionEnded || localCameraStreamRef.current || localCameraStartPromiseRef.current) return;
     if (autoCameraRestoreKeyRef.current === String(conversationId)) return;
-    if (!persistedMediaPreferences.cameraEnabled) {
-      setMicrophoneEnabled(persistedMediaPreferences.microphoneEnabled);
+
+    if (persistedMediaPreferences.cameraEnabled) {
+      autoCameraRestoreKeyRef.current = String(conversationId);
+      void startLocalCamera();
       return;
     }
-    autoCameraRestoreKeyRef.current = String(conversationId);
-    void startLocalCamera();
-  }, [conversationId, isSessionEnded, persistedMediaPreferences.cameraEnabled, persistedMediaPreferences.microphoneEnabled, startLocalCamera]);
+
+    if (persistedMediaPreferences.microphoneEnabled) {
+      autoCameraRestoreKeyRef.current = String(conversationId);
+      void startLocalMicrophone({ persistPreference: false });
+      return;
+    }
+
+    setMicrophoneEnabled(false);
+  }, [conversationId, isSessionEnded, persistedMediaPreferences.cameraEnabled, persistedMediaPreferences.microphoneEnabled, startLocalCamera, startLocalMicrophone]);
 
   const toggleLocalMicrophone = React.useCallback(async () => {
     const nextMicrophoneEnabled = !microphoneEnabled;
@@ -607,38 +691,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       return;
     }
 
-    try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-      const audioTrack = audioStream.getAudioTracks()[0];
-      if (!audioTrack) {
-        setCameraError('No microphone was detected.');
-        persistMediaPreferences(cameraStatus === 'on', false);
-        return;
-      }
-
-      if (localCameraStreamRef.current) {
-        localCameraStreamRef.current.getAudioTracks().forEach((track) => {
-          track.enabled = false;
-          track.stop();
-          localCameraStreamRef.current?.removeTrack(track);
-        });
-        localCameraStreamRef.current.addTrack(audioTrack);
-        setLocalCameraStream(new MediaStream(localCameraStreamRef.current.getTracks()));
-      } else {
-        const audioOnlyStream = new MediaStream([audioTrack]);
-        localCameraStreamRef.current = audioOnlyStream;
-        setLocalCameraStream(audioOnlyStream);
-      }
-
-      setMicrophoneEnabled(true);
-      persistMediaPreferences(cameraStatus === 'on', true);
-    } catch (error) {
-      console.error('Error accessing participant microphone:', error);
-      setCameraError('Microphone access was blocked. Allow microphone permission in your browser to use audio.');
-      setMicrophoneEnabled(false);
-      persistMediaPreferences(cameraStatus === 'on', false);
-    }
-  }, [cameraStatus, microphoneEnabled, persistMediaPreferences]);
+    await startLocalMicrophone();
+  }, [cameraStatus, microphoneEnabled, persistMediaPreferences, startLocalMicrophone]);
 
   const handleToggleLocalCameraClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

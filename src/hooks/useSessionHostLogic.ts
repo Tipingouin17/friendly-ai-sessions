@@ -54,9 +54,11 @@ export function useSessionHostLogic() {
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession, isSessionStarted: isInterfaceSessionStarted } = useSessionInterface(currentConversationId, conversationData);
     const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
+    const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
     const hasPersistedStartMarker = Boolean(
         conversationData?.session_started || (conversationData as any)?.session_started_at
     );
+    const hasAssistantMessage = sessionMessages.some((message) => message.sender === 'assistant');
 
     const handleSessionStarted = useCallback(async () => {
         try {
@@ -83,7 +85,7 @@ export function useSessionHostLogic() {
         cleanup: cleanupAutoStart
     } = useAutoStartSession({
         onStartSession: handleSessionStarted,
-        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker),
+        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || hasAssistantMessage),
         maxParticipants: Math.max(conversationData?.participants || 0, 0),
     });
 
@@ -117,7 +119,6 @@ export function useSessionHostLogic() {
     });
 
     // 3. Messages Management
-    const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
     const {
         isSessionPaused,
         toggleSessionState,
@@ -136,11 +137,14 @@ export function useSessionHostLogic() {
         conversationData
     });
 
+    // Treat the host session as live as soon as the first facilitator question
+    // exists, even if the persisted conversation start marker has not propagated.
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
         hasPersistedStartMarker ||
         isInterfaceSessionStarted ||
-        isManagerSessionStarted
+        isManagerSessionStarted ||
+        hasAssistantMessage
     );
 
     const waitingRoomParticipantCount = Math.max(
@@ -155,10 +159,10 @@ export function useSessionHostLogic() {
     );
 
     useEffect(() => {
-        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted) && !hostSessionStartedOverride) {
+        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted || hasAssistantMessage) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
+    }, [hasAssistantMessage, hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
 
     useEffect(() => {
         if (!isDataLoaded || effectiveIsSessionStarted) return;

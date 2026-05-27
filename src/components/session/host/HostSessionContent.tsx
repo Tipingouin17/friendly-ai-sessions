@@ -18,6 +18,7 @@ import type { FacilitatorToolAssignment } from "@/types/facilitator";
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
 import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from "@/hooks/useWebRTCSession";
+import { inferFacilitatorVoiceGender } from "@/utils/facilitatorVoiceGender";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -244,7 +245,14 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     localStream: hostCameraStream,
     enabled: shouldEnableHostVideoRoom,
   });
-  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { title?: string; profile_picture?: string | null } | undefined;
+  const facilitatorDetails = conversationData?.sessions?.facilitator_details as { id?: number; title?: string | null; profile_picture?: string | null; details?: string | null; description?: string | null } | undefined;
+  const facilitatorVoiceGender = React.useMemo(() => inferFacilitatorVoiceGender({
+    title: facilitatorDetails?.title,
+    details: facilitatorDetails?.details,
+    description: facilitatorDetails?.description,
+    profilePicture: facilitatorDetails?.profile_picture,
+  }), [facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title]);
+  const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
   const respondedParticipantIds = new Set(
     sessionMessages
@@ -312,6 +320,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         <div className={`session-chip ${isSessionStarted && !isSessionEnded ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : isSessionEnded ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
           <span className={`h-2 w-2 rounded-full ${isSessionStarted && !isSessionEnded ? 'bg-emerald-500' : isSessionEnded ? 'bg-slate-400' : 'bg-amber-500'}`} />
           {isSessionStarted && !isSessionEnded ? "Live" : isSessionEnded ? "Ended" : "Standby"}
+        </div>
+        <div className="session-chip border-violet-200 bg-violet-50 text-violet-700" title="Used by browser TTS voice selection when the facilitator speaks.">
+          <Sparkles className="h-3.5 w-3.5" />
+          TTS: {facilitatorVoiceGenderLabel}
         </div>
         {isSessionPaused && (
           <div className="session-chip border-amber-200 bg-amber-50 text-amber-700">
@@ -446,6 +458,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               onApproveMode={onApproveMode}
               onEndMode={onEndMode}
               onRejectMode={onRejectMode}
+              facilitatorVoiceGender={facilitatorVoiceGender}
               isSessionStarted={isSessionStarted}
               onSessionStarted={onSessionStarted}
               participants={participants}
@@ -472,6 +485,15 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <div className="session-soft-panel rounded-2xl p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-900">Facilitator voice</span>
+                  <Sparkles className="h-4 w-4 text-violet-600" />
+                </div>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  {facilitatorDetails?.title || 'AI Facilitator'} uses the {facilitatorVoiceGenderLabel.toLowerCase()} profile for TTS voice selection.
+                </p>
+              </div>
               <div className="session-soft-panel rounded-2xl p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-slate-900">Responses</span>

@@ -14,12 +14,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Message, ParticipantInfo } from '@/types/chat';
 import type { ConversationWithSession } from '@/types/database';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
+import type { FacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
-  MessageSquare, Users, Wand2, SendHorizonal,
-  ChevronDown, ChevronUp, Zap, TrendingUp, BarChart2,
-  Activity, CheckCircle2, Clock, Sparkles, ShieldCheck
+  MessageSquare, Wand2, SendHorizonal,
+  ChevronDown, ChevronUp,
+  Activity, Clock, Sparkles, ShieldCheck
 } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -52,6 +53,7 @@ interface SimplifiedHostMessagingViewProps {
   onApproveMode?: (reason?: string) => Promise<void>;
   onEndMode?: (reason?: string) => Promise<void>;
   onRejectMode?: (reason?: string) => Promise<void>;
+  facilitatorVoiceGender?: FacilitatorVoiceGender | null;
 }
 
 const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = ({
@@ -84,6 +86,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   onApproveMode,
   onEndMode,
   onRejectMode,
+  facilitatorVoiceGender = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
   const [hostInstruction, setHostInstruction] = useState('');
@@ -128,16 +131,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     );
   }
 
-  const facilitatorMessages = messages.filter(m => m.sender === 'assistant');
-  const participantMessages = messages.filter(m => m.sender === 'user');
-
-  // Derived metrics
-  const responseRate = totalParticipants > 0
-    ? Math.round((responseCount / totalParticipants) * 100)
-    : 0;
-  const avgMessagesPerParticipant = currentParticipantCount > 0
-    ? (participantMessages.length / currentParticipantCount).toFixed(1)
-    : '0';
+  const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
 
   const handleSendWithInstruction = async () => {
     if (!onTriggerFacilitatorResponse) return;
@@ -210,41 +204,29 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const quickInstructions = [
     {
       label: 'Wrap up',
-      icon: '🏁',
-      instruction: 'The host has decided to end the session now. Do NOT ask another question. Instead: (1) warmly thank all participants for their contributions, (2) synthesize the 2-3 most important insights that emerged from the discussion, (3) share a brief closing thought or call to action relevant to the session objective, and (4) formally close the session.'
+      instruction: 'The host has decided to end the session now. Do not ask another question. Warmly thank participants, synthesize the 2-3 most important insights, share a brief closing thought, and formally close the session.'
     },
     {
       label: 'Final round',
-      icon: '🎯',
-      instruction: 'This is the last question of the session. Ask one final, meaningful question that invites participants to share their single most important takeaway or commitment from today\'s discussion. After collecting responses, you will close the session.'
+      instruction: 'This is the last question of the session. Ask one concise final question that invites participants to share their most important takeaway or commitment.'
     },
     {
       label: 'Go deeper',
-      icon: '🔍',
-      instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question that challenges participants to think beyond their initial answers.'
+      instruction: 'Go deeper on the current topic. Ask a more specific, probing follow-up question that challenges participants to think beyond their first answers.'
     },
     {
       label: 'Change topic',
-      icon: '↗️',
-      instruction: 'Transition to a new aspect of the workshop topic that has not been discussed yet. Briefly acknowledge what was shared so far, then pivot naturally.'
+      instruction: 'Transition to a new aspect of the workshop topic. Briefly acknowledge what was shared so far, then pivot naturally.'
     },
     {
-      label: 'Be practical',
-      icon: '⚡',
-      instruction: 'Focus on practical, actionable examples. Ask participants to share concrete implementation ideas or next steps they could take within the next week.'
+      label: 'Make practical',
+      instruction: 'Focus on practical, actionable examples. Ask participants to share concrete next steps they could take within the next week.'
     },
     {
       label: 'Open floor',
-      icon: '🎤',
-      instruction: 'Open the floor for participants to raise any topic, question, or concern they feel has not been addressed yet in the session. Invite them to share freely.'
+      instruction: 'Open the floor for participants to raise any topic, question, or concern they feel has not been addressed yet. Invite them to share freely.'
     },
   ];
-
-  const statusConfig = isSessionEnded
-    ? { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500', label: 'Ended', pulse: false }
-    : isSessionPaused
-    ? { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500', label: 'Paused', pulse: false }
-    : { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Live', pulse: true };
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -278,14 +260,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
             </span>
           )}
         </button>
-
-        {/* Status pill */}
-        <div className="ml-auto flex items-center gap-2 pb-1">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} ${statusConfig.pulse ? 'animate-pulse' : ''}`} />
-            {statusConfig.label}
-          </span>
-        </div>
       </div>
 
       {/* ── Content ── */}
@@ -294,42 +268,36 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
           <ScrollArea className="h-full">
             <div className="p-5 space-y-4">
 
-              {/* Metric Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Participants</span>
-                    <Users className="h-3.5 w-3.5 text-indigo-500" />
+              {/* Host Command Center */}
+              <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/60 p-4 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Next facilitation move</p>
+                    <h2 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">Guide the room from one clear command surface.</h2>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span className="session-chip border-indigo-200 bg-white/80 text-indigo-700">Mode: {activeModeDefinition?.display_name || 'Open Discussion'}</span>
+                      <span className="session-chip border-violet-200 bg-white/80 text-violet-700">TTS: {facilitatorVoiceGenderLabel}</span>
+                      {isSessionPaused && <span className="session-chip border-amber-200 bg-white/80 text-amber-700">Paused</span>}
+                      {isSessionEnded && <span className="session-chip border-slate-200 bg-white/80 text-slate-700">Ended</span>}
+                    </div>
                   </div>
-                  <span className="text-2xl font-bold text-slate-950">{currentParticipantCount}</span>
-                  <span className="text-xs text-slate-500">in session</span>
-                </div>
-
-                <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Response Rate</span>
-                    <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[320px]">
+                    <Button
+                      onClick={handleContinueNormal}
+                      disabled={!onTriggerFacilitatorResponse || isSending || isSessionEnded}
+                      className="h-10 justify-center bg-indigo-600 text-xs font-semibold text-white shadow-sm shadow-indigo-100 hover:bg-indigo-500"
+                    >
+                      {isSending ? 'Generating…' : isWaitingForResponses ? 'Continue now' : 'Generate next turn'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsInstructionExpanded(true)}
+                      className="h-10 border-indigo-200 bg-white/80 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                    >
+                      Steer privately
+                    </Button>
                   </div>
-                  <span className="text-2xl font-bold text-slate-950">{responseRate}%</span>
-                  <span className="text-xs text-slate-500">{responseCount} / {totalParticipants} responded</span>
-                </div>
-
-                <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">AI Exchanges</span>
-                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                  </div>
-                  <span className="text-2xl font-bold text-slate-950">{facilitatorMessages.length}</span>
-                  <span className="text-xs text-slate-500">facilitator messages</span>
-                </div>
-
-                <div className="session-soft-panel rounded-2xl p-4 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Responses</span>
-                    <BarChart2 className="h-3.5 w-3.5 text-sky-500" />
-                  </div>
-                  <span className="text-2xl font-bold text-slate-950">{avgMessagesPerParticipant}</span>
-                  <span className="text-xs text-slate-500">per participant</span>
                 </div>
               </div>
 
@@ -380,37 +348,28 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 />
               )}
 
-              {/* Facilitator Toolbox */}
-              <div className="session-soft-panel rounded-2xl p-4">
-                <div className="flex items-start justify-between gap-3">
+              {/* Facilitator Capability Summary */}
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">Facilitator toolbox</p>
-                    <p className="mt-0.5 text-xs text-slate-500">The AI facilitator can choose among its assigned tools when generating the next response.</p>
+                    <p className="text-sm font-semibold text-slate-900">AI capabilities</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Quiet context only; the host does not need to manage these during the live flow.</p>
                   </div>
-                  <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">
-                    {isLoadingToolbox ? 'Loading…' : `${enabledTools.length} active`}
-                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {isLoadingToolbox && <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">Loading…</span>}
+                    {!isLoadingToolbox && enabledTools.slice(0, 3).map((tool) => (
+                      <span key={tool.access_id || tool.id} className="session-chip border-slate-200 bg-slate-50 text-slate-600">{tool.name}</span>
+                    ))}
+                    {!isLoadingToolbox && enabledTools.length > 3 && (
+                      <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">+{enabledTools.length - 3} more</span>
+                    )}
+                    {!isLoadingToolbox && enabledTools.length === 0 && !toolboxError && (
+                      <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">No tools assigned</span>
+                    )}
+                  </div>
                 </div>
                 {toolboxError && (
                   <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{toolboxError}</p>
-                )}
-                {!isLoadingToolbox && enabledTools.length > 0 && (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {enabledTools.map((tool) => (
-                      <div key={tool.access_id || tool.id} className="session-soft-panel rounded-xl px-3 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-slate-900">{tool.name}</p>
-                          <span className="session-chip border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">{tool.category}</span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                          {String(tool.effective_config?.hostCue || tool.description || 'Available for this facilitator')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {!isLoadingToolbox && enabledTools.length === 0 && !toolboxError && (
-                  <p className="mt-3 session-soft-panel rounded-xl px-3 py-2 text-xs text-slate-500">No active tools are assigned to this facilitator yet.</p>
                 )}
               </div>
 
@@ -419,7 +378,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Facilitation modes</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Start a structured mode that changes participant input rules and gives the facilitator an explicit lifecycle.</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Change how participants contribute when the conversation needs structure.</p>
                   </div>
                   <span className={`session-chip px-2.5 py-1 text-xs font-semibold ${activeMode ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
                     {isLoadingModes ? 'Loading…' : activeMode ? activeMode.status : `${enabledModes.length} available`}
@@ -428,22 +387,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 
                 {modeError && (
                   <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{modeError}</p>
-                )}
-
-                {recentModeEvents.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Recent mode events</p>
-                    <div className="mt-1 space-y-1">
-                      {recentModeEvents.slice(0, 3).map((event) => (
-                        <div key={event.id} className="flex items-center justify-between gap-3 text-xs text-violet-700">
-                          <span className="truncate">{event.event_type.replace(/_/g, ' ')}</span>
-                          <span className="shrink-0 text-[11px] text-violet-500">
-                            {event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 )}
 
                 {activeMode ? (
@@ -489,16 +432,16 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2 md:grid-cols-2">
                       {enabledModes.map((mode) => (
                         <button
                           key={mode.access_id || mode.id}
                           type="button"
                           onClick={() => setSelectedModeKey(mode.mode_key)}
-                          className={`session-control-button rounded-xl border px-3 py-2 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                          className={`session-control-button rounded-2xl border px-3 py-2.5 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                         >
                           <p className="text-xs font-semibold text-slate-900">{mode.display_name}</p>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{mode.purpose}</p>
+                          <p className="mt-1 line-clamp-1 text-xs text-slate-500">{mode.purpose}</p>
                         </button>
                       ))}
                     </div>
@@ -510,7 +453,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                         <Textarea
                           value={modePrompt}
                           onChange={(event) => setModePrompt(event.target.value)}
-                          placeholder="Optional mode prompt for participants… e.g. 'Vote on the most important risk.'"
+                          placeholder="Optional participant prompt… e.g. 'Vote on the most important risk.'"
                           className="min-h-[64px] resize-none border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400"
                         />
                         <Button
@@ -543,9 +486,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     </div>
                     <div>
                       <p className={`text-sm font-semibold ${isInstructionExpanded ? 'text-indigo-800' : 'text-slate-900'}`}>
-                        Steer the AI Facilitator
+                        Private facilitator instruction
                       </p>
-                      <p className="text-xs text-slate-500">Participants won't see your instruction</p>
+                      <p className="text-xs text-slate-500">Only affects the next AI turn.</p>
                     </div>
                   </div>
                   {isInstructionExpanded
@@ -567,7 +510,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                               : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
                           }`}
                         >
-                          <span>{qi.icon}</span>
                           {qi.label}
                         </button>
                       ))}
@@ -576,7 +518,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <Textarea
                       value={hostInstruction}
                       onChange={(e) => setHostInstruction(e.target.value)}
-                      placeholder="Type a custom instruction… e.g. 'Ask about implementation challenges'"
+                      placeholder="Type a concise instruction… e.g. 'Ask about implementation challenges.'"
                       className="min-h-[72px] resize-none border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-300"
                     />
 
@@ -607,42 +549,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Session Details */}
-              <div className="session-soft-panel rounded-2xl p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Session Details</p>
-                <div className="space-y-2.5">
-                  <div className="flex items-start gap-2">
-                    <Zap className="h-3.5 w-3.5 text-indigo-200 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-slate-500">Title</p>
-                      <p className="text-sm font-medium text-slate-900">
-                        {conversationData?.sessions?.title || 'Untitled Session'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-3.5 w-3.5 text-violet-200 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-slate-500">Facilitator</p>
-                      <p className="text-sm font-medium text-slate-900">
-                        {conversationData?.sessions?.facilitator_details?.title || 'Unknown'}
-                      </p>
-                    </div>
-                  </div>
-                  {conversationData?.sessions?.objective && (
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs text-slate-500">Objective</p>
-                        <p className="text-sm text-slate-200 leading-relaxed">
-                          {conversationData.sessions.objective}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
 
             </div>

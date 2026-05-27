@@ -90,13 +90,23 @@ export function useSessionPageState() {
   const retryConnection = useCallback(() => {
     stateRef.current.connectionAttempts++;
     stateRef.current.pageLoadTime = Date.now(); // Reset timer on each retry
+
+    const shouldPreserveParticipantView = !stateRef.current.isAdmin && !stateRef.current.isHost && hasInitializedProvider;
+
+    // Participants who already reached the live room should not be forced back into
+    // the loading shell during transient realtime recovery; that visual reset reads
+    // as a full page refresh after facilitator speech completes.
+    if (shouldPreserveParticipantView) {
+      setIsLoading(false);
+      return;
+    }
     
     // Force loading state during retry
     setIsLoading(true);
     
     // Reset provider initialized state to trigger reconnection
     setHasInitializedProvider(false);
-  }, []);
+  }, [hasInitializedProvider]);
 
   // Handler for provider initialization
   const handleProviderInitialized = useCallback(() => {

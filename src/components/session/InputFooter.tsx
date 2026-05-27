@@ -1,19 +1,28 @@
 /**
  * Input Footer
  *
- * Session component for the AIfacilitator application.
- * Includes participant engagement controls (skip, pause, message host).
+ * Adaptive participant composer for facilitation modes. The footer preserves the
+ * existing engagement controls and chat composer while rendering mode-specific
+ * input panels for open discussion, round robin, silent response, voting,
+ * reflection, and debate.
  */
-
-import { createLogger } from '@/utils/debugLogger';
-
-const log = createLogger('InputFooter', 'session');
 
 import React from 'react';
 import ChatInput from "@/components/chat/ChatInput";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Lock, Users } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Hand,
+  Lock,
+  Mic,
+  MoreHorizontal,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import ParticipantEngagementControls from './ParticipantEngagementControls';
@@ -27,6 +36,21 @@ interface ModeComposerContext {
   stateLabel?: string;
   isComplete?: boolean;
 }
+
+export interface AdaptiveModeOption {
+  id: string;
+  label: string;
+  description?: string;
+  value?: unknown;
+}
+
+type ParticipantModeTurnState = {
+  is_current_speaker?: boolean | null;
+  is_next?: boolean | null;
+  remaining_time?: number | null;
+};
+
+type HandRaiseState = 'idle' | 'raised' | 'floor_granted';
 
 interface InputFooterProps {
   participantCount: number;
@@ -56,7 +80,98 @@ interface InputFooterProps {
   disabledPlaceholder?: string;
   disabled?: boolean;
   modeContext?: ModeComposerContext;
+  modeOptions?: AdaptiveModeOption[];
+  selectedModeOptionId?: string | null;
+  submittingModeOptionId?: string | null;
+  modeCanSubmit?: boolean;
+  participantModeState?: ParticipantModeTurnState | null;
+  modeInputError?: string | null;
+  onVote?: (choice: AdaptiveModeOption) => void | Promise<void>;
+  onWordPick?: (choice: AdaptiveModeOption) => void | Promise<void>;
+  onReaction?: (reaction: string) => void | Promise<void>;
+  handRaiseState?: HandRaiseState;
+  onHandRaiseToggle?: (raised: boolean) => void | Promise<void>;
 }
+
+const REACTIONS = ['✋', '👋', '👍', '❓'] as const;
+const DEFAULT_VOTE_OPTIONS: AdaptiveModeOption[] = [
+  { id: 'agree', label: 'Agree', value: 'agree' },
+  { id: 'unsure', label: 'Unsure', value: 'unsure' },
+  { id: 'disagree', label: 'Disagree', value: 'disagree' },
+  { id: 'needs-discussion', label: 'Discuss', value: 'needs-discussion' },
+];
+const DEFAULT_REFLECTION_OPTIONS: AdaptiveModeOption[] = [
+  { id: 'energized', label: 'Energized', value: 'energized' },
+  { id: 'curious', label: 'Curious', value: 'curious' },
+  { id: 'unclear', label: 'Unclear', value: 'unclear' },
+  { id: 'aligned', label: 'Aligned', value: 'aligned' },
+  { id: 'concerned', label: 'Concerned', value: 'concerned' },
+  { id: 'ready', label: 'Ready', value: 'ready' },
+];
+
+const normalizeModeKey = (modeKey?: string | null): string => {
+  const normalized = (modeKey || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
+  if (normalized === 'voting') return 'voting_rating';
+  if (normalized === 'reflection') return 'reflection_checkin';
+  if (normalized === 'silent_response') return 'silent_individual_response';
+  return normalized;
+};
+
+const formatModeComponentLabel = (component?: string | null): string => {
+  if (!component) return 'Facilitation mode';
+  return component.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+};
+
+const getModeAccent = (modeKey: string, isComplete?: boolean) => {
+  if (isComplete) return { strip: 'border-emerald-200 bg-emerald-50 text-emerald-900', badge: 'bg-emerald-600 text-white', dot: 'bg-emerald-500', panel: 'border-emerald-200 bg-emerald-50/70' };
+  if (modeKey === 'voting_rating') return { strip: 'border-indigo-200 bg-indigo-50 text-indigo-950', badge: 'bg-indigo-600 text-white', dot: 'bg-indigo-500', panel: 'border-indigo-200 bg-indigo-50/70' };
+  if (modeKey === 'round_robin') return { strip: 'border-amber-200 bg-amber-50 text-amber-950', badge: 'bg-amber-500 text-white', dot: 'bg-amber-500', panel: 'border-amber-200 bg-amber-50/70' };
+  if (modeKey === 'silent_individual_response') return { strip: 'border-violet-200 bg-violet-50 text-violet-950', badge: 'bg-violet-600 text-white', dot: 'bg-violet-500', panel: 'border-violet-200 bg-violet-50/70' };
+  if (modeKey === 'reflection_checkin') return { strip: 'border-rose-200 bg-rose-50 text-rose-950', badge: 'bg-rose-500 text-white', dot: 'bg-rose-500', panel: 'border-rose-200 bg-rose-50/70' };
+  if (modeKey === 'debate') return { strip: 'border-orange-200 bg-orange-50 text-orange-950', badge: 'bg-orange-500 text-white', dot: 'bg-orange-500', panel: 'border-orange-200 bg-orange-50/70' };
+  return { strip: 'border-sky-200 bg-sky-50 text-sky-950', badge: 'bg-sky-600 text-white', dot: 'bg-sky-500', panel: 'border-sky-200 bg-sky-50/70' };
+};
+
+const getVoteEmoji = (label: string, index: number): string => {
+  const lower = label.toLowerCase();
+  if (lower.includes('agree') || lower.includes('yes')) return '👍';
+  if (lower.includes('no') || lower.includes('disagree')) return '👎';
+  if (lower.includes('unsure') || lower.includes('maybe')) return '🤔';
+  if (lower.includes('discuss') || lower.includes('question')) return '💬';
+  return ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'][index] ?? '•';
+};
+
+const MicLiveIndicator = ({ isLive, label = 'Mic live' }: { isLive: boolean; label?: string }) => (
+  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${isLive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+    <span className={`h-2 w-2 rounded-full ${isLive ? 'animate-pulse bg-emerald-500 motion-reduce:animate-none' : 'bg-slate-300'}`} />
+    <Mic className="h-3.5 w-3.5" />
+    {label}
+  </div>
+);
+
+const QuickReactions = ({ onReaction, compact = false }: { onReaction?: (reaction: string) => void | Promise<void>; compact?: boolean }) => {
+  const [sentReaction, setSentReaction] = React.useState<string | null>(null);
+  const handleReaction = (reaction: string) => {
+    setSentReaction(reaction);
+    void onReaction?.(reaction);
+    window.setTimeout(() => setSentReaction((current) => current === reaction ? null : current), 1400);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-label="Quick reactions">
+      {REACTIONS.map((reaction) => (
+        <button
+          key={reaction}
+          type="button"
+          onClick={() => handleReaction(reaction)}
+          aria-label={`Send ${reaction} reaction`}
+          className={`${compact ? 'h-8 w-8' : 'h-8 w-8 sm:h-9 sm:w-9'} inline-flex items-center justify-center rounded-full border text-base shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 active:scale-95 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${sentReaction === reaction ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50'}`}
+        >
+          <span aria-hidden="true">{reaction}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const InputFooter = ({
   participantCount,
@@ -69,8 +184,6 @@ const InputFooter = ({
   isRecording,
   setIsRecording,
   currentUserParticipantId,
-  isAnonymous,
-  toggleAnonymous,
   hasAnswered,
   totalResponses,
   viewMode,
@@ -86,17 +199,32 @@ const InputFooter = ({
   disabledPlaceholder,
   disabled = false,
   modeContext,
+  modeOptions = [],
+  selectedModeOptionId = null,
+  submittingModeOptionId = null,
+  modeCanSubmit = true,
+  participantModeState = null,
+  modeInputError = null,
+  onVote,
+  onWordPick,
+  onReaction,
+  handRaiseState = 'idle',
+  onHandRaiseToggle,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
+  const [showOverflow, setShowOverflow] = React.useState(false);
+  const [showAllReflectionWords, setShowAllReflectionWords] = React.useState(false);
+  const [localHandRaised, setLocalHandRaised] = React.useState(false);
+  const [transitionNotice, setTransitionNotice] = React.useState<string | null>(null);
+  const [isPanelFading, setIsPanelFading] = React.useState(false);
+  const [savedNotice, setSavedNotice] = React.useState<string | null>(null);
+  const previousModeKeyRef = React.useRef<string | null>(null);
+  const previousCompleteRef = React.useRef(Boolean(modeContext?.isComplete));
 
-  // Find current participant info
   const participantInfo = participants.find(p => p.id === currentParticipant);
-  const participantName = participantInfo?.name ||
-    participantNames[currentParticipant] ||
-    `Participant ${currentParticipant}`;
+  const participantName = participantInfo?.name || participantNames[currentParticipant] || `Participant ${currentParticipant}`;
 
-  // Engagement controls
   const {
     status,
     isPaused,
@@ -107,159 +235,207 @@ const InputFooter = ({
     sendMessageToHost,
     isSendingHostMessage,
     hostMessageSent,
-  } = useParticipantEngagement({
-    conversationId,
-    participantId: currentUserParticipantId ?? currentParticipant,
-    participantName,
-  });
+  } = useParticipantEngagement({ conversationId, participantId: currentUserParticipantId ?? currentParticipant, participantName });
 
-  // Notify parent when status changes (so response counting can exclude paused/skipped)
   const effectiveParticipantId = currentUserParticipantId ?? currentParticipant;
-  React.useEffect(() => {
-    onParticipantStatusChange?.(effectiveParticipantId, status);
-  }, [status, effectiveParticipantId, onParticipantStatusChange]);
+  React.useEffect(() => { onParticipantStatusChange?.(effectiveParticipantId, status); }, [status, effectiveParticipantId, onParticipantStatusChange]);
 
-  // Reset skip when a new facilitator message arrives
   const lastAssistantMessageId = React.useMemo(() => {
     const assistantMessages = messages.filter(m => m.sender === 'assistant');
     return assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1].id : null;
   }, [messages]);
-  React.useEffect(() => {
-    resetSkip();
-  }, [lastAssistantMessageId, resetSkip]);
+  React.useEffect(() => { resetSkip(); }, [lastAssistantMessageId, resetSkip]);
 
-  // Safely determine if this is a new session with just a welcome message
-  const isNewSession = Array.isArray(messages) && messages.length <= 1 &&
-    messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
-
-  // Check if the most recent message is from the facilitator
+  const isNewSession = Array.isArray(messages) && messages.length <= 1 && messages.every(msg => msg.sender === 'assistant' || msg.id === 'welcome');
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const shouldAllowAnswer = (lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered)
-    && !isPaused
-    && !isSkipped
-    && !disabled;
-
-  // Count how many questions this participant has sent
+  const modeKey = normalizeModeKey(modeContext?.modeKey);
+  const isOpenDiscussionMode = modeKey === 'open_discussion';
+  const shouldAllowAnswer = (isOpenDiscussionMode || lastMessage?.sender === 'assistant' || isNewSession || !hasAnswered) && !isPaused && !isSkipped && !disabled;
   const participantKey = String(effectiveParticipantId);
-  const userMessageCount = Array.isArray(messages)
-    ? messages.filter(m => m.sender === 'user' && m.participant === participantKey).length
-    : 0;
+  const userMessageCount = Array.isArray(messages) ? messages.filter(m => m.sender === 'user' && m.participant === participantKey).length : 0;
   const hasReachedQuestionLimit = maxQuestionsPerSession !== Infinity && userMessageCount >= maxQuestionsPerSession;
 
-
-  const modeAccentClass = React.useMemo(() => {
-    if (!modeContext) return 'border-slate-200 bg-white text-slate-700';
-    if (modeContext.isComplete) return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    if (modeContext.modeKey === 'voting_rating') return 'border-indigo-200 bg-indigo-50 text-indigo-800';
-    if (modeContext.modeKey === 'round_robin') return 'border-amber-200 bg-amber-50 text-amber-800';
-    if (modeContext.modeKey === 'silent_individual_response') return 'border-violet-200 bg-violet-50 text-violet-800';
-    if (modeContext.modeKey === 'reflection_checkin') return 'border-sky-200 bg-sky-50 text-sky-800';
-    return 'border-slate-200 bg-slate-50 text-slate-700';
-  }, [modeContext]);
-
-  const modeComponentLabel = React.useMemo(() => {
-    if (!modeContext?.component) return null;
-    return modeContext.component
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .replace(/[_-]+/g, ' ');
-  }, [modeContext?.component]);
-
-  // Enhanced participant detection logic
   const urlParams = new URLSearchParams(window.location.search);
   const hasParticipantParams = urlParams.has('participantId') || urlParams.has('name');
   const isParticipantContext = hasParticipantParams || viewMode === "participant";
+  const accent = getModeAccent(modeKey, modeContext?.isComplete);
+  const modeComponentLabel = formatModeComponentLabel(modeContext?.component);
+  const handRaised = handRaiseState === 'raised' || (handRaiseState === 'idle' && localHandRaised);
+  const floorGranted = handRaiseState === 'floor_granted';
+  const effectiveVoteOptions = modeOptions.length > 0 ? modeOptions : DEFAULT_VOTE_OPTIONS;
+  const effectiveReflectionOptions = modeOptions.length > 0 ? modeOptions : DEFAULT_REFLECTION_OPTIONS;
+  const visibleReflectionOptions = showAllReflectionWords ? effectiveReflectionOptions : effectiveReflectionOptions.slice(0, isMobile ? 6 : 8);
+  const activeModeIdentity = `${modeKey}:${modeContext?.label ?? ''}:${modeContext?.component ?? ''}`;
 
-  // Don't show input for pure admin view (without participant context)
-  if (viewMode === "admin" && !isParticipantContext) {
-    return null;
-  }
+  React.useEffect(() => {
+    const previousModeKey = previousModeKeyRef.current;
+    if (previousModeKey && previousModeKey !== activeModeIdentity) {
+      setTransitionNotice('Facilitation mode changed. Unsaved draft input was cleared.');
+      setIsPanelFading(true);
+      setShowAllReflectionWords(false);
+      setInputMessage('');
+      const bannerTimer = window.setTimeout(() => setTransitionNotice(null), 200);
+      const fadeTimer = window.setTimeout(() => setIsPanelFading(false), 200);
+      previousModeKeyRef.current = activeModeIdentity;
+      return () => { window.clearTimeout(bannerTimer); window.clearTimeout(fadeTimer); };
+    }
+    previousModeKeyRef.current = activeModeIdentity;
+  }, [activeModeIdentity, setInputMessage]);
+
+  React.useEffect(() => {
+    const wasComplete = previousCompleteRef.current;
+    const isComplete = Boolean(modeContext?.isComplete);
+    if (!wasComplete && isComplete) {
+      setSavedNotice('Response saved. Waiting for the facilitator to continue.');
+      const timer = window.setTimeout(() => setSavedNotice(null), 3000);
+      previousCompleteRef.current = isComplete;
+      return () => window.clearTimeout(timer);
+    }
+    previousCompleteRef.current = isComplete;
+  }, [modeContext?.isComplete]);
+
+  const handleHandRaiseToggle = () => {
+    const nextRaised = !(handRaised || floorGranted);
+    if (handRaiseState === 'idle') setLocalHandRaised(nextRaised);
+    void onHandRaiseToggle?.(nextRaised);
+  };
+
+  if (viewMode === "admin" && !isParticipantContext) return null;
+
+  const renderModeStrip = () => modeContext ? (
+    <div className="px-3 pt-3 sm:px-4">
+      <div className={`rounded-2xl border px-3 py-2.5 shadow-sm ${accent.strip}`}>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${accent.badge}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} />{modeContext.label}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="hidden truncate text-xs font-semibold leading-relaxed opacity-80 md:block">{modeContext.instruction}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-60 md:hidden">{modeComponentLabel}</p>
+          </div>
+          {modeContext.stateLabel && (
+            <span className="hidden shrink-0 items-center gap-1 rounded-full border border-current/20 bg-white/70 px-2.5 py-1 text-xs font-semibold sm:inline-flex">
+              {modeContext.isComplete && <CheckCircle2 className="h-3.5 w-3.5" />}{modeContext.stateLabel}
+            </span>
+          )}
+          <button type="button" onClick={() => void onReaction?.('reactions_opened')} className="session-control-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-current/15 bg-white/70 px-2.5 text-xs font-bold transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2" aria-label="Open quick reactions">
+            <Sparkles className="h-3.5 w-3.5" /><span className="hidden sm:inline">Reactions</span>
+          </button>
+          <div className="relative">
+            <button type="button" onClick={() => setShowOverflow((current) => !current)} aria-expanded={showOverflow} aria-label="More facilitation controls" className="session-control-button inline-flex h-8 w-8 items-center justify-center rounded-full border border-current/15 bg-white/70 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {showOverflow && (
+              <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs text-slate-600 shadow-xl">
+                <p className="font-bold text-slate-900">{modeComponentLabel}</p><p className="mt-1 leading-relaxed">{modeContext.instruction}</p>
+                {modeContext.stateLabel && <p className="mt-2 font-semibold text-slate-700">State: {modeContext.stateLabel}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const renderOpenDiscussionPanel = () => (
+    <div className={`mx-3 mt-2 rounded-2xl border p-3 sm:mx-4 ${accent.panel}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0"><p className="text-sm font-bold text-slate-900">Open Discussion</p><p className="hidden text-xs leading-relaxed text-slate-600 sm:block">Open floor: speak freely, add multiple written thoughts, or signal with a quick reaction.</p></div>
+        {isRecording ? <MicLiveIndicator isLive label="Dictation live" /> : <QuickReactions onReaction={onReaction} compact={isMobile} />}
+      </div>
+    </div>
+  );
+
+  const renderRoundRobinPanel = () => {
+    const isCurrent = Boolean(participantModeState?.is_current_speaker);
+    const isNext = Boolean(participantModeState?.is_next);
+    const title = isCurrent ? 'Your turn' : isNext ? "You're next" : 'Waiting';
+    const copy = isCurrent ? 'The floor is yours. Speak now or type your response.' : isNext ? 'Get ready; the facilitator will invite you shortly.' : 'The composer unlocks when your turn arrives.';
+    return (
+      <div className={`mx-3 mt-2 rounded-2xl border p-3 sm:mx-4 ${isCurrent ? 'border-emerald-200 bg-emerald-50' : isNext ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className={`text-sm font-black ${isCurrent ? 'text-emerald-800' : isNext ? 'text-amber-800' : 'text-slate-700'}`}>{title}</p><p className="mt-1 text-xs leading-relaxed text-slate-600">{copy}</p></div>
+          <div className="flex items-center gap-2">{isCurrent && <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor open'} />}{!isCurrent && <QuickReactions onReaction={onReaction} compact={isMobile} />}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSilentResponsePanel = () => (
+    <div className="mx-3 mt-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3 sm:mx-4">
+      <div className="mb-2 flex items-start gap-2 text-violet-900"><Lock className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="text-sm font-black">Private silent response</p><p className="text-xs leading-relaxed text-violet-700">Only the facilitator sees your private response until they choose what to share.</p><p className="sr-only" aria-live="polite">Private response mode is active. Your draft is private and will be sent when you press Submit.</p></div></div>
+      <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-violet-700"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Private draft</span><span>{inputMessage.length}/2000</span></div>
+    </div>
+  );
+
+  const renderVotingPanel = () => (
+    <div className="mx-3 mt-2 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-3 sm:mx-4">
+      <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-black text-indigo-950">Cast your vote</p><p className="hidden text-xs leading-relaxed text-indigo-700 sm:block">Tap an option to submit. You can change it before results are revealed.</p></div><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Voting options">
+        {effectiveVoteOptions.slice(0, 6).map((choice, index) => {
+          const isSelected = selectedModeOptionId === choice.id;
+          const isSubmitting = submittingModeOptionId === choice.id;
+          const canSelect = modeCanSubmit && !isPaused && !isSkipped && !isSubmitting;
+          return <button key={choice.id} type="button" role="radio" aria-checked={isSelected} aria-label={`Vote for ${choice.label}`} onClick={() => canSelect && void onVote?.(choice)} disabled={!canSelect} className={`session-control-button min-h-[52px] rounded-2xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-[1.02] border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50'}`}><span className="flex items-center gap-2 text-sm font-black"><span aria-hidden="true">{getVoteEmoji(choice.label, index)}</span><span className="min-w-0 flex-1 truncate">{isSubmitting ? 'Submitting…' : choice.label}</span>{isSelected && <Check className="h-4 w-4 text-emerald-600" />}</span>{choice.description && <span className="mt-1 block text-xs leading-snug opacity-70">{choice.description}</span>}</button>;
+        })}
+      </div>
+      {!modeCanSubmit && <p className="mt-2 text-xs font-semibold text-indigo-700">Voting is not open for you at this moment.</p>}
+    </div>
+  );
+
+  const renderReflectionPanel = () => (
+    <div className="mx-3 mt-2 rounded-2xl border border-rose-200 bg-rose-50/70 p-3 sm:mx-4">
+      <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-black text-rose-950">Pick a reflection word</p><p className="hidden text-xs leading-relaxed text-rose-700 sm:block">Choose the word that best captures where you are right now.</p></div><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
+      <div className="flex max-h-[76px] flex-wrap gap-2 overflow-hidden sm:max-h-none" aria-label="Reflection word choices">
+        {visibleReflectionOptions.slice(0, 12).map((choice) => {
+          const isSelected = selectedModeOptionId === choice.id;
+          const isSubmitting = submittingModeOptionId === choice.id;
+          const canSelect = modeCanSubmit && !isPaused && !isSkipped && !isSubmitting;
+          return <button key={choice.id} type="button" aria-pressed={isSelected} onClick={() => canSelect && void onWordPick?.(choice)} disabled={!canSelect} className={`session-control-button rounded-full border px-3 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none ${isSelected ? 'scale-105 border-rose-400 bg-rose-100 text-rose-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300 hover:bg-rose-50'}`}>{isSubmitting ? 'Saving…' : choice.label}</button>;
+        })}
+      </div>
+      {effectiveReflectionOptions.length > visibleReflectionOptions.length && <button type="button" onClick={() => setShowAllReflectionWords(true)} className="mt-2 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2">Show more <ChevronDown className="h-3.5 w-3.5" /></button>}
+      {selectedModeOptionId && <p className="mt-2 text-xs font-semibold text-rose-700">Reflection noted. You can change it before the facilitator moves on.</p>}
+    </div>
+  );
+
+  const renderDebatePanel = () => (
+    <div className="mx-3 mt-2 rounded-2xl border border-orange-200 bg-orange-50/70 p-3 sm:mx-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-black text-orange-950">Debate floor</p><p className="hidden text-xs leading-relaxed text-orange-700 sm:block">Raise your hand to request the floor, then react while others speak.</p></div><div className="flex flex-wrap items-center gap-2"><button type="button" onClick={handleHandRaiseToggle} aria-pressed={handRaised || floorGranted} disabled={floorGranted} className={`session-control-button inline-flex h-10 items-center gap-2 rounded-full border px-3 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none ${floorGranted ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : handRaised ? 'border-orange-400 bg-orange-100 text-orange-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-orange-300 hover:bg-orange-50'}`}><Hand className="h-4 w-4" />{floorGranted ? 'Floor granted' : handRaised ? 'Hand raised' : 'Raise hand'}</button>{floorGranted && <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor granted'} />}<QuickReactions onReaction={onReaction} compact={isMobile} /></div></div>
+    </div>
+  );
+
+  const renderModePanel = () => {
+    if (!modeContext) return null;
+    if (modeKey === 'voting_rating') return renderVotingPanel();
+    if (modeKey === 'round_robin') return renderRoundRobinPanel();
+    if (modeKey === 'silent_individual_response') return renderSilentResponsePanel();
+    if (modeKey === 'reflection_checkin') return renderReflectionPanel();
+    if (modeKey === 'debate') return renderDebatePanel();
+    return renderOpenDiscussionPanel();
+  };
+
+  const shouldRenderDefaultChatInput = !isPaused && !isSkipped && modeKey !== 'voting_rating' && modeKey !== 'reflection_checkin' && modeKey !== 'silent_individual_response';
 
   return (
     <>
-      {showResponseStats && (
-        <div className="px-2 py-1 border-t border-gray-100 bg-white">
-          <Badge variant="outline" className="bg-gray-50 text-xs px-1.5 py-0.5">
-            <Users className="w-3 h-3 mr-1" />
-            <span>{totalResponses} of {participantCount} answered</span>
-          </Badge>
-        </div>
-      )}
-
-      <div className="w-full border-t border-gray-100 bg-white/90 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        {/* Question limit reached */}
+      {showResponseStats && <div className="px-2 py-1 border-t border-gray-100 bg-white"><Badge variant="outline" className="bg-gray-50 text-xs px-1.5 py-0.5"><Users className="w-3 h-3 mr-1" /><span>{totalResponses} of {participantCount} answered</span></Badge></div>}
+      <div className="w-full flex-shrink-0 border-t border-gray-100 bg-white/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        {transitionNotice && <div className="mx-3 mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition-opacity duration-200 motion-reduce:transition-none sm:mx-4" role="status" aria-live="polite">{transitionNotice}</div>}
+        {savedNotice && <div className="mx-3 mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 sm:mx-4" role="status" aria-live="polite">{savedNotice}</div>}
         {isParticipantContext && hasReachedQuestionLimit ? (
-          <div className="p-3 sm:p-4 flex flex-col items-center justify-center">
-            <div className="mb-2 flex items-center justify-center gap-2 bg-amber-50 px-3 py-2 rounded-md text-amber-700 border border-amber-200 w-full text-sm">
-              <Lock className="h-4 w-4" />
-              <span className="font-medium">
-                Question limit reached ({maxQuestionsPerSession} per session).{" "}
-                <a href="/pricing" className="underline hover:text-amber-900">Upgrade your plan</a> for more.
-              </span>
-            </div>
-          </div>
+          <div className="p-3 sm:p-4 flex flex-col items-center justify-center"><div className="mb-2 flex items-center justify-center gap-2 bg-amber-50 px-3 py-2 rounded-md text-amber-700 border border-amber-200 w-full text-sm"><Lock className="h-4 w-4" /><span className="font-medium">Question limit reached ({maxQuestionsPerSession} per session). <a href="/pricing" className="underline hover:text-amber-900">Upgrade your plan</a> for more.</span></div></div>
         ) : isParticipantContext ? (
-          <>
-            {modeContext && (
-              <div className="px-3 pt-3 sm:px-4">
-                <div className={`rounded-2xl border px-3 py-3 shadow-sm ${modeAccentClass}`}>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-70">
-                        {modeComponentLabel || 'Facilitation composer'}
-                      </p>
-                      <p className="mt-1 text-sm font-bold">{modeContext.label}</p>
-                    </div>
-                    {modeContext.stateLabel && (
-                      <span className="inline-flex w-fit items-center gap-1 rounded-full border border-current/20 bg-white/70 px-2.5 py-1 text-xs font-semibold">
-                        {modeContext.isComplete && <CheckCircle2 className="h-3.5 w-3.5" />}
-                        {modeContext.stateLabel}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed opacity-80">{modeContext.instruction}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Engagement controls: skip / pause / message host */}
-            <ParticipantEngagementControls
-              status={status}
-              onSkip={skipQuestion}
-              onTogglePause={togglePause}
-              onSendHostMessage={sendMessageToHost}
-              isSendingHostMessage={isSendingHostMessage}
-              hostMessageSent={hostMessageSent}
-              hasAnswered={hasAnswered}
-              isMobile={isMobile}
-            />
-
-            {/* Chat input — hidden when paused or skipped */}
-            {!isPaused && !isSkipped && (
-              <ChatInput
-                inputMessage={inputMessage}
-                setInputMessage={setInputMessage}
-                onSendMessage={onSendMessage}
-                isRecording={isRecording}
-                setIsRecording={setIsRecording}
-                placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder}
-                disabled={!shouldAllowAnswer}
-                isMobile={isMobile}
-                speechEnabled={speechEnabled}
-                speechLanguage={speechLanguage}
-                onSpeechInterim={onSpeechInterim}
-                onSpeechFinal={onSpeechFinal}
-              />
-            )}
-          </>
-        ) : (
-          <div className="p-3 sm:p-4 flex flex-col items-center justify-center">
-            <div className="mb-2 flex items-center justify-center gap-2 bg-green-50 px-3 py-2 rounded-md text-green-700 border border-green-200 w-full text-sm">
-              <span className="font-medium">Your answer has been submitted</span>
-            </div>
-            <p className="text-xs text-gray-500">
-              Waiting for other participants to respond…
-            </p>
+          <div className="max-h-[160px] overflow-y-auto overscroll-contain pb-2 md:max-h-none md:overflow-visible">
+            {renderModeStrip()}<div className={`transition-opacity duration-200 motion-reduce:transition-none ${isPanelFading ? 'opacity-0' : 'opacity-100'}`}>{renderModePanel()}</div>
+            {modeInputError && <p className="mx-3 mt-2 text-xs font-semibold text-rose-600 sm:mx-4">{modeInputError}</p>}
+            <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
+            {shouldRenderDefaultChatInput && <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />}
+            {!modeContext && !isPaused && !isSkipped && <div className="px-3 pb-2 sm:px-4"><QuickReactions onReaction={onReaction} compact={isMobile} /></div>}
           </div>
+        ) : (
+          <div className="p-3 sm:p-4 flex flex-col items-center justify-center"><div className="mb-2 flex items-center justify-center gap-2 bg-green-50 px-3 py-2 rounded-md text-green-700 border border-green-200 w-full text-sm"><span className="font-medium">Your answer has been submitted</span></div><p className="text-xs text-gray-500">Waiting for other participants to respond…</p></div>
         )}
       </div>
     </>

@@ -370,6 +370,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const isRoundRobinMode = modeKey === 'round_robin';
   const isSilentResponseMode = modeKey === 'silent_individual_response';
   const isReflectionMode = modeKey === 'reflection_checkin';
+  const isOpenDiscussionMode = modeKey === 'open_discussion';
+  const modeBlocksAfterResponse = isVotingMode || isRoundRobinMode || isSilentResponseMode || isReflectionMode;
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
@@ -390,29 +392,29 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
-  const modeComposerDisabled = Boolean(activeMode && (!modeCanSubmit || hasRegisteredResponse || hasSubmittedModeChoice || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
-  const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice) => {
-    if (!submitModeInput || !modeCanSubmit || hasRegisteredResponse || hasSubmittedModeChoice) return;
+  const modeComposerDisabled = Boolean(activeMode && (!modeCanSubmit || (modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice)) || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
+  const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice, inputType: 'vote' | 'reflection_word' = 'vote') => {
+    if (!submitModeInput || !modeCanSubmit || hasRegisteredResponse || submittingChoiceId) return;
     setModeInputError(null);
     setSubmittingChoiceId(choice.id);
     try {
       await submitModeInput({
-        inputType: 'vote',
+        inputType,
         content: {
           choice: choice.label,
           value: choice.value,
           modeKey,
         },
-        visibility: 'anonymous_aggregate',
+        visibility: inputType === 'vote' ? 'anonymous_aggregate' : 'private',
       });
       setSubmittedChoiceId(choice.id);
     } catch (error) {
-      console.error('Failed to submit voting choice:', error);
+      console.error('Failed to submit mode choice:', error);
       setModeInputError('We could not submit that choice. Please try again.');
     } finally {
       setSubmittingChoiceId(null);
     }
-  }, [hasRegisteredResponse, hasSubmittedModeChoice, modeCanSubmit, modeKey, submitModeInput]);
+  }, [hasRegisteredResponse, modeCanSubmit, modeKey, submitModeInput, submittingChoiceId]);
   React.useEffect(() => {
     setSubmittedChoiceId(null);
     setModeInputError(null);
@@ -431,9 +433,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [persistMediaPreferences]);
 
   const startLocalCamera = React.useCallback(async () => {
-    if (localCameraStreamRef.current) {
+    const currentStream = localCameraStreamRef.current;
+    const hasVideoTrack = currentStream?.getVideoTracks().some((track) => track.readyState !== 'ended');
+    if (currentStream && hasVideoTrack) {
       setCameraStatus('on');
-      return localCameraStreamRef.current;
+      return currentStream;
     }
     if (localCameraStartPromiseRef.current) return localCameraStartPromiseRef.current;
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -447,7 +451,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     setCameraStatus('starting');
     setCameraError(null);
 
-    const shouldEnableMicrophone = readParticipantMediaPreferences(conversationId).microphoneEnabled;
+    const shouldEnableMicrophone = microphoneEnabled || readParticipantMediaPreferences(conversationId).microphoneEnabled;
     const cameraStartPromise = navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
       audio: shouldEnableMicrophone,
@@ -483,13 +487,17 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     localCameraStartPromiseRef.current = cameraStartPromise;
     return cameraStartPromise;
-  }, [conversationId, persistMediaPreferences]);
+  }, [conversationId, microphoneEnabled, persistMediaPreferences]);
 
   const toggleLocalCamera = React.useCallback(() => {
-    if (localCameraStreamRef.current) {
+    const currentStream = localCameraStreamRef.current;
+    const hasVideoTrack = currentStream?.getVideoTracks().some((track) => track.readyState !== 'ended');
+
+    if (currentStream && hasVideoTrack) {
       stopLocalCamera();
       return;
     }
+
     if (localCameraStartPromiseRef.current) return;
     void startLocalCamera();
   }, [startLocalCamera, stopLocalCamera]);
@@ -543,7 +551,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         localCameraStreamRef.current.addTrack(audioTrack);
         setLocalCameraStream(new MediaStream(localCameraStreamRef.current.getTracks()));
       } else {
-        audioTrack.stop();
+        const audioOnlyStream = new MediaStream([audioTrack]);
+        localCameraStreamRef.current = audioOnlyStream;
+        setLocalCameraStream(audioOnlyStream);
       }
 
       setMicrophoneEnabled(true);
@@ -621,14 +631,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       accentColor: participantColors[String(participant.id)] || undefined,
       mediaStream: isCurrentUser ? localCameraStream : remoteStream,
       isYou: isCurrentUser,
-      isMuted: !isCurrentUser || !isRecording,
-      isSpeaking: isCurrentUser && isRecording,
+      isMuted: !isCurrentUser || !microphoneEnabled,
+      isSpeaking: isCurrentUser && microphoneEnabled,
       connectionStatus: tileConnectionStatus,
       connectionStatusLabel: tileConnectionStatus ? formatPeerTileStatusLabel(tileConnectionStatus) : undefined,
     };
   })];
   const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
-  const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream);
+  const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);
   const cameraStatusLabel = cameraStatus === 'starting'
     ? 'Starting camera…'
@@ -746,7 +756,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               {cameraIsOn ? 'Camera off' : 'Camera on'}
             </button>
           </div>
-          <span className="text-slate-500">Muted · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
+          <span className="text-slate-500">{microphoneEnabled ? 'Mic on' : 'Muted'} · {cameraStatusLabel} · {roomConnectionLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
           {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
         </div>
       </div>
@@ -897,7 +907,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             </div>
 
-            {hasRegisteredResponse && (
+            {!isOpenDiscussionMode && hasRegisteredResponse && (
               <div className="session-soft-panel mt-3 rounded-2xl border-emerald-200 bg-emerald-50 p-3 md:p-4">
                 <div className="mb-2 flex items-center gap-2 text-sm font-bold text-emerald-800">
                   <CheckCircle2 className="h-4 w-4" />
@@ -915,7 +925,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             )}
 
-            {activeMode && (!hasRegisteredResponse || hasSubmittedModeChoice) && (
+            {activeMode && (isOpenDiscussionMode || !hasRegisteredResponse || hasSubmittedModeChoice) && (
               <div className="session-soft-panel mt-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm md:p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1023,7 +1033,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 currentUserParticipantId={effectiveParticipantId}
                 isAnonymous={isAnonymous}
                 toggleAnonymous={toggleAnonymous}
-                hasAnswered={hasAnswered || hasRegisteredResponse || hasSubmittedModeChoice}
+                hasAnswered={hasAnswered || (!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice))}
                 totalResponses={totalResponses}
                 viewMode={viewMode}
                 messages={messages}
@@ -1034,22 +1044,35 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 onSpeechInterim={handleSpeechInterim}
                 onSpeechFinal={handleSpeechFinal}
                 placeholder={modePlaceholder}
-                disabledPlaceholder={hasRegisteredResponse || hasSubmittedModeChoice ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
+                disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
                 disabled={modeComposerDisabled}
                 modeContext={activeMode ? {
                   label: modeLabel,
                   instruction: modeInstruction,
                   component: modeComposerComponent,
                   modeKey,
-                  stateLabel: hasRegisteredResponse || hasSubmittedModeChoice
-                    ? 'Response registered'
-                    : modeCanSubmit
-                      ? isRoundRobinMode && !participantModeState?.is_current_speaker
-                        ? 'Waiting for your turn'
-                        : 'Ready for your input'
-                      : 'Not open yet',
-                  isComplete: hasRegisteredResponse || hasSubmittedModeChoice,
+                  stateLabel: isOpenDiscussionMode
+                    ? 'Open floor'
+                    : hasRegisteredResponse || hasSubmittedModeChoice
+                      ? 'Response registered'
+                      : modeCanSubmit
+                        ? isRoundRobinMode && !participantModeState?.is_current_speaker
+                          ? 'Waiting for your turn'
+                          : 'Ready for your input'
+                        : 'Not open yet',
+                  isComplete: !isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice),
                 } : undefined}
+                modeOptions={modeChoices}
+                selectedModeOptionId={submittedChoiceId}
+                submittingModeOptionId={submittingChoiceId}
+                modeCanSubmit={modeCanSubmit}
+                participantModeState={participantModeState}
+                modeInputError={modeInputError}
+                onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
+                onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
+                onReaction={(reaction) => {
+                  console.info('Participant quick reaction', { reaction, modeKey });
+                }}
               />
             </div>
           )}

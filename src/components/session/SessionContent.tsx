@@ -52,10 +52,10 @@ const SessionContent: React.FC<SessionContentProps> = ({
       isAdmin={isAdmin}
       sessionMountedRef={sessionMountedRef}
     >
-      {/* key={connectionAttempts} forces a full remount on every retry,
-          which re-runs the React Query fetch and WebSocket connection */}
+      {/* Host/admin retries may remount the provider, but participant retries keep the live room mounted
+          so transient realtime recovery does not look like a page refresh after facilitator speech. */}
       <SessionProviderWrapper
-        key={connectionAttempts}
+        key={isAdmin ? connectionAttempts : 'participant-stable'}
         onInitialized={handleProviderInitialized}
         onLoading={setIsLoading}
         onError={handleError}

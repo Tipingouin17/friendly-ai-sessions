@@ -305,15 +305,17 @@ const PastWorkshops = () => {
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
   });
-  // active-workshops: live sessions can change, but the realtime channel
-  // handles invalidation.  2 min staleTime prevents double-fetch on tab focus.
+  // active-workshops: live sessions can change; dashboard-wide realtime is not
+  // supported by the conversation-scoped SSE shim, so polling keeps this fresh.
   const { data: activeWorkshops, isLoading: isActiveLoading, error: activeError } = useQuery({
     queryKey: ['active-workshops'],
     queryFn: fetchActiveWorkshops,
     staleTime: 2 * 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
   });
 
   // canGenerateReports and canSaveSessions come directly from usePlanLimits above
@@ -334,15 +336,6 @@ const PastWorkshops = () => {
   };
 
   useEffect(() => { clearAllParticipantState(); }, []);
-
-  useEffect(() => {
-    const channel = api.channel('workshops-realtime')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['past-workshops'] });
-        queryClient.invalidateQueries({ queryKey: ['active-workshops'] });
-      }).subscribe();
-    return () => { api.removeChannel(channel); };
-  }, [queryClient]);
 
   useEffect(() => {
     const auto = async () => {

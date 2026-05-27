@@ -36,14 +36,30 @@ function getRailwayRealtimeProxyPrefix(): string | null {
   return null;
 }
 
-function buildRealtimeSseUrl(topic: string, token: string): string {
+function buildRealtimeSseUrl(topic: string): string {
+  // Native EventSource cannot send custom Authorization headers. Keep user JWTs
+  // out of browser-visible URLs by authenticating the SSE transport with the
+  // public anon key only; session/participant authorization remains enforced by
+  // the REST endpoints that create or mutate data.
   const params = new URLSearchParams({
-    apikey: token,
+    apikey: ANON_KEY,
     topic,
   });
   const proxyPrefix = getRailwayRealtimeProxyPrefix();
   const baseUrl = proxyPrefix ? `${proxyPrefix}/realtime/v1/sse` : `${API_URL}/realtime/v1/sse`;
   return `${baseUrl}?${params.toString()}`;
+}
+
+function extractRealtimeConversationId(topic: string): string | null {
+  const filterMatch = topic.match(/conversation_id=eq\.([^&:]+)/) ?? topic.match(/(?:^|[^a-z])id=eq\.([^&:]+)/);
+  if (filterMatch?.[1]) return filterMatch[1];
+
+  const embeddedMatch = topic.match(/-([0-9]+)(?:-|$)/) ?? topic.match(/-([0-9]+)$/);
+  return embeddedMatch?.[1] ?? null;
+}
+
+function isConversationScopedRealtimeTopic(topic: string): boolean {
+  return extractRealtimeConversationId(topic) !== null;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -868,12 +884,23 @@ class SharedSSEManager {
   private readonly MAX_BACKOFF_MS = 60_000;
 
   register(ch: RealtimeChannelImpl): void {
-    this.channels.set(ch.getTopic(), ch);
-    this.openSSE(ch.getTopic());
+    const topic = ch.getTopic();
+    this.channels.set(topic, ch);
+
+    // The Railway SSE shim is scoped by conversation_id. Global Supabase-style
+    // topics such as dashboard-wide workshop lists cannot be served by this
+    // endpoint and otherwise produce repeated 400 responses.
+    if (!isConversationScopedRealtimeTopic(topic)) {
+      ch.notifyStatus("CHANNEL_ERROR");
+      return;
+    }
+
+    this.openSSE(topic);
   }
 
   forceReconnect(): void {
     for (const topic of this.channels.keys()) {
+      if (!isConversationScopedRealtimeTopic(topic)) continue;
       this.closeSSE(topic);
       this.retryCounts.set(topic, 0);
       this.openSSE(topic);
@@ -887,8 +914,7 @@ class SharedSSEManager {
 
   private openSSE(topic: string): void {
     if (this.connections.has(topic)) return;
-    const token = getToken() || ANON_KEY;
-    const url = buildRealtimeSseUrl(topic, token);
+    const url = buildRealtimeSseUrl(topic);
     const es = new EventSource(url);
     this.connections.set(topic, es);
 
@@ -938,7 +964,7 @@ class SharedSSEManager {
   }
 
   private scheduleReconnect(topic: string): void {
-    if (this.retryTimers.has(topic)) return;
+    if (!isConversationScopedRealtimeTopic(topic) || this.retryTimers.has(topic)) return;
     const count = this.retryCounts.get(topic) ?? 0;
     const delay = Math.min(3_000 * Math.pow(2, count), this.MAX_BACKOFF_MS);
     this.retryCounts.set(topic, count + 1);

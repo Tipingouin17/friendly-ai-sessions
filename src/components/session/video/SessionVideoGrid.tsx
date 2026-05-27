@@ -79,6 +79,14 @@ const parseGeneratedAvatarSeed = (avatarUrl?: string | null): string | null => {
   }
 };
 
+const isPlaceholderAvatarUrl = (avatarUrl?: string | null): boolean => {
+  if (!avatarUrl) return false;
+  const normalizedUrl = avatarUrl.trim().toLowerCase();
+  return normalizedUrl === '/placeholder.svg'
+    || normalizedUrl.endsWith('/placeholder.svg')
+    || normalizedUrl.includes('placeholder');
+};
+
 const getTileShadow = (participant: SessionVideoParticipant): string => {
   if (participant.isSpeaking && participant.isAI) {
     return 'shadow-[0_0_36px_rgba(245,158,11,0.22)]';
@@ -170,7 +178,8 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
   const [avatarImageError, setAvatarImageError] = React.useState(false);
   const generatedAvatarSeed = participant.avatarSeed || parseGeneratedAvatarSeed(participant.avatarUrl);
   const isGeneratedAvatarUrl = Boolean(participant.avatarUrl?.includes('/api/avatar'));
-  const shouldRenderAvatarImage = Boolean(participant.avatarUrl && !isGeneratedAvatarUrl && !avatarImageError);
+  const isPlaceholderAvatar = isPlaceholderAvatarUrl(participant.avatarUrl);
+  const shouldRenderAvatarImage = Boolean(participant.avatarUrl && !isGeneratedAvatarUrl && !isPlaceholderAvatar && !avatarImageError);
 
   React.useEffect(() => {
     setAvatarImageError(false);
@@ -207,7 +216,7 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
         </div>
       )}
 
-      {!hasLiveStream && !participant.avatarUrl && !generatedAvatarSeed && !participant.isAI && (
+      {!hasLiveStream && (!participant.avatarUrl || isPlaceholderAvatar) && !generatedAvatarSeed && !participant.isAI && (
         <div className="absolute right-2 top-2 rounded-full border border-white/70 bg-white/85 p-1 text-slate-500 shadow-sm backdrop-blur" title="Camera preview unavailable">
           <VideoOff className="h-3.5 w-3.5" />
         </div>

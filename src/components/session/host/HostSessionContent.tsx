@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Check, Clock3, Copy, LayoutGrid, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
+import { Check, Copy, LayoutGrid, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import ParticipantAvatar from "@/components/chat/avatars/ParticipantAvatar";
@@ -63,8 +63,6 @@ interface HostSessionContentProps {
   isSessionEnded?: boolean;
   isSessionPaused?: boolean;
 }
-
-const formatEventLabel = (eventType: string): string => eventType.replace(/^mode\./, '').replace(/_/g, ' ');
 
 type TileConnectionStatus = NonNullable<SessionVideoParticipant['connectionStatus']>;
 
@@ -128,15 +126,6 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const hostCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
   const hostCameraRequestIdRef = React.useRef(0);
   const actualParticipantCount = participants.length;
-  const responseTotal = Math.max(totalParticipants, actualParticipantCount, 1);
-  const responseProgress = Math.min(100, Math.round((responseCount / responseTotal) * 100));
-  const assistantMessageCount = sessionMessages.filter((message) => message.sender === "assistant").length;
-  const participantMessageCount = sessionMessages.filter((message) => message.sender !== "assistant").length;
-  const activeModeKey = activeMode?.facilitation_mode?.mode_key;
-  const modeName = activeMode?.facilitation_mode?.display_name
-    || enabledModes.find((mode) => mode.mode_key === activeModeKey)?.display_name
-    || "Open Discussion";
-  const latestEvents = recentModeEvents.slice(0, 4);
   const stopHostCamera = React.useCallback(() => {
     hostCameraRequestIdRef.current += 1;
     hostCameraStartPromiseRef.current = null;

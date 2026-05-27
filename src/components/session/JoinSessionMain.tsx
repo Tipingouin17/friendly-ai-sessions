@@ -1,15 +1,20 @@
 /**
  * Join Session Main
  *
- * Session component for the AIfacilitator application.
+ * Participant pre-join waiting room. All displayed values come from the loaded
+ * conversation/session, live participant rows, or the participant's current
+ * local name/avatar/media choices. No mock participant rows are rendered.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, Users, Zap, Clock, BarChart2, Globe, Tag, WifiOff } from "lucide-react";
+import BoringAvatar from 'boring-avatars';
+import { AlertCircle, Users, Zap, Globe, WifiOff, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import JoinForm from "./JoinForm";
+import { Input } from "@/components/ui/input";
 import SessionFullAlert from "./SessionFullAlert";
+import PreJoinMediaCheck from './PreJoinMediaCheck';
 import { ConversationWithSession } from "@/types/database";
+import { ParticipantInfo } from "@/types/chat";
 
 interface JoinSessionMainProps {
   conversation: ConversationWithSession | null;
@@ -27,9 +32,52 @@ interface JoinSessionMainProps {
   isPreparingSession?: boolean;
   currentParticipantCount: number;
   effectiveMaxParticipants: number;
+  joinedParticipants?: ParticipantInfo[];
   onRetry: () => void;
   isTokenReady?: boolean;
 }
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+  it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+  ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+};
+
+const AVATAR_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
+
+const ParticipantAvatarStack: React.FC<{ participants: ParticipantInfo[]; totalCount: number }> = ({ participants, totalCount }) => {
+  const visibleParticipants = participants.slice(0, 3);
+  const hiddenCount = Math.max(0, totalCount - visibleParticipants.length);
+
+  if (totalCount <= 0) {
+    return <p className="text-sm text-slate-500">You may be the first participant to join.</p>;
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex -space-x-2">
+        {visibleParticipants.map((participant) => (
+          <div key={participant.id} className="h-9 w-9 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm" title={participant.name}>
+            {participant.avatar ? (
+              <img src={participant.avatar} alt={participant.name} className="h-full w-full object-cover" />
+            ) : (
+              <BoringAvatar
+                size={36}
+                name={participant.avatarSeed || participant.name}
+                variant="beam"
+                colors={AVATAR_COLORS}
+                square={false}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-sm text-slate-500">
+        {hiddenCount > 0 ? `+${hiddenCount} waiting for you` : `${totalCount} already joined`}
+      </p>
+    </div>
+  );
+};
 
 const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   conversation,
@@ -45,21 +93,14 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   isPreparingSession = false,
   currentParticipantCount,
   effectiveMaxParticipants,
+  joinedParticipants = [],
   onRetry,
   isTokenReady = true
 }) => {
   const facilitatorDetails = conversation?.sessions?.facilitator_details;
   const sessionTitle = conversation?.sessions?.title || "Workshop Session";
-  const durationMinutes: number | null = (conversation?.sessions as any)?.duration_minutes ?? null;
-  const difficultyLevel: string | null = (conversation?.sessions as any)?.difficulty_level ?? null;
-  const sessionType: string | null = (conversation?.sessions as any)?.session_type ?? null;
+  const sessionObjective = conversation?.sessions?.objective || null;
   const language: string | null = conversation?.language ?? null;
-
-  const LANGUAGE_NAMES: Record<string, string> = {
-    en: 'English', fr: 'French', de: 'German', es: 'Spanish',
-    it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
-    ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
-  };
   const languageLabel = language ? (LANGUAGE_NAMES[language.toLowerCase()] ?? language) : null;
 
   const handleJoinClick = async () => {
@@ -82,9 +123,8 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
   // ── Skeleton while conversation data loads ────────────────────────────
   if (isLoading && !conversation) {
     if (loadingTimedOut) {
-      // Backend did not respond within 20 s — show a clear error with retry button
       return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] flex items-start justify-center px-4 pt-8 pb-6 sm:items-center">
           <div className="w-full max-w-md">
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-2 mb-4">
@@ -125,126 +165,115 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
       );
     }
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 mb-4">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] flex items-start justify-center px-4 pt-8 pb-6 sm:items-center">
+        <div className="w-full max-w-5xl">
+          <div className="mb-8 flex justify-center">
+            <div className="inline-flex items-center gap-2">
               <div className="p-2 bg-indigo-600 rounded-xl">
                 <Zap className="h-5 w-5 text-white" />
               </div>
               <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
             </div>
           </div>
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Skeleton facilitator banner */}
-            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
-              <div className="space-y-1.5 flex-1">
-                <div className="h-2.5 bg-white/30 rounded animate-pulse w-1/3" />
-                <div className="h-3.5 bg-white/40 rounded animate-pulse w-1/2" />
-              </div>
+          <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-slate-200/70 lg:grid-cols-2">
+            <div className="border-b border-slate-200 p-8 lg:border-b-0 lg:border-r">
+              <div className="h-5 w-28 animate-pulse rounded bg-slate-100" />
+              <div className="mt-5 aspect-video animate-pulse rounded-2xl bg-slate-100" />
             </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-2">
-                <div className="h-6 bg-gray-100 rounded animate-pulse w-3/4" />
-                <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2" />
-              </div>
-              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
-              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
-              <div className="h-11 bg-indigo-100 rounded-xl animate-pulse" />
+            <div className="p-8">
+              <div className="h-8 w-2/3 animate-pulse rounded bg-slate-100" />
+              <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-slate-100" />
+              <div className="mt-8 h-28 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="mt-8 h-12 animate-pulse rounded-2xl bg-slate-100" />
             </div>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Powered by AIfacilitator · AI-driven workshop facilitation
-          </p>
         </div>
       </div>
     );
   }
 
+  const participantCountLabel = effectiveMaxParticipants > 0
+    ? `${currentParticipantCount} / ${effectiveMaxParticipants} joined`
+    : `${currentParticipantCount} joined`;
+  const totalForAvatarStack = Math.max(currentParticipantCount, joinedParticipants.length);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 flex items-start sm:items-center justify-center px-4 pt-6 pb-4 sm:py-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] flex items-start justify-center px-4 pt-8 pb-6 sm:items-center">
+      <div className="w-full max-w-5xl">
         {/* Brand header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="p-2 bg-indigo-600 rounded-xl">
+        <div className="mb-8 flex flex-col items-center gap-6">
+          <div className="inline-flex items-center gap-2">
+            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
           </div>
-        </div>
 
-        {/* Main card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          {/* Facilitator banner */}
           {facilitatorDetails && (
-            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 flex items-center gap-3">
+            <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-lg shadow-slate-200/70">
               {facilitatorDetails.profile_picture ? (
                 <img
                   src={facilitatorDetails.profile_picture}
                   alt={facilitatorDetails.title || "Facilitator"}
-                  className="h-10 w-10 rounded-full object-cover border-2 border-white/30"
+                  className="h-10 w-10 rounded-full object-cover"
                 />
               ) : (
-                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
                   {(facilitatorDetails.title || "F")[0]}
                 </div>
               )}
               <div>
-                <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Your Facilitator</p>
-                <p className="text-white font-semibold">{facilitatorDetails.title || "AI Facilitator"}</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Your facilitator</p>
+                <p className="text-sm font-bold text-slate-900">{facilitatorDetails.title || "AI Facilitator"}</p>
               </div>
             </div>
           )}
+        </div>
 
-          <div className="p-6">
-            {/* Session title + participant count */}
-            <div className="mb-5">
-              <h1 className="text-xl font-bold text-gray-900 mb-1">{sessionTitle}</h1>
-              <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                <Users className="h-3.5 w-3.5 shrink-0" />
-                {effectiveMaxParticipants > 0 ? (
-                  <span>{currentParticipantCount} / {effectiveMaxParticipants} participants joined</span>
-                ) : (
-                  <span>{currentParticipantCount} participant{currentParticipantCount !== 1 ? 's' : ''} joined</span>
+        {/* Main card */}
+        <div className="grid overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-slate-200/70 backdrop-blur lg:grid-cols-2">
+          <div className="border-b border-slate-200 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+            <p className="mb-5 text-xs font-bold uppercase tracking-[0.25em] text-slate-500">Your preview</p>
+            <PreJoinMediaCheck
+              conversationId={conversation?.id ?? null}
+              disabled={isJoining || !isTokenReady}
+              participantName={participantName}
+              avatarSeed={avatarSeed}
+              onAvatarChange={onAvatarChange}
+            />
+          </div>
+
+          <div className="p-6 sm:p-8 lg:p-10">
+            <div className="mb-7">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{sessionTitle}</h1>
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4" />
+                  {participantCountLabel}
+                </span>
+                {languageLabel && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Globe className="h-4 w-4" />
+                    {languageLabel}
+                  </span>
                 )}
               </div>
-
-              {/* Session metadata chips */}
-              {(durationMinutes || difficultyLevel || sessionType || languageLabel) && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {durationMinutes && (
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
-                      <Clock className="h-3 w-3 text-indigo-400" />
-                      {durationMinutes} min
-                    </span>
-                  )}
-                  {difficultyLevel && (
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1 capitalize">
-                      <BarChart2 className="h-3 w-3 text-violet-400" />
-                      {difficultyLevel}
-                    </span>
-                  )}
-                  {sessionType && (
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1 capitalize">
-                      <Tag className="h-3 w-3 text-emerald-400" />
-                      {sessionType}
-                    </span>
-                  )}
-                  {languageLabel && (
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
-                      <Globe className="h-3 w-3 text-sky-400" />
-                      {languageLabel}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Error state */}
+            {sessionObjective && (
+              <div className="mb-7 rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Session objective</p>
+                <p className="text-sm leading-6 text-slate-700">{sessionObjective}</p>
+              </div>
+            )}
+
+            <div className="mb-7">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Already joined</p>
+              <ParticipantAvatarStack participants={joinedParticipants} totalCount={totalForAvatarStack} />
+            </div>
+
             {error && (
-              <div className="p-3.5 mb-4 border border-red-100 bg-red-50 rounded-xl text-red-700">
+              <div className="p-3.5 mb-5 border border-red-100 bg-red-50 rounded-xl text-red-700">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                   <div className="flex-1">
@@ -263,9 +292,8 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
               </div>
             )}
 
-            {/* Inline preparing-session status — shown after join while AI generates welcome */}
             {isPreparingSession && (
-              <div className="mb-4 flex items-center gap-3 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+              <div className="mb-5 flex items-center gap-3 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl">
                 <div className="shrink-0">
                   <svg className="w-5 h-5 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -279,26 +307,48 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
               </div>
             )}
 
-            {/* Full or Join form */}
             {isFull ? (
               <SessionFullAlert type="full" />
             ) : (
-              <JoinForm
-                participantName={participantName}
-                onNameChange={onNameChange}
-                avatarSeed={avatarSeed}
-                onAvatarChange={onAvatarChange}
-                onJoinSession={handleJoinClick}
-                isJoining={isJoining}
-                currentParticipantCount={currentParticipantCount}
-                effectiveMaxParticipants={effectiveMaxParticipants}
-                conversationId={conversation?.id ?? null}
-              />
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                    Your name
+                  </label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your name"
+                    value={participantName}
+                    onChange={onNameChange}
+                    className="h-12 rounded-2xl border-slate-200 bg-white px-4 text-base font-medium shadow-sm"
+                    autoComplete="name"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleJoinClick}
+                  className="h-14 w-full rounded-2xl bg-indigo-600 text-base font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700"
+                  disabled={isJoining || !isTokenReady || isFull || !participantName.trim()}
+                >
+                  {isJoining ? (
+                    <span className="flex items-center justify-center">
+                      <span className="w-4 h-4 border-t-2 border-white border-solid rounded-full animate-spin mr-2"></span>
+                      Joining...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      Join Session <ArrowRight className="ml-2 h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
+                <p className="text-center text-xs text-slate-400">Your audio and video settings are saved for this session.</p>
+              </div>
             )}
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-xs text-gray-400 mt-7">
           Powered by AIfacilitator · AI-driven workshop facilitation
         </p>
       </div>

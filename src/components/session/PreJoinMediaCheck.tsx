@@ -1,5 +1,6 @@
 import React from 'react';
-import { Camera, CameraOff, Mic, MicOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import BoringAvatar from 'boring-avatars';
+import { Camera, CameraOff, Mic, MicOff, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import {
   persistParticipantMediaPreferences,
   readParticipantMediaPreferences,
@@ -9,6 +10,9 @@ import {
 interface PreJoinMediaCheckProps {
   conversationId: number | null;
   disabled?: boolean;
+  participantName: string;
+  avatarSeed: string;
+  onAvatarChange: () => void;
 }
 
 type MediaStatus = 'idle' | 'starting' | 'on' | 'off' | 'blocked' | 'unsupported';
@@ -20,7 +24,15 @@ const createEmptyAnalyser = () => ({
   data: null as Uint8Array | null,
 });
 
-const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, disabled = false }) => {
+const AVATAR_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
+
+const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({
+  conversationId,
+  disabled = false,
+  participantName,
+  avatarSeed,
+  onAvatarChange,
+}) => {
   const initialPreferences = React.useMemo<ParticipantMediaPreferences>(
     () => readParticipantMediaPreferences(conversationId),
     [conversationId]
@@ -237,63 +249,80 @@ const PreJoinMediaCheck: React.FC<PreJoinMediaCheckProps> = ({ conversationId, d
 
   const cameraLabel = cameraStatus === 'starting' ? 'Starting…' : cameraEnabled ? 'Camera on' : 'Camera off';
   const microphoneLabel = microphoneStatus === 'starting' ? 'Testing…' : microphoneEnabled ? 'Mic on' : 'Mic off';
+  const displayName = participantName.trim() || 'You';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 sm:p-3.5">
-      <div className="mb-2 flex items-start justify-between gap-3 sm:mb-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">Check your camera and microphone</p>
-          <p className="mt-0.5 text-xs text-slate-500 sm:block">Your choices are remembered for this session before you join.</p>
-        </div>
-        {(cameraEnabled || microphoneEnabled) && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
-            <CheckCircle2 className="h-3 w-3" /> Ready
-          </span>
-        )}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-inner">
         {cameraEnabled ? (
           <video ref={videoRef} muted playsInline autoPlay disablePictureInPicture className="aspect-video w-full object-cover" />
         ) : (
-          <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 text-slate-300">
-            <CameraOff className="h-8 w-8" />
-            <span className="text-xs font-medium">Camera preview is off</span>
+          <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-slate-50 text-slate-500">
+            <div className="rounded-full border border-white bg-white p-2 shadow-sm">
+              <BoringAvatar
+                size={88}
+                name={avatarSeed || displayName}
+                variant="beam"
+                colors={AVATAR_COLORS}
+                square={false}
+              />
+            </div>
+            <p className="text-sm font-medium text-slate-500">Camera is off — avatar shown to others</p>
           </div>
         )}
+
+        <span className="absolute bottom-4 left-4 max-w-[45%] truncate rounded-full bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+          {displayName}
+        </span>
+        <button
+          type="button"
+          onClick={onAvatarChange}
+          disabled={disabled}
+          className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl bg-slate-900/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur transition hover:bg-slate-900/70 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Change avatar
+        </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           disabled={disabled || cameraStatus === 'starting'}
           onClick={cameraEnabled ? turnCameraOff : startCamera}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${cameraEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
+          className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${cameraEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
         >
-          {cameraEnabled ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
+          {cameraEnabled ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4 text-rose-400" />}
           {cameraLabel}
         </button>
         <button
           type="button"
           disabled={disabled || microphoneStatus === 'starting'}
           onClick={microphoneEnabled ? turnMicrophoneOff : startMicrophone}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${microphoneEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
+          className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${microphoneEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
         >
-          {microphoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          {microphoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose-400" />}
           {microphoneLabel}
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500">
-        <Mic className={`h-3.5 w-3.5 ${microphoneEnabled ? 'text-emerald-600' : 'text-slate-400'}`} />
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <Mic className={`h-4 w-4 ${microphoneEnabled ? 'text-emerald-600' : 'text-slate-400'}`} />
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
           <div className="h-full rounded-full bg-emerald-500 transition-all duration-100" style={{ width: `${microphoneEnabled ? Math.max(8, micLevel) : 0}%` }} />
         </div>
-        <span className="w-16 text-right">{microphoneEnabled ? 'Speak now' : 'Mic off'}</span>
+        <span className="w-20 text-right">{microphoneEnabled ? 'Speak now' : 'Muted'}</span>
       </div>
 
+      {(cameraEnabled || microphoneEnabled) && (
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Media ready
+        </div>
+      )}
+
       {mediaError && (
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{mediaError}</span>
         </div>

@@ -105,7 +105,8 @@ const JoinSessionContainer = () => {
     isLoading,
     error,
     handleJoinSession,
-    isTokenReady
+    isTokenReady,
+    joinedParticipants
   } = useJoinSessionData(conversationId, {
     defaultParticipantName,
     defaultAvatarSeed
@@ -255,6 +256,7 @@ const JoinSessionContainer = () => {
       isPreparingSession={false}
       currentParticipantCount={currentParticipantCount}
       effectiveMaxParticipants={effectiveMaxParticipants}
+      joinedParticipants={joinedParticipants}
       onRetry={handleRetry}
     />
   );

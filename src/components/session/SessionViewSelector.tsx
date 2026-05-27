@@ -200,6 +200,15 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (props.error) {
+
+    const languageNames: Record<string, string> = {
+      en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+      it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+      ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+    };
+    const language = props.conversation?.language;
+    const languageLabel = language ? (languageNames[String(language).toLowerCase()] ?? String(language)) : null;
+
     return (
       <ParticipantLoadingShell
         phase="error"
@@ -258,10 +267,24 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
       phase = 'connecting';
     }
 
+
+    const languageNames: Record<string, string> = {
+      en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+      it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+      ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+    };
+    const language = props.conversation?.language;
+    const languageLabel = language ? (languageNames[String(language).toLowerCase()] ?? String(language)) : null;
+
     return (
       <ParticipantLoadingShell
         phase={phase}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        facilitatorAvatar={props.conversation.sessions?.facilitator_details?.profile_picture}
+        sessionTitle={props.conversation.sessions?.title}
+        sessionObjective={props.conversation.sessions?.objective}
+        languageLabel={languageLabel}
+        participants={props.participants}
         currentParticipantCount={props.conversation?.current_participants || 0}
         maxParticipants={props.conversation?.participants || 0}
         onRetryGeneration={timeoutReached ? waitForWelcomeMessage : undefined}

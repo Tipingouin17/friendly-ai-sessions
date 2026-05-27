@@ -17,6 +17,7 @@ import { ConversationWithSession } from "@/types/database";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
+import { useParticipantDatabase } from "@/hooks/useParticipantDatabase";
 
 interface UseJoinSessionDataOptions {
   defaultParticipantName?: string;
@@ -56,6 +57,8 @@ export function useJoinSessionData(
   // If the host didn't set a limit (null/0), the session has unlimited capacity.
 
   // Use our hooks
+  const { participants: joinedParticipants } = useParticipantDatabase(conversationId);
+
   const {
     currentParticipantCount,
     maxParticipantsForSession,
@@ -184,6 +187,7 @@ export function useJoinSessionData(
     error,
     handleJoinSession,
     existingSessionData,
-    isTokenReady
+    isTokenReady,
+    joinedParticipants: joinedParticipants.filter(participant => !participant.isHost)
   };
 }

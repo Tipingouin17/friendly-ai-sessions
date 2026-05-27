@@ -6743,9 +6743,9 @@ async def edge_function(func_name: str, request: Request):
                         ),
                         existing AS (
                             SELECT sp.participant_id
-                            FROM public.session_participants sp
-                            WHERE sp.conversation_id = $1
-                              AND $6::text IS NOT NULL
+                            FROM conv c
+                            JOIN public.session_participants sp ON sp.conversation_id = c.id
+                            WHERE $6::text IS NOT NULL
                               AND sp.device_id = $6::text
                             LIMIT 1
                         ),
@@ -6753,8 +6753,8 @@ async def edge_function(func_name: str, request: Request):
                             SELECT
                                 COALESCE(MAX(sp.participant_id), 0) AS max_participant_id,
                                 COUNT(*) FILTER (WHERE sp.is_host = false) AS non_host_count
-                            FROM public.session_participants sp
-                            WHERE sp.conversation_id = $1
+                            FROM conv c
+                            LEFT JOIN public.session_participants sp ON sp.conversation_id = c.id
                         ),
                         decision AS (
                             SELECT

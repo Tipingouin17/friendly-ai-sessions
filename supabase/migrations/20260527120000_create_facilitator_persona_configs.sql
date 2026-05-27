@@ -98,7 +98,7 @@ create policy "Facilitator owners can create persona configs"
       select 1
       from public.facilitators f
       where f.id = facilitator_persona_configs.facilitator_id
-        and f.user_id = auth.uid()::text
+        and f.user_id = auth.uid()
     )
   );
 
@@ -114,7 +114,7 @@ create policy "Facilitator owners can update persona configs"
       select 1
       from public.facilitators f
       where f.id = facilitator_persona_configs.facilitator_id
-        and f.user_id = auth.uid()::text
+        and f.user_id = auth.uid()
     )
   )
   with check (
@@ -122,7 +122,7 @@ create policy "Facilitator owners can update persona configs"
       select 1
       from public.facilitators f
       where f.id = facilitator_persona_configs.facilitator_id
-        and f.user_id = auth.uid()::text
+        and f.user_id = auth.uid()
     )
   );
 
@@ -138,6 +138,6 @@ create policy "Facilitator owners can delete persona configs"
       select 1
       from public.facilitators f
       where f.id = facilitator_persona_configs.facilitator_id
-        and f.user_id = auth.uid()::text
+        and f.user_id = auth.uid()
     )
   );

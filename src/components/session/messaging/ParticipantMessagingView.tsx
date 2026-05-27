@@ -878,17 +878,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       <div className="flex min-h-0 flex-1 gap-2 p-2 md:gap-3 md:p-3">
         <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] md:rounded-[2rem]">
           <section className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4">
-            <div className={`session-soft-panel rounded-[1.25rem] border border-slate-200 p-2 md:rounded-[1.75rem] md:p-3 ${aiIsSpeaking ? 'session-speaking-ring animate-ai-speaking' : ''}`}>
-              <div className="h-[clamp(170px,30dvh,340px)] overflow-hidden rounded-[1rem] md:h-[min(42vh,420px)] md:rounded-[1.35rem]">
-                <SessionVideoGrid
-                  participants={participantVideoTiles}
-                  variant="participant-sidebar"
-                  emptyLabel="Video tiles will appear as participants join the session."
-                />
-              </div>
-            </div>
-
-            <div className="session-soft-panel mt-2 rounded-2xl p-3 md:mt-3 md:p-4">
+            <div className="session-soft-panel rounded-2xl p-3 md:p-4">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Current question</span>
                 <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">

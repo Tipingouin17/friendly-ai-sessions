@@ -144,6 +144,36 @@ const parseParticipantIdFromPeerId = (peerId: string): number | null => {
   return match ? Number(match[1]) : null;
 };
 
+const getRemoteOfferMediaDirection = (connection: RTCPeerConnection, kind: 'audio' | 'video'): RTCRtpTransceiverDirection | null => {
+  const remoteDescription = connection.remoteDescription;
+  if (remoteDescription?.type !== 'offer' || !remoteDescription.sdp) return null;
+
+  const mediaSections = remoteDescription.sdp.split(/\r?\nm=/);
+  const section = mediaSections.find((candidate, index) => {
+    const normalizedSection = index === 0 ? candidate : `m=${candidate}`;
+    return normalizedSection.startsWith(`m=${kind} `);
+  });
+  if (!section) return null;
+
+  const direction = section.match(/(?:^|\r?\n)a=(sendrecv|sendonly|recvonly|inactive)(?:\r?\n|$)/)?.[1];
+  if (direction === 'sendrecv' || direction === 'sendonly' || direction === 'recvonly' || direction === 'inactive') return direction;
+  return 'sendrecv';
+};
+
+const resolveTransceiverDirection = (
+  connection: RTCPeerConnection,
+  kind: 'audio' | 'video',
+  hasLocalTrack: boolean,
+): RTCRtpTransceiverDirection => {
+  const remoteOfferDirection = getRemoteOfferMediaDirection(connection, kind);
+  if (!remoteOfferDirection) return hasLocalTrack ? 'sendrecv' : 'recvonly';
+
+  if (remoteOfferDirection === 'sendrecv') return hasLocalTrack ? 'sendrecv' : 'recvonly';
+  if (remoteOfferDirection === 'sendonly') return 'recvonly';
+  if (remoteOfferDirection === 'recvonly') return hasLocalTrack ? 'sendonly' : 'inactive';
+  return 'inactive';
+};
+
 const buildIceServers = (): RTCIceServer[] => {
   const turnUrls = (import.meta.env.VITE_WEBRTC_TURN_URLS as string | undefined)?.trim();
   const turnUsername = (import.meta.env.VITE_WEBRTC_TURN_USERNAME as string | undefined)?.trim();
@@ -354,7 +384,7 @@ export function useWebRTCSession({
 
     try {
       await videoTransceiver.sender.replaceTrack(videoTrack);
-      const nextDirection: RTCRtpTransceiverDirection = videoTrack ? 'sendrecv' : 'recvonly';
+      const nextDirection = resolveTransceiverDirection(connection, 'video', Boolean(videoTrack));
       if (!videoTransceiver.stopped && videoTransceiver.direction !== nextDirection) {
         videoTransceiver.direction = nextDirection;
       }
@@ -377,7 +407,7 @@ export function useWebRTCSession({
       record.audioTransceiver = audioTransceiver;
 
       await audioTransceiver.sender.replaceTrack(audioTrack);
-      const nextAudioDirection: RTCRtpTransceiverDirection = audioTrack ? 'sendrecv' : 'recvonly';
+      const nextAudioDirection = resolveTransceiverDirection(connection, 'audio', Boolean(audioTrack));
       if (!audioTransceiver.stopped && audioTransceiver.direction !== nextAudioDirection) {
         audioTransceiver.direction = nextAudioDirection;
       }

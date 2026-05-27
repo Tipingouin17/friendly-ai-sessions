@@ -316,7 +316,6 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const facilitatorName = facilitatorDetails?.title || "AI Facilitator";
   const maxParticipants = conversationData?.participants || Math.max(actualParticipantCount, 1);
   const joinedParticipantCount = actualParticipantCount;
-  const joinedProgress = maxParticipants > 0 ? Math.min(100, Math.round((joinedParticipantCount / maxParticipants) * 100)) : 0;
   const joinToken = (conversationData as any)?.join_token;
   const sessionInviteLink = React.useMemo(() => {
     if (!currentConversationId || typeof window === 'undefined') return '';
@@ -328,7 +327,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const participantRowsToShow = Math.max(1, Math.min(waitingParticipants.length || maxParticipants, 6));
   const participantListViewportHeight = waitingParticipants.length > 0
     ? Math.min(420, Math.max(84, participantRowsToShow * 72))
-    : 220;
+    : 156;
 
   const handleCopyInviteLink = React.useCallback(async () => {
     if (!sessionInviteLink) return;
@@ -347,13 +346,13 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 text-slate-950">
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
-          <section className="mx-auto mb-7 w-full max-w-3xl text-center">
-            <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
+          <section className="mx-auto mb-7 flex w-full max-w-3xl flex-col items-center text-center" style={{ textAlign: 'center' }}>
+            <div className="mb-4 inline-flex items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
               Waiting Room
             </div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{sessionTitle}</h1>
-            <p className="mt-2 text-base text-slate-500">
+            <h1 className="mx-auto w-full text-center font-display text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{sessionTitle}</h1>
+            <p className="mx-auto mt-2 w-full text-center text-base text-slate-500">
               Facilitated by <span className="font-semibold text-amber-700">{facilitatorName}</span>
             </p>
           </section>
@@ -446,7 +445,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                   })}
                 </div>
               ) : (
-                <div className="flex h-full min-h-[220px] flex-col items-center justify-center px-6 py-10 text-center">
+                <div className="flex h-full min-h-[156px] flex-col items-center justify-center px-6 py-8 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
                     <Users className="h-7 w-7" />
                   </div>
@@ -458,9 +457,6 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           </section>
 
           <div className="mx-auto mt-7 w-full max-w-3xl">
-            <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-200">
-              <div className="h-full rounded-full bg-indigo-600 transition-all duration-500" style={{ width: `${joinedProgress}%` }} />
-            </div>
             <button
               type="button"
               onClick={onSessionStarted}

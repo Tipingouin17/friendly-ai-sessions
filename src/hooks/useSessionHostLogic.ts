@@ -146,6 +146,11 @@ export function useSessionHostLogic() {
         }
     }, [hasExplicitStartMarker, hostSessionStartedOverride]);
 
+    useEffect(() => {
+        if (!isDataLoaded || effectiveIsSessionStarted) return;
+        void triggerAutoStart(currentCount, maxCount);
+    }, [currentCount, effectiveIsSessionStarted, isDataLoaded, maxCount, triggerAutoStart]);
+
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);
     const [hostViewReady, setHostViewReady] = useState(false);

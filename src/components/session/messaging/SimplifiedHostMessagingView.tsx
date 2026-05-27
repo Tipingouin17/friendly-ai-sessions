@@ -221,23 +221,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       {isSessionEnded && <span className="session-chip border-slate-200 bg-white/80 text-slate-700">Ended</span>}
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[320px]">
-                    <Button
-                      onClick={handleContinueNormal}
-                      disabled={!onTriggerFacilitatorResponse || isSending || isSessionEnded}
-                      className="h-10 justify-center bg-indigo-600 text-xs font-semibold text-white shadow-sm shadow-indigo-100 hover:bg-indigo-500"
-                    >
-                      {isSending ? 'Generating…' : isWaitingForResponses ? 'Continue now' : 'Generate next turn'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsInstructionExpanded(true)}
-                      className="h-10 border-indigo-200 bg-white/80 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
-                    >
-                      Steer privately
-                    </Button>
-                  </div>
                 </div>
               </div>
 

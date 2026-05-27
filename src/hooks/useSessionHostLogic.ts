@@ -53,6 +53,9 @@ export function useSessionHostLogic() {
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
     const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
+    const hasPersistedStartMarker = Boolean(
+        conversationData?.session_started || (conversationData as any)?.session_started_at
+    );
 
     const handleSessionStarted = useCallback(async () => {
         try {
@@ -79,7 +82,7 @@ export function useSessionHostLogic() {
         cleanup: cleanupAutoStart
     } = useAutoStartSession({
         onStartSession: handleSessionStarted,
-        isSessionStarted: hostSessionStartedOverride,
+        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker),
         maxParticipants: Math.max(conversationData?.participants || 0, 0),
     });
 
@@ -103,9 +106,8 @@ export function useSessionHostLogic() {
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionStarted: () => {
-            // Raw session_started can still be flipped by legacy full-capacity paths.
-            // The host moves live only through the explicit Start Session handler or
-            // through a persisted session_started_at marker from that handler.
+            // The manager's persisted session_started flag is now a valid live-state
+            // signal, including older deployments without session_started_at.
         },
         onSessionFull: (currentCount, maxCount) => {
             void triggerAutoStart(currentCount, maxCount);
@@ -132,19 +134,17 @@ export function useSessionHostLogic() {
         conversationData
     });
 
-    const hasExplicitStartMarker = Boolean(
-        conversationData?.session_started && (conversationData as any)?.session_started_at
-    );
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
-        hasExplicitStartMarker
+        hasPersistedStartMarker ||
+        isManagerSessionStarted
     );
 
     useEffect(() => {
-        if (hasExplicitStartMarker && !hostSessionStartedOverride) {
+        if ((hasPersistedStartMarker || isManagerSessionStarted) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [hasExplicitStartMarker, hostSessionStartedOverride]);
+    }, [hasPersistedStartMarker, hostSessionStartedOverride, isManagerSessionStarted]);
 
     useEffect(() => {
         if (!isDataLoaded || effectiveIsSessionStarted) return;

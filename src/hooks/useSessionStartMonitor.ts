@@ -17,8 +17,9 @@ export const useSessionStartMonitor = ({
   
   useEffect(() => {
     if (conversation) {
-      // Check if the session was explicitly started by the host in the DB.
-      const isStarted = Boolean(conversation.session_started && (conversation as any).session_started_at);
+      // Check if the session was started in the DB. Newer schemas may also
+      // include session_started_at, but session_started is the cross-deployment flag.
+      const isStarted = Boolean(conversation.session_started);
       setIsSessionStartedInDB(isStarted);
     }
   }, [conversation]);

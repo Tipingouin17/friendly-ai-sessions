@@ -8,6 +8,7 @@ import { Database } from "@/integrations/supabase/types";
 
 export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"] & {
   session_started: boolean;
+  session_started_at?: string | null;
   is_session_ended?: boolean;
   participants: number;
 };

@@ -55,8 +55,9 @@ export const useSessionMonitoring = ({
     if (conversation) {
       hasMonitoredSessionRef.current = true;
       
-      // Check if the session was explicitly started by the host in the DB.
-      const isStarted = Boolean(conversation.session_started && (conversation as any).session_started_at);
+      // Check if the session was started in the DB. Newer schemas may also
+      // include session_started_at, but session_started is the cross-deployment flag.
+      const isStarted = Boolean(conversation.session_started);
       
       // Only update state if different to prevent render loops
       if (isStarted !== isSessionStartedInDB) {

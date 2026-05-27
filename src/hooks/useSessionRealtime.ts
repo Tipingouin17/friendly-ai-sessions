@@ -55,8 +55,9 @@ export const useSessionRealtime = ({
     
     // Check initial state
     if (conversation) {
-      // Check if session is already started
-      if (conversation.session_started && (conversation as any).session_started_at && !sessionStartedCalled) {
+      // Check if session is already started. Newer schemas may include session_started_at,
+      // but session_started is the durable cross-deployment flag that moves participants live.
+      if (conversation.session_started && !sessionStartedCalled) {
         setSessionStartedCalled(true);
         if (onSessionStarted) onSessionStarted();
       }
@@ -78,7 +79,7 @@ export const useSessionRealtime = ({
           
           if (payload.new) {
             // Handle session started
-            if (payload.new.session_started && (payload.new as any).session_started_at && !sessionStartedCalled) {
+            if (payload.new.session_started && !sessionStartedCalled) {
               setSessionStartedCalled(true);
               if (onSessionStarted) onSessionStarted();
             }
@@ -164,7 +165,7 @@ export const useSessionRealtime = ({
   useEffect(() => {
     if (conversation && currentConversationId) {
       // Check for session status
-      if (conversation.session_started && (conversation as any).session_started_at && !sessionStartedCalled) {
+      if (conversation.session_started && !sessionStartedCalled) {
         setSessionStartedCalled(true);
         if (onSessionStarted && typeof onSessionStarted === 'function') {
           onSessionStarted();

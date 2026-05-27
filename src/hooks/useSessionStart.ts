@@ -51,13 +51,27 @@ export const useSessionStart = ({
       
       // First, mark the session as started in the database
       const dbUpdateStart = performance.now();
-      const { error: updateError } = await api
+      let { error: updateError } = await api
         .from('conversations')
         .update({ 
           session_started: true,
           session_started_at: new Date().toISOString()
         })
         .eq('id', conversationId);
+
+      const updateErrorText = updateError
+        ? [updateError.message, updateError.details, updateError.hint, updateError.code].filter(Boolean).join(' ').toLowerCase()
+        : '';
+
+      if (updateErrorText.includes('session_started_at') && (updateErrorText.includes('column') || updateErrorText.includes('does not exist'))) {
+        logger.warn('session_started_at column is unavailable; falling back to session_started only.');
+        ({ error: updateError } = await api
+          .from('conversations')
+          .update({ 
+            session_started: true
+          })
+          .eq('id', conversationId));
+      }
         
       const dbUpdateDuration = performance.now() - dbUpdateStart;
       logger.category('session', `💾 Database update completed in ${dbUpdateDuration.toFixed(2)}ms`);

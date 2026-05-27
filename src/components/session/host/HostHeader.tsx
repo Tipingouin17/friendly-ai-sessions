@@ -119,10 +119,8 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   }, [facilitatorInfo?.profile_picture, facilitatorInfo?.id]);
 
   const isSessionEnded = conversation?.is_session_ended || false;
-  const hasExplicitStartMarker = Boolean(
-    conversation?.session_started && (conversation as any)?.session_started_at
-  );
-  const isSessionStarted = isExplicitSessionStarted ?? hasExplicitStartMarker;
+  const hasPersistedStart = Boolean(conversation?.session_started || (conversation as any)?.session_started_at);
+  const isSessionStarted = isExplicitSessionStarted ?? hasPersistedStart;
   const isBusy = isClosing || isStopping;
 
   /* ── Action buttons (shared between layouts) ── */

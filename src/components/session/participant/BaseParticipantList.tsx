@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ParticipantInfo, Message } from "@/types/chat";
-import { Users, Search, X } from "lucide-react";
+import { Users, Search, Hand } from "lucide-react";
 import { useParticipantRemoval } from "@/hooks/useParticipantRemoval";
 import { useParticipantRealtime } from "@/hooks/useParticipantRealtime";
 import ParticipantListItem from "@/components/session/participant/ParticipantListItem";
@@ -45,6 +45,8 @@ const ParticipantPanelContent: React.FC<{
   onSearchChange: (v: string) => void;
   isLoadingParticipants: boolean;
   filteredParticipants: ParticipantInfo[];
+  responseRate: number;
+  waitingCount: number;
   removeParticipant: (id: number) => void;
   isRemoving: number | null;
   getParticipantMessageCount: (id: number) => number;
@@ -52,6 +54,7 @@ const ParticipantPanelContent: React.FC<{
   showMessageInput: boolean;
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
   effectiveParticipants: ParticipantInfo[];
+  isHostView: boolean;
 }> = ({
   title,
   actualParticipantCount,
@@ -60,6 +63,8 @@ const ParticipantPanelContent: React.FC<{
   onSearchChange,
   isLoadingParticipants,
   filteredParticipants,
+  responseRate,
+  waitingCount,
   removeParticipant,
   isRemoving,
   getParticipantMessageCount,
@@ -67,39 +72,61 @@ const ParticipantPanelContent: React.FC<{
   showMessageInput,
   onSendMessage,
   effectiveParticipants,
+  isHostView,
 }) => (
-  <div className="flex flex-col h-full">
+  <div className={`flex h-full min-h-0 flex-col bg-white ${isHostView ? 'rounded-none' : ''}`}>
     {/* Header */}
-    <div className="px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <Users className="h-4 w-4 text-indigo-400" />
-          {title}
+    <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="flex min-w-0 items-center gap-2.5 text-lg font-bold tracking-tight text-slate-950">
+          <Users className="h-4.5 w-4.5 shrink-0 text-indigo-500" />
+          <span className="truncate">{title}</span>
         </h3>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-          {actualParticipantCount}/{maxParticipants || "∞"}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {waitingCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+              <Hand className="h-3.5 w-3.5" />
+              {waitingCount}
+            </span>
+          )}
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-600 shadow-sm shadow-indigo-100">
+            {actualParticipantCount}/{maxParticipants || "∞"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mb-4 space-y-2">
+        <div className="flex items-center justify-between text-sm text-slate-500">
+          <span>Response rate</span>
+          <span className="font-semibold text-emerald-600">{responseRate}%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${responseRate}%` }}
+          />
+        </div>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
-          placeholder="Search participants…"
+          placeholder="Search participants..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-8 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white"
+          className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11 text-base text-slate-700 placeholder:text-slate-400 focus:bg-white"
         />
       </div>
     </div>
 
     {/* List */}
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-4">
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="px-4 py-4">
         {isLoadingParticipants ? (
           <ParticipantListSkeleton count={actualParticipantCount || 1} />
         ) : filteredParticipants.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filteredParticipants.map((participant) => (
               <ParticipantListItem
                 key={participant.id}
@@ -125,7 +152,7 @@ const ParticipantPanelContent: React.FC<{
 
     {/* Message Input */}
     {showMessageInput && onSendMessage && (
-      <div className="border-t border-gray-200">
+      <div className="shrink-0 border-t border-slate-200 bg-white shadow-[0_-10px_28px_rgba(15,23,42,0.04)]">
         <AdminMessageInput
           onSendMessage={onSendMessage}
           participants={effectiveParticipants}
@@ -212,6 +239,11 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   });
 
   const actualParticipantCount = effectiveParticipants.length;
+  const participantResponseCount = effectiveParticipants.filter(participant => getParticipantMessageCount(participant.id) > 0).length;
+  const responseRate = actualParticipantCount > 0
+    ? Math.round((participantResponseCount / actualParticipantCount) * 100)
+    : 0;
+  const waitingCount = Math.max(actualParticipantCount - participantResponseCount, 0);
 
   const panelProps = {
     title,
@@ -221,6 +253,8 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
     onSearchChange: setSearchTerm,
     isLoadingParticipants,
     filteredParticipants,
+    responseRate,
+    waitingCount,
     removeParticipant,
     isRemoving,
     getParticipantMessageCount,
@@ -228,6 +262,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
     showMessageInput,
     onSendMessage,
     effectiveParticipants,
+    isHostView,
   };
 
   return (
@@ -246,7 +281,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
       </div>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" className="p-0 w-[85vw] max-w-sm flex flex-col">
+        <SheetContent side="right" className="flex w-[min(92vw,24rem)] flex-col p-0">
           <SheetHeader className="sr-only">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
@@ -254,8 +289,11 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
         </SheetContent>
       </Sheet>
 
-      {/* ── Desktop: fixed sidebar ── */}
-      <div className="w-72 bg-white m-3 rounded-r-2xl border border-slate-200 shadow-sm flex-col h-[calc(100%-1.5rem)] hidden md:flex overflow-hidden">
+      {/* ── Desktop: full-height rail ── */}
+      <div className={isHostView
+        ? "hidden h-full min-h-0 w-full flex-col overflow-hidden bg-white md:flex"
+        : "m-3 hidden h-[calc(100%-1.5rem)] w-[clamp(18rem,22vw,22rem)] min-w-[18rem] flex-col overflow-hidden rounded-r-3xl border border-slate-200 bg-white shadow-sm md:flex"
+      }>
         <ParticipantPanelContent {...panelProps} />
       </div>
     </>

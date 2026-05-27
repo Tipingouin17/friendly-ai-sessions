@@ -8,7 +8,7 @@
 import React from 'react';
 import { ParticipantInfo } from "@/types/chat";
 import { getParticipantColor } from "@/utils/sessionHelpers";
-import { X, Crown, Loader2, MessageSquare } from "lucide-react";
+import { X, Crown, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,68 +50,60 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
     return `${Math.round(minutesSinceActive / 60)}h ago`;
   })();
 
-  // Engagement level colour for message count badge
-  const engagementBadgeClass = (() => {
-    if (messageCount === 0) return 'bg-slate-100 text-slate-400';
-    if (messageCount < 3) return 'bg-indigo-100 text-indigo-600';
-    if (messageCount < 7) return 'bg-violet-100 text-violet-600';
-    return 'bg-emerald-100 text-emerald-700';
-  })();
+  const responseLabel = `${messageCount} resp · ${activityLabel}`;
+  const hasResponded = messageCount > 0;
 
   const displayName = participant.name || `Participant ${participant.id}`;
 
   return (
-    <div className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+    <div className="group relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-slate-50 sm:px-4">
       {/* Avatar */}
       <div className="relative shrink-0">
         {participant.isHost ? (
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-11 w-11">
             {participant.avatar && <AvatarImage src={participant.avatar} alt={displayName} />}
             <AvatarFallback className="bg-indigo-100 text-indigo-600">
-              <Crown className="h-3.5 w-3.5" />
+              <Crown className="h-4 w-4" />
             </AvatarFallback>
           </Avatar>
         ) : participant.avatar ? (
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-11 w-11">
             <AvatarImage src={participant.avatar} alt={displayName} />
-            <AvatarFallback className="p-0 bg-transparent"><InlineAvatar name={displayName} size="md" /></AvatarFallback>
+            <AvatarFallback className="p-0 bg-transparent"><InlineAvatar name={displayName} size="lg" /></AvatarFallback>
           </Avatar>
         ) : (
-          <InlineAvatar name={displayName} size="md" />
+          <InlineAvatar name={displayName} size="lg" />
         )}
         {/* Activity dot */}
-        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${activityDotClass}`} />
+        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${activityDotClass}`} />
       </div>
 
       {/* Name + activity */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="text-xs font-semibold text-slate-800 truncate">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-semibold text-slate-950 sm:text-base">
             {displayName}
           </span>
           {participant.isHost && (
-            <span className="text-[10px] text-indigo-500 font-medium shrink-0">(Host)</span>
+            <span className="shrink-0 text-[10px] font-medium text-indigo-500">(Host)</span>
           )}
         </div>
-        <span className="text-[10px] text-slate-400">{activityLabel}</span>
+        <span className="block truncate text-xs text-slate-500 sm:text-sm">{responseLabel}</span>
       </div>
 
-      {/* Message count badge */}
-      {messageCount > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${engagementBadgeClass}`}>
-                <MessageSquare className="h-2.5 w-2.5" />
-                {messageCount}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>{messageCount} message{messageCount !== 1 ? 's' : ''} sent</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {/* Response status */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs ${hasResponded ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-300'}`}>
+              {hasResponded ? <Check className="h-4 w-4" /> : '·'}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>{hasResponded ? `${messageCount} response${messageCount !== 1 ? 's' : ''}` : 'No response yet'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {/* Remove button */}
       {!participant.isHost && (
@@ -121,13 +113,13 @@ const ParticipantListItem: React.FC<ParticipantListItemProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                className="absolute right-3 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full p-0 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                 onClick={() => !isRemoving && onRemove(participant.id)}
                 disabled={isRemoving}
               >
                 {isRemoving
-                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                  : <X className="h-3 w-3" />
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <X className="h-3.5 w-3.5" />
                 }
               </Button>
             </TooltipTrigger>

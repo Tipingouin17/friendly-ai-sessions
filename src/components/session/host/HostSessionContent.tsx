@@ -468,14 +468,14 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={56} minSize={42} className="min-h-0">
+        <Panel defaultSize={54} minSize={40} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200">
             {isSessionStarted && (
-            <section className="session-avatar-stage shrink-0 border-b border-slate-200 p-3" aria-label="Host multi-video gallery">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
+            <section className="session-avatar-stage flex h-full min-h-0 flex-col p-4" aria-label="Host multi-video gallery">
+              <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Video room</p>
-                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to the room gallery.</p>
+                  <p className="truncate text-xs text-slate-500">Spotlight the facilitator or switch to the room gallery.</p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
@@ -513,22 +513,22 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               )}
 
               {videoLayout === 'gallery' ? (
-                <div>
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <SessionVideoGrid
                     participants={hostVideoParticipants}
                     variant="host-gallery"
                     showResponseStatus
                     onPin={setPinnedTileId}
-                    className="max-h-[360px] overflow-y-auto pr-1"
+                    className="h-full min-h-0 overflow-y-auto pr-1"
                   />
                 </div>
               ) : (
-                <div>
+                <div className="flex min-h-0 flex-1 flex-col">
                   <SessionVideoTile
                     participant={featuredVideoParticipant}
                     variant="spotlight"
                     showResponseStatus
-                    className="max-h-[300px]"
+                    className="min-h-[260px] flex-1"
                   />
                   <SessionVideoGrid
                     participants={videoStripParticipants}
@@ -536,7 +536,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                     showResponseStatus
                     onPin={setPinnedTileId}
                     emptyLabel="Participant thumbnails will appear here as people join."
-                    className="mt-3"
+                    className="mt-3 shrink-0"
                   />
                 </div>
               )}
@@ -550,7 +550,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={20} minSize={18} maxSize={30} className="min-h-0">
+        <Panel defaultSize={22} minSize={20} maxSize={32} className="min-h-0">
           <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[2rem]">
             <SimplifiedHostMessagingView
               messages={sessionMessages || []}

@@ -37,9 +37,6 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
     setMessage('');
   };
 
-  const recipientName = recipient === 'all'
-    ? 'all participants'
-    : participants.find(p => String(p.id) === recipient)?.name || 'selected participant';
 
   return (
     <div className="px-3 py-3 border-t border-slate-200 bg-white space-y-2">
@@ -80,9 +77,6 @@ const AdminMessageInput: React.FC<AdminMessageInputProps> = ({
         </Button>
       </div>
 
-      <p className="text-[10px] text-slate-400">
-        Sending to <span className="font-medium text-slate-600">{recipientName}</span>
-      </p>
     </div>
   );
 };

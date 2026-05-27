@@ -132,6 +132,12 @@ const getParticipantIdFromUrl = (): number | null => {
   return Number.isFinite(parsedParticipantId) && parsedParticipantId > 0 ? parsedParticipantId : null;
 };
 
+const getAvatarSeedFromUrl = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const avatarSeed = new URLSearchParams(window.location.search).get('avatarSeed')?.trim();
+  return avatarSeed || null;
+};
+
 type LegacyActiveModeFields = {
   name?: string | null;
   mode_key?: string | null;
@@ -313,6 +319,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const firstKnownParticipantId = activeParticipants.length === 1 ? activeParticipants[0]?.id : null;
     return resolvePositiveParticipantId(currentUserParticipantId, currentParticipant, urlParticipantId, firstKnownParticipantId) ?? 1;
   }, [activeParticipants, currentParticipant, currentUserParticipantId]);
+  const currentParticipantAvatarSeed = React.useMemo(() => getAvatarSeedFromUrl(), []);
 
   const persistedMediaPreferences = React.useMemo(
     () => readParticipantMediaPreferences(conversationId),
@@ -627,6 +634,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     };
   }, []);
 
+  const resolveParticipantVideoAvatarSeed = React.useCallback((participant: ParticipantInfo): string | null => {
+    if (participant.avatarSeed?.trim()) return participant.avatarSeed.trim();
+    if (participant.id === effectiveParticipantId && currentParticipantAvatarSeed) return currentParticipantAvatarSeed;
+    return null;
+  }, [currentParticipantAvatarSeed, effectiveParticipantId]);
+
   const orderedVideoParticipants = [...activeParticipants].sort((first, second) => {
     if (first.id === effectiveParticipantId) return -1;
     if (second.id === effectiveParticipantId) return 1;
@@ -667,6 +680,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       name: resolveParticipantDisplayName(participant.id, participant.name),
       initials: formatParticipantInitials(participant),
       avatarUrl: participant.avatar,
+      avatarSeed: resolveParticipantVideoAvatarSeed(participant),
       accentColor: participantColors[String(participant.id)] || undefined,
       mediaStream: isCurrentUser ? localCameraStream : remoteStream,
       isYou: isCurrentUser,

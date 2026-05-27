@@ -78,11 +78,12 @@ export function useSessionPageState() {
   
   // Session full handler
   const handleSessionFull = useCallback(() => {
-    setSessionStarted(true);
-    
+    // Full capacity must not locally mark the participant room as live. The
+    // redesigned flow requires the host's explicit Start Session action, which
+    // is reflected through the database-backed session_started flag.
     toast({
       title: "Session is full",
-      description: "The maximum number of participants has joined. Starting session automatically.",
+      description: "The room is full. Please wait for the host to start the session.",
     });
   }, [toast]);
   

@@ -591,8 +591,11 @@ class QueryBuilder<T = Record<string, unknown>> {
       ...this.xHeaders(),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Send the join token only for unauthenticated participant requests.
+    // Authenticated host/admin queries must rely on JWT ownership checks;
+    // including a stale participant token can make host conversation reads
+    // follow participant-path authorization and fail during session start.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     // Apply a bounded timeout so Railway cold-start / network issues fail fast.
     // Session guard queries may legitimately take longer on the development
     // backend immediately after cold starts, so host session creation gets a
@@ -660,8 +663,11 @@ class QueryBuilder<T = Record<string, unknown>> {
     const joinToken = getJoinToken();
     const headers: Record<string, string> = { apikey: ANON_KEY, ...this.xHeaders() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Send the join token only for unauthenticated participant requests.
+    // Authenticated host/admin queries must rely on JWT ownership checks;
+    // including a stale participant token can make host conversation reads
+    // follow participant-path authorization and fail during session start.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("HEAD")}`, { method: "HEAD", headers });
       let count: number | null = null;

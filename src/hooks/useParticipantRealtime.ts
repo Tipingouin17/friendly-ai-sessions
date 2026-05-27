@@ -170,18 +170,9 @@ export function useParticipantRealtime({
               }
             }
             
-            // Auto-start session when max participants reached
-            if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
-              api
-                .from('conversations')
-                .update({ session_started: true })
-                .eq('id', conversationId)
-                .then(({ error }) => {
-                  if (error) {
-                    console.error("Error starting session automatically:", error);
-                  }
-                });
-            }
+            // The redesigned waiting room requires an explicit host action to start.
+            // Do not mark the conversation as started when capacity is reached; the
+            // host Start Session control is the single source of truth for this state.
           }
         })
         .subscribe((status) => {

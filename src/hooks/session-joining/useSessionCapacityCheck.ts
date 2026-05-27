@@ -83,18 +83,10 @@ export async function checkSessionCapacity(
   
   const maxAllowed = latestConversation.participants || 0;
   
-  // FIXED: Use actual count for capacity check, not the stored current_participants
+  // Use actual count for capacity checks, not the stored current_participants.
+  // A full room should block additional joins without starting the session;
+  // only the host's explicit Start Session action may set session_started.
   if (maxAllowed > 0 && actualCount >= maxAllowed) {
-    
-    const { error: startError } = await api
-      .from('conversations')
-      .update({ session_started: true })
-      .eq('id', conversationId);
-      
-    if (startError) {
-      console.error("Error auto-starting session:", startError);
-    } else { /* no-op */ }
-    
     return {
       canJoin: false,
       latestConversation,

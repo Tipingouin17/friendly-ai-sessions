@@ -106,19 +106,17 @@ export function useSessionHostLogic() {
         conversationData
     });
 
-    const hasAssistantOutput = sessionMessages.some(message => message.sender === 'assistant');
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
         isManagerSessionStarted ||
-        conversationData?.session_started ||
-        hasAssistantOutput
+        conversationData?.session_started
     );
 
     useEffect(() => {
-        if ((isManagerSessionStarted || conversationData?.session_started || hasAssistantOutput) && !hostSessionStartedOverride) {
+        if ((isManagerSessionStarted || conversationData?.session_started) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [isManagerSessionStarted, conversationData?.session_started, hasAssistantOutput, hostSessionStartedOverride]);
+    }, [isManagerSessionStarted, conversationData?.session_started, hostSessionStartedOverride]);
 
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);

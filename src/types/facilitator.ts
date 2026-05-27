@@ -6,6 +6,36 @@
 
 export type Step = 1 | 2 | 3;
 
+
+export type FacilitatorGenderPresentation =
+  | "feminine"
+  | "masculine"
+  | "neutral"
+  | "non_binary"
+  | "androgynous"
+  | "custom";
+
+export interface FacilitatorPersonaConfig {
+  id: number;
+  facilitator_id: number;
+  display_name: string | null;
+  pronouns: string[] | null;
+  gender_presentation: FacilitatorGenderPresentation | string | null;
+  voice_id: string | null;
+  voice_provider: string | null;
+  voice_style: string | null;
+  avatar_style: string | null;
+  avatar_asset_url: string | null;
+  locale: string | null;
+  tone: string | null;
+  animation_preset: string | null;
+  nonverbal_behavior: Record<string, unknown>;
+  speaking_behavior: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Facilitator {
   id: number;
   title: string;
@@ -18,6 +48,7 @@ export interface Facilitator {
   order?: number;
   is_promoted?: boolean;
   plan_id?: number | null;
+  persona_config?: FacilitatorPersonaConfig | null;
 }
 
 export interface Workshop {

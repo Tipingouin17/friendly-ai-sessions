@@ -30,6 +30,34 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+interface FacilitatorPersonaConfig {
+    id?: number;
+    facilitator_id?: number;
+    display_name: string | null;
+    pronouns: string[] | null;
+    gender_presentation: string | null;
+    voice_id: string | null;
+    voice_provider: string | null;
+    voice_style: string | null;
+    avatar_style: string | null;
+    avatar_asset_url: string | null;
+    locale: string | null;
+    tone: string | null;
+    animation_preset: string | null;
+    nonverbal_behavior?: Record<string, unknown> | null;
+    speaking_behavior?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+type FacilitatorWithPersonaJoin = Facilitator & {
+    persona_config?: FacilitatorPersonaConfig[] | FacilitatorPersonaConfig | null;
+};
+
+type FacilitatorInsertPayload = Omit<Partial<Facilitator>, "id" | "created_at" | "last_active" | "persona_config">;
+type FacilitatorPersonaPayload = ReturnType<typeof preparePersonaPayload>;
+
 interface Facilitator {
     id: number;
     title: string | null;
@@ -46,9 +74,11 @@ interface Facilitator {
     order: number | null;
     created_at: string | null;
     last_active: string | null;
+    persona_config?: FacilitatorPersonaConfig | null;
 }
 
 const EXPERTISE_LEVELS = ["beginner", "intermediate", "advanced", "expert"];
+const GENDER_PRESENTATIONS = ["feminine", "masculine", "neutral", "non_binary", "androgynous", "custom"];
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || '';
 
@@ -58,6 +88,23 @@ function buildAvatarUrl(pic: string | null): string | null {
     if (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/')) return pic;
     return `${API_URL}/storage/v1/object/public/facilitator-avatars/${pic}`;
 }
+
+const emptyPersonaConfig = (): FacilitatorPersonaConfig => ({
+    display_name: "",
+    pronouns: [],
+    gender_presentation: null,
+    voice_id: "",
+    voice_provider: "",
+    voice_style: "",
+    avatar_style: "",
+    avatar_asset_url: "",
+    locale: "en-US",
+    tone: "warm",
+    animation_preset: "professional",
+    nonverbal_behavior: {},
+    speaking_behavior: {},
+    metadata: {},
+});
 
 const emptyFacilitator = (): Partial<Facilitator> => ({
     title: "",
@@ -72,7 +119,46 @@ const emptyFacilitator = (): Partial<Facilitator> => ({
     rating: 4.5,
     total_sessions: 0,
     order: 0,
+    persona_config: emptyPersonaConfig(),
 });
+
+const normalisePersonaConfig = (persona?: FacilitatorPersonaConfig | null): FacilitatorPersonaConfig => ({
+    ...emptyPersonaConfig(),
+    ...(persona ?? {}),
+    pronouns: persona?.pronouns ?? [],
+    nonverbal_behavior: persona?.nonverbal_behavior ?? {},
+    speaking_behavior: persona?.speaking_behavior ?? {},
+    metadata: persona?.metadata ?? {},
+});
+
+const preparePersonaPayload = (persona: FacilitatorPersonaConfig | null | undefined, facilitatorId: number) => {
+    if (!persona) return null;
+    const {
+        id: _id,
+        created_at: _createdAt,
+        updated_at: _updatedAt,
+        facilitator_id: _facilitatorId,
+        ...payload
+    } = persona;
+    return {
+        ...payload,
+        facilitator_id: facilitatorId,
+        display_name: payload.display_name || null,
+        gender_presentation: payload.gender_presentation || null,
+        voice_id: payload.voice_id || null,
+        voice_provider: payload.voice_provider || null,
+        voice_style: payload.voice_style || null,
+        avatar_style: payload.avatar_style || null,
+        avatar_asset_url: payload.avatar_asset_url || null,
+        locale: payload.locale || null,
+        tone: payload.tone || null,
+        animation_preset: payload.animation_preset || null,
+        pronouns: payload.pronouns?.filter(Boolean) ?? [],
+        nonverbal_behavior: payload.nonverbal_behavior ?? {},
+        speaking_behavior: payload.speaking_behavior ?? {},
+        metadata: payload.metadata ?? {},
+    };
+};
 
 export const FacilitatorManagement = () => {
     const { toast } = useToast();
@@ -90,12 +176,15 @@ export const FacilitatorManagement = () => {
         queryFn: async () => {
             let query = api
                 .from("facilitators")
-                .select("id, title, description, details, profile_picture, is_promoted, plan_id, specialties, languages, expertise_level, rating, total_sessions, order, created_at, last_active")
+                .select("id, title, description, details, profile_picture, is_promoted, plan_id, specialties, languages, expertise_level, rating, total_sessions, order, created_at, last_active, persona_config:facilitator_persona_configs(*)")
                 .order("order", { ascending: true });
             if (searchTerm) query = query.ilike("title", `%${searchTerm}%`);
             const { data, error } = await query;
             if (error) throw error;
-            return data as Facilitator[];
+            return (data ?? []).map((f: FacilitatorWithPersonaJoin) => ({
+                ...f,
+                persona_config: normalisePersonaConfig(Array.isArray(f.persona_config) ? f.persona_config[0] : f.persona_config),
+            })) as Facilitator[];
         },
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -114,14 +203,36 @@ export const FacilitatorManagement = () => {
 
     const upsertMutation = useMutation({
         mutationFn: async (facilitator: Partial<Facilitator>) => {
+            const { persona_config, ...facilitatorFields } = facilitator;
             if (facilitator.id) {
-                const { id, created_at, last_active, ...updates } = facilitator;
+                const { id, created_at, last_active, ...updates } = facilitatorFields;
                 const { error } = await api.from("facilitators").update(updates).eq("id", id!);
                 if (error) throw error;
+
+                const personaPayload = preparePersonaPayload(persona_config, id!);
+                if (personaPayload) {
+                    const { error: personaError } = await api
+                        .from("facilitator_persona_configs")
+                        .upsert(personaPayload as Exclude<FacilitatorPersonaPayload, null>, { onConflict: "facilitator_id" });
+                    if (personaError) throw personaError;
+                }
             } else {
-                const { id: _id, ...insertData } = facilitator;
-                const { error } = await api.from("facilitators").insert(insertData as any);
+                const { id: _id, created_at, last_active, ...insertData } = facilitatorFields;
+                const { data: created, error } = await api
+                    .from("facilitators")
+                    .insert(insertData as FacilitatorInsertPayload)
+                    .select("id")
+                    .single();
                 if (error) throw error;
+
+                const facilitatorId = Number((created as { id: number }).id);
+                const personaPayload = preparePersonaPayload(persona_config, facilitatorId);
+                if (personaPayload) {
+                    const { error: personaError } = await api
+                        .from("facilitator_persona_configs")
+                        .upsert(personaPayload as Exclude<FacilitatorPersonaPayload, null>, { onConflict: "facilitator_id" });
+                    if (personaError) throw personaError;
+                }
             }
         },
         onSuccess: () => {
@@ -155,13 +266,27 @@ export const FacilitatorManagement = () => {
     };
 
     const openEdit = (f: Facilitator) => {
-        setEditingFacilitator({ ...f });
+        setEditingFacilitator({ ...f, persona_config: normalisePersonaConfig(f.persona_config) });
         setIsCreating(false);
     };
 
     const openCreate = () => {
         setEditingFacilitator(emptyFacilitator());
         setIsCreating(true);
+    };
+
+    const updatePersonaConfig = (updates: Partial<FacilitatorPersonaConfig>) => {
+        setEditingFacilitator(prev => ({
+            ...prev!,
+            persona_config: {
+                ...normalisePersonaConfig(prev?.persona_config),
+                ...updates,
+            },
+        }));
+    };
+
+    const updatePronounsFromInput = (value: string) => {
+        updatePersonaConfig({ pronouns: value.split(",").map(v => v.trim()).filter(Boolean) });
     };
 
     const addSpecialty = () => {
@@ -497,6 +622,139 @@ export const FacilitatorManagement = () => {
                                             {l} ×
                                         </Badge>
                                     ))}
+                                </div>
+                            </div>
+
+
+                            <Separator />
+
+                            {/* Persona Configuration */}
+                            <div className="space-y-4 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                                <div>
+                                    <Label className="font-semibold text-indigo-900">Avatar & Persona Configuration</Label>
+                                    <p className="text-xs text-indigo-700 mt-0.5">
+                                        Stored in the separate facilitator_persona_configs table for editable voice, avatar, and presentation settings.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-display-name">Display Name Override</Label>
+                                        <Input
+                                            id="persona-display-name"
+                                            value={editingFacilitator.persona_config?.display_name ?? ""}
+                                            onChange={e => updatePersonaConfig({ display_name: e.target.value })}
+                                            placeholder="Optional persona display name"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-gender-presentation">Gender Presentation</Label>
+                                        <Select
+                                            value={editingFacilitator.persona_config?.gender_presentation ?? "none"}
+                                            onValueChange={v => updatePersonaConfig({ gender_presentation: v === "none" ? null : v })}
+                                        >
+                                            <SelectTrigger id="persona-gender-presentation">
+                                                <SelectValue placeholder="Not specified" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">Not specified</SelectItem>
+                                                {GENDER_PRESENTATIONS.map(g => (
+                                                    <SelectItem key={g} value={g} className="capitalize">{g.replace("_", " ")}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-pronouns">Pronouns</Label>
+                                        <Input
+                                            id="persona-pronouns"
+                                            value={(editingFacilitator.persona_config?.pronouns ?? []).join(", ")}
+                                            onChange={e => updatePronounsFromInput(e.target.value)}
+                                            placeholder="e.g. she, her or they, them"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-locale">Locale</Label>
+                                        <Input
+                                            id="persona-locale"
+                                            value={editingFacilitator.persona_config?.locale ?? ""}
+                                            onChange={e => updatePersonaConfig({ locale: e.target.value })}
+                                            placeholder="e.g. en-US, fr-FR"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-voice-provider">Voice Provider</Label>
+                                        <Input
+                                            id="persona-voice-provider"
+                                            value={editingFacilitator.persona_config?.voice_provider ?? ""}
+                                            onChange={e => updatePersonaConfig({ voice_provider: e.target.value })}
+                                            placeholder="openai, azure, elevenlabs"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-voice-id">Voice ID</Label>
+                                        <Input
+                                            id="persona-voice-id"
+                                            value={editingFacilitator.persona_config?.voice_id ?? ""}
+                                            onChange={e => updatePersonaConfig({ voice_id: e.target.value })}
+                                            placeholder="Provider voice identifier"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-voice-style">Voice Style</Label>
+                                        <Input
+                                            id="persona-voice-style"
+                                            value={editingFacilitator.persona_config?.voice_style ?? ""}
+                                            onChange={e => updatePersonaConfig({ voice_style: e.target.value })}
+                                            placeholder="warm, calm, energetic"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-avatar-style">Avatar Style</Label>
+                                        <Input
+                                            id="persona-avatar-style"
+                                            value={editingFacilitator.persona_config?.avatar_style ?? ""}
+                                            onChange={e => updatePersonaConfig({ avatar_style: e.target.value })}
+                                            placeholder="realistic, illustrated"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-tone">Tone</Label>
+                                        <Input
+                                            id="persona-tone"
+                                            value={editingFacilitator.persona_config?.tone ?? ""}
+                                            onChange={e => updatePersonaConfig({ tone: e.target.value })}
+                                            placeholder="warm, direct, formal"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="persona-animation-preset">Animation Preset</Label>
+                                        <Input
+                                            id="persona-animation-preset"
+                                            value={editingFacilitator.persona_config?.animation_preset ?? ""}
+                                            onChange={e => updatePersonaConfig({ animation_preset: e.target.value })}
+                                            placeholder="professional, expressive"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="persona-avatar-asset-url">Avatar Asset URL</Label>
+                                    <Input
+                                        id="persona-avatar-asset-url"
+                                        value={editingFacilitator.persona_config?.avatar_asset_url ?? ""}
+                                        onChange={e => updatePersonaConfig({ avatar_asset_url: e.target.value })}
+                                        placeholder="https://..."
+                                    />
                                 </div>
                             </div>
 

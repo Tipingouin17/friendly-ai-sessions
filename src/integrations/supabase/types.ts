@@ -264,6 +264,77 @@ export type Database = {
         }
         Relationships: []
       }
+      facilitator_persona_configs: {
+        Row: {
+          id: number
+          facilitator_id: number
+          display_name: string | null
+          pronouns: string[] | null
+          gender_presentation: string | null
+          voice_id: string | null
+          voice_provider: string | null
+          voice_style: string | null
+          avatar_style: string | null
+          avatar_asset_url: string | null
+          locale: string | null
+          tone: string | null
+          animation_preset: string | null
+          nonverbal_behavior: Json
+          speaking_behavior: Json
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          facilitator_id: number
+          display_name?: string | null
+          pronouns?: string[] | null
+          gender_presentation?: string | null
+          voice_id?: string | null
+          voice_provider?: string | null
+          voice_style?: string | null
+          avatar_style?: string | null
+          avatar_asset_url?: string | null
+          locale?: string | null
+          tone?: string | null
+          animation_preset?: string | null
+          nonverbal_behavior?: Json
+          speaking_behavior?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          facilitator_id?: number
+          display_name?: string | null
+          pronouns?: string[] | null
+          gender_presentation?: string | null
+          voice_id?: string | null
+          voice_provider?: string | null
+          voice_style?: string | null
+          avatar_style?: string | null
+          avatar_asset_url?: string | null
+          locale?: string | null
+          tone?: string | null
+          animation_preset?: string | null
+          nonverbal_behavior?: Json
+          speaking_behavior?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facilitator_persona_configs_facilitator_id_fkey"
+            columns: ["facilitator_id"]
+            isOneToOne: true
+            referencedRelation: "facilitators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facilitators: {
         Row: {
           id: number

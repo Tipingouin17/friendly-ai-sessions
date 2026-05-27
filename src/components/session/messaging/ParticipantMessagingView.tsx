@@ -283,7 +283,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
-  const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const [, setCameraError] = React.useState<string | null>(null);
   const [submittingChoiceId, setSubmittingChoiceId] = React.useState<string | null>(null);
   const [submittedChoiceId, setSubmittedChoiceId] = React.useState<string | null>(null);
   const [modeInputError, setModeInputError] = React.useState<string | null>(null);
@@ -632,7 +632,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (second.id === effectiveParticipantId) return 1;
     return first.id - second.id;
   });
-  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
+  const { remoteStreams, connectionStatus, peerStatuses } = useWebRTCSession({
     conversationId,
     role: 'participant',
     participantId: effectiveParticipantId,
@@ -676,7 +676,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       connectionStatusLabel: tileConnectionStatus ? formatPeerTileStatusLabel(tileConnectionStatus) : undefined,
     };
   })];
-  const currentParticipantInfo = activeParticipants.find((participant) => participant.id === effectiveParticipantId);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const cameraStatusLabel = cameraStatus === 'starting'
     ? 'Starting camera…'
@@ -780,22 +779,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             variant="participant-sidebar"
             emptyLabel="Video tiles will appear as participants join the session."
           />
-        </div>
-        <div className={isMobilePanel ? 'session-soft-panel mt-2 rounded-2xl px-3 py-2 text-xs text-slate-200' : 'session-soft-panel mt-3 rounded-2xl px-3 py-2 text-xs text-slate-200'}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-slate-900">{currentParticipantInfo?.name || 'You'}</span>
-            <button
-              type="button"
-              onClick={handleToggleLocalCameraClick}
-              disabled={cameraStatus === 'starting'}
-              className="session-control-button min-h-11 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70 md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
-              data-camera-toggle={`participant-${panelVariant}-preview`}
-            >
-              {cameraIsOn ? 'Camera off' : 'Camera on'}
-            </button>
-          </div>
-          <span className="text-slate-500">{microphoneEnabled ? 'Mic on' : 'Muted'} · {cameraStatusLabel} · {activePeerCount} peer{activePeerCount === 1 ? '' : 's'}</span>
-          {cameraError && <p className="mt-1 text-[11px] leading-snug text-rose-600">{cameraError}</p>}
         </div>
       </div>
     );

@@ -133,11 +133,6 @@ export function useJoinSessionData(
     if (!isOnAdminPath && !effectiveIsAdmin) {
       // Only check if session is full if effectiveMaxParticipants is greater than 0
       if (effectiveMaxParticipants > 0 && currentParticipantCount >= effectiveMaxParticipants) {
-        toast({
-          title: "Session Full",
-          description: "This session has reached its maximum capacity of participants.",
-          variant: "destructive",
-        });
         setError("This session has reached its maximum capacity of participants.");
         return null;
       }

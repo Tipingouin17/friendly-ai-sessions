@@ -79,12 +79,7 @@ export function useSessionPageState() {
   // Session full handler
   const handleSessionFull = useCallback(() => {
     setSessionStarted(true);
-    
-    toast({
-      title: "Session is full",
-      description: "The maximum number of participants has joined. Starting session automatically.",
-    });
-  }, [toast]);
+  }, []);
   
   // Retry connection handler
   const retryConnection = useCallback(() => {

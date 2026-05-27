@@ -51,12 +51,6 @@ export const useAutoStartSession = ({
     setIsAutoStarting(true);
     setAutoStartCountdown(3);
 
-    // Show toast notification
-    toast({
-      title: "Session Full",
-      description: `Maximum capacity reached (${maxParticipants} participants). Auto-starting in 3 seconds...`,
-    });
-
     // Start countdown
     countdownIntervalRef.current = setInterval(() => {
       setAutoStartCountdown((prev) => {

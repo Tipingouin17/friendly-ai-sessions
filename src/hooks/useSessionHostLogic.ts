@@ -43,7 +43,8 @@ export function useSessionHostLogic() {
     const {
         data: conversationData,
         isLoading: isConversationLoading,
-        error: conversationError
+        error: conversationError,
+        refetch: refetchConversation
     } = useConversation(currentConversationId);
     const toolbox = useFacilitatorToolbox(conversationData);
     const modeOrchestrator = useFacilitationModeOrchestrator(conversationData, {
@@ -51,7 +52,7 @@ export function useSessionHostLogic() {
     });
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
-    const { handleStartSession } = useSessionInterface(currentConversationId);
+    const { handleStartSession, isSessionStarted: isInterfaceSessionStarted } = useSessionInterface(currentConversationId, conversationData);
     const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
     const hasPersistedStartMarker = Boolean(
         conversationData?.session_started || (conversationData as any)?.session_started_at
@@ -106,8 +107,9 @@ export function useSessionHostLogic() {
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionStarted: () => {
-            // The manager's persisted session_started flag is now a valid live-state
-            // signal, including older deployments without session_started_at.
+            // Keep the conversation query fresh for header/status labels and any
+            // consumers that still read persisted start fields directly.
+            void refetchConversation();
         },
         onSessionFull: (currentCount, maxCount) => {
             void triggerAutoStart(currentCount, maxCount);
@@ -137,14 +139,15 @@ export function useSessionHostLogic() {
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
         hasPersistedStartMarker ||
+        isInterfaceSessionStarted ||
         isManagerSessionStarted
     );
 
     useEffect(() => {
-        if ((hasPersistedStartMarker || isManagerSessionStarted) && !hostSessionStartedOverride) {
+        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [hasPersistedStartMarker, hostSessionStartedOverride, isManagerSessionStarted]);
+    }, [hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
 
     useEffect(() => {
         if (!isDataLoaded || effectiveIsSessionStarted) return;

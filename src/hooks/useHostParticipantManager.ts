@@ -24,6 +24,10 @@ interface UseEnhancedHostParticipantManagerProps {
   enabled?: boolean;
 }
 
+const hasStartedSession = (conversationLike: { session_started?: boolean | null; session_started_at?: string | null } | null | undefined): boolean => {
+  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
+};
+
 export function useHostParticipantManager({
   conversationId,
   onParticipantCountChange,
@@ -125,14 +129,14 @@ export function useHostParticipantManager({
       try {
         const { data, error: err } = await api
           .from('conversations')
-          .select('current_participants, participants, session_started')
+          .select('current_participants, participants, session_started, session_started_at')
           .eq('id', conversationId)
           .single();
         if (err) { setPollingActive(false); setIsConnected(false); return; }
         if (data) {
           const cur     = data.current_participants || 0;
           const max     = data.participants || 0;
-          const started = data.session_started || false;
+          const started = hasStartedSession(data);
           setCurrentCount(cur);
           setMaxCount(max);
           setIsSessionStarted(started);
@@ -173,7 +177,7 @@ export function useHostParticipantManager({
           if (payload.new) {
             const cur     = payload.new.current_participants || 0;
             const max     = payload.new.participants || 0;
-            const started = payload.new.session_started || false;
+            const started = hasStartedSession(payload.new as { session_started?: boolean | null; session_started_at?: string | null });
             setCurrentCount(cur);
             setMaxCount(max);
             setIsSessionStarted(started);
@@ -229,14 +233,14 @@ export function useHostParticipantManager({
     try {
       const { data, error: err } = await api
         .from('conversations')
-        .select('current_participants, participants, session_started')
+        .select('current_participants, participants, session_started, session_started_at')
         .eq('id', conversationId)
         .single();
       if (err) { logger.category('admin', 'Error fetching initial data:', err); return; }
       if (data) {
         const cur     = data.current_participants || 0;
         const max     = data.participants || 0;
-        const started = data.session_started || false;
+        const started = hasStartedSession(data);
         setCurrentCount(cur);
         setMaxCount(max);
         setIsSessionStarted(started);

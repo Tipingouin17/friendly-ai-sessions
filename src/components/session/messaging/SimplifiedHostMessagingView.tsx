@@ -20,7 +20,7 @@ import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Wand2, SendHorizonal,
   ChevronDown, ChevronUp,
-  Activity, Clock, Sparkles, ShieldCheck
+  Activity, Clock
 } from 'lucide-react';
 
 interface SimplifiedHostMessagingViewProps {
@@ -74,26 +74,12 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   onCancelAutoStart,
   isSessionEnded = false,
   isSessionPaused = false,
-  enabledTools = [],
-  isLoadingToolbox = false,
-  toolboxError = null,
-  enabledModes = [],
   activeMode = null,
-  recentModeEvents = [],
-  isLoadingModes = false,
-  modeError = null,
-  onStartMode,
-  onApproveMode,
-  onEndMode,
-  onRejectMode,
-  facilitatorVoiceGender = null,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'messages'>('overview');
+  const [activeTab, setActiveTab] = useState<'controls' | 'transcript'>('controls');
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
-  const [selectedModeKey, setSelectedModeKey] = useState<string>('');
-  const [modePrompt, setModePrompt] = useState('');
-  const [isModeBusy, setIsModeBusy] = useState(false);
+
   const [isSending, setIsSending] = useState(false);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
 
@@ -131,8 +117,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     );
   }
 
-  const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
-
   const handleSendWithInstruction = async () => {
     if (!onTriggerFacilitatorResponse) return;
     setIsSending(true);
@@ -155,51 +139,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     }
   };
 
-  const selectedMode = enabledModes.find((mode) => mode.mode_key === selectedModeKey) || enabledModes[0] || null;
   const activeModeDefinition = activeMode?.facilitation_mode;
-  const isPendingHostApproval = activeMode?.status === 'recommended' || activeMode?.status === 'pending_host_confirmation';
-
-  const handleStartSelectedMode = async () => {
-    if (!selectedMode || !onStartMode) return;
-    setIsModeBusy(true);
-    try {
-      await onStartMode(selectedMode, modePrompt.trim() || undefined);
-      setModePrompt('');
-      setSelectedModeKey(selectedMode.mode_key);
-    } finally {
-      setIsModeBusy(false);
-    }
-  };
-
-  const handleApproveActiveMode = async () => {
-    if (!onApproveMode) return;
-    setIsModeBusy(true);
-    try {
-      await onApproveMode('Host approved the recommended facilitation mode.');
-    } finally {
-      setIsModeBusy(false);
-    }
-  };
-
-  const handleEndActiveMode = async () => {
-    if (!onEndMode) return;
-    setIsModeBusy(true);
-    try {
-      await onEndMode('Host ended the active facilitation mode.');
-    } finally {
-      setIsModeBusy(false);
-    }
-  };
-
-  const handleRejectActiveMode = async () => {
-    if (!onRejectMode) return;
-    setIsModeBusy(true);
-    try {
-      await onRejectMode('Host rejected the recommended facilitation mode.');
-    } finally {
-      setIsModeBusy(false);
-    }
-  };
 
   const quickInstructions = [
     {
@@ -234,26 +174,26 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
       {/* ── Tab Bar ── */}
       <div className="flex items-center gap-1 px-4 pt-3 pb-0 bg-white border-b border-slate-200">
         <button
-          onClick={() => setActiveTab('overview')}
+              onClick={() => setActiveTab('controls')}
           className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            activeTab === 'overview'
+            activeTab === 'controls'
               ? 'border-indigo-600 text-indigo-700 bg-indigo-50/60'
               : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
           }`}
         >
           <Activity className="h-3.5 w-3.5" />
-          Overview
+          Controls
         </button>
         <button
-          onClick={() => setActiveTab('messages')}
+              onClick={() => setActiveTab('transcript')}
           className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            activeTab === 'messages'
+            activeTab === 'transcript'
               ? 'border-indigo-600 text-indigo-700 bg-indigo-50/60'
               : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
           }`}
         >
           <MessageSquare className="h-3.5 w-3.5" />
-          Messages
+          Transcript
           {messages.length > 0 && (
             <span className="ml-1 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-600">
               {messages.length}
@@ -264,7 +204,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'overview' ? (
+        {activeTab === 'controls' ? (
           <ScrollArea className="h-full">
             <div className="p-5 space-y-4">
 
@@ -275,8 +215,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Next facilitation move</p>
                     <h2 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">Guide the room from one clear command surface.</h2>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className="session-chip border-indigo-200 bg-white/80 text-indigo-700">Mode: {activeModeDefinition?.display_name || 'Open Discussion'}</span>
-                      <span className="session-chip border-violet-200 bg-white/80 text-violet-700">TTS: {facilitatorVoiceGenderLabel}</span>
+                      <span className="session-chip border-indigo-200 bg-white/80 text-indigo-700">{activeModeDefinition?.display_name || 'Open Discussion'}</span>
+                      {isWaitingForResponses && <span className="session-chip border-amber-200 bg-white/80 text-amber-700">Collecting responses</span>}
                       {isSessionPaused && <span className="session-chip border-amber-200 bg-white/80 text-amber-700">Paused</span>}
                       {isSessionEnded && <span className="session-chip border-slate-200 bg-white/80 text-slate-700">Ended</span>}
                     </div>
@@ -348,128 +288,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                 />
               )}
 
-              {/* Facilitator Capability Summary */}
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">AI capabilities</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Quiet context only; the host does not need to manage these during the live flow.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {isLoadingToolbox && <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">Loading…</span>}
-                    {!isLoadingToolbox && enabledTools.slice(0, 3).map((tool) => (
-                      <span key={tool.access_id || tool.id} className="session-chip border-slate-200 bg-slate-50 text-slate-600">{tool.name}</span>
-                    ))}
-                    {!isLoadingToolbox && enabledTools.length > 3 && (
-                      <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">+{enabledTools.length - 3} more</span>
-                    )}
-                    {!isLoadingToolbox && enabledTools.length === 0 && !toolboxError && (
-                      <span className="session-chip border-slate-200 bg-slate-50 text-slate-600">No tools assigned</span>
-                    )}
-                  </div>
-                </div>
-                {toolboxError && (
-                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{toolboxError}</p>
-                )}
-              </div>
-
-              {/* Facilitation Mode Orchestrator */}
-              <div className="session-soft-panel rounded-2xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Facilitation modes</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Change how participants contribute when the conversation needs structure.</p>
-                  </div>
-                  <span className={`session-chip px-2.5 py-1 text-xs font-semibold ${activeMode ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
-                    {isLoadingModes ? 'Loading…' : activeMode ? activeMode.status : `${enabledModes.length} available`}
-                  </span>
-                </div>
-
-                {modeError && (
-                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{modeError}</p>
-                )}
-
-                {activeMode ? (
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold text-emerald-800">Active: {activeModeDefinition?.display_name || 'Facilitation mode'}</p>
-                        <p className="mt-1 text-xs text-emerald-700">{activeMode.prompt || activeModeDefinition?.composer_copy || 'Participants are guided by this mode until the host ends it.'}</p>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        {isPendingHostApproval && (
-                          <>
-                            <Button
-                              onClick={handleApproveActiveMode}
-                              size="sm"
-                              disabled={!onApproveMode || isModeBusy}
-                              className="h-8 bg-emerald-500 text-xs text-white hover:bg-emerald-400"
-                            >
-                              <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-                              Approve
-                            </Button>
-                            <Button
-                              onClick={handleRejectActiveMode}
-                              variant="outline"
-                              size="sm"
-                              disabled={isModeBusy}
-                              className="h-8 border-emerald-200 text-xs text-emerald-700 hover:bg-emerald-100"
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          onClick={handleEndActiveMode}
-                          size="sm"
-                          disabled={isModeBusy}
-                          className="h-8 bg-emerald-500 text-xs text-white hover:bg-emerald-400"
-                        >
-                          {isPendingHostApproval ? 'Dismiss' : 'End mode'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 space-y-3">
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {enabledModes.map((mode) => (
-                        <button
-                          key={mode.access_id || mode.id}
-                          type="button"
-                          onClick={() => setSelectedModeKey(mode.mode_key)}
-                          className={`session-control-button rounded-2xl border px-3 py-2.5 text-left transition-colors ${selectedMode?.mode_key === mode.mode_key ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-                        >
-                          <p className="text-xs font-semibold text-slate-900">{mode.display_name}</p>
-                          <p className="mt-1 line-clamp-1 text-xs text-slate-500">{mode.purpose}</p>
-                        </button>
-                      ))}
-                    </div>
-                    {!isLoadingModes && enabledModes.length === 0 && !modeError && (
-                      <p className="session-soft-panel rounded-xl px-3 py-2 text-xs text-slate-500">No active facilitation modes are assigned to this facilitator yet.</p>
-                    )}
-                    {enabledModes.length > 0 && (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={modePrompt}
-                          onChange={(event) => setModePrompt(event.target.value)}
-                          placeholder="Optional participant prompt… e.g. 'Vote on the most important risk.'"
-                          className="min-h-[64px] resize-none border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400"
-                        />
-                        <Button
-                          onClick={handleStartSelectedMode}
-                          size="sm"
-                          disabled={!selectedMode || !onStartMode || isModeBusy}
-                          className="h-8 bg-indigo-500 text-xs text-white hover:bg-indigo-400"
-                        >
-                          {isModeBusy ? 'Starting…' : `Start ${selectedMode?.display_name || 'mode'}`}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
               {/* Steer the AI Facilitator */}
               <div className={`session-soft-panel rounded-2xl overflow-hidden transition-all ${
                 isInstructionExpanded
@@ -523,11 +341,11 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     />
 
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-indigo-200">
+                      <p className="text-xs text-indigo-700">
                         {hostInstruction.trim()
                           ? 'AI will use your instruction for its next response'
                           : 'Select a preset or write a custom instruction above'}
-                      </span>
+                      </p>
                       <Button
                         onClick={handleSendWithInstruction}
                         size="sm"
@@ -554,7 +372,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
             </div>
           </ScrollArea>
         ) : (
-          /* Messages Tab */
+          /* Transcript Tab */
           <ScrollArea className="h-full">
             <div className="p-4 space-y-3">
               {messages.length === 0 ? (

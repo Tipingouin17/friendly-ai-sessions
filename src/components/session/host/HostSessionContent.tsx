@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Activity, Brain, Check, Clock3, Copy, LayoutGrid, MessageSquare, MonitorUp, Play, QrCode, Sparkles, Users, Video, VideoOff, Wifi } from "lucide-react";
+import { Check, Clock3, Copy, LayoutGrid, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import ParticipantAvatar from "@/components/chat/avatars/ParticipantAvatar";
@@ -20,7 +20,7 @@ import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } f
 import { SessionVideoGrid, SessionVideoTile, type SessionVideoParticipant } from "@/components/session/video/SessionVideoGrid";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
-import { useWebRTCSession, type WebRTCPeerStatus, type WebRTCConnectionStatus } from "@/hooks/useWebRTCSession";
+import { useWebRTCSession, type WebRTCPeerStatus } from "@/hooks/useWebRTCSession";
 import { inferFacilitatorVoiceGender } from "@/utils/facilitatorVoiceGender";
 
 interface HostSessionContentProps {
@@ -86,15 +86,6 @@ const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
   return 'Connecting';
 };
 
-const formatRoomConnectionLabel = (status: WebRTCConnectionStatus): string => {
-  if (status === 'connected') return 'video room connected';
-  if (status === 'failed') return 'video reconnect needed';
-  if (status === 'disconnected') return 'video reconnecting';
-  if (status === 'unsupported') return 'video unsupported';
-  if (status === 'idle') return 'video room idle';
-  return 'connecting video room';
-};
-
 const formatParticipantInitials = (participant: ParticipantInfo): string => {
   const source = participant.name?.trim() || `P${participant.id}`;
   return source
@@ -117,18 +108,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   responseCount = 0,
   totalParticipants = 1,
   onTriggerFacilitatorResponse,
-  enabledTools = [],
-  isLoadingToolbox = false,
-  toolboxError = null,
-  enabledModes = [],
   activeMode = null,
-  recentModeEvents = [],
-  isLoadingModes = false,
-  modeError = null,
-  onStartMode,
-  onApproveMode,
-  onEndMode,
-  onRejectMode,
   isSessionStarted = false,
   onSessionStarted,
   isAutoStarting = false,
@@ -243,7 +223,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }, [isSessionEnded, stopHostCamera]);
 
   const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;
-  const { remoteStreams, connectionStatus, peerStatuses, activePeerCount } = useWebRTCSession({
+  const { remoteStreams, peerStatuses } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
@@ -309,9 +289,6 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const featuredVideoParticipant = hostVideoParticipants.find((participant) => participant.id === pinnedTileId)
     || hostVideoParticipants[0];
   const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
-  const liveCameraCount = hostVideoParticipants.filter((participant) => participant.mediaStream).length;
-  const videoRoomStatusLabel = `${formatRoomConnectionLabel(connectionStatus)} · ${liveCameraCount} live camera${liveCameraCount === 1 ? '' : 's'} · ${activePeerCount} peer${activePeerCount === 1 ? '' : 's'}`;
-
   const sessionTitle = conversationData?.sessions?.title || "Untitled session";
   const facilitatorName = facilitatorDetails?.title || "AI Facilitator";
   const maxParticipants = conversationData?.participants || Math.max(actualParticipantCount, 1);
@@ -481,41 +458,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 
   return (
     <div className="host-session-cockpit session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-100">
-      <div className="session-glass-panel mb-3 flex shrink-0 flex-wrap items-center gap-3 rounded-[1.75rem] px-4 py-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600">
-          <Brain className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-base font-bold tracking-tight text-slate-950">Session workspace</p>
-          <p className="truncate text-xs text-slate-500">{conversationData?.sessions?.title || "Session"} · {modeName}</p>
-        </div>
-        <div className={`session-chip ${isSessionStarted && !isSessionEnded ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : isSessionEnded ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-          <span className={`h-2 w-2 rounded-full ${isSessionStarted && !isSessionEnded ? 'bg-emerald-500' : isSessionEnded ? 'bg-slate-400' : 'bg-amber-500'}`} />
-          {isSessionStarted && !isSessionEnded ? "Live" : isSessionEnded ? "Ended" : "Standby"}
-        </div>
-        <div className="session-chip border-violet-200 bg-violet-50 text-violet-700" title="Used by browser TTS voice selection when the facilitator speaks.">
-          <Sparkles className="h-3.5 w-3.5" />
-          TTS: {facilitatorVoiceGenderLabel}
-        </div>
-        {isSessionPaused && (
-          <div className="session-chip border-amber-200 bg-amber-50 text-amber-700">
-            Paused
-          </div>
-        )}
-      </div>
-
       <PanelGroup direction="horizontal" className="min-h-0 flex-1 gap-0 rounded-3xl">
         <Panel defaultSize={24} minSize={18} maxSize={34} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-l-[2rem]">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Participant intelligence</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{actualParticipantCount}/{conversationData?.participants || 10} present</p>
-                </div>
-                <Users className="h-5 w-5 text-slate-500" />
-              </div>
-            </div>
             <div className="min-h-0 flex-1 overflow-hidden [&>*]:h-full [&>*]:border-0 [&>*]:bg-transparent">
               <HostParticipantList
                 participants={participants || []}
@@ -534,14 +479,14 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={52} minSize={38} className="min-h-0">
+        <Panel defaultSize={56} minSize={42} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200">
             {isSessionStarted && (
             <section className="session-avatar-stage shrink-0 border-b border-slate-200 p-3" aria-label="Host multi-video gallery">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Video room</p>
-                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to a multi-participant gallery · {videoRoomStatusLabel}.</p>
+                  <p className="text-xs text-slate-500">Spotlight the facilitator or switch to the room gallery.</p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
@@ -608,8 +553,17 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               )}
             </section>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <SimplifiedHostMessagingView
+
+          </div>
+        </Panel>
+
+        <PanelResizeHandle className="group relative flex w-3 items-center justify-center">
+          <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
+        </PanelResizeHandle>
+
+        <Panel defaultSize={20} minSize={18} maxSize={30} className="min-h-0">
+          <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[2rem]">
+            <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}
               currentParticipantCount={actualParticipantCount}
@@ -618,19 +572,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               responseCount={responseCount}
               totalParticipants={totalParticipants}
               onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
-              enabledTools={enabledTools}
-              isLoadingToolbox={isLoadingToolbox}
-              toolboxError={toolboxError}
-              enabledModes={enabledModes}
               activeMode={activeMode}
-              recentModeEvents={recentModeEvents}
-              isLoadingModes={isLoadingModes}
-              modeError={modeError}
-              onStartMode={onStartMode}
-              onApproveMode={onApproveMode}
-              onEndMode={onEndMode}
-              onRejectMode={onRejectMode}
-              facilitatorVoiceGender={facilitatorVoiceGender}
               isSessionStarted={isSessionStarted}
               onSessionStarted={onSessionStarted}
               participants={participants}
@@ -639,78 +581,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               autoStartCountdown={autoStartCountdown}
               onCancelAutoStart={onCancelAutoStart}
               isSessionEnded={isSessionEnded}
-                isSessionPaused={isSessionPaused}
-              />
-            </div>
-          </div>
-        </Panel>
-
-        <PanelResizeHandle className="group relative flex w-3 items-center justify-center">
-          <span className="h-16 w-1 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
-        </PanelResizeHandle>
-
-        <Panel defaultSize={24} minSize={20} maxSize={32} className="min-h-0">
-          <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[2rem]">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Session pulse</p>
-              <p className="mt-1 text-sm text-slate-500">Live orchestration signals</p>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-              <div className="session-soft-panel rounded-2xl p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-900">Facilitator voice</span>
-                  <Sparkles className="h-4 w-4 text-violet-600" />
-                </div>
-                <p className="text-xs leading-relaxed text-slate-500">
-                  {facilitatorDetails?.title || 'AI Facilitator'} uses the {facilitatorVoiceGenderLabel.toLowerCase()} profile for TTS voice selection.
-                </p>
-              </div>
-              <div className="session-soft-panel rounded-2xl p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-900">Responses</span>
-                  <Activity className="h-4 w-4 text-indigo-600" />
-                </div>
-                <div className="session-progress-track h-2 overflow-hidden rounded-full">
-                  <div className="session-progress-fill h-full rounded-full transition-all duration-700" style={{ width: `${responseProgress}%` }} />
-                </div>
-                <p className="mt-2 font-mono text-xs text-slate-500">{responseCount}/{responseTotal} collected</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="session-soft-panel rounded-2xl p-3">
-                  <Sparkles className="mb-2 h-4 w-4 text-amber-700" />
-                  <p className="font-display text-xl font-bold text-slate-950">{assistantMessageCount}</p>
-                  <p className="text-xs text-slate-500">AI turns</p>
-                </div>
-                <div className="session-soft-panel rounded-2xl p-3">
-                  <MessageSquare className="mb-2 h-4 w-4 text-emerald-700" />
-                  <p className="font-display text-xl font-bold text-slate-950">{participantMessageCount}</p>
-                  <p className="text-xs text-slate-500">Room inputs</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-slate-500" />
-                  <span className="text-sm font-semibold text-slate-900">Recent mode events</span>
-                </div>
-                {latestEvents.length > 0 ? (
-                  <div className="space-y-2">
-                    {latestEvents.map((event) => (
-                      <div key={event.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-xs font-semibold capitalize text-slate-900">{formatEventLabel(event.event_type)}</p>
-                        <p className="truncate text-[11px] text-slate-500">{event.mode_name || event.mode_slug}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs leading-relaxed text-slate-500">
-                    Mode recommendations, approvals, and endings will appear here as the session evolves.
-                  </p>
-                )}
-              </div>
-            </div>
+              isSessionPaused={isSessionPaused}
+            />
           </aside>
         </Panel>
       </PanelGroup>

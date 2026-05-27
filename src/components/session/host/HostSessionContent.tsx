@@ -266,6 +266,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         name: participant.name || `Participant ${participant.id}`,
         initials: formatParticipantInitials(participant),
         avatarUrl: participant.avatar,
+        avatarSeed: participant.avatarSeed || null,
         accentColor: participantColors[String(participant.id)] || undefined,
         mediaStream: remoteStream,
         isMuted: true,

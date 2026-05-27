@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import BoringAvatar from 'boring-avatars';
 import { Check, Mic, MicOff, MoreHorizontal, Pin, Sparkles, VideoOff } from 'lucide-react';
 
 export type SessionVideoTileVariant = 'ai' | 'self' | 'remote' | 'spotlight';
@@ -17,6 +18,7 @@ export interface SessionVideoParticipant {
   name: string;
   initials: string;
   avatarUrl?: string | null;
+  avatarSeed?: string | null;
   accentColor?: string;
   mediaStream?: MediaStream | null;
   isAI?: boolean;
@@ -60,6 +62,21 @@ const connectionStatusClasses: Record<NonNullable<SessionVideoParticipant['conne
   connected: 'border-emerald-200 bg-emerald-50/90 text-emerald-700',
   disconnected: 'border-amber-200 bg-amber-50/90 text-amber-700',
   failed: 'border-rose-200 bg-rose-50/90 text-rose-700',
+};
+
+const GENERATED_AVATAR_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
+
+const parseGeneratedAvatarSeed = (avatarUrl?: string | null): string | null => {
+  if (!avatarUrl || !avatarUrl.includes('/api/avatar')) return null;
+
+  try {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const url = new URL(avatarUrl, baseUrl);
+    return url.searchParams.get('name');
+  } catch {
+    const match = avatarUrl.match(/[?&]name=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
 };
 
 const getTileShadow = (participant: SessionVideoParticipant): string => {
@@ -150,6 +167,14 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
   const isSpotlight = variant === 'spotlight';
   const accentColor = participant.accentColor || (participant.isAI ? 'rgb(217 119 6)' : 'rgb(79 70 229)');
   const hasLiveStream = Boolean(participant.mediaStream?.getVideoTracks().some((track) => track.readyState === 'live'));
+  const [avatarImageError, setAvatarImageError] = React.useState(false);
+  const generatedAvatarSeed = participant.avatarSeed || parseGeneratedAvatarSeed(participant.avatarUrl);
+  const isGeneratedAvatarUrl = Boolean(participant.avatarUrl?.includes('/api/avatar'));
+  const shouldRenderAvatarImage = Boolean(participant.avatarUrl && !isGeneratedAvatarUrl && !avatarImageError);
+
+  React.useEffect(() => {
+    setAvatarImageError(false);
+  }, [participant.avatarUrl]);
 
   return (
     <article
@@ -162,15 +187,27 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
     >
       {hasLiveStream && participant.mediaStream ? (
         <StreamVideo stream={participant.mediaStream} name={participant.name} muted={Boolean(participant.isYou || participant.isMuted)} />
-      ) : participant.avatarUrl ? (
-        <img src={participant.avatarUrl} alt={participant.name} className="h-full w-full object-cover" />
+      ) : shouldRenderAvatarImage ? (
+        <img src={participant.avatarUrl!} alt={participant.name} className="h-full w-full object-cover" onError={() => setAvatarImageError(true)} />
+      ) : generatedAvatarSeed && !participant.isAI ? (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-slate-100">
+          <div className="rounded-full border border-white bg-white p-2 shadow-lg shadow-slate-300/50">
+            <BoringAvatar
+              size={isSpotlight ? 136 : 88}
+              name={generatedAvatarSeed}
+              variant="beam"
+              colors={GENERATED_AVATAR_COLORS}
+              square={false}
+            />
+          </div>
+        </div>
       ) : (
         <div className={`flex h-full w-full items-center justify-center ${participant.isAI ? 'bg-gradient-to-br from-amber-50 via-white to-indigo-50 text-amber-700' : 'bg-gradient-to-br from-indigo-50 via-white to-slate-100 text-indigo-700'}`}>
           <span className={`font-display font-bold ${isSpotlight ? 'text-6xl' : 'text-xl'}`}>{participant.initials}</span>
         </div>
       )}
 
-      {!hasLiveStream && !participant.avatarUrl && !participant.isAI && (
+      {!hasLiveStream && !participant.avatarUrl && !generatedAvatarSeed && !participant.isAI && (
         <div className="absolute right-2 top-2 rounded-full border border-white/70 bg-white/85 p-1 text-slate-500 shadow-sm backdrop-blur" title="Camera preview unavailable">
           <VideoOff className="h-3.5 w-3.5" />
         </div>

@@ -356,9 +356,6 @@ const InputFooter = ({
         </div>
         <QuickReactions onReaction={onReaction} compact={isMobile} />
       </div>
-      <div className="mt-3 border-t border-indigo-50 pt-3">
-        <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
-      </div>
     </div>
   );
 
@@ -450,7 +447,7 @@ const InputFooter = ({
     return renderOpenDiscussionPanel();
   };
 
-  const shouldRenderDefaultChatInput = !isPaused && !isSkipped && !isOpenDiscussionMode && modeKey !== 'voting_rating' && modeKey !== 'reflection_checkin' && modeKey !== 'silent_individual_response';
+  const shouldRenderDefaultChatInput = !isPaused && !isSkipped && modeKey !== 'voting_rating' && modeKey !== 'reflection_checkin' && modeKey !== 'silent_individual_response';
 
   return (
     <>

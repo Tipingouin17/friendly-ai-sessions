@@ -15,6 +15,7 @@ import { useHostParticipantManager } from "@/hooks/useHostParticipantManager";
 import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostStatusPersistence } from "@/hooks/useHostStatusPersistence";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
+import { useAutoStartSession } from "@/hooks/useAutoStartSession";
 import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -51,15 +52,38 @@ export function useSessionHostLogic() {
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
-
-    // The redesigned host waiting room must be explicitly started by the host.
-    // Full-capacity auto-start previously bypassed the manual Start Session CTA,
-    // especially for one-participant sessions, so keep the auto-start UI inactive.
-    const isAutoStarting = false;
-    const autoStartCountdown = 0;
-    const cancelAutoStart = useCallback(() => undefined, []);
-
     const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
+
+    const handleSessionStarted = useCallback(async () => {
+        try {
+            setHostSessionStartedOverride(true);
+            await handleStartSession();
+            // The manager will pick up the change via realtime; the local override keeps the host UI in the active state immediately.
+        } catch (error) {
+            console.error("Error starting session:", error);
+            toast({
+                title: "Error",
+                description: "Failed to start session",
+                variant: "destructive"
+            });
+            setHostSessionStartedOverride(false);
+            throw error;
+        }
+    }, [handleStartSession, toast]);
+
+    const {
+        isAutoStarting,
+        autoStartCountdown,
+        triggerAutoStart,
+        cancelAutoStart,
+        cleanup: cleanupAutoStart
+    } = useAutoStartSession({
+        onStartSession: handleSessionStarted,
+        isSessionStarted: hostSessionStartedOverride,
+        maxParticipants: Math.max(conversationData?.participants || 0, 0),
+    });
+
+    useEffect(() => cleanupAutoStart, [cleanupAutoStart]);
 
     useEffect(() => {
         setHostSessionStartedOverride(false);
@@ -83,8 +107,8 @@ export function useSessionHostLogic() {
             // The host moves live only through the explicit Start Session handler or
             // through a persisted session_started_at marker from that handler.
         },
-        onSessionFull: () => {
-            // Intentionally no-op: the host must start the redesigned waiting room manually.
+        onSessionFull: (currentCount, maxCount) => {
+            void triggerAutoStart(currentCount, maxCount);
         }
     });
 
@@ -203,22 +227,6 @@ export function useSessionHostLogic() {
             policy: mode.effective_policy,
         });
     }, [modeOrchestrator]);
-
-    // 8. Session Start Handler
-    const handleSessionStarted = useCallback(async () => {
-        try {
-            setHostSessionStartedOverride(true);
-            await handleStartSession();
-            // The manager will pick up the change via realtime; the local override keeps the host UI in the active state immediately.
-        } catch (error) {
-            console.error("Error starting session:", error);
-            toast({
-                title: "Error",
-                description: "Failed to start session",
-                variant: "destructive"
-            });
-        }
-    }, [handleStartSession, toast]);
 
     return {
         // State

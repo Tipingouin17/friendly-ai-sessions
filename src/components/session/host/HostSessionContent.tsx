@@ -9,9 +9,10 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Activity, Brain, Check, Clock3, Copy, LayoutGrid, MessageSquare, MonitorUp, Play, QrCode, Sparkles, UserRound, Users, Video, VideoOff, Wifi } from "lucide-react";
+import { Activity, Brain, Check, Clock3, Copy, LayoutGrid, MessageSquare, MonitorUp, Play, QrCode, Sparkles, Users, Video, VideoOff, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
+import ParticipantAvatar from "@/components/chat/avatars/ParticipantAvatar";
 import { Message, ParticipantInfo } from "@/types/chat";
 import type { ConversationWithSession } from "@/types/database";
 import type { FacilitatorToolAssignment } from "@/types/facilitator";
@@ -324,6 +325,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }, [currentConversationId, joinToken]);
   const truncatedInviteLink = sessionInviteLink.length > 54 ? `${sessionInviteLink.slice(0, 51)}…` : sessionInviteLink;
   const waitingParticipants = participants.filter((participant) => !participant.isHost && !participant.isAdmin);
+  const participantRowsToShow = Math.max(1, Math.min(waitingParticipants.length || maxParticipants, 6));
+  const participantListViewportHeight = waitingParticipants.length > 0
+    ? Math.min(420, Math.max(84, participantRowsToShow * 72))
+    : 220;
 
   const handleCopyInviteLink = React.useCallback(async () => {
     if (!sessionInviteLink) return;
@@ -342,7 +347,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 text-slate-950">
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
-          <section className="mb-7 text-center">
+          <section className="mx-auto mb-7 w-full max-w-3xl text-center">
             <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
               Waiting Room
@@ -384,7 +389,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
             </div>
           </section>
 
-          <section className="mx-auto mt-7 flex w-full max-w-3xl min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+          <section className="mx-auto mt-7 flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-indigo-600" />
@@ -396,10 +401,10 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               </div>
             </header>
 
-            <div className="min-h-[220px] flex-1 overflow-y-auto">
+            <div className="overflow-y-auto transition-[height] duration-300" style={{ height: participantListViewportHeight }}>
               {isLoadingParticipants ? (
                 <div className="space-y-3 p-5">
-                  {Array.from({ length: 4 }).map((_, index) => (
+                  {Array.from({ length: Math.min(Math.max(maxParticipants, 1), 4) }).map((_, index) => (
                     <div key={index} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3">
                       <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
                       <div className="flex-1 space-y-2">
@@ -419,13 +424,14 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
                     return (
                       <div key={participantId} className="flex items-center justify-between gap-4 px-5 py-4">
                         <div className="flex min-w-0 items-center gap-3">
-                          {participant.avatar ? (
-                            <img src={participant.avatar} alt="" className="h-10 w-10 rounded-full object-cover ring-2 ring-white" />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accentColor }}>
-                              {initials || <UserRound className="h-4 w-4" />}
-                            </div>
-                          )}
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm ring-2 ring-white" style={{ backgroundColor: accentColor }}>
+                            <ParticipantAvatar
+                              avatarUrl={participant.avatar?.startsWith('/api/avatar') ? null : participant.avatar}
+                              avatarSeed={participant.avatarSeed || participantName}
+                              name={participantName}
+                              size="lg"
+                            />
+                          </div>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-950">{participantName}</p>
                             <p className="text-xs text-slate-500">{participant.isAnonymous ? 'Anonymous participant' : 'Participant'}</p>
@@ -462,7 +468,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               className="flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
             >
               <Play className="h-5 w-5 fill-current" />
-              {isAutoStarting ? `Starting in ${autoStartCountdown}s` : 'Start Session'}
+              {isAutoStarting ? `Auto-starting in ${autoStartCountdown}s` : 'Start Session'}
             </button>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-500">
               <span>{joinedParticipantCount} of {maxParticipants} participant{maxParticipants === 1 ? '' : 's'} joined</span>

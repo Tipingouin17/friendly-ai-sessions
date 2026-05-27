@@ -15,7 +15,6 @@ import { useHostParticipantManager } from "@/hooks/useHostParticipantManager";
 import { useHostMessages } from "@/hooks/useHostMessages";
 import { useHostStatusPersistence } from "@/hooks/useHostStatusPersistence";
 import { useSessionInterface } from "@/hooks/useSessionInterface";
-import { useAutoStartSession } from "@/hooks/useAutoStartSession";
 import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -53,25 +52,12 @@ export function useSessionHostLogic() {
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
 
-    // 5. Auto Start Logic
-    const {
-        isAutoStarting,
-        autoStartCountdown,
-        triggerAutoStart,
-        cancelAutoStart,
-        cleanup: cleanupAutoStart
-    } = useAutoStartSession({
-        onStartSession: handleStartSession,
-        isSessionStarted: Boolean(conversationData?.session_started),
-        maxParticipants: conversationData?.participants || 10
-    });
-
-    // Cleanup auto-start on unmount
-    useEffect(() => {
-        return () => {
-            cleanupAutoStart();
-        };
-    }, [cleanupAutoStart]);
+    // The redesigned host waiting room must be explicitly started by the host.
+    // Full-capacity auto-start previously bypassed the manual Start Session CTA,
+    // especially for one-participant sessions, so keep the auto-start UI inactive.
+    const isAutoStarting = false;
+    const autoStartCountdown = 0;
+    const cancelAutoStart = useCallback(() => undefined, []);
 
     const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
 
@@ -95,8 +81,8 @@ export function useSessionHostLogic() {
         onSessionStarted: () => {
             setHostSessionStartedOverride(true);
         },
-        onSessionFull: (fullCount, maxCount) => {
-            triggerAutoStart(fullCount, maxCount);
+        onSessionFull: () => {
+            // Intentionally no-op: the host must start the redesigned waiting room manually.
         }
     });
 

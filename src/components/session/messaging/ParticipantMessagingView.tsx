@@ -117,6 +117,16 @@ const formatParticipantInitials = (participant: ParticipantInfo): string => {
     .toUpperCase();
 };
 
+const isHostParticipant = (participant: ParticipantInfo): boolean => {
+  return Boolean(participant.isHost || participant.isAdmin);
+};
+
+const resolveHostDisplayName = (hostParticipant: ParticipantInfo | null | undefined): string => {
+  const explicitName = hostParticipant?.name?.trim();
+  if (explicitName && !isGenericParticipantLabel(explicitName)) return explicitName;
+  return 'Host';
+};
+
 const resolvePositiveParticipantId = (...candidates: Array<number | null | undefined>): number | null => {
   for (const candidate of candidates) {
     if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) return candidate;
@@ -313,7 +323,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (participants.length > 0) {
       return participants.map((participant) => ({
         ...participant,
-        name: resolveStoredParticipantName(participant, participantNames),
+        name: isHostParticipant(participant)
+          ? resolveHostDisplayName(participant)
+          : resolveStoredParticipantName(participant, participantNames),
       }));
     }
 
@@ -325,11 +337,19 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       } as ParticipantInfo;
     });
   }, [currentParticipantCount, participantNames, participants]);
+  const hostParticipant = React.useMemo(
+    () => activeParticipants.find(isHostParticipant) ?? null,
+    [activeParticipants]
+  );
+  const participantPeers = React.useMemo(
+    () => activeParticipants.filter((participant) => !isHostParticipant(participant)),
+    [activeParticipants]
+  );
   const effectiveParticipantId = React.useMemo(() => {
     const urlParticipantId = getParticipantIdFromUrl();
-    const firstKnownParticipantId = activeParticipants.length === 1 ? activeParticipants[0]?.id : null;
+    const firstKnownParticipantId = participantPeers.length === 1 ? participantPeers[0]?.id : null;
     return resolvePositiveParticipantId(currentUserParticipantId, currentParticipant, urlParticipantId, firstKnownParticipantId) ?? 1;
-  }, [activeParticipants, currentParticipant, currentUserParticipantId]);
+  }, [currentParticipant, currentUserParticipantId, participantPeers]);
   const currentParticipantAvatarSeed = React.useMemo(() => getAvatarSeedFromUrl(), []);
 
   const persistedMediaPreferences = React.useMemo(
@@ -347,7 +367,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const filteredMessages = useMessageProcessor({
     messages,
     viewMode: "participant",
-    participants: activeParticipants,
+    participants: participantPeers,
     participantNames,
     currentParticipant: effectiveParticipantId
   });
@@ -435,7 +455,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const resolveParticipantDisplayName = React.useCallback((participantId: number | string | null | undefined, fallbackName?: string | null): string => {
     const numericParticipantId = Number(participantId);
     const participant = Number.isFinite(numericParticipantId)
-      ? activeParticipants.find((candidate) => candidate.id === numericParticipantId)
+      ? participantPeers.find((candidate) => candidate.id === numericParticipantId)
       : undefined;
 
     if (participant) return resolveStoredParticipantName(participant, participantNames);
@@ -447,11 +467,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (cleanedFallback && !isGenericParticipantLabel(cleanedFallback) && cleanedFallback !== 'You') return cleanedFallback;
 
     return Number.isFinite(numericParticipantId) && numericParticipantId > 0 ? `Participant ${numericParticipantId}` : 'Participant';
-  }, [activeParticipants, participantNames]);
+  }, [participantPeers, participantNames]);
 
   const latestParticipantMessages = React.useMemo(() => {
-    return [...filteredMessages].reverse().filter((message) => message.sender !== 'assistant').slice(0, 4).reverse();
-  }, [filteredMessages]);
+    return [...messages]
+      .filter((message) => message.sender !== 'assistant' && !message.isPrivateToHost)
+      .slice(-12);
+  }, [messages]);
   const latestOwnParticipantMessage = React.useMemo(() => {
     const participantKey = String(effectiveParticipantId);
     const latestAssistantIndex = filteredMessages.map((message) => message.sender).lastIndexOf('assistant');
@@ -462,7 +484,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || String(message.participant) === participantKey)) ?? null;
   }, [effectiveParticipantId, filteredMessages]);
   const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
-  const responseTotal = Math.max(totalParticipants, currentParticipantCount, participants.length, 1);
+  const participantResponseTotal = participantPeers.length > 0 ? participantPeers.length : Math.max(currentParticipantCount, participants.length, 0);
+  const responseTotal = Math.max(totalParticipants, participantResponseTotal, 1);
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
@@ -723,7 +746,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return null;
   }, [currentParticipantAvatarSeed, effectiveParticipantId]);
 
-  const orderedVideoParticipants = [...activeParticipants].sort((first, second) => {
+  const orderedVideoParticipants = [...participantPeers].sort((first, second) => {
     if (first.id === effectiveParticipantId) return -1;
     if (second.id === effectiveParticipantId) return 1;
     return first.id - second.id;
@@ -732,23 +755,25 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     conversationId,
     role: 'participant',
     participantId: effectiveParticipantId,
-    participants: activeParticipants,
+    participants: participantPeers,
     localStream: localCameraStream,
     enabled: !isSessionEnded,
   });
   const hostRemoteStream = remoteStreams[HOST_VIDEO_STREAM_KEY] ?? null;
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
+  const hostDisplayName = resolveHostDisplayName(hostParticipant);
   const hostVideoTile: SessionVideoParticipant = {
     id: HOST_VIDEO_STREAM_KEY,
-    name: facilitatorName,
-    initials: facilitatorName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'AI',
-    avatarUrl: facilitatorAvatarUrl || undefined,
+    name: hostDisplayName,
+    initials: hostDisplayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'H',
+    avatarUrl: hostParticipant?.avatar || undefined,
+    avatarSeed: hostParticipant?.avatarSeed || undefined,
     mediaStream: hostRemoteStream,
     isMuted: false,
-    isSpeaking: aiIsSpeaking || Boolean(hostRemoteStream),
+    isSpeaking: Boolean(hostRemoteStream),
     connectionStatus: hostTileConnectionStatus,
-    connectionStatusLabel: aiIsSpeaking ? 'AI speaking' : formatPeerTileStatusLabel(hostTileConnectionStatus),
+    connectionStatusLabel: formatPeerTileStatusLabel(hostTileConnectionStatus),
     accentColor: 'rgb(217 119 6)',
   };
 
@@ -891,7 +916,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             {latestParticipantMessages.map((message) => (
               <div key={message.id} className="session-soft-panel rounded-2xl p-3">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-indigo-600">{resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
+                  <span className="truncate text-xs font-semibold text-indigo-600">{message.sender === 'admin' ? 'Host' : resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
                   <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
                 </div>
                 <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
@@ -1026,7 +1051,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 participantCount={maxParticipants}
                 currentParticipant={effectiveParticipantId}
                 participantNames={participantNames}
-                participants={activeParticipants}
+                participants={participantPeers}
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 onSendMessage={onSendMessage}

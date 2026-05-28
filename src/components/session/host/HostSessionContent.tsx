@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Check, Copy, LayoutGrid, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
+import { CalendarClock, Check, Copy, LayoutGrid, Mail, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import ParticipantAvatar from "@/components/chat/avatars/ParticipantAvatar";
@@ -22,6 +22,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
 import { useWebRTCSession, type WebRTCPeerStatus } from "@/hooks/useWebRTCSession";
 import { inferFacilitatorVoiceGender } from "@/utils/facilitatorVoiceGender";
+import { getScheduledStartIso, getSessionInvitations } from "@/services/facilitatorService";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -303,6 +304,26 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const isRoomReadyToStart = Boolean(isWaitingRoomFull || (maxParticipants > 0 && joinedParticipantCount >= maxParticipants));
   const seatsOpen = Math.max(0, maxParticipants - joinedParticipantCount);
 
+  const scheduledStartIso = getScheduledStartIso((conversationData as any)?.flow_config);
+  const scheduledInvitations = getSessionInvitations((conversationData as any)?.flow_config);
+  const isScheduledSession = Boolean(scheduledStartIso || (conversationData as any)?.status === 'scheduled');
+  const scheduledStartLabel = scheduledStartIso
+    ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(scheduledStartIso))
+    : null;
+  const expectedInvitees = scheduledInvitations.length;
+  const joinedInviteeEmails = new Set(
+    waitingParticipants
+      .map((participant) => (participant as any).email)
+      .filter(Boolean)
+      .map((email: string) => email.toLowerCase())
+  );
+  const invitedReadinessRows = scheduledInvitations.map((invite) => {
+    const joinedByEmail = joinedInviteeEmails.has(invite.email.toLowerCase());
+    const joinedByName = waitingParticipants.some((participant) => (participant.name || '').trim().toLowerCase() === invite.name.trim().toLowerCase());
+    return { ...invite, isReady: joinedByEmail || joinedByName };
+  });
+  const readyInviteeCount = invitedReadinessRows.filter((invite) => invite.isReady).length;
+
   const handleCopyInviteLink = React.useCallback(async () => {
     if (!sessionInviteLink) return;
     try {
@@ -330,6 +351,23 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               Facilitated by <span className="font-semibold text-amber-700">{facilitatorName}</span>
             </p>
           </section>
+
+
+          {isScheduledSession && (
+            <section className="mx-auto mb-6 w-full max-w-3xl rounded-3xl border border-indigo-100 bg-indigo-50 p-5 text-left shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-indigo-700"><CalendarClock className="h-4 w-4" /> Reconnected scheduled session</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950">{scheduledStartLabel ? `Scheduled for ${scheduledStartLabel}` : 'Scheduled waiting area'}</p>
+                  <p className="mt-1 text-sm text-slate-600">Keep this room open to monitor invited participants as they arrive, then start when the group is ready.</p>
+                </div>
+                <div className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-950">{readyInviteeCount} of {expectedInvitees || maxParticipants} ready</p>
+                  <p>{expectedInvitees ? 'Invitation roster' : 'Open invite link'}</p>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-5">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -429,6 +467,34 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
               )}
             </div>
           </section>
+
+
+
+          {isScheduledSession && invitedReadinessRows.length > 0 && (
+            <section className="mx-auto mt-7 w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-indigo-600" />
+                  <h2 className="text-base font-semibold text-slate-950">Invitation readiness</h2>
+                </div>
+                <span className="text-sm font-medium text-slate-500">{readyInviteeCount} of {invitedReadinessRows.length} joined</span>
+              </header>
+              <div className="divide-y divide-slate-100">
+                {invitedReadinessRows.map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-950">{invite.name}</p>
+                      <p className="truncate text-xs text-slate-500">{invite.email}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${invite.isReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {invite.isReady ? <Wifi className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
+                      {invite.isReady ? 'In waiting room' : 'Invited'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="mx-auto mt-7 w-full max-w-3xl">
             <button

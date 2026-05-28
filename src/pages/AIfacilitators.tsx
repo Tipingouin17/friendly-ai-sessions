@@ -6,8 +6,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopCreation } from "@/hooks/useWorkshopCreation";
-import { fetchFacilitators, fetchWorkshops } from "@/services/facilitatorService";
+import { fetchFacilitators, fetchUpcomingScheduledSessions, fetchWorkshops } from "@/services/facilitatorService";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import { useAuth } from "@/contexts/AuthContext";
 
 import { FacilitatorStepper } from "@/components/facilitator/FacilitatorStepper";
 import { FacilitatorSelection } from "@/components/facilitator/FacilitatorSelection";
@@ -70,6 +71,9 @@ const AIfacilitators = () => {
     setAgreed,
     durationMinutes,
     setDurationMinutes,
+    scheduledStartAt,
+    setScheduledStartAt,
+    isScheduled,
     handleNext,
     handlePrevious,
     handleSubmit,
@@ -87,6 +91,7 @@ const AIfacilitators = () => {
   } = usePlanLimits();
 
   const { currentPlanId } = useUserPlan();
+  const { user } = useAuth();
 
   // Map a plan ID to its effective access tier for facilitator lock checks.
   // Mirrors the same logic in FacilitatorCarousel.tsx.
@@ -112,6 +117,19 @@ const AIfacilitators = () => {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+
+
+  const {
+    data: upcomingScheduledSessions = [],
+    isLoading: isUpcomingScheduledSessionsLoading,
+  } = useQuery({
+    queryKey: ['upcoming-scheduled-sessions', user?.id],
+    queryFn: () => fetchUpcomingScheduledSessions(user?.id),
+    enabled: currentStep === 1 && isClient && Boolean(user?.id),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -214,6 +232,8 @@ const AIfacilitators = () => {
                 selectedFacilitator={selectedFacilitator}
                 onSelect={setSelectedFacilitator}
                 isLoading={isFacilitatorsLoading}
+                upcomingScheduledSessions={upcomingScheduledSessions}
+                isLoadingUpcomingSessions={isUpcomingScheduledSessionsLoading}
               />
             </div>
 
@@ -243,6 +263,8 @@ const AIfacilitators = () => {
                 durationMinutes={durationMinutes}
                 setDurationMinutes={setDurationMinutes}
                 defaultDurationMinutes={workshops.find(w => w.id === selectedWorkshop)?.duration_minutes ?? null}
+                scheduledStartAt={scheduledStartAt}
+                setScheduledStartAt={setScheduledStartAt}
               />
             </div>
           </div>
@@ -256,6 +278,7 @@ const AIfacilitators = () => {
             isSubmitDisabled={isSubmitDisabled}
             hasReachedSessionLimit={hasReachedSessionLimit}
             isSubmitting={isSubmitting}
+            isScheduled={isScheduled}
           />
         </div>
       </div>

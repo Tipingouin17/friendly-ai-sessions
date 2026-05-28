@@ -18,6 +18,16 @@ import { AlertCircle, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+const formatLocalDateTime = (date: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const parseLocalDateTime = (value: string) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 interface WorkshopSetupProps {
   participantCount: number;
   setParticipantCount: (count: number) => void;
@@ -30,6 +40,8 @@ interface WorkshopSetupProps {
   durationMinutes: number | "";
   setDurationMinutes: (v: number | "") => void;
   defaultDurationMinutes?: number | null;
+  scheduledStartAt: Date;
+  setScheduledStartAt: (date: Date) => void;
 }
 
 export const WorkshopSetup = ({
@@ -44,6 +56,8 @@ export const WorkshopSetup = ({
   durationMinutes,
   setDurationMinutes,
   defaultDurationMinutes,
+  scheduledStartAt,
+  setScheduledStartAt,
 }: WorkshopSetupProps) => {
   const navigate = useNavigate();
   const {
@@ -140,6 +154,21 @@ export const WorkshopSetup = ({
             <SelectItem value="ar">Arabic</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+
+      <div>
+        <label className="block text-sm font-medium mb-2 text-left">
+          Session date and time
+        </label>
+        <Input
+          type="datetime-local"
+          value={formatLocalDateTime(scheduledStartAt)}
+          onChange={(e) => setScheduledStartAt(parseLocalDateTime(e.target.value))}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Leave as now to start immediately, or choose a future date to schedule invitations.
+        </p>
       </div>
 
       <div>

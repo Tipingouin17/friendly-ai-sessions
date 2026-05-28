@@ -100,6 +100,10 @@ export const useMessageFetching = ({
         }
         const textContent = parsedContent && 'text' in parsedContent ? String(parsedContent.text) : (typeof msg.content === 'string' ? msg.content : '');
         const isPrivateToHost = parsedContent ? Boolean(parsedContent.private_to_host) : false;
+        const rawFacilitationTechnique = parsedContent?.facilitation_technique;
+        const facilitationTechnique = rawFacilitationTechnique && typeof rawFacilitationTechnique === 'object' && !Array.isArray(rawFacilitationTechnique)
+          ? rawFacilitationTechnique as Message['facilitationTechnique']
+          : null;
         return {
           id: msg.id.toString(),
           content: textContent,
@@ -110,14 +114,29 @@ export const useMessageFetching = ({
           avatar: parsedContent && 'avatar' in parsedContent ? String(parsedContent.avatar) : undefined,
           role: msg.role || 'user',
           isPrivateToHost,
+          facilitationTechnique,
         };
       });
 
-      // Only update state if messages actually changed
-      const currentIds = messagesRef.current.map(m => m.id).join(',');
-      const newIds = formattedMessages.map(m => m.id).join(',');
+      // Only update state if messages actually changed. Include rendered content and
+      // technique metadata, not only IDs, so the UI refreshes if a row is enriched
+      // after insertion or if JSONB content is normalised by the backend.
+      const currentSignature = JSON.stringify(messagesRef.current.map(m => ({
+        id: m.id,
+        content: m.content,
+        sender: m.sender,
+        participant: m.participant,
+        facilitationTechnique: m.facilitationTechnique ?? null,
+      })));
+      const newSignature = JSON.stringify(formattedMessages.map(m => ({
+        id: m.id,
+        content: m.content,
+        sender: m.sender,
+        participant: m.participant,
+        facilitationTechnique: m.facilitationTechnique ?? null,
+      })));
       
-      if (currentIds !== newIds) {
+      if (currentSignature !== newSignature) {
         setMessages(formattedMessages);
       }
 

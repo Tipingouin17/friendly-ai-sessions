@@ -5,12 +5,20 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { Message } from '@/types/chat';
+import { Message, ParticipantInfo } from '@/types/chat';
+import { getScheduledStartIso } from '@/services/facilitatorService';
+
+interface AutoStartConversation {
+  current_participants?: number | null;
+  participants?: number | null;
+  session_started?: boolean | null;
+  flow_config?: unknown;
+}
 
 interface UseSessionAutoStartMonitoringProps {
   conversationId: number | null;
-  conversation: any;
-  participants: any[];
+  conversation: AutoStartConversation | null;
+  participants: ParticipantInfo[];
   onSessionStarted?: () => void;
   onAIMessageGenerated?: (message: Message) => void;
   isHost?: boolean;
@@ -19,9 +27,7 @@ interface UseSessionAutoStartMonitoringProps {
 export const useSessionAutoStartMonitoring = ({
   conversationId,
   conversation,
-  participants,
   onSessionStarted,
-  onAIMessageGenerated,
   isHost = false
 }: UseSessionAutoStartMonitoringProps) => {
   const lastProcessedCountRef = useRef<number>(0);
@@ -33,6 +39,10 @@ export const useSessionAutoStartMonitoring = ({
     const currentCount = conversation.current_participants || 0;
     const maxCount = conversation.participants || 0;
     const sessionStarted = conversation.session_started;
+    const isScheduledWaitingRoom = Boolean(getScheduledStartIso(conversation.flow_config)) && !sessionStarted;
+
+    // Scheduled sessions must remain waiting until the host explicitly starts them.
+    if (isScheduledWaitingRoom) return;
 
     // Only process if the count has actually changed
     if (currentCount === lastProcessedCountRef.current) return;
@@ -64,7 +74,7 @@ export const useSessionAutoStartMonitoring = ({
         }, 2000);
       }
     }
-  }, [conversationId, conversation, participants, onSessionStarted, isHost]);
+  }, [conversationId, conversation, onSessionStarted, isHost]);
 
   // Monitor conversation changes for auto-start
   useEffect(() => {

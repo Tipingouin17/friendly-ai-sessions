@@ -184,6 +184,8 @@ export function useSessionHostLogic() {
                 "[SYSTEM] The session ends in 2 minutes. Please deliver a concise final summary and thank the participants."
             );
         }
+    // Timer warning side-effects should run only when the remaining time changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [timer.timeRemaining]);
 
     // 8. Session Start Handler

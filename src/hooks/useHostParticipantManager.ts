@@ -13,6 +13,7 @@ import api from "@/lib/api";
 import { removeChannel } from '@/utils/realtimeHelpers';
 import { ParticipantInfo } from '@/types/chat';
 import { createLogger } from '@/utils/debugLogger';
+import { getScheduledStartIso } from '@/services/facilitatorService';
 
 interface UseEnhancedHostParticipantManagerProps {
   conversationId: number | null;
@@ -44,7 +45,7 @@ export function useHostParticipantManager({
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [pollingActive, setPollingActive] = useState(false);
 
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const mountedRef = useRef(true);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -125,7 +126,7 @@ export function useHostParticipantManager({
       try {
         const { data, error: err } = await api
           .from('conversations')
-          .select('current_participants, participants, session_started')
+          .select('current_participants, participants, session_started, flow_config')
           .eq('id', conversationId)
           .single();
         if (err) { setPollingActive(false); setIsConnected(false); return; }
@@ -133,6 +134,7 @@ export function useHostParticipantManager({
           const cur     = data.current_participants || 0;
           const max     = data.participants || 0;
           const started = data.session_started || false;
+          const isScheduledWaitingRoom = Boolean(getScheduledStartIso(data.flow_config)) && !started;
           setCurrentCount(cur);
           setMaxCount(max);
           setIsSessionStarted(started);
@@ -140,7 +142,7 @@ export function useHostParticipantManager({
           setError('Using polling updates (real-time unavailable)');
           onParticipantCountChangeRef.current?.(cur);
           onMaxParticipantsChangeRef.current?.(max);
-          if (max > 0 && cur >= max && !started) onSessionFullRef.current?.();
+          if (max > 0 && cur >= max && !started && !isScheduledWaitingRoom) onSessionFullRef.current?.();
           await fetchParticipantList();
         }
       } catch (e) {
@@ -174,13 +176,14 @@ export function useHostParticipantManager({
             const cur     = payload.new.current_participants || 0;
             const max     = payload.new.participants || 0;
             const started = payload.new.session_started || false;
+            const isScheduledWaitingRoom = Boolean(getScheduledStartIso(payload.new.flow_config)) && !started;
             setCurrentCount(cur);
             setMaxCount(max);
             setIsSessionStarted(started);
             onParticipantCountChangeRef.current?.(cur);
             onMaxParticipantsChangeRef.current?.(max);
             if (started) onSessionStartedRef.current?.();
-            if (max > 0 && cur >= max && !started) onSessionFullRef.current?.();
+            if (max > 0 && cur >= max && !started && !isScheduledWaitingRoom) onSessionFullRef.current?.();
           }
         })
         .on('postgres_changes', {
@@ -229,7 +232,7 @@ export function useHostParticipantManager({
     try {
       const { data, error: err } = await api
         .from('conversations')
-        .select('current_participants, participants, session_started')
+        .select('current_participants, participants, session_started, flow_config')
         .eq('id', conversationId)
         .single();
       if (err) { logger.category('admin', 'Error fetching initial data:', err); return; }
@@ -260,6 +263,8 @@ export function useHostParticipantManager({
       mountedRef.current = false;
       cleanup();
     };
+  // Only conversation identity and enabled state should recreate the realtime channel; callbacks are kept stable via refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, enabled]); // intentionally minimal — fns are stable
 
   const reconnect = useCallback(() => {

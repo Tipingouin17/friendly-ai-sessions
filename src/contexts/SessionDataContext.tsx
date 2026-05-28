@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Session Data Context
  *
@@ -16,6 +17,7 @@ import { useSessionLogger } from "@/hooks/useSessionLogger";
 import { useSessionErrorBoundary } from "@/hooks/useSessionErrorBoundary";
 import { useSessionStartMonitor } from "@/hooks/useSessionStartMonitor";
 import { LocationStateType } from "@/hooks/useConversationId";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 
 // Context type definition
 interface SessionDataContextType {
@@ -69,13 +71,17 @@ export const SessionDataProvider: React.FC<SessionDataProviderProps> = ({
     conversation: sessionData.conversation
   });
 
-  // Set up participant management
+  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(sessionData.conversation?.flow_config)) && !isSessionStartedInDB;
+
+  // Set up participant management. Scheduled sessions must remain in the
+  // waiting room until the host explicitly starts them; reaching capacity is not
+  // a valid start signal for these sessions.
   const participantManager = useSessionParticipantManager({
     conversationId: sessionData.currentConversationId,
     conversation: sessionData.conversation,
     locationState: sessionData.locationState,
     refetch: sessionData.refetch,
-    onSessionFull
+    onSessionFull: isScheduledWaitingRoom ? undefined : onSessionFull
   });
 
   // Set up error boundary

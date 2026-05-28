@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Session State Provider
  *
@@ -13,6 +14,7 @@ import { useSessionErrorBoundary } from "@/hooks/useSessionErrorBoundary";
 import { useSessionParticipantContext } from "@/hooks/useSessionParticipantContext";
 import { useSessionLogger } from "@/hooks/useSessionLogger";
 import { participantColors } from "@/utils/sessionHelpers";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 
 // Context type definition
 type SessionStateContextType = {
@@ -81,12 +83,16 @@ export const SessionStateProvider: React.FC<SessionStateProviderProps> = ({
     error: boundaryError
   });
   
-  // Check if session is full and trigger callback
+  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(sessionData.conversation?.flow_config)) && !sessionData.isSessionStartedInDB;
+
+  // Check if session is full and trigger callback. For scheduled sessions,
+  // capacity must not auto-start the room; only the host's explicit start action
+  // may promote the persisted database state.
   React.useEffect(() => {
-    if (participantContext.isSessionFull && onSessionFull) {
+    if (participantContext.isSessionFull && onSessionFull && !isScheduledWaitingRoom) {
       onSessionFull();
     }
-  }, [participantContext.isSessionFull, onSessionFull]);
+  }, [participantContext.isSessionFull, onSessionFull, isScheduledWaitingRoom]);
   
   // Create enhanced session context with combined state
   const enhancedSessionContext = useMemo(() => ({

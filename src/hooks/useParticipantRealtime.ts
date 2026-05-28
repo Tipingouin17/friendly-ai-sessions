@@ -216,5 +216,7 @@ export function useParticipantRealtime({
       
       hasSetupSubscription.current = false;
     };
+  // Keep subscription setup keyed to session identity and explicit auto-start configuration only.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, setParticipants, setIsLoading, maxParticipants, disableAutoStart]);
 }

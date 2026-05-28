@@ -11,13 +11,15 @@ import { ParticipantInfo } from '@/types/chat';
 import { ConversationWithSession } from '@/types/database';
 import { createLogger } from '@/utils/debugLogger';
 import { isNetworkError } from '@/utils/networkUtils';
+import { getScheduledStartIso } from '@/services/facilitatorService';
+import { LocationStateType } from '@/hooks/useConversationId';
 
 interface UseSessionParticipantManagerProps {
   conversationId: number | null;
   conversation: ConversationWithSession | null;
-  refetch?: () => Promise<any>;
+  refetch?: () => Promise<unknown> | void;
   onSessionFull?: () => void;
-  locationState?: any;
+  locationState?: LocationStateType | null;
 }
 
 export function useSessionParticipantManager({
@@ -34,7 +36,7 @@ export function useSessionParticipantManager({
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const mountedRef = useRef(true);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
@@ -54,6 +56,10 @@ export function useSessionParticipantManager({
   const isSessionFull = useMemo(() => 
     currentParticipantCount >= maxParticipantsForSession && maxParticipantsForSession > 0,
     [currentParticipantCount, maxParticipantsForSession]
+  );
+  const isScheduledWaitingRoom = useMemo(() =>
+    Boolean(getScheduledStartIso(conversation?.flow_config)) && !conversation?.session_started,
+    [conversation?.flow_config, conversation?.session_started]
   );
 
   // Cleanup function
@@ -229,11 +235,11 @@ export function useSessionParticipantManager({
 
   // Session full detection
   useEffect(() => {
-    if (isSessionFull && onSessionFull) {
+    if (isSessionFull && onSessionFull && !isScheduledWaitingRoom) {
       logger.category('participants', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
       onSessionFull();
     }
-  }, [isSessionFull, onSessionFull, currentParticipantCount, maxParticipantsForSession, logger]);
+  }, [isSessionFull, onSessionFull, isScheduledWaitingRoom, currentParticipantCount, maxParticipantsForSession, logger]);
 
   // Force refresh function
   const forceRefreshParticipants = useCallback(() => {

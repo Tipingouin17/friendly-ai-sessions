@@ -254,6 +254,8 @@ export const useSessionParticipantSetup = ({
       loadingRef.current = false;
       currentConversationIdRef.current = null;
     };
+  // Participant loading is intentionally keyed only to conversation changes to avoid duplicate joins.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]); // Only depend on conversationId
   
   // Update participant counts when conversation or participants change

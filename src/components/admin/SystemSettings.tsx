@@ -20,7 +20,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff, Mic, Volume2, Activity,
+    Settings, Bot, Globe, Shield, MessageSquare, Mail, Save, Loader2, RefreshCw, Eye, EyeOff, Mic, Volume2, Activity,
 } from "lucide-react";
 
 interface Config {

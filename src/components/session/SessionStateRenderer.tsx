@@ -41,6 +41,10 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
 
   const isOnAdminRoute = window.location.pathname.includes('/admin');
   const isParticipantPath = window.location.pathname.includes('/session') && !isOnAdminRoute;
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasSessionId = urlParams.has('id') && !!urlParams.get('id');
+  const hasParticipantIdentity = urlParams.has('participantId') || urlParams.has('name') || urlParams.has('token');
+  const isBareParticipantSessionRoute = window.location.pathname === '/session' && !hasSessionId && !hasParticipantIdentity;
   
   const shouldUseAdminPrivileges = isParticipantPath ? 
     (props.isAdmin || false) : effectiveAdmin;
@@ -90,6 +94,14 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     );
   }
   
+  if (isBareParticipantSessionRoute) {
+    return <JoinSessionLoadingState
+      error="This session link is missing required session information. Please use the invite link from your host or return home."
+      onRetry={retryConnection}
+      retryCount={connectionAttempts}
+    />;
+  }
+
   if ((isLoading || props.isLoading) && !props.conversation) {
     return <JoinSessionLoadingState 
       onRetry={retryConnection}
@@ -110,9 +122,6 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
     // Without an ?id= param the user may be navigating here before a conversation has been
     // created (e.g. right after session creation), so we show the loading spinner instead
     // of a misleading "Session not found" error message.
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasSessionId = urlParams.has('id') && !!urlParams.get('id');
-
     if (hasSessionId) {
       console.error("No conversation ID found in session provider, but no error was returned");
       return <JoinSessionLoadingState 
@@ -122,10 +131,10 @@ const SessionStateRenderer: React.FC<SessionStateRendererProps> = ({
       />;
     }
 
-    // No ?id= in URL — show a neutral loading spinner while the conversation ID resolves.
-    return <JoinSessionLoadingState 
+    return <JoinSessionLoadingState
+      error="This session link is missing required session information. Please use the invite link from your host or return home."
       onRetry={retryConnection}
-      retryCount={connectionAttempts} 
+      retryCount={connectionAttempts}
     />;
   }
   

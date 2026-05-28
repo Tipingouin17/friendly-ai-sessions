@@ -44,6 +44,7 @@ const Referrals     = lazy(() => import("./pages/Referrals"));
 const Terms         = lazy(() => import("./pages/Terms"));
 const Privacy       = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
 const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
 const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
@@ -129,6 +130,7 @@ function App() {
                 <Route path="/faqs" element={<FAQs />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-email-sent" element={<VerifyEmailSent />} />

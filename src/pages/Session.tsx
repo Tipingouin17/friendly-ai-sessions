@@ -10,6 +10,7 @@ import { useSessionPageEffects } from "@/hooks/useSessionPageEffects";
 import SessionContent from "@/components/session/SessionContent";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SessionMobileNav from "@/components/session/SessionMobileNav";
+import JoinSessionLoadingState from "@/components/session/JoinSessionLoadingState";
 
 const Session = () => {
   // Get session state from our custom hook
@@ -43,6 +44,21 @@ const Session = () => {
 
   // Show mobile nav only when we know we're on mobile
   const showMobileNav = isClient && isMobile;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasSessionId = urlParams.has('id') && !!urlParams.get('id');
+  const hasParticipantIdentity = urlParams.has('participantId') || urlParams.has('name') || urlParams.has('token');
+  const isBareParticipantSessionRoute = window.location.pathname === '/session' && !hasSessionId && !hasParticipantIdentity;
+
+  if (isBareParticipantSessionRoute) {
+    return (
+      <JoinSessionLoadingState
+        error="This session link is missing required session information. Please use the invite link from your host or return home."
+        onRetry={retryConnection}
+        retryCount={stateRef.current.connectionAttempts}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-[100dvh]">

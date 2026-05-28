@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 
 const participantView = read('src/components/session/messaging/ParticipantMessagingView.tsx');
+const sessionPage = read('src/pages/Session.tsx');
 const inputFooter = read('src/components/session/InputFooter.tsx');
 const hostContent = read('src/components/session/host/HostSessionContent.tsx');
 const hostMessagingView = read('src/components/session/messaging/SimplifiedHostMessagingView.tsx');
@@ -16,6 +17,7 @@ const videoGrid = read('src/components/session/video/SessionVideoGrid.tsx');
 const preJoinMediaCheck = read('src/components/session/PreJoinMediaCheck.tsx');
 const webRTCSessionHook = read('src/hooks/useWebRTCSession.ts');
 const sessionContent = read('src/components/session/SessionContent.tsx');
+const sessionStateRenderer = read('src/components/session/SessionStateRenderer.tsx');
 const sessionPageState = read('src/hooks/useSessionPageState.ts');
 const phase3RuntimeService = read('src/services/facilitator/phase3RuntimeService.ts');
 const apiClient = read('src/lib/api.ts');
@@ -23,6 +25,10 @@ const vercelConfig = read('vercel.json');
 const realtimeHelpers = read('src/utils/realtimeHelpers.ts');
 const requestDeduplication = read('src/utils/requestDeduplication.ts');
 const fastApiServer = read('supabase_proxy/server_fastapi.py');
+const protectedHostRoute = read('src/components/ProtectedHostRoute.tsx');
+const appRoutes = read('src/App.tsx');
+const forgotPasswordPage = read('src/pages/ForgotPassword.tsx');
+const resetPasswordPage = read('src/pages/ResetPassword.tsx');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -82,6 +88,9 @@ assertContains(inputFooter, "isOpenDiscussionMode || lastMessage?.sender === 'as
 assertContains(inputFooter, "You're live — speak freely", 'adaptive footer explains Open Discussion as a free-speaking mode');
 assertContains(sessionContent, "key={isAdmin ? connectionAttempts : 'participant-stable'}", 'participant session provider remains mounted during transient retries to avoid refresh-like resets');
 assertContains(sessionPageState, 'shouldPreserveParticipantView', 'participant retry preserves the live room instead of returning to the loading shell');
+assertContains(sessionStateRenderer, "error=\"This session link is missing required session information.", 'session renderer retains a recoverable missing-context guard');
+assertContains(sessionPage, 'const isBareParticipantSessionRoute', 'session page detects a bare participant route before mounting the provider overlay');
+assertContains(sessionPage, '<JoinSessionLoadingState', 'session page renders a page-level missing-context guard for bare participant deep links');
 assertContains(inputFooter, "modeKey === 'voting_rating'", 'adaptive footer renders voting mode panel');
 assertContains(inputFooter, "modeKey === 'round_robin'", 'adaptive footer renders round robin turn-gated panel');
 assertContains(inputFooter, "modeKey === 'silent_individual_response'", 'adaptive footer renders private silent response panel');
@@ -231,5 +240,13 @@ assertContains(realtimeHelpers, 'void Promise.resolve(channel.unsubscribe()).cat
 assertContains(realtimeHelpers, 'void Promise.resolve(api.removeChannel(channel)).catch(swallowExpectedRemovalError)', 'realtime helper catches async removeChannel abort rejections');
 assertContains(requestDeduplication, 'void promise.then(', 'request deduplication cleanup handles rejected participant-load promises without creating unhandled finally rejections');
 assertNotContains(requestDeduplication, 'promise.finally(', 'request deduplication must not attach bare finally cleanup to abortable participant-load promises');
+assertContains(appRoutes, 'const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));', 'forgot-password page is registered as a lazy route');
+assertContains(appRoutes, '<Route path="/forgot-password" element={<ForgotPassword />} />', 'forgot-password path renders a public password-reset request page');
+assertContains(forgotPasswordPage, 'await resetPassword(trimmedEmail);', 'forgot-password page sends the existing password reset email flow');
+assertContains(forgotPasswordPage, 'Check your email', 'forgot-password page renders a non-404 success state');
+assertContains(resetPasswordPage, "navigate('/forgot-password')", 'expired reset-token CTA sends users to request a new link');
+assertContains(protectedHostRoute, "setHostRouteError('missing-session')", 'direct host route without a session id records missing-context state');
+assertContains(protectedHostRoute, 'Missing host session', 'direct host route renders a missing-session recovery message');
+assertContains(protectedHostRoute, '<Link to="/my-facilitators">Back to facilitators</Link>', 'direct host route provides a dashboard recovery action instead of redirecting into participant loading');
 
 console.log('UX session shell regression checks passed.');

@@ -163,7 +163,7 @@ export default function ResetPassword() {
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">Link expired</h1>
                 <p className="text-gray-500 text-sm mb-6">{tokenError}</p>
                 <Button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/forgot-password')}
                   className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white"
                 >
                   Request a new link

@@ -37,6 +37,8 @@ interface HostSessionContentProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  waitingRoomParticipantCount?: number;
+  waitingRoomCapacity?: number;
   isGeneratingResponse?: boolean;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   enabledTools?: FacilitatorToolAssignment[];
@@ -108,6 +110,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  waitingRoomParticipantCount,
+  waitingRoomCapacity,
   isGeneratingResponse = false,
   onTriggerFacilitatorResponse,
   enabledTools = [],
@@ -303,8 +307,18 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
   const sessionTitle = conversationData?.sessions?.title || "Untitled session";
   const facilitatorName = facilitatorDetails?.title || "AI Facilitator";
-  const maxParticipants = conversationData?.participants || Math.max(actualParticipantCount, 1);
-  const joinedParticipantCount = actualParticipantCount;
+  const reconciledParticipantCount = Math.max(
+    actualParticipantCount,
+    waitingRoomParticipantCount ?? 0,
+    (conversationData as any)?.current_participants ?? 0,
+  );
+  const maxParticipants = Math.max(
+    waitingRoomCapacity ?? 0,
+    conversationData?.participants || 0,
+    reconciledParticipantCount,
+    1,
+  );
+  const joinedParticipantCount = reconciledParticipantCount;
   const joinToken = (conversationData as any)?.join_token;
   const sessionInviteLink = React.useMemo(() => {
     if (!currentConversationId || typeof window === 'undefined') return '';

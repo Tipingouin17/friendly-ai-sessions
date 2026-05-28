@@ -28,6 +28,8 @@ const SessionHost = () => {
     autoStartCountdown,
     cancelAutoStart,
     isWaitingRoomFull,
+    waitingRoomParticipantCount,
+    waitingRoomCapacity,
 
     // Messages
     sessionMessages,
@@ -95,6 +97,8 @@ const SessionHost = () => {
       isWaitingForResponses={isWaitingForResponses}
       responseCount={responseCount}
       totalParticipants={participantCount}
+      waitingRoomParticipantCount={waitingRoomParticipantCount}
+      waitingRoomCapacity={waitingRoomCapacity}
       isGeneratingResponse={isGeneratingResponse}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
       enabledTools={enabledTools}

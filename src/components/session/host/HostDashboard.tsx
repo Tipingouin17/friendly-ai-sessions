@@ -28,6 +28,8 @@ interface HostDashboardProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  waitingRoomParticipantCount?: number;
+  waitingRoomCapacity?: number;
   isGeneratingResponse?: boolean;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
   enabledTools?: FacilitatorToolAssignment[];
@@ -70,6 +72,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  waitingRoomParticipantCount,
+  waitingRoomCapacity,
   isGeneratingResponse = false,
   onTriggerFacilitatorResponse,
   enabledTools = [],
@@ -119,6 +123,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isWaitingForResponses={isWaitingForResponses}
         responseCount={responseCount}
         totalParticipants={totalParticipants}
+        waitingRoomParticipantCount={waitingRoomParticipantCount}
+        waitingRoomCapacity={waitingRoomCapacity}
         isGeneratingResponse={isGeneratingResponse}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
         enabledTools={enabledTools}

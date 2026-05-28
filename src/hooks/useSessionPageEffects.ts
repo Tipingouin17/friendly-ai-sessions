@@ -5,7 +5,6 @@
  */
 
 import { useRef, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
 
 export function useSessionPageEffects({
   isLoading,
@@ -22,7 +21,6 @@ export function useSessionPageEffects({
   isAdmin: boolean;
   isOnAdminPath: boolean;
 }) {
-  const { toast } = useToast();
   const sessionMountedRef = useRef(true);
   const stateRef = useRef({
     pageLoadTime: Date.now(),
@@ -49,13 +47,8 @@ export function useSessionPageEffects({
         if (isLoading && !hasInitializedProvider) {
           stateRef.current.hasShownToast = true;
           
-          // Skip toast for admin
-          if (!isOnAdminPath && !isAdmin) {
-            toast({
-              title: "Loading your session",
-              description: "Please wait while we connect you to the session.",
-            });
-          }
+          // SessionConnecting already provides the visible loading state for participants.
+          // Avoid stacking transient toast notifications over the session screen.
         }
       }
     }, initialTimeout);

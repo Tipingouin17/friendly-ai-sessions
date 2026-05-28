@@ -3754,6 +3754,63 @@ async def admin_delete_user(user_id: str, request: Request):
         raise HTTPException(500, str(e))
 
 
+@app.delete("/admin/facilitators/{facilitator_id}")
+async def admin_delete_facilitator(facilitator_id: int, request: Request):
+    """Permanently delete an AI facilitator while preserving historical sessions.
+
+    Sessions may reference facilitators through the sessions.facilitator foreign key.
+    The database intentionally restricts direct facilitator deletion while those
+    references exist, so admin deletion first detaches historical sessions by
+    setting sessions.facilitator to NULL, then deletes the facilitator row.
+    Requires admin JWT.
+    """
+    caller = get_current_user(request)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    caller_id = caller.get("sub") or caller.get("id")
+    try:
+        async with _pool.acquire() as conn:
+            async with conn.transaction():
+                facilitator = await conn.fetchrow(
+                    "SELECT id, title FROM facilitators WHERE id = $1",
+                    facilitator_id,
+                )
+                if not facilitator:
+                    raise HTTPException(404, "Facilitator not found")
+
+                referenced_session_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM sessions WHERE facilitator = $1",
+                    facilitator_id,
+                )
+                await conn.execute(
+                    "UPDATE sessions SET facilitator = NULL WHERE facilitator = $1",
+                    facilitator_id,
+                )
+                await conn.execute(
+                    "DELETE FROM facilitators WHERE id = $1",
+                    facilitator_id,
+                )
+
+        log_auth.info(
+            "admin_delete_facilitator: facilitator %s deleted by admin %s; detached %s session(s)",
+            facilitator_id,
+            caller_id,
+            referenced_session_count,
+        )
+        return {
+            "success": True,
+            "facilitator_id": facilitator_id,
+            "title": facilitator["title"],
+            "deleted": True,
+            "detached_sessions": referenced_session_count or 0,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_auth.error("admin_delete_facilitator error: %s", e, exc_info=True)
+        raise HTTPException(500, str(e))
+
+
 # ============================================================
 # Admin Session Monitoring endpoints
 # ============================================================

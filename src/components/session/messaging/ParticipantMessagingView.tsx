@@ -481,19 +481,29 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
   const lastFacilitationTechnique = latestAssistantMessage?.facilitationTechnique ?? null;
+  const selectedTechniqueKey = lastFacilitationTechnique?.selected
+    || lastFacilitationTechnique?.selected_technique
+    || lastFacilitationTechnique?.label
+    || lastFacilitationTechnique?.display_name
+    || null;
+  const techniqueDisplayLabel = lastFacilitationTechnique?.label
+    || lastFacilitationTechnique?.display_name
+    || lastFacilitationTechnique?.selected
+    || lastFacilitationTechnique?.selected_technique
+    || null;
   const techniqueModeKey = React.useMemo(() => {
-    const selectedTechnique = lastFacilitationTechnique?.selected || lastFacilitationTechnique?.label || null;
-    return inferModeKeyFromTechnique(normalizeTechniqueKey(selectedTechnique));
-  }, [lastFacilitationTechnique?.label, lastFacilitationTechnique?.selected]);
+    return inferModeKeyFromTechnique(normalizeTechniqueKey(selectedTechniqueKey));
+  }, [selectedTechniqueKey]);
   const techniqueModeContext = React.useMemo(() => {
     if (!lastFacilitationTechnique || activeMode) return null;
-    const label = lastFacilitationTechnique.label || lastFacilitationTechnique.selected || 'Adaptive facilitation';
+    const label = techniqueDisplayLabel || titleizeModeKey(techniqueModeKey);
     const instruction = lastFacilitationTechnique.expected_participant_input
       || lastFacilitationTechnique.steering_instruction
       || lastFacilitationTechnique.divergence_guidance
+      || lastFacilitationTechnique.prompt
       || getParticipantModeInstruction(techniqueModeKey, null);
     return { label, instruction, modeKey: techniqueModeKey };
-  }, [activeMode, lastFacilitationTechnique, techniqueModeKey]);
+  }, [activeMode, lastFacilitationTechnique, techniqueDisplayLabel, techniqueModeKey]);
   const effectiveModeKey = techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeKey;
   const effectiveModeLabel = techniqueModeContext && !activeMode ? techniqueModeContext.label : modeLabel;
   const effectiveModeInstruction = techniqueModeContext && !activeMode ? techniqueModeContext.instruction : modeInstruction;

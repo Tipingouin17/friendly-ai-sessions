@@ -35,6 +35,7 @@ const ScheduleInvitations = () => {
   const [emailBody, setEmailBody] = useState("Hello,\n\nYou are invited to join our upcoming facilitated session. Please use the secure link when it is time to join.\n\nSee you there.");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileUnavailable, setTurnstileUnavailable] = useState(false);
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
 
   const { data: conversation, isLoading } = useQuery({
@@ -71,8 +72,12 @@ const ScheduleInvitations = () => {
       return;
     }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      toast({ title: "Verification required", description: "Please complete the verification before sending invitations.", variant: "destructive" });
-      return;
+      toast({
+        title: turnstileUnavailable ? "Verification unavailable" : "Saving without email handoff",
+        description: turnstileUnavailable
+          ? "The verification widget could not connect, so invitations will be saved and the waiting area will open without sending emails."
+          : "Complete verification to send emails automatically, or continue to save the roster and open the waiting area.",
+      });
     }
 
     setIsSubmitting(true);
@@ -85,8 +90,10 @@ const ScheduleInvitations = () => {
         cfTurnstileToken: turnstileToken,
       });
       toast({
-        title: "Invitations prepared",
-        description: "Participants were saved on the scheduled session, and the email handoff was requested.",
+        title: turnstileToken ? "Invitations prepared" : "Invitations saved",
+        description: turnstileToken
+          ? "Participants were saved on the scheduled session, and the email handoff was requested."
+          : "Participants were saved on the scheduled session. Email handoff was skipped because verification was unavailable.",
       });
       await navigateToHostSession(conversationId);
     } catch (error) {
@@ -159,11 +166,29 @@ const ScheduleInvitations = () => {
               {TURNSTILE_SITE_KEY && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Verification</div>
-                  <Turnstile ref={turnstileRef} siteKey={TURNSTILE_SITE_KEY} onSuccess={(token) => setTurnstileToken(token)} onExpire={() => setTurnstileToken(null)} onError={() => setTurnstileToken(null)} options={{ theme: "light" }} />
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => {
+                      setTurnstileToken(token);
+                      setTurnstileUnavailable(false);
+                    }}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => {
+                      setTurnstileToken(null);
+                      setTurnstileUnavailable(true);
+                    }}
+                    options={{ theme: "light" }}
+                  />
+                  {turnstileUnavailable && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      Verification is currently unavailable. You can still save the invite roster and open the waiting area; automatic email sending will be skipped.
+                    </p>
+                  )}
                 </div>
               )}
-              <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting || validInvitees.length === 0 || (!!TURNSTILE_SITE_KEY && !turnstileToken)} onClick={handleSubmit}>
-                {isSubmitting ? "Preparing invitations…" : "Send invitations and open waiting area"}
+              <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting || validInvitees.length === 0} onClick={handleSubmit}>
+                {isSubmitting ? "Preparing invitations…" : turnstileToken ? "Send invitations and open waiting area" : "Save invitations and open waiting area"}
                 {!isSubmitting && <Send className="ml-2 h-4 w-4" />}
               </Button>
             </div>

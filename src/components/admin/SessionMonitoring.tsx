@@ -31,9 +31,16 @@ import {
 import {
     Loader2, Search, AlertTriangle, Eye, Users, MessageSquare, Clock,
     Flag, XCircle, Download, RefreshCw, ChevronLeft, ChevronRight,
-    Activity, Filter, Bot, MoreHorizontal, Trash2,
+    Activity, Filter, Bot, MoreHorizontal, Trash2, UserRound, Mail,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+
+interface OwnerProfile {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    display_name: string | null;
+}
 
 interface Conversation {
     id: number;
@@ -90,6 +97,14 @@ const isFutureScheduledConversation = (conv: Conversation): boolean => {
 
     const scheduledStartTime = new Date(scheduledStartIso).getTime();
     return Number.isFinite(scheduledStartTime) && scheduledStartTime > Date.now();
+};
+
+const getOwnerDisplayName = (profile?: OwnerProfile): string => {
+    return profile?.display_name?.trim() || profile?.full_name?.trim() || "Unknown host";
+};
+
+const getOwnerEmail = (profile?: OwnerProfile): string => {
+    return profile?.email?.trim() || "Email unavailable";
 };
 
 function getAdminAccessToken(): string {
@@ -159,6 +174,28 @@ export const SessionMonitoring = () => {
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
     });
+
+    const ownerIds = Array.from(new Set((conversations ?? []).map(c => c.user_id).filter(Boolean)));
+
+    const { data: ownerProfiles = [] } = useQuery({
+        queryKey: ["admin-conversation-owners", ownerIds.join(",")],
+        enabled: ownerIds.length > 0,
+        queryFn: async () => {
+            const { data, error } = await api
+                .from("profiles")
+                .select("id, email, full_name, display_name")
+                .in("id", ownerIds);
+
+            if (error) throw error;
+            return data as OwnerProfile[];
+        },
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
+
+    const ownerById = new Map(ownerProfiles.map(profile => [profile.id, profile]));
+    const deleteConversation = conversations?.find(c => c.id === deleteConvId);
+    const deleteOwnerProfile = deleteConversation ? ownerById.get(deleteConversation.user_id) : undefined;
 
     // Use dedicated admin endpoint to bypass RLS
     const { data: messages, isLoading: messagesLoading } = useQuery({
@@ -263,7 +300,9 @@ export const SessionMonitoring = () => {
         return (
             c.id.toString().includes(q) ||
             (c.sessions?.title ?? "").toLowerCase().includes(q) ||
-            (c.participant_description ?? "").toLowerCase().includes(q)
+            (c.participant_description ?? "").toLowerCase().includes(q) ||
+            getOwnerDisplayName(ownerById.get(c.user_id)).toLowerCase().includes(q) ||
+            getOwnerEmail(ownerById.get(c.user_id)).toLowerCase().includes(q)
         );
     });
 
@@ -294,7 +333,7 @@ export const SessionMonitoring = () => {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="Search by session title or ID..."
+                                placeholder="Search by session title, host, email, or ID..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 className="pl-9"
@@ -332,6 +371,7 @@ export const SessionMonitoring = () => {
                                         <TableRow className="bg-gray-50">
                                             <TableHead>ID</TableHead>
                                             <TableHead>Session</TableHead>
+                                            <TableHead>Host / Owner</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Participants</TableHead>
                                             <TableHead>Messages</TableHead>
@@ -351,6 +391,18 @@ export const SessionMonitoring = () => {
                                                     {conv.language && (
                                                         <p className="text-xs text-gray-400">{conv.language}</p>
                                                     )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="max-w-[210px] space-y-1">
+                                                        <p className="flex items-center gap-1.5 text-sm font-medium text-gray-900 truncate">
+                                                            <UserRound className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                                            <span className="truncate">{getOwnerDisplayName(ownerById.get(conv.user_id))}</span>
+                                                        </p>
+                                                        <p className="flex items-center gap-1.5 text-xs text-gray-500 truncate">
+                                                            <Mail className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                                            <span className="truncate">{getOwnerEmail(ownerById.get(conv.user_id))}</span>
+                                                        </p>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>{statusBadge(conv)}</TableCell>
                                                 <TableCell>
@@ -462,6 +514,18 @@ export const SessionMonitoring = () => {
                                 <Users className="h-3.5 w-3.5" />
                                 {selectedConversation?.participants ?? 0} participants
                             </span>
+                            {selectedConversation && (
+                                <span className="flex items-center gap-1">
+                                    <UserRound className="h-3.5 w-3.5" />
+                                    Host: {getOwnerDisplayName(ownerById.get(selectedConversation.user_id))}
+                                </span>
+                            )}
+                            {selectedConversation && (
+                                <span className="flex items-center gap-1">
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {getOwnerEmail(ownerById.get(selectedConversation.user_id))}
+                                </span>
+                            )}
                             <span className="flex items-center gap-1">
                                 <MessageSquare className="h-3.5 w-3.5" />
                                 {selectedConversation?.total_messages ?? 0} messages
@@ -600,8 +664,18 @@ export const SessionMonitoring = () => {
                         <AlertDialogTitle className="flex items-center gap-2 text-red-600">
                             <Trash2 className="h-5 w-5" /> Delete Conversation
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete conversation #{deleteConvId} and all its messages, participants, and reports. This action <strong>cannot be undone</strong>.
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 text-sm text-gray-600">
+                                <p>
+                                    This will permanently delete conversation #{deleteConvId} and all its messages, participants, and reports. This action <strong>cannot be undone</strong>.
+                                </p>
+                                <div className="rounded-lg border border-red-100 bg-red-50/70 p-3 text-left">
+                                    <p className="font-medium text-gray-900">Deletion target</p>
+                                    <p>Session: {deleteConversation?.sessions?.title ?? "Unknown Session"}</p>
+                                    <p>Host: {getOwnerDisplayName(deleteOwnerProfile)}</p>
+                                    <p>Email: {getOwnerEmail(deleteOwnerProfile)}</p>
+                                </div>
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -477,15 +477,33 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const remainingTimeLabel = formatRemainingTime(participantModeState?.remaining_time);
   const modeCanSubmit = participantModeState?.can_submit ?? true;
   const modeComposerComponent = activeMode?.composer_component ?? activeMode?.facilitation_mode?.composer_component ?? null;
-  const isVotingMode = modeKey === 'voting_rating';
-  const isRoundRobinMode = modeKey === 'round_robin';
-  const isSilentResponseMode = modeKey === 'silent_individual_response';
-  const isReflectionMode = modeKey === 'reflection_checkin';
-  const isOpenDiscussionMode = modeKey === 'open_discussion';
-  const modeBlocksAfterResponse = isVotingMode || isRoundRobinMode || isSilentResponseMode || isReflectionMode;
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
+  const lastFacilitationTechnique = latestAssistantMessage?.facilitationTechnique ?? null;
+  const techniqueModeKey = React.useMemo(() => {
+    const selectedTechnique = lastFacilitationTechnique?.selected || lastFacilitationTechnique?.label || null;
+    return inferModeKeyFromTechnique(normalizeTechniqueKey(selectedTechnique));
+  }, [lastFacilitationTechnique?.label, lastFacilitationTechnique?.selected]);
+  const techniqueModeContext = React.useMemo(() => {
+    if (!lastFacilitationTechnique || activeMode) return null;
+    const label = lastFacilitationTechnique.label || lastFacilitationTechnique.selected || 'Adaptive facilitation';
+    const instruction = lastFacilitationTechnique.expected_participant_input
+      || lastFacilitationTechnique.steering_instruction
+      || lastFacilitationTechnique.divergence_guidance
+      || getParticipantModeInstruction(techniqueModeKey, null);
+    return { label, instruction, modeKey: techniqueModeKey };
+  }, [activeMode, lastFacilitationTechnique, techniqueModeKey]);
+  const effectiveModeKey = techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeKey;
+  const effectiveModeLabel = techniqueModeContext && !activeMode ? techniqueModeContext.label : modeLabel;
+  const effectiveModeInstruction = techniqueModeContext && !activeMode ? techniqueModeContext.instruction : modeInstruction;
+  const effectiveModePlaceholder = techniqueModeContext && !activeMode ? getModePlaceholder(techniqueModeContext.modeKey, techniqueModeContext.instruction) : modePlaceholder;
+  const isVotingMode = effectiveModeKey === 'voting_rating';
+  const isRoundRobinMode = effectiveModeKey === 'round_robin';
+  const isSilentResponseMode = effectiveModeKey === 'silent_individual_response';
+  const isReflectionMode = effectiveModeKey === 'reflection_checkin';
+  const isOpenDiscussionMode = effectiveModeKey === 'open_discussion';
+  const modeBlocksAfterResponse = isVotingMode || isRoundRobinMode || isSilentResponseMode || isReflectionMode;
   const resolveParticipantDisplayName = React.useCallback((participantId: number | string | null | undefined, fallbackName?: string | null): string => {
     const numericParticipantId = Number(participantId);
     const participant = Number.isFinite(numericParticipantId)
@@ -523,7 +541,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
-  const modeComposerDisabled = Boolean(activeMode && (!modeCanSubmit || (modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice)) || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
+  const modeComposerDisabled = Boolean((activeMode || techniqueModeContext) && (!modeCanSubmit || (modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice)) || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
   const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice, inputType: 'vote' | 'reflection_word' = 'vote') => {
     if (!submitModeInput || !modeCanSubmit || hasRegisteredResponse || submittingChoiceId) return;
     setModeInputError(null);
@@ -534,7 +552,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         content: {
           choice: choice.label,
           value: choice.value,
-          modeKey,
+          modeKey: effectiveModeKey,
         },
         visibility: inputType === 'vote' ? 'anonymous_aggregate' : 'private',
       });
@@ -545,7 +563,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     } finally {
       setSubmittingChoiceId(null);
     }
-  }, [hasRegisteredResponse, modeCanSubmit, modeKey, submitModeInput, submittingChoiceId]);
+  }, [effectiveModeKey, hasRegisteredResponse, modeCanSubmit, submitModeInput, submittingChoiceId]);
   React.useEffect(() => {
     setSubmittedChoiceId(null);
     setModeInputError(null);
@@ -583,7 +601,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     setCameraStatus('off');
     setMicrophoneEnabled(hasActiveAudioTrack);
     persistMediaPreferences(false, hasActiveAudioTrack);
-  }, [microphoneEnabled, persistMediaPreferences]);
+  }, [persistMediaPreferences]);
 
   const startLocalCamera = React.useCallback(async () => {
     const currentStream = localCameraStreamRef.current;
@@ -875,24 +893,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     : 'Camera off';
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
-  const lastAssistantMessage = React.useMemo(() => {
-    return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
-  }, [messages]);
-
-  const lastFacilitationTechnique = lastAssistantMessage?.facilitationTechnique ?? null;
-  const techniqueModeKey = React.useMemo(() => {
-    const selectedTechnique = lastFacilitationTechnique?.selected || lastFacilitationTechnique?.label || null;
-    return inferModeKeyFromTechnique(normalizeTechniqueKey(selectedTechnique));
-  }, [lastFacilitationTechnique?.label, lastFacilitationTechnique?.selected]);
-  const techniqueModeContext = React.useMemo(() => {
-    if (!lastFacilitationTechnique || activeMode) return null;
-    const label = lastFacilitationTechnique.label || lastFacilitationTechnique.selected || 'Adaptive facilitation';
-    const instruction = lastFacilitationTechnique.expected_participant_input
-      || lastFacilitationTechnique.steering_instruction
-      || lastFacilitationTechnique.divergence_guidance
-      || getParticipantModeInstruction(techniqueModeKey, null);
-    return { label, instruction, modeKey: techniqueModeKey };
-  }, [activeMode, lastFacilitationTechnique, techniqueModeKey]);
+  const lastAssistantMessage = latestAssistantMessage;
 
   React.useEffect(() => {
     if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
@@ -960,7 +961,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         content: {
           transcript: payload.transcript,
           confidence: payload.confidence,
-          modeKey,
+          modeKey: effectiveModeKey,
           startedAt: payload.startedAt,
           endedAt: payload.endedAt,
           durationMs: payload.durationMs,
@@ -987,11 +988,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       endedAt: payload.endedAt,
       metrics: {
         composer: isOpenDiscussionMode ? 'open_discussion_live_listening' : 'participant_chat_input',
-        modeKey,
+        modeKey: effectiveModeKey,
         activeModeId: activeMode?.id ?? null,
       },
     });
-  }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, modeKey, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
+  }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveModeKey, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
 
   const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile') => {
     const isMobilePanel = panelVariant === 'mobile';
@@ -1098,15 +1099,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Current question</span>
                 <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">
-                  {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : modeLabel}
+                  {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : effectiveModeLabel}
                 </span>
               </div>
               <p className="line-clamp-5 text-sm font-medium leading-relaxed text-slate-700 md:line-clamp-none md:text-base">
                 {latestAssistantMessage?.content || activeMode?.prompt || 'The AI facilitator is preparing the next question for the room.'}
               </p>
-              {activeMode && (
+              {(activeMode || techniqueModeContext) && (
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                  {modeInstruction}
+                  {effectiveModeInstruction}
                 </p>
               )}
               <div className="mt-4 flex items-center gap-3">
@@ -1178,14 +1179,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
                 onSpeechInterim={handleSpeechInterim}
                 onSpeechFinal={handleSpeechFinal}
-                placeholder={techniqueModeContext && !activeMode ? getModePlaceholder(techniqueModeContext.modeKey, techniqueModeContext.instruction) : modePlaceholder}
-                disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${modeLabel} response registered. Waiting for the facilitator to continue…` : modePlaceholder}
+                placeholder={effectiveModePlaceholder}
+                disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${effectiveModeLabel} response registered. Waiting for the facilitator to continue…` : effectiveModePlaceholder}
                 disabled={modeComposerDisabled}
                 modeContext={activeMode || isOpenDiscussionMode || techniqueModeContext ? {
-                  label: techniqueModeContext && !activeMode ? techniqueModeContext.label : modeLabel,
-                  instruction: techniqueModeContext && !activeMode ? techniqueModeContext.instruction : modeInstruction,
+                  label: effectiveModeLabel,
+                  instruction: effectiveModeInstruction,
                   component: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeComposerComponent,
-                  modeKey: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeKey,
+                  modeKey: effectiveModeKey,
                   stateLabel: techniqueModeContext && !activeMode
                     ? 'Selected facilitation technique'
                     : isOpenDiscussionMode
@@ -1215,7 +1216,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                       inputType: 'reaction',
                       content: {
                         reaction,
-                        modeKey,
+                        modeKey: effectiveModeKey,
                         source: 'participant_quick_reaction',
                       },
                       visibility: 'public',
@@ -1223,7 +1224,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                       console.warn('Unable to submit Open Discussion quick reaction:', error);
                     });
                   } else {
-                    console.info('Participant quick reaction', { reaction, modeKey });
+                    console.info('Participant quick reaction', { reaction, modeKey: effectiveModeKey });
                   }
                 }}
               />

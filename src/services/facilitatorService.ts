@@ -148,7 +148,11 @@ export const createConversation = async (params: {
       accept_terms_and_conditions: params.agreed,
       is_saved: false,
       is_session_ended: false,
-      status: isScheduled ? "scheduled" : "active",
+      // Keep database status aligned with the existing active-session constraint.
+      // Scheduled behavior is represented by flow_config.scheduled_start_at so
+      // hosted dev/prod databases that only allow active conversations still
+      // accept the record while the UI can distinguish scheduled sessions.
+      status: "active",
       user_id: params.userId,
       ...(flowConfig ? { flow_config: flowConfig } : {}),
       ...(params.durationMinutes ? { session_duration_minutes: params.durationMinutes } : {})
@@ -172,7 +176,7 @@ export const fetchUpcomingScheduledSessions = async (userId?: string): Promise<U
       )
     `)
     .eq('is_session_ended', false)
-    .eq('status', 'scheduled')
+    .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (userId) query.eq('user_id', userId);

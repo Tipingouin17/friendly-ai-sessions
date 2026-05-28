@@ -6,6 +6,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Message, ParticipantInfo } from "@/types/chat";
+import type { ConversationWithSession } from "@/types/database";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
+import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import AdminMessagingView from "./messaging/AdminMessagingView";
 import ParticipantMessagingView from "./messaging/ParticipantMessagingView";
 
@@ -39,7 +43,21 @@ interface MessagingAreaProps {
   currentUserParticipantId?: number | null;
   
   // Add conversationData prop to pass session info
-  conversationData?: any;
+  conversationData?: ConversationWithSession | null;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  participantModeState?: ModeParticipantState | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  submitModeInput?: (params: {
+    inputType: string;
+    content: Record<string, unknown>;
+    visibility?: ModeInput["visibility"];
+  }) => Promise<unknown>;
 }
 
 const MessagingArea = ({
@@ -72,7 +90,17 @@ const MessagingArea = ({
   currentUserParticipantId = null,
   
   // Session data
-  conversationData
+  conversationData,
+  facilitatorRuntime,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  enabledModes = [],
+  activeMode = null,
+  participantModeState = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  submitModeInput
 }: MessagingAreaProps) => {
   // State for admin filters and search
   const [showAnonymous, setShowAnonymous] = useState(true);
@@ -145,6 +173,16 @@ const MessagingArea = ({
       participantNames={participantNames}
       currentUserParticipantId={currentUserParticipantId}
       showResponseStats={false}
+      facilitatorRuntime={facilitatorRuntime}
+      enabledTools={enabledTools}
+      isLoadingToolbox={isLoadingToolbox}
+      enabledModes={enabledModes}
+      activeMode={activeMode}
+      participantModeState={participantModeState}
+      recentModeEvents={recentModeEvents}
+      isLoadingModes={isLoadingModes}
+      modeError={modeError}
+      submitModeInput={submitModeInput}
     />
   );
 };

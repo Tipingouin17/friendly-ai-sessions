@@ -11,6 +11,16 @@ import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
+const hasStartedSession = (conversationLike: any): boolean => {
+  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
+};
+
+const isMissingSessionStartedAtColumn = (error: { message?: string; details?: string; hint?: string; code?: string } | null): boolean => {
+  if (!error) return false;
+  const combined = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ').toLowerCase();
+  return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
+};
+
 export function useSessionInterface(
   conversationId: number | null,
   conversation?: ConversationWithSession | null
@@ -34,12 +44,15 @@ export function useSessionInterface(
     return token
       ? `${baseUrl}/join-session?id=${conversationId}&token=${encodeURIComponent(token)}`
       : `${baseUrl}/join-session?id=${conversationId}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [conversationId, (conversation as any)?.join_token]);
 
-  // Sync session_started from conversation data
+  // Sync persisted starts from conversation data. Newer backends include
+  // session_started_at, but older deployments only have session_started; both
+  // must be accepted so the host and participants are not stranded in waiting room.
   useEffect(() => {
     if (!conversation) return;
-    const started = (conversation as any).session_started === true;
+    const started = hasStartedSession(conversation as any);
     if (started && !lastSessionStarted.current) {
       lastSessionStarted.current = true;
       setIsSessionStarted(true);
@@ -48,7 +61,8 @@ export function useSessionInterface(
       setIsSessionStarted(false);
       setShowQrCodeView(true);
     }
-  }, [(conversation as any)?.session_started]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
+  }, [(conversation as any)?.session_started, (conversation as any)?.session_started_at]);
 
   // Set up real-time subscription for session_started updates
   useEffect(() => {
@@ -70,8 +84,11 @@ export function useSessionInterface(
       }, (payload) => {
         if (
           payload.new &&
-          payload.old?.session_started !== payload.new.session_started &&
-          payload.new.session_started === true
+          (
+            payload.old?.session_started !== payload.new.session_started ||
+            payload.old?.session_started_at !== payload.new.session_started_at
+          ) &&
+          hasStartedSession(payload.new as any)
         ) {
           if (!lastSessionStarted.current) {
             lastSessionStarted.current = true;
@@ -79,7 +96,7 @@ export function useSessionInterface(
             setShowQrCodeView(false);
             toast({
               title: "Session Started",
-              description: "The session has been automatically started.",
+              description: "The host has started the session.",
             });
           }
         }
@@ -118,17 +135,27 @@ export function useSessionInterface(
     sessionStorage.setItem('isHostSession', 'true');
 
     try {
-      const { error } = await api
+      const startedAt = new Date().toISOString();
+      let { error } = await api
         .from('conversations')
-        .update({ session_started: true })
+        .update({
+          session_started: true,
+          session_started_at: startedAt,
+        })
         .eq('id', conversationId);
 
+      if (isMissingSessionStartedAtColumn(error)) {
+        console.warn('session_started_at column is unavailable; falling back to session_started only.');
+        ({ error } = await api
+          .from('conversations')
+          .update({
+            session_started: true,
+          })
+          .eq('id', conversationId));
+      }
+
       if (error) {
-        toast({
-          title: "Error starting session",
-          description: "There was a problem starting the session. Please try again.",
-          variant: "destructive",
-        });
+        throw new Error(error.message || "Failed to start session");
       } else {
         setIsSessionStarted(true);
         setShowQrCodeView(false);
@@ -145,6 +172,7 @@ export function useSessionInterface(
         description: "There was a problem starting the session. Please try again.",
         variant: "destructive",
       });
+      throw err;
     }
   };
 

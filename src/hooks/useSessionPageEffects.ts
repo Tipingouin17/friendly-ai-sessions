@@ -94,6 +94,7 @@ export function useSessionPageEffects({
     return () => {
       if (stateRef.current.initializeTimeout) {
         clearTimeout(stateRef.current.initializeTimeout);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
         stateRef.current.initializeTimeout = null;
       }
       clearTimeout(criticalTimer);

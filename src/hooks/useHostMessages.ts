@@ -205,9 +205,11 @@ export const useHostMessages = ({
     isHost: true
   });
 
+  const hasPersistedStart = Boolean(conversationState?.session_started);
+
   // Enhanced session start state monitoring for immediate welcome generation
   useEffect(() => {
-    if (conversationState?.session_started && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
+    if (hasPersistedStart && !welcomeGeneratedRef.current && !autoStartHandledRef.current) {
 
       // Check if we need to generate welcome message
       if (messages.length === 0) {
@@ -217,7 +219,7 @@ export const useHostMessages = ({
         }, 500);
       }
     }
-  }, [conversationState?.session_started, messages.length, triggerImmediateWelcomeGeneration]);
+  }, [hasPersistedStart, messages.length, triggerImmediateWelcomeGeneration]);
 
   // Reset flags when conversation changes
   useEffect(() => {

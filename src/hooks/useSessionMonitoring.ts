@@ -55,7 +55,8 @@ export const useSessionMonitoring = ({
     if (conversation) {
       hasMonitoredSessionRef.current = true;
       
-      // Check if the session is already started in the DB
+      // Check if the session was started in the DB. Newer schemas may also
+      // include session_started_at, but session_started is the cross-deployment flag.
       const isStarted = Boolean(conversation.session_started);
       
       // Only update state if different to prevent render loops

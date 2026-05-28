@@ -20,7 +20,6 @@ import SessionView from "./SessionView";
 import ParticipantLoadingShell, { ParticipantLoadingPhase } from "./ParticipantLoadingShell";
 import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
-import { getScheduledStartIso } from "@/services/facilitatorService";
 import { useNavigate } from "react-router-dom";
 import api, { clearAllParticipantState } from "@/lib/api";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
@@ -52,16 +51,13 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const { logSecurityViolation } = useSecurityAudit();
-  const participantEventChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
+  const participantEventChannelRef = useRef<any>(null);
   const processedEventIds = useRef<Set<string>>(new Set());
   const isNavigatingRef = useRef(false);
   const sessionTransitionRef = useRef(false);
 
-  // Check session state to determine what view to show. For scheduled
-  // waiting rooms, only the persisted database start flag can advance the
-  // participant into the live-session/welcome-message flow.
-  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(props.conversation?.flow_config)) && !props.isSessionStartedInDB;
-  const sessionStartedInDB = props.isSessionStartedInDB || (!isScheduledWaitingRoom && sessionStarted);
+  // Check session state to determine what view to show
+  const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
 
   // Welcome message gate for participants
   const {
@@ -124,8 +120,6 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
 
     const channelName = `participant-events-${props.currentConversationId}-${props.currentUserParticipantId}`;
-
-    const processedEventIdsForEffect = processedEventIds.current;
 
     try {
       const channel = api
@@ -194,7 +188,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           console.error("Error removing participant events channel:", err);
         }
       }
-      processedEventIdsForEffect.clear();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
+      processedEventIds.current.clear();
     };
   }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);
 
@@ -205,6 +200,15 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (props.error) {
+
+    const languageNames: Record<string, string> = {
+      en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+      it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+      ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+    };
+    const language = props.conversation?.language;
+    const languageLabel = language ? (languageNames[String(language).toLowerCase()] ?? String(language)) : null;
+
     return (
       <ParticipantLoadingShell
         phase="error"
@@ -263,10 +267,24 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
       phase = 'connecting';
     }
 
+
+    const languageNames: Record<string, string> = {
+      en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+      it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+      ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+    };
+    const language = props.conversation?.language;
+    const languageLabel = language ? (languageNames[String(language).toLowerCase()] ?? String(language)) : null;
+
     return (
       <ParticipantLoadingShell
         phase={phase}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
+        facilitatorAvatar={props.conversation.sessions?.facilitator_details?.profile_picture}
+        sessionTitle={props.conversation.sessions?.title}
+        sessionObjective={props.conversation.sessions?.objective}
+        languageLabel={languageLabel}
+        participants={props.participants}
         currentParticipantCount={props.conversation?.current_participants || 0}
         maxParticipants={props.conversation?.participants || 0}
         onRetryGeneration={timeoutReached ? waitForWelcomeMessage : undefined}

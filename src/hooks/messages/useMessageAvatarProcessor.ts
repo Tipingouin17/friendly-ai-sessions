@@ -34,12 +34,9 @@ export const useMessageAvatarProcessor = () => {
       displayName = participantInfo.name;
     }
     
-    // Show "You" for current user
-    if (currentUserParticipantId && 
-        message.participant === String(currentUserParticipantId) && 
-        !isAnonymous) {
-      displayName = "You";
-    }
+    // Keep the participant's chosen name even for the current user so video tiles
+    // and sent-message labels stay consistent across host and participant views.
+    void currentUserParticipantId;
 
     // Process avatar URL
     let processedAvatar = message.avatar;

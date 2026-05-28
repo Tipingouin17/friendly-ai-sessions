@@ -5,14 +5,33 @@
  * inbox and click the verification link before they can log in.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { BadgeCheck, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import PageHead from '@/components/PageHead';
+import { api } from '@/lib/api';
 
 const VerifyEmailSent: React.FC = () => {
   const location = useLocation();
   const email = (location.state as { email?: string } | null)?.email ?? 'your email address';
+  const canResend = email !== 'your email address';
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+
+  const handleResendVerification = async () => {
+    if (!canResend || resending) return;
+    setResending(true);
+    setResendMessage(null);
+    setResendError(null);
+    const { error } = await api.auth.resendVerificationEmail(email);
+    setResending(false);
+    if (error) {
+      setResendError(error.message || 'We could not resend the verification email. Please try again.');
+      return;
+    }
+    setResendMessage('If this account is still awaiting verification, a new link has been sent.');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
@@ -47,17 +66,26 @@ const VerifyEmailSent: React.FC = () => {
           </ul>
         </div>
 
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-800 text-left mb-8">
-          <div className="flex items-start gap-2">
-            <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-            <div>
-              <p className="font-semibold">Next step for your 3-month tester trial</p>
-              <p className="mt-1 text-emerald-700">
-                After verifying your email, contact Julia with <strong>{email}</strong>. She will manually upgrade your AIfacilitator access for free.
-              </p>
-            </div>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={!canResend || resending}
+          className="mb-4 inline-block w-full py-3 px-6 rounded-full border border-indigo-200 text-indigo-700 font-semibold text-sm hover:bg-indigo-50 transition disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {resending ? 'Sending...' : 'Resend verification email'}
+        </button>
+
+        {resendMessage && (
+          <p className="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+            {resendMessage}
+          </p>
+        )}
+
+        {resendError && (
+          <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">
+            {resendError}
+          </p>
+        )}
 
         <Link
           to="/login"

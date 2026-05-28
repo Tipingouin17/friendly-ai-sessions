@@ -120,13 +120,13 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
       )}
 
       {/* ── Action buttons ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-end gap-1 px-3 py-2">
+      <div className="flex items-center justify-end gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
 
         {/* Skip */}
         {!hasAnswered && !isSkipped && !isPaused && (
           <button
             onClick={onSkip}
-            className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:px-3"
           >
             <SkipForward className="h-3.5 w-3.5" />
             <span className="hidden xs:inline">Skip question</span>
@@ -138,7 +138,7 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
         <button
           onClick={onTogglePause}
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 transition-colors",
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3",
             isPaused
               ? "text-amber-600 hover:text-amber-800 hover:bg-amber-50"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
@@ -154,7 +154,7 @@ const ParticipantEngagementControls: React.FC<ParticipantEngagementControlsProps
         <button
           onClick={() => setShowHostComposer(v => !v)}
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 transition-colors",
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3",
             showHostComposer
               ? "text-blue-600 bg-blue-50"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"

@@ -64,6 +64,16 @@ const SessionView: React.FC<SessionViewProps> = ({ props, isAdmin }) => {
       onSendAdminMessage={props.onSendAdminMessage}
       isAnonymous={props.anonymousState.isAnonymous}
       toggleAnonymous={props.anonymousState.toggleAnonymous}
+      facilitatorRuntime={props.facilitatorRuntime}
+      enabledTools={props.sessionState.enabledTools}
+      isLoadingToolbox={props.sessionState.isLoadingToolbox}
+      enabledModes={props.sessionState.enabledModes}
+      activeMode={props.sessionState.activeMode}
+      participantModeState={props.sessionState.participantModeState}
+      recentModeEvents={props.sessionState.recentModeEvents}
+      isLoadingModes={props.sessionState.isLoadingModes}
+      modeError={props.sessionState.modeError}
+      submitModeInput={props.sessionState.submitModeInput}
     />
   );
 };

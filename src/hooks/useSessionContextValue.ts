@@ -6,24 +6,39 @@
 
 import { useMemo } from "react";
 import { SessionContextProps } from "@/types/session";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
+import type { Message, ParticipantInfo } from "@/types/chat";
+import type { ConversationWithSession } from "@/types/database";
 import { participantColors } from "@/utils/sessionHelpers";
+
+type RoomState = Partial<SessionContextProps["sessionState"]> & {
+  anonymousState?: SessionContextProps["anonymousState"];
+  isWaitingForResponse?: boolean;
+  handleSendMessage?: () => Promise<void>;
+};
+
+interface ConnectionState {
+  isConnected?: boolean;
+  connectionAttempts?: number;
+}
 
 interface UseSessionContextValueProps {
   isLoading: boolean;
-  conversation: any;
+  conversation: ConversationWithSession | null;
   currentConversationId: number | null;
   refetch: () => void;
   showQrCodeView: boolean;
   sessionLink: string | null;
   isSessionStartedInDB: boolean;
-  roomState: any;
-  participants: any[];
+  roomState: RoomState | null;
+  participants: ParticipantInfo[];
   currentUserParticipantId: number | null;
   isAdmin: boolean;
   providerError: string | null;
-  connection: any;
+  connection: ConnectionState | null;
   handleStartSession: () => void;
   effectiveAdmin: boolean;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
 }
 
 export function useSessionContextValue({
@@ -41,7 +56,8 @@ export function useSessionContextValue({
   providerError,
   connection,
   handleStartSession,
-  effectiveAdmin
+  effectiveAdmin,
+  facilitatorRuntime
 }: UseSessionContextValueProps): SessionContextProps {
   // Create safe defaults for any potentially undefined values
   const safeRoomState = useMemo(() => roomState || {
@@ -59,7 +75,23 @@ export function useSessionContextValue({
     viewMode: "participant",
     setViewMode: () => { /* no-op */ },
     recordResponse: () => { /* no-op */ },
-    error: null
+    error: null,
+    enabledTools: [],
+    isLoadingToolbox: false,
+    toolboxError: null,
+    toolboxInstruction: undefined,
+    enabledModes: [],
+    activeMode: null,
+    participantModeState: null,
+    isLoadingModes: false,
+    modeError: null,
+    modeInstruction: undefined,
+    recentModeEvents: [],
+    startMode: async () => Promise.resolve(),
+    approveMode: async () => Promise.resolve(),
+    endMode: async () => Promise.resolve(),
+    rejectMode: async () => Promise.resolve(),
+    submitModeInput: async () => Promise.resolve()
   }, [roomState]);
 
   // Create session state object separately to avoid re-creating on every render
@@ -78,7 +110,23 @@ export function useSessionContextValue({
     viewMode: safeRoomState.viewMode || "participant",
     setViewMode: safeRoomState.setViewMode || (() => { /* no-op */ }),
     recordResponse: safeRoomState.recordResponse || (() => { /* no-op */ }),
-    error: safeRoomState.error || null
+    error: safeRoomState.error || null,
+    enabledTools: safeRoomState.enabledTools || [],
+    isLoadingToolbox: safeRoomState.isLoadingToolbox || false,
+    toolboxError: safeRoomState.toolboxError || null,
+    toolboxInstruction: safeRoomState.toolboxInstruction,
+    enabledModes: safeRoomState.enabledModes || [],
+    activeMode: safeRoomState.activeMode || null,
+    participantModeState: safeRoomState.participantModeState || null,
+    isLoadingModes: safeRoomState.isLoadingModes || false,
+    modeError: safeRoomState.modeError || null,
+    modeInstruction: safeRoomState.modeInstruction,
+    recentModeEvents: safeRoomState.recentModeEvents || [],
+    startMode: safeRoomState.startMode || (async () => Promise.resolve()),
+    approveMode: safeRoomState.approveMode || (async () => Promise.resolve()),
+    endMode: safeRoomState.endMode || (async () => Promise.resolve()),
+    rejectMode: safeRoomState.rejectMode || (async () => Promise.resolve()),
+    submitModeInput: safeRoomState.submitModeInput || (async () => Promise.resolve())
   }), [safeRoomState]);
 
   // Create anonymous state object separately
@@ -98,7 +146,7 @@ export function useSessionContextValue({
   // immediately instead of the generic "No messages yet" empty state.
   const isWaitingForFirstMessage = useMemo(() => {
     if (isAdmin || effectiveAdmin) return false;
-    const msgs: any[] = safeRoomState.messages || [];
+    const msgs: Message[] = safeRoomState.messages || [];
     const isActive = conversation && !conversation.is_session_ended && conversation.status === 'active';
     return isActive && msgs.length === 0;
   }, [isAdmin, effectiveAdmin, safeRoomState.messages, conversation]);
@@ -112,7 +160,7 @@ export function useSessionContextValue({
   const isWaitingForOtherParticipants = useMemo(() => {
     if (isAdmin || effectiveAdmin) return false;
     if (!currentUserParticipantId) return false;
-    const msgs: any[] = safeRoomState.messages || [];
+    const msgs: Message[] = safeRoomState.messages || [];
     if (msgs.length === 0) return false;
     const isActive = conversation && !conversation.is_session_ended && conversation.status === 'active';
     if (!isActive) return false;
@@ -126,13 +174,13 @@ export function useSessionContextValue({
     // message is still from a user, they are waiting for the AI's first response.
     if (lastAssistantIdx === -1) {
       const hasUserMsg = msgs.some(
-        (m: any) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
+        (m: Message) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
       );
       return hasUserMsg && lastMsg.sender !== 'assistant';
     }
     // Check if the current participant has answered after the last assistant message
     const hasAnsweredThisRound = msgs.slice(lastAssistantIdx + 1).some(
-      (m: any) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
+      (m: Message) => m.sender === 'user' && m.participant === String(currentUserParticipantId)
     );
     // If the participant has answered but the last message is not from the assistant,
     // they are waiting for other participants and/or the AI response.
@@ -160,6 +208,23 @@ export function useSessionContextValue({
     isSessionStartedInDB,
     refetch,
     error: providerError,
+    facilitatorRuntime,
+    enabledTools: safeRoomState.enabledTools || [],
+    isLoadingToolbox: safeRoomState.isLoadingToolbox || false,
+    toolboxError: safeRoomState.toolboxError || null,
+    toolboxInstruction: safeRoomState.toolboxInstruction,
+    enabledModes: safeRoomState.enabledModes || [],
+    activeMode: safeRoomState.activeMode || null,
+    participantModeState: safeRoomState.participantModeState || null,
+    isLoadingModes: safeRoomState.isLoadingModes || false,
+    modeError: safeRoomState.modeError || null,
+    modeInstruction: safeRoomState.modeInstruction,
+    recentModeEvents: safeRoomState.recentModeEvents || [],
+    startMode: safeRoomState.startMode,
+    approveMode: safeRoomState.approveMode,
+    endMode: safeRoomState.endMode,
+    rejectMode: safeRoomState.rejectMode,
+    submitModeInput: safeRoomState.submitModeInput,
     ...connectionProps
   }), [
     isLoading,
@@ -168,6 +233,22 @@ export function useSessionContextValue({
     sessionState,
     participants,
     safeRoomState.isWaitingForResponse,
+    safeRoomState.enabledTools,
+    safeRoomState.isLoadingToolbox,
+    safeRoomState.toolboxError,
+    safeRoomState.toolboxInstruction,
+    safeRoomState.enabledModes,
+    safeRoomState.activeMode,
+    safeRoomState.participantModeState,
+    safeRoomState.isLoadingModes,
+    safeRoomState.modeError,
+    safeRoomState.modeInstruction,
+    safeRoomState.recentModeEvents,
+    safeRoomState.startMode,
+    safeRoomState.approveMode,
+    safeRoomState.endMode,
+    safeRoomState.rejectMode,
+    safeRoomState.submitModeInput,
     isWaitingForFirstMessage,
     isWaitingForOtherParticipants,
     handleStartSession,
@@ -180,6 +261,7 @@ export function useSessionContextValue({
     providerError,
     connectionProps,
     refetch,
-    effectiveAdmin
+    effectiveAdmin,
+    facilitatorRuntime
   ]);
 }

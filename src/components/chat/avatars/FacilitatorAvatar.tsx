@@ -11,17 +11,22 @@ import { handleAvatarError, isImageUrl, getFacilitatorAvatarUrl } from '@/utils/
 import { isInCrossOriginContext } from '@/utils/crossOriginUtils';
 import { debugLog } from '@/utils/debugLogger';
 import InlineAvatar from './InlineAvatar';
+import type { FacilitatorAvatarState as RuntimeAvatarState } from '@/types/facilitatorRuntime';
 
 interface FacilitatorAvatarProps {
   avatarUrl?: string | null;
   name?: string;
   size?: 'sm' | 'md' | 'lg';
+  runtimeState?: RuntimeAvatarState | null;
+  enableRuntimeAnimation?: boolean;
 }
 
 const FacilitatorAvatar = ({ 
   avatarUrl, 
   name = "Facilitator", 
-  size = 'md' 
+  size = 'md',
+  runtimeState = null,
+  enableRuntimeAnimation = false
 }: FacilitatorAvatarProps) => {
   const [normalizedUrl, setNormalizedUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -32,6 +37,18 @@ const FacilitatorAvatar = ({
     md: 'h-8 w-8',
     lg: 'h-10 w-10'
   };
+
+  const runtimeStateClass = enableRuntimeAnimation && runtimeState
+    ? {
+        silent: 'ring-1 ring-slate-200',
+        listening: 'ring-2 ring-indigo-200 shadow-sm shadow-indigo-100',
+        thinking: 'ring-2 ring-violet-200 shadow-sm shadow-violet-100 animate-pulse',
+        speaking: 'ring-2 ring-blue-300 shadow-sm shadow-blue-100',
+        encouraging: 'ring-2 ring-emerald-300 shadow-sm shadow-emerald-100',
+        clarifying: 'ring-2 ring-amber-300 shadow-sm shadow-amber-100',
+        intervening: 'ring-2 ring-rose-300 shadow-sm shadow-rose-100 animate-pulse'
+      }[runtimeState.state]
+    : '';
 
   // Process and normalize avatar URL
   useEffect(() => {
@@ -98,7 +115,7 @@ const FacilitatorAvatar = ({
     
     return (
       // rounded-xl matches the MessageBubble's rounded-tl-none flat corner for visual alignment
-      <Avatar className={`${dimensions[size]} !rounded-xl avatar-container ${isLoading ? 'bg-gray-100' : ''}`}>
+      <Avatar className={`${dimensions[size]} !rounded-xl avatar-container ${runtimeStateClass} transition-all duration-300 ${isLoading ? 'bg-gray-100' : ''}`}>
         <AvatarImage 
           src={normalizedUrl} 
           alt={name} 
@@ -115,7 +132,7 @@ const FacilitatorAvatar = ({
 
   // Fallback: InlineAvatar with facilitator name for a coloured initial avatar
   return (
-    <div className={`${dimensions[size]} overflow-hidden rounded-xl shrink-0`}>
+    <div className={`${dimensions[size]} overflow-hidden rounded-xl shrink-0 ${runtimeStateClass} transition-all duration-300`}>
       <InlineAvatar name={name} size={size} className="!rounded-xl" />
     </div>
   );

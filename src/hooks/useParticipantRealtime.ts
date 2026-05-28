@@ -17,7 +17,6 @@ interface UseParticipantRealtimeProps {
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   maxParticipants?: number;
   enabled?: boolean; // Allow disabling the hook
-  disableAutoStart?: boolean;
 }
 
 export function useParticipantRealtime({
@@ -26,8 +25,7 @@ export function useParticipantRealtime({
   setParticipants,
   setIsLoading,
   maxParticipants,
-  enabled = true,
-  disableAutoStart = false
+  enabled = true
 }: UseParticipantRealtimeProps) {
   const participantsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const eventsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
@@ -172,19 +170,9 @@ export function useParticipantRealtime({
               }
             }
             
-            // Auto-start session when max participants reached, unless the caller
-            // has disabled capacity-driven starts for scheduled waiting rooms.
-            if (!disableAutoStart && eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
-              api
-                .from('conversations')
-                .update({ session_started: true })
-                .eq('id', conversationId)
-                .then(({ error }) => {
-                  if (error) {
-                    console.error("Error starting session automatically:", error);
-                  }
-                });
-            }
+            // The redesigned waiting room requires an explicit host action to start.
+            // Do not mark the conversation as started when capacity is reached; the
+            // host Start Session control is the single source of truth for this state.
           }
         })
         .subscribe((status) => {
@@ -216,7 +204,6 @@ export function useParticipantRealtime({
       
       hasSetupSubscription.current = false;
     };
-  // Keep subscription setup keyed to session identity and explicit auto-start configuration only.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, setParticipants, setIsLoading, maxParticipants, disableAutoStart]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
+  }, [conversationId, setParticipants, setIsLoading, maxParticipants]);
 }

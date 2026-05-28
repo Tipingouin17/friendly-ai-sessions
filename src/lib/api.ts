@@ -8,12 +8,58 @@ const API_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 const ANON_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 const SESSION_KEY = "mf_session";
 
+const RAILWAY_DEV_PROXY_PREFIX = "/__railway_dev";
+const RAILWAY_PROD_PROXY_PREFIX = "/__railway_prod";
+
 // Named exports for files that import these constants directly
 export const EDGE_FUNCTION_URL: string = (import.meta.env.VITE_API_URL as string) || "";
 export const EDGE_FUNCTION_KEY: string = (import.meta.env.VITE_API_ANON_KEY as string) || "";
 
 if (!API_URL) {
   throw new Error("Missing VITE_API_URL. Set it to your Railway backend URL.");
+}
+
+function isLocalBrowserHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function getRailwayRealtimeProxyPrefix(): string | null {
+  if (typeof window === "undefined" || isLocalBrowserHost(window.location.hostname)) return null;
+  try {
+    const backendHost = new URL(API_URL).hostname;
+    if (!backendHost.endsWith("railway.app")) return null;
+    if (backendHost.includes("development")) return RAILWAY_DEV_PROXY_PREFIX;
+    if (backendHost.includes("production")) return RAILWAY_PROD_PROXY_PREFIX;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function buildRealtimeSseUrl(topic: string, token: string | null): string {
+  // Native EventSource cannot send custom Authorization headers. Keep user JWTs
+  // out of browser-visible URLs by authenticating the SSE transport with the
+  // public anon key only; session/participant authorization remains enforced by
+  // the REST endpoints that create or mutate data.
+  const params = new URLSearchParams({
+    apikey: token || ANON_KEY,
+    topic,
+  });
+  const proxyPrefix = getRailwayRealtimeProxyPrefix();
+  const baseUrl = proxyPrefix ? `${proxyPrefix}/realtime/v1/sse` : `${API_URL}/realtime/v1/sse`;
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function extractRealtimeConversationId(topic: string): string | null {
+  const filterMatch = topic.match(/conversation_id=eq\.([^&:]+)/) ?? topic.match(/(?:^|[^a-z])id=eq\.([^&:]+)/);
+  if (filterMatch?.[1]) return filterMatch[1];
+
+  const embeddedMatch = topic.match(/-([0-9]+)(?:-|$)/) ?? topic.match(/-([0-9]+)$/);
+  return embeddedMatch?.[1] ?? null;
+}
+
+function isConversationScopedRealtimeTopic(topic: string): boolean {
+  return extractRealtimeConversationId(topic) !== null;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,6 +97,23 @@ export interface ApiResponse<T> {
   data: T | null;
   error: ApiError | null;
   count?: number | null;
+}
+
+export interface MfaFactor {
+  id: string;
+  type: "totp";
+  factor_type?: "totp";
+  friendly_name?: string | null;
+  status: "unverified" | "verified";
+  created_at?: string | null;
+  updated_at?: string | null;
+  verified_at?: string | null;
+}
+
+export interface MfaFactorsResponse {
+  all: MfaFactor[];
+  totp: MfaFactor[];
+  phone: MfaFactor[];
 }
 
 export type RealtimeEvent = "INSERT" | "UPDATE" | "DELETE" | "*";
@@ -227,9 +290,10 @@ export function clearParticipantSessionData(): void {
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit & { headers?: Record<string, string> } = {}
+  options: RequestInit & { headers?: Record<string, string>; timeoutMs?: number } = {}
 ): Promise<ApiResponse<T>> {
   try {
+    const { timeoutMs = 15_000, ...fetchOptions } = options;
     const token = getToken();
     const joinToken = getJoinToken();
     const headers: Record<string, string> = {
@@ -247,10 +311,11 @@ async function apiFetch<T>(
     // can read the session data they are allowed to access.
     if (joinToken && !token) headers["X-Join-Token"] = joinToken;
 
-    // Apply a 15-second timeout so Railway cold-start / network issues fail fast
-    // instead of hanging indefinitely. The caller (React Query) will retry.
+    // Apply a bounded timeout so Railway cold-start / network issues fail fast
+    // instead of hanging indefinitely. Callers with known long-running backend
+    // work (for example conversation creation) may opt into a longer timeout.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const signal = options.signal
       ? (AbortSignal as any).any
         ? (AbortSignal as any).any([options.signal, controller.signal])
@@ -258,7 +323,7 @@ async function apiFetch<T>(
       : controller.signal;
     let res: Response;
     try {
-      res = await fetch(`${API_URL}${path}`, { ...options, headers, signal });
+      res = await fetch(`${API_URL}${path}`, { ...fetchOptions, headers, signal });
     } finally {
       clearTimeout(timeoutId);
     }
@@ -401,12 +466,65 @@ export const auth = {
     return { error: res.error };
   },
 
+  async resendVerificationEmail(email: string): Promise<{ error: ApiError | null }> {
+    const res = await apiFetch("/auth/v1/resend", {
+      method: "POST",
+      body: JSON.stringify({ type: "signup", email }),
+      headers: {},
+    });
+    return { error: res.error };
+  },
+
   mfa: {
-    async enroll(_p: unknown): Promise<{ data: null; error: ApiError }> {
-      return { data: null, error: { message: "MFA not supported on this backend" } };
+    async enroll(params: { factorType?: "totp"; factor_type?: "totp"; friendlyName?: string } = {}): Promise<{
+      data: { id: string; type: string; status: string; totp: { qr_code: string; secret: string; uri: string } } | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<{ id: string; type: string; status: string; totp: { qr_code: string; secret: string; uri: string } }>(
+        "/auth/v1/mfa/enroll",
+        {
+          method: "POST",
+          body: JSON.stringify(params),
+        },
+      );
+      return { data: res.data, error: res.error };
     },
-    async challengeAndVerify(_p: unknown): Promise<{ data: null; error: ApiError }> {
-      return { data: null, error: { message: "MFA not supported on this backend" } };
+
+    async listFactors(): Promise<{
+      data: MfaFactorsResponse | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<MfaFactorsResponse>("/auth/v1/mfa/factors", {
+        method: "GET",
+      });
+      return { data: res.data, error: res.error };
+    },
+
+    async unenroll(params: { factorId: string }): Promise<{
+      data: { success: boolean; factor_id: string } | null;
+      error: ApiError | null;
+    }> {
+      const res = await apiFetch<{ success: boolean; factor_id: string }>(`/auth/v1/mfa/factors/${encodeURIComponent(params.factorId)}`, {
+        method: "DELETE",
+      });
+      return { data: res.data, error: res.error };
+    },
+
+    async challengeAndVerify(params: { factorId: string; code: string }): Promise<{
+      data: { success: boolean; factor_id: string } | null;
+      error: ApiError | null;
+    }> {
+      const challenge = await apiFetch<{ id: string }>("/auth/v1/mfa/challenge", {
+        method: "POST",
+        body: JSON.stringify({ factorId: params.factorId }),
+      });
+      if (challenge.error) return { data: null, error: challenge.error };
+
+      const verification = await apiFetch<{ success: boolean; factor_id: string }>("/auth/v1/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({ factorId: params.factorId, code: params.code }),
+      });
+      return { data: verification.data, error: verification.error };
     },
   },
 };
@@ -439,8 +557,12 @@ class QueryBuilder<T = Record<string, unknown>> {
     if (opts?.count) this.s.count = opts.count;
     return this;
   }
-  eq(col: string, val: unknown): this { this.s.filters.push([col, `eq.${val}`]); return this; }
-  neq(col: string, val: unknown): this { this.s.filters.push([col, `neq.${val}`]); return this; }
+  private normalizeFilterValue(col: string, val: unknown): unknown {
+    return this.s.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
+  }
+
+  eq(col: string, val: unknown): this { this.s.filters.push([col, `eq.${this.normalizeFilterValue(col, val)}`]); return this; }
+  neq(col: string, val: unknown): this { this.s.filters.push([col, `neq.${this.normalizeFilterValue(col, val)}`]); return this; }
   gt(col: string, val: unknown): this { this.s.filters.push([col, `gt.${val}`]); return this; }
   gte(col: string, val: unknown): this { this.s.filters.push([col, `gte.${val}`]); return this; }
   lt(col: string, val: unknown): this { this.s.filters.push([col, `lt.${val}`]); return this; }
@@ -450,7 +572,7 @@ class QueryBuilder<T = Record<string, unknown>> {
   in(col: string, vals: unknown[]): this { this.s.filters.push([col, `in.(${vals.join(",")})`]); return this; }
   is(col: string, val: null | boolean): this { this.s.filters.push([col, `is.${val}`]); return this; }
   not(col: string, op: string, val: unknown): this { this.s.filters.push([col, `not.${op}.${val}`]); return this; }
-  filter(col: string, op: FilterOp, val: unknown): this { this.s.filters.push([col, `${op}.${val}`]); return this; }
+  filter(col: string, op: FilterOp, val: unknown): this { this.s.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }
   order(col: string, opts?: { ascending?: boolean; nullsFirst?: boolean }): this {
     const dir = opts?.ascending === false ? "desc" : "asc";
     this.s.order.push(`${col}.${dir}${opts?.nullsFirst ? ".nullsfirst" : ""}`);
@@ -496,11 +618,18 @@ class QueryBuilder<T = Record<string, unknown>> {
       ...this.xHeaders(),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    if (joinToken) headers["X-Join-Token"] = joinToken;
-    // Apply a 15-second timeout so Railway cold-start / network issues fail fast.
+    // Send the join token only for unauthenticated participant requests.
+    // Authenticated host/admin queries must rely on JWT ownership checks;
+    // including a stale participant token can make host conversation reads
+    // follow participant-path authorization and fail during session start.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
+    // Apply a bounded timeout so Railway cold-start / network issues fail fast.
+    // Session guard queries may legitimately take longer on the development
+    // backend immediately after cold starts, so host session creation gets a
+    // longer window before surfacing a network error.
+    const timeoutMs = this.s.table === 'sessions' ? 60_000 : 15_000;
     const _ctrl = new AbortController();
-    const _tid = setTimeout(() => _ctrl.abort(), 15_000);
+    const _tid = setTimeout(() => _ctrl.abort(), timeoutMs);
     const _sig = this.s.signal
       ? (AbortSignal as any).any
         ? (AbortSignal as any).any([this.s.signal, _ctrl.signal])
@@ -561,8 +690,11 @@ class QueryBuilder<T = Record<string, unknown>> {
     const joinToken = getJoinToken();
     const headers: Record<string, string> = { apikey: ANON_KEY, ...this.xHeaders() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Always send the join token when present — even for authenticated users.
-    if (joinToken) headers["X-Join-Token"] = joinToken;
+    // Send the join token only for unauthenticated participant requests.
+    // Authenticated host/admin queries must rely on JWT ownership checks;
+    // including a stale participant token can make host conversation reads
+    // follow participant-path authorization and fail during session start.
+    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
     try {
       const res = await fetch(`${API_URL}${this.url("HEAD")}`, { method: "HEAD", headers });
       let count: number | null = null;
@@ -574,18 +706,29 @@ class QueryBuilder<T = Record<string, unknown>> {
     }
   }
 
+  private normalizeMutationBody(value: unknown): unknown {
+    if (this.s.table !== 'facilitator_tts_events') return value;
+    const normalizeRow = (row: unknown): unknown => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+      const next = { ...(row as Record<string, unknown>) };
+      if (next.message_id !== undefined && next.message_id !== null) next.message_id = String(next.message_id);
+      return next;
+    };
+    return Array.isArray(value) ? value.map(normalizeRow) : normalizeRow(value);
+  }
+
   insert(rows: Partial<T> | Partial<T>[]): MutationBuilder<T> {
-    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters);
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(this.normalizeMutationBody(rows)), this.s.filters);
   }
 
   update(patch: Partial<T>): MutationBuilder<T> {
-    return new MutationBuilder<T>(this.s.table, "PATCH", JSON.stringify(patch), this.s.filters);
+    return new MutationBuilder<T>(this.s.table, "PATCH", JSON.stringify(this.normalizeMutationBody(patch)), this.s.filters);
   }
 
   upsert(rows: Partial<T> | Partial<T>[], opts?: { onConflict?: string }): MutationBuilder<T> {
     const extra: Record<string, string> = { Prefer: "resolution=merge-duplicates,return=representation" };
     if (opts?.onConflict) extra["on_conflict"] = opts.onConflict;
-    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(rows), this.s.filters, extra);
+    return new MutationBuilder<T>(this.s.table, "POST", JSON.stringify(this.normalizeMutationBody(rows)), this.s.filters, extra);
   }
 
   delete(): MutationBuilder<T> {
@@ -624,19 +767,23 @@ class MutationBuilder<T = Record<string, unknown>> {
   maybeSingle(): this { this.maybeSingleFlag = true; return this; }
   abortSignal(signal: AbortSignal): this { this.abortSignalRef = signal; return this; }
 
+  private normalizeFilterValue(col: string, val: unknown): unknown {
+    return this.table === 'facilitator_tts_events' && col === 'message_id' && val != null ? String(val) : val;
+  }
+
   // Filter methods (same as QueryBuilder) — needed for .update().eq(...) patterns
-  eq(col: string, val: unknown): this { this.filters.push([col, `eq.${val}`]); return this; }
-  neq(col: string, val: unknown): this { this.filters.push([col, `neq.${val}`]); return this; }
+  eq(col: string, val: unknown): this { this.filters.push([col, `eq.${this.normalizeFilterValue(col, val)}`]); return this; }
+  neq(col: string, val: unknown): this { this.filters.push([col, `neq.${this.normalizeFilterValue(col, val)}`]); return this; }
   gt(col: string, val: unknown): this { this.filters.push([col, `gt.${val}`]); return this; }
   gte(col: string, val: unknown): this { this.filters.push([col, `gte.${val}`]); return this; }
   lt(col: string, val: unknown): this { this.filters.push([col, `lt.${val}`]); return this; }
   lte(col: string, val: unknown): this { this.filters.push([col, `lte.${val}`]); return this; }
   like(col: string, p: string): this { this.filters.push([col, `like.${p}`]); return this; }
   ilike(col: string, p: string): this { this.filters.push([col, `ilike.${p}`]); return this; }
-  in(col: string, vals: unknown[]): this { this.filters.push([col, `in.(${vals.join(",")})`]); return this; }
+  in(col: string, vals: unknown[]): this { this.filters.push([col, `in.(${vals.map((val) => this.normalizeFilterValue(col, val)).join(",")})`]); return this; }
   is(col: string, val: null | boolean): this { this.filters.push([col, `is.${val}`]); return this; }
-  filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${val}`]); return this; }
-  match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${v}`])); return this; }
+  filter(col: string, op: string, val: unknown): this { this.filters.push([col, `${op}.${this.normalizeFilterValue(col, val)}`]); return this; }
+  match(obj: Record<string, unknown>): this { Object.entries(obj).forEach(([k, v]) => this.filters.push([k, `eq.${this.normalizeFilterValue(k, v)}`])); return this; }
 
   private async exec(): Promise<ApiResponse<T | T[]>> {
     const p = new URLSearchParams();
@@ -650,7 +797,8 @@ class MutationBuilder<T = Record<string, unknown>> {
     p.set("select", this.selectCols);
     if (this.extra["on_conflict"]) p.set("on_conflict", this.extra["on_conflict"]);
     const url = `/rest/v1/${this.table}?${p.toString()}`;
-    return apiFetch<T | T[]>(url, { method: this.method, body: this.body, headers });
+    const timeoutMs = this.table === 'conversations' && this.method === 'POST' ? 60_000 : undefined;
+    return apiFetch<T | T[]>(url, { method: this.method, body: this.body, headers, timeoutMs });
   }
 
   then<R1 = ApiResponse<T | T[]>, R2 = never>(
@@ -747,12 +895,23 @@ class SharedSSEManager {
   private readonly MAX_BACKOFF_MS = 60_000;
 
   register(ch: RealtimeChannelImpl): void {
-    this.channels.set(ch.getTopic(), ch);
-    this.openSSE(ch.getTopic());
+    const topic = ch.getTopic();
+    this.channels.set(topic, ch);
+
+    // The Railway SSE shim is scoped by conversation_id. Global Supabase-style
+    // topics such as dashboard-wide workshop lists cannot be served by this
+    // endpoint and otherwise produce repeated 400 responses.
+    if (!isConversationScopedRealtimeTopic(topic)) {
+      ch.notifyStatus("CHANNEL_ERROR");
+      return;
+    }
+
+    this.openSSE(topic);
   }
 
   forceReconnect(): void {
     for (const topic of this.channels.keys()) {
+      if (!isConversationScopedRealtimeTopic(topic)) continue;
       this.closeSSE(topic);
       this.retryCounts.set(topic, 0);
       this.openSSE(topic);
@@ -766,8 +925,8 @@ class SharedSSEManager {
 
   private openSSE(topic: string): void {
     if (this.connections.has(topic)) return;
-    const token = getToken() || ANON_KEY;
-    const url = `${API_URL}/realtime/v1/sse?apikey=${encodeURIComponent(token)}&topic=${encodeURIComponent(topic)}`;
+    const token = ANON_KEY;
+    const url = buildRealtimeSseUrl(topic, token);
     const es = new EventSource(url);
     this.connections.set(topic, es);
 
@@ -817,7 +976,7 @@ class SharedSSEManager {
   }
 
   private scheduleReconnect(topic: string): void {
-    if (this.retryTimers.has(topic)) return;
+    if (!isConversationScopedRealtimeTopic(topic) || this.retryTimers.has(topic)) return;
     const count = this.retryCounts.get(topic) ?? 0;
     const delay = Math.min(3_000 * Math.pow(2, count), this.MAX_BACKOFF_MS);
     this.retryCounts.set(topic, count + 1);

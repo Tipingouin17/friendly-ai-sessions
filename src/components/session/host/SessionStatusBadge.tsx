@@ -11,12 +11,14 @@ import { Circle } from "lucide-react";
 interface SessionStatusBadgeProps {
   isActive: boolean;
   sessionStarted: boolean;
+  isWaitingRoomFull?: boolean;
   isSessionEnded?: boolean;
 }
 
 const SessionStatusBadge: React.FC<SessionStatusBadgeProps> = ({ 
   isActive, 
   sessionStarted,
+  isWaitingRoomFull = false,
   isSessionEnded = false,
 }) => {
   const getStatusInfo = () => {
@@ -30,6 +32,14 @@ const SessionStatusBadge: React.FC<SessionStatusBadgeProps> = ({
     }
 
     if (!sessionStarted) {
+      if (isWaitingRoomFull) {
+        return {
+          label: "Ready",
+          variant: "secondary" as const,
+          color: "text-emerald-600"
+        };
+      }
+
       return {
         label: "Not Started",
         variant: "secondary" as const,

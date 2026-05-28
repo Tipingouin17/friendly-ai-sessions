@@ -83,10 +83,12 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
   // Stable session start handler with logging
   const handleSessionStart = useCallback(() => {
     onSessionStarted();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [onSessionStarted, stableParticipantCount, conversationId]);
 
   // Determine if session data has loaded
   const isDataLoaded = !!conversationData?.sessions;
+  const isSessionStarted = Boolean(conversationData?.session_started);
 
   // Memoize facilitator and session data — only use fallbacks when data is confirmed loaded
   const sessionInfo = useMemo(() => ({
@@ -162,15 +164,17 @@ const PreSessionHostView: React.FC<PreSessionHostViewProps> = ({
               <div className="text-center lg:text-left">
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">Ready to Begin?</h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  Once participants have joined, click "Start Session" to begin the facilitated discussion.
-                  {stableParticipantCount === 0 && " You need at least one participant to start."}
+                  {isSessionStarted
+                    ? 'The facilitated discussion is live. Participants can now answer the current prompt.'
+                    : 'Once participants have joined, click "Start Session" to begin the facilitated discussion.'}
+                  {!isSessionStarted && stableParticipantCount === 0 && " You need at least one participant to start."}
                 </p>
                 
               </div>
               <div className="flex-shrink-0 w-full lg:w-auto" style={{
               pointerEvents: 'auto'
             }}>
-                <StartSessionButton onStartSession={handleSessionStart} participantCount={stableParticipantCount} isSessionStarted={false} isAutoStarting={isAutoStarting} autoStartCountdown={autoStartCountdown} onCancelAutoStart={onCancelAutoStart} />
+                <StartSessionButton onStartSession={handleSessionStart} participantCount={stableParticipantCount} isSessionStarted={isSessionStarted} isAutoStarting={isAutoStarting} autoStartCountdown={autoStartCountdown} onCancelAutoStart={onCancelAutoStart} />
               </div>
             </div>
           </CardContent>

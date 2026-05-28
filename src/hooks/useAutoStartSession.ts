@@ -11,14 +11,12 @@ interface UseAutoStartSessionProps {
   onStartSession: () => Promise<void>;
   isSessionStarted: boolean;
   maxParticipants: number;
-  isAutoStartEnabled?: boolean;
 }
 
 export const useAutoStartSession = ({
   onStartSession,
   isSessionStarted,
-  maxParticipants,
-  isAutoStartEnabled = true
+  maxParticipants
 }: UseAutoStartSessionProps) => {
   const [isAutoStarting, setIsAutoStarting] = useState(false);
   const [autoStartCountdown, setAutoStartCountdown] = useState(0);
@@ -39,20 +37,30 @@ export const useAutoStartSession = ({
     setAutoStartCountdown(0);
   }, []);
 
-  const triggerAutoStart = useCallback(async (currentParticipantCount: number) => {
-    // Don't auto-start if the caller has disabled capacity-driven starts,
-    // or if the session is already started or starting.
-    if (!isAutoStartEnabled || isSessionStarted || isAutoStarting) {
+  const triggerAutoStart = useCallback(async (
+    currentParticipantCount: number,
+    maxParticipantsOverride?: number
+  ) => {
+    // Don't auto-start if session is already started or starting
+    if (isSessionStarted || isAutoStarting) {
       return;
     }
 
-    // Only auto-start if we've reached max capacity
-    if (currentParticipantCount < maxParticipants) {
+    const capacity = maxParticipantsOverride ?? maxParticipants;
+
+    // Only auto-start if we've reached a known max capacity
+    if (capacity <= 0 || currentParticipantCount < capacity) {
       return;
     }
 
     setIsAutoStarting(true);
     setAutoStartCountdown(3);
+
+    // Show toast notification
+    toast({
+      title: "Session Full",
+      description: `Maximum capacity reached (${capacity} participants). Auto-starting in 3 seconds...`,
+    });
 
     // Start countdown
     countdownIntervalRef.current = setInterval(() => {
@@ -88,7 +96,7 @@ export const useAutoStartSession = ({
         setAutoStartCountdown(0);
       }
     }, 3000);
-  }, [isAutoStartEnabled, isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
+  }, [isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
 
   const cancelAutoStart = useCallback(() => {
     clearAutoStartTimer();

@@ -79,9 +79,14 @@ const MessageList = ({
       if (message.sender === 'user' && message.participant) {
         const participantNumber = parseInt(message.participant, 10);
         if (!isNaN(participantNumber)) {
+          const persistedParticipantName = (message as Message & { displayName?: string }).displayName || message.name;
           participantInfo = participants.find(p => p.id === participantNumber) ?? (
             participantNumber > 0
-              ? { id: participantNumber, name: `Participant ${participantNumber}`, avatar: null }
+              ? {
+                id: participantNumber,
+                name: persistedParticipantName || `Participant ${participantNumber}`,
+                avatar: message.avatar ?? null,
+              }
               : null
           );
         }

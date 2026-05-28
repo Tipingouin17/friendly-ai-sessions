@@ -18,6 +18,7 @@ import { useEffectiveAdminStatus } from "@/hooks/useEffectiveAdminStatus";
 import { useStuckStateHandler } from "@/hooks/useStuckStateHandler";
 import { useSessionProviderErrorHandler } from "@/hooks/useSessionProviderErrorHandler";
 import { SessionProviderCoreError } from "./SessionProviderCoreError";
+import { useStreamingFacilitatorRuntime } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
 
 interface SessionProviderCoreProps {
   children: React.ReactNode;
@@ -136,6 +137,20 @@ export const SessionProviderCore = ({
     forceAdmin: effectiveAdmin
   });
 
+  // Feature-flagged stream-aware facilitator foundation. This is intentionally
+  // mounted near the provider boundary, where conversation/session/participant
+  // identifiers and the live draft input are available, but it does not alter the
+  // visible UX unless explicitly enabled in the dev environment.
+  const facilitatorRuntime = useStreamingFacilitatorRuntime({
+    conversationId: currentConversationId,
+    facilitatorId: conversation?.sessions?.facilitator ?? null,
+    sessionId: conversation?.sessions?.id ?? null,
+    participantId: currentUserParticipantId,
+    participantName: participants.find((participant) => participant.id === currentUserParticipantId)?.name ?? null,
+    inputMessage: roomState.inputMessage,
+    isAdmin: effectiveAdmin
+  });
+
   // Determine the effective admin/host status
   const sessionContextValue = useSessionContextValue({
     isLoading,
@@ -152,7 +167,8 @@ export const SessionProviderCore = ({
     providerError,
     connection,
     handleStartSession: enhancedHandleStartSession,
-    effectiveAdmin
+    effectiveAdmin,
+    facilitatorRuntime
   });
 
   // Memoize the error component to prevent re-renders

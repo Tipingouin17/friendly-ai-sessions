@@ -30,10 +30,6 @@ export const Navigation = () => {
 
   const adminPageClass = isAdminPage ? 'bg-transparent border-transparent z-30' : 'bg-white/90 backdrop-blur-md border-gray-100';
 
-  if (isMobile && isSessionPage) {
-    return null;
-  }
-
   const userDisplayName = getUserDisplayName(user);
 
   const navLinkClass = (path: string) =>
@@ -67,6 +63,10 @@ export const Navigation = () => {
       {children}
     </Link>
   );
+
+  if (isMobile && isSessionPage) {
+    return null;
+  }
 
   return (
     <nav className={`fixed top-0 left-0 right-0 ${adminPageClass} z-50 border-b ${isSessionPage ? 'hidden md:flex' : 'flex'}`}>

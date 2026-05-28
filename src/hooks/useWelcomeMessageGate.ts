@@ -12,6 +12,8 @@ interface UseWelcomeMessageGateProps {
   sessionStarted: boolean;
 }
 
+const WELCOME_MESSAGE_FAIL_OPEN_MS = 12_000;
+
 interface WelcomeMessageGateState {
   isWaitingForMessage: boolean;
   messageReady: boolean;
@@ -127,17 +129,18 @@ export const useWelcomeMessageGate = ({
       console.error('[WelcomeMessageGate] [AI-TRACKING] Error checking conversation status:', error);
     }
 
-    // Set up timeout (45 seconds — accounts for Railway cold start + OpenAI generation time).
-    // On timeout, set timeoutReached=true but keep isWaitingForMessage=false so the UI
-    // shows the timeout phase with a "Try Again" button instead of blocking indefinitely.
+    // Fail open quickly for participants: the live room should be usable even if
+    // AI welcome generation is slow. The welcome message can still arrive later via
+    // the normal message subscription path.
     timeoutRef.current = setTimeout(() => {
-      setState(prev => ({ 
-        ...prev, 
-        isWaitingForMessage: false, 
-        messageReady: false, 
-        timeoutReached: true 
+      messageReadyForConversationRef.current = conversationId;
+      setState(prev => ({
+        ...prev,
+        isWaitingForMessage: false,
+        messageReady: true,
+        timeoutReached: false,
       }));
-    }, 45000);
+    }, WELCOME_MESSAGE_FAIL_OPEN_MS);
 
     // Listen for welcome message ready notification and status changes
     const channelName = `welcome-gate-${conversationId}`;
@@ -184,10 +187,13 @@ export const useWelcomeMessageGate = ({
           }));
         } else if (newStatus === 'failed') {
           console.error('[AI-TRACKING] Welcome message generation failed via status update');
-          setState(prev => ({ 
-            ...prev, 
-            error: 'AI generation failed',
-            isWaitingForMessage: false
+          messageReadyForConversationRef.current = conversationId;
+          setState(prev => ({
+            ...prev,
+            error: null,
+            isWaitingForMessage: false,
+            messageReady: true,
+            timeoutReached: false,
           }));
         }
       })

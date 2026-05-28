@@ -26,6 +26,387 @@ import stripe as stripe_lib
 # OpenAI client – uses OPENAI_API_KEY and OPENAI_BASE_URL env vars automatically
 openai_client = OpenAI()
 
+
+# ============================================================
+# Adaptive facilitation technique selector helpers (legacy Flask)
+# ============================================================
+def _flask_safe_json_value(value, default):
+    """Return a JSON-like value from psycopg/text with a safe fallback."""
+    if value is None:
+        return default
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return default
+    return value
+
+
+def _flask_extract_message_text(content):
+    """Extract display text from a message content payload."""
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except Exception:
+            return content
+    if isinstance(content, dict):
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+        return json.dumps(content, ensure_ascii=False)
+    return str(content or "")
+
+
+def _flask_clip_text(value, max_chars=900):
+    """Serialize and clip a value for compact selector prompt inclusion."""
+    if isinstance(value, str):
+        rendered = value
+    else:
+        rendered = json.dumps(value, ensure_ascii=False)
+    rendered = rendered.strip()
+    if len(rendered) <= max_chars:
+        return rendered
+    return rendered[: max_chars - 3].rstrip() + "..."
+
+
+def _flask_fallback_facilitation_selection(available_modes=None, reason="Selector unavailable"):
+    available_modes = available_modes or []
+    selected_mode = None
+    for mode in available_modes:
+        if mode.get("mode_key") == "open_discussion":
+            selected_mode = mode
+            break
+    if selected_mode is None and available_modes:
+        selected_mode = available_modes[0]
+    if selected_mode is None:
+        selected_mode = {
+            "id": None,
+            "mode_key": "open_discussion",
+            "display_name": "Open Discussion",
+            "purpose": "Maintain a natural, inclusive workshop discussion.",
+            "floor_rules": {},
+            "ai_responsibilities": ["Synthesize participant contributions and ask an objective-aligned follow-up."],
+        }
+    return {
+        "selected_technique": selected_mode.get("mode_key") or "open_discussion",
+        "selected_mode": selected_mode,
+        "rationale": reason,
+        "divergence_intent": False,
+        "steering_instruction": "Use open discussion to synthesize what participants shared, then ask a constructive follow-up aligned with the session objective.",
+        "selector_model": None,
+        "selector_fallback": True,
+    }
+
+
+def _flask_parse_selector_json(raw_text):
+    text_value = (raw_text or "").strip()
+    if text_value.startswith("```"):
+        text_value = re.sub(r"^```(?:json)?\s*", "", text_value, flags=re.IGNORECASE)
+        text_value = re.sub(r"\s*```$", "", text_value)
+    try:
+        return json.loads(text_value)
+    except Exception:
+        start = text_value.find("{")
+        end = text_value.rfind("}")
+        if start >= 0 and end > start:
+            return json.loads(text_value[start:end + 1])
+        raise
+
+
+def _flask_compute_engagement_signals(participant_messages, expected_participants, response_count, ai_turn_count):
+    texts = [_flask_extract_message_text(m.get("content")) for m in participant_messages]
+    word_counts = [len(re.findall(r"\b\w+\b", item)) for item in texts]
+    total_words = sum(word_counts)
+    avg_words = round(total_words / len(word_counts), 1) if word_counts else 0.0
+    response_rate = round(response_count / max(expected_participants, 1), 2)
+    question_marks = sum(item.count("?") for item in texts)
+    exclamation_marks = sum(item.count("!") for item in texts)
+    short_answers = sum(1 for count in word_counts if count <= 8)
+    long_answers = sum(1 for count in word_counts if count >= 35)
+
+    if response_rate < 0.6 or avg_words < 10 or (texts and short_answers / max(len(texts), 1) >= 0.6):
+        energy_level = "low"
+    elif avg_words >= 35 or exclamation_marks >= max(2, len(texts)) or question_marks >= max(2, len(texts)):
+        energy_level = "high"
+    else:
+        energy_level = "medium"
+
+    stop_words = {
+        "the", "and", "for", "that", "with", "this", "from", "are", "was", "were", "you", "your", "our", "their", "have",
+        "has", "had", "but", "not", "all", "can", "could", "would", "should", "about", "into", "than", "then", "them",
+        "they", "what", "when", "where", "how", "why", "who", "there", "here", "will", "just", "like", "also", "because",
+        "dans", "pour", "avec", "que", "qui", "une", "des", "les", "nous", "vous", "sur", "est", "sont", "pas", "plus",
+    }
+    term_frequency = {}
+    for item in texts:
+        seen = set()
+        for token in re.findall(r"\b[\wÀ-ÿ]{4,}\b", item.lower()):
+            if token not in stop_words:
+                seen.add(token)
+        for token in seen:
+            term_frequency[token] = term_frequency.get(token, 0) + 1
+    repeated_terms = [term for term, count in term_frequency.items() if count >= 2]
+    if len(texts) <= 1:
+        convergence_state = "insufficient data"
+    elif len(repeated_terms) >= max(2, len(texts) // 2):
+        convergence_state = "converging on shared themes"
+    elif len(term_frequency) >= max(12, len(texts) * 5):
+        convergence_state = "diverging across varied perspectives"
+    else:
+        convergence_state = "mixed"
+
+    return {
+        "average_answer_words": avg_words,
+        "response_rate": response_rate,
+        "answered_participants": response_count,
+        "expected_participants": expected_participants,
+        "energy_level": energy_level,
+        "question_marks": question_marks,
+        "exclamation_marks": exclamation_marks,
+        "short_answer_count": short_answers,
+        "long_answer_count": long_answers,
+        "ai_turn_count": ai_turn_count,
+        "convergence_state": convergence_state,
+        "repeated_terms": repeated_terms[:8],
+        "answer_count": len(texts),
+    }
+
+
+def _select_facilitation_technique_sync(conv_id, facilitator_id, session_context):
+    """Legacy synchronous selector. It never raises to avoid blocking facilitator output."""
+    if not facilitator_id:
+        return _flask_fallback_facilitation_selection(reason="No facilitator id available for technique access lookup")
+
+    available_modes = []
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT fm.id, fm.mode_key, fm.display_name, fm.purpose, fm.primary_input,
+                   fm.floor_rules, fm.ai_responsibilities, fm.entry_conditions,
+                   fm.exit_conditions, fm.candidate_transitions, fm.success_metrics,
+                   fm.default_timer_seconds, fm.requires_host_confirmation,
+                   fma.policy_override
+            FROM facilitator_mode_access fma
+            JOIN facilitation_modes fm ON fm.id = fma.mode_id
+            WHERE fma.facilitator_id = %s AND fma.enabled IS TRUE AND fm.is_active IS TRUE
+            ORDER BY fm.mode_key
+            """,
+            (int(facilitator_id),),
+        )
+        available_modes = list(cur.fetchall())
+        if not available_modes:
+            cur.execute(
+                """
+                SELECT id, mode_key, display_name, purpose, primary_input, floor_rules,
+                       ai_responsibilities, entry_conditions, exit_conditions,
+                       candidate_transitions, success_metrics, default_timer_seconds,
+                       requires_host_confirmation, '{}'::jsonb AS policy_override
+                FROM facilitation_modes
+                WHERE mode_key = 'open_discussion' AND is_active IS TRUE
+                LIMIT 1
+                """
+            )
+            row = cur.fetchone()
+            if row:
+                available_modes = [row]
+        cur.execute(
+            """
+            SELECT sam.id, sam.mode_id, sam.status, sam.started_at, sam.timer_seconds,
+                   sam.floor_rules, sam.prompt, sam.state, sam.metrics,
+                   fm.mode_key, fm.display_name
+            FROM session_active_modes sam
+            JOIN facilitation_modes fm ON fm.id = sam.mode_id
+            WHERE sam.conversation_id = %s
+              AND sam.status IN ('recommended', 'pending_host_confirmation', 'active', 'ending')
+            ORDER BY sam.updated_at DESC
+            LIMIT 1
+            """,
+            (conv_id,),
+        )
+        active_mode = cur.fetchone()
+        cur.execute(
+            """
+            SELECT sme.event_type, sme.reason, sme.confidence, sme.payload, sme.trigger_signals,
+                   sme.created_at, fm.mode_key, fm.display_name
+            FROM session_mode_events sme
+            LEFT JOIN facilitation_modes fm ON fm.id = sme.mode_id
+            WHERE sme.conversation_id = %s
+            ORDER BY sme.created_at DESC
+            LIMIT 5
+            """,
+            (conv_id,),
+        )
+        recent_history = list(cur.fetchall())
+        cur.execute(
+            "SELECT id, participant_id, name FROM session_participants WHERE conversation_id = %s ORDER BY id ASC",
+            (conv_id,),
+        )
+        participants = list(cur.fetchall())
+        cur.execute(
+            """
+            SELECT id, content, role, name, participant_id, created_at
+            FROM messages
+            WHERE conversation_id = %s AND role = 'user'
+            ORDER BY created_at DESC LIMIT 20
+            """,
+            (conv_id,),
+        )
+        participant_messages = list(reversed(cur.fetchall()))
+        cur.execute("SELECT COUNT(*) AS cnt FROM messages WHERE conversation_id = %s AND role = 'assistant'", (conv_id,))
+        ai_turn_row = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception as exc:
+        print(f"[AI selector] DB lookup failed for conv={conv_id}: {exc}")
+        traceback.print_exc()
+        return _flask_fallback_facilitation_selection(available_modes, "Technique selector database lookup failed; using safe open discussion fallback")
+
+    if not available_modes:
+        return _flask_fallback_facilitation_selection(reason="No enabled facilitation modes found")
+
+    for mode in available_modes:
+        for key, default in (
+            ("floor_rules", {}), ("ai_responsibilities", []), ("entry_conditions", []),
+            ("exit_conditions", []), ("candidate_transitions", []), ("success_metrics", []),
+            ("policy_override", {}),
+        ):
+            mode[key] = _flask_safe_json_value(mode.get(key), default)
+
+    expected_participants = int(session_context.get("expected_participants") or len(participants) or 1)
+    participant_ids = {str(m.get("participant_id") or f"anon_{m.get('id')}") for m in participant_messages}
+    response_count = int(session_context.get("response_count") or len(participant_ids))
+    engagement = _flask_compute_engagement_signals(
+        participant_messages,
+        expected_participants,
+        response_count,
+        int((ai_turn_row or {}).get("cnt") or 0),
+    )
+
+    answer_lines = []
+    for msg in participant_messages[-12:]:
+        answer_lines.append(f"- {msg.get('name') or 'Participant'}: {_flask_extract_message_text(msg.get('content'))}")
+    answer_summary = _flask_clip_text("\n".join(answer_lines) or "No participant answers available.", 4500)
+
+    participant_lines = []
+    for p in participants:
+        display_name = p.get("name") or f"Participant {p.get('participant_id') or p.get('id')}"
+        participant_lines.append(f"- {display_name} (session participant id: {p.get('id')})")
+    participant_profile_text = "\n".join(participant_lines) or "No named participant records available; infer profiles from the recent answers only."
+
+    if active_mode:
+        active_mode["floor_rules"] = _flask_safe_json_value(active_mode.get("floor_rules"), {})
+        active_mode["state"] = _flask_safe_json_value(active_mode.get("state"), {})
+        active_mode["metrics"] = _flask_safe_json_value(active_mode.get("metrics"), {})
+    for item in recent_history:
+        item["payload"] = _flask_safe_json_value(item.get("payload"), {})
+        item["trigger_signals"] = _flask_safe_json_value(item.get("trigger_signals"), [])
+        if item.get("created_at"):
+            item["created_at"] = str(item["created_at"])
+        if item.get("confidence") is not None:
+            item["confidence"] = float(item["confidence"])
+
+    available_modes_text = "\n\n".join(
+        "\n".join([
+            f"Technique: {mode.get('mode_key')} ({mode.get('display_name')})",
+            f"Purpose: {mode.get('purpose')}",
+            f"Primary input: {mode.get('primary_input')}",
+            f"Floor rules: {_flask_clip_text(mode.get('floor_rules'), 700)}",
+            f"AI responsibilities: {_flask_clip_text(mode.get('ai_responsibilities'), 900)}",
+            f"Entry conditions: {_flask_clip_text(mode.get('entry_conditions'), 700)}",
+            f"Exit conditions: {_flask_clip_text(mode.get('exit_conditions'), 700)}",
+            f"Candidate transitions: {_flask_clip_text(mode.get('candidate_transitions'), 700)}",
+        ])
+        for mode in available_modes
+    )
+
+    selector_system = (
+        "You are an expert session facilitator advisor. Select the single best facilitation technique "
+        "for the facilitator's next intervention. Be pragmatic, objective-oriented, and context-sensitive. "
+        "Purposeful divergence is allowed in creative or exploratory moments, but the choice should still help "
+        "the session later converge constructively toward its objective. Respond only with valid JSON."
+    )
+    selector_user = f"""
+SESSION: {session_context.get('title') or 'Untitled workshop'}
+OBJECTIVE: {session_context.get('objective') or 'Facilitate a productive discussion'}
+SCOPE: {session_context.get('scope') or 'No explicit scope provided'}
+FACILITATOR: {session_context.get('facilitator_name') or 'Facilitator'}
+
+PARTICIPANTS ({len(participants) or expected_participants or 'unknown'}):
+{participant_profile_text}
+
+SESSION PROGRESS:
+- AI facilitator turns so far: {engagement['ai_turn_count']}
+- Current active mode: {_flask_clip_text(active_mode, 900) if active_mode else 'None'}
+- Recent mode history: {_flask_clip_text(recent_history, 1200)}
+
+ENGAGEMENT AND ANSWER-QUALITY SIGNALS:
+- Average answer length: {engagement['average_answer_words']} words
+- Response rate: {engagement['answered_participants']}/{engagement['expected_participants']} participants answered ({engagement['response_rate']})
+- Energy level: {engagement['energy_level']}
+- Convergence/divergence: {engagement['convergence_state']}
+- Repeated terms/themes proxy: {', '.join(engagement['repeated_terms']) if engagement['repeated_terms'] else 'none detected'}
+- Short answers: {engagement['short_answer_count']}; long answers: {engagement['long_answer_count']}
+
+RECENT PARTICIPANT ANSWERS:
+{answer_summary}
+
+AVAILABLE ENABLED TECHNIQUES:
+{available_modes_text}
+
+SELECTION CRITERIA TO WEIGH:
+1. Alignment with the session objective and scope.
+2. Current engagement level; low engagement usually needs a more structured or safer technique.
+3. Session phase; early sessions can open up, mid sessions can structure exploration, and late sessions should converge or reflect.
+4. Recent technique history; avoid repeating the same technique consecutively unless it is clearly still best.
+5. Creative sessions may benefit from purposeful divergence before convergence.
+6. Participant diversity inferred from names and answers; mixed or uneven participation may need more scaffolded floor rules.
+
+Respond with this exact JSON shape:
+{{
+  "selected_technique": "<one mode_key from AVAILABLE ENABLED TECHNIQUES>",
+  "rationale": "<1-2 sentence explanation>",
+  "divergence_intent": true,
+  "steering_instruction": "<specific instruction for how the facilitator should apply this technique in the next message>"
+}}
+""".strip()
+
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {"role": "system", "content": selector_system},
+                {"role": "user", "content": selector_user},
+            ],
+            max_tokens=350,
+            temperature=0.2,
+            response_format={"type": "json_object"},
+            timeout=8,
+        )
+        parsed = _flask_parse_selector_json(response.choices[0].message.content.strip())
+        selected_key = str(parsed.get("selected_technique") or "").strip()
+        enabled_keys = {str(mode.get("mode_key")) for mode in available_modes}
+        if selected_key not in enabled_keys:
+            print(f"[AI selector] invalid technique '{selected_key}' for conv={conv_id}; enabled={sorted(enabled_keys)}")
+            return _flask_fallback_facilitation_selection(available_modes, "Selector returned a technique that is not enabled; using safe fallback")
+        selected_mode = next(mode for mode in available_modes if str(mode.get("mode_key")) == selected_key)
+        return {
+            "selected_technique": selected_key,
+            "selected_mode": selected_mode,
+            "rationale": str(parsed.get("rationale") or "Selected based on current engagement and objective alignment.").strip(),
+            "divergence_intent": bool(parsed.get("divergence_intent")),
+            "steering_instruction": str(parsed.get("steering_instruction") or "Apply the selected technique while steering constructively toward the session objective.").strip(),
+            "selector_model": getattr(response, "model", "gpt-4.1-nano"),
+            "selector_fallback": False,
+            "engagement_signals": engagement,
+        }
+    except Exception as exc:
+        print(f"[AI selector] AI selection failed for conv={conv_id}: {exc}")
+        fallback = _flask_fallback_facilitation_selection(available_modes, "Technique selector failed or timed out; using safe open discussion fallback")
+        fallback["engagement_signals"] = engagement
+        return fallback
+
 app = Flask(__name__)
 
 # Rate limiting: protects AI endpoints and auth routes from abuse
@@ -140,6 +521,7 @@ ALLOWED_TABLES = {
     "admin_notifications", "security_audit_log",
     "conversations_config", "feedback", "referrals",
     "login_activity", "user_sessions", "sessions_history",
+    "facilitator_persona_configs",
 }
 
 ALLOWED_RPC_FUNCTIONS = {
@@ -161,6 +543,7 @@ FK_MAP = {
     "messages_conversation_id_fkey": ("messages", "conversation_id", "conversations", "id"),
     "fk_messages_conversations": ("messages", "conversation_id", "conversations", "id"),
     "messages_facilitator_id_fkey": ("messages", "facilitator_id", "facilitators", "id"),
+    "facilitator_persona_configs_facilitator_id_fkey": ("facilitator_persona_configs", "facilitator_id", "facilitators", "id"),
     "feedback_conversation_id_fkey": ("feedback", "conversation_id", "conversations", "id"),
     "session_events_conversation_id_fkey": ("session_events", "conversation_id", "conversations", "id"),
     "session_participants_conversation_id_fkey": ("session_participants", "conversation_id", "conversations", "id"),
@@ -995,6 +1378,8 @@ def edge_function(func_name):
         randomness_cfg = None
         avatar_url = ""
         facilitator_language = None  # primary language for AI responses
+        facilitator_persona_config = None
+        facilitator_id = None
 
         if conv_id:
             try:
@@ -1003,17 +1388,40 @@ def edge_function(func_name):
                     "SELECT c.id, s.title, s.facilitator, s.objective, s.prompt, "
                     "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
                     "f.title as facilitator_name, f.details as facilitator_details, "
-                    "f.profile_picture, f.languages as facilitator_languages "
+                    "f.profile_picture, f.languages as facilitator_languages, "
+                    "fpc.display_name as persona_display_name, fpc.pronouns as persona_pronouns, "
+                    "fpc.gender_presentation as persona_gender_presentation, fpc.voice_id as persona_voice_id, "
+                    "fpc.voice_provider as persona_voice_provider, fpc.voice_style as persona_voice_style, "
+                    "fpc.avatar_style as persona_avatar_style, fpc.avatar_asset_url as persona_avatar_asset_url, "
+                    "fpc.locale as persona_locale, fpc.tone as persona_tone, fpc.animation_preset as persona_animation_preset, "
+                    "fpc.nonverbal_behavior as persona_nonverbal_behavior, fpc.speaking_behavior as persona_speaking_behavior "
                     "FROM conversations c "
                     "LEFT JOIN sessions s ON c.sessions_id = s.id "
                     "LEFT JOIN facilitators f ON s.facilitator = f.id "
+                    "LEFT JOIN facilitator_persona_configs fpc ON fpc.facilitator_id = f.id "
                     "WHERE c.id = %s", (conv_id,)
                 )
                 row = cur.fetchone()
                 if row:
+                    facilitator_id = row.get('facilitator')
                     session_title = row.get('title') or session_title
-                    facilitator_name = row.get('facilitator_name') or facilitator_name
+                    facilitator_name = row.get('persona_display_name') or row.get('facilitator_name') or facilitator_name
                     facilitator_details = row.get('facilitator_details') or ""
+                    facilitator_persona_config = {
+                        "display_name": row.get('persona_display_name'),
+                        "pronouns": row.get('persona_pronouns'),
+                        "gender_presentation": row.get('persona_gender_presentation'),
+                        "voice_id": row.get('persona_voice_id'),
+                        "voice_provider": row.get('persona_voice_provider'),
+                        "voice_style": row.get('persona_voice_style'),
+                        "avatar_style": row.get('persona_avatar_style'),
+                        "avatar_asset_url": row.get('persona_avatar_asset_url'),
+                        "locale": row.get('persona_locale'),
+                        "tone": row.get('persona_tone'),
+                        "animation_preset": row.get('persona_animation_preset'),
+                        "nonverbal_behavior": row.get('persona_nonverbal_behavior'),
+                        "speaking_behavior": row.get('persona_speaking_behavior'),
+                    } if row.get('persona_display_name') or row.get('persona_tone') or row.get('persona_voice_style') else None
                     objective = row.get('objective') or objective
                     session_prompt = row.get('prompt') or ""
                     welcome_message_template = row.get('welcome_message') or ""
@@ -1057,6 +1465,37 @@ def edge_function(func_name):
                 f"You are facilitating a session titled \"{session_title}\".")
         if facilitator_details:
             system_parts.append(f"Background: {facilitator_details}")
+        if facilitator_persona_config:
+            def _persona_json(value):
+                if value is None:
+                    return ""
+                if isinstance(value, str):
+                    return value
+                try:
+                    return json.dumps(value, ensure_ascii=False)
+                except Exception:
+                    return str(value)
+
+            persona_instruction_lines = [
+                "FACILITATOR PERSONA CONFIGURATION:",
+                "Use these settings as presentation and facilitation style guidance for your generated messages. They are not participant-visible configuration details and must never be quoted as internal settings.",
+            ]
+            if facilitator_persona_config.get("display_name"):
+                persona_instruction_lines.append(f"- Display name: {facilitator_persona_config['display_name']}")
+            if facilitator_persona_config.get("pronouns"):
+                persona_instruction_lines.append(f"- Pronouns: {_persona_json(facilitator_persona_config['pronouns'])}")
+            if facilitator_persona_config.get("gender_presentation"):
+                persona_instruction_lines.append(f"- Avatar presentation: {facilitator_persona_config['gender_presentation']}")
+            if facilitator_persona_config.get("tone"):
+                persona_instruction_lines.append(f"- Tone: {facilitator_persona_config['tone']}")
+            if facilitator_persona_config.get("voice_style"):
+                persona_instruction_lines.append(f"- Spoken voice style: {facilitator_persona_config['voice_style']}")
+            if facilitator_persona_config.get("speaking_behavior"):
+                persona_instruction_lines.append(f"- Speaking behavior: {_persona_json(facilitator_persona_config['speaking_behavior'])}")
+            if facilitator_persona_config.get("nonverbal_behavior"):
+                persona_instruction_lines.append(f"- Nonverbal/avatar cues to imply in concise language when useful: {_persona_json(facilitator_persona_config['nonverbal_behavior'])}")
+            persona_instruction_lines.append("Apply this persona naturally: adapt word choice, pacing, warmth, energy, and questioning style, while still prioritizing the workshop objective, host instructions, safety, and confidentiality rules.")
+            system_parts.append("\n".join(persona_instruction_lines))
         system_parts.append(f"Session objective: {objective}")
         if session_scope:
             system_parts.append(f"Session scope: {session_scope}")
@@ -1178,23 +1617,45 @@ def edge_function(func_name):
                 if role == 'user':
                     participant_answers.append(f"{name}: {text}")
 
-            if host_instruction:
-                user_prompt = (
-                    f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
-                    f"{conversation_context}\n"
-                    f"The host has instructed you to: {host_instruction}\n\n"
-                    "Follow the host's instruction above. "
-                    "Reference the participants' contributions where relevant. "
-                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
-            else:
-                user_prompt = (
-                    f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
-                    f"{conversation_context}\n"
-                    "Based on the participants' responses above:\n"
-                    "1. Briefly acknowledge and synthesize the key themes from their answers\n"
-                    "2. Highlight any interesting connections or contrasts between different participants' views\n"
-                    "3. Ask a thoughtful follow-up question that builds on what they shared and deepens the discussion\n\n"
-                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
+            technique_selection = _select_facilitation_technique_sync(conv_id, facilitator_id, {
+                "facilitator_name": facilitator_name,
+                "title": session_title,
+                "objective": objective,
+                "scope": session_scope,
+            })
+            selected_mode = technique_selection.get("selected_mode") or {}
+            mode_floor_rules = _flask_safe_json_value(selected_mode.get("floor_rules"), {})
+            mode_ai_responsibilities = _flask_safe_json_value(selected_mode.get("ai_responsibilities"), [])
+            system_message += (
+                "\n\nADAPTIVE FACILITATION TECHNIQUE FOR THIS TURN:\n"
+                f"Technique: {technique_selection.get('selected_technique')} ({selected_mode.get('display_name') or 'selected technique'})\n"
+                f"Purpose: {selected_mode.get('purpose') or 'Guide the next facilitator intervention.'}\n"
+                f"Floor rules to respect: {_flask_clip_text(mode_floor_rules, 900)}\n"
+                f"AI responsibilities: {_flask_clip_text(mode_ai_responsibilities, 1000)}\n"
+                f"Selection rationale: {technique_selection.get('rationale')}\n"
+                "Apply these technique-specific rules naturally. Do not mention the internal technique selection unless it is helpful to participants."
+            )
+            divergence_note = (
+                "The selector intentionally chose purposeful divergence for this turn. Encourage exploration, broaden the idea space, and still leave a constructive path back toward the objective."
+                if technique_selection.get("divergence_intent")
+                else "The selector did not choose purposeful divergence for this turn. Keep the discussion constructively oriented toward the objective."
+            )
+            host_guidance = f"The host has instructed you to: {host_instruction}\n\nFollow the host's instruction above while applying the selected technique where compatible.\n" if host_instruction else ""
+            user_prompt = (
+                f"Here is the recent conversation in our workshop \"{session_title}\":\n\n"
+                f"{conversation_context}\n"
+                f"{host_guidance}"
+                "Adaptive facilitation guidance for your next intervention:\n"
+                f"- Selected technique: {technique_selection.get('selected_technique')} ({selected_mode.get('display_name') or 'selected technique'})\n"
+                f"- Rationale: {technique_selection.get('rationale')}\n"
+                f"- Technique responsibilities: {_flask_clip_text(mode_ai_responsibilities, 900)}\n"
+                f"- Steering instruction: {technique_selection.get('steering_instruction')}\n"
+                f"- Divergence guidance: {divergence_note}\n\n"
+                "Based on the participants' responses above and the selected technique:\n"
+                "1. Briefly acknowledge and synthesize the key themes from their answers.\n"
+                "2. Highlight any interesting connections or contrasts between different participants' views when useful.\n"
+                "3. Ask the next question or give the next instruction in a way that follows the selected facilitation technique.\n\n"
+                "Keep your response to 2-3 short paragraphs. Be specific about what participants said.")
 
         # ── Call OpenAI API ──
         print(f"[AI] Calling {model} for conv={conv_id} (start={is_session_start}, report={generate_report})")
@@ -1228,12 +1689,41 @@ def edge_function(func_name):
 
         # ── Save the AI message to the database ──
         msg_id = None
+        if 'technique_selection' not in locals():
+            technique_selection = None
+        if 'selected_mode' not in locals():
+            selected_mode = {}
         if conv_id:
             try:
                 conn = get_db(); cur = conn.cursor()
-                content_json = json.dumps({"text": txt})
-                if avatar_url:
-                    content_json = json.dumps({"text": txt, "avatar": avatar_url})
+                persona_message_metadata = {}
+                if facilitator_persona_config:
+                    persona_message_metadata = {
+                        "facilitator_persona": {
+                            "voice_id": facilitator_persona_config.get("voice_id"),
+                            "voice_provider": facilitator_persona_config.get("voice_provider"),
+                            "voice_style": facilitator_persona_config.get("voice_style"),
+                            "locale": facilitator_persona_config.get("locale"),
+                            "tone": facilitator_persona_config.get("tone"),
+                            "animation_preset": facilitator_persona_config.get("animation_preset"),
+                        }
+                    }
+                technique_message_metadata = {}
+                if technique_selection:
+                    technique_message_metadata = {
+                        "facilitation_technique": {
+                            "selected_technique": technique_selection.get("selected_technique"),
+                            "display_name": selected_mode.get("display_name"),
+                            "mode_id": selected_mode.get("id"),
+                            "rationale": technique_selection.get("rationale"),
+                            "divergence_intent": bool(technique_selection.get("divergence_intent")),
+                            "steering_instruction": technique_selection.get("steering_instruction"),
+                            "selector_model": technique_selection.get("selector_model"),
+                            "selector_fallback": bool(technique_selection.get("selector_fallback")),
+                            "engagement_signals": technique_selection.get("engagement_signals"),
+                        }
+                    }
+                content_json = json.dumps({"text": txt, **({"avatar": avatar_url} if avatar_url else {}), **persona_message_metadata, **technique_message_metadata})
                 cur.execute(
                     "INSERT INTO messages (conversation_id, content, role, name) VALUES (%s, %s, 'assistant', %s) RETURNING id",
                     (conv_id, content_json, facilitator_name)

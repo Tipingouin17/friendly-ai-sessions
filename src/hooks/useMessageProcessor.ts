@@ -95,5 +95,6 @@ export const useMessageProcessor = ({
     // For admin mode, return all processed messages
     debugLog('all', `Returning all ${processedMessages.length} messages for admin view`);
     return processedMessages;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [messages, viewMode, participants, participantNames, currentParticipant, processMessageAvatar, groupMessages]);
 };

@@ -47,12 +47,16 @@ interface HostHeaderProps {
   conversation: ConversationWithSession | null;
   isSessionPaused: boolean;
   toggleSessionState: () => void;
+  isSessionStarted?: boolean;
+  isWaitingRoomFull?: boolean;
 }
 
 const HostHeader: React.FC<HostHeaderProps> = ({
   conversation,
   isSessionPaused,
   toggleSessionState,
+  isSessionStarted: isExplicitSessionStarted,
+  isWaitingRoomFull = false,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -113,10 +117,12 @@ const HostHeader: React.FC<HostHeaderProps> = ({
     getFacilitatorAvatarUrl(facilitatorInfo).then(url => {
       setFacilitatorAvatarUrl(url && url !== '/placeholder.svg' ? url : null);
     }).catch(() => setFacilitatorAvatarUrl(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [facilitatorInfo?.profile_picture, facilitatorInfo?.id]);
 
   const isSessionEnded = conversation?.is_session_ended || false;
-  const isSessionStarted = conversation?.session_started || false;
+  const hasPersistedStart = Boolean(conversation?.session_started || (conversation as any)?.session_started_at);
+  const isSessionStarted = isExplicitSessionStarted ?? hasPersistedStart;
   const isBusy = isClosing || isStopping;
 
   /* ── Action buttons (shared between layouts) ── */
@@ -226,7 +232,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   return (
     <>
       {/* ── Main header bar ── */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+      <div className="host-live-header sticky top-0 z-10 border-b shadow-sm">
 
         {/* ── Single row on sm+ / two rows on mobile ── */}
         <div className="px-3 sm:px-5">
@@ -257,6 +263,7 @@ const HostHeader: React.FC<HostHeaderProps> = ({
                 <SessionStatusBadge
                   isActive={!isSessionPaused && !isSessionEnded && isSessionStarted}
                   sessionStarted={isSessionStarted}
+                  isWaitingRoomFull={isWaitingRoomFull}
                   isSessionEnded={isSessionEnded}
                 />
                 {isSessionStarted && !isSessionEnded && (
@@ -337,11 +344,11 @@ const HostHeader: React.FC<HostHeaderProps> = ({
 
         {/* Analytics panel (collapsible) */}
         {conversation?.id && analyticsOpen && (
-          <div className="px-3 sm:px-5 pb-4 border-t border-slate-100 bg-slate-50">
+          <div className="host-live-analytics-panel px-3 sm:px-5 pb-4 border-t">
             <div className="pt-4">
               <SessionAnalyticsDashboard
                 conversationId={conversation.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm"
+                className="rounded-xl border shadow-sm"
               />
             </div>
           </div>

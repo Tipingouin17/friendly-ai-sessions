@@ -27,17 +27,31 @@ const SessionHost = () => {
     isAutoStarting,
     autoStartCountdown,
     cancelAutoStart,
+    isWaitingRoomFull,
 
     // Messages
     sessionMessages,
     isSessionPaused,
     responseCount,
     isWaitingForResponses,
+    isGeneratingResponse,
 
     // Actions
     toggleSessionState,
     handleSendHostMessage,
     triggerFacilitatorResponse,
+    enabledTools,
+    isLoadingToolbox,
+    toolboxError,
+    enabledModes,
+    activeMode,
+    recentModeEvents,
+    isLoadingModes,
+    modeError,
+    startMode,
+    approveMode,
+    endMode,
+    rejectMode,
     handleSessionStarted,
     refresh
   } = useSessionHostLogic();
@@ -81,12 +95,26 @@ const SessionHost = () => {
       isWaitingForResponses={isWaitingForResponses}
       responseCount={responseCount}
       totalParticipants={participantCount}
+      isGeneratingResponse={isGeneratingResponse}
       onTriggerFacilitatorResponse={triggerFacilitatorResponse}
+      enabledTools={enabledTools}
+      isLoadingToolbox={isLoadingToolbox}
+      toolboxError={toolboxError}
+      enabledModes={enabledModes}
+      activeMode={activeMode}
+      recentModeEvents={recentModeEvents}
+      isLoadingModes={isLoadingModes}
+      modeError={modeError}
+      onStartMode={startMode}
+      onApproveMode={approveMode}
+      onEndMode={endMode}
+      onRejectMode={rejectMode}
       isSessionStarted={isSessionStarted}
       onSessionStarted={handleSessionStarted}
       isAutoStarting={isAutoStarting}
       autoStartCountdown={autoStartCountdown}
       onCancelAutoStart={cancelAutoStart}
+      isWaitingRoomFull={isWaitingRoomFull}
       isSessionEnded={conversationData?.is_session_ended === true}
     />
   );

@@ -36,7 +36,7 @@ export const useSessionParticipantContext = ({
   useEffect(() => {
     if (conversation) {
       setParticipantCount(conversation.current_participants || 0);
-      setMaxParticipants(conversation.participants || 0);
+      setMaxParticipants(Math.max((conversation.participants || 0) - 1, 0));
     }
   }, [conversation]);
   
@@ -45,11 +45,13 @@ export const useSessionParticipantContext = ({
     ? participantMap[currentUserParticipantId] 
     : null;
   
+  const attendeeCount = Math.max(participantCount - 1, 0);
+
   return {
     participantMap,
     participantCount,
     maxParticipants,
     currentParticipant,
-    isSessionFull: maxParticipants > 0 && participantCount >= maxParticipants
+    isSessionFull: maxParticipants > 0 && attendeeCount >= maxParticipants
   };
 };

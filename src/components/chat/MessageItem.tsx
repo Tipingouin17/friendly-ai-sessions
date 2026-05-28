@@ -43,10 +43,6 @@ const MessageItem = ({
   const isCurrentUser =
     !!(currentParticipant && message.participant === currentParticipant && !isAnonymous);
 
-  if (isCurrentUser) {
-    displayParticipantName = "You";
-  }
-
   const isLeft = message.sender === "assistant" || message.sender === "admin";
 
   // Admin messages are always centered

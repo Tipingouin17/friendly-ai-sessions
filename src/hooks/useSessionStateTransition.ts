@@ -9,7 +9,6 @@ import { SessionContextProps } from "@/types/session";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
-import { getScheduledStartIso } from "@/services/facilitatorService";
 
 interface UseSessionStateTransitionProps {
   props: SessionContextProps;
@@ -101,27 +100,16 @@ export function useSessionStateTransition({
                              props.participants?.length || 0;
   const maxParticipants = props.conversation?.participants || 0;
   const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
-  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(props.conversation?.flow_config)) && !props.isSessionStartedInDB;
   
-  // Enhanced session full handling with navigation lock
+  // Full capacity no longer starts the room locally. The redesigned waiting-room
+  // flow requires the host's explicit Start Session action, and participants move
+  // to the live view only after the database-backed session_started flag changes.
   useEffect(() => {
-    if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current && !isScheduledWaitingRoom) {
+    if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current) {
       sessionFullTriggeredRef.current = true;
-      
-      // Set navigation lock for participants to prevent redirects during auto-start
-      if (!isAdmin) {
-        participantNavigationLockRef.current = true;
-        
-        // Clear the lock after session has time to stabilize
-        setTimeout(() => {
-          participantNavigationLockRef.current = false;
-        }, 5000);
-      }
-      
-      setSessionStarted(true);
       if (onSessionFull) onSessionFull();
     }
-  }, [isSessionFull, onSessionFull, setSessionStarted, isAdmin, isScheduledWaitingRoom]);
+  }, [isSessionFull, onSessionFull]);
   
   // Reset transition state after a maximum timeout
   useEffect(() => {

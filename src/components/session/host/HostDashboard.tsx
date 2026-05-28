@@ -8,9 +8,10 @@ import React from "react";
 import HostHeader from "./HostHeader";
 import HostSessionContent from "./HostSessionContent";
 import WaitingParticipantsBanner from "./WaitingParticipantsBanner";
-import { EngagementStatsPanel } from "./EngagementStatsPanel";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { ConversationWithSession } from "@/types/database";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
+import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 
 interface HostDashboardProps {
   conversation: ConversationWithSession | null;
@@ -27,7 +28,20 @@ interface HostDashboardProps {
   isWaitingForResponses?: boolean;
   responseCount?: number;
   totalParticipants?: number;
+  isGeneratingResponse?: boolean;
   onTriggerFacilitatorResponse?: (hostInstruction?: string) => void;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  toolboxError?: string | null;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  onStartMode?: (mode: FacilitatorModeAssignment, prompt?: string) => Promise<void>;
+  onApproveMode?: (reason?: string) => Promise<void>;
+  onEndMode?: (reason?: string) => Promise<void>;
+  onRejectMode?: (reason?: string) => Promise<void>;
   
   // Session start props
   isSessionStarted?: boolean;
@@ -37,6 +51,7 @@ interface HostDashboardProps {
   isAutoStarting?: boolean;
   autoStartCountdown?: number;
   onCancelAutoStart?: () => void;
+  isWaitingRoomFull?: boolean;
 
   // Session state
   isSessionEnded?: boolean;
@@ -55,12 +70,26 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
   isWaitingForResponses = false,
   responseCount = 0,
   totalParticipants = 1,
+  isGeneratingResponse = false,
   onTriggerFacilitatorResponse,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  toolboxError = null,
+  enabledModes = [],
+  activeMode = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  onStartMode,
+  onApproveMode,
+  onEndMode,
+  onRejectMode,
   isSessionStarted = false,
   onSessionStarted,
   isAutoStarting = false,
   autoStartCountdown = 0,
   onCancelAutoStart,
+  isWaitingRoomFull = false,
   isSessionEnded = false,
 }) => {
   return (
@@ -69,6 +98,8 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         conversation={conversation}
         isSessionPaused={isSessionPaused}
         toggleSessionState={toggleSessionState}
+        isSessionStarted={isSessionStarted}
+        isWaitingRoomFull={isWaitingRoomFull}
       />
 
       {/* Waiting participants notification banner */}
@@ -76,15 +107,6 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         <WaitingParticipantsBanner conversationId={currentConversationId} />
       )}
 
-      {/* Live engagement stats (skip / pause / message-host events) */}
-      {currentConversationId && isSessionStarted && (
-        <div className="px-4 pt-2">
-          <EngagementStatsPanel
-            conversationId={currentConversationId}
-            participants={participants.map(p => ({ id: Number(p.id), name: p.name }))}
-          />
-        </div>
-      )}
       
       <HostSessionContent
         sessionMessages={sessionMessages}
@@ -97,12 +119,26 @@ const HostDashboard: React.FC<HostDashboardProps> = ({
         isWaitingForResponses={isWaitingForResponses}
         responseCount={responseCount}
         totalParticipants={totalParticipants}
+        isGeneratingResponse={isGeneratingResponse}
         onTriggerFacilitatorResponse={onTriggerFacilitatorResponse}
+        enabledTools={enabledTools}
+        isLoadingToolbox={isLoadingToolbox}
+        toolboxError={toolboxError}
+        enabledModes={enabledModes}
+        activeMode={activeMode}
+        recentModeEvents={recentModeEvents}
+        isLoadingModes={isLoadingModes}
+        modeError={modeError}
+        onStartMode={onStartMode}
+        onApproveMode={onApproveMode}
+        onEndMode={onEndMode}
+        onRejectMode={onRejectMode}
         isSessionStarted={isSessionStarted}
         onSessionStarted={onSessionStarted}
         isAutoStarting={isAutoStarting}
         autoStartCountdown={autoStartCountdown}
         onCancelAutoStart={onCancelAutoStart}
+        isWaitingRoomFull={isWaitingRoomFull}
         isSessionEnded={isSessionEnded}
         isSessionPaused={isSessionPaused}
       />

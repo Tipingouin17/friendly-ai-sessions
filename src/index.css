@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -154,6 +154,63 @@
     @apply bg-white/70 backdrop-blur-lg border border-white/20;
 }
 
+.font-display {
+    font-family: 'Sora', 'Inter', system-ui, sans-serif;
+}
+
+.font-mono {
+    font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+@keyframes aiSpeakingPulse {
+    0%,
+    100% {
+        box-shadow: 0 0 28px rgba(245, 158, 11, 0.18);
+    }
+
+    50% {
+        box-shadow: 0 0 58px rgba(245, 158, 11, 0.34);
+    }
+}
+
+@keyframes soundBar {
+    0%,
+    100% {
+        transform: scaleY(0.45);
+        opacity: 0.55;
+    }
+
+    50% {
+        transform: scaleY(1.3);
+        opacity: 1;
+    }
+}
+
+@keyframes reactionPop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -6px) scale(0.88);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+
+.animate-ai-speaking {
+    animation: aiSpeakingPulse 1.8s ease-in-out infinite;
+}
+
+.animate-sound-bar {
+    animation: soundBar 900ms ease-in-out infinite;
+}
+
+.animate-reaction-pop {
+    animation: reactionPop 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Light UX session shell utilities */
 /* Add explicit message width controls */
 .message-width-control {
     width: fit-content !important;
@@ -233,9 +290,16 @@
     animation: fadeInLeft 0.4s ease-out;
 }
 
-.animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .line-clamp-4 {
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
 
 /* ============================================================
    Print / PDF export styles (used by SessionReportView)
@@ -279,4 +343,197 @@
         break-inside: avoid;
         page-break-inside: avoid;
     }
+}
+
+/* Session pages redesign tokens and utilities */
+:root {
+    --session-ink: 222 47% 11%;
+    --session-muted: 215 16% 47%;
+    --session-bg-start: 210 40% 98%;
+    --session-bg-mid: 220 33% 98%;
+    --session-bg-end: 226 40% 96%;
+    --session-panel: 0 0% 100%;
+    --session-panel-strong: 210 40% 98%;
+    --session-border: 214 32% 91%;
+    --session-indigo: 244 83% 67%;
+    --session-violet: 263 82% 72%;
+    --session-amber: 38 92% 58%;
+    --session-emerald: 151 71% 46%;
+    --session-rose: 351 83% 61%;
+}
+
+.session-redesign-shell {
+    color: hsl(var(--session-ink));
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.10), transparent 28rem),
+        radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.08), transparent 30rem),
+        linear-gradient(135deg, hsl(var(--session-bg-start)), hsl(var(--session-bg-mid)) 48%, hsl(var(--session-bg-end)));
+}
+
+.session-glass-panel {
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+    backdrop-filter: blur(12px);
+}
+
+.session-soft-panel {
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(248, 250, 252, 0.88);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.055);
+    backdrop-filter: blur(10px);
+}
+
+.session-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--session-border));
+    background: rgba(255, 255, 255, 0.86);
+    color: hsl(var(--session-ink));
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.session-avatar-stage {
+    background:
+        radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.22), rgba(238, 242, 255, 0.92) 48%, rgba(255, 255, 255, 0.96)),
+        linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(226, 232, 240, 0.86));
+}
+
+.session-speaking-ring {
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.35), 0 0 28px rgba(129, 140, 248, 0.28), inset 0 0 30px rgba(245, 158, 11, 0.08);
+}
+
+.session-progress-track {
+    background: rgba(148, 163, 184, 0.24);
+}
+
+.session-progress-fill {
+    background: linear-gradient(90deg, hsl(var(--session-indigo)), hsl(var(--session-violet)));
+}
+
+.session-control-button {
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.session-control-button:hover {
+    transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .session-control-button,
+    .animate-ai-speaking,
+    .animate-sound-bar,
+    .animate-reaction-pop {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Host live-session workspace: light orchestration surface. */
+.host-live-header {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: rgba(226, 232, 240, 0.9);
+    box-shadow: 0 14px 38px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+}
+
+.host-live-header .text-slate-900,
+.host-live-header .text-slate-700,
+.host-live-header .text-slate-600 {
+    color: hsl(var(--session-ink)) !important;
+}
+
+.host-live-header .text-slate-500,
+.host-live-header .text-slate-400 {
+    color: hsl(var(--session-muted)) !important;
+}
+
+.host-live-header .border-slate-200,
+.host-live-header .border-slate-100,
+.host-live-analytics-panel {
+    border-color: rgba(226, 232, 240, 0.92) !important;
+}
+
+.host-live-header .bg-white,
+.host-live-header .bg-slate-50,
+.host-live-header .bg-slate-100,
+.host-live-analytics-panel {
+    background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.host-live-header button:hover {
+    background: rgba(238, 242, 255, 0.9) !important;
+    color: hsl(var(--session-ink)) !important;
+}
+
+.host-live-header [class*="bg-indigo-50"] {
+    background: rgba(238, 242, 255, 0.96) !important;
+    border-color: rgba(199, 210, 254, 0.92) !important;
+    color: rgb(67, 56, 202) !important;
+}
+
+.host-session-cockpit {
+    color: hsl(var(--session-ink));
+    background:
+        radial-gradient(circle at 14% 0%, rgba(99, 102, 241, 0.12), transparent 28rem),
+        radial-gradient(circle at 82% 12%, rgba(14, 165, 233, 0.10), transparent 30rem),
+        radial-gradient(circle at 50% 100%, rgba(124, 58, 237, 0.06), transparent 32rem),
+        linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #f8fafc 100%);
+}
+
+.host-session-cockpit .session-glass-panel {
+    border-color: rgba(226, 232, 240, 0.92);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+    backdrop-filter: blur(16px);
+}
+
+.host-session-cockpit .session-soft-panel,
+.host-session-cockpit .rounded-2xl.border,
+.host-session-cockpit .rounded-3xl.border {
+    border-color: rgba(226, 232, 240, 0.92) !important;
+    background: rgba(255, 255, 255, 0.82) !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.055);
+}
+
+.host-session-cockpit .session-avatar-stage {
+    background:
+        radial-gradient(circle at 50% 8%, rgba(99, 102, 241, 0.18), transparent 12rem),
+        radial-gradient(circle at 50% 0%, rgba(224, 231, 255, 0.74), rgba(241, 245, 249, 0.96) 56%, rgba(255, 255, 255, 0.98)),
+        linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.7));
+}
+
+.host-session-cockpit .session-chip {
+    border-color: rgba(199, 210, 254, 0.9);
+    background: rgba(255, 255, 255, 0.9);
+    color: hsl(var(--session-ink));
+}
+
+.host-session-cockpit .session-progress-track {
+    background: rgba(148, 163, 184, 0.22);
+}
+
+.host-session-cockpit .session-progress-fill {
+    background: linear-gradient(90deg, hsl(var(--session-indigo)), hsl(var(--session-violet)));
+}
+
+.host-session-cockpit input,
+.host-session-cockpit textarea,
+.host-session-cockpit [role="combobox"] {
+    border-color: rgba(203, 213, 225, 0.9) !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: hsl(var(--session-ink)) !important;
+}
+
+.host-session-cockpit input::placeholder,
+.host-session-cockpit textarea::placeholder {
+    color: hsl(var(--session-muted)) !important;
+}
+
+.host-session-cockpit button:hover {
+    border-color: rgba(129, 140, 248, 0.42) !important;
 }

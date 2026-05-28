@@ -9,17 +9,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import api from "@/lib/api";
+import api, { MfaFactor } from "@/lib/api";
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Copy, CheckCircle2, AlertCircle, ShieldCheck, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface TwoFactorSetupModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onStatusChange?: () => void;
 }
 
-export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen, onClose }) => {
+export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen, onClose, onStatusChange }) => {
     const { toast } = useToast();
     const [step, setStep] = useState<'init' | 'scan' | 'verify' | 'success'>('init');
     const [factorId, setFactorId] = useState<string>('');
@@ -28,6 +29,34 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
     const [verifyCode, setVerifyCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [factors, setFactors] = useState<MfaFactor[]>([]);
+
+    const verifiedFactors = factors.filter((factor) => factor.status === 'verified');
+
+    const loadFactors = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const { data, error } = await api.auth.mfa.listFactors();
+            if (error) throw error;
+            setFactors(data?.totp ?? []);
+        } catch (err: any) {
+            console.error('Error loading MFA factors:', err);
+            setError(err.message || 'Failed to load two-factor authentication status');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setStep('init');
+        setVerifyCode('');
+        setFactorId('');
+        setQrCode('');
+        setSecret('');
+        void loadFactors();
+    }, [isOpen]);
 
     const startSetup = async () => {
         setIsLoading(true);
@@ -68,6 +97,8 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
 
             if (error) throw error;
 
+            await loadFactors();
+            onStatusChange?.();
             setStep('success');
             toast({
                 title: "2FA Enabled",
@@ -81,12 +112,33 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
         }
     };
 
-    const handleClose = () => {
-        // Reset state when closing
-        if (step === 'success') {
-            setStep('init');
-            setVerifyCode('');
+    const disableFactor = async (id: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const { error } = await api.auth.mfa.unenroll({ factorId: id });
+            if (error) throw error;
+            await loadFactors();
+            onStatusChange?.();
+            toast({
+                title: "2FA Disabled",
+                description: "Two-factor authentication has been disabled for your account.",
+            });
+        } catch (err: any) {
+            console.error('Error disabling MFA:', err);
+            setError(err.message || 'Failed to disable two-factor authentication');
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    const handleClose = () => {
+        // Reset setup state when closing
+        setStep('init');
+        setVerifyCode('');
+        setFactorId('');
+        setQrCode('');
+        setSecret('');
         onClose();
     };
 
@@ -111,11 +163,44 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({ isOpen
                 <div className="py-4">
                     {step === 'init' && (
                         <div className="space-y-4">
-                            <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
-                                <p>You will need an authenticator app like Google Authenticator, Authy, or Microsoft Authenticator.</p>
-                            </div>
+                            {verifiedFactors.length > 0 ? (
+                                <div className="space-y-3">
+                                    <Alert>
+                                        <ShieldCheck className="h-4 w-4" />
+                                        <AlertTitle>Two-factor authentication is enabled</AlertTitle>
+                                        <AlertDescription>
+                                            Your account requires a verified authenticator app during sensitive sign-in flows.
+                                        </AlertDescription>
+                                    </Alert>
+                                    {verifiedFactors.map((factor) => (
+                                        <div key={factor.id} className="rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">Authenticator app</p>
+                                                <p className="text-xs text-gray-500">
+                                                    Enabled {factor.verified_at ? new Date(factor.verified_at).toLocaleDateString() : 'for this account'}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-red-600 hover:text-red-700"
+                                                onClick={() => disableFactor(factor.id)}
+                                                disabled={isLoading}
+                                            >
+                                                <Trash2 size={14} className="mr-1" />
+                                                Disable
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
+                                    <p>You will need an authenticator app like Google Authenticator, Authy, or Microsoft Authenticator.</p>
+                                </div>
+                            )}
                             <Button onClick={startSetup} className="w-full" disabled={isLoading}>
-                                {isLoading ? "Initializing..." : "Start Setup"}
+                                {isLoading ? "Initializing..." : verifiedFactors.length > 0 ? "Add Another Authenticator" : "Start Setup"}
                             </Button>
                         </div>
                     )}

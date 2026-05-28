@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +20,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff, Mail,
+    Settings, Bot, Globe, Shield, MessageSquare, Save, Loader2, RefreshCw, Eye, EyeOff, Mic, Volume2, Activity,
 } from "lucide-react";
 
 interface Config {
@@ -30,6 +31,15 @@ interface Config {
     google_capcha_key: string | null;
     secret_message: string | null;
     free_plan_message_limit: number | null;
+    toolbox_token_accounting_enabled: boolean;
+    toolbox_default_token_budget: number;
+    toolbox_overage_policy: string;
+    speech_stack_enabled: boolean;
+    speech_default_language: string;
+    tts_avatar_enabled: boolean;
+    tts_default_voice_id: string | null;
+    tts_lip_sync_enabled: boolean;
+    facilitation_analytics_enabled: boolean;
     languages: Record<string, boolean> | null;
     contact_email: string | null;
     business_hours: string | null;
@@ -72,6 +82,7 @@ const SECTIONS = [
     { id: "security", label: "Security", icon: Shield, color: "red" },
     { id: "messaging", label: "Messaging", icon: MessageSquare, color: "green" },
     { id: "contact", label: "Contact Info", icon: Mail, color: "indigo" },
+    { id: "voice", label: "Speech & Avatar", icon: Mic, color: "indigo" },
 ];
 
 export const SystemSettings = () => {
@@ -89,6 +100,15 @@ export const SystemSettings = () => {
         google_capcha_key: "",
         secret_message: "",
         free_plan_message_limit: 20,
+        toolbox_token_accounting_enabled: true,
+        toolbox_default_token_budget: 6000,
+        toolbox_overage_policy: "warn",
+        speech_stack_enabled: true,
+        speech_default_language: "en-US",
+        tts_avatar_enabled: true,
+        tts_default_voice_id: "",
+        tts_lip_sync_enabled: true,
+        facilitation_analytics_enabled: true,
         languages: { en: true },
         contact_email: "support@aifacilitator.ai",
         business_hours: "Mon - Fri, 9am - 6pm CET",
@@ -119,6 +139,15 @@ export const SystemSettings = () => {
                 google_capcha_key: config.google_capcha_key ?? "",
                 secret_message: config.secret_message ?? "",
                 free_plan_message_limit: config.free_plan_message_limit ?? 20,
+                toolbox_token_accounting_enabled: config.toolbox_token_accounting_enabled ?? true,
+                toolbox_default_token_budget: config.toolbox_default_token_budget ?? 6000,
+                toolbox_overage_policy: config.toolbox_overage_policy ?? "warn",
+                speech_stack_enabled: config.speech_stack_enabled ?? true,
+                speech_default_language: config.speech_default_language ?? "en-US",
+                tts_avatar_enabled: config.tts_avatar_enabled ?? true,
+                tts_default_voice_id: config.tts_default_voice_id ?? "",
+                tts_lip_sync_enabled: config.tts_lip_sync_enabled ?? true,
+                facilitation_analytics_enabled: config.facilitation_analytics_enabled ?? true,
                 languages: (config.languages as Record<string, boolean>) ?? { en: true },
                 contact_email: config.contact_email ?? "support@aifacilitator.ai",
                 business_hours: config.business_hours ?? "Mon - Fri, 9am - 6pm CET",
@@ -130,32 +159,32 @@ export const SystemSettings = () => {
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const payload = {
-                default_gpt_token: form.default_gpt_token || null,
-                default_ai_model: form.default_ai_model || "gpt-4.1-mini",
-                default_currency: form.default_currency ?? "EUR",
-                google_capcha_key: form.google_capcha_key || null,
-                secret_message: form.secret_message || null,
-                free_plan_message_limit: form.free_plan_message_limit ?? 20,
-                languages: form.languages ?? { en: true },
+            if (!config) throw new Error("No configuration record found.");
+            const { error } = await api
+                .from("configurations")
+                .update({
+                    default_gpt_token: form.default_gpt_token || null,
+                    default_ai_model: form.default_ai_model || "gpt-4.1-mini",
+                    default_currency: form.default_currency ?? "USD",
+                    google_capcha_key: form.google_capcha_key || null,
+                    secret_message: form.secret_message || null,
+                    free_plan_message_limit: form.free_plan_message_limit ?? 20,
+                    toolbox_token_accounting_enabled: form.toolbox_token_accounting_enabled ?? true,
+                    toolbox_default_token_budget: Number(form.toolbox_default_token_budget ?? 6000),
+                    toolbox_overage_policy: form.toolbox_overage_policy ?? "warn",
+                    speech_stack_enabled: form.speech_stack_enabled ?? true,
+                    speech_default_language: form.speech_default_language || "en-US",
+                    tts_avatar_enabled: form.tts_avatar_enabled ?? true,
+                    tts_default_voice_id: form.tts_default_voice_id || null,
+                    tts_lip_sync_enabled: form.tts_lip_sync_enabled ?? true,
+                    facilitation_analytics_enabled: form.facilitation_analytics_enabled ?? true,
+                    languages: form.languages ?? { en: true },
                 contact_email: form.contact_email || "support@aifacilitator.ai",
                 business_hours: form.business_hours || "Mon - Fri, 9am - 6pm CET",
                 contact_address: form.contact_address || "Europe",
-            };
-            if (config) {
-                // Row exists — update it
-                const { error } = await api
-                    .from("configurations")
-                    .update(payload)
-                    .eq("id", config.id);
-                if (error) throw error;
-            } else {
-                // Table is empty — insert the first row
-                const { error } = await api
-                    .from("configurations")
-                    .insert(payload);
-                if (error) throw error;
-            }
+                })
+                .eq("id", config.id);
+            if (error) throw error;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-system-config"] });
@@ -297,6 +326,49 @@ export const SystemSettings = () => {
                                                 </button>
                                             </div>
                                         </div>
+                                        <Separator />
+                                        <div className="space-y-4 rounded-xl border border-purple-100 bg-purple-50/50 p-4">
+                                            <div>
+                                                <Label className="font-semibold">Toolbox token consumption</Label>
+                                                <p className="text-xs text-gray-500">Controls how facilitator tool usage is accounted for after the new database-backed toolbox is enabled.</p>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable per-tool token accounting</p>
+                                                    <p className="text-xs text-gray-500">When enabled, each tool contributes its configured token cost to session economics.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.toolbox_token_accounting_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("toolbox_token_accounting_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label>Default session tool budget</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        value={form.toolbox_default_token_budget ?? 6000}
+                                                        onChange={e => handleChange("toolbox_default_token_budget", Number(e.target.value))}
+                                                    />
+                                                    <p className="text-xs text-gray-500">Fallback token budget used when a session has no stricter plan or prompt budget.</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label>Overage policy</Label>
+                                                    <Select
+                                                        value={form.toolbox_overage_policy ?? "warn"}
+                                                        onValueChange={v => handleChange("toolbox_overage_policy", v)}
+                                                    >
+                                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="warn">Warn facilitator only</SelectItem>
+                                                            <SelectItem value="soft_limit">Soft limit with throttling</SelectItem>
+                                                            <SelectItem value="hard_limit">Hard stop at budget</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </>
                                 )}
 
@@ -384,6 +456,86 @@ export const SystemSettings = () => {
                                         </div>
                                     </>
                                 )}
+
+                                {/* Speech & Avatar */}
+                                {activeSection === "voice" && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`p-1.5 rounded-md ${colorMap.indigo}`}>
+                                                <Mic className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="font-semibold text-gray-800">Speech, Avatar & Analytics</h3>
+                                        </div>
+                                        <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable browser speech stack</p>
+                                                    <p className="text-xs text-gray-500">Allows participants to dictate responses and persist final speech turns for facilitation analytics.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.speech_stack_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("speech_stack_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Default speech language</Label>
+                                                <Input
+                                                    value={form.speech_default_language ?? "en-US"}
+                                                    onChange={e => handleChange("speech_default_language", e.target.value)}
+                                                    placeholder="en-US"
+                                                />
+                                                <p className="text-xs text-gray-500">BCP-47 language code used by browser speech recognition unless a session overrides it.</p>
+                                            </div>
+                                            <Separator />
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div className="flex items-start gap-3">
+                                                    <Volume2 className="mt-0.5 h-4 w-4 text-indigo-500" />
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-800">Enable avatar TTS playback</p>
+                                                        <p className="text-xs text-gray-500">Lets the AI facilitator speak browser-synthesized responses and emit avatar speaking states.</p>
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={form.tts_avatar_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("tts_avatar_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Preferred TTS voice ID</Label>
+                                                <Input
+                                                    value={form.tts_default_voice_id ?? ""}
+                                                    onChange={e => handleChange("tts_default_voice_id", e.target.value)}
+                                                    placeholder="Browser voice name or provider voice id"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Enable lip-sync cues</p>
+                                                    <p className="text-xs text-gray-500">Stores lightweight marker metadata for future embodied-avatar providers.</p>
+                                                </div>
+                                                <Switch
+                                                    checked={form.tts_lip_sync_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("tts_lip_sync_enabled", checked)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-white p-3 border">
+                                                <div className="flex items-start gap-3">
+                                                    <Activity className="mt-0.5 h-4 w-4 text-indigo-500" />
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-800">Enable facilitation analytics snapshots</p>
+                                                        <p className="text-xs text-gray-500">Persists health, balance, coverage, topic-drift, speech, and TTS summary metrics.</p>
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={form.facilitation_analytics_enabled ?? true}
+                                                    onCheckedChange={checked => handleChange("facilitation_analytics_enabled", checked)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+
 
                                 {/* Contact Info */}
                                 {activeSection === "contact" && (
@@ -477,6 +629,9 @@ export const SystemSettings = () => {
                                                     secret_message: config.secret_message ?? "",
                                                     free_plan_message_limit: config.free_plan_message_limit ?? 20,
                                                     languages: (config.languages as Record<string, boolean>) ?? { en: true },
+                contact_email: config.contact_email ?? "support@aifacilitator.ai",
+                business_hours: config.business_hours ?? "Mon - Fri, 9am - 6pm CET",
+                contact_address: config.contact_address ?? "Europe",
                                                 });
                                                 setIsDirty(false);
                                             }
@@ -488,7 +643,7 @@ export const SystemSettings = () => {
                                     <Button
                                         className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
                                         onClick={() => saveMutation.mutate()}
-                                        disabled={saveMutation.isPending || (!isDirty && activeSection !== "contact")}
+                                        disabled={saveMutation.isPending || !isDirty}
                                     >
                                         {saveMutation.isPending
                                             ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>

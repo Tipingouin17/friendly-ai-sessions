@@ -5,14 +5,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 
 export function useAdminSessions() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [activeSessions, setActiveSessions] = useState<ConversationWithSession[]>([]);
   
   // Fetch active sessions for admin
@@ -59,44 +58,12 @@ export function useAdminSessions() {
     staleTime: 60000,
     gcTime: 300000,
     refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
   });
   
-  // Set up real-time listener for conversations changes
-  useEffect(() => {
-    
-    const channel = api
-      .channel('admin-sessions-realtime')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'conversations'
-      }, (payload) => {
-        
-        // Check if the change affects session status
-        if (payload.new && payload.old) {
-          const newRecord = payload.new as any;
-          const oldRecord = payload.old as any;
-          
-          // If session status changed (ended/started) or participant count changed
-          if (newRecord.is_session_ended !== oldRecord.is_session_ended ||
-              newRecord.status !== oldRecord.status ||
-              newRecord.current_participants !== oldRecord.current_participants) {
-            
-            // Invalidate and refetch the admin sessions query
-            queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
-            
-            // Also trigger a manual refetch for immediate update
-            refetch();
-          }
-        }
-      })
-      .subscribe((status) => { /* no-op */ });
+  // The Railway SSE shim is conversation-scoped, so dashboard-wide session
+  // updates are refreshed by the query polling interval above.
 
-    return () => {
-      api.removeChannel(channel);
-    };
-  }, [queryClient, refetch]);
-  
   // Set active sessions whenever data changes
   useEffect(() => {
     if (data) {

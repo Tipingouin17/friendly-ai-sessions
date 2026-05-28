@@ -11,12 +11,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { CrispChat } from "./components/CrispChat";
+import { MicrosoftUet } from "./components/MicrosoftUet";
+import { CookieBanner } from "./components/CookieBanner";
+import { initializeTracking, reinitializeTracking, trackPageView } from "./lib/tracking";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { initializeTracking, trackPageView, reinitializeTracking } from "./lib/tracking";
-import { CookieBanner } from "./components/CookieBanner";
 
 // Eagerly loaded — always needed on first paint
 import Index from "./pages/Index";
@@ -81,45 +82,42 @@ function RouteTracking() {
 
   useEffect(() => {
     initializeTracking();
+
+    const handleConsentUpdated = () => {
+      reinitializeTracking();
+    };
+
+    window.addEventListener("cookie-consent-updated", handleConsentUpdated);
+    return () => window.removeEventListener("cookie-consent-updated", handleConsentUpdated);
   }, []);
 
   useEffect(() => {
-    const path = `${location.pathname}${location.search}${location.hash}`;
-    trackPageView(path);
-  }, [location.pathname, location.search, location.hash]);
+    trackPageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
 
   return null;
 }
 
 function App() {
+  const [forceCookieSettingsOpen, setForceCookieSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenCookieSettings = () => setForceCookieSettingsOpen(true);
+    window.addEventListener("open-cookie-settings", handleOpenCookieSettings);
+    return () => window.removeEventListener("open-cookie-settings", handleOpenCookieSettings);
+  }, []);
+
   useBackendWarmup();
-  const [cookieSettingsOpen, setCookieSettingsOpen] = useState(false);
-
-  // Re-initialize tracking whenever consent is updated
-  useEffect(() => {
-    const handler = () => reinitializeTracking();
-    window.addEventListener("cookie-consent-updated", handler);
-    return () => window.removeEventListener("cookie-consent-updated", handler);
-  }, []);
-
-  // Expose a global function so the Footer "Cookie Settings" link can open the banner
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__openCookieSettings = () => setCookieSettingsOpen(true);
-    return () => { delete (window as unknown as Record<string, unknown>).__openCookieSettings; };
-  }, []);
-
   return (
     <ErrorBoundary>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <RouteTracking />
           <CrispChat />
-          <CookieBanner
-            forceOpen={cookieSettingsOpen}
-            onClose={() => setCookieSettingsOpen(false)}
-          />
+          <MicrosoftUet />
+          <RouteTracking />
+          <CookieBanner forceOpen={forceCookieSettingsOpen} onClose={() => setForceCookieSettingsOpen(false)} />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Layout><Outlet /></Layout>}>

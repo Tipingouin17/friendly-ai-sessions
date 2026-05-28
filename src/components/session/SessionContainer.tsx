@@ -7,13 +7,17 @@
 import React, { useEffect } from "react";
 import MessagingArea from "./MessagingArea";
 import { Message, ParticipantInfo } from "@/types/chat";
+import type { ConversationWithSession, DbFacilitator } from "@/types/database";
+import type { UseStreamingFacilitatorRuntimeResult } from "@/hooks/facilitator/useStreamingFacilitatorRuntime";
+import type { FacilitatorToolAssignment } from "@/types/facilitator";
+import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from "@/services/modeOrchestratorService";
 import { getParticipantColor } from "@/utils/sessionHelpers";
 import InputFooter from "./InputFooter";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SessionContainerProps {
   participantCount: number;
-  conversation: any | null;
+  conversation: ConversationWithSession | null;
   messages: Message[];
   inputMessage: string;
   setInputMessage: (message: string) => void;
@@ -31,7 +35,7 @@ interface SessionContainerProps {
   participantNames: { [key: number]: string };
   participants: ParticipantInfo[];
   conversationId: number | null;
-  facilitator: any;
+  facilitator: DbFacilitator | null;
   objective: string;
   currentParticipantCount: number;
   currentUserParticipantId: number | null;
@@ -43,6 +47,20 @@ interface SessionContainerProps {
   onSendAdminMessage?: (message: string) => void;
   isAnonymous?: boolean;
   toggleAnonymous?: () => void;
+  facilitatorRuntime?: UseStreamingFacilitatorRuntimeResult;
+  enabledTools?: FacilitatorToolAssignment[];
+  isLoadingToolbox?: boolean;
+  enabledModes?: FacilitatorModeAssignment[];
+  activeMode?: SessionActiveMode | null;
+  participantModeState?: ModeParticipantState | null;
+  recentModeEvents?: SessionModeEvent[];
+  isLoadingModes?: boolean;
+  modeError?: string | null;
+  submitModeInput?: (params: {
+    inputType: string;
+    content: Record<string, unknown>;
+    visibility?: ModeInput["visibility"];
+  }) => Promise<unknown>;
 }
 
 const SessionContainer: React.FC<SessionContainerProps> = ({
@@ -76,7 +94,17 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   isAdmin,
   onSendAdminMessage,
   isAnonymous = false,
-  toggleAnonymous = () => { /* no-op */ }
+  toggleAnonymous = () => { /* no-op */ },
+  facilitatorRuntime,
+  enabledTools = [],
+  isLoadingToolbox = false,
+  enabledModes = [],
+  activeMode = null,
+  participantModeState = null,
+  recentModeEvents = [],
+  isLoadingModes = false,
+  modeError = null,
+  submitModeInput
 }) => {
   const mobileState = useIsMobile();
   const isMobile = mobileState === true;
@@ -129,6 +157,16 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           totalResponses={totalResponses}
           participantNames={allParticipantNames}
           currentUserParticipantId={currentUserParticipantId}
+          facilitatorRuntime={facilitatorRuntime}
+          enabledTools={enabledTools}
+          isLoadingToolbox={isLoadingToolbox}
+          enabledModes={enabledModes}
+          activeMode={activeMode}
+          participantModeState={participantModeState}
+          recentModeEvents={recentModeEvents}
+          isLoadingModes={isLoadingModes}
+          modeError={modeError}
+          submitModeInput={submitModeInput}
         />
       </div>
     </div>

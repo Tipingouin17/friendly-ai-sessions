@@ -5,6 +5,7 @@
  */
 
 import api from "@/lib/api";
+import type { FacilitatorTool, FacilitatorToolAssignment, FacilitatorToolConfig } from "@/types/facilitator";
 
 export interface ScheduledSessionInvitation {
   id: string;
@@ -77,7 +78,6 @@ export const fetchWorkshops = async (facilitatorId: number | null) => {
   const { data, error } = await query;
   if (error) throw error;
   // Filter out admin-locked sessions client-side (lock === true means locked)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data as any[])?.filter((s: any) => s.lock !== true) ?? [];
 };
 
@@ -110,7 +110,6 @@ export const createConversation = async (params: {
   }
 
   // Check facilitator plan-tier lock
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const facilitatorData = session?.facilitator as any;
   if (facilitatorData && typeof facilitatorData === 'object' && facilitatorData.lock === true) {
     // Resolve user's plan tier from their profile
@@ -140,7 +139,11 @@ export const createConversation = async (params: {
     .insert({
       participant_description: params.description,
       language: params.language,
-      participants: params.participantCount,
+      // Store room capacity as host-inclusive because database-side capacity
+      // enforcement counts the host row as a participant. The product-facing
+      // value remains attendee capacity: a host who asks for 10 participants
+      // should be able to admit 10 non-host attendees.
+      participants: params.participantCount + 1,
       sessions_id: params.workshopId,
       accept_terms_and_conditions: params.agreed,
       is_saved: false,
@@ -266,4 +269,67 @@ export const createSessionInvitations = async (params: {
   }
 
   return data;
+};
+
+
+const normalizeToolConfig = (value: unknown): FacilitatorToolConfig => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as FacilitatorToolConfig;
+};
+
+const mergeToolConfig = (base: unknown, override: unknown): FacilitatorToolConfig => ({
+  ...normalizeToolConfig(base),
+  ...normalizeToolConfig(override),
+});
+
+export const fetchToolboxTools = async (): Promise<FacilitatorTool[]> => {
+  const { data, error } = await api
+    .from('facilitator_tools')
+    .select('*')
+    .order('category', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+
+  return ((data ?? []) as FacilitatorTool[]).map((tool) => ({
+    ...tool,
+    config: normalizeToolConfig(tool.config),
+  }));
+};
+
+export const fetchFacilitatorToolAssignments = async (facilitatorId: number): Promise<FacilitatorToolAssignment[]> => {
+  const { data, error } = await api
+    .from('facilitator_tool_access')
+    .select('*, facilitator_tool:facilitator_tools!inner(*)')
+    .eq('facilitator_id', facilitatorId)
+    .order('enabled', { ascending: false });
+
+  if (error) throw error;
+
+  return ((data ?? []) as Array<{
+    id: number;
+    facilitator_id: number;
+    tool_id: number;
+    enabled: boolean;
+    config_override: unknown;
+    facilitator_tool?: FacilitatorTool | null;
+  }>).map((assignment) => {
+    const tool = assignment.facilitator_tool;
+    if (!tool) return null;
+    const configOverride = normalizeToolConfig(assignment.config_override);
+    return {
+      ...tool,
+      access_id: assignment.id,
+      facilitator_id: assignment.facilitator_id,
+      enabled: assignment.enabled,
+      config: normalizeToolConfig(tool.config),
+      config_override: configOverride,
+      effective_config: mergeToolConfig(tool.config, configOverride),
+    } as FacilitatorToolAssignment;
+  }).filter(Boolean) as FacilitatorToolAssignment[];
+};
+
+export const fetchEnabledFacilitatorTools = async (facilitatorId: number): Promise<FacilitatorToolAssignment[]> => {
+  const assignments = await fetchFacilitatorToolAssignments(facilitatorId);
+  return assignments.filter((tool) => tool.enabled && tool.is_active);
 };

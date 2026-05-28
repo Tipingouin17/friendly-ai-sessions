@@ -4,7 +4,7 @@
  * Page for the AIfacilitator application.
  */
 
-import { Check, X, Minus, Infinity } from "lucide-react";
+import { Check, X, Minus, Infinity as InfinityIcon } from "lucide-react";
 
 interface PricingFeatureValueProps {
   value: boolean | string | number | null | undefined;
@@ -22,7 +22,7 @@ export const PricingFeatureValue = ({ value }: PricingFeatureValueProps) => {
   if (value === 'unlimited' || value === 'Unlimited') {
     return (
       <div className="flex flex-col items-center">
-        <Infinity className="h-5 w-5 text-primary mx-auto" />
+        <InfinityIcon className="h-5 w-5 text-primary mx-auto" />
         <span className="text-xs text-gray-700 mt-1">Unlimited</span>
       </div>
     );
@@ -37,7 +37,7 @@ export const PricingFeatureValue = ({ value }: PricingFeatureValueProps) => {
     if (value >= 999999) {
       return (
         <div className="flex flex-col items-center">
-          <Infinity className="h-5 w-5 text-primary mx-auto" />
+          <InfinityIcon className="h-5 w-5 text-primary mx-auto" />
           <span className="text-xs text-gray-700 mt-1">Unlimited</span>
         </div>
       );

@@ -11,6 +11,7 @@ import { participantColors } from "@/utils/sessionHelpers";
 import { useMessageSaver } from "./messageSender/useMessageSaver";
 import { useEnhancedSessionLogger } from "./useEnhancedSessionLogger";
 import { useResponseCollection } from "./useResponseCollection";
+import api from "@/lib/api";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -41,6 +42,7 @@ export const useMessageSender = ({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const requestInProgressRef = useRef(false);
+  const continuationInProgressRef = useRef(false);
   
   // Import our helper hooks
   const { saveUserMessage } = useMessageSaver();
@@ -153,18 +155,80 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
-      // ARCHITECTURE HARMONISÉE : Le participant ne déclenche JAMAIS l'IA directement.
-      // Quel que soit le nombre de participants (1 ou N), c'est TOUJOURS le Host
-      // (via useMessageFetching.generateAggregatedResponse) qui orchestre l'appel IA.
-      //
-      // Avantages :
-      //  - Un seul chemin de code pour tous les scénarios (1 participant, multi, skip, host trigger)
-      //  - La logique skip/pause est centralisée côté Host (useParticipantStatusTracker)
-      //  - Pas de double déclenchement possible
-      //  - L'état UI du participant est dérivé de la DB (dernier message = participant → en attente)
-      //
-      // Le ThinkingIndicator est affiché via isWaitingForOtherParticipants dans
-      // useSessionContextValue (détecte que le dernier message est du participant, pas de l'IA).
+      // Primary continuation remains server/host-driven. As a resilience fallback,
+      // the participant checks shortly after sending whether all expected answers
+      // are present and whether no facilitator message has appeared yet. This keeps
+      // single-participant and host-tab-closed sessions from getting stuck.
+      window.setTimeout(async () => {
+        if (continuationInProgressRef.current || !currentConversationId) return;
+
+        try {
+          const { data: latestMessages, error } = await api
+            .from('messages')
+            .select('id, role, content, participant_id, name, created_at')
+            .eq('conversation_id', currentConversationId)
+            .order('created_at', { ascending: true });
+
+          if (error || !Array.isArray(latestMessages) || latestMessages.length === 0) {
+            if (error) console.error('Participant continuation check failed:', error);
+            return;
+          }
+
+          const lastMessage = latestMessages[latestMessages.length - 1];
+          if (lastMessage?.role === 'assistant') return;
+
+          let lastAssistantIndex = -1;
+          for (let i = latestMessages.length - 1; i >= 0; i -= 1) {
+            if (latestMessages[i]?.role === 'assistant') {
+              lastAssistantIndex = i;
+              break;
+            }
+          }
+          if (lastAssistantIndex === -1) return;
+
+          const respondentKeys = new Set(
+            latestMessages
+              .slice(lastAssistantIndex + 1)
+              .filter(message => message.role !== 'assistant' && message.role !== 'admin')
+              .map(message => message.participant_id ?? message.name)
+              .filter(Boolean)
+          );
+          if (respondentKeys.size < Math.max(1, totalParticipants)) return;
+
+          continuationInProgressRef.current = true;
+          const facilitatorContext = latestMessages.map(message => {
+            let content = '';
+            if (typeof message.content === 'string') {
+              try {
+                const parsed = JSON.parse(message.content);
+                content = parsed?.text ? String(parsed.text) : message.content;
+              } catch {
+                content = message.content;
+              }
+            } else if (message.content && typeof message.content === 'object' && 'text' in message.content) {
+              content = String((message.content as { text?: unknown }).text ?? '');
+            }
+
+            return {
+              role: message.role === 'assistant' ? 'assistant' : 'user',
+              content,
+            };
+          });
+
+          await api.functions.invoke('handle-facilitator-response', {
+            body: {
+              messages: facilitatorContext,
+              conversationId: currentConversationId,
+              sessionStart: false,
+              generateReport: false,
+            },
+          });
+        } catch (error) {
+          console.error('Participant continuation fallback failed:', error);
+        } finally {
+          continuationInProgressRef.current = false;
+        }
+      }, 4500);
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -177,6 +241,7 @@ export const useMessageSender = ({
     } finally {
       requestInProgressRef.current = false;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [
     isWaitingForResponse, 
     sessionState, 

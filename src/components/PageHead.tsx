@@ -21,7 +21,6 @@ interface PageHeadProps {
   description?: string;
   canonical?: string;
   ogImage?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   jsonLd?: Record<string, any>[];
   breadcrumbs?: BreadcrumbItem[];
   noIndex?: boolean;

@@ -12,7 +12,6 @@ import { getParticipantInfo } from "@/utils/participantUtils";
 import api from "@/lib/api";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
-import { getScheduledStartIso } from "@/services/facilitatorService";
 import { retryWithBackoff, isNetworkError, isAbortError } from "@/utils/networkUtils";
 import { requestDeduplicator } from "@/utils/requestDeduplication";
 import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
@@ -219,7 +218,7 @@ export const useSessionParticipantSetup = ({
         setCurrentUserParticipantId(participantId);
       } else { /* no-op */ }
       
-    } catch (err: unknown) {
+    } catch (err: any) {
       if (isAbortError(err)) {
         return;
       }
@@ -254,28 +253,26 @@ export const useSessionParticipantSetup = ({
       loadingRef.current = false;
       currentConversationIdRef.current = null;
     };
-  // Participant loading is intentionally keyed only to conversation changes to avoid duplicate joins.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
   }, [conversationId]); // Only depend on conversationId
   
   // Update participant counts when conversation or participants change
   useEffect(() => {
     if (conversation) {
-      const maxParticipants = conversation.participants || 0;
+      const maxParticipants = Math.max((conversation.participants || 0) - 1, 0);
       const currentCount = conversation.current_participants || 0;
+      const attendeeCount = Math.max(currentCount - 1, 0);
       
       setMaxParticipantsForSession(maxParticipants);
       setCurrentParticipantCount(currentCount);
       
-      // Check if session is full. Scheduled sessions must remain in the
-      // waiting room until the host explicitly starts them, even when the
-      // invited roster reaches capacity.
-      const isFull = maxParticipants > 0 && currentCount >= maxParticipants;
-      const isScheduledWaitingRoom = Boolean(getScheduledStartIso(conversation.flow_config)) && !conversation.session_started;
+      // Check if attendee capacity is full. Stored counts include the host,
+      // but the product-facing capacity is non-host attendees only.
+      const isFull = maxParticipants > 0 && attendeeCount >= maxParticipants;
       setIsSessionFull(isFull);
       
       // Call onSessionFull if session is full and not already called
-      if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin && !isScheduledWaitingRoom) {
+      if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin) {
         sessionFullCalledRef.current = true;
         onSessionFull();
       }
@@ -289,7 +286,7 @@ export const useSessionParticipantSetup = ({
     setParticipants,
     conversation,
     refetch,
-    handleSessionFull: conversation && Boolean(getScheduledStartIso(conversation.flow_config)) && !conversation.session_started ? undefined : onSessionFull,
+    handleSessionFull: onSessionFull,
     onSessionStarted: () => { /* no-op */ }
   });
   

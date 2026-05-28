@@ -20,7 +20,9 @@ import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
-import { getScheduledStartIso } from "@/services/facilitatorService";
+import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
+import { useFacilitationModeOrchestrator } from "@/hooks/useFacilitationModeOrchestrator";
+import type { FacilitatorModeAssignment } from "@/services/modeOrchestratorService";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -41,15 +43,40 @@ export function useSessionHostLogic() {
     const {
         data: conversationData,
         isLoading: isConversationLoading,
-        error: conversationError
+        error: conversationError,
+        refetch: refetchConversation
     } = useConversation(currentConversationId);
+    const toolbox = useFacilitatorToolbox(conversationData);
+    const modeOrchestrator = useFacilitationModeOrchestrator(conversationData, {
+        conversationId: currentConversationId,
+    });
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
-    const { handleStartSession } = useSessionInterface(currentConversationId);
-    const scheduledStartIso = getScheduledStartIso(conversationData?.flow_config);
-    const isScheduledSession = Boolean(scheduledStartIso);
+    const { handleStartSession, isSessionStarted: isInterfaceSessionStarted } = useSessionInterface(currentConversationId, conversationData);
+    const [hostSessionStartedOverride, setHostSessionStartedOverride] = useState(false);
+    const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
+    const hasPersistedStartMarker = Boolean(
+        conversationData?.session_started || (conversationData as any)?.session_started_at
+    );
+    const hasAssistantMessage = sessionMessages.some((message) => message.sender === 'assistant');
 
-    // 5. Auto Start Logic
+    const handleSessionStarted = useCallback(async () => {
+        try {
+            setHostSessionStartedOverride(true);
+            await handleStartSession();
+            // The manager will pick up the change via realtime; the local override keeps the host UI in the active state immediately.
+        } catch (error) {
+            console.error("Error starting session:", error);
+            toast({
+                title: "Error",
+                description: "Failed to start session",
+                variant: "destructive"
+            });
+            setHostSessionStartedOverride(false);
+            throw error;
+        }
+    }, [handleStartSession, toast]);
+
     const {
         isAutoStarting,
         autoStartCountdown,
@@ -57,18 +84,16 @@ export function useSessionHostLogic() {
         cancelAutoStart,
         cleanup: cleanupAutoStart
     } = useAutoStartSession({
-        onStartSession: handleStartSession,
-        isSessionStarted: Boolean(conversationData?.session_started),
-        maxParticipants: conversationData?.participants || 10,
-        isAutoStartEnabled: !isScheduledSession
+        onStartSession: handleSessionStarted,
+        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || hasAssistantMessage),
+        maxParticipants: Math.max(conversationData?.participants || 0, 0),
     });
 
-    // Cleanup auto-start on unmount
+    useEffect(() => cleanupAutoStart, [cleanupAutoStart]);
+
     useEffect(() => {
-        return () => {
-            cleanupAutoStart();
-        };
-    }, [cleanupAutoStart]);
+        setHostSessionStartedOverride(false);
+    }, [currentConversationId]);
 
     // 2. Participant & Session State Management (Single Source of Truth)
     const {
@@ -83,17 +108,17 @@ export function useSessionHostLogic() {
     } = useHostParticipantManager({
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
-        onSessionFull: () => {
-            if (isScheduledSession) {
-                log.category('session', 'Scheduled session reached capacity; waiting for manual host start instead of auto-starting.');
-                return;
-            }
-            triggerAutoStart(currentCount);
+        onSessionStarted: () => {
+            // Keep the conversation query fresh for header/status labels and any
+            // consumers that still read persisted start fields directly.
+            void refetchConversation();
+        },
+        onSessionFull: (currentCount, maxCount) => {
+            void triggerAutoStart(currentCount, maxCount);
         }
     });
 
     // 3. Messages Management
-    const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
     const {
         isSessionPaused,
         toggleSessionState,
@@ -103,6 +128,7 @@ export function useSessionHostLogic() {
         isWaitingForResponses,
         totalParticipants,
         triggerFacilitatorResponse,
+        isGeneratingResponse,
         isProcessingAutoStart
     } = useHostMessages({
         conversationId: currentConversationId,
@@ -111,6 +137,38 @@ export function useSessionHostLogic() {
         setMessages: setSessionMessages,
         conversationData
     });
+
+    // Treat the host session as live as soon as the first facilitator question
+    // exists, even if the persisted conversation start marker has not propagated.
+    const effectiveIsSessionStarted = Boolean(
+        hostSessionStartedOverride ||
+        hasPersistedStartMarker ||
+        isInterfaceSessionStarted ||
+        isManagerSessionStarted ||
+        hasAssistantMessage
+    );
+
+    const waitingRoomParticipantCount = Math.max(
+        currentCount || 0,
+        (participants || []).filter((participant) => !participant.isHost && !participant.isAdmin).length
+    );
+    const waitingRoomCapacity = Math.max(maxCount || 0, conversationData?.participants || 0);
+    const isWaitingRoomFull = Boolean(
+        !effectiveIsSessionStarted &&
+        waitingRoomCapacity > 0 &&
+        waitingRoomParticipantCount >= waitingRoomCapacity
+    );
+
+    useEffect(() => {
+        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted || hasAssistantMessage) && !hostSessionStartedOverride) {
+            setHostSessionStartedOverride(true);
+        }
+    }, [hasAssistantMessage, hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
+
+    useEffect(() => {
+        if (!isDataLoaded || effectiveIsSessionStarted) return;
+        void triggerAutoStart(currentCount, maxCount);
+    }, [currentCount, effectiveIsSessionStarted, isDataLoaded, maxCount, triggerAutoStart]);
 
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);
@@ -166,8 +224,7 @@ export function useSessionHostLogic() {
     useEffect(() => {
         const { timeRemaining, isExpired } = timer;
         if (timeRemaining === null) return;
-        const isStarted = isManagerSessionStarted || conversationData?.session_started;
-        if (!isStarted || isExpired) return;
+        if (!effectiveIsSessionStarted || isExpired) return;
 
         // 10-minute warning
         if (timeRemaining <= 600 && !wrapUpFiredRef.current.tenMin) {
@@ -184,24 +241,16 @@ export function useSessionHostLogic() {
                 "[SYSTEM] The session ends in 2 minutes. Please deliver a concise final summary and thank the participants."
             );
         }
-    // Timer warning side-effects should run only when the remaining time changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional session lifecycle boundary: dependencies are mediated by refs/one-shot guards so realtime subscriptions, timers, and recovery flows are not replayed by changing callback identities.
     }, [timer.timeRemaining]);
 
-    // 8. Session Start Handler
-    const handleSessionStarted = useCallback(async () => {
-        try {
-            await handleStartSession();
-            // The manager will pick up the change via realtime
-        } catch (error) {
-            console.error("Error starting session:", error);
-            toast({
-                title: "Error",
-                description: "Failed to start session",
-                variant: "destructive"
-            });
-        }
-    }, [handleStartSession, toast]);
+    const handleStartMode = useCallback((mode: FacilitatorModeAssignment, prompt?: string) => {
+        return modeOrchestrator.startMode({
+            modeId: mode.id,
+            prompt,
+            policy: mode.effective_policy,
+        });
+    }, [modeOrchestrator]);
 
     return {
         // State
@@ -216,21 +265,44 @@ export function useSessionHostLogic() {
         isLoadingParticipants: !isDataLoaded,
 
         // Session Status
-        isSessionStarted: isManagerSessionStarted || conversationData?.session_started,
+        isSessionStarted: effectiveIsSessionStarted,
         isAutoStarting: isAutoStarting || isProcessingAutoStart,
         autoStartCountdown,
         cancelAutoStart,
+        isWaitingRoomFull,
+        waitingRoomParticipantCount,
+        waitingRoomCapacity,
 
         // Messages
         sessionMessages,
         isSessionPaused,
         responseCount,
         isWaitingForResponses,
+        isGeneratingResponse,
 
         // Actions
         toggleSessionState,
         handleSendHostMessage,
-        triggerFacilitatorResponse,
+        triggerFacilitatorResponse: (hostInstruction?: string) => {
+            const finalInstruction = [
+                toolbox.toolboxInstruction,
+                modeOrchestrator.modeInstruction,
+                hostInstruction,
+            ].filter(Boolean).join("\n\n");
+            return triggerFacilitatorResponse(finalInstruction || undefined);
+        },
+        enabledTools: toolbox.enabledTools,
+        isLoadingToolbox: toolbox.isLoadingToolbox,
+        toolboxError: toolbox.toolboxError,
+        enabledModes: modeOrchestrator.enabledModes,
+        activeMode: modeOrchestrator.activeMode,
+        recentModeEvents: modeOrchestrator.recentModeEvents,
+        isLoadingModes: modeOrchestrator.isLoadingModes,
+        modeError: modeOrchestrator.modeError,
+        startMode: handleStartMode,
+        approveMode: modeOrchestrator.approveMode,
+        endMode: modeOrchestrator.endMode,
+        rejectMode: modeOrchestrator.rejectMode,
         handleSessionStarted,
         refresh,
 

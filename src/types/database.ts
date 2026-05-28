@@ -8,11 +8,13 @@ import { Database } from "@/integrations/supabase/types";
 
 export type DbConversation = Database["public"]["Tables"]["conversations"]["Row"] & {
   session_started: boolean;
+  session_started_at?: string | null;
   is_session_ended?: boolean;
   participants: number;
 };
 export type DbSession = Database["public"]["Tables"]["sessions"]["Row"];
 export type DbFacilitator = Database["public"]["Tables"]["facilitators"]["Row"];
+export type DbFacilitatorPersonaConfig = Database["public"]["Tables"]["facilitator_persona_configs"]["Row"];
 
 // Define the exact shape of facilitator details we're selecting in our query
 export interface FacilitatorDetails {
@@ -20,6 +22,11 @@ export interface FacilitatorDetails {
   title: string | null;
   profile_picture: string | null;
   details: string | null;
+  description?: string | null;
+  expertise_level?: string | null;
+  specialties?: string[] | null;
+  languages?: string[] | null;
+  persona_config?: DbFacilitatorPersonaConfig | DbFacilitatorPersonaConfig[] | null;
 }
 
 export interface ConversationWithSession extends DbConversation {

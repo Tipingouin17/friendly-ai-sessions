@@ -69,6 +69,9 @@ export const useEnhancedSessionMessages = ({
             if (p && typeof p === 'object' && !Array.isArray(p)) parsedContent = p as Record<string, unknown>;
           } catch { /* plain text string — leave parsedContent null */ }
         }
+        const facilitationTechnique = parsedContent && typeof parsedContent.facilitation_technique === 'object' && parsedContent.facilitation_technique
+          ? parsedContent.facilitation_technique as Message['facilitationTechnique']
+          : null;
         return {
           id: msg.id.toString(),
           content: parsedContent && 'text' in parsedContent ? String(parsedContent.text) : (typeof msg.content === 'string' ? msg.content : ''),
@@ -77,6 +80,7 @@ export const useEnhancedSessionMessages = ({
           participant: msg.participant_id != null ? String(msg.participant_id) : undefined,
           name: msg.name || undefined,
           avatar: parsedContent && 'avatar' in parsedContent ? String(parsedContent.avatar) : undefined,
+          facilitationTechnique,
           role: msg.role || 'user'
         };
       });
@@ -91,13 +95,13 @@ export const useEnhancedSessionMessages = ({
 
       setMessages(prev => {
         // Only update if messages have actually changed
-        if (prev.length !== deduped.length || 
+        if (prev.length !== deduped.length ||
             prev.some((msg, i) => msg.id !== deduped[i]?.id)) {
           return deduped;
         }
         return prev;
       });
-      
+
       lastFetchTimeRef.current = now;
       setLastFetchTime(now);
     } catch (err) {
@@ -106,7 +110,7 @@ export const useEnhancedSessionMessages = ({
     } finally {
       setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [conversationId]); // lastFetchTime intentionally excluded — use ref to avoid stale closure recreation
 
   // Stable callbacks — must be wrapped in useCallback so their reference only
@@ -132,11 +136,11 @@ export const useEnhancedSessionMessages = ({
   });
 
   // Message delivery tracking
-  const { 
-    deliveryStatus, 
-    getDeliveryStats, 
+  const {
+    deliveryStatus,
+    getDeliveryStats,
     forceCheck: forceDeliveryCheck,
-    isTracking 
+    isTracking
   } = useMessageDeliveryTracker({
     conversationId,
     onMessageReceived: (messageId) => {
@@ -172,13 +176,13 @@ export const useEnhancedSessionMessages = ({
 
   // Enhanced message handler
   const handleNewMessage = useCallback((message: Message) => {
-    
+
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
         return prev;
       }
-      
+
       const updated = [...prev, message];
       return updated;
     });

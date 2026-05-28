@@ -52,6 +52,7 @@ export const useMessageSaver = () => {
       timestamp: new Date(),
       color: color,
       avatar: participantInfo?.avatar,
+      name: resolvedName,
       isAnonymous: isAnonymous
     };
 

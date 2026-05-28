@@ -78,20 +78,36 @@ export function useSessionPageState() {
   
   // Session full handler
   const handleSessionFull = useCallback(() => {
-    setSessionStarted(true);
-  }, []);
+    // Full capacity must not locally mark the participant room as live. The
+    // redesigned flow requires the host's explicit Start Session action, which
+    // is reflected through the database-backed session_started flag.
+    toast({
+      title: "Session is full",
+      description: "The room is full. Please wait for the host to start the session.",
+    });
+  }, [toast]);
   
   // Retry connection handler
   const retryConnection = useCallback(() => {
     stateRef.current.connectionAttempts++;
     stateRef.current.pageLoadTime = Date.now(); // Reset timer on each retry
+
+    const shouldPreserveParticipantView = !stateRef.current.isAdmin && !stateRef.current.isHost && hasInitializedProvider;
+
+    // Participants who already reached the live room should not be forced back into
+    // the loading shell during transient realtime recovery; that visual reset reads
+    // as a full page refresh after facilitator speech completes.
+    if (shouldPreserveParticipantView) {
+      setIsLoading(false);
+      return;
+    }
     
     // Force loading state during retry
     setIsLoading(true);
     
     // Reset provider initialized state to trigger reconnection
     setHasInitializedProvider(false);
-  }, []);
+  }, [hasInitializedProvider]);
 
   // Handler for provider initialization
   const handleProviderInitialized = useCallback(() => {

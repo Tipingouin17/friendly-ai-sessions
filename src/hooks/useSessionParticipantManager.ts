@@ -43,7 +43,8 @@ export function useSessionParticipantManager({
 
   // Memoized values
   const currentParticipantCount = useMemo(() => participants.length, [participants.length]);
-  const maxParticipantsForSession = useMemo(() => conversation?.participants || 0, [conversation?.participants]);
+  const currentAttendeeCount = useMemo(() => Math.max(currentParticipantCount - 1, 0), [currentParticipantCount]);
+  const attendeeCapacityForSession = useMemo(() => Math.max((conversation?.participants || 0) - 1, 0), [conversation?.participants]);
   // Fall back to the URL search param when location.state is absent (page refresh,
   // direct navigation, or mobile deep-link — React Router drops state in those cases).
   const currentUserParticipantId = useMemo(() => {
@@ -54,8 +55,8 @@ export function useSessionParticipantManager({
     } catch { return null; }
   }, [locationState?.participantId]);
   const isSessionFull = useMemo(() => 
-    currentParticipantCount >= maxParticipantsForSession && maxParticipantsForSession > 0,
-    [currentParticipantCount, maxParticipantsForSession]
+    currentAttendeeCount >= attendeeCapacityForSession && attendeeCapacityForSession > 0,
+    [currentAttendeeCount, attendeeCapacityForSession]
   );
   const isScheduledWaitingRoom = useMemo(() =>
     Boolean(getScheduledStartIso(conversation?.flow_config)) && !conversation?.session_started,

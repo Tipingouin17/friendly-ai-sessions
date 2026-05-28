@@ -18,6 +18,7 @@ interface StepNavigationProps {
   hasReachedSessionLimit: boolean;
   /** True while the session creation API call is in-flight */
   isSubmitting?: boolean;
+  isScheduled?: boolean;
 }
 
 export const StepNavigation = ({
@@ -28,7 +29,8 @@ export const StepNavigation = ({
   isNextDisabled,
   isSubmitDisabled,
   hasReachedSessionLimit,
-  isSubmitting = false
+  isSubmitting = false,
+  isScheduled = false
 }: StepNavigationProps) => {
   return (
     <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100 gap-3">
@@ -60,17 +62,17 @@ export const StepNavigation = ({
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              <span className="sm:hidden">Starting...</span>
-              <span className="hidden sm:inline">Starting Session...</span>
+              <span className="sm:hidden">{isScheduled ? "Scheduling..." : "Starting..."}</span>
+              <span className="hidden sm:inline">{isScheduled ? "Scheduling Session..." : "Starting Session..."}</span>
             </>
           ) : (
             <>
               {/* Abbreviated label on xs screens to avoid overflow */}
               <span className="sm:hidden">
-                {hasReachedSessionLimit ? "Upgrade Plan" : "Start Session"}
+                {hasReachedSessionLimit ? "Upgrade Plan" : isScheduled ? "Schedule Session" : "Start Session"}
               </span>
               <span className="hidden sm:inline">
-                {hasReachedSessionLimit ? "Upgrade to Start Session" : "Start Session"}
+                {hasReachedSessionLimit ? "Upgrade to Start Session" : isScheduled ? "Schedule Session" : "Start Session"}
               </span>
             </>
           )}

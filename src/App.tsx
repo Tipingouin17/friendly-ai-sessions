@@ -29,6 +29,7 @@ const Contact       = lazy(() => import("./pages/Contact"));
 const Profile       = lazy(() => import("./pages/Profile"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const AIfacilitators = lazy(() => import("./pages/AIfacilitators"));
+const ScheduleInvitations = lazy(() => import("./pages/ScheduleInvitations"));
 const PastWorkshops = lazy(() => import("./pages/PastWorkshops"));
 const Session       = lazy(() => import("./pages/Session"));
 const SessionHost   = lazy(() => import("./pages/SessionHost"));
@@ -161,6 +162,11 @@ function App() {
                 <Route path="/my-facilitators" element={
                   <ProtectedRoute>
                     <AIfacilitators />
+                  </ProtectedRoute>
+                } />
+                <Route path="/schedule-invitations" element={
+                  <ProtectedRoute>
+                    <ScheduleInvitations />
                   </ProtectedRoute>
                 } />
                 <Route path="/past-workshops" element={

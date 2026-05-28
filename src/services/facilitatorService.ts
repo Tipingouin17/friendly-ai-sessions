@@ -6,6 +6,49 @@
 
 import api from "@/lib/api";
 
+export interface ScheduledSessionInvitation {
+  id: string;
+  name: string;
+  email: string;
+  token: string;
+  status: "invited" | "confirmed" | "waiting" | "live" | "missing";
+  sent_at?: string | null;
+  confirmed_at?: string | null;
+}
+
+export interface UpcomingScheduledSession {
+  id: number;
+  created_at?: string | null;
+  participants?: number | null;
+  participant_description?: string | null;
+  session_duration_minutes?: number | null;
+  flow_config?: Record<string, unknown> | null;
+  join_token?: string | null;
+  sessions?: {
+    title?: string | null;
+    facilitator?: number | null;
+    objective?: string | null;
+  } | null;
+  scheduled_start_at: string;
+  invited_count: number;
+}
+
+const getFlowConfigObject = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+export const getScheduledStartIso = (flowConfig: unknown): string | null => {
+  const cfg = getFlowConfigObject(flowConfig);
+  const value = cfg.scheduled_start_at;
+  return typeof value === "string" && value ? value : null;
+};
+
+export const getSessionInvitations = (flowConfig: unknown): ScheduledSessionInvitation[] => {
+  const cfg = getFlowConfigObject(flowConfig);
+  return Array.isArray(cfg.invitations) ? (cfg.invitations as ScheduledSessionInvitation[]) : [];
+};
+
 export const fetchFacilitators = async () => {
   const { data, error } = await api
     .from('facilitators')
@@ -46,6 +89,7 @@ export const createConversation = async (params: {
   agreed: boolean;
   userId: string;
   durationMinutes?: number;
+  scheduledStartAt?: Date;
 }) => {
   // Guard: verify the session template is not admin-locked and that the
   // facilitator is accessible for the user's plan tier before creating a
@@ -85,6 +129,12 @@ export const createConversation = async (params: {
     }
   }
 
+  const scheduledIso = params.scheduledStartAt?.toISOString();
+  const isScheduled = Boolean(scheduledIso && new Date(scheduledIso).getTime() > Date.now() + 60_000);
+  const flowConfig = isScheduled
+    ? { scheduled_start_at: scheduledIso, invitation_status: "draft", invitations: [] }
+    : undefined;
+
   const { data, error } = await api
     .from('conversations')
     .insert({
@@ -95,12 +145,125 @@ export const createConversation = async (params: {
       accept_terms_and_conditions: params.agreed,
       is_saved: false,
       is_session_ended: false,
+      // Keep database status aligned with the existing active-session constraint.
+      // Scheduled behavior is represented by flow_config.scheduled_start_at so
+      // hosted databases that only allow active conversations still accept the
+      // record while the UI can distinguish scheduled sessions.
+      status: "active",
       user_id: params.userId,
+      ...(flowConfig ? { flow_config: flowConfig } : {}),
       ...(params.durationMinutes ? { session_duration_minutes: params.durationMinutes } : {})
     })
     .select('id')
     .single();
     
   if (error) throw error;
+  return data;
+};
+
+export const fetchUpcomingScheduledSessions = async (userId?: string): Promise<UpcomingScheduledSession[]> => {
+  const query = api
+    .from('conversations')
+    .select(`
+      *,
+      sessions!conversations_sessions_id_fkey (
+        title,
+        facilitator,
+        objective
+      )
+    `)
+    .eq('is_session_ended', false)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+
+  if (userId) query.eq('user_id', userId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const now = Date.now();
+  return ((data ?? []) as Array<Record<string, unknown>>)
+    .map((row) => {
+      const scheduledStart = getScheduledStartIso(row.flow_config);
+      const invitations = getSessionInvitations(row.flow_config);
+      if (!scheduledStart) return null;
+      return {
+        ...(row as unknown as UpcomingScheduledSession),
+        scheduled_start_at: scheduledStart,
+        invited_count: invitations.length,
+      };
+    })
+    .filter((row): row is UpcomingScheduledSession => Boolean(row && new Date(row.scheduled_start_at).getTime() >= now - 60_000))
+    .sort((a, b) => new Date(a.scheduled_start_at).getTime() - new Date(b.scheduled_start_at).getTime());
+};
+
+export const createSessionInvitations = async (params: {
+  conversationId: number;
+  invitees: Array<{ name: string; email: string }>;
+  emailSubject: string;
+  emailBody: string;
+  cfTurnstileToken?: string | null;
+}) => {
+  const { data: conversation, error: loadError } = await api
+    .from('conversations')
+    .select('id, flow_config, join_token')
+    .eq('id', params.conversationId)
+    .single();
+
+  if (loadError) throw loadError;
+
+  const existingConfig = getFlowConfigObject((conversation as Record<string, unknown>)?.flow_config);
+  const nowIso = new Date().toISOString();
+  const invitations: ScheduledSessionInvitation[] = params.invitees.map((invitee, index) => {
+    const tokenSource = `${params.conversationId}:${invitee.email}:${Date.now()}:${index}:${Math.random()}`;
+    let token = '';
+    try {
+      token = btoa(tokenSource).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+    } catch {
+      token = `${Date.now()}${index}`;
+    }
+    return {
+      id: `${params.conversationId}-${index + 1}`,
+      name: invitee.name.trim(),
+      email: invitee.email.trim().toLowerCase(),
+      token,
+      status: 'invited',
+      sent_at: nowIso,
+      confirmed_at: null,
+    };
+  });
+
+  const updatedFlowConfig = {
+    ...existingConfig,
+    invitation_status: 'sent',
+    invitations,
+    invitation_email_subject: params.emailSubject,
+    invitation_email_body: params.emailBody,
+    invitations_updated_at: nowIso,
+  };
+
+  const { data, error } = await api
+    .from('conversations')
+    .update({ flow_config: updatedFlowConfig })
+    .eq('id', params.conversationId)
+    .select('id, flow_config')
+    .single();
+
+  if (error) throw error;
+
+  if (params.cfTurnstileToken) {
+    api.functions.invoke('send-session-invitations', {
+      body: {
+        conversation_id: params.conversationId,
+        invitees: invitations,
+        subject: params.emailSubject,
+        body: params.emailBody,
+        cf_turnstile_token: params.cfTurnstileToken,
+      },
+    }).catch((err) => {
+      console.warn('Invitation email endpoint is not available yet; invitations were saved as drafts.', err);
+    });
+  }
+
   return data;
 };

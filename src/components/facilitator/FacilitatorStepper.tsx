@@ -26,7 +26,7 @@ export const FacilitatorStepper = ({
   const steps = [
     { value: "1", label: "Choose Facilitator", shortLabel: "Facilitator",   disabled: isStep1Disabled },
     { value: "2", label: "Select Workshop",    shortLabel: "Workshop",       disabled: isStep2Disabled },
-    { value: "3", label: "Setup Participants", shortLabel: "Participants",   disabled: isStep3Disabled },
+    { value: "3", label: "Configure Session", shortLabel: "Configure",   disabled: isStep3Disabled },
   ];
 
   return (

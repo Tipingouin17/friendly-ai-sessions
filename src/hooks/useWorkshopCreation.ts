@@ -4,7 +4,7 @@
  * Hook for the AIfacilitator application.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/api";
 import { Step } from "@/types/facilitator";
@@ -21,6 +21,7 @@ export const useWorkshopCreation = () => {
   const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState<number | "">("");
+  const [scheduledStartAt, setScheduledStartAt] = useState<Date>(() => new Date());
   /** True while the session creation API call (+ OpenAI) is in-flight */
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -28,6 +29,10 @@ export const useWorkshopCreation = () => {
   // Secure navigation for host session page
   const { navigateToHostSession } = useNavigateToSession();
   const navigate = useNavigate();
+
+  const isScheduled = useMemo(() => {
+    return scheduledStartAt.getTime() > Date.now() + 60_000;
+  }, [scheduledStartAt]);
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -84,9 +89,19 @@ export const useWorkshopCreation = () => {
         agreed,
         userId: user.id,
         durationMinutes: durationMinutes !== "" ? Number(durationMinutes) : undefined,
+        scheduledStartAt: isScheduled ? scheduledStartAt : undefined,
       });
 
       if (data?.id) {
+        if (isScheduled) {
+          navigate(`/schedule-invitations?id=${data.id}`);
+          toast({
+            title: "Session Scheduled",
+            description: "Draft your participant invitations before the scheduled start.",
+          });
+          return;
+        }
+
         // Navigate immediately — the session page shows a ThinkingIndicator
         // while the AI generates the welcome message server-side.
         await navigateToHostSession(data.id);
@@ -129,6 +144,9 @@ export const useWorkshopCreation = () => {
     setAgreed,
     durationMinutes,
     setDurationMinutes,
+    scheduledStartAt,
+    setScheduledStartAt,
+    isScheduled,
     isSubmitting,
     handleNext,
     handlePrevious,

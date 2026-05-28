@@ -16,19 +16,37 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { debugLog } from "@/utils/debugLogger";
 import { useNavigate } from "react-router-dom";
+import { CalendarClock, Mail, Play, Users } from "lucide-react";
+import type { UpcomingScheduledSession } from "@/services/facilitatorService";
+import { Button } from "@/components/ui/button";
+
+
+const formatUpcomingSessionTime = (iso: string) => {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+};
 
 interface FacilitatorSelectionProps {
   facilitators: Facilitator[];
   selectedFacilitator: number | null;
   onSelect: (id: number) => void;
   isLoading?: boolean;
+  upcomingScheduledSessions?: UpcomingScheduledSession[];
+  isLoadingUpcomingSessions?: boolean;
 }
 
 export const FacilitatorSelection = ({ 
   facilitators, 
   selectedFacilitator, 
   onSelect,
-  isLoading = false 
+  isLoading = false,
+  upcomingScheduledSessions = [],
+  isLoadingUpcomingSessions = false 
 }: FacilitatorSelectionProps) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [facilitatorImages, setFacilitatorImages] = useState<Record<number, string>>({ /* no-op */ });
@@ -154,6 +172,43 @@ export const FacilitatorSelection = ({
 
   return (
     <div>
+
+      {(isLoadingUpcomingSessions || upcomingScheduledSessions.length > 0) && (
+        <section className="mb-6 rounded-3xl border border-indigo-100 bg-indigo-50/70 p-4 text-left shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-indigo-700"><CalendarClock className="h-4 w-4" /> Upcoming scheduled sessions</p>
+              <p className="mt-1 text-sm text-slate-600">Reconnect to a scheduled waiting area or finish invitation drafts before participants arrive.</p>
+            </div>
+          </div>
+          {isLoadingUpcomingSessions ? (
+            <div className="h-24 animate-pulse rounded-2xl bg-white/80" />
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {upcomingScheduledSessions.slice(0, 4).map((session) => (
+                <article key={session.id} className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-semibold text-slate-950">{session.sessions?.title || 'Scheduled session'}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{formatUpcomingSessionTime(session.scheduled_start_at)}</p>
+                    </div>
+                    <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">Scheduled</span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
+                    <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-indigo-500" /> {Math.max((session.participants ?? 1) - 1, 0)} seats</span>
+                    <span className="inline-flex items-center gap-1.5"><Mail className="h-4 w-4 text-indigo-500" /> {session.invited_count} invited</span>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => navigate(`/session/host?id=${session.id}`)}><Play className="mr-2 h-4 w-4" /> Reconnect</Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/schedule-invitations?id=${session.id}`)}>Invite</Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       <FacilitatorCarousel
         facilitators={facilitators}
         selectedFacilitator={selectedFacilitator}

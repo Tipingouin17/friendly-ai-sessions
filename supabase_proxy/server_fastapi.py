@@ -3046,14 +3046,23 @@ async def admin_delete_conversation(conv_id: int, request: Request):
     caller_id = caller.get("sub") or caller.get("id")
     try:
         async with _pool.acquire() as conn:
-            conv = await conn.fetchrow("SELECT id FROM conversations WHERE id = $1", conv_id)
-            if not conv:
-                raise HTTPException(404, "Conversation not found")
-            await conn.execute("DELETE FROM messages WHERE conversation_id = $1", conv_id)
-            await conn.execute("DELETE FROM session_events WHERE conversation_id = $1", conv_id)
-            await conn.execute("DELETE FROM session_reports WHERE conversation_id = $1", conv_id)
-            await conn.execute("DELETE FROM session_participants WHERE conversation_id = $1", conv_id)
-            await conn.execute("DELETE FROM conversations WHERE id = $1", conv_id)
+            async with conn.transaction():
+                conv = await conn.fetchrow("SELECT id FROM conversations WHERE id = $1", conv_id)
+                if not conv:
+                    raise HTTPException(404, "Conversation not found")
+
+                # conversations.final_report_id has a foreign-key reference to
+                # session_reports.id. Clear that reference before deleting the
+                # reports, otherwise PostgreSQL correctly blocks the delete.
+                await conn.execute(
+                    "UPDATE conversations SET final_report_id = NULL WHERE id = $1",
+                    conv_id,
+                )
+                await conn.execute("DELETE FROM messages WHERE conversation_id = $1", conv_id)
+                await conn.execute("DELETE FROM session_events WHERE conversation_id = $1", conv_id)
+                await conn.execute("DELETE FROM session_participants WHERE conversation_id = $1", conv_id)
+                await conn.execute("DELETE FROM session_reports WHERE conversation_id = $1", conv_id)
+                await conn.execute("DELETE FROM conversations WHERE id = $1", conv_id)
         log_auth.info("admin_delete_conversation: conv %s deleted by admin %s", conv_id, caller_id)
         return {"success": True, "conversation_id": conv_id, "deleted": True}
     except HTTPException:

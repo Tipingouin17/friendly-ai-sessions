@@ -147,8 +147,8 @@ export const createConversation = async (params: {
       is_session_ended: false,
       // Keep database status aligned with the existing active-session constraint.
       // Scheduled behavior is represented by flow_config.scheduled_start_at so
-      // hosted databases that only allow active conversations still accept the
-      // record while the UI can distinguish scheduled sessions.
+      // hosted dev/prod databases that only allow active conversations still
+      // accept the record while the UI can distinguish scheduled sessions.
       status: "active",
       user_id: params.userId,
       ...(flowConfig ? { flow_config: flowConfig } : {}),

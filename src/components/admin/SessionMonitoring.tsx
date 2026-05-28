@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api";
+import api, { EDGE_FUNCTION_URL } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,35 @@ const checkFlagged = (text: string): boolean => {
 
 const PAGE_SIZE = 20;
 
+function getAdminAccessToken(): string {
+    try {
+        const session = JSON.parse(localStorage.getItem("mf_session") || "null");
+        return session?.access_token || "";
+    } catch {
+        return "";
+    }
+}
+
+async function adminEndpointFetch(path: string, init: RequestInit = {}) {
+    const token = getAdminAccessToken();
+    const headers = new Headers(init.headers);
+    headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    const res = await fetch(`${EDGE_FUNCTION_URL}${path}`, {
+        ...init,
+        headers,
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err?.detail?.message || err?.detail || err?.message;
+        throw new Error(detail || `Admin request failed with HTTP ${res.status}`);
+    }
+
+    return res;
+}
+
 export const SessionMonitoring = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -119,18 +148,7 @@ export const SessionMonitoring = () => {
         queryKey: ["admin-messages", selectedConversation?.id],
         enabled: !!selectedConversation,
         queryFn: async () => {
-            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
-            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
-            const res = await fetch(`${backendUrl}/admin/conversations/${selectedConversation!.id}/messages`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || "Failed to load messages");
-            }
+            const res = await adminEndpointFetch(`/admin/conversations/${selectedConversation!.id}/messages`);
             const data: Message[] = await res.json();
             return data;
         },
@@ -156,16 +174,7 @@ export const SessionMonitoring = () => {
 
     const deleteConvMutation = useMutation({
         mutationFn: async (id: number) => {
-            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
-            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
-            const res = await fetch(`${backendUrl}/admin/conversations/${id}`, {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` },
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || "Failed to delete conversation");
-            }
+            await adminEndpointFetch(`/admin/conversations/${id}`, { method: "DELETE" });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-conversations"] });
@@ -178,20 +187,10 @@ export const SessionMonitoring = () => {
 
     const reportMutation = useMutation({
         mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
-            const token = localStorage.getItem("sb-token") || sessionStorage.getItem("sb-token") || "";
-            const backendUrl = import.meta.env.VITE_SUPABASE_URL || "";
-            const res = await fetch(`${backendUrl}/admin/conversations/${id}/report`, {
+            await adminEndpointFetch(`/admin/conversations/${id}/report`, {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
                 body: JSON.stringify({ reason }),
             });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || "Failed to report conversation");
-            }
         },
         onSuccess: () => {
             toast({ title: "Conversation reported", description: "The conversation has been flagged for review." });

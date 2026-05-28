@@ -1,194 +1,98 @@
 /**
  * Revenue Dashboard
  *
- * Admin component for the AIfacilitator application.
+ * Live admin revenue view backed by the server-side cost analytics endpoint.
+ * This component intentionally avoids fabricated transaction rows or profile-derived
+ * revenue estimates when the database does not expose a payment ledger.
  */
 import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { EDGE_FUNCTION_URL } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-    DollarSign,
-    TrendingUp,
-    CreditCard,
     AlertCircle,
+    CreditCard,
+    DollarSign,
     Loader2,
+    TrendingUp,
     Users,
-    Calendar
 } from "lucide-react";
 import {
-    LineChart,
-    Line,
-    BarChart,
     Bar,
+    BarChart,
+    CartesianGrid,
+    Legend,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
     XAxis,
     YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer
 } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth, startOfDay } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface RevenueData {
-    mrr: number;
-    arr: number;
-    totalRevenue: number;
-    activeSubscriptions: number;
-    churnRate: number;
-    revenueByPlan: Array<{ plan: string; revenue: number; users: number }>;
-    monthlyRevenue: Array<{ month: string; revenue: number; newUsers: number }>;
-    recentTransactions: Array<{
-        id: string;
-        user_email: string;
-        plan: string;
-        amount: number;
-        date: string;
-        status: string;
-    }>;
+interface CostSummary {
+    monthly_revenue_eur: number;
+    gross_margin_pct: number | null;
+    total_paid_subscribers: number;
+    monthly_growth_rate_pct: number;
 }
 
+interface RevenuePlan {
+    plan_name: string;
+    plan_price_eur: number;
+    subscriber_count: number;
+    monthly_revenue_eur: number;
+}
+
+interface SubscriberGrowth {
+    month: string;
+    new_paid_subscribers: number;
+}
+
+interface MrrProjection {
+    month: string;
+    projected_mrr_eur: number;
+    projected_arr_eur: number;
+}
+
+interface RevenueAnalyticsData {
+    summary: CostSummary;
+    revenue_by_plan: RevenuePlan[];
+    subscriber_growth: SubscriberGrowth[];
+    mrr_projection: MrrProjection[];
+}
+
+function getAdminAccessToken(): string {
+    try {
+        const session = JSON.parse(localStorage.getItem("mf_session") || "null");
+        return session?.access_token || "";
+    } catch {
+        return "";
+    }
+}
+
+const fmt = {
+    eur: (value: number | null | undefined) => `€${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    pct: (value: number | null | undefined) => value == null ? "—" : `${Number(value).toFixed(1)}%`,
+    num: (value: number | null | undefined) => Number(value || 0).toLocaleString(),
+};
+
 export const RevenueDashboard = () => {
-    const { data: revenue, isLoading } = useQuery({
-        queryKey: ['admin-revenue'],
-        queryFn: async (): Promise<RevenueData> => {
-            // Get all profiles with plan info (email and full_name for transaction display)
-            const { data: profiles } = await api
-                .from('profiles')
-                .select(`
-          id,
-          email,
-          full_name,
-          role,
-          current_plan_id,
-          created_at,
-          updated_at,
-          subscription_status
-        `);
-
-            // Get plan pricing
-            const { data: plans } = await api
-                .from('plans')
-                .select('id, title, price');
-
-            // Calculate MRR (Monthly Recurring Revenue)
-            let mrr = 0;
-            let activeSubscriptions = 0;
-            const revenueByPlan: Record<string, { revenue: number; users: number }> = { /* no-op */ };
-
-            profiles?.forEach(profile => {
-                if (profile.subscription_status === 'active' && profile.current_plan_id) {
-                    const plan = plans?.find(p => p.id === profile.current_plan_id);
-                    if (plan && plan.price) {
-                        mrr += plan.price;
-                        activeSubscriptions++;
-
-                        const planName = plan.title || 'Unknown';
-                        if (!revenueByPlan[planName]) {
-                            revenueByPlan[planName] = { revenue: 0, users: 0 };
-                        }
-                        revenueByPlan[planName].revenue += plan.price;
-                        revenueByPlan[planName].users += 1;
-                    }
-                }
+    const { data: revenue, isLoading, error } = useQuery<RevenueAnalyticsData>({
+        queryKey: ["admin-revenue-live"],
+        queryFn: async () => {
+            const token = getAdminAccessToken();
+            const res = await fetch(`${EDGE_FUNCTION_URL}/admin/cost-analytics`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
-
-            const arr = mrr * 12;
-
-            // Calculate churn rate (users who cancelled in last 30 days)
-            const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-            const { count: totalUsers } = await api
-                .from('profiles')
-                .select('*', { count: 'exact', head: true });
-
-            const { count: churnedUsers } = await api
-                .from('profiles')
-                .select('*', { count: 'exact', head: true })
-                .eq('subscription_status', 'canceled')
-                .gte('updated_at', thirtyDaysAgo);
-
-            const churnRate = totalUsers && totalUsers > 0
-                ? ((churnedUsers || 0) / totalUsers) * 100
-                : 0;
-
-            // Revenue by plan
-            const revenueByPlanArray = Object.entries(revenueByPlan).map(([plan, data]) => ({
-                plan,
-                revenue: data.revenue,
-                users: data.users
-            }));
-
-            // Monthly revenue for last 6 months — single query, client-side grouping.
-            // Fetch all profiles created in the last 6 months in one request.
-            const sixMonthsAgo = startOfMonth(subDays(new Date(), 5 * 30)).toISOString();
-            const { data: recentProfiles } = await api
-                .from('profiles')
-                .select('id, created_at, current_plan_id, subscription_status')
-                .gte('created_at', sixMonthsAgo);
-
-            const monthlyRevenue: Array<{ month: string; revenue: number; newUsers: number }> = [];
-            for (let i = 5; i >= 0; i--) {
-                const monthStart = startOfMonth(subDays(new Date(), i * 30));
-                const monthEnd = endOfMonth(monthStart);
-                const monthStartMs = monthStart.getTime();
-                const monthEndMs = monthEnd.getTime();
-
-                const monthProfiles = (recentProfiles || []).filter(p => {
-                    const t = new Date(p.created_at).getTime();
-                    return t >= monthStartMs && t <= monthEndMs;
-                });
-
-                // Calculate actual MRR contribution from users who joined this month
-                // and are still on a paid plan (more accurate than a flat $29 estimate)
-                const monthRevenue = monthProfiles.reduce((sum, p) => {
-                    if (p.subscription_status === 'active' && p.current_plan_id) {
-                        const plan = plans?.find(pl => pl.id === p.current_plan_id);
-                        return sum + (plan?.price || 0);
-                    }
-                    return sum;
-                }, 0);
-
-                monthlyRevenue.push({
-                    month: format(monthStart, 'MMM yyyy'),
-                    revenue: monthRevenue,
-                    newUsers: monthProfiles.length
-                });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                const detail = body?.detail?.message || body?.detail || body?.message;
+                throw new Error(detail || `Failed to load live revenue analytics (HTTP ${res.status})`);
             }
-
-            // Recent subscription activity: profiles with active/canceled status,
-            // sorted by updated_at descending (most recent subscription change first).
-            // This is the best available data without a dedicated payments table.
-            const recentTransactions = (profiles || [])
-                .filter(p => p.subscription_status === 'active' || p.subscription_status === 'canceled')
-                .sort((a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime())
-                .slice(0, 10)
-                .map((profile) => {
-                    const plan = plans?.find(p => p.id === profile.current_plan_id);
-                    const displayEmail = (profile as { email?: string }).email
-                        || `user_${profile.id.substring(0, 8)}`;
-                    return {
-                        id: profile.id,
-                        user_email: displayEmail,
-                        plan: plan?.title || 'Unknown',
-                        amount: plan?.price || 0,
-                        date: (profile as { updated_at?: string }).updated_at ?? profile.created_at,
-                        status: profile.subscription_status === 'active' ? 'active' : 'canceled'
-                    };
-                });
-
-            return {
-                mrr,
-                arr,
-                totalRevenue: mrr * 6, // Simplified: 6 months of MRR
-                activeSubscriptions,
-                churnRate,
-                revenueByPlan: revenueByPlanArray,
-                monthlyRevenue,
-                recentTransactions
-            };
+            return res.json();
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes — matches refetchInterval
+        staleTime: 60_000,
         refetchInterval: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
     });
@@ -201,9 +105,32 @@ export const RevenueDashboard = () => {
         );
     }
 
+    if (error || !revenue) {
+        return (
+            <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                    Failed to load live revenue analytics: {error instanceof Error ? error.message : "Unknown error"}
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    const { summary, revenue_by_plan, subscriber_growth, mrr_projection } = revenue;
+    const arr = Number(summary.monthly_revenue_eur || 0) * 12;
+    const hasRevenueByPlan = revenue_by_plan.some(plan => Number(plan.monthly_revenue_eur || 0) > 0 || Number(plan.subscriber_count || 0) > 0);
+    const hasSubscriberGrowth = subscriber_growth.some(month => Number(month.new_paid_subscribers || 0) > 0);
+    const hasProjection = mrr_projection.some(month => Number(month.projected_mrr_eur || 0) > 0 || Number(month.projected_arr_eur || 0) > 0);
+
     return (
         <div className="space-y-6">
-            {/* Revenue KPIs */}
+            <Alert className="border-blue-200 bg-blue-50">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                    This page now uses the live backend <strong>admin cost analytics</strong> endpoint. It shows factual subscription aggregates from the database and no longer fabricates recent transaction rows when no payments ledger is available.
+                </AlertDescription>
+            </Alert>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
                     <CardHeader className="pb-2">
@@ -212,13 +139,11 @@ export const RevenueDashboard = () => {
                             Monthly Recurring Revenue
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-green-900">
-                            ${revenue?.mrr.toLocaleString()}
+                            {fmt.eur(summary.monthly_revenue_eur)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-green-600">
-                            MRR from active subscriptions
-                        </p>
+                        <p className="text-sm text-green-600">Live MRR from active paid subscriptions</p>
                     </CardContent>
                 </Card>
 
@@ -229,13 +154,11 @@ export const RevenueDashboard = () => {
                             Annual Recurring Revenue
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-emerald-900">
-                            ${revenue?.arr.toLocaleString()}
+                            {fmt.eur(arr)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-emerald-600">
-                            ARR (MRR × 12)
-                        </p>
+                        <p className="text-sm text-emerald-600">ARR calculated from live MRR × 12</p>
                     </CardContent>
                 </Card>
 
@@ -243,159 +166,153 @@ export const RevenueDashboard = () => {
                     <CardHeader className="pb-2">
                         <CardDescription className="flex items-center gap-2">
                             <CreditCard className="h-4 w-4 text-blue-600" />
-                            Active Subscriptions
+                            Paid Subscribers
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-blue-900">
-                            {revenue?.activeSubscriptions}
+                            {fmt.num(summary.total_paid_subscribers)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-blue-600">
-                            Paying customers
-                        </p>
+                        <p className="text-sm text-blue-600">Live active paid subscriber count</p>
                     </CardContent>
                 </Card>
 
-                <Card className={revenue && revenue.churnRate > 5 ? 'border-red-200 bg-gradient-to-br from-red-50 to-white' : 'border-amber-200 bg-gradient-to-br from-amber-50 to-white'}>
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
                     <CardHeader className="pb-2">
                         <CardDescription className="flex items-center gap-2">
-                            <AlertCircle className={revenue && revenue.churnRate > 5 ? 'h-4 w-4 text-red-600' : 'h-4 w-4 text-amber-600'} />
-                            Churn Rate (30d)
+                            <Users className="h-4 w-4 text-purple-600" />
+                            Monthly Growth
                         </CardDescription>
-                        <CardTitle className={revenue && revenue.churnRate > 5 ? 'text-3xl font-bold text-red-900' : 'text-3xl font-bold text-amber-900'}>
-                            {revenue?.churnRate.toFixed(1)}%
+                        <CardTitle className="text-3xl font-bold text-purple-900">
+                            {fmt.pct(summary.monthly_growth_rate_pct)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className={revenue && revenue.churnRate > 5 ? 'text-sm text-red-600' : 'text-sm text-amber-600'}>
-                            {revenue && revenue.churnRate > 5 ? 'High churn!' : 'Healthy'}
-                        </p>
+                        <p className="text-sm text-purple-600">Paid subscriber growth rate</p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Alerts */}
-            {revenue && revenue.churnRate > 5 && (
-                <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800">
-                        <strong>High Churn Alert:</strong> Your churn rate is above 5%. Consider implementing retention campaigns or investigating user feedback.
-                    </AlertDescription>
-                </Alert>
-            )}
-
-            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Monthly Revenue Trend */}
                 <Card className="border-green-200">
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <TrendingUp className="h-5 w-5 text-green-600" />
-                            <CardTitle>Revenue Trend (6 Months)</CardTitle>
+                            <CardTitle>Paid Subscriber Growth</CardTitle>
                         </div>
-                        <CardDescription>Monthly revenue and new user acquisition</CardDescription>
+                        <CardDescription>Live monthly count of new paid subscribers from database records</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {revenue?.monthlyRevenue?.every(m => m.revenue === 0 && m.newUsers === 0) ? (
+                        {!hasSubscriberGrowth ? (
                             <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
                                 <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
-                                <p className="text-sm font-medium">No revenue data yet</p>
-                                <p className="text-xs mt-1">Revenue will appear here once subscriptions are active</p>
+                                <p className="text-sm font-medium">No paid subscriber growth data yet</p>
+                                <p className="text-xs mt-1">The chart will populate when paid subscriptions are recorded</p>
                             </div>
                         ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={revenue?.monthlyRevenue}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="month" />
-                                <YAxis yAxisId="left" />
-                                <YAxis yAxisId="right" orientation="right" />
-                                <Tooltip />
-                                <Legend />
-                                <Line
-                                    yAxisId="left"
-                                    type="monotone"
-                                    dataKey="revenue"
-                                    stroke="#10b981"
-                                    strokeWidth={2}
-                                    name="Revenue ($)"
-                                />
-                                <Line
-                                    yAxisId="right"
-                                    type="monotone"
-                                    dataKey="newUsers"
-                                    stroke="#3b82f6"
-                                    strokeWidth={2}
-                                    name="New Users"
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={subscriber_growth}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="month" />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="new_paid_subscribers"
+                                        stroke="#3b82f6"
+                                        strokeWidth={2}
+                                        name="New Paid Subscribers"
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Revenue by Plan */}
                 <Card className="border-blue-200">
                     <CardHeader>
                         <div className="flex items-center gap-2">
-                            <DollarSign className="h-5 w-5 text-blue-600" />
+                            <CreditCard className="h-5 w-5 text-blue-600" />
                             <CardTitle>Revenue by Plan</CardTitle>
                         </div>
-                        <CardDescription>Monthly revenue breakdown</CardDescription>
+                        <CardDescription>Live subscriber counts and MRR by subscription plan</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {!revenue?.revenueByPlan?.length ? (
+                        {!hasRevenueByPlan ? (
                             <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
-                                <DollarSign className="h-12 w-12 mb-3 opacity-20" />
-                                <p className="text-sm font-medium">No plan revenue data yet</p>
-                                <p className="text-xs mt-1">Revenue breakdown will appear once paid subscriptions are active</p>
+                                <CreditCard className="h-12 w-12 mb-3 opacity-20" />
+                                <p className="text-sm font-medium">No active paid subscription data</p>
+                                <p className="text-xs mt-1">Plan revenue appears when paying subscribers exist</p>
                             </div>
                         ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={revenue?.revenueByPlan}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="plan" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="revenue" fill="#10b981" name="Revenue ($)" />
-                                <Bar dataKey="users" fill="#3b82f6" name="Users" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={revenue_by_plan}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="plan_name" />
+                                    <YAxis yAxisId="left" />
+                                    <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
+                                    <Tooltip formatter={(value, name) => name === "Monthly Revenue (€)" ? fmt.eur(Number(value)) : value} />
+                                    <Legend />
+                                    <Bar yAxisId="left" dataKey="monthly_revenue_eur" fill="#10b981" name="Monthly Revenue (€)" />
+                                    <Bar yAxisId="right" dataKey="subscriber_count" fill="#3b82f6" name="Subscribers" />
+                                </BarChart>
+                            </ResponsiveContainer>
                         )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Recent Transactions */}
             <Card className="border-purple-200">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5 text-purple-600" />
-                        <CardTitle>Recent Transactions</CardTitle>
+                        <TrendingUp className="h-5 w-5 text-purple-600" />
+                        <CardTitle>MRR Projection</CardTitle>
                     </div>
-                    <CardDescription>Latest subscription activities</CardDescription>
+                    <CardDescription>Backend-calculated projection from live subscriber and plan data</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-3">
-                        {revenue?.recentTransactions.map((txn) => (
-                            <div key={txn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-100 rounded-full">
-                                        <DollarSign className="h-4 w-4 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium">{txn.user_email}</p>
-                                        <p className="text-sm text-gray-500">{txn.plan}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="font-semibold text-green-600">${txn.amount}</p>
-                                    <p className="text-xs text-gray-500">
-                                        {format(new Date(txn.date), 'MMM d, yyyy')}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
+                    {!hasProjection ? (
+                        <div className="flex flex-col items-center justify-center h-[260px] text-gray-400">
+                            <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
+                            <p className="text-sm font-medium">No projection available yet</p>
+                            <p className="text-xs mt-1">Projection appears when the live revenue baseline is non-zero</p>
+                        </div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={320}>
+                            <LineChart data={mrr_projection}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="month" />
+                                <YAxis />
+                                <Tooltip formatter={(value) => fmt.eur(Number(value))} />
+                                <Legend />
+                                <Line type="monotone" dataKey="projected_mrr_eur" stroke="#8b5cf6" strokeWidth={2} name="Projected MRR" />
+                                <Line type="monotone" dataKey="projected_arr_eur" stroke="#06b6d4" strokeWidth={2} name="Projected ARR" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="border-gray-200">
+                <CardHeader>
+                    <CardTitle>Live Data Coverage</CardTitle>
+                    <CardDescription>What the database currently exposes for this revenue page</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                            <p className="font-semibold text-green-900">Live</p>
+                            <p className="text-green-700 mt-1">Subscription MRR, ARR, paid subscriber count, growth, and revenue by plan.</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                            <p className="font-semibold text-blue-900">Backend-derived</p>
+                            <p className="text-blue-700 mt-1">MRR/ARR projections are calculated server-side from live subscription records.</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                            <p className="font-semibold text-amber-900">Not shown as live</p>
+                            <p className="text-amber-700 mt-1">Payment transaction history is omitted because no dedicated live payment ledger endpoint is available.</p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

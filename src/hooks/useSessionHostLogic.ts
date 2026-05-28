@@ -86,7 +86,11 @@ export function useSessionHostLogic() {
         cleanup: cleanupAutoStart
     } = useAutoStartSession({
         onStartSession: handleSessionStarted,
-        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted),
+        // `isManagerSessionStarted` is produced by useHostParticipantManager below, so
+        // it cannot be referenced here without causing a render-time temporal-dead-zone
+        // ReferenceError on the host route. The full effective live-state is combined
+        // after all hooks have initialized.
+        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || isInterfaceSessionStarted),
         maxParticipants: Math.max(conversationData?.participants || 0, 0),
     });
 

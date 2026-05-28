@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarClock, Mail, Plus, Send, ShieldCheck, Users } from "lucide-react";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import api from "@/lib/api";
-import { createSessionInvitations, getScheduledStartIso } from "@/services/facilitatorService";
+import { createSessionInvitations, getScheduledStartIso, getSessionInvitations } from "@/services/facilitatorService";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
@@ -36,6 +36,7 @@ const ScheduleInvitations = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileUnavailable, setTurnstileUnavailable] = useState(false);
+  const hydratedConversationIdRef = useRef<number | null>(null);
   const turnstileRef = useRef<{ reset: () => void } | null>(null);
 
   const { data: conversation, isLoading } = useQuery({
@@ -51,6 +52,25 @@ const ScheduleInvitations = () => {
     },
     enabled: Number.isFinite(conversationId) && conversationId > 0,
   });
+
+  useEffect(() => {
+    if (!conversation || hydratedConversationIdRef.current === conversationId) return;
+
+    const savedInvitations = getSessionInvitations(conversation.flow_config);
+    if (savedInvitations.length > 0) {
+      setInvitees(savedInvitations.map((invitee) => ({ name: invitee.name ?? "", email: invitee.email ?? "" })));
+    }
+
+    const flowConfig = conversation.flow_config && typeof conversation.flow_config === "object" && !Array.isArray(conversation.flow_config)
+      ? (conversation.flow_config as Record<string, unknown>)
+      : {};
+    const savedSubject = flowConfig.invitation_email_subject;
+    const savedBody = flowConfig.invitation_email_body;
+    if (typeof savedSubject === "string" && savedSubject.trim()) setEmailSubject(savedSubject);
+    if (typeof savedBody === "string" && savedBody.trim()) setEmailBody(savedBody);
+
+    hydratedConversationIdRef.current = conversationId;
+  }, [conversation, conversationId]);
 
   const scheduledStartIso = useMemo(() => getScheduledStartIso(conversation?.flow_config), [conversation]);
   const participantCapacity = Number(conversation?.participants ?? 1) - 1;

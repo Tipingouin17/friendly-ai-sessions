@@ -50,6 +50,7 @@ interface Conversation {
     ended_at: string | null;
     session_duration_minutes: number | null;
     language: string | null;
+    flow_config: Record<string, unknown> | null;
     sessions: { title: string } | null;
 }
 
@@ -74,6 +75,22 @@ const checkFlagged = (text: string): boolean => {
 };
 
 const PAGE_SIZE = 20;
+
+const getScheduledStartIso = (flowConfig: unknown): string | null => {
+    if (!flowConfig || typeof flowConfig !== "object" || Array.isArray(flowConfig)) return null;
+    const value = (flowConfig as Record<string, unknown>).scheduled_start_at;
+    return typeof value === "string" && value ? value : null;
+};
+
+const isFutureScheduledConversation = (conv: Conversation): boolean => {
+    if (conv.is_session_ended || conv.session_started) return false;
+
+    const scheduledStartIso = getScheduledStartIso(conv.flow_config);
+    if (!scheduledStartIso) return false;
+
+    const scheduledStartTime = new Date(scheduledStartIso).getTime();
+    return Number.isFinite(scheduledStartTime) && scheduledStartTime > Date.now();
+};
 
 function getAdminAccessToken(): string {
     try {
@@ -125,7 +142,7 @@ export const SessionMonitoring = () => {
                     id, created_at, session_started, is_session_ended,
                     current_participants, participants, total_messages,
                     participant_description, user_id, sessions_id, status,
-                    ended_at, session_duration_minutes, language,
+                    ended_at, session_duration_minutes, language, flow_config,
                     sessions!sessions_id ( title )
                 `)
                 .order("created_at", { ascending: false })
@@ -133,7 +150,7 @@ export const SessionMonitoring = () => {
 
             if (statusFilter === "active") query = query.eq("is_session_ended", false).eq("session_started", true);
             if (statusFilter === "ended") query = query.eq("is_session_ended", true);
-            if (statusFilter === "pending") query = query.eq("session_started", false);
+            if (statusFilter === "pending" || statusFilter === "scheduled") query = query.eq("session_started", false).eq("is_session_ended", false);
 
             const { data, error } = await query;
             if (error) throw error;
@@ -231,10 +248,16 @@ export const SessionMonitoring = () => {
         if (conv.status === "force_closed") return <Badge className="bg-red-100 text-red-700 border border-red-200">Force Closed</Badge>;
         if (conv.is_session_ended) return <Badge className="bg-gray-100 text-gray-700 border border-gray-200">Ended</Badge>;
         if (conv.session_started) return <Badge className="bg-green-100 text-green-700 border border-green-200"><Activity className="h-3 w-3 mr-1" />Active</Badge>;
+        if (isFutureScheduledConversation(conv)) return <Badge className="bg-blue-100 text-blue-700 border border-blue-200">Scheduled</Badge>;
         return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending</Badge>;
     };
 
     const filteredConversations = conversations?.filter(c => {
+        const isFutureScheduled = isFutureScheduledConversation(c);
+
+        if (statusFilter === "scheduled" && !isFutureScheduled) return false;
+        if (statusFilter === "pending" && isFutureScheduled) return false;
+
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
         return (
@@ -286,6 +309,7 @@ export const SessionMonitoring = () => {
                                 <SelectItem value="all">All Sessions</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="ended">Ended</SelectItem>
+                                <SelectItem value="scheduled">Scheduled</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
                             </SelectContent>
                         </Select>

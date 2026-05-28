@@ -5166,7 +5166,8 @@ async def edge_function(func_name: str, request: Request):
                     conv = await conn.fetchrow(
                         """
                         SELECT id, status, is_session_ended, participants,
-                               current_participants, join_token
+                               current_participants, join_token, session_started,
+                               flow_config
                         FROM public.conversations
                         WHERE id = $1
                         """,
@@ -5186,6 +5187,18 @@ async def edge_function(func_name: str, request: Request):
                         raise HTTPException(400, "This session has already ended")
                     if conv["status"] and conv["status"] != "active":
                         raise HTTPException(400, "This session is not currently active")
+
+                    # Scheduled sessions must remain in the waiting room until the host
+                    # explicitly starts them.  Production can also have database-level
+                    # capacity triggers, so remember this state before count updates and
+                    # defensively restore it after participant insertion if needed.
+                    flow_config = conv["flow_config"] or {}
+                    if isinstance(flow_config, str):
+                        try:
+                            flow_config = json.loads(flow_config)
+                        except Exception:
+                            flow_config = {}
+                    is_scheduled_waiting_room = bool(flow_config.get("scheduled_start_at")) and not bool(conv["session_started"])
 
                     # 2a. If device_id is provided, check for an existing slot
                     #     for this device in this conversation.  This allows a
@@ -5270,6 +5283,19 @@ async def edge_function(func_name: str, request: Request):
                         """,
                         conversation_id, conversation_id,
                     )
+
+                    if is_scheduled_waiting_room:
+                        await conn.execute(
+                            """
+                            UPDATE public.conversations
+                            SET session_started = false,
+                                welcome_message_status = 'pending'
+                            WHERE id = $1
+                              AND flow_config ? 'scheduled_start_at'
+                              AND session_started = true
+                            """,
+                            conversation_id,
+                        )
 
                     await conn.execute(
                         """

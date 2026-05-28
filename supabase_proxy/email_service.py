@@ -5,6 +5,7 @@ Provides beautiful HTML email templates for:
   - Welcome / signup confirmation
   - Password reset
   - Email address verification
+  - Workshop/session invitations
 
 NOTE: All env vars (RESEND_API_KEY, EMAIL_FROM, etc.) are read at *call time*
 inside send_email() — not at module import time — so that Railway env var
@@ -13,6 +14,7 @@ updates take effect without requiring a full redeploy.
 import os
 import resend
 from datetime import datetime
+from html import escape
 
 # ── Helpers to read config at call time ───────────────────────────────────────
 def _api_key() -> str:
@@ -181,6 +183,45 @@ def build_password_reset_email(full_name: str, reset_url: str) -> tuple[str, str
     return subject, _base_template("Reset your AIfacilitator password — link expires in 1 hour.", body)
 
 
+# ── Workshop invitation email ─────────────────────────────────────────────────
+def build_workshop_invitation_email(
+    invitee_name: str,
+    facilitator_subject: str,
+    facilitator_body: str,
+    join_url: str,
+    session_title: str | None = None,
+    scheduled_time: str | None = None,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for a scheduled workshop invitation."""
+    first = invitee_name.split()[0] if invitee_name else "there"
+    subject = facilitator_subject.strip() or "You're invited to an AI-facilitated session"
+    safe_first = escape(first)
+    safe_session_title = escape(session_title or "AI-facilitated session")
+    safe_scheduled_time = escape(scheduled_time or "the scheduled time")
+    safe_body = "<br />".join(escape(facilitator_body or "You are invited to join our upcoming facilitated session.").splitlines())
+    safe_join_url = escape(join_url, quote=True)
+
+    body = f"""
+      <h1>You are invited, {safe_first}</h1>
+      <p>You have been invited to join <span class="highlight">{safe_session_title}</span>.</p>
+      <p><strong>Scheduled time:</strong> {safe_scheduled_time}</p>
+
+      <div class="divider"></div>
+      <p>{safe_body}</p>
+
+      <div class="btn-wrap">
+        <a href="{safe_join_url}" class="btn">Join Session →</a>
+      </div>
+
+      <div class="divider"></div>
+      <p class="small">This is your personal secure invitation link. Please do not forward it to other participants.</p>
+      <p class="small" style="margin-top:12px;">If the button doesn't work, copy and paste this link into your browser:</p>
+      <p class="small"><a href="{safe_join_url}" class="link">{safe_join_url}</a></p>
+    """
+    preheader = f"{safe_first}, you are invited to join {safe_session_title}."
+    return subject, _base_template(preheader, body)
+
+
 # ── Send helper ───────────────────────────────────────────────────────────────
 def send_email(to_email: str, subject: str, html: str) -> bool:
     """Send an email via Resend. Returns True on success, False on failure.
@@ -228,4 +269,24 @@ def send_verification_email(to_email: str, full_name: str, token: str) -> bool:
 def send_password_reset_email(to_email: str, full_name: str, token: str) -> bool:
     reset_url = f"{_site_url()}/reset-password?token={token}"
     subject, html = build_password_reset_email(full_name, reset_url)
+    return send_email(to_email, subject, html)
+
+
+def send_workshop_invitation_email(
+    to_email: str,
+    invitee_name: str,
+    facilitator_subject: str,
+    facilitator_body: str,
+    join_url: str,
+    session_title: str | None = None,
+    scheduled_time: str | None = None,
+) -> bool:
+    subject, html = build_workshop_invitation_email(
+        invitee_name=invitee_name,
+        facilitator_subject=facilitator_subject,
+        facilitator_body=facilitator_body,
+        join_url=join_url,
+        session_title=session_title,
+        scheduled_time=scheduled_time,
+    )
     return send_email(to_email, subject, html)

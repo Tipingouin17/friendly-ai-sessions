@@ -72,13 +72,19 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 try:
-    from email_service import send_welcome_email, send_password_reset_email, send_verification_email
+    from email_service import (
+        send_welcome_email,
+        send_password_reset_email,
+        send_verification_email,
+        send_workshop_invitation_email,
+    )
     EMAIL_ENABLED = True
 except ImportError:
     EMAIL_ENABLED = False
     def send_welcome_email(*a, **k): return False
     def send_password_reset_email(*a, **k): return False
     def send_verification_email(*a, **k): return False
+    def send_workshop_invitation_email(*a, **k): return False
 
 # ============================================================
 # Password hashing helpers (bcrypt with SHA-256 legacy upgrade)
@@ -7059,6 +7065,125 @@ async def edge_function(func_name: str, request: Request):
         except Exception as _crisp_err:
             logger.error("contact-form: Crisp API error: %s", _crisp_err, exc_info=True)
             raise HTTPException(502, detail={"error": "Failed to send your message. Please try again later."})
+
+    elif func_name == "send-session-invitations":
+        import httpx as _httpx
+
+        conversation_id = data.get("conversation_id")
+        invitees = data.get("invitees") or []
+        subject = (data.get("subject") or "You're invited to an AI-facilitated session").strip()
+        body = (data.get("body") or "You are invited to join our upcoming facilitated session.").strip()
+        cf_token = (data.get("cf_turnstile_token") or "").strip()
+
+        if not conversation_id or not isinstance(invitees, list) or not invitees:
+            raise HTTPException(400, detail={"error": "conversation_id and at least one invitee are required."})
+        if not cf_token:
+            raise HTTPException(400, detail={"error": "Turnstile token is required."})
+        if not EMAIL_ENABLED:
+            raise HTTPException(500, detail={"error": "Email service is not configured."})
+
+        _ts_secret = os.environ.get("TURNSTILE_SECRET_KEY", "")
+        if not _ts_secret:
+            logger.warning("send-session-invitations: TURNSTILE_SECRET_KEY not configured, skipping verification")
+        else:
+            try:
+                async with _httpx.AsyncClient(timeout=10) as _hc:
+                    _ts_resp = await _hc.post(
+                        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                        data={"secret": _ts_secret, "response": cf_token},
+                    )
+                _ts_data = _ts_resp.json()
+                if not _ts_data.get("success"):
+                    logger.warning("send-session-invitations: Turnstile verification failed: %s", _ts_data)
+                    raise HTTPException(400, detail={"error": "CAPTCHA verification failed. Please try again."})
+            except HTTPException:
+                raise
+            except Exception as _ts_err:
+                logger.error("send-session-invitations: Turnstile request error: %s", _ts_err)
+                raise HTTPException(502, detail={"error": "Could not verify CAPTCHA. Please try again."})
+
+        session_title = "AI-facilitated session"
+        scheduled_time = "the scheduled time"
+        try:
+            async with _pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """
+                    SELECT c.flow_config, s.title
+                    FROM conversations c
+                    LEFT JOIN sessions s ON s.id = c.sessions_id
+                    WHERE c.id = $1
+                    """,
+                    int(conversation_id),
+                )
+            if row:
+                session_title = row.get("title") or session_title
+                flow_config = row.get("flow_config") or {}
+                if isinstance(flow_config, str):
+                    try:
+                        flow_config = json.loads(flow_config)
+                    except Exception:
+                        flow_config = {}
+                scheduled_iso = flow_config.get("scheduled_start_at") if isinstance(flow_config, dict) else None
+                if scheduled_iso:
+                    scheduled_time = scheduled_iso
+                    try:
+                        scheduled_time = datetime.fromisoformat(str(scheduled_iso).replace("Z", "+00:00")).strftime("%A, %B %d, %Y at %H:%M UTC")
+                    except Exception:
+                        pass
+        except Exception as meta_err:
+            logger.warning("send-session-invitations: could not load session metadata for conversation %s: %s", conversation_id, meta_err)
+
+        site_url = os.environ.get("SITE_URL") or os.environ.get("FRONTEND_URL") or "https://aifacilitator.ai"
+        site_url = site_url.rstrip("/")
+        sent = []
+        failed = []
+
+        for invitee in invitees:
+            if not isinstance(invitee, dict):
+                failed.append({"email": None, "error": "Invalid invitee payload"})
+                continue
+
+            email = (invitee.get("email") or "").strip().lower()
+            name = (invitee.get("name") or "Participant").strip() or "Participant"
+            token = (invitee.get("token") or "").strip()
+            if not email or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email) or not token:
+                failed.append({"email": email or None, "error": "Missing or invalid email/token"})
+                continue
+
+            join_url = (
+                f"{site_url}/session?id={quote(str(conversation_id))}"
+                f"&name={quote(name)}"
+                f"&token={quote(token)}"
+            )
+            ok = send_workshop_invitation_email(
+                to_email=email,
+                invitee_name=name,
+                facilitator_subject=subject,
+                facilitator_body=body,
+                join_url=join_url,
+                session_title=session_title,
+                scheduled_time=scheduled_time,
+            )
+            if ok:
+                sent.append(email)
+            else:
+                failed.append({"email": email, "error": "Email provider returned failure"})
+
+        logger.info(
+            "send-session-invitations: conversation=%s sent=%d failed=%d",
+            conversation_id, len(sent), len(failed),
+        )
+        if failed:
+            raise HTTPException(
+                502,
+                detail={
+                    "error": "Some invitations could not be sent.",
+                    "sent": sent,
+                    "failed": failed,
+                },
+            )
+
+        return {"success": True, "sent": sent, "failed": []}
 
     raise HTTPException(404, f"Function '{func_name}' not found")
 

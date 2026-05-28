@@ -15,6 +15,38 @@ interface UseSessionStartProps {
   conversationData: any;
 }
 
+const hasStartedSession = (conversationLike: any): boolean => {
+  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
+};
+
+const isMissingSessionStartedAtColumn = (error: { message?: string; details?: string; hint?: string; code?: string } | null): boolean => {
+  if (!error) return false;
+  const combined = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ').toLowerCase();
+  return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
+};
+
+const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
+  let { data, error } = await api
+    .from('conversations')
+    .select('id,session_started,session_started_at')
+    .eq('id', conversationId)
+    .single();
+
+  if (isMissingSessionStartedAtColumn(error)) {
+    ({ data, error } = await api
+      .from('conversations')
+      .select('id,session_started')
+      .eq('id', conversationId)
+      .single());
+  }
+
+  if (error) {
+    throw new Error(error.message || 'Unable to verify that the session started');
+  }
+
+  return hasStartedSession(data);
+};
+
 export const useSessionStart = ({
   conversationId,
   participants,
@@ -59,11 +91,7 @@ export const useSessionStart = ({
         })
         .eq('id', conversationId);
 
-      const updateErrorText = updateError
-        ? [updateError.message, updateError.details, updateError.hint, updateError.code].filter(Boolean).join(' ').toLowerCase()
-        : '';
-
-      if (updateErrorText.includes('session_started_at') && (updateErrorText.includes('column') || updateErrorText.includes('does not exist'))) {
+      if (isMissingSessionStartedAtColumn(updateError)) {
         logger.warn('session_started_at column is unavailable; falling back to session_started only.');
         ({ error: updateError } = await api
           .from('conversations')
@@ -79,6 +107,11 @@ export const useSessionStart = ({
       if (updateError) {
         logger.error('❌ Error updating session_started:', updateError);
         throw updateError;
+      }
+
+      const persistedStartConfirmed = await verifyPersistedSessionStart(conversationId);
+      if (!persistedStartConfirmed) {
+        throw new Error('Session start was not persisted by the backend');
       }
 
       logger.category('session', '✅ Session marked as started in database');

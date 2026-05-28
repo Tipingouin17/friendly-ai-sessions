@@ -58,13 +58,14 @@ export function useSessionHostLogic() {
     const hasPersistedStartMarker = Boolean(
         conversationData?.session_started || (conversationData as any)?.session_started_at
     );
-    const hasAssistantMessage = sessionMessages.some((message) => message.sender === 'assistant');
-
     const handleSessionStarted = useCallback(async () => {
         try {
-            setHostSessionStartedOverride(true);
             await handleStartSession();
-            // The manager will pick up the change via realtime; the local override keeps the host UI in the active state immediately.
+            // Only switch the host into live management after the backend start
+            // mutation has succeeded and the persisted start marker has been
+            // confirmed. Participant views use the same persisted marker.
+            setHostSessionStartedOverride(true);
+            void refetchConversation();
         } catch (error) {
             console.error("Error starting session:", error);
             toast({
@@ -75,7 +76,7 @@ export function useSessionHostLogic() {
             setHostSessionStartedOverride(false);
             throw error;
         }
-    }, [handleStartSession, toast]);
+    }, [handleStartSession, refetchConversation, toast]);
 
     const {
         isAutoStarting,
@@ -85,7 +86,7 @@ export function useSessionHostLogic() {
         cleanup: cleanupAutoStart
     } = useAutoStartSession({
         onStartSession: handleSessionStarted,
-        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || hasAssistantMessage),
+        isSessionStarted: Boolean(hostSessionStartedOverride || hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted),
         maxParticipants: Math.max(conversationData?.participants || 0, 0),
     });
 
@@ -138,14 +139,15 @@ export function useSessionHostLogic() {
         conversationData
     });
 
-    // Treat the host session as live as soon as the first facilitator question
-    // exists, even if the persisted conversation start marker has not propagated.
+    // Treat the session as live only after the shared persisted start signal has
+    // been confirmed by the backend-backed hooks, or after an explicit host start
+    // has completed successfully. Assistant messages alone must not move the host
+    // into live mode because participants rely on the same persisted start signal.
     const effectiveIsSessionStarted = Boolean(
         hostSessionStartedOverride ||
         hasPersistedStartMarker ||
         isInterfaceSessionStarted ||
-        isManagerSessionStarted ||
-        hasAssistantMessage
+        isManagerSessionStarted
     );
 
     const waitingRoomParticipantCount = Math.max(
@@ -160,10 +162,10 @@ export function useSessionHostLogic() {
     );
 
     useEffect(() => {
-        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted || hasAssistantMessage) && !hostSessionStartedOverride) {
+        if ((hasPersistedStartMarker || isInterfaceSessionStarted || isManagerSessionStarted) && !hostSessionStartedOverride) {
             setHostSessionStartedOverride(true);
         }
-    }, [hasAssistantMessage, hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
+    }, [hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
 
     useEffect(() => {
         if (!isDataLoaded || effectiveIsSessionStarted) return;

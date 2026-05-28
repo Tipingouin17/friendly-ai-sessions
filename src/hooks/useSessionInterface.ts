@@ -21,6 +21,28 @@ const isMissingSessionStartedAtColumn = (error: { message?: string; details?: st
   return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
 };
 
+const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
+  let { data, error } = await api
+    .from('conversations')
+    .select('id,session_started,session_started_at')
+    .eq('id', conversationId)
+    .single();
+
+  if (isMissingSessionStartedAtColumn(error)) {
+    ({ data, error } = await api
+      .from('conversations')
+      .select('id,session_started')
+      .eq('id', conversationId)
+      .single());
+  }
+
+  if (error) {
+    throw new Error(error.message || 'Unable to verify that the session started');
+  }
+
+  return hasStartedSession(data);
+};
+
 export function useSessionInterface(
   conversationId: number | null,
   conversation?: ConversationWithSession | null
@@ -156,16 +178,21 @@ export function useSessionInterface(
 
       if (error) {
         throw new Error(error.message || "Failed to start session");
-      } else {
-        setIsSessionStarted(true);
-        setShowQrCodeView(false);
-        lastSessionStarted.current = true;
-        toast({
-          title: "Session started",
-          description: "The session has been successfully started.",
-        });
-        await navigateToHostSession(conversationId);
       }
+
+      const persistedStartConfirmed = await verifyPersistedSessionStart(conversationId);
+      if (!persistedStartConfirmed) {
+        throw new Error("Session start was not persisted by the backend");
+      }
+
+      setIsSessionStarted(true);
+      setShowQrCodeView(false);
+      lastSessionStarted.current = true;
+      toast({
+        title: "Session started",
+        description: "The session has been successfully started.",
+      });
+      await navigateToHostSession(conversationId);
     } catch (err) {
       toast({
         title: "Error starting session",

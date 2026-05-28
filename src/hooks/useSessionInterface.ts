@@ -22,19 +22,17 @@ const isMissingSessionStartedAtColumn = (error: { message?: string; details?: st
 };
 
 const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
-  let { data, error } = await api
+  // The deployed Railway/PostgREST-compatible backend currently persists the
+  // lifecycle signal with `session_started`. Some historical frontend builds
+  // also probed `session_started_at`, but that column is not guaranteed to
+  // exist in every environment and can make the backend return HTTP 400 before
+  // the host can enter the live room. Verification should therefore read the
+  // canonical shared flag only.
+  const { data, error } = await api
     .from('conversations')
-    .select('id,session_started,session_started_at')
+    .select('id,session_started')
     .eq('id', conversationId)
     .single();
-
-  if (isMissingSessionStartedAtColumn(error)) {
-    ({ data, error } = await api
-      .from('conversations')
-      .select('id,session_started')
-      .eq('id', conversationId)
-      .single());
-  }
 
   if (error) {
     throw new Error(error.message || 'Unable to verify that the session started');
@@ -157,24 +155,12 @@ export function useSessionInterface(
     sessionStorage.setItem('isHostSession', 'true');
 
     try {
-      const startedAt = new Date().toISOString();
-      let { error } = await api
+      const { error } = await api
         .from('conversations')
         .update({
           session_started: true,
-          session_started_at: startedAt,
         })
         .eq('id', conversationId);
-
-      if (isMissingSessionStartedAtColumn(error)) {
-        console.warn('session_started_at column is unavailable; falling back to session_started only.');
-        ({ error } = await api
-          .from('conversations')
-          .update({
-            session_started: true,
-          })
-          .eq('id', conversationId));
-      }
 
       if (error) {
         throw new Error(error.message || "Failed to start session");

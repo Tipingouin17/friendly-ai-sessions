@@ -82,6 +82,30 @@ const GENDER_PRESENTATIONS = ["feminine", "masculine", "neutral", "non_binary", 
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || '';
 
+interface AdminDeleteFacilitatorResponse {
+    success: boolean;
+    error?: string;
+    detached_sessions?: number;
+}
+
+/** Call a dedicated admin endpoint with the current JWT. */
+async function adminFetch(path: string, method: string): Promise<AdminDeleteFacilitatorResponse> {
+    const session = JSON.parse(localStorage.getItem("mf_session") || "null");
+    const token = session?.access_token;
+    const res = await fetch(`${API_URL}${path}`, {
+        method,
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        return { success: false, error: body?.detail?.message || body?.detail || `HTTP ${res.status}` };
+    }
+    return { success: true, ...body };
+}
+
 /** Build a full avatar URL from a profile_picture value (filename or full URL). */
 function buildAvatarUrl(pic: string | null): string | null {
     if (!pic) return null;
@@ -248,18 +272,30 @@ export const FacilitatorManagement = () => {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { error } = await api.from("facilitators").delete().eq("id", id);
-            if (error) throw error;
+            const result = await adminFetch(`/admin/facilitators/${id}`, "DELETE");
+            if (!result.success) throw new Error(result.error || "Failed to delete facilitator");
+            return result;
         },
-        onSuccess: () => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: ["admin-facilitators"] });
-            toast({ title: "Facilitator deleted", description: "The facilitator has been removed." });
+            const detachedCount = result.detached_sessions ?? 0;
+            toast({
+                title: "Facilitator deleted",
+                description: detachedCount > 0
+                    ? `The facilitator was removed and detached from ${detachedCount} historical session${detachedCount === 1 ? "" : "s"}.`
+                    : "The facilitator has been removed.",
+            });
             setDeletingId(null);
         },
         onError: (error: Error) => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
         },
     });
+
+    const deletingFacilitator = useMemo(
+        () => facilitators?.find(f => f.id === deletingId) ?? null,
+        [facilitators, deletingId]
+    );
 
     const togglePromoted = (f: Facilitator) => {
         upsertMutation.mutate({ ...f, is_promoted: !f.is_promoted });
@@ -792,20 +828,30 @@ export const FacilitatorManagement = () => {
             <AlertDialog open={!!deletingId} onOpenChange={open => !open && setDeletingId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Facilitator</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete this facilitator. Any sessions linked to this facilitator may be affected. This action cannot be undone.
+                        <AlertDialogTitle>
+                            Delete {deletingFacilitator?.title ? `“${deletingFacilitator.title}”` : "Facilitator"}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <span className="block">
+                                This will permanently delete the facilitator profile{deletingFacilitator?.title ? ` for ${deletingFacilitator.title}` : ""}.
+                            </span>
+                            <span className="block font-medium text-amber-700">
+                                Historical sessions will be preserved and detached from this facilitator; they will not be deleted.
+                            </span>
+                            <span className="block">
+                                This action cannot be undone.
+                            </span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => deletingId && deleteMutation.mutate(deletingId)}
                             disabled={deleteMutation.isPending}
                             className="bg-red-600 hover:bg-red-700"
                         >
                             {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                            Delete
+                            {deleteMutation.isPending ? "Deleting..." : "Delete Facilitator"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

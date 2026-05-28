@@ -6,11 +6,18 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
-import { ConversationWithSession } from "@/types/database";
+import { getScheduledStartIso } from "@/services/facilitatorService";
+
+interface CapacityConversation {
+  id: number;
+  current_participants?: number | null;
+  participants?: number | null;
+  flow_config?: unknown;
+}
 
 interface SessionCapacityResult {
   canJoin: boolean;
-  latestConversation: any;
+  latestConversation: CapacityConversation | null;
   newParticipantId: number;
   error?: string;
 }
@@ -26,7 +33,7 @@ export async function checkSessionCapacity(
   
   const { data: latestConversation, error: fetchError } = await api
     .from('conversations')
-    .select('id, current_participants, participants')
+    .select('id, current_participants, participants, flow_config')
     .eq('id', conversationId)
     .single();
     
@@ -82,18 +89,20 @@ export async function checkSessionCapacity(
   }
   
   const maxAllowed = latestConversation.participants || 0;
+  const isScheduledSession = Boolean(getScheduledStartIso(latestConversation.flow_config));
   
   // FIXED: Use actual count for capacity check, not the stored current_participants
   if (maxAllowed > 0 && actualCount >= maxAllowed) {
-    
-    const { error: startError } = await api
-      .from('conversations')
-      .update({ session_started: true })
-      .eq('id', conversationId);
-      
-    if (startError) {
-      console.error("Error auto-starting session:", startError);
-    } else { /* no-op */ }
+    if (!isScheduledSession) {
+      const { error: startError } = await api
+        .from('conversations')
+        .update({ session_started: true })
+        .eq('id', conversationId);
+        
+      if (startError) {
+        console.error("Error auto-starting session:", startError);
+      } else { /* no-op */ }
+    }
     
     return {
       canJoin: false,

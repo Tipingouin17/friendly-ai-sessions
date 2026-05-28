@@ -17,10 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 
 // Simple local logger to avoid import issues
-const createLogger = (component: string, category: string) => ({
-  category: (cat: string, message: string, ...data: any[]) => { /* no-op */ }
+const createLogger = (_component: string, _category: string) => ({
+  category: (_cat: string, _message: string, ..._data: unknown[]) => { /* no-op */ }
 });
 
 interface BaseParticipantListProps {
@@ -28,7 +29,7 @@ interface BaseParticipantListProps {
   currentParticipantCount: number;
   maxParticipants: number;
   isLoading: boolean;
-  conversationData: any;
+  conversationData: { id?: number | null; flow_config?: unknown } | null | undefined;
   messages?: Message[];
   onSendMessage?: (message: string, isPinned: boolean, recipientId?: string) => void;
   title?: string;
@@ -164,6 +165,7 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
   }, [participants, isLoading, isHostView]);
 
   const effectiveParticipants = isHostView ? participants : participantsList;
+  const isScheduledSession = Boolean(getScheduledStartIso(conversationData?.flow_config));
 
   const {
     displayCount,
@@ -186,7 +188,8 @@ const BaseParticipantList: React.FC<BaseParticipantListProps> = ({
     setParticipants: setParticipantsList,
     setIsLoading: setIsLoadingParticipants,
     maxParticipants,
-    enabled: !isHostView
+    enabled: !isHostView,
+    disableAutoStart: isScheduledSession
   });
 
   const getParticipantMessageCount = (participantId: number) => {

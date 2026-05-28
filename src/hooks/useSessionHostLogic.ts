@@ -20,6 +20,7 @@ import { Message } from "@/types/chat";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 
 export function useSessionHostLogic() {
     const { currentConversationId, locationState } = useConversationId();
@@ -45,6 +46,8 @@ export function useSessionHostLogic() {
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession } = useSessionInterface(currentConversationId);
+    const scheduledStartIso = getScheduledStartIso(conversationData?.flow_config);
+    const isScheduledSession = Boolean(scheduledStartIso);
 
     // 5. Auto Start Logic
     const {
@@ -56,7 +59,8 @@ export function useSessionHostLogic() {
     } = useAutoStartSession({
         onStartSession: handleStartSession,
         isSessionStarted: Boolean(conversationData?.session_started),
-        maxParticipants: conversationData?.participants || 10
+        maxParticipants: conversationData?.participants || 10,
+        isAutoStartEnabled: !isScheduledSession
     });
 
     // Cleanup auto-start on unmount
@@ -80,6 +84,10 @@ export function useSessionHostLogic() {
         conversationId: currentConversationId,
         enabled: !!currentConversationId,
         onSessionFull: () => {
+            if (isScheduledSession) {
+                log.category('session', 'Scheduled session reached capacity; waiting for manual host start instead of auto-starting.');
+                return;
+            }
             triggerAutoStart(currentCount);
         }
     });

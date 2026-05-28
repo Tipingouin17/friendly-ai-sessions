@@ -17,6 +17,7 @@ interface UseParticipantRealtimeProps {
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   maxParticipants?: number;
   enabled?: boolean; // Allow disabling the hook
+  disableAutoStart?: boolean;
 }
 
 export function useParticipantRealtime({
@@ -25,7 +26,8 @@ export function useParticipantRealtime({
   setParticipants,
   setIsLoading,
   maxParticipants,
-  enabled = true
+  enabled = true,
+  disableAutoStart = false
 }: UseParticipantRealtimeProps) {
   const participantsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const eventsChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
@@ -170,8 +172,9 @@ export function useParticipantRealtime({
               }
             }
             
-            // Auto-start session when max participants reached
-            if (eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
+            // Auto-start session when max participants reached, unless the caller
+            // has disabled capacity-driven starts for scheduled waiting rooms.
+            if (!disableAutoStart && eventType === 'participant_joined' && eventData && maxParticipants && eventData.current_count >= maxParticipants) {
               api
                 .from('conversations')
                 .update({ session_started: true })
@@ -213,5 +216,5 @@ export function useParticipantRealtime({
       
       hasSetupSubscription.current = false;
     };
-  }, [conversationId, setParticipants, setIsLoading, maxParticipants]);
+  }, [conversationId, setParticipants, setIsLoading, maxParticipants, disableAutoStart]);
 }

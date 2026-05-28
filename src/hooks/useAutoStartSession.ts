@@ -11,12 +11,14 @@ interface UseAutoStartSessionProps {
   onStartSession: () => Promise<void>;
   isSessionStarted: boolean;
   maxParticipants: number;
+  isAutoStartEnabled?: boolean;
 }
 
 export const useAutoStartSession = ({
   onStartSession,
   isSessionStarted,
-  maxParticipants
+  maxParticipants,
+  isAutoStartEnabled = true
 }: UseAutoStartSessionProps) => {
   const [isAutoStarting, setIsAutoStarting] = useState(false);
   const [autoStartCountdown, setAutoStartCountdown] = useState(0);
@@ -38,8 +40,9 @@ export const useAutoStartSession = ({
   }, []);
 
   const triggerAutoStart = useCallback(async (currentParticipantCount: number) => {
-    // Don't auto-start if session is already started or starting
-    if (isSessionStarted || isAutoStarting) {
+    // Don't auto-start if the caller has disabled capacity-driven starts,
+    // or if the session is already started or starting.
+    if (!isAutoStartEnabled || isSessionStarted || isAutoStarting) {
       return;
     }
 
@@ -85,7 +88,7 @@ export const useAutoStartSession = ({
         setAutoStartCountdown(0);
       }
     }, 3000);
-  }, [isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
+  }, [isAutoStartEnabled, isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
 
   const cancelAutoStart = useCallback(() => {
     clearAutoStartTimer();

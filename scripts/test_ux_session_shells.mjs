@@ -80,11 +80,12 @@ assertContains(participantView, 'await submitModeInput({', 'participant mode inp
 assertContains(participantView, 'modeOptions={modeChoices}', 'participant passes dynamic vote and reflection options to adaptive footer');
 assertContains(participantView, "onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}", 'participant wires voting selection callbacks into mode submission');
 assertContains(participantView, "onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}", 'participant wires reflection word callbacks into mode submission');
-assertContains(participantView, "const isOpenDiscussionMode = modeKey === 'open_discussion';", 'participant explicitly recognizes open discussion as a free-floor mode');
+assertContains(participantView, "const isOpenDiscussionMode = effectiveModeKey === 'open_discussion';", 'participant explicitly recognizes effective adaptive open discussion as a free-floor mode');
 assertContains(participantView, 'modeBlocksAfterResponse', 'participant only blocks repeat composer use for restricted facilitation modes');
 assertContains(participantView, 'const audioOnlyStream = new MediaStream([audioTrack]);', 'participant microphone can create an audio-only live stream for free speaking');
 assertContains(participantView, "{microphoneEnabled ? 'Mic on' : 'Muted'}", 'participant status reflects live microphone state independently of text dictation');
 assertContains(inputFooter, "isOpenDiscussionMode || lastMessage?.sender === 'assistant'", 'adaptive footer keeps Open Discussion composer available after participant contributions');
+assertContains(inputFooter, "const shouldRenderDefaultChatInput = !modeContext && !isPaused && !isSkipped;", 'adaptive footer suppresses the fallback ChatInput when a facilitation-mode footer is already rendered');
 assertContains(inputFooter, "You're live — speak freely", 'adaptive footer explains Open Discussion as a free-speaking mode');
 assertContains(sessionContent, "key={isAdmin ? connectionAttempts : 'participant-stable'}", 'participant session provider remains mounted during transient retries to avoid refresh-like resets');
 assertContains(sessionPageState, 'shouldPreserveParticipantView', 'participant retry preserves the live room instead of returning to the loading shell');

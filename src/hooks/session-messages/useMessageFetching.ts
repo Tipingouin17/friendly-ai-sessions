@@ -102,7 +102,19 @@ export const useMessageFetching = ({
         const isPrivateToHost = parsedContent ? Boolean(parsedContent.private_to_host) : false;
         const rawFacilitationTechnique = parsedContent?.facilitation_technique;
         const facilitationTechnique = rawFacilitationTechnique && typeof rawFacilitationTechnique === 'object' && !Array.isArray(rawFacilitationTechnique)
-          ? rawFacilitationTechnique as Message['facilitationTechnique']
+          ? {
+              ...(rawFacilitationTechnique as NonNullable<Message['facilitationTechnique']>),
+              selected: String(
+                (rawFacilitationTechnique as Record<string, unknown>).selected
+                ?? (rawFacilitationTechnique as Record<string, unknown>).selected_technique
+                ?? ''
+              ) || null,
+              label: String(
+                (rawFacilitationTechnique as Record<string, unknown>).label
+                ?? (rawFacilitationTechnique as Record<string, unknown>).display_name
+                ?? ''
+              ) || null,
+            } as Message['facilitationTechnique']
           : null;
         return {
           id: msg.id.toString(),

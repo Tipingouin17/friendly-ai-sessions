@@ -26,6 +26,10 @@ export interface Message {
   facilitationTechnique?: {
     selected?: string | null;
     label?: string | null;
+    selected_technique?: string | null;
+    display_name?: string | null;
+    mode_id?: number | string | null;
+    prompt?: string | null;
     rationale?: string | null;
     steering_instruction?: string | null;
     divergence_guidance?: string | null;

@@ -21,6 +21,26 @@ const isMissingSessionStartedAtColumn = (error: { message?: string; details?: st
   return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
 };
 
+const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
+  // The deployed Railway/PostgREST-compatible backend currently persists the
+  // lifecycle signal with `session_started`. Some historical frontend builds
+  // also probed `session_started_at`, but that column is not guaranteed to
+  // exist in every environment and can make the backend return HTTP 400 before
+  // the host can enter the live room. Verification should therefore read the
+  // canonical shared flag only.
+  const { data, error } = await api
+    .from('conversations')
+    .select('id,session_started')
+    .eq('id', conversationId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to verify that the session started');
+  }
+
+  return hasStartedSession(data);
+};
+
 export function useSessionInterface(
   conversationId: number | null,
   conversation?: ConversationWithSession | null
@@ -135,37 +155,30 @@ export function useSessionInterface(
     sessionStorage.setItem('isHostSession', 'true');
 
     try {
-      const startedAt = new Date().toISOString();
-      let { error } = await api
+      const { error } = await api
         .from('conversations')
         .update({
           session_started: true,
-          session_started_at: startedAt,
         })
         .eq('id', conversationId);
 
-      if (isMissingSessionStartedAtColumn(error)) {
-        console.warn('session_started_at column is unavailable; falling back to session_started only.');
-        ({ error } = await api
-          .from('conversations')
-          .update({
-            session_started: true,
-          })
-          .eq('id', conversationId));
-      }
-
       if (error) {
         throw new Error(error.message || "Failed to start session");
-      } else {
-        setIsSessionStarted(true);
-        setShowQrCodeView(false);
-        lastSessionStarted.current = true;
-        toast({
-          title: "Session started",
-          description: "The session has been successfully started.",
-        });
-        await navigateToHostSession(conversationId);
       }
+
+      const persistedStartConfirmed = await verifyPersistedSessionStart(conversationId);
+      if (!persistedStartConfirmed) {
+        throw new Error("Session start was not persisted by the backend");
+      }
+
+      setIsSessionStarted(true);
+      setShowQrCodeView(false);
+      lastSessionStarted.current = true;
+      toast({
+        title: "Session started",
+        description: "The session has been successfully started.",
+      });
+      await navigateToHostSession(conversationId);
     } catch (err) {
       toast({
         title: "Error starting session",

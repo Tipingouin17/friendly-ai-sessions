@@ -11,10 +11,21 @@ import HostParticipantList from "@/components/session/HostParticipantList";
 import { Message, ParticipantInfo } from "@/types/chat";
 import { getScheduledStartIso, getSessionInvitations } from "@/services/facilitatorService";
 
+interface HostConversationData {
+  participants?: number;
+  flow_config?: unknown;
+  [key: string]: unknown;
+}
+
+const getParticipantEmail = (participant: ParticipantInfo): string | null => {
+  const maybeEmail = (participant as ParticipantInfo & { email?: unknown }).email;
+  return typeof maybeEmail === "string" ? maybeEmail : null;
+};
+
 interface HostSessionContentProps {
   sessionMessages: Message[];
   participantColors: { [key: string]: string };
-  conversationData: any;
+  conversationData: HostConversationData | null | undefined;
   participants: ParticipantInfo[];
   isLoadingParticipants: boolean;
   currentConversationId: number | null;
@@ -72,9 +83,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     : null;
   const joinedInviteeEmails = new Set(
     waitingParticipants
-      .map((participant) => (participant as any).email)
-      .filter(Boolean)
-      .map((email: string) => email.toLowerCase())
+      .map(getParticipantEmail)
+      .filter((email): email is string => Boolean(email))
+      .map((email) => email.toLowerCase())
   );
   const invitedReadinessRows = scheduledInvitations.map((invite) => {
     const joinedByEmail = joinedInviteeEmails.has(invite.email.toLowerCase());

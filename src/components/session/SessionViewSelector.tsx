@@ -20,6 +20,7 @@ import SessionView from "./SessionView";
 import ParticipantLoadingShell, { ParticipantLoadingPhase } from "./ParticipantLoadingShell";
 import { SessionContextProps } from "@/types/session";
 import { useToast } from "@/components/ui/use-toast";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 import { useNavigate } from "react-router-dom";
 import api, { clearAllParticipantState } from "@/lib/api";
 import { useSessionEndListener } from "@/hooks/useSessionEndListener";
@@ -51,13 +52,16 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const { logSecurityViolation } = useSecurityAudit();
-  const participantEventChannelRef = useRef<any>(null);
+  const participantEventChannelRef = useRef<ReturnType<typeof api.channel> | null>(null);
   const processedEventIds = useRef<Set<string>>(new Set());
   const isNavigatingRef = useRef(false);
   const sessionTransitionRef = useRef(false);
 
-  // Check session state to determine what view to show
-  const sessionStartedInDB = props.isSessionStartedInDB || sessionStarted;
+  // Check session state to determine what view to show. For scheduled
+  // waiting rooms, only the persisted database start flag can advance the
+  // participant into the live-session/welcome-message flow.
+  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(props.conversation?.flow_config)) && !props.isSessionStartedInDB;
+  const sessionStartedInDB = props.isSessionStartedInDB || (!isScheduledWaitingRoom && sessionStarted);
 
   // Welcome message gate for participants
   const {
@@ -120,6 +124,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     if (!props.currentConversationId || !props.currentUserParticipantId || isAdmin) return;
 
     const channelName = `participant-events-${props.currentConversationId}-${props.currentUserParticipantId}`;
+
+    const processedEventIdsForEffect = processedEventIds.current;
 
     try {
       const channel = api
@@ -188,7 +194,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
           console.error("Error removing participant events channel:", err);
         }
       }
-      processedEventIds.current.clear();
+      processedEventIdsForEffect.clear();
     };
   }, [props.currentConversationId, props.currentUserParticipantId, navigate, toast, isAdmin]);
 

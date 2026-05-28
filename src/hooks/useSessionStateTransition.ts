@@ -9,6 +9,7 @@ import { SessionContextProps } from "@/types/session";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 
 interface UseSessionStateTransitionProps {
   props: SessionContextProps;
@@ -100,10 +101,11 @@ export function useSessionStateTransition({
                              props.participants?.length || 0;
   const maxParticipants = props.conversation?.participants || 0;
   const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
+  const isScheduledWaitingRoom = Boolean(getScheduledStartIso(props.conversation?.flow_config)) && !props.isSessionStartedInDB;
   
   // Enhanced session full handling with navigation lock
   useEffect(() => {
-    if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current) {
+    if (isSessionFull && onSessionFull && !sessionFullTriggeredRef.current && !isScheduledWaitingRoom) {
       sessionFullTriggeredRef.current = true;
       
       // Set navigation lock for participants to prevent redirects during auto-start
@@ -119,7 +121,7 @@ export function useSessionStateTransition({
       setSessionStarted(true);
       if (onSessionFull) onSessionFull();
     }
-  }, [isSessionFull, onSessionFull, setSessionStarted, isAdmin]);
+  }, [isSessionFull, onSessionFull, setSessionStarted, isAdmin, isScheduledWaitingRoom]);
   
   // Reset transition state after a maximum timeout
   useEffect(() => {

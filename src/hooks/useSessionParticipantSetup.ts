@@ -12,6 +12,7 @@ import { getParticipantInfo } from "@/utils/participantUtils";
 import api from "@/lib/api";
 import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useSessionRealtime } from "@/hooks/useSessionRealtime";
+import { getScheduledStartIso } from "@/services/facilitatorService";
 import { retryWithBackoff, isNetworkError, isAbortError } from "@/utils/networkUtils";
 import { requestDeduplicator } from "@/utils/requestDeduplication";
 import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
@@ -218,7 +219,7 @@ export const useSessionParticipantSetup = ({
         setCurrentUserParticipantId(participantId);
       } else { /* no-op */ }
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isAbortError(err)) {
         return;
       }
@@ -264,12 +265,15 @@ export const useSessionParticipantSetup = ({
       setMaxParticipantsForSession(maxParticipants);
       setCurrentParticipantCount(currentCount);
       
-      // Check if session is full
+      // Check if session is full. Scheduled sessions must remain in the
+      // waiting room until the host explicitly starts them, even when the
+      // invited roster reaches capacity.
       const isFull = maxParticipants > 0 && currentCount >= maxParticipants;
+      const isScheduledWaitingRoom = Boolean(getScheduledStartIso(conversation.flow_config)) && !conversation.session_started;
       setIsSessionFull(isFull);
       
       // Call onSessionFull if session is full and not already called
-      if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin) {
+      if (isFull && onSessionFull && !sessionFullCalledRef.current && !forceAdmin && !isScheduledWaitingRoom) {
         sessionFullCalledRef.current = true;
         onSessionFull();
       }
@@ -283,7 +287,7 @@ export const useSessionParticipantSetup = ({
     setParticipants,
     conversation,
     refetch,
-    handleSessionFull: onSessionFull,
+    handleSessionFull: conversation && Boolean(getScheduledStartIso(conversation.flow_config)) && !conversation.session_started ? undefined : onSessionFull,
     onSessionStarted: () => { /* no-op */ }
   });
   

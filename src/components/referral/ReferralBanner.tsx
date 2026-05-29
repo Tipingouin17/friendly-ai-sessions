@@ -1,7 +1,7 @@
 /**
  * ReferralBanner
  *
- * A compact, dismissible banner shown to logged-in users on the My Facilitators
+ * A compact, dismissible banner shown to logged-in users on the My Workshops
  * page. Displays the user's unique referral link with a one-click copy button
  * and a link to the full Referrals page.
  *

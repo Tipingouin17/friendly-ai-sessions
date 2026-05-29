@@ -65,7 +65,7 @@ const SessionMobileNav = () => {
               <div className="flex flex-col space-y-3">
                 <Link to="/my-facilitators" className="w-full">
                   <Button variant="outline" className="w-full text-center rounded-full">
-                    My Facilitators
+                    My Workshops
                   </Button>
                 </Link>
                 <Link to="/profile" className="w-full">

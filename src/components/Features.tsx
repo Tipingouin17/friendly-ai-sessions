@@ -60,7 +60,7 @@ export const Features = () => {
 
           <div className="mt-16 text-center">
             <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
-              {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
+              {isAuthenticated ? "Go to My Workshops" : "Try it for free now"}
             </Button>
             {showNoCreditCardText && (
               <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>
@@ -79,7 +79,7 @@ export const Features = () => {
             Our platform revolutionizes how sessions are conducted, empowering businesses and individuals to achieve greater outcomes.
           </p>
           <Button size="lg" variant="default" className="hover-lift" onClick={handleButtonClick}>
-            {isAuthenticated ? "Go to My Facilitators" : "Try it for free now"}
+            {isAuthenticated ? "Go to My Workshops" : "Try it for free now"}
           </Button>
           {showNoCreditCardText && (
             <p className="text-sm text-muted-foreground mt-4 text-center">*no credit card required</p>

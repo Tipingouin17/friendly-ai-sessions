@@ -131,9 +131,9 @@ const Index = () => {
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
 
-    /** Primary CTA destination — logged-in users go straight to their facilitators. */
+    /** Primary CTA destination — logged-in users go straight to their workshops. */
     const primaryCtaHref = isAuthenticated ? '/my-facilitators' : '/signup';
-    const primaryCtaLabel = isAuthenticated ? 'Go to My Facilitators' : 'Claim 3-Month Free Trial';
+    const primaryCtaLabel = isAuthenticated ? 'Go to My Workshops' : 'Claim 3-Month Free Trial';
 
     const handlePrimaryCta = (location: string) => {
         trackCtaClick('home_primary_cta', primaryCtaHref, location);

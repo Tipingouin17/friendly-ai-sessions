@@ -91,7 +91,7 @@ export const Navigation = () => {
                 <div className="flex flex-col space-y-6 mt-8">
                   {isAuthenticated && (
                     <MobileLink to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
-                      My Facilitators
+                      My Workshops
                     </MobileLink>
                   )}
                   <MobileLink
@@ -187,7 +187,7 @@ export const Navigation = () => {
             <div className="hidden md:flex items-center space-x-8">
               {isAuthenticated && (
                 <Link to="/my-facilitators" className={navLinkClass('/my-facilitators')}>
-                  My Facilitators
+                  My Workshops
                 </Link>
               )}
               <Link to="/" className={navLinkClass('/')}>Home</Link>

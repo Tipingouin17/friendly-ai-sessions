@@ -168,7 +168,7 @@ const AIfacilitators = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHead title="My Facilitators" description="Choose your AI facilitator and create workshops" />
+      <PageHead title="My Workshops" description="Choose your AI facilitator and create workshops" />
       <WelcomeModal
         isOpen={showWelcome && !hasSeenWelcome}
         onClose={() => { setHasSeenWelcome(true); setShowWelcome(false); }}

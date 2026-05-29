@@ -8,11 +8,14 @@
  */
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { getStoredConsent } from "@/components/CookieBanner";
 
 const UET_TAG_ID = "343249109";
 const UET_QUEUE_NAME = "uetq";
 const SCRIPT_ID = "microsoft-uet-script";
 const DISABLED_PATHS = ["/session", "/join-session", "/admin"];
+
+type UetConsentState = "granted" | "denied";
 
 declare global {
   interface Window {
@@ -27,6 +30,20 @@ function isDisabledPath(pathname: string) {
   return DISABLED_PATHS.some(path => pathname.startsWith(path));
 }
 
+function ensureUetQueue() {
+  window[UET_QUEUE_NAME] = window[UET_QUEUE_NAME] || [];
+  return window[UET_QUEUE_NAME];
+}
+
+function getAdStorageConsent(): UetConsentState {
+  return getStoredConsent()?.advertising ? "granted" : "denied";
+}
+
+function pushUetConsent(command: "default" | "update", adStorage: UetConsentState) {
+  const queue = ensureUetQueue();
+  queue.push?.("consent", command, { ad_storage: adStorage });
+}
+
 export function MicrosoftUet() {
   const location = useLocation();
 
@@ -34,7 +51,18 @@ export function MicrosoftUet() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     if (isDisabledPath(location.pathname)) return;
 
-    window[UET_QUEUE_NAME] = window[UET_QUEUE_NAME] || [];
+    pushUetConsent("default", "denied");
+
+    const storedConsent = getStoredConsent();
+    if (storedConsent) {
+      pushUetConsent("update", getAdStorageConsent());
+    }
+
+    const handleConsentUpdated = () => {
+      pushUetConsent("update", getAdStorageConsent());
+    };
+
+    window.addEventListener("cookie-consent-updated", handleConsentUpdated);
 
     const loadUet = () => {
       if (typeof window.UET !== "function") return;
@@ -52,7 +80,7 @@ export function MicrosoftUet() {
     const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
     if (existingScript) {
       loadUet();
-      return;
+      return () => window.removeEventListener("cookie-consent-updated", handleConsentUpdated);
     }
 
     const script = document.createElement("script");
@@ -61,6 +89,8 @@ export function MicrosoftUet() {
     script.async = true;
     script.onload = loadUet;
     document.head.appendChild(script);
+
+    return () => window.removeEventListener("cookie-consent-updated", handleConsentUpdated);
   }, [location.pathname]);
 
   return null;

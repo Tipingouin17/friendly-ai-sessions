@@ -15,12 +15,13 @@ import { getStoredConsent } from "@/components/CookieBanner";
 type GtagCommand = 'js' | 'config' | 'event' | 'set' | 'consent';
 type GtagArguments = [GtagCommand, ...unknown[]];
 type DataLayerItem = GtagArguments | Record<string, unknown>;
+type UetConsentState = 'granted' | 'denied';
 
 declare global {
   interface Window {
     dataLayer?: DataLayerItem[];
     gtag?: (...args: GtagArguments) => void;
-    uetq?: Array<Record<string, unknown>> & { push: (...args: unknown[]) => number };
+    uetq?: unknown[] | { push?: (...args: unknown[]) => unknown };
     clarity?: (...args: unknown[]) => void;
   }
 }
@@ -80,6 +81,15 @@ function updateGoogleConsent(analyticsConsent: boolean, advertisingConsent: bool
     ad_storage: advertisingConsent ? 'granted' : 'denied',
     ad_user_data: advertisingConsent ? 'granted' : 'denied',
     ad_personalization: advertisingConsent ? 'granted' : 'denied',
+  });
+}
+
+function updateMicrosoftConsent(advertisingConsent: boolean): void {
+  if (typeof window === 'undefined') return;
+
+  window.uetq = window.uetq || [];
+  window.uetq.push?.('consent', 'update', {
+    ad_storage: (advertisingConsent ? 'granted' : 'denied') satisfies UetConsentState,
   });
 }
 
@@ -160,9 +170,9 @@ function initUet(advertisingConsent: boolean): void {
 
   uetInitialized = true;
 
-  if (!window.uetq) {
-    window.uetq = [] as typeof window.uetq;
-  }
+  window.uetq = window.uetq || [];
+  window.uetq.push?.('consent', 'default', { ad_storage: 'denied' });
+  updateMicrosoftConsent(advertisingConsent);
 
   const uetId = config.microsoftUetId;
   const uetScript = document.createElement('script');
@@ -189,6 +199,7 @@ export function initializeTracking(): void {
   if (!consent) return;
 
   updateGoogleConsent(consent.analytics, consent.advertising);
+  updateMicrosoftConsent(consent.advertising);
   initGtag(consent.analytics, consent.advertising);
   initClarity(consent.analytics);
   initUet(consent.advertising);

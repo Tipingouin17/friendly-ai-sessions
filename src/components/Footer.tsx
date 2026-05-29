@@ -56,7 +56,7 @@ export const Footer = () => {
               <Link to="/privacy" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Terms of Service</Link>
               <button
-                onClick={() => (window as unknown as Record<string, unknown>).__openCookieSettings?.()}
+                onClick={() => window.dispatchEvent(new Event("open-cookie-settings"))}
                 className="text-sm text-gray-400 hover:text-indigo-400 transition-colors text-left"
               >
                 Cookie Settings

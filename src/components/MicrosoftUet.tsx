@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { getStoredConsent } from "@/components/CookieBanner";
 
-const UET_TAG_ID = "343249109";
+const UET_TAG_ID = "343251742";
 const UET_QUEUE_NAME = "uetq";
 const SCRIPT_ID = "microsoft-uet-script";
 const DISABLED_PATHS = ["/session", "/join-session", "/admin"];

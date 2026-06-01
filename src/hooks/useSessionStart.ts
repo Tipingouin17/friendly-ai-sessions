@@ -8,6 +8,7 @@ import { useState } from 'react';
 import api from "@/lib/api";
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/utils/debugLogger';
+import { trackFirstRealSessionStarted } from '@/lib/tracking';
 
 interface UseSessionStartProps {
   conversationId: number | null;
@@ -159,6 +160,7 @@ export const useSessionStart = ({
 
       const totalDuration = performance.now() - startTime;
       logger.category('session', `🎯 Session start completed in ${totalDuration.toFixed(2)}ms total`);
+      trackFirstRealSessionStarted('session_start');
 
       toast({
         title: "Session started",

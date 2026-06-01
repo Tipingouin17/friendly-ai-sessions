@@ -85,6 +85,12 @@ export interface ApiSession {
   user: ApiUser;
 }
 
+interface SignupResponse extends Partial<ApiSession> {
+  user?: ApiUser | null;
+  requires_verification?: boolean;
+  message?: string;
+}
+
 export interface ApiError {
   message: string;
   code?: string;
@@ -415,17 +421,22 @@ export const auth = {
     // Pass user metadata (name, etc.) at the top level so the backend can read it.
     // The backend accepts both options.data and top-level data shapes.
     if (params.options?.data) body.data = params.options.data;
-    const res = await apiFetch<ApiSession>("/auth/v1/signup", {
+    const res = await apiFetch<SignupResponse>("/auth/v1/signup", {
       method: "POST",
       body: JSON.stringify(body),
       headers: {},
     });
     if (res.error || !res.data) return { data: { session: null, user: null }, error: res.error };
-    // Save the session and fire SIGNED_IN so the user is authenticated immediately
-    // after signup — no separate login step required.
-    saveSession(res.data);
-    notifyAuth("SIGNED_IN", res.data);
-    return { data: { session: res.data, user: res.data.user }, error: null };
+
+    const hasAuthenticatedSession = Boolean(res.data.access_token && res.data.user);
+    if (!hasAuthenticatedSession || res.data.requires_verification) {
+      return { data: { session: null, user: res.data.user ?? null }, error: null };
+    }
+
+    const session = res.data as ApiSession;
+    saveSession(session);
+    notifyAuth("SIGNED_IN", session);
+    return { data: { session, user: session.user }, error: null };
   },
 
   async signOut(): Promise<{ error: ApiError | null }> {

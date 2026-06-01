@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Send the display name so the backend can store it in profiles.full_name.
           // The backend accepts both 'name' and 'full_name' inside options.data.
           data: { name: name.trim() },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}/onboarding/demo`,
         },
       });
 

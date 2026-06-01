@@ -2,12 +2,12 @@
  * VerifyEmailSent
  *
  * Shown immediately after a user registers. Instructs them to check their
- * inbox and click the verification link before they can log in.
+ * inbox and click the verification link to start the activation demo path.
  */
 
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Mail, Sparkles } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 import { api } from '@/lib/api';
 
@@ -37,7 +37,7 @@ const VerifyEmailSent: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
       <PageHead
         title="Verify your email"
-        description="Check your inbox to activate your AIfacilitator account."
+        description="Check your inbox to verify your email and start your first AI workshop demo."
       />
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-10 text-center">
         {/* Icon */}
@@ -45,7 +45,7 @@ const VerifyEmailSent: React.FC = () => {
           <Mail className="h-8 w-8 text-indigo-600" />
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">Check your inbox</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">Verify your email to start your first AI workshop demo</h1>
 
         <p className="text-gray-600 mb-2">
           We've sent a verification link to
@@ -53,9 +53,18 @@ const VerifyEmailSent: React.FC = () => {
         <p className="font-semibold text-indigo-700 mb-6 break-all">{email}</p>
 
         <p className="text-sm text-gray-500 mb-8">
-          Click the link in the email to activate your account. The link expires in&nbsp;
+          Click the link in the email to activate your account. After verification, we’ll take you directly to a short AI-participant demo so you can experience your first workshop before inviting real participants. The link expires in&nbsp;
           <strong>24&nbsp;hours</strong>.
         </p>
+
+        <div className="rounded-xl bg-purple-50 p-4 text-sm text-purple-800 text-left mb-6">
+          <div className="flex gap-3">
+            <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-600" />
+            <p>
+              <strong>Next step:</strong> verify your email, then run a guided demo workshop with AI participants.
+            </p>
+          </div>
+        </div>
 
         <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700 text-left mb-6 space-y-1">
           <p className="font-semibold mb-1">Didn't receive the email?</p>
@@ -91,7 +100,7 @@ const VerifyEmailSent: React.FC = () => {
           to="/login"
           className="inline-block w-full py-3 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:opacity-90 transition"
         >
-          Go to Login
+          I have already verified — go to login
         </Link>
 
         <p className="mt-4 text-xs text-gray-400">

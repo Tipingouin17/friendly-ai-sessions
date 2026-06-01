@@ -308,6 +308,78 @@ export function trackSignup(method = 'email'): void {
   trackMicrosoftEvent('generate_lead', parameters);
 }
 
+export function trackActivationSignupSubmitted(method = 'email'): void {
+  const parameters = {
+    method,
+    event_category: 'activation',
+    event_label: 'signup_submitted',
+    activation_step: 'signup_submitted',
+  };
+
+  trackGa4Event('activation_signup_submitted', parameters);
+  trackMicrosoftEvent('activation_signup_submitted', parameters);
+}
+
+export function trackActivationEmailVerified(source = 'email_link'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'email_verified',
+    source,
+  };
+
+  trackGa4Event('activation_email_verified', parameters);
+  trackMicrosoftEvent('activation_email_verified', parameters);
+}
+
+export function trackActivationDemoViewed(source = 'post_verification'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'demo_viewed',
+    source,
+  };
+
+  trackGa4Event('activation_demo_viewed', parameters);
+  trackMicrosoftEvent('activation_demo_viewed', parameters);
+}
+
+export function trackActivationDemoStarted(source = 'onboarding_demo'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'demo_started',
+    source,
+  };
+
+  trackGa4Event('activation_demo_started', parameters);
+  trackMicrosoftEvent('activation_demo_started', parameters);
+}
+
+export function trackInviteParticipantsIntent(source = 'onboarding_demo'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'invite_participants_intent',
+    source,
+  };
+
+  trackGa4Event('invite_participants_intent', parameters);
+  trackMicrosoftEvent('invite_participants_intent', parameters);
+}
+
+export function trackFirstRealSessionStarted(source = 'session_start'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'first_real_session_started',
+    source,
+  };
+
+  trackGa4Event('first_real_session_started', parameters);
+  trackMicrosoftEvent('first_real_session_started', parameters);
+}
+
 export function trackContactLead(source = 'contact_form'): void {
   const eventId = createClientEventId('contact-lead');
   const parameters = {

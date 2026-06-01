@@ -48,6 +48,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
 const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
 const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
+const OnboardingDemo  = lazy(() => import("./pages/OnboardingDemo"));
 // SEO / Content pages
 const About              = lazy(() => import("./pages/About"));
 const DesignSprint       = lazy(() => import("./pages/use-cases/DesignSprint"));
@@ -162,6 +163,11 @@ function App() {
                 <Route path="/my-facilitators" element={
                   <ProtectedRoute>
                     <AIfacilitators />
+                  </ProtectedRoute>
+                } />
+                <Route path="/onboarding/demo" element={
+                  <ProtectedRoute>
+                    <OnboardingDemo />
                   </ProtectedRoute>
                 } />
                 <Route path="/schedule-invitations" element={

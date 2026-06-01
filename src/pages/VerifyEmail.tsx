@@ -10,6 +10,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 import { EDGE_FUNCTION_URL } from '@/lib/api';
+import { trackActivationEmailVerified } from '@/lib/tracking';
 
 type Status = 'loading' | 'success' | 'error';
 
@@ -36,9 +37,10 @@ const VerifyEmail: React.FC = () => {
         if (data?.access_token) {
           // Store the JWT so the app picks it up on next navigation
           localStorage.setItem('mf_session', JSON.stringify(data));
+          trackActivationEmailVerified('verification_link');
           setStatus('success');
-          // Redirect to dashboard after a short delay
-          setTimeout(() => navigate('/', { replace: true }), 2500);
+          // Redirect to the activation demo after a short delay.
+          setTimeout(() => navigate('/onboarding/demo', { replace: true }), 2500);
         } else {
           setStatus('error');
           setErrorMessage(data?.message ?? 'Verification failed. Please try again.');
@@ -72,13 +74,13 @@ const VerifyEmail: React.FC = () => {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-3">Email verified!</h1>
             <p className="text-gray-600 mb-6">
-              Your account is now active. Redirecting you to the dashboard…
+              Your account is now active. Redirecting you to your first AI workshop demo…
             </p>
             <Link
-              to="/"
+              to="/onboarding/demo"
               className="inline-block w-full py-3 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:opacity-90 transition"
             >
-              Go to Dashboard
+              Start AI demo workshop
             </Link>
           </>
         )}

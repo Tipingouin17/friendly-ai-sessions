@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema, sanitizeInput } from '@/utils/inputValidation';
 import { SignupFormFields } from './SignupFormFields';
-import { trackSignup } from '@/lib/tracking';
+import { trackActivationSignupSubmitted, trackSignup } from '@/lib/tracking';
 
 // Define validation schema
 const signupFormSchema = signupSchema.extend({
@@ -78,6 +78,7 @@ export const SignupForm: React.FC = () => {
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
       trackSignup('email');
+      trackActivationSignupSubmitted('email');
       // The backend now requires email verification before login.
       // Redirect to a confirmation page instead of the dashboard.
       toast.success("Account created! Please check your email to verify your account.");

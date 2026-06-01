@@ -22,6 +22,7 @@ import { createLogger } from '@/utils/debugLogger';
 const log = createLogger('AIfacilitators', 'plan');
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { clearAllParticipantState } from "@/lib/api";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { UsageMeter } from "@/components/subscription/UsageMeter";
@@ -34,6 +35,8 @@ const AIfacilitators = () => {
   const [isCreateWorkshopModalOpen, setIsCreateWorkshopModalOpen] = useState(false);
   // Delay showing the welcome modal so it never flashes on top of a loading page
   const [showWelcome, setShowWelcome] = useState(false);
+  const [hasAppliedOnboardingPreset, setHasAppliedOnboardingPreset] = useState(false);
+  const [searchParams] = useSearchParams();
 
   // Must be declared before the useEffect that uses it to avoid TDZ error
   const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
@@ -92,6 +95,9 @@ const AIfacilitators = () => {
 
   const { currentPlanId } = useUserPlan();
   const { user } = useAuth();
+  const onboardingMode = searchParams.get("onboarding");
+  const isOnboardingDemo = onboardingMode === "demo";
+  const isOnboardingInvite = onboardingMode === "invite";
 
   // Map a plan ID to its effective access tier for facilitator lock checks.
   // Mirrors the same logic in FacilitatorCarousel.tsx.
@@ -104,6 +110,17 @@ const AIfacilitators = () => {
   };
 
   const userTier = effectivePlanTier(currentPlanId);
+
+  useEffect(() => {
+    if (!isOnboardingDemo || hasAppliedOnboardingPreset) return;
+
+    setParticipantCount(1);
+    if (!description.trim()) {
+      setDescription("Solo demo user exploring AIfacilitator before inviting real participants.");
+    }
+    setDurationMinutes(15);
+    setHasAppliedOnboardingPreset(true);
+  }, [description, hasAppliedOnboardingPreset, isOnboardingDemo, setDescription, setDurationMinutes, setParticipantCount]);
 
   // Don't render plan-dependent UI until data is loaded
   const planDataReady = !limitsLoading && maxSessions > 0;
@@ -204,6 +221,24 @@ const AIfacilitators = () => {
 
         {/* Referral programme banner — visible to all logged-in users */}
         <ReferralBanner />
+
+        {isOnboardingDemo && (
+          <div className="mb-6 rounded-2xl border border-purple-100 bg-purple-50 p-5 text-purple-900">
+            <p className="font-semibold">Demo path: create a short AI workshop first</p>
+            <p className="mt-1 text-sm leading-6">
+              Select a facilitator, choose or create a workshop, then use the prefilled setup as a quick solo demo before inviting real participants.
+            </p>
+          </div>
+        )}
+
+        {isOnboardingInvite && (
+          <div className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-emerald-900">
+            <p className="font-semibold">Ready for real participants</p>
+            <p className="mt-1 text-sm leading-6">
+              Create or select a workshop here, then start or schedule the session and invite your participants.
+            </p>
+          </div>
+        )}
 
         {!limitsLoading && (
           <PlanLimitAlert

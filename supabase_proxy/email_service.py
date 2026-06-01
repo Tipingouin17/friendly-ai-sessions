@@ -99,10 +99,10 @@ def _base_template(preheader: str, body_html: str) -> str:
 
 
 # ── Welcome email ─────────────────────────────────────────────────────────────
-def build_welcome_email(full_name: str, login_url: str) -> tuple[str, str]:
+def build_welcome_email(full_name: str, onboarding_url: str) -> tuple[str, str]:
     """Returns (subject, html_body)."""
     first = full_name.split()[0] if full_name else "there"
-    subject = "Welcome to AIfacilitator 🎉"
+    subject = "Welcome to AIfacilitator — start your first AI workshop demo"
     body = f"""
       <h1>Welcome aboard, {first}! 👋</h1>
       <p>Your account has been created successfully. You're now part of a growing community of facilitators using AI to run more engaging, insightful workshops.</p>
@@ -122,29 +122,29 @@ def build_welcome_email(full_name: str, login_url: str) -> tuple[str, str]:
         </div>
       </div>
 
-      <p>Ready to run your first session? Click below to get started:</p>
+      <p>Ready to experience your first workshop? Click below to start a short AI-participant demo, then invite real participants when you are ready.</p>
 
       <div class="btn-wrap">
-        <a href="{login_url}" class="btn">Get Started →</a>
+        <a href="{onboarding_url}" class="btn">Start AI workshop demo →</a>
       </div>
 
       <div class="divider"></div>
       <p class="small">If you didn't create this account, you can safely ignore this email. No action is required.</p>
     """
-    return subject, _base_template(f"Welcome to AIfacilitator, {first}! Your account is ready.", body)
+    return subject, _base_template(f"Welcome to AIfacilitator, {first}! Start your first AI workshop demo.", body)
 
 
 # ── Email verification ────────────────────────────────────────────────────────
 def build_verification_email(full_name: str, verify_url: str) -> tuple[str, str]:
     """Returns (subject, html_body) for the email verification message."""
     first = full_name.split()[0] if full_name else "there"
-    subject = "Verify your AIfacilitator email address"
+    subject = "Verify your email to start your first AI workshop demo"
     body = f"""
       <h1>Almost there, {first}! ✉️</h1>
-      <p>Thanks for signing up for AIfacilitator. To activate your account and start running AI-powered sessions, please verify your email address by clicking the button below:</p>
+      <p>Thanks for signing up for AIfacilitator. To activate your account and start a short AI workshop demo, please verify your email address by clicking the button below:</p>
 
       <div class="btn-wrap">
-        <a href="{verify_url}" class="btn">Verify Email Address →</a>
+        <a href="{verify_url}" class="btn">Verify and start demo →</a>
       </div>
 
       <div class="divider"></div>
@@ -155,7 +155,7 @@ def build_verification_email(full_name: str, verify_url: str) -> tuple[str, str]
       <p class="small"><a href="{verify_url}" class="link">{verify_url}</a></p>
     """
     return subject, _base_template(
-        f"Verify your email to activate your AIfacilitator account, {first}.",
+        f"Verify your email to start your first AI workshop demo, {first}.",
         body,
     )
 
@@ -255,8 +255,8 @@ def send_email(to_email: str, subject: str, html: str) -> bool:
 
 
 def send_welcome_email(to_email: str, full_name: str) -> bool:
-    login_url = f"{_site_url()}/login"
-    subject, html = build_welcome_email(full_name, login_url)
+    onboarding_url = f"{_site_url()}/onboarding/demo"
+    subject, html = build_welcome_email(full_name, onboarding_url)
     return send_email(to_email, subject, html)
 
 

@@ -146,6 +146,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const hostCameraStartPromiseRef = React.useRef<Promise<MediaStream | null> | null>(null);
   const hostCameraRequestIdRef = React.useRef(0);
   const actualParticipantCount = participants.length;
+  const humanParticipants = participants.filter((participant) => !participant.isHost && !participant.isAdmin);
+  const humanParticipantCount = humanParticipants.length;
   const stopHostCamera = React.useCallback(() => {
     hostCameraRequestIdRef.current += 1;
     hostCameraStartPromiseRef.current = null;
@@ -307,14 +309,22 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const videoStripParticipants = hostVideoParticipants.filter((participant) => participant.id !== featuredVideoParticipant.id);
   const sessionTitle = conversationData?.sessions?.title || "Untitled session";
   const facilitatorName = facilitatorDetails?.title || "AI Facilitator";
+  const hostInclusiveCurrentParticipantCount = Math.max((conversationData as any)?.current_participants ?? 0, 0);
+  const hostInclusiveMaxParticipantCount = Math.max(conversationData?.participants || 0, 0);
+  const inferredJoinedHumanParticipantCount = hostInclusiveCurrentParticipantCount > 0
+    ? Math.max(hostInclusiveCurrentParticipantCount - 1, 0)
+    : 0;
   const reconciledParticipantCount = Math.max(
-    actualParticipantCount,
+    humanParticipantCount,
     waitingRoomParticipantCount ?? 0,
-    (conversationData as any)?.current_participants ?? 0,
+    inferredJoinedHumanParticipantCount,
   );
+  const productFacingParticipantCapacity = hostInclusiveMaxParticipantCount > 0
+    ? Math.max(hostInclusiveMaxParticipantCount - 1, 0)
+    : 0;
   const maxParticipants = Math.max(
     waitingRoomCapacity ?? 0,
-    conversationData?.participants || 0,
+    productFacingParticipantCapacity,
     reconciledParticipantCount,
     1,
   );
@@ -326,7 +336,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     return joinToken ? `${baseUrl}&token=${encodeURIComponent(String(joinToken))}` : baseUrl;
   }, [currentConversationId, joinToken]);
   const truncatedInviteLink = sessionInviteLink.length > 54 ? `${sessionInviteLink.slice(0, 51)}…` : sessionInviteLink;
-  const waitingParticipants = participants.filter((participant) => !participant.isHost && !participant.isAdmin);
+  const waitingParticipants = humanParticipants;
   const participantRowsToShow = Math.max(1, Math.min(waitingParticipants.length || maxParticipants, 6));
   const participantListViewportHeight = waitingParticipants.length > 0
     ? Math.min(420, Math.max(84, participantRowsToShow * 72))

@@ -154,11 +154,24 @@ export function useSessionHostLogic() {
         isManagerSessionStarted
     );
 
+    // The conversations table stores participant capacity/counts as host-inclusive
+    // because database-side capacity enforcement counts the host row. Product-facing
+    // waiting-room metrics should only describe human attendee seats; the AI
+    // facilitator is never a seat, and the host should not consume an attendee slot.
+    const attendeeCountFromConversation = currentCount > 0 ? Math.max(currentCount - 1, 0) : 0;
+    const attendeeCapacityFromManager = maxCount > 0 ? Math.max(maxCount - 1, 0) : 0;
+    const attendeeCapacityFromConversation = (conversationData?.participants || 0) > 0
+        ? Math.max((conversationData?.participants || 0) - 1, 0)
+        : 0;
     const waitingRoomParticipantCount = Math.max(
-        currentCount || 0,
+        attendeeCountFromConversation,
         (participants || []).filter((participant) => !participant.isHost && !participant.isAdmin).length
     );
-    const waitingRoomCapacity = Math.max(maxCount || 0, conversationData?.participants || 0);
+    const waitingRoomCapacity = Math.max(
+        attendeeCapacityFromManager,
+        attendeeCapacityFromConversation,
+        waitingRoomParticipantCount
+    );
     const isWaitingRoomFull = Boolean(
         !effectiveIsSessionStarted &&
         waitingRoomCapacity > 0 &&

@@ -4,7 +4,7 @@
  * Page for the AIfacilitator application.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createLogger } from '@/utils/debugLogger';
 
 const log = createLogger('Checkout', 'plan');
@@ -18,6 +18,7 @@ import { BillingDetails } from './types';
 import { CheckoutContainer } from './CheckoutContainer';
 import { CheckoutLoadingState } from './CheckoutLoadingState';
 import { CheckoutErrorState } from './CheckoutErrorState';
+import { trackBeginCheckout } from '@/lib/tracking';
 
 const Checkout = () => {
   const [searchParams] = useSearchParams();
@@ -25,6 +26,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const trackedCheckoutKeyRef = useRef<string | null>(null);
   const [billingDetails, setBillingDetails] = useState<BillingDetails>({
     name: '',
     email: user?.email || '',
@@ -152,6 +154,16 @@ const Checkout = () => {
       navigate('/login?redirect=/checkout?plan=' + planId);
     }
   }, [user, planId, navigate, toast]);
+
+  useEffect(() => {
+    if (!plan || !user?.email) return;
+
+    const checkoutKey = `${plan.id}:${user.email}`;
+    if (trackedCheckoutKeyRef.current === checkoutKey) return;
+
+    trackedCheckoutKeyRef.current = checkoutKey;
+    trackBeginCheckout(plan.title, Number(plan.price), plan.currency || 'EUR', { email: user.email });
+  }, [plan, user?.email]);
 
   // Loading state
   if (planLoading) {

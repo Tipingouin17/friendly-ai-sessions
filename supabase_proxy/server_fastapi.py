@@ -4473,7 +4473,7 @@ async def admin_sync_marketing_analytics(request: Request):
         end_date = datetime.utcnow().date()
         start_date = end_date - timedelta(days=days - 1)
         results: List[Dict[str, Any]] = []
-        async with db_pool.acquire() as conn:
+        async with _pool.acquire() as conn:
             has_snapshots = await table_exists(conn, "marketing_daily_snapshots")
             has_sync_log = await table_exists(conn, "marketing_api_sync_log")
             if not has_snapshots or not has_sync_log:

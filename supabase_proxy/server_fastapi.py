@@ -21,7 +21,7 @@ import logging
 import sys
 from urllib.parse import quote
 import bcrypt as _bcrypt
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 # ============================================================
 # Structured logging setup
@@ -3846,6 +3846,9 @@ def _safe_int(value: Any) -> int:
 
 
 async def _upsert_marketing_snapshot(conn, row: Dict[str, Any]) -> None:
+    row_date = row.get("date")
+    if isinstance(row_date, str):
+        row_date = date.fromisoformat(row_date)
     await conn.execute(
         """
         INSERT INTO marketing_daily_snapshots (
@@ -3863,7 +3866,7 @@ async def _upsert_marketing_snapshot(conn, row: Dict[str, Any]) -> None:
             raw_payload = EXCLUDED.raw_payload,
             updated_at = NOW()
         """,
-        row["date"], row["channel"], row.get("account_id"), row.get("campaign_id"), row.get("campaign_name"),
+        row_date, row["channel"], row.get("account_id"), row.get("campaign_id"), row.get("campaign_name"),
         Decimal(str(row.get("spend_eur", 0))), _safe_int(row.get("impressions")), _safe_int(row.get("clicks")),
         _safe_int(row.get("sessions")), Decimal(str(row.get("platform_conversions", 0))), json.dumps(row.get("raw_payload", {})),
     )

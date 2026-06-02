@@ -1678,6 +1678,79 @@ async def run_startup_migrations() -> None:
             ADD COLUMN IF NOT EXISTS tts_lip_sync_enabled BOOLEAN NOT NULL DEFAULT TRUE,
             ADD COLUMN IF NOT EXISTS facilitation_analytics_enabled BOOLEAN NOT NULL DEFAULT TRUE;
         """,
+
+        # 2026-06-02: Marketing analytics reconciliation and durable first-touch attribution.
+        """
+        CREATE TABLE IF NOT EXISTS marketing_user_attribution (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL DEFAULT 'signup' CHECK (event_type IN ('visit', 'signup', 'checkout', 'purchase', 'lead')),
+            utm_source TEXT,
+            utm_medium TEXT,
+            utm_campaign TEXT,
+            utm_term TEXT,
+            utm_content TEXT,
+            gclid TEXT,
+            gbraid TEXT,
+            wbraid TEXT,
+            msclkid TEXT,
+            fbclid TEXT,
+            landing_page TEXT,
+            current_page TEXT,
+            referrer TEXT,
+            consent_analytics BOOLEAN,
+            consent_advertising BOOLEAN,
+            raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS marketing_user_attribution_user_idx
+            ON marketing_user_attribution(user_id, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS marketing_user_attribution_campaign_idx
+            ON marketing_user_attribution(utm_source, utm_medium, utm_campaign);
+        CREATE INDEX IF NOT EXISTS marketing_user_attribution_click_id_idx
+            ON marketing_user_attribution(gclid, msclkid);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS marketing_daily_snapshots (
+            id BIGSERIAL PRIMARY KEY,
+            date DATE NOT NULL,
+            channel TEXT NOT NULL CHECK (channel IN ('google_ads', 'microsoft_ads', 'ga4', 'organic', 'direct', 'referral', 'email', 'unknown')),
+            account_id TEXT,
+            campaign_id TEXT,
+            campaign_name TEXT,
+            spend_eur NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (spend_eur >= 0),
+            impressions INTEGER NOT NULL DEFAULT 0 CHECK (impressions >= 0),
+            clicks INTEGER NOT NULL DEFAULT 0 CHECK (clicks >= 0),
+            sessions INTEGER NOT NULL DEFAULT 0 CHECK (sessions >= 0),
+            platform_conversions NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (platform_conversions >= 0),
+            backend_signups INTEGER NOT NULL DEFAULT 0 CHECK (backend_signups >= 0),
+            backend_purchases INTEGER NOT NULL DEFAULT 0 CHECK (backend_purchases >= 0),
+            revenue_eur NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (revenue_eur >= 0),
+            raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (date, channel, account_id, campaign_id)
+        );
+        CREATE INDEX IF NOT EXISTS marketing_daily_snapshots_date_channel_idx
+            ON marketing_daily_snapshots(date DESC, channel);
+        CREATE INDEX IF NOT EXISTS marketing_daily_snapshots_campaign_idx
+            ON marketing_daily_snapshots(campaign_id, date DESC);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS marketing_api_sync_log (
+            id BIGSERIAL PRIMARY KEY,
+            source TEXT NOT NULL CHECK (source IN ('google_ads', 'microsoft_ads', 'ga4')),
+            status TEXT NOT NULL DEFAULT 'started' CHECK (status IN ('started', 'success', 'partial', 'failed', 'not_configured')),
+            started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            finished_at TIMESTAMPTZ,
+            rows_imported INTEGER NOT NULL DEFAULT 0 CHECK (rows_imported >= 0),
+            error_message TEXT,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+        );
+        CREATE INDEX IF NOT EXISTS marketing_api_sync_log_source_started_idx
+            ON marketing_api_sync_log(source, started_at DESC);
+        """,
     ]
 
     try:

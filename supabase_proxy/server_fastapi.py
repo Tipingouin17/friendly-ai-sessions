@@ -4474,8 +4474,24 @@ async def admin_sync_marketing_analytics(request: Request):
         start_date = end_date - timedelta(days=days - 1)
         results: List[Dict[str, Any]] = []
         async with _pool.acquire() as conn:
-            has_snapshots = await table_exists(conn, "marketing_daily_snapshots")
-            has_sync_log = await table_exists(conn, "marketing_api_sync_log")
+            has_snapshots = bool(await conn.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = $1
+                )
+                """,
+                "marketing_daily_snapshots",
+            ))
+            has_sync_log = bool(await conn.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = $1
+                )
+                """,
+                "marketing_api_sync_log",
+            ))
             if not has_snapshots or not has_sync_log:
                 raise HTTPException(503, "Marketing analytics tables are not available yet; wait for backend startup migrations and retry")
             for source in sources:

@@ -17,6 +17,11 @@ type GtagArguments = [GtagCommand, ...unknown[]];
 type DataLayerItem = GtagArguments | Record<string, unknown>;
 type UetConsentState = 'granted' | 'denied';
 
+export type GoogleAdsEnhancedConversionUserData = {
+  /** Plain email is accepted by Google tag and hashed by Google before matching. */
+  email?: string | null;
+};
+
 declare global {
   interface Window {
     dataLayer?: DataLayerItem[];
@@ -112,6 +117,33 @@ function sanitizeEventParameters(parameters: Record<string, unknown>): Record<st
   return Object.fromEntries(
     Object.entries(parameters).filter(([, value]) => value !== undefined && value !== null && value !== ''),
   );
+}
+
+function normalizeEmailForEnhancedConversions(email?: string | null): string | undefined {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) return undefined;
+
+  // Avoid sending malformed user-provided data to the Google tag.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return undefined;
+
+  return normalizedEmail;
+}
+
+function getEnhancedConversionUserData(
+  userData?: GoogleAdsEnhancedConversionUserData,
+): Record<string, string> | undefined {
+  const email = normalizeEmailForEnhancedConversions(userData?.email);
+
+  if (!email) return undefined;
+
+  return { email };
+}
+
+function setGoogleAdsEnhancedConversionUserData(userData?: GoogleAdsEnhancedConversionUserData): void {
+  const enhancedConversionUserData = getEnhancedConversionUserData(userData);
+  if (!enhancedConversionUserData || !window.gtag) return;
+
+  window.gtag('set', 'user_data', enhancedConversionUserData);
 }
 
 function pushDataLayerEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
@@ -260,12 +292,18 @@ function trackGa4Event(eventName: string, parameters: Record<string, unknown> = 
   }
 }
 
-function trackGoogleAdsConversion(label?: string, parameters: Record<string, unknown> = {}): void {
+function trackGoogleAdsConversion(
+  label?: string,
+  parameters: Record<string, unknown> = {},
+  userData?: GoogleAdsEnhancedConversionUserData,
+): void {
   const consent = getStoredConsent();
   if (!consent?.advertising) return;
   initializeTracking();
 
   if (!hasValue(config.googleAdsId) || !hasValue(label) || !window.gtag) return;
+
+  setGoogleAdsEnhancedConversionUserData(userData);
 
   window.gtag('event', 'conversion', {
     send_to: `${config.googleAdsId}/${label}`,
@@ -293,7 +331,7 @@ function createClientEventId(prefix: string): string {
   return `${prefix}-${randomValue}`;
 }
 
-export function trackSignup(method = 'email'): void {
+export function trackSignup(method = 'email', userData?: GoogleAdsEnhancedConversionUserData): void {
   const parameters = {
     method,
     event_category: 'acquisition',
@@ -303,7 +341,7 @@ export function trackSignup(method = 'email'): void {
 
   trackGa4Event('sign_up', parameters);
   trackGa4Event('generate_lead', parameters);
-  trackGoogleAdsConversion(config.googleAdsSignupConversionLabel, parameters);
+  trackGoogleAdsConversion(config.googleAdsSignupConversionLabel, parameters, userData);
   trackMicrosoftEvent('sign_up', parameters);
   trackMicrosoftEvent('generate_lead', parameters);
 }
@@ -442,7 +480,12 @@ export function trackPricingView(source = 'pricing_page'): void {
   trackMicrosoftEvent('view_pricing', parameters);
 }
 
-export function trackBeginCheckout(planName?: string, value?: number, currency = 'EUR'): void {
+export function trackBeginCheckout(
+  planName?: string,
+  value?: number,
+  currency = 'EUR',
+  userData?: GoogleAdsEnhancedConversionUserData,
+): void {
   const parameters = {
     event_category: 'monetization',
     event_label: planName || 'pricing_checkout',
@@ -451,11 +494,16 @@ export function trackBeginCheckout(planName?: string, value?: number, currency =
   };
 
   trackGa4Event('begin_checkout', parameters);
-  trackGoogleAdsConversion(config.googleAdsBeginCheckoutConversionLabel, parameters);
+  trackGoogleAdsConversion(config.googleAdsBeginCheckoutConversionLabel, parameters, userData);
   trackMicrosoftEvent('begin_checkout', parameters);
 }
 
-export function trackPurchase(transactionId: string, value?: number, currency = 'EUR'): void {
+export function trackPurchase(
+  transactionId: string,
+  value?: number,
+  currency = 'EUR',
+  userData?: GoogleAdsEnhancedConversionUserData,
+): void {
   const parameters = {
     transaction_id: transactionId,
     currency,
@@ -463,6 +511,6 @@ export function trackPurchase(transactionId: string, value?: number, currency = 
   };
 
   trackGa4Event('purchase', parameters);
-  trackGoogleAdsConversion(config.googleAdsPurchaseConversionLabel, parameters);
+  trackGoogleAdsConversion(config.googleAdsPurchaseConversionLabel, parameters, userData);
   trackMicrosoftEvent('purchase', parameters);
 }

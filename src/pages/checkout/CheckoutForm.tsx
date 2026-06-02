@@ -96,7 +96,9 @@ export const CheckoutForm = ({
       if (import.meta.env.DEV || !stripe || !elements || !plan.stripe_plan_id) {
         
         await updateUserSubscription(user.id, plan.id);
-        trackPurchase(`dev-${plan.id}-${Date.now()}`, Number(plan.price), plan.currency || 'EUR');
+        trackPurchase(`dev-${plan.id}-${Date.now()}`, Number(plan.price), plan.currency || 'EUR', {
+          email: billingDetails.email || user.email,
+        });
         
         toast({
           title: "Success",
@@ -147,7 +149,9 @@ export const CheckoutForm = ({
         plan.id,
         paymentIntent?.id
       );
-      trackPurchase(paymentIntent?.id || subscriptionId, Number(plan.price), plan.currency || 'EUR');
+      trackPurchase(paymentIntent?.id || subscriptionId, Number(plan.price), plan.currency || 'EUR', {
+        email: billingDetails.email || user.email,
+      });
 
       toast({
         title: "Success",

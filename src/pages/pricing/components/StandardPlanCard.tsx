@@ -7,7 +7,6 @@ import { Check, Users, Calendar, UserPlus, MessageSquare, Wand2, Save, BarChart3
 import { Button } from "@/components/ui/button";
 import { Plan } from "../types";
 import { useNavigate } from "react-router-dom";
-import { trackBeginCheckout } from "@/lib/tracking";
 
 interface StandardPlanCardProps {
   plan: Plan;
@@ -26,7 +25,6 @@ export const StandardPlanCard = ({
     if (isCurrentPlan) {
       navigate('/profile');
     } else {
-      trackBeginCheckout(plan.title, Number(plan.price), plan.currency || 'EUR');
       navigate(`/checkout?plan=${plan.id}`);
     }
   };

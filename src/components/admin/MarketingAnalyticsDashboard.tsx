@@ -5,7 +5,8 @@
  * business outcomes. The dashboard deliberately labels unavailable API connectors
  * as not configured instead of fabricating marketing data.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
     Activity,
     AlertTriangle,
@@ -110,6 +111,20 @@ interface MarketingAnalyticsData {
     measurement_health: MeasurementHealth;
 }
 
+interface MarketingSyncResult {
+    source: string;
+    status: string;
+    rows_imported: number;
+    error?: string;
+}
+
+interface MarketingSyncResponse {
+    status: string;
+    start_date: string;
+    end_date: string;
+    results: MarketingSyncResult[];
+}
+
 function getAdminAccessToken(): string {
     try {
         const session = JSON.parse(localStorage.getItem("mf_session") || "null");
@@ -191,12 +206,14 @@ const EmptyConnectorState = () => (
 );
 
 export const MarketingAnalyticsDashboard = () => {
+    const [syncResult, setSyncResult] = useState<MarketingSyncResponse | null>(null);
+    const apiUrl = (import.meta.env as Record<string, string>).VITE_API_URL ||
+        "https://friendly-ai-sessions-production.up.railway.app";
+
     const { data, isLoading, error, refetch, isFetching } = useQuery<MarketingAnalyticsData>({
         queryKey: ["admin-marketing-analytics"],
         queryFn: async () => {
             const token = getAdminAccessToken();
-            const apiUrl = (import.meta.env as Record<string, string>).VITE_API_URL ||
-                "https://friendly-ai-sessions-production.up.railway.app";
             const res = await fetch(`${apiUrl}/admin/marketing-analytics`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -204,6 +221,27 @@ export const MarketingAnalyticsDashboard = () => {
             return res.json();
         },
         staleTime: 60_000,
+    });
+
+    const syncMutation = useMutation<MarketingSyncResponse>({
+        mutationFn: async () => {
+            const token = getAdminAccessToken();
+            const res = await fetch(`${apiUrl}/admin/marketing-analytics/sync`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ sources: ["google_ads", "microsoft_ads", "ga4"], days: 30 }),
+            });
+            const body = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`);
+            return body;
+        },
+        onSuccess: (result) => {
+            setSyncResult(result);
+            refetch();
+        },
     });
 
     if (isLoading) return (
@@ -232,17 +270,55 @@ export const MarketingAnalyticsDashboard = () => {
                         Reconcile paid-media platforms, GA4 website behavior, and backend-confirmed business outcomes without forcing incompatible numbers to match.
                     </p>
                 </div>
-                <button
-                    onClick={() => refetch()}
-                    disabled={isFetching}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-60"
-                >
-                    <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-                    Refresh
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                        Sync live APIs
+                    </button>
+                    <button
+                        onClick={() => refetch()}
+                        disabled={isFetching}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-60"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {!connectorConfigured && <EmptyConnectorState />}
+
+            {(syncResult || syncMutation.error) && (
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Clock className="h-5 w-5 text-indigo-500" />
+                        <h3 className="text-lg font-bold text-gray-900">Live API sync result</h3>
+                    </div>
+                    {syncMutation.error ? (
+                        <p className="text-sm text-red-600">{syncMutation.error instanceof Error ? syncMutation.error.message : "Live sync failed"}</p>
+                    ) : syncResult && (
+                        <div className="space-y-2">
+                            <p className="text-sm text-gray-600">Imported range: {syncResult.start_date} to {syncResult.end_date}. Overall status: <span className="font-semibold">{syncResult.status}</span>.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {syncResult.results.map((result) => (
+                                    <div key={result.source} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-sm font-semibold text-gray-900">{result.source.replace(/_/g, " ")}</span>
+                                            <StatusBadge status={result.status} />
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Rows imported: {fmt.num(result.rows_imported)}</p>
+                                        {result.error && <p className="text-xs text-red-600 mt-1 line-clamp-2">{result.error}</p>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <KpiCard title="Paid Spend" value={fmt.eur(summary.spend_eur)} sub="Google Ads + Microsoft Ads" icon={DollarSign} color="bg-emerald-500" />

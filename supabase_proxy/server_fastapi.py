@@ -21,7 +21,7 @@ import logging
 import sys
 from urllib.parse import quote
 import bcrypt as _bcrypt
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ============================================================
 # Structured logging setup
@@ -58,6 +58,7 @@ from typing import Any, Dict, List, Optional
 
 import jwt
 import asyncpg
+import requests
 from contextlib import asynccontextmanager
 import stripe as stripe_lib
 from fastapi import (
@@ -3749,6 +3750,325 @@ async def admin_cost_analytics(request: Request):
 # ============================================================
 # Admin marketing analytics endpoint
 # ============================================================
+
+# ============================================================
+# Live marketing API sync helpers
+# ============================================================
+
+MARKETING_SYNC_SOURCES = ("google_ads", "microsoft_ads", "ga4")
+
+
+def _env_present(name: str) -> bool:
+    return bool((os.environ.get(name) or "").strip())
+
+
+def get_marketing_sync_config_status() -> Dict[str, str]:
+    """Return provider configuration status without exposing secret values."""
+    google_required = [
+        "GOOGLE_ADS_DEVELOPER_TOKEN",
+        "GOOGLE_ADS_CLIENT_ID",
+        "GOOGLE_ADS_CLIENT_SECRET",
+        "GOOGLE_ADS_REFRESH_TOKEN",
+        "GOOGLE_ADS_CUSTOMER_ID",
+    ]
+    ga4_oauth_required = [
+        "GA4_PROPERTY_ID",
+        "GA4_CLIENT_ID",
+        "GA4_CLIENT_SECRET",
+        "GA4_REFRESH_TOKEN",
+    ]
+    microsoft_required = [
+        "MICROSOFT_ADS_DEVELOPER_TOKEN",
+        "MICROSOFT_ADS_CLIENT_ID",
+        "MICROSOFT_ADS_CLIENT_SECRET",
+        "MICROSOFT_ADS_REFRESH_TOKEN",
+        "MICROSOFT_ADS_ACCOUNT_ID",
+        "MICROSOFT_ADS_CUSTOMER_ID",
+    ]
+    return {
+        "google_ads": "configured" if all(_env_present(v) for v in google_required) else "not_configured",
+        "ga4": "configured" if all(_env_present(v) for v in ga4_oauth_required) else "not_configured",
+        "microsoft_ads": "configured" if all(_env_present(v) for v in microsoft_required) else "not_configured",
+    }
+
+
+def _post_form(url: str, data: Dict[str, str]) -> Dict[str, Any]:
+    response = requests.post(url, data=data, timeout=30)
+    if response.status_code >= 400:
+        raise RuntimeError(f"OAuth request failed with HTTP {response.status_code}: {response.text[:500]}")
+    return response.json()
+
+
+def _google_oauth_access_token() -> str:
+    payload = {
+        "client_id": os.environ["GOOGLE_ADS_CLIENT_ID"],
+        "client_secret": os.environ["GOOGLE_ADS_CLIENT_SECRET"],
+        "refresh_token": os.environ["GOOGLE_ADS_REFRESH_TOKEN"],
+        "grant_type": "refresh_token",
+    }
+    return str(_post_form("https://oauth2.googleapis.com/token", payload)["access_token"])
+
+
+def _ga4_oauth_access_token() -> str:
+    payload = {
+        "client_id": os.environ["GA4_CLIENT_ID"],
+        "client_secret": os.environ["GA4_CLIENT_SECRET"],
+        "refresh_token": os.environ["GA4_REFRESH_TOKEN"],
+        "grant_type": "refresh_token",
+    }
+    return str(_post_form("https://oauth2.googleapis.com/token", payload)["access_token"])
+
+
+def _microsoft_oauth_access_token() -> str:
+    tenant = (os.environ.get("MICROSOFT_ADS_TENANT_ID") or "common").strip()
+    payload = {
+        "client_id": os.environ["MICROSOFT_ADS_CLIENT_ID"],
+        "client_secret": os.environ["MICROSOFT_ADS_CLIENT_SECRET"],
+        "refresh_token": os.environ["MICROSOFT_ADS_REFRESH_TOKEN"],
+        "grant_type": "refresh_token",
+        "scope": "https://ads.microsoft.com/msads.manage offline_access",
+    }
+    return str(_post_form(f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token", payload)["access_token"])
+
+
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except Exception:
+        return 0.0
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(float(value or 0))
+    except Exception:
+        return 0
+
+
+async def _upsert_marketing_snapshot(conn, row: Dict[str, Any]) -> None:
+    await conn.execute(
+        """
+        INSERT INTO marketing_daily_snapshots (
+            date, channel, account_id, campaign_id, campaign_name,
+            spend_eur, impressions, clicks, sessions, platform_conversions, raw_payload, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,NOW())
+        ON CONFLICT (date, channel, account_id, campaign_id)
+        DO UPDATE SET
+            campaign_name = EXCLUDED.campaign_name,
+            spend_eur = EXCLUDED.spend_eur,
+            impressions = EXCLUDED.impressions,
+            clicks = EXCLUDED.clicks,
+            sessions = EXCLUDED.sessions,
+            platform_conversions = EXCLUDED.platform_conversions,
+            raw_payload = EXCLUDED.raw_payload,
+            updated_at = NOW()
+        """,
+        row["date"], row["channel"], row.get("account_id"), row.get("campaign_id"), row.get("campaign_name"),
+        Decimal(str(row.get("spend_eur", 0))), _safe_int(row.get("impressions")), _safe_int(row.get("clicks")),
+        _safe_int(row.get("sessions")), Decimal(str(row.get("platform_conversions", 0))), json.dumps(row.get("raw_payload", {})),
+    )
+
+
+def _fetch_google_ads_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    token = _google_oauth_access_token()
+    customer_id = os.environ["GOOGLE_ADS_CUSTOMER_ID"].replace("-", "")
+    api_version = os.environ.get("GOOGLE_ADS_API_VERSION", "v18")
+    query = f"""
+        SELECT segments.date, campaign.id, campaign.name, metrics.cost_micros,
+               metrics.impressions, metrics.clicks, metrics.conversions
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY segments.date
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "developer-token": os.environ["GOOGLE_ADS_DEVELOPER_TOKEN"],
+        "Content-Type": "application/json",
+    }
+    login_customer_id = (os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID") or "").replace("-", "").strip()
+    if login_customer_id:
+        headers["login-customer-id"] = login_customer_id
+    response = requests.post(
+        f"https://googleads.googleapis.com/{api_version}/customers/{customer_id}/googleAds:searchStream",
+        headers=headers,
+        json={"query": " ".join(query.split())},
+        timeout=60,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"Google Ads API failed with HTTP {response.status_code}: {response.text[:800]}")
+    rows: List[Dict[str, Any]] = []
+    for batch in response.json():
+        for item in batch.get("results", []):
+            metrics = item.get("metrics", {})
+            campaign = item.get("campaign", {})
+            segments = item.get("segments", {})
+            rows.append({
+                "date": segments.get("date"),
+                "channel": "google_ads",
+                "account_id": customer_id,
+                "campaign_id": str(campaign.get("id") or "unknown"),
+                "campaign_name": campaign.get("name") or "Unknown campaign",
+                "spend_eur": round(_safe_float(metrics.get("costMicros")) / 1_000_000, 2),
+                "impressions": _safe_int(metrics.get("impressions")),
+                "clicks": _safe_int(metrics.get("clicks")),
+                "sessions": 0,
+                "platform_conversions": _safe_float(metrics.get("conversions")),
+                "raw_payload": item,
+            })
+    return rows
+
+
+def _fetch_ga4_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    token = _ga4_oauth_access_token()
+    property_id = os.environ["GA4_PROPERTY_ID"]
+    body = {
+        "dateRanges": [{"startDate": start_date, "endDate": end_date}],
+        "dimensions": [{"name": "date"}, {"name": "sessionSourceMedium"}, {"name": "sessionCampaignName"}],
+        "metrics": [{"name": "sessions"}, {"name": "conversions"}],
+        "dimensionFilter": {
+            "orGroup": {
+                "expressions": [
+                    {"filter": {"fieldName": "sessionSourceMedium", "stringFilter": {"matchType": "CONTAINS", "value": "google"}}},
+                    {"filter": {"fieldName": "sessionSourceMedium", "stringFilter": {"matchType": "CONTAINS", "value": "microsoft"}}},
+                    {"filter": {"fieldName": "sessionSourceMedium", "stringFilter": {"matchType": "CONTAINS", "value": "bing"}}},
+                    {"filter": {"fieldName": "sessionSourceMedium", "stringFilter": {"matchType": "CONTAINS", "value": "cpc"}}},
+                    {"filter": {"fieldName": "sessionSourceMedium", "stringFilter": {"matchType": "CONTAINS", "value": "paid"}}},
+                ]
+            }
+        },
+        "limit": 10000,
+    }
+    response = requests.post(
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{property_id}:runReport",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=body,
+        timeout=60,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"GA4 Data API failed with HTTP {response.status_code}: {response.text[:800]}")
+    rows: List[Dict[str, Any]] = []
+    for item in response.json().get("rows", []):
+        dims = [v.get("value", "") for v in item.get("dimensionValues", [])]
+        metrics = [v.get("value", "0") for v in item.get("metricValues", [])]
+        yyyymmdd = dims[0] if dims else ""
+        date_value = f"{yyyymmdd[0:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:8]}" if len(yyyymmdd) == 8 else yyyymmdd
+        source_medium = (dims[1] if len(dims) > 1 else "").lower()
+        channel = "microsoft_ads" if "microsoft" in source_medium or "bing" in source_medium else "google_ads" if "google" in source_medium else "ga4"
+        rows.append({
+            "date": date_value,
+            "channel": channel,
+            "account_id": property_id,
+            "campaign_id": f"ga4:{dims[1] if len(dims) > 1 else 'unknown'}:{dims[2] if len(dims) > 2 else 'unknown'}",
+            "campaign_name": dims[2] if len(dims) > 2 else "GA4 paid traffic",
+            "spend_eur": 0,
+            "impressions": 0,
+            "clicks": 0,
+            "sessions": _safe_int(metrics[0] if metrics else 0),
+            "platform_conversions": _safe_float(metrics[1] if len(metrics) > 1 else 0),
+            "raw_payload": item,
+        })
+    return rows
+
+
+def _fetch_microsoft_ads_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Fetch Microsoft Ads reporting rows if REST reporting is enabled for this account.
+
+    Microsoft Advertising still commonly relies on SOAP report jobs. This REST adapter uses
+    the currently documented reporting endpoint pattern when available, and fails cleanly into
+    sync-log diagnostics when the account requires a SOAP-specific integration.
+    """
+    token = _microsoft_oauth_access_token()
+    account_id = os.environ["MICROSOFT_ADS_ACCOUNT_ID"]
+    customer_id = os.environ["MICROSOFT_ADS_CUSTOMER_ID"]
+    endpoint = os.environ.get("MICROSOFT_ADS_REPORTING_ENDPOINT", "https://reports.api.bingads.microsoft.com/Api/Advertiser/Reporting/v13/GenerateReportSubmit")
+    body = {
+        "ReportRequest": {
+            "Format": "Json",
+            "ReportName": "AIFacilitator campaign performance",
+            "ReturnOnlyCompleteData": False,
+            "Aggregation": "Daily",
+            "Scope": {"AccountIds": [account_id]},
+            "Time": {"CustomDateRangeStart": start_date, "CustomDateRangeEnd": end_date},
+            "Columns": ["TimePeriod", "CampaignId", "CampaignName", "Spend", "Impressions", "Clicks", "Conversions"],
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "DeveloperToken": os.environ["MICROSOFT_ADS_DEVELOPER_TOKEN"],
+        "CustomerId": customer_id,
+        "CustomerAccountId": account_id,
+        "Content-Type": "application/json",
+    }
+    response = requests.post(endpoint, headers=headers, json=body, timeout=60)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Microsoft Advertising reporting request failed with HTTP {response.status_code}: {response.text[:800]}")
+    payload = response.json()
+    report_rows = payload.get("Rows") or payload.get("rows") or []
+    rows: List[Dict[str, Any]] = []
+    for item in report_rows:
+        rows.append({
+            "date": item.get("TimePeriod") or item.get("timePeriod") or item.get("date"),
+            "channel": "microsoft_ads",
+            "account_id": account_id,
+            "campaign_id": str(item.get("CampaignId") or item.get("campaignId") or "unknown"),
+            "campaign_name": item.get("CampaignName") or item.get("campaignName") or "Unknown campaign",
+            "spend_eur": _safe_float(item.get("Spend") or item.get("spend")),
+            "impressions": _safe_int(item.get("Impressions") or item.get("impressions")),
+            "clicks": _safe_int(item.get("Clicks") or item.get("clicks")),
+            "sessions": 0,
+            "platform_conversions": _safe_float(item.get("Conversions") or item.get("conversions")),
+            "raw_payload": item,
+        })
+    return rows
+
+
+async def run_marketing_provider_sync(conn, source: str, start_date: str, end_date: str) -> Dict[str, Any]:
+    if source not in MARKETING_SYNC_SOURCES:
+        raise HTTPException(400, f"Unsupported marketing sync source: {source}")
+    status_map = get_marketing_sync_config_status()
+    started_at = datetime.utcnow()
+    if status_map.get(source) != "configured":
+        await conn.execute(
+            """INSERT INTO marketing_api_sync_log (source, status, started_at, finished_at, rows_imported, error_message, metadata)
+               VALUES ($1, 'not_configured', $2, NOW(), 0, $3, $4::jsonb)""",
+            source, started_at, "Required backend environment variables are missing", json.dumps({"start_date": start_date, "end_date": end_date}),
+        )
+        return {"source": source, "status": "not_configured", "rows_imported": 0, "error": "Required backend environment variables are missing"}
+
+    await conn.execute(
+        """INSERT INTO marketing_api_sync_log (source, status, started_at, metadata)
+           VALUES ($1, 'started', $2, $3::jsonb)""",
+        source, started_at, json.dumps({"start_date": start_date, "end_date": end_date}),
+    )
+    try:
+        if source == "google_ads":
+            rows = await asyncio.to_thread(_fetch_google_ads_rows, start_date, end_date)
+        elif source == "ga4":
+            rows = await asyncio.to_thread(_fetch_ga4_rows, start_date, end_date)
+        else:
+            rows = await asyncio.to_thread(_fetch_microsoft_ads_rows, start_date, end_date)
+        imported = 0
+        for row in rows:
+            if not row.get("date"):
+                continue
+            await _upsert_marketing_snapshot(conn, row)
+            imported += 1
+        await conn.execute(
+            """UPDATE marketing_api_sync_log
+               SET status='success', finished_at=NOW(), rows_imported=$1, metadata=$2::jsonb
+               WHERE source=$3 AND started_at=$4""",
+            imported, json.dumps({"start_date": start_date, "end_date": end_date}), source, started_at,
+        )
+        return {"source": source, "status": "success", "rows_imported": imported}
+    except Exception as exc:
+        await conn.execute(
+            """UPDATE marketing_api_sync_log
+               SET status='failed', finished_at=NOW(), rows_imported=0, error_message=$1, metadata=$2::jsonb
+               WHERE source=$3 AND started_at=$4""",
+            str(exc)[:1000], json.dumps({"start_date": start_date, "end_date": end_date}), source, started_at,
+        )
+        return {"source": source, "status": "failed", "rows_imported": 0, "error": str(exc)}
+
 @app.get("/admin/marketing-analytics")
 async def admin_marketing_analytics(
     request: Request,
@@ -4034,7 +4354,8 @@ async def admin_marketing_analytics(
             timeseries = [time_map[k] for k in sorted(time_map.keys())]
 
             latest_sync = None
-            sync_sources = {"google_ads": "not_configured", "microsoft_ads": "not_configured", "ga4": "not_configured"}
+            config_sources = get_marketing_sync_config_status()
+            sync_sources = {"google_ads": config_sources["google_ads"], "microsoft_ads": config_sources["microsoft_ads"], "ga4": config_sources["ga4"]}
             if has_sync_log:
                 for r in await conn.fetch("""
                     SELECT DISTINCT ON (source) source, status, finished_at
@@ -4126,6 +4447,41 @@ async def admin_marketing_analytics(
                 "analytics_consent_rate_pct": None,
             },
         }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+
+@app.post("/admin/marketing-analytics/sync")
+async def admin_sync_marketing_analytics(request: Request):
+    """Trigger a live marketing API import for configured providers.
+
+    This endpoint is admin-only and non-destructive: it upserts daily reporting snapshots
+    and records provider errors in marketing_api_sync_log for dashboard visibility.
+    """
+    try:
+        caller = get_current_user(request)
+        if not caller or caller.get("role") != "admin":
+            raise HTTPException(403, "Admin access required")
+        payload = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        sources = payload.get("sources") or list(MARKETING_SYNC_SOURCES)
+        if isinstance(sources, str):
+            sources = [sources]
+        days = max(1, min(int(payload.get("days", 30)), 90))
+        end_date = datetime.utcnow().date()
+        start_date = end_date - timedelta(days=days - 1)
+        results: List[Dict[str, Any]] = []
+        async with db_pool.acquire() as conn:
+            has_snapshots = await table_exists(conn, "marketing_daily_snapshots")
+            has_sync_log = await table_exists(conn, "marketing_api_sync_log")
+            if not has_snapshots or not has_sync_log:
+                raise HTTPException(503, "Marketing analytics tables are not available yet; wait for backend startup migrations and retry")
+            for source in sources:
+                results.append(await run_marketing_provider_sync(conn, str(source), start_date.isoformat(), end_date.isoformat()))
+        status = "success" if all(r.get("status") == "success" for r in results) else "partial"
+        return {"status": status, "start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "results": results}
     except HTTPException:
         raise
     except Exception as e:

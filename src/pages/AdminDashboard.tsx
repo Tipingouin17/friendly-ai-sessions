@@ -5,7 +5,7 @@
 import { useState } from "react";
 import {
     Shield, Settings, Users, FileText, BarChart3, TrendingUp, DollarSign,
-    Bell, MessageSquare, ArrowLeft, Bot, Activity, ChevronRight, Menu, X, Wrench,
+    Bell, MessageSquare, ArrowLeft, Bot, Activity, ChevronRight, Menu, X, Wrench, MousePointerClick,
 } from "lucide-react";
 import { PromptManagement } from "@/components/admin/PromptManagement";
 import { PlanManagement } from "@/components/admin/PlanManagement";
@@ -18,6 +18,7 @@ import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { FacilitationAnalyticsDashboard } from "@/components/admin/FacilitationAnalyticsDashboard";
 import { RevenueDashboard } from "@/components/admin/RevenueDashboard";
 import { CostRevenueDashboard } from "@/components/admin/CostRevenueDashboard";
+import { MarketingAnalyticsDashboard } from "@/components/admin/MarketingAnalyticsDashboard";
 import { AlertsMonitoring } from "@/components/admin/AlertsMonitoring";
 import { CommunicationCenter } from "@/components/admin/CommunicationCenter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
             { id: "facilitation-analytics", label: "Facilitation AI", icon: Activity, description: "Speech, avatar & process analytics" },
             { id: "revenue", label: "Revenue", icon: DollarSign, description: "Subscriptions & billing" },
             { id: "costs", label: "Cost & Margin", icon: BarChart3, description: "LLM costs, margins & session economics" },
+            { id: "marketing", label: "Marketing", icon: MousePointerClick, description: "Paid acquisition & attribution" },
             { id: "alerts", label: "Alerts", icon: Bell, description: "System & business alerts" },
         ],
     },
@@ -70,6 +72,7 @@ const CONTENT_MAP: Record<string, React.ReactNode> = {
     "facilitation-analytics": <FacilitationAnalyticsDashboard />,
     revenue: <RevenueDashboard />,
     costs: <CostRevenueDashboard />,
+    marketing: <MarketingAnalyticsDashboard />,
     alerts: <AlertsMonitoring />,
     users: <UserManagement />,
     facilitators: <FacilitatorManagement />,
@@ -86,6 +89,7 @@ const LABEL_MAP: Record<string, string> = {
     "facilitation-analytics": "Facilitation AI",
     revenue: "Revenue",
     costs: "Cost & Margin",
+    marketing: "Marketing",
     alerts: "Alerts",
     users: "Users",
     facilitators: "Facilitators",

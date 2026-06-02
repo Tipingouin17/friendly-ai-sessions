@@ -2528,6 +2528,9 @@ async def auth_signup(request: Request):
         or top_meta.get("full_name") or top_meta.get("name")
         or ""
     )
+    marketing_attribution = top_meta.get("marketing_attribution") or options_meta.get("marketing_attribution") or {}
+    if not isinstance(marketing_attribution, dict):
+        marketing_attribution = {}
 
     user_id = str(uuid.uuid4())
     pw_hash = _hash_password(password)  # bcrypt cost 12
@@ -2577,6 +2580,45 @@ async def auth_signup(request: Request):
                 "VALUES ($1, $2, $3, 'free', $4, FALSE, $5, 'free', NOW(), NOW())",
                 user_id, email, full_name or None, pw_hash, free_plan_id,
             )
+            marketing_table_exists = await conn.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'marketing_user_attribution'
+                )
+                """
+            )
+            if marketing_table_exists and marketing_attribution:
+                await conn.execute(
+                    """
+                    INSERT INTO marketing_user_attribution (
+                        user_id, event_type, utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+                        gclid, gbraid, wbraid, msclkid, fbclid, landing_page, current_page, referrer,
+                        consent_analytics, consent_advertising, raw_payload, occurred_at
+                    ) VALUES (
+                        $1::uuid, 'signup', $2, $3, $4, $5, $6,
+                        $7, $8, $9, $10, $11, $12, $13, $14,
+                        $15, $16, $17::jsonb, NOW()
+                    )
+                    """,
+                    user_id,
+                    marketing_attribution.get("utm_source"),
+                    marketing_attribution.get("utm_medium"),
+                    marketing_attribution.get("utm_campaign"),
+                    marketing_attribution.get("utm_term"),
+                    marketing_attribution.get("utm_content"),
+                    marketing_attribution.get("gclid"),
+                    marketing_attribution.get("gbraid"),
+                    marketing_attribution.get("wbraid"),
+                    marketing_attribution.get("msclkid"),
+                    marketing_attribution.get("fbclid"),
+                    marketing_attribution.get("landing_page"),
+                    marketing_attribution.get("current_page"),
+                    marketing_attribution.get("referrer"),
+                    marketing_attribution.get("consent_analytics"),
+                    marketing_attribution.get("consent_advertising"),
+                    json.dumps(marketing_attribution),
+                )
             # Generate a 24-hour email verification token and store it
             verification_token = str(uuid.uuid4())
             await conn.execute(
@@ -3626,6 +3668,393 @@ async def admin_cost_analytics(request: Request):
             "subscriber_growth": subscriber_growth,
             "mrr_projection": mrr_projection,
         }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+
+# ============================================================
+# Admin marketing analytics endpoint
+# ============================================================
+@app.get("/admin/marketing-analytics")
+async def admin_marketing_analytics(
+    request: Request,
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    granularity: str = Query("day"),
+):
+    """Return normalized marketing analytics for the admin panel.
+
+    This endpoint intentionally returns a stable reconciliation model even before
+    external Google Ads, Microsoft Advertising, and GA4 credentials are configured.
+    Backend-confirmed signups and paid users are derived from local product tables;
+    ad-platform and GA4 sections expose safe zero/not_configured states until sync
+    tables or API connectors are added.
+    """
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    from datetime import date, timedelta
+
+    allowed_granularities = {"day", "week", "month"}
+    if granularity not in allowed_granularities:
+        raise HTTPException(400, f"granularity must be one of {', '.join(sorted(allowed_granularities))}")
+
+    def parse_iso_date(raw: Optional[str], fallback: date) -> date:
+        if not raw:
+            return fallback
+        try:
+            return date.fromisoformat(raw[:10])
+        except Exception:
+            raise HTTPException(400, f"Invalid date: {raw}. Expected YYYY-MM-DD")
+
+    today = date.today()
+    end = parse_iso_date(end_date, today)
+    start = parse_iso_date(start_date, end - timedelta(days=29))
+    if start > end:
+        raise HTTPException(400, "start_date must be before or equal to end_date")
+    if (end - start).days > 370:
+        raise HTTPException(400, "Date range cannot exceed 370 days")
+
+    start_ts = datetime.combine(start, datetime.min.time())
+    end_exclusive_ts = datetime.combine(end + timedelta(days=1), datetime.min.time())
+
+    def to_float(value: Any) -> float:
+        if value is None:
+            return 0.0
+        if isinstance(value, Decimal):
+            return float(value)
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+
+    def to_int(value: Any) -> int:
+        if value is None:
+            return 0
+        try:
+            return int(value)
+        except Exception:
+            return 0
+
+    def pct_variance(platform_value: float, backend_value: float) -> Optional[float]:
+        if platform_value == 0 and backend_value == 0:
+            return None
+        if backend_value == 0:
+            return 100.0 if platform_value > 0 else None
+        return round(((platform_value - backend_value) / backend_value) * 100, 1)
+
+    def status_from_variance(variance: Optional[float], configured: bool) -> str:
+        if not configured:
+            return "not_configured"
+        if variance is None or abs(variance) <= 20:
+            return "ok"
+        if abs(variance) <= 50:
+            return "watch"
+        return "action_needed"
+
+    def bucket_expr(column_name: str) -> str:
+        if granularity == "month":
+            return f"TO_CHAR(DATE_TRUNC('month', {column_name}), 'YYYY-MM')"
+        if granularity == "week":
+            return f"TO_CHAR(DATE_TRUNC('week', {column_name}), 'IYYY-IW')"
+        return f"TO_CHAR({column_name}::date, 'YYYY-MM-DD')"
+
+    async def table_exists(conn: asyncpg.Connection, table_name: str) -> bool:
+        return bool(await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )
+            """,
+            table_name,
+        ))
+
+    async def column_exists(conn: asyncpg.Connection, table_name: str, column_name: str) -> bool:
+        return bool(await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+            )
+            """,
+            table_name,
+            column_name,
+        ))
+
+    try:
+        async with _pool.acquire() as conn:
+            has_snapshots = await table_exists(conn, "marketing_daily_snapshots")
+            has_sync_log = await table_exists(conn, "marketing_api_sync_log")
+            has_user_attr = await table_exists(conn, "marketing_user_attribution")
+            profiles_has_plan = await column_exists(conn, "profiles", "current_plan_id")
+            profiles_has_created = await column_exists(conn, "profiles", "created_at")
+            profiles_has_plan_upgraded = await column_exists(conn, "profiles", "plan_upgraded_at")
+
+            paid_plan_subquery = """
+                SELECT id FROM plans
+                WHERE LOWER(COALESCE(plan_type, '')) = 'free'
+                   OR LOWER(COALESCE(title, '')) = 'free'
+                   OR id = 1
+                ORDER BY CASE
+                  WHEN LOWER(COALESCE(plan_type, '')) = 'free' THEN 0
+                  WHEN LOWER(COALESCE(title, '')) = 'free' THEN 1
+                  WHEN id = 1 THEN 2
+                  ELSE 3
+                END
+                LIMIT 1
+            """
+
+            signups_total = 0
+            purchases_total = 0
+            if profiles_has_created:
+                signups_total = to_int(await conn.fetchval(
+                    "SELECT COUNT(*) FROM profiles WHERE created_at >= $1 AND created_at < $2",
+                    start_ts,
+                    end_exclusive_ts,
+                ))
+
+            if profiles_has_plan:
+                purchase_date_col = "COALESCE(plan_upgraded_at, updated_at, created_at)" if profiles_has_plan_upgraded else "COALESCE(updated_at, created_at)"
+                purchases_total = to_int(await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM profiles
+                    WHERE current_plan_id IS NOT NULL
+                      AND current_plan_id != ({paid_plan_subquery})
+                      AND {purchase_date_col} >= $1
+                      AND {purchase_date_col} < $2
+                """, start_ts, end_exclusive_ts))
+
+            snapshot_rows: List[Dict[str, Any]] = []
+            if has_snapshots:
+                snapshot_rows = [dict(r) for r in await conn.fetch("""
+                    SELECT
+                        COALESCE(channel, 'unknown') AS channel,
+                        COALESCE(SUM(spend_eur), 0) AS spend_eur,
+                        COALESCE(SUM(clicks), 0) AS clicks,
+                        COALESCE(SUM(sessions), 0) AS ga4_sessions,
+                        COALESCE(SUM(platform_conversions), 0) AS platform_conversions,
+                        COALESCE(SUM(backend_signups), 0) AS backend_signups,
+                        COALESCE(SUM(backend_purchases), 0) AS backend_purchases
+                    FROM marketing_daily_snapshots
+                    WHERE date >= $1 AND date <= $2
+                    GROUP BY COALESCE(channel, 'unknown')
+                    ORDER BY spend_eur DESC, platform_conversions DESC, channel
+                """, start, end)]
+
+            ga4_sessions_total = sum(to_int(r.get("ga4_sessions")) for r in snapshot_rows)
+            spend_total = round(sum(to_float(r.get("spend_eur")) for r in snapshot_rows), 2)
+            clicks_total = sum(to_int(r.get("clicks")) for r in snapshot_rows)
+            platform_conversions_total = sum(to_float(r.get("platform_conversions")) for r in snapshot_rows)
+            snapshot_backend_signups = sum(to_int(r.get("backend_signups")) for r in snapshot_rows)
+            snapshot_backend_purchases = sum(to_int(r.get("backend_purchases")) for r in snapshot_rows)
+            backend_signups_total = snapshot_backend_signups or signups_total
+            backend_purchases_total = snapshot_backend_purchases or purchases_total
+
+            paid_channels = ["google_ads", "microsoft_ads"]
+            channels: List[Dict[str, Any]] = []
+            by_channel = {str(r.get("channel")): r for r in snapshot_rows}
+            for channel in paid_channels:
+                row = by_channel.get(channel, {})
+                configured = bool(row)
+                platform_conversions = to_float(row.get("platform_conversions"))
+                backend_purchases = to_int(row.get("backend_purchases"))
+                variance = pct_variance(platform_conversions, backend_purchases)
+                channels.append({
+                    "channel": channel,
+                    "label": "Google Ads" if channel == "google_ads" else "Microsoft Advertising",
+                    "spend_eur": round(to_float(row.get("spend_eur")), 2),
+                    "clicks": to_int(row.get("clicks")),
+                    "platform_conversions": platform_conversions,
+                    "ga4_sessions": to_int(row.get("ga4_sessions")),
+                    "backend_signups": to_int(row.get("backend_signups")),
+                    "backend_purchases": backend_purchases,
+                    "cac_eur": round(to_float(row.get("spend_eur")) / backend_purchases, 2) if backend_purchases > 0 else None,
+                    "variance_pct": variance,
+                    "status": status_from_variance(variance, configured),
+                    "configured": configured,
+                })
+
+            for row in snapshot_rows:
+                channel = str(row.get("channel") or "unknown")
+                if channel in paid_channels:
+                    continue
+                backend_purchases = to_int(row.get("backend_purchases"))
+                platform_conversions = to_float(row.get("platform_conversions"))
+                variance = pct_variance(platform_conversions, backend_purchases)
+                channels.append({
+                    "channel": channel,
+                    "label": channel.replace("_", " ").title(),
+                    "spend_eur": round(to_float(row.get("spend_eur")), 2),
+                    "clicks": to_int(row.get("clicks")),
+                    "platform_conversions": platform_conversions,
+                    "ga4_sessions": to_int(row.get("ga4_sessions")),
+                    "backend_signups": to_int(row.get("backend_signups")),
+                    "backend_purchases": backend_purchases,
+                    "cac_eur": round(to_float(row.get("spend_eur")) / backend_purchases, 2) if backend_purchases > 0 else None,
+                    "variance_pct": variance,
+                    "status": status_from_variance(variance, True),
+                    "configured": True,
+                })
+
+            bucket = bucket_expr("created_at")
+            signup_timeseries = []
+            if profiles_has_created:
+                signup_timeseries = [dict(r) for r in await conn.fetch(f"""
+                    SELECT {bucket} AS date, COUNT(*) AS signups
+                    FROM profiles
+                    WHERE created_at >= $1 AND created_at < $2
+                    GROUP BY {bucket}
+                    ORDER BY MIN(created_at)
+                """, start_ts, end_exclusive_ts)]
+
+            purchase_timeseries = []
+            if profiles_has_plan:
+                purchase_date_col = "COALESCE(plan_upgraded_at, updated_at, created_at)" if profiles_has_plan_upgraded else "COALESCE(updated_at, created_at)"
+                purchase_bucket = bucket_expr(purchase_date_col)
+                purchase_timeseries = [dict(r) for r in await conn.fetch(f"""
+                    SELECT {purchase_bucket} AS date, COUNT(*) AS purchases
+                    FROM profiles
+                    WHERE current_plan_id IS NOT NULL
+                      AND current_plan_id != ({paid_plan_subquery})
+                      AND {purchase_date_col} >= $1
+                      AND {purchase_date_col} < $2
+                    GROUP BY {purchase_bucket}
+                    ORDER BY MIN({purchase_date_col})
+                """, start_ts, end_exclusive_ts)]
+
+            snapshot_timeseries: List[Dict[str, Any]] = []
+            if has_snapshots:
+                snapshot_bucket = "TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM')" if granularity == "month" else "TO_CHAR(DATE_TRUNC('week', date), 'IYYY-IW')" if granularity == "week" else "TO_CHAR(date, 'YYYY-MM-DD')"
+                snapshot_timeseries = [dict(r) for r in await conn.fetch(f"""
+                    SELECT
+                        {snapshot_bucket} AS date,
+                        COALESCE(SUM(spend_eur), 0) AS spend_eur,
+                        COALESCE(SUM(clicks), 0) AS clicks,
+                        COALESCE(SUM(platform_conversions), 0) AS platform_conversions,
+                        COALESCE(SUM(sessions), 0) AS ga4_sessions
+                    FROM marketing_daily_snapshots
+                    WHERE date >= $1 AND date <= $2
+                    GROUP BY {snapshot_bucket}
+                    ORDER BY MIN(date)
+                """, start, end)]
+
+            time_map: Dict[str, Dict[str, Any]] = {}
+            for row in snapshot_timeseries:
+                key = str(row.get("date"))
+                time_map[key] = {
+                    "date": key,
+                    "spend_eur": round(to_float(row.get("spend_eur")), 2),
+                    "clicks": to_int(row.get("clicks")),
+                    "ga4_sessions": to_int(row.get("ga4_sessions")),
+                    "platform_conversions": to_float(row.get("platform_conversions")),
+                    "signups": 0,
+                    "purchases": 0,
+                }
+            for row in signup_timeseries:
+                key = str(row.get("date"))
+                time_map.setdefault(key, {"date": key, "spend_eur": 0, "clicks": 0, "ga4_sessions": 0, "platform_conversions": 0, "signups": 0, "purchases": 0})["signups"] = to_int(row.get("signups"))
+            for row in purchase_timeseries:
+                key = str(row.get("date"))
+                time_map.setdefault(key, {"date": key, "spend_eur": 0, "clicks": 0, "ga4_sessions": 0, "platform_conversions": 0, "signups": 0, "purchases": 0})["purchases"] = to_int(row.get("purchases"))
+            timeseries = [time_map[k] for k in sorted(time_map.keys())]
+
+            latest_sync = None
+            sync_sources = {"google_ads": "not_configured", "microsoft_ads": "not_configured", "ga4": "not_configured"}
+            if has_sync_log:
+                for r in await conn.fetch("""
+                    SELECT DISTINCT ON (source) source, status, finished_at
+                    FROM marketing_api_sync_log
+                    ORDER BY source, finished_at DESC NULLS LAST, started_at DESC NULLS LAST
+                """):
+                    source = str(r.get("source"))
+                    status = str(r.get("status") or "unknown")
+                    if source in sync_sources:
+                        sync_sources[source] = status
+                    finished_at = r.get("finished_at")
+                    if isinstance(finished_at, datetime) and (latest_sync is None or finished_at > latest_sync):
+                        latest_sync = finished_at
+
+            attribution_records = 0
+            if has_user_attr:
+                attribution_records = to_int(await conn.fetchval("SELECT COUNT(*) FROM marketing_user_attribution"))
+
+        diagnostics: List[Dict[str, Any]] = []
+        if not has_snapshots:
+            diagnostics.append({
+                "severity": "info",
+                "title": "Advertising and GA4 API syncs are not configured yet",
+                "explanation": "The dashboard is using backend-confirmed signups and purchases only. Add marketing_daily_snapshots or live API syncs to populate spend, clicks, GA4 sessions, and ad-platform conversions.",
+            })
+        if backend_signups_total > 0 and clicks_total == 0:
+            diagnostics.append({
+                "severity": "info",
+                "title": "Backend signups exist without paid-media click data",
+                "explanation": "This usually means acquisition is organic/direct, API syncs are not connected yet, or click identifiers are not persisted at signup.",
+            })
+        if platform_conversions_total > 0 and backend_purchases_total == 0:
+            diagnostics.append({
+                "severity": "warning",
+                "title": "Ad-platform conversions exceed backend purchases",
+                "explanation": "Ad platforms may be counting lead events, modeled conversions, or non-purchase goals. Use backend purchases as the business-truth column for CAC and revenue decisions.",
+            })
+        if clicks_total > 0 and ga4_sessions_total == 0:
+            diagnostics.append({
+                "severity": "warning",
+                "title": "Ad clicks are present but GA4 paid sessions are missing",
+                "explanation": "This can happen when GA4 credentials are not connected, UTMs are missing, analytics consent is declined, or browser protections block analytics tags.",
+            })
+        if not has_user_attr:
+            diagnostics.append({
+                "severity": "warning",
+                "title": "Durable attribution persistence is not implemented yet",
+                "explanation": "Persist UTMs, gclid, gbraid, wbraid, msclkid, landing page, referrer, and consent state at first visit and signup to reconcile users to campaigns.",
+            })
+
+        funnel = [
+            {"step": "Ad clicks", "google_ads": next((c["clicks"] for c in channels if c["channel"] == "google_ads"), 0), "microsoft_ads": next((c["clicks"] for c in channels if c["channel"] == "microsoft_ads"), 0), "ga4": 0, "backend": 0},
+            {"step": "GA4 paid sessions", "google_ads": next((c["ga4_sessions"] for c in channels if c["channel"] == "google_ads"), 0), "microsoft_ads": next((c["ga4_sessions"] for c in channels if c["channel"] == "microsoft_ads"), 0), "ga4": ga4_sessions_total, "backend": 0},
+            {"step": "Backend signups", "google_ads": next((c["backend_signups"] for c in channels if c["channel"] == "google_ads"), 0), "microsoft_ads": next((c["backend_signups"] for c in channels if c["channel"] == "microsoft_ads"), 0), "ga4": 0, "backend": backend_signups_total},
+            {"step": "Backend purchases", "google_ads": next((c["backend_purchases"] for c in channels if c["channel"] == "google_ads"), 0), "microsoft_ads": next((c["backend_purchases"] for c in channels if c["channel"] == "microsoft_ads"), 0), "ga4": 0, "backend": backend_purchases_total},
+        ]
+
+        cac_eur = round(spend_total / backend_purchases_total, 2) if backend_purchases_total > 0 else None
+        roas = None
+
+        return {
+            "summary": {
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "granularity": granularity,
+                "spend_eur": spend_total,
+                "clicks": clicks_total,
+                "ga4_paid_sessions": ga4_sessions_total,
+                "ad_platform_conversions": platform_conversions_total,
+                "backend_signups": backend_signups_total,
+                "backend_purchases": backend_purchases_total,
+                "cac_eur": cac_eur,
+                "roas": roas,
+                "data_freshness": latest_sync.isoformat() if latest_sync else None,
+            },
+            "channels": channels,
+            "funnel": funnel,
+            "timeseries": timeseries,
+            "diagnostics": diagnostics,
+            "measurement_health": {
+                "google_ads_api": sync_sources["google_ads"],
+                "microsoft_ads_api": sync_sources["microsoft_ads"],
+                "ga4_data_api": sync_sources["ga4"],
+                "marketing_snapshots_table": "configured" if has_snapshots else "missing",
+                "marketing_user_attribution_table": "configured" if has_user_attr else "missing",
+                "attribution_records": attribution_records,
+                "utm_coverage_pct": None,
+                "advertising_consent_rate_pct": None,
+                "analytics_consent_rate_pct": None,
+            },
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(500, str(e))

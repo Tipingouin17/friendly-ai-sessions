@@ -17,6 +17,26 @@ type GtagArguments = [GtagCommand, ...unknown[]];
 type DataLayerItem = GtagArguments | Record<string, unknown>;
 type UetConsentState = 'granted' | 'denied';
 
+export interface AcquisitionAttributionSnapshot {
+  first_seen_at: string;
+  last_seen_at: string;
+  landing_page: string;
+  current_page: string;
+  referrer: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  gclid?: string;
+  gbraid?: string;
+  wbraid?: string;
+  msclkid?: string;
+  fbclid?: string;
+  consent_analytics?: boolean;
+  consent_advertising?: boolean;
+}
+
 export type GoogleAdsEnhancedConversionUserData = {
   /** Plain email is accepted by Google tag and hashed by Google before matching. */
   email?: string | null;
@@ -38,6 +58,8 @@ const DEFAULT_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL = 'dFKvCLrn8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_BEGIN_CHECKOUT_CONVERSION_LABEL = 'Y_4DCL3n8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL = 'KEhxCMDn8K0cEKLkvdRD';
 const DEFAULT_MICROSOFT_UET_ID = '343251742';
+const ATTRIBUTION_STORAGE_KEY = 'aifacilitator_acquisition_attribution_v1';
+const ATTRIBUTION_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'gbraid', 'wbraid', 'msclkid', 'fbclid'] as const;
 
 const config = {
   ga4MeasurementId: (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || DEFAULT_GA4_MEASUREMENT_ID,
@@ -111,6 +133,83 @@ function appendScript(id: string, src: string): void {
   script.async = true;
   script.src = src;
   document.head.appendChild(script);
+}
+
+function readStoredAttribution(): AcquisitionAttributionSnapshot | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as AcquisitionAttributionSnapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAttribution(snapshot: AcquisitionAttributionSnapshot): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Ignore storage failures caused by private mode, quota limits, or disabled storage.
+  }
+}
+
+export function captureAcquisitionAttribution(): AcquisitionAttributionSnapshot | null {
+  if (typeof window === 'undefined') return null;
+
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  const foundParams = Object.fromEntries(
+    ATTRIBUTION_PARAM_KEYS
+      .map((key) => [key, params.get(key) || undefined] as const)
+      .filter(([, value]) => Boolean(value)),
+  ) as Partial<AcquisitionAttributionSnapshot>;
+  const existing = readStoredAttribution();
+  const now = new Date().toISOString();
+  const consent = getStoredConsent();
+  const hasMarketingParams = Object.keys(foundParams).length > 0;
+
+  if (!existing && !hasMarketingParams && !document.referrer) return null;
+
+  const snapshot: AcquisitionAttributionSnapshot = {
+    ...(existing || {}),
+    ...foundParams,
+    first_seen_at: existing?.first_seen_at || now,
+    last_seen_at: now,
+    landing_page: existing?.landing_page || window.location.href,
+    current_page: window.location.href,
+    referrer: existing?.referrer || document.referrer || '',
+    consent_analytics: consent?.analytics,
+    consent_advertising: consent?.advertising,
+  };
+
+  writeStoredAttribution(snapshot);
+  return snapshot;
+}
+
+export function getStoredAttribution(): AcquisitionAttributionSnapshot | null {
+  return captureAcquisitionAttribution() || readStoredAttribution();
+}
+
+function getAttributionEventParameters(): Record<string, unknown> {
+  const attribution = getStoredAttribution();
+  if (!attribution) return {};
+
+  return {
+    utm_source: attribution.utm_source,
+    utm_medium: attribution.utm_medium,
+    utm_campaign: attribution.utm_campaign,
+    utm_term: attribution.utm_term,
+    utm_content: attribution.utm_content,
+    gclid: attribution.gclid,
+    gbraid: attribution.gbraid,
+    wbraid: attribution.wbraid,
+    msclkid: attribution.msclkid,
+    landing_page: attribution.landing_page,
+    first_referrer: attribution.referrer,
+  };
 }
 
 function sanitizeEventParameters(parameters: Record<string, unknown>): Record<string, unknown> {
@@ -225,6 +324,8 @@ function initUet(advertisingConsent: boolean): void {
 export function initializeTracking(): void {
   if (typeof window === 'undefined') return;
 
+  captureAcquisitionAttribution();
+
   const consent = getStoredConsent();
 
   // No consent decision yet — GTM keeps Google Consent Mode defaults denied.
@@ -253,10 +354,13 @@ export function trackPageView(path: string, title = document.title): void {
   if (!consent) return;
 
   const pageLocation = `${window.location.origin}${path}`;
+  captureAcquisitionAttribution();
+
   const parameters = {
     page_title: title,
     page_location: pageLocation,
     page_path: path,
+    ...getAttributionEventParameters(),
   };
 
   if (consent.analytics) {
@@ -281,7 +385,10 @@ function trackGa4Event(eventName: string, parameters: Record<string, unknown> = 
   if (!consent?.analytics) return;
   initializeTracking();
 
-  const sanitizedParameters = sanitizeEventParameters(parameters);
+  const sanitizedParameters = sanitizeEventParameters({
+    ...getAttributionEventParameters(),
+    ...parameters,
+  });
 
   // Always push a GTM-style event. This keeps events measurable even when GA4 is
   // configured in GTM rather than injected through Vite environment variables.
@@ -307,7 +414,10 @@ function trackGoogleAdsConversion(
 
   window.gtag('event', 'conversion', {
     send_to: `${config.googleAdsId}/${label}`,
-    ...sanitizeEventParameters(parameters),
+    ...sanitizeEventParameters({
+      ...getAttributionEventParameters(),
+      ...parameters,
+    }),
   });
 }
 
@@ -318,7 +428,10 @@ function trackMicrosoftEvent(eventName: string, parameters: Record<string, unkno
 
   window.uetq.push('event', eventName, {
     event_category: 'acquisition',
-    ...sanitizeEventParameters(parameters),
+    ...sanitizeEventParameters({
+      ...getAttributionEventParameters(),
+      ...parameters,
+    }),
   });
 }
 

@@ -10,6 +10,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { ApiUser, ApiSession } from '@/lib/api';
 import api from "@/lib/api";
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
+import { getStoredAttribution } from '@/lib/tracking';
 
 interface AuthContextType {
   user: ApiUser | null;

@@ -77,7 +77,7 @@ export const SignupForm: React.FC = () => {
     setIsLoading(true);
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
-      trackSignup('email');
+      trackSignup('email', { email: sanitizeInput(email) });
       trackActivationSignupSubmitted('email');
       // The backend now requires email verification before login.
       // Redirect to a confirmation page instead of the dashboard.

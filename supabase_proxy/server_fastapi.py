@@ -3824,6 +3824,23 @@ def _ga4_oauth_access_token() -> str:
     return str(_post_form("https://oauth2.googleapis.com/token", payload)["access_token"])
 
 
+def _env_first_present(*names: str) -> str:
+    for name in names:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    raise KeyError(names[0] if names else "environment variable")
+
+
+def _microsoft_ads_identity_provider() -> str:
+    provider = (os.environ.get("MICROSOFT_ADS_IDENTITY_PROVIDER") or "microsoft").strip().lower()
+    if provider in {"", "microsoft", "msa", "entra", "azure", "azuread", "aad"}:
+        return "microsoft"
+    if provider in {"google", "google_identity", "google-sign-in", "google_sign_in"}:
+        return "google"
+    raise RuntimeError("MICROSOFT_ADS_IDENTITY_PROVIDER must be either 'microsoft' or 'google'")
+
+
 def _microsoft_oauth_access_token() -> str:
     tenant = (os.environ.get("MICROSOFT_ADS_TENANT_ID") or "common").strip()
     payload = {
@@ -3834,6 +3851,22 @@ def _microsoft_oauth_access_token() -> str:
         "scope": "https://ads.microsoft.com/msads.manage offline_access",
     }
     return str(_post_form(f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token", payload)["access_token"])
+
+
+def _microsoft_ads_google_oauth_access_token() -> str:
+    payload = {
+        "client_id": _env_first_present("MICROSOFT_ADS_GOOGLE_CLIENT_ID", "GA4_CLIENT_ID", "GOOGLE_ADS_CLIENT_ID"),
+        "client_secret": _env_first_present("MICROSOFT_ADS_GOOGLE_CLIENT_SECRET", "GA4_CLIENT_SECRET", "GOOGLE_ADS_CLIENT_SECRET"),
+        "refresh_token": _env_first_present("MICROSOFT_ADS_GOOGLE_REFRESH_TOKEN", "MICROSOFT_ADS_REFRESH_TOKEN"),
+        "grant_type": "refresh_token",
+    }
+    return str(_post_form("https://oauth2.googleapis.com/token", payload)["access_token"])
+
+
+def _microsoft_ads_oauth_access_token() -> str:
+    if _microsoft_ads_identity_provider() == "google":
+        return _microsoft_ads_google_oauth_access_token()
+    return _microsoft_oauth_access_token()
 
 
 def _safe_float(value: Any) -> float:
@@ -3988,7 +4021,7 @@ def _xml_text_by_local_name(xml_text: str, local_name: str) -> Optional[str]:
 
 
 def _microsoft_ads_rest_headers(token: str, customer_id: str, account_id: str) -> Dict[str, str]:
-    return {
+    headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -3996,6 +4029,9 @@ def _microsoft_ads_rest_headers(token: str, customer_id: str, account_id: str) -
         "CustomerId": customer_id,
         "CustomerAccountId": account_id,
     }
+    if _microsoft_ads_identity_provider() == "google":
+        headers["IdentityProvider"] = "Google"
+    return headers
 
 
 def _microsoft_ads_date_json(value: str) -> Dict[str, int]:
@@ -4133,7 +4169,7 @@ def _parse_microsoft_ads_report_csv(csv_text: str, account_id: str) -> List[Dict
 
 def _fetch_microsoft_ads_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Fetch Microsoft Ads campaign-performance rows through the Reporting v13 async flow."""
-    token = _microsoft_oauth_access_token()
+    token = _microsoft_ads_oauth_access_token()
     account_id = os.environ["MICROSOFT_ADS_ACCOUNT_ID"]
     customer_id = os.environ["MICROSOFT_ADS_CUSTOMER_ID"]
     report_request_id = _submit_microsoft_ads_report(token, customer_id, account_id, start_date, end_date)

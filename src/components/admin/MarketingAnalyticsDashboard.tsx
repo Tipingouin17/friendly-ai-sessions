@@ -292,33 +292,6 @@ export const MarketingAnalyticsDashboard = () => {
 
             {!connectorConfigured && <EmptyConnectorState />}
 
-            {(syncResult || syncMutation.error) && (
-                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Clock className="h-5 w-5 text-indigo-500" />
-                        <h3 className="text-lg font-bold text-gray-900">Live API sync result</h3>
-                    </div>
-                    {syncMutation.error ? (
-                        <p className="text-sm text-red-600">{syncMutation.error instanceof Error ? syncMutation.error.message : "Live sync failed"}</p>
-                    ) : syncResult && (
-                        <div className="space-y-2">
-                            <p className="text-sm text-gray-600">Imported range: {syncResult.start_date} to {syncResult.end_date}. Overall status: <span className="font-semibold">{syncResult.status}</span>.</p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {syncResult.results.map((result) => (
-                                    <div key={result.source} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-sm font-semibold text-gray-900">{result.source.replace(/_/g, " ")}</span>
-                                            <StatusBadge status={result.status} />
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">Rows imported: {fmt.num(result.rows_imported)}</p>
-                                        {result.error && <p className="text-xs text-red-600 mt-1 line-clamp-2">{result.error}</p>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <KpiCard title="Paid Spend" value={fmt.eur(summary.spend_eur)} sub="Google Ads + Microsoft Ads" icon={DollarSign} color="bg-emerald-500" />
@@ -419,56 +392,95 @@ export const MarketingAnalyticsDashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Info className="h-5 w-5 text-indigo-500" />
-                        <h3 className="text-lg font-bold text-gray-900">Discrepancy explainer</h3>
-                    </div>
-                    <div className="space-y-3">
-                        {diagnostics.map((diagnostic, index) => (
-                            <div key={`${diagnostic.title}-${index}`} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
-                                <div className="flex items-start gap-3">
-                                    {diagnostic.severity === "warning" || diagnostic.severity === "critical" ? (
-                                        <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
-                                    ) : (
-                                        <CheckCircle className="h-5 w-5 text-indigo-500 mt-0.5" />
-                                    )}
-                                    <div>
-                                        <p className="font-semibold text-gray-900">{diagnostic.title}</p>
-                                        <p className="text-sm text-gray-600 mt-1">{diagnostic.explanation}</p>
+            <details className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    <span className="flex items-center gap-2">
+                        <Gauge className="h-4 w-4 text-gray-500" />
+                        Configuration & diagnostics
+                    </span>
+                    <span className="text-xs font-medium text-gray-400">Collapsed by default</span>
+                </summary>
+                <div className="space-y-5 border-t border-gray-100 p-5">
+                    {(syncResult || syncMutation.error) && (
+                        <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Clock className="h-5 w-5 text-indigo-500" />
+                                <h3 className="text-lg font-bold text-gray-900">Live API sync result</h3>
+                            </div>
+                            {syncMutation.error ? (
+                                <p className="text-sm text-red-600">{syncMutation.error instanceof Error ? syncMutation.error.message : "Live sync failed"}</p>
+                            ) : syncResult && (
+                                <div className="space-y-2">
+                                    <p className="text-sm text-gray-600">Imported range: {syncResult.start_date} to {syncResult.end_date}. Overall status: <span className="font-semibold">{syncResult.status}</span>.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {syncResult.results.map((result) => (
+                                            <div key={result.source} className="rounded-xl border border-gray-100 bg-white p-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-sm font-semibold text-gray-900">{result.source.replace(/_/g, " ")}</span>
+                                                    <StatusBadge status={result.status} />
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">Rows imported: {fmt.num(result.rows_imported)}</p>
+                                                {result.error && <p className="text-xs text-red-600 mt-1 line-clamp-2">{result.error}</p>}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                            )}
+                        </div>
+                    )}
 
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Gauge className="h-5 w-5 text-emerald-500" />
-                        <h3 className="text-lg font-bold text-gray-900">Measurement health</h3>
-                    </div>
-                    <div className="space-y-3">
-                        {[
-                            ["Google Ads API", measurement_health.google_ads_api],
-                            ["Microsoft Ads API", measurement_health.microsoft_ads_api],
-                            ["GA4 Data API", measurement_health.ga4_data_api],
-                            ["Snapshot cache", measurement_health.marketing_snapshots_table],
-                            ["Attribution storage", measurement_health.marketing_user_attribution_table],
-                        ].map(([label, status]) => (
-                            <div key={label} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2">
-                                <span className="text-sm font-medium text-gray-700">{label}</span>
-                                <StatusBadge status={String(status)} />
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <div className="xl:col-span-2 rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Info className="h-5 w-5 text-indigo-500" />
+                                <h3 className="text-lg font-bold text-gray-900">Discrepancy explainer</h3>
                             </div>
-                        ))}
-                        <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 text-sm text-indigo-800">
-                            <div className="flex items-center gap-2 font-semibold"><Clock className="h-4 w-4" /> Attribution records</div>
-                            <p className="mt-1">{fmt.num(measurement_health.attribution_records)} persisted records. Next step: store UTMs and click IDs at first visit and signup.</p>
+                            <div className="space-y-3">
+                                {diagnostics.map((diagnostic, index) => (
+                                    <div key={`${diagnostic.title}-${index}`} className="rounded-xl border border-gray-100 bg-white p-4">
+                                        <div className="flex items-start gap-3">
+                                            {diagnostic.severity === "warning" || diagnostic.severity === "critical" ? (
+                                                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                                            ) : (
+                                                <CheckCircle className="h-5 w-5 text-indigo-500 mt-0.5" />
+                                            )}
+                                            <div>
+                                                <p className="font-semibold text-gray-900">{diagnostic.title}</p>
+                                                <p className="text-sm text-gray-600 mt-1">{diagnostic.explanation}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Gauge className="h-5 w-5 text-emerald-500" />
+                                <h3 className="text-lg font-bold text-gray-900">Measurement health</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {[
+                                    ["Google Ads API", measurement_health.google_ads_api],
+                                    ["Microsoft Ads API", measurement_health.microsoft_ads_api],
+                                    ["GA4 Data API", measurement_health.ga4_data_api],
+                                    ["Snapshot cache", measurement_health.marketing_snapshots_table],
+                                    ["Attribution storage", measurement_health.marketing_user_attribution_table],
+                                ].map(([label, status]) => (
+                                    <div key={label} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2">
+                                        <span className="text-sm font-medium text-gray-700">{label}</span>
+                                        <StatusBadge status={String(status)} />
+                                    </div>
+                                ))}
+                                <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 text-sm text-indigo-800">
+                                    <div className="flex items-center gap-2 font-semibold"><Clock className="h-4 w-4" /> Attribution records</div>
+                                    <p className="mt-1">{fmt.num(measurement_health.attribution_records)} persisted records. Next step: store UTMs and click IDs at first visit and signup.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
     );
 };

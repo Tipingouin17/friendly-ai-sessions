@@ -7,6 +7,11 @@ from __future__ import annotations
 
 import os
 import re
+import csv
+import io
+import zipfile
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 import json
 import uuid
 import time
@@ -3973,44 +3978,162 @@ def _fetch_ga4_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def _fetch_microsoft_ads_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
-    """Fetch Microsoft Ads reporting rows if REST reporting is enabled for this account.
+def _xml_text_by_local_name(xml_text: str, local_name: str) -> Optional[str]:
+    """Return the first XML element text matching a local name, independent of namespace."""
+    root = ET.fromstring(xml_text)
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] == local_name:
+            return element.text
+    return None
 
-    Microsoft Advertising still commonly relies on SOAP report jobs. This REST adapter uses
-    the currently documented reporting endpoint pattern when available, and fails cleanly into
-    sync-log diagnostics when the account requires a SOAP-specific integration.
-    """
-    token = _microsoft_oauth_access_token()
-    account_id = os.environ["MICROSOFT_ADS_ACCOUNT_ID"]
-    customer_id = os.environ["MICROSOFT_ADS_CUSTOMER_ID"]
-    endpoint = os.environ.get("MICROSOFT_ADS_REPORTING_ENDPOINT", "https://reports.api.bingads.microsoft.com/Api/Advertiser/Reporting/v13/GenerateReportSubmit")
-    body = {
-        "ReportRequest": {
-            "Format": "Json",
-            "ReportName": "AIFacilitator campaign performance",
-            "ReturnOnlyCompleteData": False,
-            "Aggregation": "Daily",
-            "Scope": {"AccountIds": [account_id]},
-            "Time": {"CustomDateRangeStart": start_date, "CustomDateRangeEnd": end_date},
-            "Columns": ["TimePeriod", "CampaignId", "CampaignName", "Spend", "Impressions", "Clicks", "Conversions"],
-        }
-    }
-    headers = {
-        "Authorization": f"Bearer {token}",
+
+def _microsoft_ads_soap_headers(action: str, token: str, customer_id: str, account_id: str) -> Dict[str, str]:
+    return {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": action,
+        "Accept": "text/xml",
         "DeveloperToken": os.environ["MICROSOFT_ADS_DEVELOPER_TOKEN"],
         "CustomerId": customer_id,
         "CustomerAccountId": account_id,
-        "Content-Type": "application/json",
     }
-    response = requests.post(endpoint, headers=headers, json=body, timeout=60)
+
+
+def _microsoft_ads_common_soap_header(action: str, token: str, customer_id: str, account_id: str) -> str:
+    developer_token = os.environ["MICROSOFT_ADS_DEVELOPER_TOKEN"]
+    return f"""
+  <s:Header xmlns="https://bingads.microsoft.com/Reporting/v13">
+    <Action mustUnderstand="1">{_xml_escape(action)}</Action>
+    <AuthenticationToken i:nil="false">{_xml_escape(token)}</AuthenticationToken>
+    <CustomerAccountId i:nil="false">{_xml_escape(account_id)}</CustomerAccountId>
+    <CustomerId i:nil="false">{_xml_escape(customer_id)}</CustomerId>
+    <DeveloperToken i:nil="false">{_xml_escape(developer_token)}</DeveloperToken>
+  </s:Header>"""
+
+
+def _microsoft_ads_date_xml(value: str) -> str:
+    parsed = date.fromisoformat(value)
+    return f"""<Day>{parsed.day}</Day><Month>{parsed.month}</Month><Year>{parsed.year}</Year>"""
+
+
+def _submit_microsoft_ads_report(token: str, customer_id: str, account_id: str, start_date: str, end_date: str) -> str:
+    endpoint = os.environ.get(
+        "MICROSOFT_ADS_REPORTING_SUBMIT_ENDPOINT",
+        "https://reporting.api.bingads.microsoft.com/Reporting/v13/GenerateReport/Submit",
+    )
+    columns = ["TimePeriod", "CampaignId", "CampaignName", "Spend", "Impressions", "Clicks", "Conversions"]
+    column_xml = "".join(f"<CampaignPerformanceReportColumn>{column}</CampaignPerformanceReportColumn>" for column in columns)
+    body = f"""<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="https://bingads.microsoft.com/Reporting/v13" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+{_microsoft_ads_common_soap_header('SubmitGenerateReport', token, customer_id, account_id)}
+  <s:Body>
+    <SubmitGenerateReportRequest xmlns="https://bingads.microsoft.com/Reporting/v13">
+      <ReportRequest i:nil="false" i:type="a:CampaignPerformanceReportRequest">
+        <ExcludeColumnHeaders i:nil="false">false</ExcludeColumnHeaders>
+        <ExcludeReportFooter i:nil="false">true</ExcludeReportFooter>
+        <ExcludeReportHeader i:nil="false">true</ExcludeReportHeader>
+        <Format i:nil="false">Csv</Format>
+        <FormatVersion i:nil="false">2.0</FormatVersion>
+        <ReportName i:nil="false">AIFacilitator campaign performance</ReportName>
+        <ReturnOnlyCompleteData i:nil="false">false</ReturnOnlyCompleteData>
+        <Aggregation>Daily</Aggregation>
+        <Columns i:nil="false">{column_xml}</Columns>
+        <Scope i:nil="false">
+          <AccountIds i:nil="false" xmlns:a1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+            <a1:long>{_xml_escape(account_id)}</a1:long>
+          </AccountIds>
+        </Scope>
+        <Time i:nil="false">
+          <CustomDateRangeEnd i:nil="false">{_microsoft_ads_date_xml(end_date)}</CustomDateRangeEnd>
+          <CustomDateRangeStart i:nil="false">{_microsoft_ads_date_xml(start_date)}</CustomDateRangeStart>
+        </Time>
+      </ReportRequest>
+    </SubmitGenerateReportRequest>
+  </s:Body>
+</s:Envelope>"""
+    response = requests.post(endpoint, headers=_microsoft_ads_soap_headers("SubmitGenerateReport", token, customer_id, account_id), data=body.encode("utf-8"), timeout=60)
     if response.status_code >= 400:
-        raise RuntimeError(f"Microsoft Advertising reporting request failed with HTTP {response.status_code}: {response.text[:800]}")
-    payload = response.json()
-    report_rows = payload.get("Rows") or payload.get("rows") or []
+        raise RuntimeError(f"Microsoft Advertising SubmitGenerateReport failed with HTTP {response.status_code}: {response.text[:800]}")
+    report_request_id = _xml_text_by_local_name(response.text, "ReportRequestId")
+    if not report_request_id:
+        raise RuntimeError(f"Microsoft Advertising SubmitGenerateReport response did not include ReportRequestId: {response.text[:800]}")
+    return report_request_id
+
+
+def _poll_microsoft_ads_report(token: str, customer_id: str, account_id: str, report_request_id: str) -> str:
+    endpoint = os.environ.get(
+        "MICROSOFT_ADS_REPORTING_POLL_ENDPOINT",
+        "https://reporting.api.bingads.microsoft.com/Reporting/v13/GenerateReport/Poll",
+    )
+    max_wait_seconds = _safe_int(os.environ.get("MICROSOFT_ADS_REPORTING_MAX_WAIT_SECONDS") or 240)
+    poll_interval_seconds = max(5, _safe_int(os.environ.get("MICROSOFT_ADS_REPORTING_POLL_INTERVAL_SECONDS") or 10))
+    deadline = time.monotonic() + max_wait_seconds
+    last_status = "Unknown"
+    last_response = ""
+    while time.monotonic() < deadline:
+        body = f"""<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="https://bingads.microsoft.com/Reporting/v13" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+{_microsoft_ads_common_soap_header('PollGenerateReport', token, customer_id, account_id)}
+  <s:Body>
+    <PollGenerateReportRequest xmlns="https://bingads.microsoft.com/Reporting/v13">
+      <ReportRequestId i:nil="false">{_xml_escape(report_request_id)}</ReportRequestId>
+    </PollGenerateReportRequest>
+  </s:Body>
+</s:Envelope>"""
+        response = requests.post(endpoint, headers=_microsoft_ads_soap_headers("PollGenerateReport", token, customer_id, account_id), data=body.encode("utf-8"), timeout=60)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Microsoft Advertising PollGenerateReport failed with HTTP {response.status_code}: {response.text[:800]}")
+        last_response = response.text
+        status = (_xml_text_by_local_name(response.text, "Status") or "Unknown").strip()
+        last_status = status
+        if status.lower() == "success":
+            download_url = _xml_text_by_local_name(response.text, "ReportDownloadUrl")
+            if not download_url:
+                raise RuntimeError("Microsoft Advertising report status is Success but no ReportDownloadUrl was returned")
+            return download_url
+        if status.lower() not in {"pending", "unknown"}:
+            raise RuntimeError(f"Microsoft Advertising report failed with status {status}: {response.text[:800]}")
+        time.sleep(poll_interval_seconds)
+    raise RuntimeError(f"Microsoft Advertising report did not complete within {max_wait_seconds} seconds; last status was {last_status}: {last_response[:800]}")
+
+
+def _download_microsoft_ads_report(download_url: str) -> str:
+    response = requests.get(download_url, timeout=120)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Microsoft Advertising report download failed with HTTP {response.status_code}: {response.text[:800]}")
+    content = response.content
+    if zipfile.is_zipfile(io.BytesIO(content)):
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            names = [name for name in archive.namelist() if not name.endswith("/")]
+            if not names:
+                raise RuntimeError("Microsoft Advertising report download zip did not contain a report file")
+            with archive.open(names[0]) as handle:
+                return handle.read().decode("utf-8-sig")
+    return content.decode("utf-8-sig")
+
+
+def _parse_microsoft_ads_report_csv(csv_text: str, account_id: str) -> List[Dict[str, Any]]:
+    reader = csv.DictReader(io.StringIO(csv_text))
+    if not reader.fieldnames:
+        return []
+    expected = {"TimePeriod", "CampaignId", "CampaignName"}
+    if not expected.issubset(set(reader.fieldnames)):
+        lines = [line for line in csv_text.splitlines() if line.strip()]
+        header_index = next((idx for idx, line in enumerate(lines) if "TimePeriod" in line and "CampaignId" in line), None)
+        if header_index is None:
+            raise RuntimeError(f"Microsoft Advertising report CSV did not contain expected campaign columns. Header fields: {reader.fieldnames}")
+        reader = csv.DictReader(io.StringIO("\n".join(lines[header_index:])))
     rows: List[Dict[str, Any]] = []
-    for item in report_rows:
+    for item in reader:
+        if not item or not (item.get("TimePeriod") or item.get("CampaignId") or item.get("CampaignName")):
+            continue
+        row_date = item.get("TimePeriod") or item.get("timePeriod") or item.get("date")
+        try:
+            if row_date:
+                date.fromisoformat(row_date)
+        except ValueError:
+            continue
         rows.append({
-            "date": item.get("TimePeriod") or item.get("timePeriod") or item.get("date"),
+            "date": row_date,
             "channel": "microsoft_ads",
             "account_id": account_id,
             "campaign_id": str(item.get("CampaignId") or item.get("campaignId") or "unknown"),
@@ -4023,6 +4146,17 @@ def _fetch_microsoft_ads_rows(start_date: str, end_date: str) -> List[Dict[str, 
             "raw_payload": item,
         })
     return rows
+
+
+def _fetch_microsoft_ads_rows(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Fetch Microsoft Ads campaign-performance rows through the Reporting v13 async flow."""
+    token = _microsoft_oauth_access_token()
+    account_id = os.environ["MICROSOFT_ADS_ACCOUNT_ID"]
+    customer_id = os.environ["MICROSOFT_ADS_CUSTOMER_ID"]
+    report_request_id = _submit_microsoft_ads_report(token, customer_id, account_id, start_date, end_date)
+    download_url = _poll_microsoft_ads_report(token, customer_id, account_id, report_request_id)
+    csv_text = _download_microsoft_ads_report(download_url)
+    return _parse_microsoft_ads_report_csv(csv_text, account_id)
 
 
 async def run_marketing_provider_sync(conn, source: str, start_date: str, end_date: str) -> Dict[str, Any]:

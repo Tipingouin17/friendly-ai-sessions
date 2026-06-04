@@ -176,7 +176,7 @@ const Index = () => {
                         <span className="text-gray-900">Automate Workshop</span>
                         <br />
                         <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent">
-                            Documentation with AI
+                            Facilitation with AI
                         </span>
                     </h1>
 

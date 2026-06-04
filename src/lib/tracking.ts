@@ -60,6 +60,7 @@ const DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL = 'KEhxCMDn8K0cEKLkvdRD';
 const DEFAULT_MICROSOFT_UET_ID = '343251742';
 const ATTRIBUTION_STORAGE_KEY = 'aifacilitator_acquisition_attribution_v1';
 const ATTRIBUTION_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'gbraid', 'wbraid', 'msclkid', 'fbclid'] as const;
+const UET_DISABLED_PATHS = ['/session', '/join-session', '/admin'];
 
 const config = {
   ga4MeasurementId: (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || DEFAULT_GA4_MEASUREMENT_ID,
@@ -122,6 +123,11 @@ function updateMicrosoftConsent(advertisingConsent: boolean): void {
 
 function hasValue(value?: string): value is string {
   return Boolean(value && value.trim().length > 0 && !value.includes('your_'));
+}
+
+function isUetDisabledPath(): boolean {
+  if (typeof window === 'undefined') return true;
+  return UET_DISABLED_PATHS.some(path => window.location.pathname.startsWith(path));
 }
 
 function appendScript(id: string, src: string): void {
@@ -285,11 +291,18 @@ function initGtag(analyticsConsent: boolean, advertisingConsent: boolean): void 
 
 /** Load Microsoft Clarity — requires analytics consent. */
 function initClarity(analyticsConsent: boolean): void {
-  if (clarityInitialized || !analyticsConsent || !hasValue(config.clarityProjectId) || typeof window === 'undefined') return;
+  if (clarityInitialized || !analyticsConsent || !hasValue(config.clarityProjectId) || typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const existingClarityScript = document.querySelector('script[src*="clarity.ms/tag/"]');
+  if (existingClarityScript) {
+    clarityInitialized = true;
+    return;
+  }
 
   clarityInitialized = true;
   window.clarity = window.clarity || function clarity(...args: unknown[]) {
-    (window.clarity as unknown[]).push(args);
+    const clarityFunction = window.clarity as Window['clarity'] & { q?: unknown[] };
+    (clarityFunction.q = clarityFunction.q || []).push(args);
   } as Window['clarity'];
 
   appendScript('aifacilitator-clarity', `https://www.clarity.ms/tag/${encodeURIComponent(config.clarityProjectId)}`);
@@ -297,7 +310,12 @@ function initClarity(analyticsConsent: boolean): void {
 
 /** Load Microsoft UET tag — requires advertising consent. */
 function initUet(advertisingConsent: boolean): void {
-  if (uetInitialized || !advertisingConsent || !hasValue(config.microsoftUetId) || typeof window === 'undefined') return;
+  if (uetInitialized || !advertisingConsent || !hasValue(config.microsoftUetId) || typeof window === 'undefined' || typeof document === 'undefined' || isUetDisabledPath()) return;
+
+  if (document.getElementById('aifacilitator-uet-config') || document.getElementById('microsoft-uet-script')) {
+    uetInitialized = true;
+    return;
+  }
 
   uetInitialized = true;
 
@@ -375,7 +393,7 @@ export function trackPageView(path: string, title = document.title): void {
     window.gtag('config', config.googleAdsId, parameters);
   }
 
-  if (consent.advertising && window.uetq) {
+  if (consent.advertising && window.uetq && !isUetDisabledPath()) {
     window.uetq.push('event', 'page_view', parameters);
   }
 }
@@ -424,7 +442,7 @@ function trackGoogleAdsConversion(
 function trackMicrosoftEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
   const consent = getStoredConsent();
   if (!consent?.advertising) return;
-  if (!window.uetq) return;
+  if (!window.uetq || isUetDisabledPath()) return;
 
   window.uetq.push('event', eventName, {
     event_category: 'acquisition',

@@ -11,7 +11,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { CrispChat } from "./components/CrispChat";
-import { MicrosoftUet } from "./components/MicrosoftUet";
 import { CookieBanner } from "./components/CookieBanner";
 import { initializeTracking, reinitializeTracking, trackPageView } from "./lib/tracking";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -117,7 +116,6 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <CrispChat />
-          <MicrosoftUet />
           <RouteTracking />
           <CookieBanner forceOpen={forceCookieSettingsOpen} onClose={() => setForceCookieSettingsOpen(false)} />
           <Suspense fallback={<PageLoader />}>

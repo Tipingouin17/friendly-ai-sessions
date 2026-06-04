@@ -4447,6 +4447,24 @@ async def admin_marketing_analytics(
                     "configured": True,
                 })
 
+            unattributed_backend_signups = max(backend_signups_total - snapshot_backend_signups, 0)
+            unattributed_backend_purchases = max(backend_purchases_total - snapshot_backend_purchases, 0)
+            if unattributed_backend_signups > 0 or unattributed_backend_purchases > 0:
+                channels.append({
+                    "channel": "backend_unattributed",
+                    "label": "Backend — unattributed",
+                    "spend_eur": 0,
+                    "clicks": 0,
+                    "platform_conversions": 0,
+                    "ga4_sessions": 0,
+                    "backend_signups": unattributed_backend_signups,
+                    "backend_purchases": unattributed_backend_purchases,
+                    "cac_eur": None,
+                    "variance_pct": None,
+                    "status": "pending_attribution",
+                    "configured": False,
+                })
+
             bucket = bucket_expr("created_at")
             signup_timeseries = []
             if profiles_has_created:
@@ -4541,7 +4559,7 @@ async def admin_marketing_analytics(
             diagnostics.append({
                 "severity": "info",
                 "title": "Backend signups exist without paid-media click data",
-                "explanation": "This usually means acquisition is organic/direct, API syncs are not connected yet, or click identifiers are not persisted at signup.",
+                "explanation": "This usually means acquisition is organic/direct, API syncs are not connected yet, or click identifiers are not persisted at signup. These users are shown in the Backend — unattributed row instead of being forced into a paid channel.",
             })
         if platform_conversions_total > 0 and backend_purchases_total == 0:
             diagnostics.append({

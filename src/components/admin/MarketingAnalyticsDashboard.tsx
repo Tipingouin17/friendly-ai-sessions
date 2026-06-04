@@ -146,6 +146,7 @@ const STATUS_STYLES: Record<string, string> = {
     watch: "bg-amber-50 text-amber-700 border-amber-100",
     action_needed: "bg-red-50 text-red-700 border-red-100",
     not_configured: "bg-slate-50 text-slate-600 border-slate-200",
+    pending_attribution: "bg-blue-50 text-blue-700 border-blue-100",
     missing: "bg-amber-50 text-amber-700 border-amber-100",
     configured: "bg-emerald-50 text-emerald-700 border-emerald-100",
 };
@@ -301,15 +302,42 @@ export const MarketingAnalyticsDashboard = () => {
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 className="text-lg font-bold text-gray-900">Channel reconciliation</h3>
-                        <p className="text-sm text-gray-500">Ad platforms optimize campaigns; GA4 validates behavior; backend data is business truth.</p>
+                        <p className="text-sm text-gray-500">Backend totals stay visible even when signups cannot yet be attributed to Google Ads, Microsoft Ads, or GA4.</p>
                     </div>
                     <StatusBadge status={dataQualityStatus} />
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-100 text-sm">
+                <div className="border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-800 sm:px-5">
+                    Paid-channel rows show only signups and purchases with durable campaign attribution. The separate backend attribution row prevents organic, direct, or currently unattributed signups from being mistaken for paid-media performance.
+                </div>
+
+                <div className="space-y-3 p-4 md:hidden">
+                    {channels.map((channel) => (
+                        <div key={channel.channel} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="font-semibold text-gray-900">{channel.label}</p>
+                                    <p className="text-xs text-gray-500">{channel.configured ? "Configured source" : "Not configured yet"}</p>
+                                </div>
+                                <StatusBadge status={channel.status} />
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                <div><p className="text-xs text-gray-500">Spend</p><p className="font-semibold text-gray-900">{fmt.eur(channel.spend_eur)}</p></div>
+                                <div><p className="text-xs text-gray-500">Clicks</p><p className="font-semibold text-gray-900">{fmt.num(channel.clicks)}</p></div>
+                                <div><p className="text-xs text-gray-500">GA4 sessions</p><p className="font-semibold text-gray-900">{fmt.num(channel.ga4_sessions)}</p></div>
+                                <div><p className="text-xs text-gray-500">Platform conv.</p><p className="font-semibold text-gray-900">{fmt.num(channel.platform_conversions)}</p></div>
+                                <div><p className="text-xs text-gray-500">Backend signups</p><p className="font-semibold text-gray-900">{fmt.num(channel.backend_signups)}</p></div>
+                                <div><p className="text-xs text-gray-500">Backend purchases</p><p className="font-semibold text-gray-900">{fmt.num(channel.backend_purchases)}</p></div>
+                                <div className="col-span-2"><p className="text-xs text-gray-500">CAC</p><p className="font-semibold text-gray-900">{fmt.eur(channel.cac_eur)}</p></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                    <table className="min-w-[980px] divide-y divide-gray-100 text-sm">
                         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th className="px-5 py-3 text-left font-semibold">Channel</th>

@@ -107,7 +107,8 @@ const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState("analytics");
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const activeItem = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === activeTab);
+    const flatNavItems = NAV_GROUPS.flatMap(g => g.items);
+    const activeItem = flatNavItems.find(i => i.id === activeTab);
 
     return (
         <ErrorBoundary>
@@ -211,7 +212,7 @@ const AdminDashboard = () => {
                     </aside>
 
                     {/* ── Main Content ─────────────────────────────────────────────── */}
-                    <main className="flex-1 overflow-y-auto">
+                    <main className="flex-1 min-w-0 overflow-y-auto">
                         {/* Top bar */}
                         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center gap-4">
                             <button
@@ -220,14 +221,30 @@ const AdminDashboard = () => {
                             >
                                 <Menu className="h-5 w-5" />
                             </button>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <Shield className="h-4 w-4 text-purple-600" />
+                            <div className="flex min-w-0 items-center gap-2 text-sm text-gray-500">
+                                <Shield className="h-4 w-4 shrink-0 text-purple-600" />
                                 <span className="text-gray-400">/</span>
-                                <span className="font-semibold text-gray-800">{LABEL_MAP[activeTab]}</span>
+                                <span className="truncate font-semibold text-gray-800">{LABEL_MAP[activeTab]}</span>
                             </div>
                             {activeItem && (
                                 <p className="hidden sm:block text-xs text-gray-400 ml-1">— {activeItem.description}</p>
                             )}
+                        </div>
+
+                        <div className="lg:hidden border-b border-gray-200 bg-white px-4 py-3">
+                            <label htmlFor="admin-mobile-section" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Admin section
+                            </label>
+                            <select
+                                id="admin-mobile-section"
+                                value={activeTab}
+                                onChange={(event) => setActiveTab(event.target.value)}
+                                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                            >
+                                {flatNavItems.map((item) => (
+                                    <option key={item.id} value={item.id}>{item.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         {/* Tab content */}

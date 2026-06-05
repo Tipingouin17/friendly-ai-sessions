@@ -179,6 +179,17 @@ export const AnalyticsDashboard = () => {
         );
     }
 
+    const planDistribution = analytics?.planDistribution ?? [];
+    const planDistributionTotal = planDistribution.reduce((sum, item) => sum + item.value, 0);
+    const hasPlanDistribution = planDistributionTotal > 0;
+    const formatPercent = (value: number) => {
+        if (!planDistributionTotal) return '0%';
+        return `${((value / planDistributionTotal) * 100).toFixed(1)}%`;
+    };
+    const truncateLabel = (label: string, maxLength = 26) => (
+        label.length > maxLength ? `${label.slice(0, maxLength - 1)}…` : label
+    );
+
     return (
         <div className="space-y-6">
             {/* KPI Cards */}
@@ -293,25 +304,64 @@ export const AnalyticsDashboard = () => {
                         <CardDescription>Users by subscription tier</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={analytics?.planDistribution}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {analytics?.planDistribution.map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        {hasPlanDistribution ? (
+                            <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1fr)_220px] gap-4 items-center">
+                                <div className="min-h-[260px]">
+                                    <ResponsiveContainer width="100%" height={260}>
+                                        <PieChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
+                                            <Pie
+                                                data={planDistribution}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                outerRadius={92}
+                                                innerRadius={48}
+                                                minAngle={4}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {planDistribution.map((_, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                formatter={(value: number, _name, item) => [
+                                                    `${value.toLocaleString()} users (${formatPercent(value)})`,
+                                                    item.payload.name,
+                                                ]}
+                                            />
+                                            <Legend />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                                        Plan breakdown
+                                    </p>
+                                    {planDistribution.map((item, index) => (
+                                        <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span
+                                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                                />
+                                                <span className="truncate font-medium text-gray-700" title={item.name}>
+                                                    {item.name}
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-semibold text-gray-900">{item.value.toLocaleString()}</p>
+                                                <p className="text-xs text-gray-500">{formatPercent(item.value)}</p>
+                                            </div>
+                                        </div>
                                     ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex h-[260px] items-center justify-center rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 text-sm text-gray-500">
+                                No plan data available yet.
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -353,11 +403,20 @@ export const AnalyticsDashboard = () => {
                     </CardHeader>
                     <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analytics?.sessionsByFacilitator} layout="vertical">
+                            <BarChart
+                                data={analytics?.sessionsByFacilitator}
+                                layout="vertical"
+                                margin={{ top: 8, right: 24, bottom: 8, left: 16 }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" />
-                                <YAxis dataKey="name" type="category" width={150} />
-                                <Tooltip />
+                                <XAxis type="number" allowDecimals={false} />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    width={170}
+                                    tickFormatter={(value: string) => truncateLabel(value)}
+                                />
+                                <Tooltip formatter={(value: number) => [value.toLocaleString(), 'Sessions']} />
                                 <Bar dataKey="count" fill="#10b981" name="Sessions" />
                             </BarChart>
                         </ResponsiveContainer>

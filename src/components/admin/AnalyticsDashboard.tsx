@@ -72,7 +72,7 @@ export const AnalyticsDashboard = () => {
             ] = await Promise.all([
                 api.from('profiles').select('*', { count: 'exact', head: true }),
                 api.from('profiles').select('*', { count: 'exact', head: true }).gte('updated_at', thirtyDaysAgo),
-                api.from('conversations').select('id, created_at, is_session_ended, session_duration_minutes, sessions_id, sessions(title), user_id'),
+                api.from('conversations').select('id, created_at, status, is_session_ended, session_started, session_duration_minutes, sessions_id, sessions(title), user_id'),
                 api.from('messages').select('*', { count: 'exact', head: true }),
                 api.from('profiles').select('id, created_at, current_plan_id').gte('created_at', thirtyDaysAgo),
                 api.from('conversations').select('id, created_at').gte('created_at', fourteenDaysAgo),
@@ -81,7 +81,11 @@ export const AnalyticsDashboard = () => {
             ]);
 
             // ── Derived KPIs ───────────────────────────────────────────────────────
-            const activeSessions = (allConversations || []).filter(c => !c.is_session_ended).length;
+            const activeSessions = (allConversations || []).filter(c => (
+                !c.is_session_ended &&
+                c.session_started === true &&
+                (c.status === 'active' || c.status == null)
+            )).length;
             const totalSessions = (allConversations || []).length;
 
             const validDurations = (allConversations || []).filter(

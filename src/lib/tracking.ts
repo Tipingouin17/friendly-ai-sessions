@@ -398,7 +398,9 @@ export function trackPageView(path: string, title = document.title): void {
   }
 }
 
-function trackGa4Event(eventName: string, parameters: Record<string, unknown> = {}): void {
+
+
+export function trackGa4Event(eventName: string, parameters: Record<string, unknown> = {}): void {
   const consent = getStoredConsent();
   if (!consent?.analytics) return;
   initializeTracking();
@@ -413,11 +415,24 @@ function trackGa4Event(eventName: string, parameters: Record<string, unknown> = 
   pushDataLayerEvent(eventName, sanitizedParameters);
 
   if (hasValue(config.ga4MeasurementId) && window.gtag) {
-    window.gtag('event', eventName, sanitizedParameters);
+    window.gtag("event", eventName, sanitizedParameters);
   }
 }
 
-function trackGoogleAdsConversion(
+export function trackMicrosoftEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
+  const consent = getStoredConsent();
+  if (!consent?.advertising || isUetDisabledPath()) return;
+  initializeTracking();
+
+  if (window.uetq) {
+    window.uetq.push("event", eventName, sanitizeEventParameters(parameters));
+  }
+}
+
+
+
+
+export function trackGoogleAdsConversion(
   label?: string,
   parameters: Record<string, unknown> = {},
   userData?: GoogleAdsEnhancedConversionUserData,
@@ -439,19 +454,7 @@ function trackGoogleAdsConversion(
   });
 }
 
-function trackMicrosoftEvent(eventName: string, parameters: Record<string, unknown> = {}): void {
-  const consent = getStoredConsent();
-  if (!consent?.advertising) return;
-  if (!window.uetq || isUetDisabledPath()) return;
 
-  window.uetq.push('event', eventName, {
-    event_category: 'acquisition',
-    ...sanitizeEventParameters({
-      ...getAttributionEventParameters(),
-      ...parameters,
-    }),
-  });
-}
 
 function createClientEventId(prefix: string): string {
   const randomValue =

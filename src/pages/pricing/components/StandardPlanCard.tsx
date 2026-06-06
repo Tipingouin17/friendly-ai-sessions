@@ -7,6 +7,7 @@ import { Check, Users, Calendar, UserPlus, MessageSquare, Wand2, Save, BarChart3
 import { Button } from "@/components/ui/button";
 import { Plan } from "../types";
 import { useNavigate } from "react-router-dom";
+import { trackCtaClick, trackLeadIntent } from "@/lib/tracking";
 
 interface StandardPlanCardProps {
   plan: Plan;
@@ -22,10 +23,15 @@ export const StandardPlanCard = ({
   const navigate = useNavigate();
 
   const handleGetStarted = () => {
+    const ctaLabel = `${plan.title}_plan_card_cta`;
     if (isCurrentPlan) {
-      navigate('/profile');
+      trackCtaClick(ctaLabel, '/profile', 'pricing_page');
+      navigate("/profile");
     } else {
-      navigate(`/checkout?plan=${plan.id}`);
+      const destination = `/checkout?plan=${plan.id}`;
+      trackCtaClick(ctaLabel, destination, 'pricing_page');
+      trackLeadIntent(ctaLabel, destination);
+      navigate(destination);
     }
   };
 

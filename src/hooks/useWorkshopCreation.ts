@@ -11,6 +11,7 @@ import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useNavigate } from "react-router-dom";
+import { trackGa4Event, trackGoogleAdsConversion, trackMicrosoftEvent } from "@/lib/tracking";
 
 export const useWorkshopCreation = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -92,7 +93,21 @@ export const useWorkshopCreation = () => {
         scheduledStartAt: isScheduled ? scheduledStartAt : undefined,
       });
 
-      if (data?.id) {
+        if (data?.id) {
+          const eventParameters = {
+            session_id: data.id,
+            workshop_id: selectedWorkshop,
+            facilitator_id: selectedFacilitator,
+            participant_count: participantCount,
+            language: language,
+            is_scheduled: isScheduled,
+          };
+
+          trackGa4Event('session_created', eventParameters);
+          trackGoogleAdsConversion('session_created', eventParameters);
+          trackMicrosoftEvent('session_created', eventParameters);
+
+
         if (isScheduled) {
           navigate(`/schedule-invitations?id=${data.id}`);
           toast({

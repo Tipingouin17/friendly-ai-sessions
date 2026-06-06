@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema, sanitizeInput } from '@/utils/inputValidation';
 import { SignupFormFields } from './SignupFormFields';
-import { trackActivationSignupSubmitted, trackSignup } from '@/lib/tracking';
+import { trackActivationSignupSubmitted, trackSignup, trackSignupStart } from '@/lib/tracking';
 
 // Define validation schema
 const signupFormSchema = signupSchema.extend({
@@ -75,6 +75,7 @@ export const SignupForm: React.FC = () => {
     }
     
     setIsLoading(true);
+    trackSignupStart('email');
     try {
       await signup(sanitizeInput(email), password, sanitizeInput(name));
       trackSignup('email', { email: sanitizeInput(email) });

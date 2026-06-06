@@ -11,7 +11,7 @@ import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useNavigate } from "react-router-dom";
-import { trackGa4Event, trackGoogleAdsConversion, trackMicrosoftEvent } from "@/lib/tracking";
+import { trackSessionCreated } from "@/lib/tracking";
 
 export const useWorkshopCreation = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -103,9 +103,7 @@ export const useWorkshopCreation = () => {
             is_scheduled: isScheduled,
           };
 
-          trackGa4Event('session_created', eventParameters);
-          trackGoogleAdsConversion('session_created', eventParameters);
-          trackMicrosoftEvent('session_created', eventParameters);
+          trackSessionCreated(eventParameters);
 
 
         if (isScheduled) {

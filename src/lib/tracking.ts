@@ -77,6 +77,7 @@ const config = {
   googleAdsPurchaseConversionLabel:
     (import.meta.env.VITE_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL as string | undefined) ||
     DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL,
+  googleAdsSessionCreatedConversionLabel: import.meta.env.VITE_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL as string | undefined,
   microsoftUetId: (import.meta.env.VITE_MICROSOFT_UET_ID as string | undefined) || DEFAULT_MICROSOFT_UET_ID,
   clarityProjectId: import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined,
 };
@@ -425,7 +426,10 @@ export function trackMicrosoftEvent(eventName: string, parameters: Record<string
   initializeTracking();
 
   if (window.uetq) {
-    window.uetq.push("event", eventName, sanitizeEventParameters(parameters));
+    window.uetq.push("event", eventName, sanitizeEventParameters({
+      ...getAttributionEventParameters(),
+      ...parameters,
+    }));
   }
 }
 
@@ -465,18 +469,36 @@ function createClientEventId(prefix: string): string {
   return `${prefix}-${randomValue}`;
 }
 
+export function trackSignupStart(method = 'email'): void {
+  const parameters = {
+    method,
+    event_category: 'acquisition',
+    event_label: 'signup_form_submitted',
+    funnel_step: 'signup_start',
+    lead_source: 'signup',
+  };
+
+  trackGa4Event('signup_start', parameters);
+  trackMicrosoftEvent('signup_start', parameters);
+}
+
 export function trackSignup(method = 'email', userData?: GoogleAdsEnhancedConversionUserData): void {
   const parameters = {
     method,
     event_category: 'acquisition',
     event_label: 'account_created',
+    funnel_step: 'signup_complete',
     lead_source: 'signup',
   };
 
   trackGa4Event('sign_up', parameters);
+  trackGa4Event('signup_complete', parameters);
   trackGa4Event('generate_lead', parameters);
   trackGoogleAdsConversion(config.googleAdsSignupConversionLabel, parameters, userData);
+  // Microsoft Ads custom goal requested by the brief: window.uetq.push('event', 'signup', ...)
+  trackMicrosoftEvent('signup', parameters);
   trackMicrosoftEvent('sign_up', parameters);
+  trackMicrosoftEvent('signup_complete', parameters);
   trackMicrosoftEvent('generate_lead', parameters);
 }
 
@@ -550,6 +572,21 @@ export function trackFirstRealSessionStarted(source = 'session_start'): void {
 
   trackGa4Event('first_real_session_started', parameters);
   trackMicrosoftEvent('first_real_session_started', parameters);
+}
+
+export function trackSessionCreated(parameters: Record<string, unknown>): void {
+  const conversionParameters = {
+    event_category: 'activation',
+    event_label: 'session_created',
+    funnel_step: 'session_created',
+    ...parameters,
+  };
+
+  trackGa4Event('session_created', conversionParameters);
+  if (config.googleAdsSessionCreatedConversionLabel) {
+    trackGoogleAdsConversion(config.googleAdsSessionCreatedConversionLabel, conversionParameters);
+  }
+  trackMicrosoftEvent('session_created', conversionParameters);
 }
 
 export function trackContactLead(source = 'contact_form'): void {

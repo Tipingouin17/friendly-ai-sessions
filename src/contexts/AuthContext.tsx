@@ -156,13 +156,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Password must be at least 8 characters long');
       }
 
+      const marketingAttribution = getStoredAttribution();
       const { error } = await api.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
-          // Send the display name so the backend can store it in profiles.full_name.
-          // The backend accepts both 'name' and 'full_name' inside options.data.
-          data: { name: name.trim() },
+          // Send the display name and first-touch marketing attribution so the backend can
+          // reconcile confirmed users with paid campaigns, click IDs, landing pages, and consent state.
+          data: {
+            name: name.trim(),
+            ...(marketingAttribution ? { marketing_attribution: marketingAttribution } : {}),
+          },
           emailRedirectTo: `${window.location.origin}/onboarding/demo`,
         },
       });

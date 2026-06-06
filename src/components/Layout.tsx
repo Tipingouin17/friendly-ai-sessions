@@ -4,19 +4,22 @@
  * Component for the AIfacilitator application.
  */
 
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Navigation } from "./Navigation";
-import { Footer } from "./Footer";
 import { useLocation } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SessionMobileNav from "./session/SessionMobileNav";
 
+const DeferredFooter = lazy(() => import("./Footer").then(module => ({ default: module.Footer })));
+
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [footerReady, setFooterReady] = useState(false);
   const hideFooterPaths = ['/my-facilitators', '/session'];
   
   // Check if we're on the admin page or session page to add proper spacing
@@ -29,6 +32,19 @@ export const Layout = ({ children }: LayoutProps) => {
   // Don't render main navigation on admin pages at all
   const shouldShowMainNav = !isAdminPage;
 
+  useEffect(() => {
+    setFooterReady(false);
+    const showFooter = () => window.setTimeout(() => setFooterReady(true), location.pathname === '/' ? 1200 : 0);
+
+    if (document.readyState === 'complete') {
+      const timeoutId = showFooter();
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    window.addEventListener('load', showFooter, { once: true });
+    return () => window.removeEventListener('load', showFooter);
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen flex flex-col text-left">
       {/* Skip to main content — visible only on keyboard focus for screen readers */}
@@ -39,7 +55,11 @@ export const Layout = ({ children }: LayoutProps) => {
       <main id="main-content" className={`flex-grow ${isSessionPage && !isAdminPage ? 'pt-0' : shouldShowMainNav ? 'pt-16' : 'pt-0'}`}>
         {children}
       </main>
-      {!hideFooterPaths.includes(location.pathname) && !isAdminPage && <Footer />}
+      {!hideFooterPaths.includes(location.pathname) && !isAdminPage && footerReady && (
+        <Suspense fallback={null}>
+          <DeferredFooter />
+        </Suspense>
+      )}
     </div>
   );
 };

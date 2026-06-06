@@ -14,7 +14,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserCircle, Settings, BookOpen, ChevronDown, Menu, Zap, Shield } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getUserDisplayName } from "@/utils/userUtils";
 import { useState, useCallback } from "react";
 
@@ -81,108 +80,60 @@ export const Navigation = () => {
           </Link>
 
           {isMobile ? (
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 p-0" aria-label="Open menu">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="flex flex-col">
-                <div className="flex flex-col space-y-6 mt-8">
-                  {isAuthenticated && (
-                    <MobileLink to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
-                      My Workshops
-                    </MobileLink>
-                  )}
-                  <MobileLink
-                    to="/"
-                    className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    Home
-                  </MobileLink>
-                  <MobileLink
-                    to="/about"
-                    className={`${location.pathname === '/about' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    About
-                  </MobileLink>
-                  <MobileLink
-                    to="/pricing"
-                    className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    Pricing
-                  </MobileLink>
-                  <MobileLink
-                    to="/faqs"
-                    className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    FAQs
-                  </MobileLink>
-                  <MobileLink
-                    to="/blog"
-                    className={`${location.pathname.startsWith('/blog') ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    Blog
-                  </MobileLink>
-                  <MobileLink
-                    to="/contact"
-                    className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}
-                  >
-                    Contact Us
-                  </MobileLink>
-                </div>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 p-0"
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-navigation-menu"
+                onClick={() => setMobileMenuOpen(open => !open)}
+              >
+                <Menu className="h-6 w-6" />
+              </Button>
+              {mobileMenuOpen && (
+                <div id="mobile-navigation-menu" className="fixed inset-x-3 top-20 z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="Main navigation">
+                  <div className="flex flex-col space-y-5">
+                    {isAuthenticated && (
+                      <MobileLink to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
+                        My Workshops
+                      </MobileLink>
+                    )}
+                    <MobileLink to="/" className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Home</MobileLink>
+                    <MobileLink to="/about" className={`${location.pathname === '/about' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>About</MobileLink>
+                    <MobileLink to="/pricing" className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Pricing</MobileLink>
+                    <MobileLink to="/faqs" className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>FAQs</MobileLink>
+                    <MobileLink to="/blog" className={`${location.pathname.startsWith('/blog') ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Blog</MobileLink>
+                    <MobileLink to="/contact" className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Contact Us</MobileLink>
+                  </div>
 
-                <div className="mt-auto mb-8">
-                  {!isAuthenticated ? (
-                    <div className="flex flex-col space-y-3">
-                      <MobileLink to="/login" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-xl">
-                          Log in
-                        </Button>
-                      </MobileLink>
-                      <MobileLink to="/signup" className="w-full">
-                        <Button className="w-full text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">
-                          Get Started Free
-                        </Button>
-                      </MobileLink>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col space-y-3">
-                      <div className="text-sm text-gray-600 mb-2">Hi, {userDisplayName}</div>
-                      <MobileLink to="/profile" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
-                          <UserCircle className="h-4 w-4" /> Profile
-                        </Button>
-                      </MobileLink>
-                      <MobileLink to="/settings" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
-                          <Settings className="h-4 w-4" /> Settings
-                        </Button>
-                      </MobileLink>
-                      <MobileLink to="/past-workshops" className="w-full">
-                        <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" /> Past Workshops
-                        </Button>
-                      </MobileLink>
-                      {user?.role === 'admin' && (
-                        <MobileLink to="/admin" className="w-full">
-                          <Button variant="outline" className="w-full text-center rounded-xl flex items-center gap-2 text-purple-600 border-purple-200 hover:border-purple-400">
-                            <Shield className="h-4 w-4" /> Admin Panel
-                          </Button>
+                  <div className="mt-6 border-t border-gray-100 pt-4">
+                    {!isAuthenticated ? (
+                      <div className="flex flex-col space-y-3">
+                        <MobileLink to="/login" className="w-full">
+                          <Button variant="outline" className="w-full min-h-11 text-center rounded-xl">Log in</Button>
                         </MobileLink>
-                      )}
-                      <Button
-                        variant="outline"
-                        className="w-full text-center rounded-xl"
-                        onClick={() => { closeMobileMenu(); logout(); }}
-                      >
-                        Log out
-                      </Button>
-                    </div>
-                  )}
+                        <MobileLink to="/signup" className="w-full">
+                          <Button className="w-full min-h-11 text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">Get Started Free</Button>
+                        </MobileLink>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col space-y-3">
+                        <div className="text-sm text-gray-600 mb-2">Hi, {userDisplayName}</div>
+                        <MobileLink to="/profile" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><UserCircle className="h-4 w-4" /> Profile</Button></MobileLink>
+                        <MobileLink to="/settings" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><Settings className="h-4 w-4" /> Settings</Button></MobileLink>
+                        <MobileLink to="/past-workshops" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><BookOpen className="h-4 w-4" /> Past Workshops</Button></MobileLink>
+                        {user?.role === 'admin' && (
+                          <MobileLink to="/admin" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2 text-purple-600 border-purple-200 hover:border-purple-400"><Shield className="h-4 w-4" /> Admin Panel</Button></MobileLink>
+                        )}
+                        <Button variant="outline" className="w-full min-h-11 text-center rounded-xl" onClick={() => { closeMobileMenu(); logout(); }}>Log out</Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </SheetContent>
-            </Sheet>
+              )}
+            </>
           ) : (
             <div className="hidden md:flex items-center space-x-8">
               {isAuthenticated && (

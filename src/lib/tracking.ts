@@ -57,6 +57,7 @@ const DEFAULT_GOOGLE_ADS_CONTACT_CONVERSION_LABEL = '4PthCKTk6q0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL = 'dFKvCLrn8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_BEGIN_CHECKOUT_CONVERSION_LABEL = 'Y_4DCL3n8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL = 'KEhxCMDn8K0cEKLkvdRD';
+const DEFAULT_GTM_CONTAINER_ID = 'GTM-NK8ZJFW2';
 const DEFAULT_MICROSOFT_UET_ID = '343251742';
 const ATTRIBUTION_STORAGE_KEY = 'aifacilitator_acquisition_attribution_v1';
 const ATTRIBUTION_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'gbraid', 'wbraid', 'msclkid', 'fbclid'] as const;
@@ -78,11 +79,13 @@ const config = {
     (import.meta.env.VITE_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL as string | undefined) ||
     DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL,
   googleAdsSessionCreatedConversionLabel: import.meta.env.VITE_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL as string | undefined,
+  gtmContainerId: (import.meta.env.VITE_GTM_CONTAINER_ID as string | undefined) || DEFAULT_GTM_CONTAINER_ID,
   microsoftUetId: (import.meta.env.VITE_MICROSOFT_UET_ID as string | undefined) || DEFAULT_MICROSOFT_UET_ID,
   clarityProjectId: import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined,
 };
 
 let gtagInitialized = false;
+let gtmInitialized = false;
 let clarityInitialized = false;
 let uetInitialized = false;
 
@@ -131,15 +134,56 @@ function isUetDisabledPath(): boolean {
   return UET_DISABLED_PATHS.some(path => window.location.pathname.startsWith(path));
 }
 
-function appendScript(id: string, src: string): void {
+function appendScript(id: string, src: string, onload?: () => void): void {
   if (typeof document === 'undefined') return;
-  if (document.getElementById(id)) return;
+  const existing = document.getElementById(id) as HTMLScriptElement | null;
+  if (existing) {
+    onload?.();
+    return;
+  }
 
   const script = document.createElement('script');
   script.id = id;
   script.async = true;
   script.src = src;
+  if (onload) script.addEventListener('load', onload, { once: true });
   document.head.appendChild(script);
+}
+
+function runAfterInitialRender(callback: () => void): void {
+  if (typeof window === 'undefined') return;
+
+  const run = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(callback, { timeout: 2500 });
+      return;
+    }
+
+    window.setTimeout(callback, 2000);
+  };
+
+  if (document.readyState === 'complete') {
+    run();
+    return;
+  }
+
+  window.addEventListener('load', run, { once: true });
+}
+
+/** Load GTM only after a consent decision and after the initial render path. */
+function initGtm(analyticsConsent: boolean, advertisingConsent: boolean): void {
+  if (gtmInitialized || (!analyticsConsent && !advertisingConsent) || !hasValue(config.gtmContainerId)) return;
+
+  gtmInitialized = true;
+  const dataLayer = ensureDataLayer();
+  dataLayer?.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+
+  runAfterInitialRender(() => {
+    appendScript(
+      'aifacilitator-gtm',
+      `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(config.gtmContainerId)}`,
+    );
+  });
 }
 
 function readStoredAttribution(): AcquisitionAttributionSnapshot | null {
@@ -353,6 +397,7 @@ export function initializeTracking(): void {
   updateGoogleConsent(consent.analytics, consent.advertising);
   updateMicrosoftConsent(consent.advertising);
   initGtag(consent.analytics, consent.advertising);
+  initGtm(consent.analytics, consent.advertising);
   initClarity(consent.analytics);
   initUet(consent.advertising);
 }
@@ -361,6 +406,7 @@ export function initializeTracking(): void {
 export function reinitializeTracking(): void {
   // Reset flags so scripts can be loaded if consent was just granted
   gtagInitialized = false;
+  gtmInitialized = false;
   clarityInitialized = false;
   uetInitialized = false;
   initializeTracking();

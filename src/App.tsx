@@ -5,14 +5,8 @@
  */
 
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { CrispChat } from "./components/CrispChat";
-import { CookieBanner } from "./components/CookieBanner";
-import { initializeTracking, reinitializeTracking, trackPageView } from "./lib/tracking";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
@@ -46,6 +40,10 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const RedeemAppSumo   = lazy(() => import("./pages/RedeemAppSumo"));
 const VerifyEmail     = lazy(() => import("./pages/VerifyEmail"));
+const DeferredToaster = lazy(() => import("@/components/ui/toaster").then(module => ({ default: module.Toaster })));
+const DeferredSonner = lazy(() => import("@/components/ui/sonner").then(module => ({ default: module.Toaster })));
+const DeferredCookieBanner = lazy(() => import("./components/CookieBanner").then(module => ({ default: module.CookieBanner })));
+const DeferredCrispChat = lazy(() => import("./components/CrispChat").then(module => ({ default: module.CrispChat })));
 const VerifyEmailSent = lazy(() => import("./pages/VerifyEmailSent"));
 const OnboardingDemo  = lazy(() => import("./pages/OnboardingDemo"));
 // SEO / Content pages
@@ -69,31 +67,90 @@ const PageLoader = () => (
   </div>
 );
 
-// Fire-and-forget warm-up ping so the Railway container is awake before users navigate to Pricing
+function runAfterInitialPageLoad(callback: () => void, delayMs = 3000) {
+  if (typeof window === "undefined") return () => undefined;
+
+  let timeoutId: number | undefined;
+  const run = () => {
+    timeoutId = window.setTimeout(callback, delayMs);
+  };
+
+  if (document.readyState === "complete") {
+    run();
+  } else {
+    window.addEventListener("load", run, { once: true });
+  }
+
+  return () => {
+    if (timeoutId) window.clearTimeout(timeoutId);
+    window.removeEventListener("load", run);
+  };
+}
+
+// Fire-and-forget warm-up ping, but keep it out of the mobile landing-page critical path.
 function useBackendWarmup() {
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL as string;
     if (!apiUrl) return;
-    fetch(`${apiUrl}/health`, { method: "GET", mode: "cors" }).catch(() => { /* ignore errors silently */ });
+
+    return runAfterInitialPageLoad(() => {
+      fetch(`${apiUrl}/health`, { method: "GET", mode: "cors" }).catch(() => { /* ignore errors silently */ });
+    }, 7000);
   }, []);
+}
+
+function DeferredAppChrome({
+  forceCookieSettingsOpen,
+  onCookieBannerClose,
+}: {
+  forceCookieSettingsOpen: boolean;
+  onCookieBannerClose: () => void;
+}) {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => runAfterInitialPageLoad(() => setEnabled(true), 1500), []);
+
+  if (!enabled) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <DeferredToaster />
+      <DeferredSonner />
+      <DeferredCrispChat />
+      <DeferredCookieBanner forceOpen={forceCookieSettingsOpen} onClose={onCookieBannerClose} />
+    </Suspense>
+  );
 }
 
 function RouteTracking() {
   const location = useLocation();
 
   useEffect(() => {
-    initializeTracking();
+    let active = true;
+    let removeConsentListener: (() => void) | undefined;
 
-    const handleConsentUpdated = () => {
-      reinitializeTracking();
+    import("./lib/tracking").then(({ initializeTracking, reinitializeTracking }) => {
+      if (!active) return;
+      initializeTracking();
+
+      const handleConsentUpdated = () => {
+        reinitializeTracking();
+      };
+
+      window.addEventListener("cookie-consent-updated", handleConsentUpdated);
+      removeConsentListener = () => window.removeEventListener("cookie-consent-updated", handleConsentUpdated);
+    });
+
+    return () => {
+      active = false;
+      removeConsentListener?.();
     };
-
-    window.addEventListener("cookie-consent-updated", handleConsentUpdated);
-    return () => window.removeEventListener("cookie-consent-updated", handleConsentUpdated);
   }, []);
 
   useEffect(() => {
-    trackPageView(location.pathname + location.search);
+    import("./lib/tracking").then(({ trackPageView }) => {
+      trackPageView(location.pathname + location.search);
+    });
   }, [location.pathname, location.search]);
 
   return null;
@@ -111,13 +168,12 @@ function App() {
   useBackendWarmup();
   return (
     <ErrorBoundary>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <CrispChat />
+      <BrowserRouter>
           <RouteTracking />
-          <CookieBanner forceOpen={forceCookieSettingsOpen} onClose={() => setForceCookieSettingsOpen(false)} />
+          <DeferredAppChrome
+            forceCookieSettingsOpen={forceCookieSettingsOpen}
+            onCookieBannerClose={() => setForceCookieSettingsOpen(false)}
+          />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Layout><Outlet /></Layout>}>
@@ -214,8 +270,7 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
-        </BrowserRouter>
-      </TooltipProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

@@ -29,6 +29,7 @@ const HIDDEN_PATHS = ["/admin", "/session", "/join-session"];
 
 const STYLE_ID = "crisp-visibility-style";
 const SCRIPT_ID = "crisp-sdk-script";
+const CRISP_LOAD_DELAY_MS = 6000;
 
 declare global {
   interface Window {
@@ -43,6 +44,7 @@ declare global {
 // Module-level flag: true only after CRISP_READY_TRIGGER has fired.
 // Prevents crispSet/crispDo from calling SDK methods before full initialisation.
 let crispReady = false;
+let crispLoadScheduled = false;
 
 /** Inject or update a <style> tag that controls Crisp chatbox visibility */
 function setCrispVisibility(hidden: boolean) {
@@ -58,6 +60,39 @@ function setCrispVisibility(hidden: boolean) {
   styleEl.textContent = hidden
     ? "#crisp-chatbox { display: none !important; }"
     : "#crisp-chatbox { display: block !important; }";
+}
+
+function scheduleNonCriticalWidgetLoad(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  let cancelled = false;
+  let timeoutId: number | undefined;
+
+  const run = () => {
+    if (cancelled) return;
+    cancelled = true;
+    callback();
+  };
+
+  const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
+  events.forEach((eventName) => window.addEventListener(eventName, run, { once: true, passive: true }));
+
+  const startTimer = () => {
+    timeoutId = window.setTimeout(run, CRISP_LOAD_DELAY_MS);
+  };
+
+  if (document.readyState === "complete") {
+    startTimer();
+  } else {
+    window.addEventListener("load", startTimer, { once: true });
+  }
+
+  return () => {
+    cancelled = true;
+    if (timeoutId) window.clearTimeout(timeoutId);
+    events.forEach((eventName) => window.removeEventListener(eventName, run));
+    window.removeEventListener("load", startTimer);
+  };
 }
 
 /**
@@ -134,8 +169,7 @@ export function CrispChat() {
       return;
     }
 
-    crispReady = false;
-    window.$crisp = [];
+    window.$crisp = window.$crisp || [];
     window.CRISP_WEBSITE_ID = CRISP_WEBSITE_ID;
 
     // CRISP_READY_TRIGGER fires once when the Crisp SDK finishes loading.
@@ -159,18 +193,22 @@ export function CrispChat() {
       }
     };
 
-    const script = document.createElement("script");
-    script.id = SCRIPT_ID;
-    script.src = "https://client.crisp.chat/l.js";
-    script.async = true;
-    document.head.appendChild(script);
+    const cancelScheduledLoad = scheduleNonCriticalWidgetLoad(() => {
+      if (crispLoadScheduled || document.getElementById(SCRIPT_ID)) return;
+      crispLoadScheduled = true;
+      crispReady = false;
+
+      const script = document.createElement("script");
+      script.id = SCRIPT_ID;
+      script.src = "https://client.crisp.chat/l.js";
+      script.async = true;
+      document.head.appendChild(script);
+    });
 
     return () => {
-      // Clean up on unmount (hot-reload / SPA navigation)
-      crispReady = false;
-      try { document.head.removeChild(script); } catch (_) { /* ignore */ }
-      window.CRISP_READY_TRIGGER = undefined;
-      // Remove the visibility style on unmount
+      cancelScheduledLoad();
+      // Keep an already-loaded Crisp SDK in place across SPA navigation. Removing
+      // it after initialisation can leave Crisp's injected iframe state dangling.
       const styleEl = document.getElementById(STYLE_ID);
       if (styleEl) styleEl.remove();
     };

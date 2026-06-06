@@ -26,21 +26,21 @@ export const Footer = () => {
               AI-powered facilitation for workshops, brainstorming sessions, and team discussions. Run better meetings, every time.
             </p>
             <div className="flex gap-4 pt-1">
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-indigo-400 transition-colors">
-                <Twitter className="h-5 w-5" />
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Follow AIfacilitator on X" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+                <Twitter className="h-5 w-5" aria-hidden="true" />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-indigo-400 transition-colors">
-                <Linkedin className="h-5 w-5" />
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="Follow AIfacilitator on LinkedIn" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+                <Linkedin className="h-5 w-5" aria-hidden="true" />
               </a>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-indigo-400 transition-colors">
-                <Github className="h-5 w-5" />
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="View AIfacilitator on GitHub" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+                <Github className="h-5 w-5" aria-hidden="true" />
               </a>
             </div>
           </div>
 
           {/* Product */}
           <div className="space-y-4">
-            <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-widest">Product</h4>
+            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Product</h2>
             <div className="flex flex-col space-y-2.5">
               <Link to="/pricing" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Pricing</Link>
               <Link to="/faqs" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">FAQs</Link>
@@ -51,7 +51,7 @@ export const Footer = () => {
 
           {/* Legal */}
           <div className="space-y-4">
-            <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-widest">Legal</h4>
+            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Legal</h2>
             <div className="flex flex-col space-y-2.5">
               <Link to="/privacy" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Terms of Service</Link>
@@ -66,12 +66,12 @@ export const Footer = () => {
         </div>
 
         <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-xs text-gray-600">
-            &copy; {currentYear} AIfacilitator. All Rights Reserved.
-          </p>
-          <p className="text-xs text-gray-600">
-            Built with AI &nbsp;·&nbsp; Powered by innovation
-          </p>
+            <p className="text-xs text-gray-400">
+              &copy; {currentYear} AIfacilitator. All Rights Reserved.
+            </p>
+            <p className="text-xs text-gray-400">
+              Built with AI &nbsp;·&nbsp; Powered by innovation
+            </p>
         </div>
       </div>
     </footer>

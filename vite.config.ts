@@ -1,10 +1,41 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 const DEV_API_URL = 'https://friendly-ai-sessions-development.up.railway.app';
 // SECURITY: Never hardcode Stripe keys in source code.
 // Set VITE_STRIPE_PUBLISHABLE_KEY as an environment variable in Vercel (dev environment).
+
+const nonBlockingAppCssPlugin = (): Plugin => ({
+  name: 'non-blocking-app-css',
+  enforce: 'post',
+  transformIndexHtml(html, context) {
+    // Vite injects the compiled Tailwind bundle as a render-blocking stylesheet in production.
+    // The landing page now has an inline critical mobile shell, so the full SPA stylesheet can
+    // be loaded asynchronously without blocking the first meaningful paint or LCP candidate.
+    if (!context.bundle) {
+      return html;
+    }
+
+    return html.replace(
+      /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
+      (match, beforeHref, href, afterHref) => {
+        if (match.includes('media="print"') || match.includes('data-critical-async="true"')) {
+          return match;
+        }
+
+        const attributes = `${beforeHref}${afterHref}`.trim();
+        const safeAttributes = attributes ? ` ${attributes}` : '';
+
+        return [
+          `<link rel="preload" href="${href}" as="style"${safeAttributes}>`,
+          `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'" data-critical-async="true"${safeAttributes}>`,
+          `<noscript><link rel="stylesheet" href="${href}"${safeAttributes}></noscript>`,
+        ].join('');
+      }
+    );
+  },
+});
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -41,6 +72,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    nonBlockingAppCssPlugin(),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -48,6 +80,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    modulePreload: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

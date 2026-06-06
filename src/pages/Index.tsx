@@ -133,7 +133,7 @@ const Index = () => {
 
     /** Primary CTA destination — logged-in users go straight to their workshops. */
     const primaryCtaHref = isAuthenticated ? '/my-facilitators' : '/signup';
-    const primaryCtaLabel = isAuthenticated ? 'Go to My Workshops' : 'Claim 3-Month Free Trial';
+    const primaryCtaLabel = isAuthenticated ? 'Go to My Workshops' : 'Start Your Free AI-Facilitated Workshop';
 
     const handlePrimaryCta = (location: string) => {
         trackCtaClick('home_primary_cta', primaryCtaHref, location);
@@ -181,9 +181,9 @@ const Index = () => {
                     </h1>
 
                     {/* Subheadline */}
-                    <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center px-2">
-                        Capture decisions, action items, and team alignment in real time so innovation leads, agile coaches, and product managers can facilitate instead of taking notes.
-                    </p>
+                        <p className="text-lg md:text-xl lg:text-2xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed text-center px-2">
+                            Streamline workshops, capture decisions, and drive action with AI-powered facilitation. Focus on outcomes, not notes.
+                        </p>
 
                     {/* CTAs */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10 px-4 sm:px-0">
@@ -237,10 +237,10 @@ const Index = () => {
                     {/* Social proof stats — 2×2 on mobile, 4-column on sm+ */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 px-4 py-5 rounded-2xl bg-white border border-gray-100 shadow-sm max-w-lg sm:max-w-none mx-auto">
                         {[
-                            { value: '10,000+', label: 'Sessions Run' },
-                            { value: '500+', label: 'Teams Served' },
-                            { value: '98%', label: 'Satisfaction Rate' },
-                            { value: '40%', label: 'Time Saved' },
+                            { value: '10,000+', label: 'Workshops Facilitated' },
+                            { value: '500+', label: 'Teams Empowered' },
+                            { value: '98%', label: 'Facilitator Satisfaction' },
+                            { value: '40%', label: 'Time Saved Per Session' },
                         ].map(stat => (
                             <div key={stat.label} className="text-center">
                                 <div className="text-2xl sm:text-3xl font-bold text-indigo-600">{stat.value}</div>

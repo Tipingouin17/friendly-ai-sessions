@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 
 const BASE_TITLE = 'AIfacilitator';
 const SITE_URL = 'https://aifacilitator.ai';
-const DEFAULT_OG_IMAGE = 'https://aifacilitator.ai/og-image.png';
+const DEFAULT_OG_IMAGE = 'https://aifacilitator.ai/og-image.webp';
 
 interface BreadcrumbItem {
   name: string;

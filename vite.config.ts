@@ -12,7 +12,8 @@ const nonBlockingAppCssPlugin = (): Plugin => ({
   transformIndexHtml(html, context) {
     // Vite injects the compiled Tailwind bundle as a render-blocking stylesheet in production.
     // The landing page now has an inline critical mobile shell, so the full SPA stylesheet can
-    // be loaded asynchronously without blocking the first meaningful paint or LCP candidate.
+    // be loaded with print-media async CSS instead of a high-priority preload. This prevents the
+    // full Tailwind bundle from competing with the first JavaScript and font requests on slow mobile.
     if (!context.bundle) {
       return html;
     }
@@ -28,7 +29,6 @@ const nonBlockingAppCssPlugin = (): Plugin => ({
         const safeAttributes = attributes ? ` ${attributes}` : '';
 
         return [
-          `<link rel="preload" href="${href}" as="style"${safeAttributes}>`,
           `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'" data-critical-async="true"${safeAttributes}>`,
           `<noscript><link rel="stylesheet" href="${href}"${safeAttributes}></noscript>`,
         ].join('');

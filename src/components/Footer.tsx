@@ -23,16 +23,16 @@ export const Footer = () => {
               <span className="text-lg font-bold text-white">AIfacilitator</span>
             </Link>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-              Facilitation d’ateliers par IA pour structurer vos conversations, accélérer vos décisions et transformer les échanges d’équipe en actions concrètes.
+              AI-facilitated workshops that help teams structure conversations, make better decisions, and turn collaborative work into clear next actions.
             </p>
             <div className="flex gap-4 pt-1">
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Suivre AIfacilitator sur X" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Follow AIfacilitator on X" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
                 <Twitter className="h-5 w-5" aria-hidden="true" />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="Suivre AIfacilitator sur LinkedIn" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="Follow AIfacilitator on LinkedIn" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
                 <Linkedin className="h-5 w-5" aria-hidden="true" />
               </a>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="Voir AIfacilitator sur GitHub" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="View AIfacilitator on GitHub" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-300 hover:text-indigo-300 hover:bg-white/5 transition-colors">
                 <Github className="h-5 w-5" aria-hidden="true" />
               </a>
             </div>
@@ -40,38 +40,38 @@ export const Footer = () => {
 
           {/* Product */}
           <div className="space-y-4">
-            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Produit</h2>
+            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Product</h2>
             <div className="flex flex-col space-y-2.5">
-              <Link to="/pricing" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Offres</Link>
+              <Link to="/pricing" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Pricing</Link>
               <Link to="/faqs" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">FAQs</Link>
               <Link to="/contact" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Contact</Link>
-              <Link to="/signup" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Essayer gratuitement</Link>
+              <Link to="/signup" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Try for free</Link>
             </div>
           </div>
 
           {/* Legal */}
           <div className="space-y-4">
-            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Légal</h2>
+            <h2 className="text-xs font-semibold text-gray-200 uppercase tracking-widest">Legal</h2>
             <div className="flex flex-col space-y-2.5">
-              <Link to="/privacy" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Politique de confidentialité</Link>
-              <Link to="/terms" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Conditions d’utilisation</Link>
+              <Link to="/privacy" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="text-sm text-gray-400 hover:text-indigo-400 transition-colors">Terms of Service</Link>
               <button
                 onClick={() => window.dispatchEvent(new Event("open-cookie-settings"))}
                 className="text-sm text-gray-400 hover:text-indigo-400 transition-colors text-left"
               >
-                Paramètres des cookies
+                Cookie Settings
               </button>
             </div>
           </div>
         </div>
 
         <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <p className="text-xs text-gray-400">
-              &copy; {currentYear} AIfacilitator. Tous droits réservés.
-            </p>
-            <p className="text-xs text-gray-400">
-              Conçu avec l’IA &nbsp;·&nbsp; Propulsé par l’innovation
-            </p>
+          <p className="text-xs text-gray-400">
+            &copy; {currentYear} AIfacilitator. All rights reserved.
+          </p>
+          <p className="text-xs text-gray-400">
+            Built with AI &nbsp;·&nbsp; Powered by innovation
+          </p>
         </div>
       </div>
     </footer>

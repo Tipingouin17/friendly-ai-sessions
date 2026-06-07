@@ -1,9 +1,9 @@
 /**
  * Index (Home Page)
  *
- * French-first marketing landing page for the AIfacilitator application.
- * CTA buttons are auth-aware: authenticated users are directed to
- * /my-facilitators while anonymous visitors are sent to /signup.
+ * English-only marketing landing page for the AIfacilitator application.
+ * CTA buttons are auth-aware: authenticated users are directed toward the
+ * guided demo preset while anonymous visitors are sent to signup.
  */
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -18,54 +18,54 @@ const HomeBelowFold = lazy(() => import('@/components/home/HomeBelowFold'));
 const SCHEMA_FAQ_HOME = {
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
-  inLanguage: 'fr-FR',
+  inLanguage: 'en',
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'Qu’est-ce qu’AIfacilitator ?',
+      name: 'What is AIfacilitator?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'AIfacilitator est une plateforme de facilitation d’ateliers par IA. Elle guide les équipes dans des conversations structurées, aide à prendre des décisions et produit des synthèses actionnables après la session.',
+        text: 'AIfacilitator is a web platform for AI-facilitated workshops. It guides teams through structured conversations, helps them make decisions, and turns session outputs into clear summaries and next actions.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Comment fonctionne une facilitation d’atelier par IA ?',
+      name: 'How does an AI-facilitated workshop work?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'L’IA propose un cadre d’atelier, guide les participants étape par étape, relance les échanges quand c’est nécessaire et transforme les contributions en priorités, décisions et prochaines actions.',
+        text: 'The AI facilitator frames the workshop, guides participants step by step, prompts the right questions, captures important contributions, and summarizes priorities, decisions, and action items.',
       },
     },
     {
       '@type': 'Question',
-      name: 'À qui s’adresse AIfacilitator ?',
+      name: 'Can I try AIfacilitator before inviting my team?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'AIfacilitator s’adresse aux product managers, coachs agiles, Scrum Masters, responsables RH, consultants, équipes innovation et organisations hybrides qui veulent animer de meilleurs ateliers sans dépendre d’un facilitateur dédié à chaque fois.',
+        text: 'Yes. New users are guided toward a low-risk first experience, such as a short demo-style session or a first session created from a template, before they need to invite real participants.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Quels types d’ateliers puis-je lancer ?',
+      name: 'What types of sessions can I run?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'La plateforme peut accompagner des rétrospectives agiles, ateliers de décision, brainstormings, alignements d’équipe, sessions de cadrage, ateliers de priorisation et formats collaboratifs à distance ou en présentiel.',
+        text: 'AIfacilitator can support brainstorming, retrospectives, decision meetings, planning workshops, feedback sessions, alignment conversations, and collaborative sessions for remote, hybrid, or in-person teams.',
       },
     },
     {
       '@type': 'Question',
-      name: 'En quoi AIfacilitator est différent d’un tableau blanc ou d’un modèle d’agenda ?',
+      name: 'How is AIfacilitator different from a whiteboard or agenda template?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Un tableau blanc fournit un espace de collaboration et un modèle d’agenda décrit une structure. AIfacilitator agit comme un co-facilitateur actif : il guide la discussion, adapte les questions au contexte et capture les résultats en temps réel.',
+        text: 'A whiteboard gives teams a shared space, and an agenda template gives them a structure. AIfacilitator acts as an active co-facilitator by guiding the conversation, adapting prompts, and capturing useful outcomes as the session progresses.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Puis-je essayer AIfacilitator gratuitement ?',
+      name: 'Can I start for free?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Oui. Vous pouvez créer un compte gratuitement pour tester une première expérience facilitée par IA. Une offre testeur permet également d’obtenir trois mois gratuits pendant la phase de lancement.',
+        text: 'Yes. You can create an account and start exploring AIfacilitator for free. During launch, eligible testers can also request extended tester access.',
       },
     },
   ],
@@ -78,28 +78,28 @@ const SCHEMA_SOFTWARE_APPLICATION = {
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   url: 'https://aifacilitator.ai/',
-  inLanguage: 'fr-FR',
-  description: 'AIfacilitator est une plateforme web de facilitation d’ateliers par IA pour rétrospectives agiles, décisions d’équipe, brainstormings, alignement stratégique et ateliers hybrides.',
+  inLanguage: 'en',
+  description: 'AIfacilitator is a web platform for AI-facilitated workshops, retrospectives, decision meetings, brainstorming, alignment conversations, and hybrid team sessions.',
   offers: {
     '@type': 'Offer',
-    name: 'Plan gratuit AIfacilitator',
+    name: 'AIfacilitator free plan',
     price: '0',
     priceCurrency: 'EUR',
     availability: 'https://schema.org/InStock',
     url: 'https://aifacilitator.ai/pricing',
-    description: 'Plan gratuit disponible pour démarrer ; des formules payantes existent pour les équipes qui ont besoin de plus de sessions et de personnalisation.',
+    description: 'A free plan is available to get started, with paid plans for teams that need more sessions and customization.',
   },
   featureList: [
-    'Facilitation d’atelier guidée par IA',
-    'Rétrospectives agiles et ateliers de décision',
-    'Sessions structurées pour équipes distantes et hybrides',
-    'Liens d’invitation pour participants',
-    'Synthèses, décisions et prochaines actions',
-    'Parcours de démonstration et première session rapide',
+    'AI-guided workshop facilitation',
+    'Retrospectives, brainstorming, and decision meetings',
+    'Structured sessions for remote and hybrid teams',
+    'Participant invitation links',
+    'Summaries, decisions, and next actions',
+    'Low-risk demo path and fast first-session setup',
   ],
   audience: {
     '@type': 'Audience',
-    audienceType: 'Product managers, coachs agiles, Scrum Masters, consultants, facilitateurs, équipes RH, équipes innovation et équipes distribuées',
+    audienceType: 'Product managers, agile coaches, Scrum Masters, consultants, facilitators, HR teams, innovation teams, and distributed teams',
   },
 };
 
@@ -122,8 +122,8 @@ const SCHEMA_WEBSITE = {
   '@type': 'WebSite',
   name: 'AIfacilitator',
   url: 'https://aifacilitator.ai/',
-  inLanguage: 'fr-FR',
-  description: 'Facilitation d’ateliers par IA pour des conversations structurées, de meilleures décisions et des actions claires.',
+  inLanguage: 'en',
+  description: 'AI-facilitated workshops for structured conversations, better decisions, clear summaries, and action-oriented team outcomes.',
 };
 
 function useDeferredHomepageSections() {
@@ -144,10 +144,10 @@ function useDeferredHomepageSections() {
   return ready;
 }
 
-function useFrenchDocumentLanguage() {
+function useEnglishDocumentLanguage() {
   useEffect(() => {
     const previousLang = document.documentElement.lang;
-    document.documentElement.lang = 'fr';
+    document.documentElement.lang = 'en';
 
     return () => {
       document.documentElement.lang = previousLang || 'en';
@@ -158,11 +158,11 @@ function useFrenchDocumentLanguage() {
 const Index = () => {
   const { isAuthenticated } = useAuth();
   const showBelowFold = useDeferredHomepageSections();
-  useFrenchDocumentLanguage();
+  useEnglishDocumentLanguage();
 
-  /** Primary CTA destination — logged-in users go straight to their workshops. */
-  const primaryCtaHref = isAuthenticated ? '/my-facilitators' : '/signup';
-  const primaryCtaLabel = isAuthenticated ? 'Accéder à mes ateliers' : 'Tester une session IA gratuite';
+  /** Primary CTA destination — logged-in users go straight to the guided demo preset. */
+  const primaryCtaHref = isAuthenticated ? '/my-facilitators?onboarding=demo' : '/signup';
+  const primaryCtaLabel = isAuthenticated ? 'Start demo session' : 'Try a free AI session';
 
   const handlePrimaryCta = (location: string) => {
     trackCtaClick('home_primary_cta', primaryCtaHref, location);
@@ -179,8 +179,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-white">
       <PageHead
-        title="Facilitation d’ateliers par IA pour équipes"
-        description="AIfacilitator guide vos ateliers, rétrospectives et sessions de décision avec une IA facilitatrice qui structure les échanges, capte les décisions et transforme les idées en actions."
+        title="AI-facilitated workshops for teams"
+        description="Run your first AI-facilitated session with AIfacilitator. Start with a low-risk demo, create a structured workshop, and turn conversations into decisions and next actions."
         canonical="https://aifacilitator.ai/"
         jsonLd={[SCHEMA_SOFTWARE_APPLICATION, SCHEMA_ORGANIZATION, SCHEMA_WEBSITE, SCHEMA_FAQ_HOME]}
       />
@@ -193,19 +193,19 @@ const Index = () => {
         <div className="relative container mx-auto max-w-5xl text-center">
           <span className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold tracking-wide border border-indigo-200">
             <Zap className="h-3.5 w-3.5" aria-hidden="true" />
-            Offre de lancement testeur : 3 mois gratuits
+            Launch tester access: 3 months free
           </span>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-[1.1] tracking-tight text-center">
-            <span className="text-gray-900">Animez vos ateliers</span>
+            <span className="text-gray-900">Run your first</span>
             <br />
             <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent">
-              avec un facilitateur IA
+              AI-facilitated session
             </span>
           </h1>
 
           <p className="text-lg md:text-xl lg:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed text-center px-2">
-            Lancez une première expérience en quelques minutes : l’IA structure la conversation, guide les participants, capture les décisions et transforme les échanges en prochaines actions.
+            AIfacilitator helps teams move from open conversation to clear outcomes. Start with a safe demo, create a real session from a template, and let the AI facilitator guide the flow, capture decisions, and turn ideas into next actions.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10 px-4 sm:px-0">
@@ -224,7 +224,7 @@ const Index = () => {
                 variant="outline"
                 className="w-full sm:w-auto text-base font-semibold px-8 py-6 border-2 border-gray-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all rounded-xl"
               >
-                Voir les offres
+                View plans
               </Button>
             </Link>
           </div>
@@ -237,14 +237,14 @@ const Index = () => {
                     <Gift className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Accès testeur exclusif : 3 mois gratuits</p>
+                    <p className="text-sm font-semibold text-gray-900">Tester access: start free, then unlock 3 months</p>
                     <p className="mt-1 text-sm text-gray-600">
-                      Créez votre compte gratuitement, essayez le parcours de démarrage, puis contactez Julia avec votre email de compte pour activer l’accès testeur étendu.
+                      Create your account, experience the guided first-step flow, and contact Julia with your account email to activate extended tester access.
                     </p>
                   </div>
                 </div>
                 <div className="grid gap-1 text-xs font-medium text-gray-600 sm:min-w-48">
-                  {['Sans carte bancaire', 'Première valeur rapide', 'Conçu pour de vrais ateliers'].map(item => (
+                  {['No credit card required', 'Fast first value', 'Built for real team sessions'].map(item => (
                     <span key={item} className="flex items-center gap-1.5">
                       <BadgeCheck className="h-3.5 w-3.5 text-indigo-500" aria-hidden="true" />
                       {item}
@@ -257,10 +257,10 @@ const Index = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 px-4 py-5 rounded-2xl bg-white border border-gray-100 shadow-sm max-w-lg sm:max-w-none mx-auto">
             {[
-              { value: '2 min', label: 'pour tester une démo guidée' },
-              { value: '3', label: 'chemins d’activation clairs' },
-              { value: '0', label: 'carte bancaire requise' },
-              { value: '100%', label: 'orienté décisions et actions' },
+              { value: '2 min', label: 'to try a guided demo' },
+              { value: '3', label: 'clear activation paths' },
+              { value: '0', label: 'credit card required' },
+              { value: '100%', label: 'focused on decisions and actions' },
             ].map(stat => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-indigo-600">{stat.value}</div>

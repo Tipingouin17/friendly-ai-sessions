@@ -85,7 +85,7 @@ export const Navigation = () => {
                 variant="ghost"
                 size="icon"
                 className="h-11 w-11 p-0"
-                aria-label={mobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-navigation-menu"
                 onClick={() => setMobileMenuOpen(open => !open)}
@@ -93,16 +93,16 @@ export const Navigation = () => {
                 <Menu className="h-6 w-6" />
               </Button>
               {mobileMenuOpen && (
-                <div id="mobile-navigation-menu" className="fixed inset-x-3 top-20 z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="Navigation principale">
+                <div id="mobile-navigation-menu" className="fixed inset-x-3 top-20 z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="Main navigation">
                   <div className="flex flex-col space-y-5">
                     {isAuthenticated && (
                       <MobileLink to="/my-facilitators" className="text-gray-800 hover:text-indigo-600 font-medium text-lg">
-                        Mes ateliers
+                        My Facilitators
                       </MobileLink>
                     )}
-                    <MobileLink to="/" className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Accueil</MobileLink>
-                    <MobileLink to="/about" className={`${location.pathname === '/about' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>À propos</MobileLink>
-                    <MobileLink to="/pricing" className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Offres</MobileLink>
+                    <MobileLink to="/" className={`${location.pathname === '/' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Home</MobileLink>
+                    <MobileLink to="/about" className={`${location.pathname === '/about' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>About</MobileLink>
+                    <MobileLink to="/pricing" className={`${location.pathname === '/pricing' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Pricing</MobileLink>
                     <MobileLink to="/faqs" className={`${location.pathname === '/faqs' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>FAQs</MobileLink>
                     <MobileLink to="/blog" className={`${location.pathname.startsWith('/blog') ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Blog</MobileLink>
                     <MobileLink to="/contact" className={`${location.pathname === '/contact' ? 'text-indigo-600 font-medium' : 'text-gray-600'} hover:text-indigo-600 text-lg`}>Contact</MobileLink>
@@ -112,22 +112,22 @@ export const Navigation = () => {
                     {!isAuthenticated ? (
                       <div className="flex flex-col space-y-3">
                         <MobileLink to="/login" className="w-full">
-                          <Button variant="outline" className="w-full min-h-11 text-center rounded-xl">Connexion</Button>
+                          <Button variant="outline" className="w-full min-h-11 text-center rounded-xl">Sign in</Button>
                         </MobileLink>
                         <MobileLink to="/signup" className="w-full">
-                          <Button className="w-full min-h-11 text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">Essayer gratuitement</Button>
+                          <Button className="w-full min-h-11 text-center bg-indigo-600 hover:bg-indigo-700 rounded-xl">Try for free</Button>
                         </MobileLink>
                       </div>
                     ) : (
                       <div className="flex flex-col space-y-3">
-                        <div className="text-sm text-gray-600 mb-2">Bonjour, {userDisplayName}</div>
-                        <MobileLink to="/profile" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><UserCircle className="h-4 w-4" /> Profil</Button></MobileLink>
-                        <MobileLink to="/settings" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><Settings className="h-4 w-4" /> Paramètres</Button></MobileLink>
-                        <MobileLink to="/past-workshops" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ateliers passés</Button></MobileLink>
+                        <div className="text-sm text-gray-600 mb-2">Hello, {userDisplayName}</div>
+                        <MobileLink to="/profile" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><UserCircle className="h-4 w-4" /> Profile</Button></MobileLink>
+                        <MobileLink to="/settings" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><Settings className="h-4 w-4" /> Settings</Button></MobileLink>
+                        <MobileLink to="/past-workshops" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2"><BookOpen className="h-4 w-4" /> Past Workshops</Button></MobileLink>
                         {user?.role === 'admin' && (
                           <MobileLink to="/admin" className="w-full"><Button variant="outline" className="w-full min-h-11 text-center rounded-xl flex items-center gap-2 text-purple-600 border-purple-200 hover:border-purple-400"><Shield className="h-4 w-4" /> Administration</Button></MobileLink>
                         )}
-                        <Button variant="outline" className="w-full min-h-11 text-center rounded-xl" onClick={() => { closeMobileMenu(); logout(); }}>Déconnexion</Button>
+                        <Button variant="outline" className="w-full min-h-11 text-center rounded-xl" onClick={() => { closeMobileMenu(); logout(); }}>Sign out</Button>
                       </div>
                     )}
                   </div>
@@ -138,39 +138,39 @@ export const Navigation = () => {
             <div className="hidden md:flex items-center space-x-8">
               {isAuthenticated && (
                 <Link to="/my-facilitators" className={navLinkClass('/my-facilitators')}>
-                  Mes ateliers
+                  My Facilitators
                 </Link>
               )}
-              <Link to="/" className={navLinkClass('/')}>Accueil</Link>
-              <Link to="/about" className={navLinkClass('/about')}>À propos</Link>
-              <Link to="/pricing" className={navLinkClass('/pricing')}>Offres</Link>
+              <Link to="/" className={navLinkClass('/')}>Home</Link>
+              <Link to="/about" className={navLinkClass('/about')}>About</Link>
+              <Link to="/pricing" className={navLinkClass('/pricing')}>Pricing</Link>
               <Link to="/faqs" className={navLinkClass('/faqs')}>FAQs</Link>
               <Link to="/blog" className={navLinkClass('/blog')}>Blog</Link>
               <Link to="/contact" className={navLinkClass('/contact')}>Contact</Link>
 
               {isAuthenticated ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-500">Bonjour, {userDisplayName}</span>
+                  <span className="text-sm text-gray-500">Hello, {userDisplayName}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="gap-2 rounded-xl text-sm border-gray-200 hover:border-indigo-300 hover:text-indigo-600">
-                        Mon compte <ChevronDown className="h-4 w-4" />
+                        My account <ChevronDown className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 bg-white rounded-xl shadow-lg border-gray-100">
                       <DropdownMenuItem asChild>
                         <Link to="/profile" className="flex items-center gap-2">
-                          <UserCircle className="h-4 w-4" /> Profil
+                          <UserCircle className="h-4 w-4" /> Profile
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/settings" className="flex items-center gap-2">
-                          <Settings className="h-4 w-4" /> Paramètres
+                          <Settings className="h-4 w-4" /> Settings
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/past-workshops" className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" /> Ateliers passés
+                          <BookOpen className="h-4 w-4" /> Past Workshops
                         </Link>
                       </DropdownMenuItem>
                       {user?.role === 'admin' && (
@@ -184,7 +184,7 @@ export const Navigation = () => {
                         </>
                       )}
                       <DropdownMenuItem onClick={logout}>
-                        Déconnexion
+                        Sign out
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -192,11 +192,11 @@ export const Navigation = () => {
               ) : (
                 <div className="flex items-center gap-3">
                   <Link to="/login">
-                    <Button variant="ghost" className="rounded-xl text-sm text-gray-600 hover:text-indigo-600">Connexion</Button>
+                    <Button variant="ghost" className="rounded-xl text-sm text-gray-600 hover:text-indigo-600">Sign in</Button>
                   </Link>
                   <Link to="/signup">
                     <Button className="bg-indigo-600 hover:bg-indigo-700 rounded-xl text-sm font-semibold px-5 shadow-sm shadow-indigo-500/20">
-                      Essayer gratuitement
+                      Try for free
                     </Button>
                   </Link>
                 </div>

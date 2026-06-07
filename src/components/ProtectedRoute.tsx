@@ -4,15 +4,17 @@
  * Component for the AIfacilitator application.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { clearAllParticipantState } from '@/lib/api';
+import { api, clearAllParticipantState } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
+  const [sessionRecoveryChecked, setSessionRecoveryChecked] = useState(false);
+  const [recoveringSession, setRecoveringSession] = useState(false);
 
   // Clear ALL participant state (join tokens + session data for every session)
   // whenever an authenticated host navigates to a protected route.
@@ -24,7 +26,31 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     clearAllParticipantState();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    if (loading || isAuthenticated || sessionRecoveryChecked) return;
+
+    let active = true;
+    setRecoveringSession(true);
+
+    api.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!active) return;
+        if (session?.access_token) {
+          void api.auth.acceptVerifiedSession(session);
+        }
+      })
+      .finally(() => {
+        if (!active) return;
+        setSessionRecoveryChecked(true);
+        setRecoveringSession(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, loading, sessionRecoveryChecked]);
+
+  if (loading || recoveringSession || (!isAuthenticated && !sessionRecoveryChecked)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -33,7 +59,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && sessionRecoveryChecked) {
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   }
 

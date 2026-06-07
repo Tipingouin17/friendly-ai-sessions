@@ -6,18 +6,19 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import PageHead from '@/components/PageHead';
-import { EDGE_FUNCTION_URL } from '@/lib/api';
+import { api, EDGE_FUNCTION_URL } from '@/lib/api';
 import { recordActivationEventBeacon } from '@/lib/activationTracking';
 import { trackActivationEmailVerified } from '@/lib/tracking';
 
 type Status = 'loading' | 'success' | 'error';
 
+const VERIFIED_REDIRECT_PATH = '/my-facilitators?onboarding=demo';
+
 const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -36,16 +37,16 @@ const VerifyEmail: React.FC = () => {
         const data = await res.json();
 
         if (data?.access_token) {
-          // Store the JWT so the app picks it up on next navigation
-          localStorage.setItem('mf_session', JSON.stringify(data));
+          await api.auth.acceptVerifiedSession(data);
           recordActivationEventBeacon('activation_signup_completed', {
             activation_step: 'email_verified',
             source: 'verification_link',
           });
           trackActivationEmailVerified('verification_link');
           setStatus('success');
-          // Redirect to the activation demo after a short delay.
-          setTimeout(() => navigate('/onboarding/demo', { replace: true }), 2500);
+          // Use a full-page redirect so AuthContext rehydrates from the persisted
+          // verified session before entering protected workshop routes.
+          setTimeout(() => window.location.assign(VERIFIED_REDIRECT_PATH), 2500);
         } else {
           setStatus('error');
           setErrorMessage(data?.message ?? 'Verification failed. Please try again.');
@@ -58,7 +59,7 @@ const VerifyEmail: React.FC = () => {
     };
 
     verify();
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
@@ -79,10 +80,10 @@ const VerifyEmail: React.FC = () => {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-3">Email verified!</h1>
             <p className="text-gray-600 mb-6">
-              Your account is now active. Redirecting you to your first AI workshop demo…
+              Your account is now active. Redirecting you to your first AI workshop setup…
             </p>
             <Link
-              to="/onboarding/demo"
+              to={VERIFIED_REDIRECT_PATH}
               className="inline-block w-full py-3 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:opacity-90 transition"
             >
               Start AI demo workshop

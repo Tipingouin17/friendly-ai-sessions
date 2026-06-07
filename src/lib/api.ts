@@ -449,6 +449,15 @@ export const auth = {
     return { data: { user: res.data }, error: res.error };
   },
 
+  async acceptVerifiedSession(session: ApiSession): Promise<{
+    data: { session: ApiSession; user: ApiUser | null };
+    error: ApiError | null;
+  }> {
+    saveSession(session);
+    notifyAuth("SIGNED_IN", session);
+    return { data: { session, user: session.user ?? null }, error: null };
+  },
+
   async signInWithPassword(creds: { email: string; password: string }): Promise<{
     data: { session: ApiSession | null; user: ApiUser | null };
     error: ApiError | null;

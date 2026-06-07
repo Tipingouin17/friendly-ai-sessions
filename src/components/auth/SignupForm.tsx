@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema, sanitizeInput } from '@/utils/inputValidation';
 import { SignupFormFields } from './SignupFormFields';
+import { recordActivationEventBeacon } from '@/lib/activationTracking';
 import { trackActivationSignupSubmitted, trackSignup, trackSignupStart } from '@/lib/tracking';
 
 // Define validation schema
@@ -74,16 +75,29 @@ export const SignupForm: React.FC = () => {
       return;
     }
     
+    const sanitizedEmail = sanitizeInput(email);
+    const sanitizedName = sanitizeInput(name);
+
     setIsLoading(true);
+    recordActivationEventBeacon('activation_signup_started', {
+      activation_step: 'signup_started',
+      method: 'email',
+      form: 'signup',
+    });
     trackSignupStart('email');
     try {
-      await signup(sanitizeInput(email), password, sanitizeInput(name));
-      trackSignup('email', { email: sanitizeInput(email) });
+      await signup(sanitizedEmail, password, sanitizedName);
+      recordActivationEventBeacon('activation_signup_submitted', {
+        activation_step: 'signup_submitted',
+        method: 'email',
+        form: 'signup',
+      });
+      trackSignup('email', { email: sanitizedEmail });
       trackActivationSignupSubmitted('email');
       // The backend now requires email verification before login.
       // Redirect to a confirmation page instead of the dashboard.
       toast.success("Account created! Please check your email to verify your account.");
-      navigate('/verify-email-sent', { replace: true, state: { email: sanitizeInput(email) } });
+      navigate('/verify-email-sent', { replace: true, state: { email: sanitizedEmail } });
     } catch (error: unknown) {
       setAttempts(prev => prev + 1);
       // Handle both Error instances and Supabase/API error objects with a message property

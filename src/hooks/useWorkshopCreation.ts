@@ -11,6 +11,7 @@ import { Step } from "@/types/facilitator";
 import { createConversation } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useNavigate } from "react-router-dom";
+import { recordActivationEventBeacon } from "@/lib/activationTracking";
 import { trackSessionCreated } from "@/lib/tracking";
 
 export const useWorkshopCreation = () => {
@@ -104,6 +105,10 @@ export const useWorkshopCreation = () => {
           };
 
           trackSessionCreated(eventParameters);
+          recordActivationEventBeacon('activation_first_session_created', {
+            activation_step: 'first_session_created',
+            ...eventParameters,
+          });
 
 
         if (isScheduled) {

@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ActivationRouteGuard } from "./components/ActivationRouteGuard";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -216,7 +217,14 @@ function App() {
                 } />
                 <Route path="/my-facilitators" element={
                   <ProtectedRoute>
-                    <AIfacilitators />
+                    <ActivationRouteGuard>
+                      <AIfacilitators />
+                    </ActivationRouteGuard>
+                  </ProtectedRoute>
+                } />
+                <Route path="/activation" element={
+                  <ProtectedRoute>
+                    <OnboardingDemo />
                   </ProtectedRoute>
                 } />
                 <Route path="/onboarding/demo" element={

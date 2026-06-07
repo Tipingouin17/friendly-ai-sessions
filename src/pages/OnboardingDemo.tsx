@@ -7,10 +7,12 @@
  * simulation system.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bot, CheckCircle2, MessageSquare, Users } from 'lucide-react';
 import PageHead from '@/components/PageHead';
+import { markActivationRouteBypassed } from '@/components/ActivationRouteGuard';
+import { recordActivationEventBeacon } from '@/lib/activationTracking';
 import {
   trackActivationDemoViewed,
   trackActivationDemoStarted,
@@ -37,19 +39,60 @@ const demoSteps = [
 
 const OnboardingDemo: React.FC = () => {
   const navigate = useNavigate();
+  const [feedback, setFeedback] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
+    recordActivationEventBeacon('activation_home_viewed', {
+      activation_step: 'activation_home_viewed',
+      source: 'post_verification',
+    });
     trackActivationDemoViewed('post_verification');
   }, []);
 
   const startDemo = () => {
+    markActivationRouteBypassed();
+    recordActivationEventBeacon('activation_demo_started', {
+      activation_step: 'demo_started',
+      source: 'onboarding_demo_page',
+      next_path: '/my-facilitators?onboarding=demo',
+    });
     trackActivationDemoStarted('onboarding_demo_page');
     navigate('/my-facilitators?onboarding=demo', { replace: false });
   };
 
   const inviteRealParticipants = () => {
+    markActivationRouteBypassed();
+    recordActivationEventBeacon('activation_first_session_started', {
+      activation_step: 'first_real_session_started',
+      source: 'onboarding_demo_page',
+      next_path: '/my-facilitators?onboarding=invite',
+    });
     trackInviteParticipantsIntent('onboarding_demo_page');
     navigate('/my-facilitators?onboarding=invite', { replace: false });
+  };
+
+  const skipActivationForNow = () => {
+    markActivationRouteBypassed();
+    recordActivationEventBeacon('activation_home_viewed', {
+      activation_step: 'activation_skipped_for_now',
+      source: 'onboarding_demo_page',
+      next_path: '/my-facilitators',
+    });
+  };
+
+  const submitFeedback = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedFeedback = feedback.trim();
+    if (!trimmedFeedback) return;
+
+    recordActivationEventBeacon('activation_feedback_submitted', {
+      activation_step: 'activation_feedback_submitted',
+      source: 'onboarding_demo_page',
+      feedback: trimmedFeedback.slice(0, 1000),
+    });
+    setFeedbackSubmitted(true);
+    setFeedback('');
   };
 
   return (
@@ -121,9 +164,39 @@ const OnboardingDemo: React.FC = () => {
             </div>
           </div>
 
+          <form onSubmit={submitFeedback} className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-5 text-left">
+            <label htmlFor="activation-feedback" className="block text-sm font-semibold text-gray-900">
+              What would make this first step easier?
+            </label>
+            <p className="mt-1 text-sm text-gray-600">
+              Optional feedback helps us remove friction from the activation flow.
+            </p>
+            <textarea
+              id="activation-feedback"
+              value={feedback}
+              onChange={(event) => setFeedback(event.target.value)}
+              rows={3}
+              maxLength={1000}
+              className="mt-3 w-full rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              placeholder="Example: I need a sample agenda, clearer demo expectations, or a faster way to invite people."
+            />
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="submit"
+                disabled={!feedback.trim()}
+                className="inline-flex items-center justify-center rounded-full bg-gray-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Send feedback
+              </button>
+              {feedbackSubmitted && (
+                <p className="text-sm font-medium text-emerald-700">Thanks — your feedback was recorded.</p>
+              )}
+            </div>
+          </form>
+
           <p className="mt-8 text-center text-sm text-gray-500">
             Prefer to explore later?{' '}
-            <Link to="/my-facilitators" className="font-semibold text-indigo-600 hover:underline">
+            <Link to="/my-facilitators" onClick={skipActivationForNow} className="font-semibold text-indigo-600 hover:underline">
               Go to My Workshops
             </Link>
           </p>

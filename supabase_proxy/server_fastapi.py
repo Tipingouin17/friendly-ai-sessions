@@ -1757,6 +1757,84 @@ async def run_startup_migrations() -> None:
         CREATE INDEX IF NOT EXISTS marketing_api_sync_log_source_started_idx
             ON marketing_api_sync_log(source, started_at DESC);
         """,
+
+        # 2026-06-07: First-party activation funnel instrumentation.
+        """
+        CREATE TABLE IF NOT EXISTS activation_events (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+            anonymous_id TEXT,
+            activation_session_id TEXT,
+            event_name TEXT NOT NULL CHECK (event_name IN (
+                'activation_landing_view',
+                'activation_signup_started',
+                'activation_signup_submitted',
+                'activation_signup_completed',
+                'activation_home_viewed',
+                'activation_demo_started',
+                'activation_demo_completed',
+                'activation_first_session_started',
+                'activation_first_session_created',
+                'activation_feedback_submitted'
+            )),
+            activation_step TEXT,
+            page_url TEXT,
+            referrer TEXT,
+            utm_source TEXT,
+            utm_medium TEXT,
+            utm_campaign TEXT,
+            utm_term TEXT,
+            utm_content TEXT,
+            gclid TEXT,
+            gbraid TEXT,
+            wbraid TEXT,
+            msclkid TEXT,
+            fbclid TEXT,
+            consent_analytics BOOLEAN,
+            consent_advertising BOOLEAN,
+            event_properties JSONB NOT NULL DEFAULT '{}'::jsonb,
+            raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS activation_events_user_time_idx
+            ON activation_events(user_id, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS activation_events_anonymous_idx
+            ON activation_events(anonymous_id, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS activation_events_session_idx
+            ON activation_events(activation_session_id, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS activation_events_name_time_idx
+            ON activation_events(event_name, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS activation_events_campaign_idx
+            ON activation_events(utm_source, utm_medium, utm_campaign);
+        CREATE INDEX IF NOT EXISTS activation_events_click_id_idx
+            ON activation_events(gclid, msclkid);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS activation_user_state (
+            user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+            activation_status TEXT NOT NULL DEFAULT 'not_started' CHECK (activation_status IN ('not_started', 'started', 'demo_started', 'first_session_created', 'activated')),
+            first_activation_event_at TIMESTAMPTZ,
+            signup_completed_at TIMESTAMPTZ,
+            activation_home_viewed_at TIMESTAMPTZ,
+            demo_started_at TIMESTAMPTZ,
+            demo_completed_at TIMESTAMPTZ,
+            first_session_created_at TIMESTAMPTZ,
+            activated_at TIMESTAMPTZ,
+            last_event_name TEXT,
+            activation_session_id TEXT,
+            anonymous_id TEXT,
+            first_session_id BIGINT,
+            activation_score INTEGER NOT NULL DEFAULT 0 CHECK (activation_score >= 0),
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS activation_user_state_status_idx
+            ON activation_user_state(activation_status, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS activation_user_state_session_idx
+            ON activation_user_state(activation_session_id);
+        """,
     ]
 
     try:
@@ -3413,6 +3491,230 @@ async def auth_mfa_verify(request: Request):
 
 
 # ============================================================
+# Activation funnel instrumentation
+# ============================================================
+_ACTIVATION_EVENT_NAMES = {
+    "activation_landing_view",
+    "activation_signup_started",
+    "activation_signup_submitted",
+    "activation_signup_completed",
+    "activation_home_viewed",
+    "activation_demo_started",
+    "activation_demo_completed",
+    "activation_first_session_started",
+    "activation_first_session_created",
+    "activation_feedback_submitted",
+}
+
+_ACTIVATION_STATUS_BY_EVENT = {
+    "activation_signup_completed": "started",
+    "activation_home_viewed": "started",
+    "activation_demo_started": "demo_started",
+    "activation_demo_completed": "demo_started",
+    "activation_first_session_started": "demo_started",
+    "activation_first_session_created": "first_session_created",
+    "activation_feedback_submitted": "activated",
+}
+
+_ACTIVATION_SCORE_BY_EVENT = {
+    "activation_signup_completed": 10,
+    "activation_home_viewed": 20,
+    "activation_demo_started": 40,
+    "activation_demo_completed": 60,
+    "activation_first_session_started": 70,
+    "activation_first_session_created": 90,
+    "activation_feedback_submitted": 100,
+}
+
+_ACTIVATION_TIMESTAMP_COLUMN_BY_EVENT = {
+    "activation_signup_completed": "signup_completed_at",
+    "activation_home_viewed": "activation_home_viewed_at",
+    "activation_demo_started": "demo_started_at",
+    "activation_demo_completed": "demo_completed_at",
+    "activation_first_session_created": "first_session_created_at",
+    "activation_feedback_submitted": "activated_at",
+}
+
+
+def _activation_text(value: Any, max_len: int = 500) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text[:max_len]
+
+
+def _activation_bool(value: Any) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "granted", "accepted"}:
+            return True
+        if lowered in {"false", "0", "no", "denied", "rejected"}:
+            return False
+    return None
+
+
+async def _upsert_activation_state(conn: asyncpg.Connection, user_id: str, event_name: str, payload: dict, occurred_at: datetime) -> None:
+    status = _ACTIVATION_STATUS_BY_EVENT.get(event_name, "started")
+    score = _ACTIVATION_SCORE_BY_EVENT.get(event_name, 5)
+    timestamp_column = _ACTIVATION_TIMESTAMP_COLUMN_BY_EVENT.get(event_name)
+    timestamp_assignment = f", {timestamp_column} = COALESCE(activation_user_state.{timestamp_column}, EXCLUDED.{timestamp_column})" if timestamp_column else ""
+    first_session_id = payload.get("first_session_id") or payload.get("session_id") or (payload.get("event_properties") or {}).get("session_id")
+    try:
+        first_session_id = int(first_session_id) if first_session_id is not None else None
+    except (TypeError, ValueError):
+        first_session_id = None
+
+    columns = [
+        "user_id", "activation_status", "first_activation_event_at", "last_event_name",
+        "activation_session_id", "anonymous_id", "first_session_id", "activation_score", "metadata",
+    ]
+    values = [
+        user_id, status, occurred_at, event_name,
+        _activation_text(payload.get("activation_session_id"), 200),
+        _activation_text(payload.get("anonymous_id"), 200),
+        first_session_id, score, json.dumps(payload.get("event_properties") or {}),
+    ]
+    if timestamp_column:
+        columns.append(timestamp_column)
+        values.append(occurred_at)
+
+    placeholders = ", ".join(f"${i}" for i in range(1, len(values) + 1))
+    column_sql = ", ".join(columns)
+    await conn.execute(
+        f"""
+        INSERT INTO activation_user_state ({column_sql})
+        VALUES ({placeholders})
+        ON CONFLICT (user_id) DO UPDATE SET
+            activation_status = CASE
+                WHEN activation_user_state.activation_status = 'activated' THEN activation_user_state.activation_status
+                WHEN EXCLUDED.activation_score >= activation_user_state.activation_score THEN EXCLUDED.activation_status
+                ELSE activation_user_state.activation_status
+            END,
+            first_activation_event_at = COALESCE(activation_user_state.first_activation_event_at, EXCLUDED.first_activation_event_at),
+            last_event_name = EXCLUDED.last_event_name,
+            activation_session_id = COALESCE(EXCLUDED.activation_session_id, activation_user_state.activation_session_id),
+            anonymous_id = COALESCE(EXCLUDED.anonymous_id, activation_user_state.anonymous_id),
+            first_session_id = COALESCE(activation_user_state.first_session_id, EXCLUDED.first_session_id),
+            activation_score = GREATEST(activation_user_state.activation_score, EXCLUDED.activation_score),
+            metadata = activation_user_state.metadata || EXCLUDED.metadata,
+            updated_at = NOW()
+            {timestamp_assignment}
+        """,
+        *values,
+    )
+
+
+@app.post("/api/activation/events")
+@limiter.limit("120/minute")
+async def record_activation_event(request: Request):
+    """Persist first-party activation events without relying on third-party scripts.
+
+    Anonymous events are allowed for pre-signup steps. When a valid JWT is present,
+    user_id is derived from the token and the per-user activation state is updated.
+    """
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    if not isinstance(data, dict):
+        raise HTTPException(400, detail={"code": "invalid_payload", "message": "Activation event payload must be an object"})
+
+    event_name = _activation_text(data.get("event_name") or data.get("eventName"), 100)
+    if event_name not in _ACTIVATION_EVENT_NAMES:
+        raise HTTPException(400, detail={"code": "invalid_event_name", "message": "Unsupported activation event name"})
+
+    user = get_current_user(request)
+    if user:
+        _check_not_banned(user)
+    user_id = (user.get("sub") or user.get("id")) if user else None
+    now = datetime.utcnow()
+    attribution = data.get("attribution") if isinstance(data.get("attribution"), dict) else {}
+    consent = data.get("consent") if isinstance(data.get("consent"), dict) else {}
+    event_properties = data.get("event_properties") or data.get("eventProperties") or {}
+    if not isinstance(event_properties, dict):
+        event_properties = {"value": event_properties}
+
+    record = {
+        "user_id": user_id,
+        "anonymous_id": _activation_text(data.get("anonymous_id") or data.get("anonymousId"), 200),
+        "activation_session_id": _activation_text(data.get("activation_session_id") or data.get("activationSessionId"), 200),
+        "event_name": event_name,
+        "activation_step": _activation_text(data.get("activation_step") or data.get("activationStep"), 120),
+        "page_url": _activation_text(data.get("page_url") or data.get("pageUrl") or attribution.get("page_url"), 1000),
+        "referrer": _activation_text(data.get("referrer") or attribution.get("referrer"), 1000),
+        "utm_source": _activation_text(attribution.get("utm_source") or data.get("utm_source"), 255),
+        "utm_medium": _activation_text(attribution.get("utm_medium") or data.get("utm_medium"), 255),
+        "utm_campaign": _activation_text(attribution.get("utm_campaign") or data.get("utm_campaign"), 255),
+        "utm_term": _activation_text(attribution.get("utm_term") or data.get("utm_term"), 255),
+        "utm_content": _activation_text(attribution.get("utm_content") or data.get("utm_content"), 255),
+        "gclid": _activation_text(attribution.get("gclid") or data.get("gclid"), 255),
+        "gbraid": _activation_text(attribution.get("gbraid") or data.get("gbraid"), 255),
+        "wbraid": _activation_text(attribution.get("wbraid") or data.get("wbraid"), 255),
+        "msclkid": _activation_text(attribution.get("msclkid") or data.get("msclkid"), 255),
+        "fbclid": _activation_text(attribution.get("fbclid") or data.get("fbclid"), 255),
+        "consent_analytics": _activation_bool(consent.get("analytics") if consent else data.get("consent_analytics")),
+        "consent_advertising": _activation_bool(consent.get("advertising") if consent else data.get("consent_advertising")),
+        "event_properties": event_properties,
+        "raw_payload": data,
+    }
+
+    try:
+        async with _pool.acquire() as conn:
+            async with conn.transaction():
+                inserted = await conn.fetchrow(
+                    """
+                    INSERT INTO activation_events (
+                        user_id, anonymous_id, activation_session_id, event_name, activation_step,
+                        page_url, referrer, utm_source, utm_medium, utm_campaign, utm_term,
+                        utm_content, gclid, gbraid, wbraid, msclkid, fbclid,
+                        consent_analytics, consent_advertising, event_properties, raw_payload
+                    ) VALUES (
+                        $1::uuid, $2, $3, $4, $5,
+                        $6, $7, $8, $9, $10, $11,
+                        $12, $13, $14, $15, $16, $17,
+                        $18, $19, $20::jsonb, $21::jsonb
+                    ) RETURNING id, occurred_at
+                    """,
+                    record["user_id"], record["anonymous_id"], record["activation_session_id"], record["event_name"], record["activation_step"],
+                    record["page_url"], record["referrer"], record["utm_source"], record["utm_medium"], record["utm_campaign"], record["utm_term"],
+                    record["utm_content"], record["gclid"], record["gbraid"], record["wbraid"], record["msclkid"], record["fbclid"],
+                    record["consent_analytics"], record["consent_advertising"], json.dumps(record["event_properties"]), json.dumps(record["raw_payload"]),
+                )
+                if user_id:
+                    await _upsert_activation_state(conn, user_id, event_name, {**record, "first_session_id": data.get("first_session_id") or data.get("firstSessionId")}, inserted["occurred_at"] or now)
+                return {"success": True, "event_id": inserted["id"], "user_id": user_id}
+    except Exception as exc:
+        logger.error("activation event insert failed: %s", exc, exc_info=True)
+        raise HTTPException(500, detail={"code": "activation_event_failed", "message": "Could not record activation event"})
+
+
+@app.get("/api/activation/state")
+@limiter.limit("60/minute")
+async def get_activation_state(request: Request):
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT user_id, activation_status, first_activation_event_at, signup_completed_at,
+                   activation_home_viewed_at, demo_started_at, demo_completed_at,
+                   first_session_created_at, activated_at, last_event_name,
+                   activation_session_id, anonymous_id, first_session_id, activation_score,
+                   metadata, created_at, updated_at
+            FROM activation_user_state
+            WHERE user_id = $1::uuid
+            """,
+            user_id,
+        )
+    if not row:
+        return {"user_id": user_id, "activation_status": "not_started", "activation_score": 0}
+    return serialize_row(dict(row))
+
+
+# ============================================================
 # PostgREST RPC
 # ============================================================
 @app.post("/rest/v1/rpc/{func_name}")
@@ -3480,7 +3782,7 @@ async def rpc_call(func_name: str, request: Request):
 SECURE_CONV_TABLES = {"messages", "session_participants", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
 SECURE_REPORT_TABLES = {"session_reports"}
 # referrals is filtered by referrer_id (the owner column) just like user_id tables
-SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log"}
+SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log", "activation_events", "activation_user_state"}
 # Tables participants may read with a valid join token (no auth required)
 PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
 # Toolbox tables are publicly readable through the proxy for runtime UX, but mutations are admin-only.

@@ -10,6 +10,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import PageHead from '@/components/PageHead';
 import { EDGE_FUNCTION_URL } from '@/lib/api';
+import { recordActivationEventBeacon } from '@/lib/activationTracking';
 import { trackActivationEmailVerified } from '@/lib/tracking';
 
 type Status = 'loading' | 'success' | 'error';
@@ -37,6 +38,10 @@ const VerifyEmail: React.FC = () => {
         if (data?.access_token) {
           // Store the JWT so the app picks it up on next navigation
           localStorage.setItem('mf_session', JSON.stringify(data));
+          recordActivationEventBeacon('activation_signup_completed', {
+            activation_step: 'email_verified',
+            source: 'verification_link',
+          });
           trackActivationEmailVerified('verification_link');
           setStatus('success');
           // Redirect to the activation demo after a short delay.

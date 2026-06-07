@@ -105,6 +105,58 @@ export interface ApiResponse<T> {
   count?: number | null;
 }
 
+export type ActivationEventName =
+  | "activation_landing_view"
+  | "activation_signup_started"
+  | "activation_signup_submitted"
+  | "activation_signup_completed"
+  | "activation_home_viewed"
+  | "activation_demo_started"
+  | "activation_demo_completed"
+  | "activation_first_session_started"
+  | "activation_first_session_created"
+  | "activation_feedback_submitted";
+
+export interface ActivationEventPayload {
+  event_name: ActivationEventName;
+  activation_step?: string;
+  anonymous_id?: string;
+  activation_session_id?: string;
+  page_url?: string;
+  referrer?: string;
+  attribution?: Record<string, unknown> | null;
+  consent?: {
+    analytics?: boolean;
+    advertising?: boolean;
+  } | null;
+  event_properties?: Record<string, unknown>;
+  first_session_id?: number | string | null;
+}
+
+export interface ActivationEventResponse {
+  success: boolean;
+  event_id: number;
+  user_id?: string | null;
+}
+
+export interface ActivationState {
+  user_id: string;
+  activation_status: "not_started" | "started" | "demo_started" | "first_session_created" | "activated" | string;
+  activation_score: number;
+  first_activation_event_at?: string | null;
+  signup_completed_at?: string | null;
+  activation_home_viewed_at?: string | null;
+  demo_started_at?: string | null;
+  demo_completed_at?: string | null;
+  first_session_created_at?: string | null;
+  activated_at?: string | null;
+  last_event_name?: string | null;
+  activation_session_id?: string | null;
+  anonymous_id?: string | null;
+  first_session_id?: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 export interface MfaFactor {
   id: string;
   type: "totp";
@@ -1044,12 +1096,32 @@ class RealtimeChannelImpl implements RealtimeChannel {
   }
 }
 
+// ─── Activation instrumentation ──────────────────────────────────────────────
+
+export const activation = {
+  recordEvent(payload: ActivationEventPayload): Promise<ApiResponse<ActivationEventResponse>> {
+    return apiFetch<ActivationEventResponse>("/api/activation/events", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      timeoutMs: 8_000,
+    });
+  },
+
+  getState(): Promise<ApiResponse<ActivationState>> {
+    return apiFetch<ActivationState>("/api/activation/state", {
+      method: "GET",
+      timeoutMs: 8_000,
+    });
+  },
+};
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export const api = {
   auth,
   storage,
   functions,
+  activation,
   from<T = Record<string, unknown>>(table: string): QueryBuilder<T> {
     return new QueryBuilder<T>(table);
   },

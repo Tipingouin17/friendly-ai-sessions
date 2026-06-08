@@ -103,8 +103,11 @@ export const useMessageSender = ({
       return;
     }
     
-    // Don't send empty messages
-    if (!sessionState.inputMessage.trim()) {
+    // Don't send empty messages. Snapshot the draft before any async work so
+    // late speech-recognition events or network latency cannot keep the old
+    // answer visible in the participant composer.
+    const sentMessage = sessionState.inputMessage.trim();
+    if (!sentMessage) {
       return;
     }
 
@@ -117,9 +120,13 @@ export const useMessageSender = ({
       requestInProgressRef.current = true;
       setError(null); // Clear any previous errors
       
+      // Clear the composer immediately after the participant sends. If the
+      // save fails, the catch block restores the draft so no answer is lost.
+      sessionState.setInputMessage("");
+
       // Save user message
       const newMessage = await saveUserMessage({
-        message: sessionState.inputMessage,
+        message: sentMessage,
         currentConversationId,
         currentParticipant,
         participantInfo,
@@ -131,16 +138,12 @@ export const useMessageSender = ({
       logMessageSent(
         currentConversationId,
         currentParticipant,
-        sessionState.inputMessage.length,
+        sentMessage.length,
         isAnonymous ? 'anonymous' : 'named'
       );
 
       // Update UI immediately
       sessionState.setMessages(prev => [...prev, newMessage]);
-      const sentMessage = sessionState.inputMessage;
-      
-      // CRITICAL: Clear the input field immediately after sending
-      sessionState.setInputMessage("");
       
       // Record that this participant has responded
       sessionState.recordResponse(currentParticipant, true);
@@ -230,7 +233,8 @@ export const useMessageSender = ({
         }
       }, 4500);
       
-    } catch (error) {
+    } catch (error: unknown) {
+      sessionState.setInputMessage(sentMessage);
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
       toast({

@@ -49,6 +49,7 @@ const ChatInput = ({
   const recordingStartedMsRef = useRef<number | null>(null);
   const finalTranscriptRef = useRef<string>('');
   const latestConfidenceRef = useRef<number | null>(null);
+  const suppressRecognitionResultRef = useRef(false);
   const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
 
   const charCount = inputMessage.length;
@@ -78,6 +79,7 @@ const ChatInput = ({
     recognitionRef.current.lang = speechLanguage;
 
     recognitionRef.current.onresult = (event) => {
+      if (suppressRecognitionResultRef.current) return;
       const resultList = Array.from(event.results);
       const transcript = resultList.map(r => r[0].transcript).join('');
       const finalTranscript = resultList
@@ -113,7 +115,8 @@ const ChatInput = ({
 
     recognitionRef.current.onend = () => {
       setIsRecording(false);
-      const finalTranscript = finalTranscriptRef.current.trim();
+      const shouldSuppressFinal = suppressRecognitionResultRef.current;
+      const finalTranscript = shouldSuppressFinal ? '' : finalTranscriptRef.current.trim();
       if (finalTranscript) {
         const endedAt = new Date().toISOString();
         const durationMs = recordingStartedMsRef.current !== null
@@ -131,6 +134,7 @@ const ChatInput = ({
       latestConfidenceRef.current = null;
       recordingStartedAtRef.current = null;
       recordingStartedMsRef.current = null;
+      suppressRecognitionResultRef.current = false;
     };
 
     return () => {
@@ -144,6 +148,9 @@ const ChatInput = ({
 
   useEffect(() => {
     if (!speechEnabled && isRecording) {
+      suppressRecognitionResultRef.current = true;
+      preRecordingTextRef.current = '';
+      finalTranscriptRef.current = '';
       try {
         recognitionRef.current?.stop();
       } catch {
@@ -168,6 +175,7 @@ const ChatInput = ({
     }
     if (recognitionRef.current) {
       preRecordingTextRef.current = inputMessage;
+      suppressRecognitionResultRef.current = false;
       try {
         recognitionRef.current.lang = speechLanguage;
         recordingStartedAtRef.current = new Date().toISOString();
@@ -183,7 +191,12 @@ const ChatInput = ({
     }
   };
 
-  const handleStopRecording = () => {
+  const handleStopRecording = (options: { suppressFinalTranscript?: boolean } = {}) => {
+    if (options.suppressFinalTranscript) {
+      suppressRecognitionResultRef.current = true;
+      preRecordingTextRef.current = '';
+      finalTranscriptRef.current = '';
+    }
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -195,7 +208,7 @@ const ChatInput = ({
   const handleSend = () => {
     if (!inputMessage.trim() || disabled) return;
     if (isOverLimit) return; // hard block at 2000 chars
-    if (isRecording) handleStopRecording();
+    if (isRecording) handleStopRecording({ suppressFinalTranscript: true });
     onSendMessage();
   };
 

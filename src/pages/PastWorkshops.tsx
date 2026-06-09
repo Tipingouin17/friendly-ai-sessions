@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInMinutes } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useNavigate } from "react-router-dom";
 import { clearAllParticipantState } from "@/lib/api";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
@@ -17,6 +18,7 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useWorkshopReports } from "@/hooks/useWorkshopReports";
 import { useReportDownloader } from "@/hooks/session-closure/useReportDownloader";
 import ReportDownloadDialog from "@/components/session/ReportDownloadDialog";
+import SessionAnalyticsDashboard from "@/components/session/admin/SessionAnalyticsDashboard";
 import WorkshopMetrics from "@/components/session/WorkshopMetrics";
 import FacilitatorInfo from "@/components/session/FacilitatorInfo";
 import WorkshopTags from "@/components/session/WorkshopTags";
@@ -81,6 +83,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
@@ -187,7 +190,11 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
                 `Completed ${format(new Date(workshop.ended_at), 'PP')}`
               ) : ''}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowDiagnostics(true)} className="rounded-full h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                <Activity size={12} className="mr-1.5" />
+                Diagnostics
+              </Button>
               {isActive && (
                 <Button size="sm" onClick={() => navigateToHostSession(workshop.id)} className="rounded-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700">
                   Manage Session
@@ -218,6 +225,23 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
           reportContent={reportData?.report_content as string}
         />
       )}
+
+      <Sheet open={showDiagnostics} onOpenChange={setShowDiagnostics}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl lg:max-w-3xl">
+          <SheetHeader className="mb-5 pr-8">
+            <SheetTitle>Session diagnostics</SheetTitle>
+            <SheetDescription>
+              Review analytics, privacy-safe event logs, blockers, errors, and participant drop-off clues for “{title}”.
+            </SheetDescription>
+          </SheetHeader>
+          {showDiagnostics && (
+            <SessionAnalyticsDashboard
+              conversationId={workshop.id}
+              className="border-gray-100 shadow-none"
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 };

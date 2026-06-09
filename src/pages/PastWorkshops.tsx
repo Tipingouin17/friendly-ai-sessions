@@ -104,7 +104,9 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
     }
   };
 
-  const participantCount = workshop.current_participants ?? workshop.participants ?? 0;
+  const participantCount = isActive
+    ? (workshop.current_participants ?? workshop.participants ?? 0)
+    : (workshop.participants ?? workshop.current_participants ?? 0);
   const messageCount = workshop.total_messages || 0;
   const duration = calculateDuration(workshop);
   const title = getWorkshopTitle(workshop);
@@ -237,6 +239,14 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
           {showDiagnostics && (
             <SessionAnalyticsDashboard
               conversationId={workshop.id}
+              summarySnapshot={{
+                participants: participantCount,
+                currentParticipants: workshop.current_participants ?? null,
+                messages: messageCount,
+                durationMinutes: duration,
+                createdAt: workshop.created_at ?? null,
+                endedAt: workshop.ended_at ?? null,
+              }}
               className="border-gray-100 shadow-none"
             />
           )}
@@ -373,9 +383,10 @@ const PastWorkshops = () => {
   // Aggregate stats
   const totalSessions = (pastWorkshops?.length || 0) + (activeWorkshops?.length || 0);
   // Use Math.max(0, ...) to guard against negative counts from race conditions
-  const totalParticipants = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce(
-    (s, w) => s + Math.max(0, w.current_participants ?? 0), 0
-  );
+  const totalParticipants = [
+    ...(pastWorkshops || []).map(w => w.participants ?? w.current_participants ?? 0),
+    ...(activeWorkshops || []).map(w => w.current_participants ?? w.participants ?? 0),
+  ].reduce((s, count) => s + Math.max(0, count), 0);
   const totalMessages = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.total_messages || 0), 0);
   // Only show avg engagement when at least one session has a real score
   const sessionsWithScore = (pastWorkshops || []).filter(w => (w.participant_engagement_score ?? 0) > 0);

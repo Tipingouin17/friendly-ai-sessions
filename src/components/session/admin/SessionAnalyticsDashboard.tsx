@@ -22,8 +22,18 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+interface SessionSummarySnapshot {
+  participants: number;
+  currentParticipants: number | null;
+  messages: number;
+  durationMinutes: number;
+  createdAt: string | null;
+  endedAt: string | null;
+}
+
 interface SessionAnalyticsDashboardProps {
   conversationId: number;
+  summarySnapshot?: SessionSummarySnapshot;
   className?: string;
 }
 
@@ -47,6 +57,11 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
+const formatMinutes = (minutes: number | null | undefined) => {
+  if (!minutes || minutes <= 0) return '—';
+  return `${minutes}m`;
+};
+
 const formatTimestamp = (value: string | null) => {
   if (!value) return 'Not available';
 
@@ -66,6 +81,7 @@ const visibleDetailEntries = (details: Record<string, string | number | boolean 
 
 const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
   conversationId,
+  summarySnapshot,
   className = ""
 }) => {
   const { analytics, isLoading, error } = useSessionAnalytics({
@@ -129,23 +145,52 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Participant Metrics */}
+        {summarySnapshot && (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+            <div className="mb-2 text-sm font-semibold text-indigo-900">Saved session snapshot</div>
+            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div>
+                <div className="font-medium text-indigo-800">Participants</div>
+                <div className="text-indigo-700">{summarySnapshot.participants}</div>
+              </div>
+              <div>
+                <div className="font-medium text-indigo-800">Messages</div>
+                <div className="text-indigo-700">{summarySnapshot.messages}</div>
+              </div>
+              <div>
+                <div className="font-medium text-indigo-800">Open-to-close</div>
+                <div className="text-indigo-700">{formatMinutes(summarySnapshot.durationMinutes)}</div>
+              </div>
+              <div>
+                <div className="font-medium text-indigo-800">Live count</div>
+                <div className="text-indigo-700">{summarySnapshot.currentParticipants ?? '—'}</div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-indigo-700">
+              These are the values used on the Past Workshops card. Event-log metrics below are operational traces and can include reconnects, retries, and signalling activity.
+            </p>
+          </div>
+        )}
+
+        {/* Event-log activity metrics */}
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-500" />
             <div className="text-sm">
-              <div className="font-medium">Participants</div>
+              <div className="font-medium">Join events</div>
               <div className="text-gray-600">
                 {analytics.participantJoins} joined, {analytics.participantLeaves} left
               </div>
+              <div className="text-xs text-gray-500">Counts lifecycle events, not unique seats.</div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-green-500" />
             <div className="text-sm">
-              <div className="font-medium">Messages</div>
+              <div className="font-medium">Message events</div>
               <div className="text-gray-600">{analytics.messagesSent} sent</div>
+              <div className="text-xs text-gray-500">Only messages mirrored into session events.</div>
             </div>
           </div>
         </div>
@@ -176,7 +221,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium">Duration</span>
+              <span className="text-sm font-medium">Event span</span>
             </div>
             <span className="text-sm text-gray-600">
               {formatDuration(analytics.sessionDuration)}
@@ -184,9 +229,9 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Engagement Score</span>
+            <span className="text-sm font-medium">Event engagement score</span>
             <Badge variant={analytics.engagementScore > 2 ? "default" : "secondary"}>
-              {analytics.engagementScore}/participant
+              {analytics.engagementScore}/event participant
             </Badge>
           </div>
 
@@ -213,7 +258,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
               <Activity className="h-4 w-4 text-indigo-500" />
               <div>
                 <div className="text-sm font-semibold">Session Diagnostics</div>
-                <div className="text-xs text-gray-500">Privacy-safe events and blocker clues</div>
+                <div className="text-xs text-gray-500">Latest privacy-safe events and blocker clues</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -250,11 +295,11 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
                   <div className="text-gray-600">{diagnosticsSummary.errorEvents}</div>
                 </div>
                 <div className="rounded-md bg-gray-50 p-2">
-                  <div className="font-medium text-gray-700">Message events</div>
+                  <div className="font-medium text-gray-700">Recent message events</div>
                   <div className="text-gray-600">{diagnosticsSummary.messageEvents}</div>
                 </div>
                 <div className="rounded-md bg-gray-50 p-2">
-                  <div className="font-medium text-gray-700">Last event</div>
+                  <div className="font-medium text-gray-700">Latest event</div>
                   <div className="text-gray-600">{formatTimestamp(diagnosticsSummary.lastEventAt)}</div>
                 </div>
               </div>

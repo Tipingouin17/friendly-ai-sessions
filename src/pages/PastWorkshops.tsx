@@ -3,13 +3,14 @@
  * Premium dashboard with stats header, filter tabs, rich workshop cards.
  */
 import { useEffect, useState } from "react";
-import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Users, MessageSquare, Clock, Zap, LayoutDashboard, Activity, AlertTriangle } from "lucide-react";
+import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Users, MessageSquare, Clock, Zap, LayoutDashboard, Activity, AlertTriangle, Eye, UserRound, CalendarClock } from "lucide-react";
 import api from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInMinutes } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useNavigate } from "react-router-dom";
 import { clearAllParticipantState } from "@/lib/api";
@@ -28,6 +29,168 @@ import { useToast } from "@/components/ui/use-toast";
 const ITEMS_PER_PAGE = 12;
 
 const STALE_SESSION_TIMEOUT_MINUTES = 120;
+
+
+type OwnerProfile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  display_name: string | null;
+};
+
+type SessionClassificationId = 'real' | 'demo' | 'dry-run' | 'exploratory' | 'unclear';
+
+type SessionClassification = {
+  id: SessionClassificationId;
+  label: string;
+  badgeClass: string;
+  headline: string;
+  summary: string;
+  evidence: string[];
+};
+
+const getScheduledStartIso = (flowConfig: unknown): string | null => {
+  if (!flowConfig || typeof flowConfig !== 'object' || Array.isArray(flowConfig)) return null;
+  const value = (flowConfig as Record<string, unknown>).scheduled_start_at;
+  return typeof value === 'string' && value ? value : null;
+};
+
+const getOwnerDisplayName = (profile?: OwnerProfile): string => {
+  return profile?.display_name?.trim() || profile?.full_name?.trim() || 'Unknown host';
+};
+
+const getOwnerEmail = (profile?: OwnerProfile): string => {
+  return profile?.email?.trim() || 'Email unavailable';
+};
+
+const getScheduleLabel = (scheduledStartIso: string | null): string => {
+  if (!scheduledStartIso) return 'Ad hoc';
+  const scheduledDate = new Date(scheduledStartIso);
+  if (Number.isNaN(scheduledDate.getTime())) return 'Ad hoc';
+  return `Scheduled ${format(scheduledDate, 'MMM d, h:mm a')}`;
+};
+
+const getScheduleNarrative = (workshop: Workshop, scheduledStartIso: string | null): string => {
+  if (!scheduledStartIso) {
+    return 'This session was started without a stored future scheduled start time, so it is treated as an ad hoc session.';
+  }
+
+  const scheduledDate = new Date(scheduledStartIso);
+  if (Number.isNaN(scheduledDate.getTime())) {
+    return 'This session has scheduling metadata, but the scheduled start time could not be interpreted.';
+  }
+
+  const createdDate = workshop.created_at ? new Date(workshop.created_at) : null;
+  const endedDate = workshop.ended_at ? new Date(workshop.ended_at) : null;
+  const createdText = createdDate && !Number.isNaN(createdDate.getTime()) ? format(createdDate, 'MMM d, h:mm a') : 'an unknown time';
+  const endedText = endedDate && !Number.isNaN(endedDate.getTime()) ? ` and ended ${format(endedDate, 'MMM d, h:mm a')}` : '';
+  return `This session was scheduled for ${format(scheduledDate, 'MMM d, yyyy h:mm a')}, created ${createdText}${endedText}.`;
+};
+
+const classifySession = ({
+  workshop,
+  participantCount,
+  messageCount,
+  duration,
+  scheduledStartIso,
+}: {
+  workshop: Workshop;
+  participantCount: number;
+  messageCount: number;
+  duration: number;
+  scheduledStartIso: string | null;
+}): SessionClassification => {
+  const engagementScore = workshop.participant_engagement_score || 0;
+  const attendeeCount = Math.max(participantCount - 1, 0);
+  const isScheduled = Boolean(scheduledStartIso);
+  const isAutoClosed = workshop.status === 'auto_closed_inactive';
+  const evidence = [
+    `${participantCount} recorded participant${participantCount === 1 ? '' : 's'} (${attendeeCount} attendee${attendeeCount === 1 ? '' : 's'} beyond the host)`,
+    `${messageCount} saved message${messageCount === 1 ? '' : 's'}`,
+    duration > 0 ? `${duration} minute open-to-close duration` : 'No reliable saved duration',
+    engagementScore > 0 ? `${engagementScore.toFixed(1)} engagement score` : 'No saved engagement score',
+    isScheduled ? 'Scheduled start metadata is present' : 'No scheduled start metadata is present',
+  ];
+
+  if (isAutoClosed) {
+    evidence.push(`Auto-closed after ${STALE_SESSION_TIMEOUT_MINUTES} minutes of inactivity`);
+  }
+
+  const strongRealSignals =
+    (participantCount >= 3 && messageCount >= 20 && duration >= 15) ||
+    (isScheduled && participantCount >= 2 && messageCount >= 15 && engagementScore >= 3) ||
+    (participantCount >= 4 && messageCount >= 12 && duration >= 10);
+
+  if (strongRealSignals) {
+    return {
+      id: 'real',
+      label: 'Real Workshop',
+      badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      headline: 'Likely real workshop',
+      summary: 'The session shows strong workshop signals: multiple people, sustained activity, and meaningful saved conversation volume.',
+      evidence,
+    };
+  }
+
+  const dryRunSignals =
+    messageCount <= 3 ||
+    (participantCount <= 1 && messageCount <= 6 && duration <= 10) ||
+    (duration > 0 && duration <= 5 && messageCount <= 8);
+
+  if (dryRunSignals) {
+    return {
+      id: 'dry-run',
+      label: 'Dry Run / Test',
+      badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+      headline: 'Likely dry run or technical test',
+      summary: 'The session appears to have been used to test setup or flow mechanics, with limited participant and message activity.',
+      evidence,
+    };
+  }
+
+  const demoSignals =
+    participantCount <= 2 &&
+    messageCount >= 8 &&
+    messageCount < 25 &&
+    duration >= 5 &&
+    duration <= 45;
+
+  if (demoSignals) {
+    return {
+      id: 'demo',
+      label: 'Demo',
+      badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
+      headline: 'Likely demo session',
+      summary: 'The session has enough activity to show the experience, but the small participant footprint suggests a demonstration rather than a full workshop.',
+      evidence,
+    };
+  }
+
+  const exploratorySignals =
+    messageCount >= 4 ||
+    duration >= 10 ||
+    engagementScore > 0;
+
+  if (exploratorySignals) {
+    return {
+      id: 'exploratory',
+      label: 'Exploratory',
+      badgeClass: 'border-violet-200 bg-violet-50 text-violet-700',
+      headline: 'Likely exploratory session',
+      summary: 'The session contains some meaningful use, but the signals are not strong enough to classify it as a full workshop or a compact demo.',
+      evidence,
+    };
+  }
+
+  return {
+    id: 'unclear',
+    label: 'Unclear',
+    badgeClass: 'border-gray-200 bg-gray-50 text-gray-700',
+    headline: 'Session type unclear',
+    summary: 'There is not enough saved activity to confidently identify how this session was used.',
+    evidence,
+  };
+};
 
 const parseTime = (value?: string | null): number => {
   if (!value) return 0;
@@ -181,14 +344,15 @@ const fetchActiveWorkshops = async () => {
 };
 
 /* ── Workshop Card ── */
-const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions, reportData, onSaveToggle }: {
+const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions, reportData, onSaveToggle, ownerProfile }: {
   workshop: Workshop; isActive: boolean; canGenerateReports: boolean; canSaveSessions: boolean;
-  reportData?: Record<string, unknown>; onSaveToggle?: (id: number, saved: boolean) => void;
+  reportData?: Record<string, unknown>; onSaveToggle?: (id: number, saved: boolean) => void; ownerProfile?: OwnerProfile;
 }) => {
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
@@ -220,6 +384,12 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
   const hasContent = messageCount > 0;
   const engagementScore = workshop.participant_engagement_score || 0;
   const isAutoClosed = workshop.status === 'auto_closed_inactive';
+  const scheduledStartIso = getScheduledStartIso(workshop.flow_config);
+  const isScheduled = Boolean(scheduledStartIso);
+  const scheduleLabel = getScheduleLabel(scheduledStartIso);
+  const ownerName = getOwnerDisplayName(ownerProfile);
+  const ownerEmail = getOwnerEmail(ownerProfile);
+  const classification = classifySession({ workshop, participantCount, messageCount, duration, scheduledStartIso });
 
   // Colour accent per difficulty
   const difficultyAccent: Record<string, string> = {
@@ -278,6 +448,24 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
             </p>
           )}
 
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Badge variant="outline" className={classification.badgeClass}>{classification.label}</Badge>
+            <Badge variant="outline" className={isScheduled ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-700'}>
+              <CalendarClock size={11} className="mr-1" />
+              {isScheduled ? 'Scheduled' : 'Ad hoc'}
+            </Badge>
+          </div>
+
+          <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2">
+            <div className="flex items-start gap-2 text-xs text-gray-600">
+              <UserRound size={13} className="mt-0.5 flex-shrink-0 text-gray-400" />
+              <div className="min-w-0">
+                <p className="font-medium text-gray-700 truncate">Started by {ownerName}</p>
+                <p className="truncate text-gray-400">{ownerEmail} · {scheduleLabel}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Metrics row */}
           <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-4">
             <MetricPill
@@ -324,6 +512,10 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
               ) : ''}
             </span>
             <div className="flex flex-wrap justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowDetails(true)} className="rounded-full h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50">
+                <Eye size={12} className="mr-1.5" />
+                View
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setShowDiagnostics(true)} className="rounded-full h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50">
                 <Activity size={12} className="mr-1.5" />
                 Diagnostics
@@ -343,6 +535,67 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
           </div>
         </div>
       </div>
+
+
+      <Sheet open={showDetails} onOpenChange={setShowDetails}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader className="mb-5 pr-8">
+            <SheetTitle>Session details</SheetTitle>
+            <SheetDescription>
+              A plain-language summary of what happened in “{title}”, who started it, and how it was scheduled.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Badge variant="outline" className={classification.badgeClass}>{classification.label}</Badge>
+                <Badge variant="outline" className={isScheduled ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-700'}>
+                  {isScheduled ? 'Scheduled' : 'Ad hoc'}
+                </Badge>
+                {isAutoClosed && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Auto-closed</Badge>}
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">{classification.headline}</h3>
+              <p className="mt-2 text-sm leading-6 text-gray-600">{classification.summary}</p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-gray-900">Narrative summary</h4>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                “{title}” was initiated by <span className="font-medium text-gray-800">{ownerName}</span> ({ownerEmail}).
+                It recorded {participantCount} participant{participantCount === 1 ? '' : 's'}, {messageCount} saved message{messageCount === 1 ? '' : 's'},
+                {duration > 0 ? ` and a saved duration of ${duration} minutes.` : ' and no reliable saved duration.'}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">{getScheduleNarrative(workshop, scheduledStartIso)}</p>
+              {workshop.sessions?.objective && (
+                <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Workshop objective</p>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">{workshop.sessions.objective}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-gray-900">Classification evidence</h4>
+              <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                {classification.evidence.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-400" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <DetailStat label="Started" value={workshop.created_at ? format(new Date(workshop.created_at), 'MMM d, yyyy h:mm a') : 'Unknown'} />
+              <DetailStat label="Ended" value={workshop.ended_at ? format(new Date(workshop.ended_at), 'MMM d, yyyy h:mm a') : (isActive ? 'In progress' : 'Unknown')} />
+              <DetailStat label="Status" value={workshop.status || (isActive ? 'active' : 'ended')} />
+              <DetailStat label="Conversation ID" value={`#${workshop.id}`} />
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {showReportDialog && reportData && (
         <ReportDownloadDialog
@@ -396,6 +649,13 @@ const MetricPill = ({ icon, value, label, helper, highlight }: { icon: React.Rea
     <span className={`text-sm font-bold ${highlight === 'emerald' ? 'text-emerald-600' : highlight === 'indigo' ? 'text-indigo-600' : 'text-gray-700'}`}>{value}</span>
     <span className="text-[10px] text-gray-500 font-medium leading-tight">{label}</span>
     {helper && <span className="mt-0.5 text-[9px] leading-tight text-gray-400">{helper}</span>}
+  </div>
+);
+
+const DetailStat = ({ label, value }: { label: string; value: string | number }) => (
+  <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+    <p className="mt-1 break-words text-sm font-medium text-gray-800">{value}</p>
   </div>
 );
 
@@ -488,6 +748,24 @@ const PastWorkshops = () => {
   });
 
   // canGenerateReports and canSaveSessions come directly from usePlanLimits above
+
+  const ownerIds = Array.from(new Set([...(pastWorkshops || []), ...(activeWorkshops || [])].map(w => w.user_id).filter(Boolean)));
+  const { data: ownerProfiles = [] } = useQuery({
+    queryKey: ['past-workshop-owners', ownerIds.join(',')],
+    enabled: ownerIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await api
+        .from('profiles')
+        .select('id, email, full_name, display_name')
+        .in('id', ownerIds);
+
+      if (error) throw error;
+      return data as OwnerProfile[];
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const ownerById = new Map(ownerProfiles.map(profile => [profile.id, profile]));
 
   const filteredPast = activeTab === 'saved'
     ? (pastWorkshops || []).filter(w => w.is_saved)
@@ -584,7 +862,7 @@ const PastWorkshops = () => {
         <div className="mb-6 rounded-2xl border border-indigo-100 bg-white/80 p-4 text-sm text-gray-600 shadow-sm">
           <p className="font-semibold text-gray-800">How to read this dashboard</p>
           <p className="mt-1">
-            Past workshop cards show the saved end-of-session snapshot: final participant count, saved messages, and open-to-close duration. Diagnostics is for troubleshooting and shows raw events, so reconnects can appear as extra join events.
+Past workshop cards show the saved end-of-session snapshot plus session-intelligence badges: likely session type, who started it, and whether it was scheduled or ad hoc. Use View for a narrative summary, and Diagnostics for raw event troubleshooting where reconnects can appear as extra join events.
           </p>
           <p className="mt-1 text-xs text-gray-500">
             Sessions with no messages or diagnostic activity for {STALE_SESSION_TIMEOUT_MINUTES} minutes are automatically closed and moved out of Active Sessions on refresh.
@@ -621,7 +899,14 @@ const PastWorkshops = () => {
               activeWorkshops && activeWorkshops.length > 0 ? (
                 <div className="grid sm:grid-cols-2 gap-4">
                   {activeWorkshops.map(w => (
-                    <WorkshopCard key={w.id} workshop={w} isActive={true} canGenerateReports={canGenerateReports} canSaveSessions={canSaveSessions} />
+                    <WorkshopCard
+                      key={w.id}
+                      workshop={w}
+                      isActive={true}
+                      canGenerateReports={canGenerateReports}
+                      canSaveSessions={canSaveSessions}
+                      ownerProfile={ownerById.get(w.user_id)}
+                    />
                   ))}
                 </div>
               ) : null
@@ -648,6 +933,7 @@ const PastWorkshops = () => {
                         canSaveSessions={canSaveSessions}
                         reportData={reportsData[w.id]}
                         onSaveToggle={handleSaveToggle}
+                        ownerProfile={ownerById.get(w.user_id)}
                       />
                     ))}
                   </div>

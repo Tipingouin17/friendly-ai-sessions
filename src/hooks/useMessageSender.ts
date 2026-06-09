@@ -46,7 +46,7 @@ export const useMessageSender = ({
   
   // Import our helper hooks
   const { saveUserMessage } = useMessageSaver();
-  const { logMessageSent, logPerformanceMetric } = useEnhancedSessionLogger();
+  const { logMessageSent, logPerformanceMetric, logSessionEvent } = useEnhancedSessionLogger();
   
   // Use the live participant array length for accurate multi-participant counting.
   // conversation.participants is a static DB column set at session creation and may be stale.
@@ -64,6 +64,34 @@ export const useMessageSender = ({
     totalParticipants,
     currentUserParticipantId: sessionState.currentParticipant
   });
+
+  const getDiagnosticErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
+  };
+
+  const logParticipantDiagnostic = useCallback((eventType: string, eventData: Record<string, any> = {}) => {
+    if (!currentConversationId) return;
+
+    logSessionEvent({
+      conversationId: currentConversationId,
+      eventType,
+      participantId: sessionState.currentParticipant,
+      eventData: {
+        diagnostic_scope: 'participant_message_flow',
+        participant_name: participants.find(p => p.id === sessionState.currentParticipant)?.name ?? null,
+        ...eventData,
+      },
+      performanceMetrics: {
+        timestamp: performance.now(),
+      },
+    });
+  }, [currentConversationId, logSessionEvent, participants, sessionState.currentParticipant]);
 
   // Start collecting responses when facilitator asks a question
   const startResponseCollection = useCallback((questionId: string) => {
@@ -120,6 +148,12 @@ export const useMessageSender = ({
       requestInProgressRef.current = true;
       setError(null); // Clear any previous errors
       
+      logParticipantDiagnostic('participant_message_send_started', {
+        message_length: sentMessage.length,
+        view_mode: sessionState.viewMode,
+        participant_context: isParticipantContext ? 'participant' : 'admin',
+      });
+
       // Clear the composer immediately after the participant sends. If the
       // save fails, the catch block restores the draft so no answer is lost.
       sessionState.setInputMessage("");
@@ -166,6 +200,10 @@ export const useMessageSender = ({
         if (continuationInProgressRef.current || !currentConversationId) return;
 
         try {
+          logParticipantDiagnostic('participant_continuation_check_started', {
+            expected_participants: Math.max(1, totalParticipants),
+          });
+
           const { data: latestMessages, error } = await api
             .from('messages')
             .select('id, role, content, participant_id, name, created_at')
@@ -174,11 +212,21 @@ export const useMessageSender = ({
 
           if (error || !Array.isArray(latestMessages) || latestMessages.length === 0) {
             if (error) console.error('Participant continuation check failed:', error);
+            logParticipantDiagnostic('participant_continuation_check_failed', {
+              stage: 'fetch_latest_messages',
+              error_message: error ? getDiagnosticErrorMessage(error) : 'No latest messages returned',
+            });
             return;
           }
 
           const lastMessage = latestMessages[latestMessages.length - 1];
-          if (lastMessage?.role === 'assistant') return;
+          if (lastMessage?.role === 'assistant') {
+            logParticipantDiagnostic('participant_continuation_skipped_assistant_already_replied', {
+              latest_message_role: lastMessage.role,
+              latest_message_id: lastMessage.id,
+            });
+            return;
+          }
 
           let lastAssistantIndex = -1;
           for (let i = latestMessages.length - 1; i >= 0; i -= 1) {
@@ -187,7 +235,13 @@ export const useMessageSender = ({
               break;
             }
           }
-          if (lastAssistantIndex === -1) return;
+          if (lastAssistantIndex === -1) {
+            logParticipantDiagnostic('participant_continuation_check_failed', {
+              stage: 'no_prior_assistant_message',
+              message_count: latestMessages.length,
+            });
+            return;
+          }
 
           const respondentKeys = new Set(
             latestMessages
@@ -196,7 +250,15 @@ export const useMessageSender = ({
               .map(message => message.participant_id ?? message.name)
               .filter(Boolean)
           );
-          if (respondentKeys.size < Math.max(1, totalParticipants)) return;
+          const expectedParticipants = Math.max(1, totalParticipants);
+          if (respondentKeys.size < expectedParticipants) {
+            logParticipantDiagnostic('participant_continuation_waiting_for_more_responses', {
+              respondent_count: respondentKeys.size,
+              expected_participants: expectedParticipants,
+              last_assistant_message_index: lastAssistantIndex,
+            });
+            return;
+          }
 
           continuationInProgressRef.current = true;
           const facilitatorContext = latestMessages.map(message => {
@@ -218,7 +280,13 @@ export const useMessageSender = ({
             };
           });
 
-          await api.functions.invoke('handle-facilitator-response', {
+          logParticipantDiagnostic('participant_continuation_triggered', {
+            respondent_count: respondentKeys.size,
+            expected_participants: expectedParticipants,
+            message_count: latestMessages.length,
+          });
+
+          const { error: invokeError } = await api.functions.invoke('handle-facilitator-response', {
             body: {
               messages: facilitatorContext,
               conversationId: currentConversationId,
@@ -226,8 +294,24 @@ export const useMessageSender = ({
               generateReport: false,
             },
           });
+
+          if (invokeError) {
+            logParticipantDiagnostic('participant_continuation_failed', {
+              stage: 'invoke_facilitator_response',
+              error_message: getDiagnosticErrorMessage(invokeError),
+            });
+          } else {
+            logParticipantDiagnostic('participant_continuation_completed', {
+              respondent_count: respondentKeys.size,
+              expected_participants: expectedParticipants,
+            });
+          }
         } catch (error) {
           console.error('Participant continuation fallback failed:', error);
+          logParticipantDiagnostic('participant_continuation_failed', {
+            stage: 'unexpected_client_error',
+            error_message: getDiagnosticErrorMessage(error),
+          });
         } finally {
           continuationInProgressRef.current = false;
         }
@@ -235,6 +319,11 @@ export const useMessageSender = ({
       
     } catch (error: unknown) {
       sessionState.setInputMessage(sentMessage);
+      logParticipantDiagnostic('participant_message_send_failed', {
+        stage: 'save_or_update_message',
+        message_length: sentMessage.length,
+        error_message: getDiagnosticErrorMessage(error),
+      });
       console.error("Error sending message:", error);
       setError("Failed to send message. Please try again.");
       toast({
@@ -258,8 +347,9 @@ export const useMessageSender = ({
     toast,
     saveUserMessage,
     logMessageSent,
-    logPerformanceMetric,
-    recordParticipantResponse,
+      logPerformanceMetric,
+      logParticipantDiagnostic,
+      recordParticipantResponse,
     stopWaitingForResponses,
     startResponseCollection
   ]);

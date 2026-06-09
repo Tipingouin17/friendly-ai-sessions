@@ -7,15 +7,19 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useSessionAnalytics } from '@/hooks/useSessionAnalytics';
-import { 
-  Users, 
-  MessageSquare, 
-  Bot, 
-  Shield, 
-  Clock, 
+import { useSessionDiagnostics, DiagnosticSeverity } from '@/hooks/useSessionDiagnostics';
+import {
+  Users,
+  MessageSquare,
+  Bot,
+  Shield,
+  Clock,
   TrendingUp,
-  AlertTriangle 
+  AlertTriangle,
+  Activity,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SessionAnalyticsDashboardProps {
@@ -23,13 +27,61 @@ interface SessionAnalyticsDashboardProps {
   className?: string;
 }
 
+const severityBadgeVariant: Record<DiagnosticSeverity, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  info: 'outline',
+  success: 'default',
+  warning: 'secondary',
+  error: 'destructive',
+};
+
+const healthBadgeVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  healthy: 'default',
+  warning: 'secondary',
+  error: 'destructive',
+  empty: 'outline',
+};
+
+const formatDuration = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+};
+
+const formatTimestamp = (value: string | null) => {
+  if (!value) return 'Not available';
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
+};
+
+const visibleDetailEntries = (details: Record<string, string | number | boolean | null>) =>
+  Object.entries(details)
+    .filter(([key, value]) => value !== null && !['user_agent', 'page_url', 'timestamp', 'diagnostic_scope'].includes(key))
+    .slice(0, 6);
+
 const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
   conversationId,
   className = ""
 }) => {
-  const { analytics, isLoading, error } = useSessionAnalytics({ 
-    conversationId, 
-    realtime: true 
+  const { analytics, isLoading, error } = useSessionAnalytics({
+    conversationId,
+    realtime: true
+  });
+  const {
+    events: diagnosticEvents,
+    summary: diagnosticsSummary,
+    isLoading: diagnosticsLoading,
+    error: diagnosticsError,
+    refetch: refetchDiagnostics,
+  } = useSessionDiagnostics({
+    conversationId,
+    realtime: true,
+    limit: 80,
   });
 
   if (isLoading) {
@@ -68,12 +120,6 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
     );
   }
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-  };
-
   return (
     <Card className={className}>
       <CardHeader>
@@ -82,7 +128,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
           Session Analytics
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Participant Metrics */}
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2">
@@ -94,7 +140,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-green-500" />
             <div className="text-sm">
@@ -115,7 +161,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-orange-500" />
             <div className="text-sm">
@@ -136,14 +182,14 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
               {formatDuration(analytics.sessionDuration)}
             </span>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Engagement Score</span>
             <Badge variant={analytics.engagementScore > 2 ? "default" : "secondary"}>
               {analytics.engagementScore}/participant
             </Badge>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Total Events</span>
             <Badge variant="outline">{analytics.totalEvents}</Badge>
@@ -157,6 +203,101 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
               </div>
               <Badge variant="destructive">{analytics.errorCount}</Badge>
             </div>
+          )}
+        </div>
+
+        {/* Diagnostics */}
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-indigo-500" />
+              <div>
+                <div className="text-sm font-semibold">Session Diagnostics</div>
+                <div className="text-xs text-gray-500">Privacy-safe events and blocker clues</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={healthBadgeVariant[diagnosticsSummary.health]}>
+                {diagnosticsSummary.healthLabel}
+              </Badge>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2"
+                onClick={() => refetchDiagnostics()}
+                disabled={diagnosticsLoading}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${diagnosticsLoading ? 'animate-spin' : ''}`} />
+                <span className="sr-only">Refresh diagnostics</span>
+              </Button>
+            </div>
+          </div>
+
+          {diagnosticsError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {diagnosticsError}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-md bg-gray-50 p-2">
+                  <div className="font-medium text-gray-700">Blockers</div>
+                  <div className="text-gray-600">{diagnosticsSummary.blockerEvents}</div>
+                </div>
+                <div className="rounded-md bg-gray-50 p-2">
+                  <div className="font-medium text-gray-700">Errors</div>
+                  <div className="text-gray-600">{diagnosticsSummary.errorEvents}</div>
+                </div>
+                <div className="rounded-md bg-gray-50 p-2">
+                  <div className="font-medium text-gray-700">Message events</div>
+                  <div className="text-gray-600">{diagnosticsSummary.messageEvents}</div>
+                </div>
+                <div className="rounded-md bg-gray-50 p-2">
+                  <div className="font-medium text-gray-700">Last event</div>
+                  <div className="text-gray-600">{formatTimestamp(diagnosticsSummary.lastEventAt)}</div>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {diagnosticsLoading && diagnosticEvents.length === 0 ? (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-12 rounded bg-gray-100" />
+                    <div className="h-12 rounded bg-gray-100" />
+                  </div>
+                ) : diagnosticEvents.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-3 text-sm text-gray-500">
+                    No diagnostics have been logged for this session yet.
+                  </div>
+                ) : (
+                  diagnosticEvents.slice(0, 20).map((event) => (
+                    <div key={event.id} className="rounded-md border p-3 text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="font-medium text-gray-900">{event.label}</div>
+                          <div className="text-xs text-gray-500">
+                            {formatTimestamp(event.createdAt)}
+                            {event.participantName ? ` · ${event.participantName}` : ''}
+                            {!event.participantName && event.participantId ? ` · Participant ${event.participantId}` : ''}
+                          </div>
+                        </div>
+                        <Badge variant={severityBadgeVariant[event.severity]}>{event.severity}</Badge>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-600">{event.description}</p>
+                      {visibleDetailEntries(event.details).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {visibleDetailEntries(event.details).map(([key, value]) => (
+                            <Badge key={key} variant="outline" className="font-normal">
+                              {key}: {String(value)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
       </CardContent>

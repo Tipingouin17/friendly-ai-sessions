@@ -3,7 +3,7 @@
  * Premium dashboard with stats header, filter tabs, rich workshop cards.
  */
 import { useEffect, useState } from "react";
-import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Users, MessageSquare, Clock, Zap, LayoutDashboard, Activity } from "lucide-react";
+import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Users, MessageSquare, Clock, Zap, LayoutDashboard, Activity, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,110 @@ import PageHead from "@/components/PageHead";
 import { useToast } from "@/components/ui/use-toast";
 
 const ITEMS_PER_PAGE = 12;
+
+const STALE_SESSION_TIMEOUT_MINUTES = 120;
+
+const parseTime = (value?: string | null): number => {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const getMostRecentIso = (...values: Array<string | null | undefined>): string | null => {
+  const latest = values
+    .map(parseTime)
+    .filter((timestamp) => timestamp > 0)
+    .sort((a, b) => b - a)[0];
+
+  return latest ? new Date(latest).toISOString() : null;
+};
+
+const calculateInactiveDurationMinutes = (workshop: Workshop, lastActivityAt: string | null): number => {
+  const createdAt = parseTime(workshop.created_at);
+  const lastActivity = parseTime(lastActivityAt);
+
+  if (!createdAt || !lastActivity || lastActivity <= createdAt) return 0;
+
+  const minutes = Math.round((lastActivity - createdAt) / 60_000);
+  return minutes > 480 ? 0 : Math.max(1, minutes);
+};
+
+const fetchLatestActivityAt = async (conversationId: number): Promise<string | null> => {
+  const [latestEvent, latestMessage] = await Promise.all([
+    api
+      .from('session_events')
+      .select('created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    api
+      .from('messages')
+      .select('created_at, updated_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (latestEvent.error) console.warn('Unable to inspect latest session event for stale-session cleanup', latestEvent.error);
+  if (latestMessage.error) console.warn('Unable to inspect latest message for stale-session cleanup', latestMessage.error);
+
+  return getMostRecentIso(
+    latestEvent.data?.created_at,
+    latestMessage.data?.created_at,
+    latestMessage.data?.updated_at,
+  );
+};
+
+const autoCloseInactiveWorkshops = async (workshops: Workshop[]): Promise<Workshop[]> => {
+  const now = Date.now();
+  const checked = await Promise.all(workshops.map(async (workshop) => {
+    const latestActivityAt = await fetchLatestActivityAt(workshop.id);
+    const lastActivityAt = getMostRecentIso(
+      latestActivityAt,
+      workshop.updated_at,
+      workshop.created_at,
+    );
+    const lastActivityTime = parseTime(lastActivityAt);
+    const inactiveMinutes = lastActivityTime ? Math.floor((now - lastActivityTime) / 60_000) : 0;
+
+    return { workshop, lastActivityAt, inactiveMinutes };
+  }));
+
+  const stale = checked.filter(({ inactiveMinutes }) => inactiveMinutes >= STALE_SESSION_TIMEOUT_MINUTES);
+
+  await Promise.all(stale.map(async ({ workshop, lastActivityAt }) => {
+    const durationMinutes = calculateInactiveDurationMinutes(workshop, lastActivityAt);
+    const updatePayload: Record<string, string | number | boolean | null> = {
+      is_session_ended: true,
+      status: 'auto_closed_inactive',
+      ended_at: lastActivityAt ?? new Date().toISOString(),
+      current_participants: 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (!workshop.session_duration_minutes && durationMinutes > 0) {
+      updatePayload.session_duration_minutes = durationMinutes;
+    }
+
+    const { error } = await api
+      .from('conversations')
+      .update(updatePayload)
+      .eq('id', workshop.id)
+      .eq('is_session_ended', false);
+
+    if (error) {
+      console.warn(`Unable to auto-close inactive session ${workshop.id}`, error);
+    }
+  }));
+
+  const staleIds = new Set(stale.map(({ workshop }) => workshop.id));
+  return checked
+    .filter(({ workshop }) => !staleIds.has(workshop.id))
+    .map(({ workshop }) => workshop);
+};
+
 
 const calculateDuration = (workshop: Workshop): number => {
   if (workshop.session_duration_minutes && workshop.session_duration_minutes > 0) {
@@ -72,7 +176,8 @@ const fetchActiveWorkshops = async () => {
     .eq('status', 'active')
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data as Workshop[];
+
+  return autoCloseInactiveWorkshops((data || []) as Workshop[]);
 };
 
 /* ── Workshop Card ── */
@@ -107,11 +212,14 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
   const participantCount = isActive
     ? (workshop.current_participants ?? workshop.participants ?? 0)
     : (workshop.participants ?? workshop.current_participants ?? 0);
+  const attendeeCapacity = Math.max((workshop.participants ?? 0) - 1, 0);
+  const attendeeLabel = isActive ? 'Live now' : 'Final count';
   const messageCount = workshop.total_messages || 0;
   const duration = calculateDuration(workshop);
   const title = getWorkshopTitle(workshop);
   const hasContent = messageCount > 0;
   const engagementScore = workshop.participant_engagement_score || 0;
+  const isAutoClosed = workshop.status === 'auto_closed_inactive';
 
   // Colour accent per difficulty
   const difficultyAccent: Record<string, string> = {
@@ -171,17 +279,40 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
           )}
 
           {/* Metrics row */}
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            <MetricPill icon={<Users size={12} />} value={participantCount} label="Participants" />
-            <MetricPill icon={<MessageSquare size={12} />} value={messageCount} label="Messages" />
-            <MetricPill icon={<Clock size={12} />} value={duration > 0 ? `${duration}m` : '—'} label="Duration" />
+          <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-4">
+            <MetricPill
+              icon={<Users size={12} />}
+              value={participantCount}
+              label={attendeeLabel}
+              helper={attendeeCapacity > 0 ? `Seat limit: ${attendeeCapacity}` : 'Host-only or no seat limit saved'}
+            />
+            <MetricPill
+              icon={<MessageSquare size={12} />}
+              value={messageCount}
+              label="Saved messages"
+              helper="Final conversation total"
+            />
+            <MetricPill
+              icon={<Clock size={12} />}
+              value={duration > 0 ? `${duration}m` : '—'}
+              label={isActive ? 'Open time' : 'Session length'}
+              helper={isActive ? `${STALE_SESSION_TIMEOUT_MINUTES}m inactivity cleanup` : 'Saved open-to-close duration'}
+            />
             <MetricPill
               icon={<Zap size={12} />}
               value={engagementScore > 0 ? engagementScore.toFixed(1) : '—'}
               label="Engagement"
+              helper="Saved summary score"
               highlight={engagementScore >= 4 ? 'emerald' : engagementScore >= 2.5 ? 'indigo' : undefined}
             />
           </div>
+
+          {!isActive && isAutoClosed && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Auto-closed after {STALE_SESSION_TIMEOUT_MINUTES} minutes without activity. The card shows saved summary values; diagnostics shows raw event activity.</span>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-50">
@@ -189,7 +320,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
               {isActive ? (
                 <span className="text-emerald-600 font-medium">In progress</span>
               ) : workshop.ended_at ? (
-                `Completed ${format(new Date(workshop.ended_at), 'PP')}`
+                `${isAutoClosed ? 'Auto-closed' : 'Completed'} ${format(new Date(workshop.ended_at), 'PP')}`
               ) : ''}
             </span>
             <div className="flex flex-wrap justify-end gap-2">
@@ -242,6 +373,9 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
               summarySnapshot={{
                 participants: participantCount,
                 currentParticipants: workshop.current_participants ?? null,
+                attendeeCapacity,
+                status: workshop.status ?? null,
+                inactivityTimeoutMinutes: STALE_SESSION_TIMEOUT_MINUTES,
                 messages: messageCount,
                 durationMinutes: duration,
                 createdAt: workshop.created_at ?? null,
@@ -256,11 +390,12 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
   );
 };
 
-const MetricPill = ({ icon, value, label, highlight }: { icon: React.ReactNode; value: string | number; label: string; highlight?: 'emerald' | 'indigo' }) => (
-  <div className="flex flex-col items-center bg-gray-50 rounded-xl py-2 px-1">
+const MetricPill = ({ icon, value, label, helper, highlight }: { icon: React.ReactNode; value: string | number; label: string; helper?: string; highlight?: 'emerald' | 'indigo' }) => (
+  <div className="flex min-h-[4.75rem] flex-col items-center justify-center bg-gray-50 rounded-xl py-2 px-1 text-center" title={helper}>
     <span className={`${highlight === 'emerald' ? 'text-emerald-500' : highlight === 'indigo' ? 'text-indigo-500' : 'text-gray-400'} mb-0.5`}>{icon}</span>
     <span className={`text-sm font-bold ${highlight === 'emerald' ? 'text-emerald-600' : highlight === 'indigo' ? 'text-indigo-600' : 'text-gray-700'}`}>{value}</span>
-    <span className="text-[10px] text-gray-400 font-medium">{label}</span>
+    <span className="text-[10px] text-gray-500 font-medium leading-tight">{label}</span>
+    {helper && <span className="mt-0.5 text-[9px] leading-tight text-gray-400">{helper}</span>}
   </div>
 );
 
@@ -382,7 +517,13 @@ const PastWorkshops = () => {
 
   // Aggregate stats
   const totalSessions = (pastWorkshops?.length || 0) + (activeWorkshops?.length || 0);
-  // Use Math.max(0, ...) to guard against negative counts from race conditions
+  const staleActiveSessions = (activeWorkshops || []).filter((w) => {
+    const lastActivityAt = getMostRecentIso(w.updated_at, w.created_at);
+    const lastActivityTime = parseTime(lastActivityAt);
+    return lastActivityTime > 0 && (Date.now() - lastActivityTime) / 60_000 >= STALE_SESSION_TIMEOUT_MINUTES;
+  }).length;
+  // Use Math.max(0, ...) to guard against negative counts from race conditions.
+  // Completed sessions use the saved final snapshot; active sessions use the live count.
   const totalParticipants = [
     ...(pastWorkshops || []).map(w => w.participants ?? w.current_participants ?? 0),
     ...(activeWorkshops || []).map(w => w.current_participants ?? w.participants ?? 0),
@@ -438,6 +579,17 @@ const PastWorkshops = () => {
               <p className="text-2xl font-bold text-gray-900">{s.value}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-indigo-100 bg-white/80 p-4 text-sm text-gray-600 shadow-sm">
+          <p className="font-semibold text-gray-800">How to read this dashboard</p>
+          <p className="mt-1">
+            Past workshop cards show the saved end-of-session snapshot: final participant count, saved messages, and open-to-close duration. Diagnostics is for troubleshooting and shows raw events, so reconnects can appear as extra join events.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Sessions with no messages or diagnostic activity for {STALE_SESSION_TIMEOUT_MINUTES} minutes are automatically closed and moved out of Active Sessions on refresh.
+            {staleActiveSessions > 0 ? ` ${staleActiveSessions} stale active session${staleActiveSessions === 1 ? '' : 's'} will be cleaned up on the next refresh.` : ''}
+          </p>
         </div>
 
         {/* ── Filter Tabs ── */}

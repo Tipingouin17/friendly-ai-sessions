@@ -11,6 +11,8 @@ interface SessionAnalytics {
   totalEvents: number;
   participantJoins: number;
   participantLeaves: number;
+  uniqueParticipants: number;
+  reconnectEvents: number;
   messagesSent: number;
   aiResponses: number;
   adminActions: number;
@@ -30,6 +32,8 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
     totalEvents: 0,
     participantJoins: 0,
     participantLeaves: 0,
+    uniqueParticipants: 0,
+    reconnectEvents: 0,
     messagesSent: 0,
     aiResponses: 0,
     adminActions: 0,
@@ -45,19 +49,32 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
     try {
       setIsLoading(true);
       
-      // Fetch all session events for this conversation
-      const { data: events, error: eventsError } = await api
-        .from('session_events')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      // Fetch all session events and participant rows for this conversation.
+      // Events explain operational activity; participant rows provide the best
+      // available unique attendee count without treating reconnects as new seats.
+      const [{ data: events, error: eventsError }, { data: participantRows, error: participantsError }] = await Promise.all([
+        api
+          .from('session_events')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true }),
+        api
+          .from('session_participants')
+          .select('participant_id, is_host')
+          .eq('conversation_id', conversationId),
+      ]);
 
       if (eventsError) {
         throw eventsError;
       }
 
+      if (participantsError) {
+        console.warn('Unable to load session participants for diagnostics', participantsError);
+      }
+
       if (!events || events.length === 0) {
-        setAnalytics(prev => ({ ...prev }));
+        const uniqueParticipantsFromRows = (participantRows || []).filter((participant: any) => !participant.is_host).length;
+        setAnalytics(prev => ({ ...prev, uniqueParticipants: uniqueParticipantsFromRows }));
         return;
       }
 
@@ -91,8 +108,13 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
         ? new Date(lastEvent.created_at).getTime() - new Date(firstEvent.created_at).getTime()
         : 0;
 
-      // Calculate engagement score (messages per participant)
-      const uniqueParticipants = new Set(
+      // Calculate unique participants separately from join/reconnect events.
+      const participantIdsFromRows = new Set(
+        (participantRows || [])
+          .filter((participant: any) => !participant.is_host && participant.participant_id)
+          .map((participant: any) => participant.participant_id)
+      );
+      const participantIdsFromEvents = new Set(
         events
           .filter(e => {
             const eventData = e.data as Record<string, any>;
@@ -102,7 +124,9 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
             const eventData = e.data as Record<string, any>;
             return eventData.participant_id;
           })
-      ).size;
+      );
+      const uniqueParticipants = participantIdsFromRows.size || participantIdsFromEvents.size;
+      const reconnectEvents = Math.max(0, participantJoins - uniqueParticipants);
       
       const engagementScore = uniqueParticipants > 0 
         ? messagesSent / uniqueParticipants 
@@ -112,6 +136,8 @@ export const useSessionAnalytics = ({ conversationId, realtime = false }: Analyt
         totalEvents,
         participantJoins,
         participantLeaves,
+        uniqueParticipants,
+        reconnectEvents,
         messagesSent,
         aiResponses,
         adminActions,

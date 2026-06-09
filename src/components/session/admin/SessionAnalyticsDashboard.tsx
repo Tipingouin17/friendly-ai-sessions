@@ -25,6 +25,9 @@ import {
 interface SessionSummarySnapshot {
   participants: number;
   currentParticipants: number | null;
+  attendeeCapacity?: number | null;
+  status?: string | null;
+  inactivityTimeoutMinutes?: number | null;
   messages: number;
   durationMinutes: number;
   createdAt: string | null;
@@ -150,7 +153,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
             <div className="mb-2 text-sm font-semibold text-indigo-900">Saved session snapshot</div>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <div>
-                <div className="font-medium text-indigo-800">Participants</div>
+                <div className="font-medium text-indigo-800">Final participants</div>
                 <div className="text-indigo-700">{summarySnapshot.participants}</div>
               </div>
               <div>
@@ -162,12 +165,12 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
                 <div className="text-indigo-700">{formatMinutes(summarySnapshot.durationMinutes)}</div>
               </div>
               <div>
-                <div className="font-medium text-indigo-800">Live count</div>
-                <div className="text-indigo-700">{summarySnapshot.currentParticipants ?? '—'}</div>
+                <div className="font-medium text-indigo-800">Seat limit</div>
+                <div className="text-indigo-700">{summarySnapshot.attendeeCapacity && summarySnapshot.attendeeCapacity > 0 ? summarySnapshot.attendeeCapacity : '—'}</div>
               </div>
             </div>
             <p className="mt-2 text-xs text-indigo-700">
-              These are the values used on the Past Workshops card. Event-log metrics below are operational traces and can include reconnects, retries, and signalling activity.
+              These are the values used on the Past Workshops card. Event-log metrics below are operational traces and can include reconnects, retries, and signalling activity. {summarySnapshot.status === 'auto_closed_inactive' ? `This session was auto-closed after ${summarySnapshot.inactivityTimeoutMinutes ?? 120} minutes without activity.` : ''}
             </p>
           </div>
         )}
@@ -176,12 +179,12 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-500" />
-            <div className="text-sm">
-              <div className="font-medium">Join events</div>
+              <div className="text-sm">
+              <div className="font-medium">Unique participants</div>
               <div className="text-gray-600">
-                {analytics.participantJoins} joined, {analytics.participantLeaves} left
+                {analytics.uniqueParticipants} unique, {analytics.participantJoins} join events
               </div>
-              <div className="text-xs text-gray-500">Counts lifecycle events, not unique seats.</div>
+              <div className="text-xs text-gray-500">Reconnect/retry events: {analytics.reconnectEvents}. Leaves: {analytics.participantLeaves}.</div>
             </div>
           </div>
 
@@ -231,7 +234,7 @@ const SessionAnalyticsDashboard: React.FC<SessionAnalyticsDashboardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Event engagement score</span>
             <Badge variant={analytics.engagementScore > 2 ? "default" : "secondary"}>
-              {analytics.engagementScore}/event participant
+              {analytics.engagementScore}/unique participant
             </Badge>
           </div>
 

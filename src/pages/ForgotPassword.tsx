@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, MailCheck } from 'lucide-react';
 import PageHead from '@/components/PageHead';
+import { validateEmailAddress, sanitizeInput } from '@/utils/inputValidation';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -31,8 +32,8 @@ const ForgotPassword = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+    const trimmedEmail = sanitizeInput(email).toLowerCase();
+    if (!validateEmailAddress(trimmedEmail).isValid) {
       toast({
         title: 'Invalid email',
         description: 'Please enter a valid email address.',
@@ -46,14 +47,14 @@ const ForgotPassword = () => {
       await resetPassword(trimmedEmail);
       setHasSentResetLink(true);
       toast({
-        title: 'Password reset email sent',
-        description: 'Check your email for a link to reset your password.',
+        title: 'Check your email',
+        description: 'If an account exists for that address, a reset link has been sent.',
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Please try again later.';
+      console.error('Password reset request failed:', error);
       toast({
-        title: 'Failed to send reset email',
-        description: errorMessage,
+        title: 'Reset request could not be completed',
+        description: 'Please try again in a few minutes or contact support if the problem continues.',
         variant: 'destructive',
       });
     } finally {
@@ -83,7 +84,7 @@ const ForgotPassword = () => {
               <div>
                 <h1 className="text-2xl font-bold mb-2">Check your email</h1>
                 <p className="text-sm text-gray-600">
-                  If an AIfacilitator account exists for <span className="font-medium text-gray-900">{email.trim()}</span>, we sent a secure link to reset your password.
+                  If an AIfacilitator account exists for <span className="font-medium text-gray-900">{sanitizeInput(email).toLowerCase()}</span>, we sent a secure link to reset your password.
                 </p>
               </div>
               <div className="space-y-3">

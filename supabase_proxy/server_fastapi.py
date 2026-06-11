@@ -8180,6 +8180,16 @@ async def edge_function(func_name: str, request: Request):
                               AND sp.device_id = $6::text
                             LIMIT 1
                         ),
+                        removed_device AS (
+                            SELECT 1 AS denied
+                            FROM conv c
+                            JOIN public.session_events se ON se.conversation_id = c.id
+                            WHERE $6::text IS NOT NULL
+                              AND se.event_type = 'participant_removed'
+                              AND COALESCE(se.data->>'access_revoked', 'false') = 'true'
+                              AND se.data->>'device_id' = $6::text
+                            LIMIT 1
+                        ),
                         stats AS (
                             SELECT
                                 COALESCE(MAX(sp.participant_id), 0) AS max_participant_id,
@@ -8195,12 +8205,14 @@ async def edge_function(func_name: str, request: Request):
                                 GREATEST(COALESCE(c.participants, 0) - 1, 0) AS participant_capacity,
                                 (($5::boolean = true) OR (COALESCE($7::text, '') <> '' AND c.join_token::text = $7::text)) AS token_valid,
                                 e.participant_id AS existing_participant_id,
+                                (rd.denied IS NOT NULL) AS access_revoked,
                                 s.max_participant_id + 1 AS candidate_participant_id,
                                 s.non_host_count,
                                 (GREATEST(COALESCE(c.participants, 0) - 1, 0) > 0 AND s.non_host_count >= GREATEST(COALESCE(c.participants, 0) - 1, 0) AND $5::boolean = false) AS is_full
                             FROM conv c
                             CROSS JOIN stats s
                             LEFT JOIN existing e ON true
+                            LEFT JOIN removed_device rd ON true
                         ),
                         updated_existing AS (
                             UPDATE public.session_participants sp
@@ -8221,6 +8233,7 @@ async def edge_function(func_name: str, request: Request):
                             WHERE d.existing_participant_id IS NULL
                               AND d.is_session_ended = false
                               AND (d.status IS NULL OR d.status = 'active')
+                              AND d.access_revoked = false
                               AND d.token_valid = true
                               AND d.is_full = false
                             RETURNING participant_id, false AS is_rejoining
@@ -8245,6 +8258,7 @@ async def edge_function(func_name: str, request: Request):
                             EXISTS (SELECT 1 FROM conv) AS conversation_exists,
                             (SELECT is_session_ended FROM decision) AS is_session_ended,
                             (SELECT status FROM decision) AS status,
+                            (SELECT access_revoked FROM decision) AS access_revoked,
                             (SELECT token_valid FROM decision) AS token_valid,
                             (SELECT is_full FROM decision) AS is_full,
                             (SELECT participant_id FROM chosen) AS participant_id,
@@ -8266,6 +8280,8 @@ async def edge_function(func_name: str, request: Request):
                         raise HTTPException(400, "This session has already ended")
                     if join_row["status"] and join_row["status"] != "active":
                         raise HTTPException(400, "This session is not currently active")
+                    if join_row["access_revoked"]:
+                        raise HTTPException(403, "Your access to this session has been revoked by the facilitator")
                     if not join_row["token_valid"]:
                         raise HTTPException(403, "Invalid join token")
                     if join_row["is_full"]:

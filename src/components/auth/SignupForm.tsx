@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { signupSchema, sanitizeInput } from '@/utils/inputValidation';
+import { signupSchema, sanitizeInput, normalizePersonName } from '@/utils/inputValidation';
 import { SignupFormFields } from './SignupFormFields';
 import { recordActivationEventBeacon } from '@/lib/activationTracking';
 import { trackActivationSignupSubmitted, trackSignup, trackSignupStart } from '@/lib/tracking';
@@ -38,8 +38,8 @@ export const SignupForm: React.FC = () => {
   const validateForm = () => {
     try {
       signupFormSchema.parse({ 
-        name: sanitizeInput(name), 
-        email: sanitizeInput(email), 
+        name: normalizePersonName(name), 
+        email: sanitizeInput(email).toLowerCase(), 
         password, 
         confirmPassword 
       });
@@ -75,8 +75,8 @@ export const SignupForm: React.FC = () => {
       return;
     }
     
-    const sanitizedEmail = sanitizeInput(email);
-    const sanitizedName = sanitizeInput(name);
+    const sanitizedEmail = sanitizeInput(email).toLowerCase();
+    const sanitizedName = normalizePersonName(name);
 
     setIsLoading(true);
     recordActivationEventBeacon('activation_signup_started', {
@@ -115,7 +115,7 @@ export const SignupForm: React.FC = () => {
       ) {
         friendlyMessage = "An account with this email already exists. Please log in instead.";
       } else if (rawMessage.toLowerCase().includes('weak_password')) {
-        friendlyMessage = "Password is too weak. Please choose a stronger password (at least 8 characters).";
+        friendlyMessage = "Password is too weak. Use at least 8 characters with uppercase, lowercase, number, and special character.";
       } else if (rawMessage.toLowerCase().includes('invalid_email') || rawMessage.toLowerCase().includes('invalid email')) {
         friendlyMessage = "Please enter a valid email address.";
       }

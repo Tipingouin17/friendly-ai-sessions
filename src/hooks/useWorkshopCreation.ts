@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/api";
 import { Step } from "@/types/facilitator";
-import { createConversation } from "@/services/facilitatorService";
+import { createConversation, validateScheduledStartAt } from "@/services/facilitatorService";
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useNavigate } from "react-router-dom";
 import { recordActivationEventBeacon } from "@/lib/activationTracking";
@@ -32,9 +32,11 @@ export const useWorkshopCreation = () => {
   const { navigateToHostSession } = useNavigateToSession();
   const navigate = useNavigate();
 
-  const isScheduled = useMemo(() => {
-    return scheduledStartAt.getTime() > Date.now() + 60_000;
+  const scheduleValidation = useMemo(() => {
+    return validateScheduledStartAt(scheduledStartAt);
   }, [scheduledStartAt]);
+
+  const isScheduled = scheduleValidation.isScheduled;
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -80,6 +82,25 @@ export const useWorkshopCreation = () => {
         return;
       }
 
+      const currentScheduleValidation = validateScheduledStartAt(scheduledStartAt);
+      if (!currentScheduleValidation.isValid) {
+        toast({
+          title: "Invalid session date",
+          description: currentScheduleValidation.error,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (durationMinutes !== "" && (Number(durationMinutes) < 5 || Number(durationMinutes) > 480)) {
+        toast({
+          title: "Invalid session duration",
+          description: "Session duration must be between 5 and 480 minutes.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Show spinner immediately — the OpenAI call can take 10–15 s
       setIsSubmitting(true);
 
@@ -91,7 +112,7 @@ export const useWorkshopCreation = () => {
         agreed,
         userId: user.id,
         durationMinutes: durationMinutes !== "" ? Number(durationMinutes) : undefined,
-        scheduledStartAt: isScheduled ? scheduledStartAt : undefined,
+        scheduledStartAt: currentScheduleValidation.isScheduled ? scheduledStartAt : undefined,
       });
 
         if (data?.id) {
@@ -101,7 +122,7 @@ export const useWorkshopCreation = () => {
             facilitator_id: selectedFacilitator,
             participant_count: participantCount,
             language: language,
-            is_scheduled: isScheduled,
+            is_scheduled: currentScheduleValidation.isScheduled,
           };
 
           trackSessionCreated(eventParameters);
@@ -111,7 +132,7 @@ export const useWorkshopCreation = () => {
           });
 
 
-        if (isScheduled) {
+        if (currentScheduleValidation.isScheduled) {
           navigate(`/schedule-invitations?id=${data.id}`);
           toast({
             title: "Session Scheduled",

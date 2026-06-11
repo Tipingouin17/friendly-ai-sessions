@@ -18,10 +18,63 @@ export const sanitizeHtml = (content: string): string => {
 };
 
 /**
- * Sanitizes input by trimming and removing potentially dangerous characters
+ * Sanitizes input by trimming and removing potentially dangerous characters.
  */
 export const sanitizeInput = (input: string): string => {
   return input.trim().replace(/[<>]/g, '');
+};
+
+/**
+ * Normalizes user-facing names and free-text labels so whitespace-only values
+ * cannot pass validation and copied names do not keep accidental spacing.
+ */
+export const normalizeWhitespace = (input: string): string => {
+  return input.trim().replace(/\s+/g, ' ');
+};
+
+export const normalizePersonName = (input: string): string => {
+  return normalizeWhitespace(sanitizeInput(input));
+};
+
+export const validateEmailAddress = (email: string): { isValid: boolean; error?: string } => {
+  const normalized = sanitizeInput(email).toLowerCase();
+  if (!normalized) return { isValid: false, error: 'Email address is required' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return { isValid: false, error: 'Please enter a valid email address' };
+  }
+  return { isValid: true };
+};
+
+export type PasswordRequirementKey = 'length' | 'uppercase' | 'lowercase' | 'number' | 'special';
+
+export interface PasswordRequirementStatus {
+  key: PasswordRequirementKey;
+  label: string;
+  met: boolean;
+}
+
+export const getPasswordRequirementStatuses = (password: string): PasswordRequirementStatus[] => ([
+  { key: 'length', label: 'At least 8 characters', met: password.length >= 8 },
+  { key: 'uppercase', label: 'One uppercase letter', met: /[A-Z]/.test(password) },
+  { key: 'lowercase', label: 'One lowercase letter', met: /[a-z]/.test(password) },
+  { key: 'number', label: 'One number', met: /\d/.test(password) },
+  { key: 'special', label: 'One special character', met: /[^A-Za-z0-9]/.test(password) },
+]);
+
+export const validatePasswordStrength = (password: string): { isValid: boolean; error?: string; missingRequirements: string[] } => {
+  const missingRequirements = getPasswordRequirementStatuses(password)
+    .filter((requirement) => !requirement.met)
+    .map((requirement) => requirement.label.toLowerCase());
+
+  if (missingRequirements.length > 0) {
+    return {
+      isValid: false,
+      error: `Password must include ${missingRequirements.join(', ')}.`,
+      missingRequirements,
+    };
+  }
+
+  return { isValid: true, missingRequirements: [] };
 };
 
 /**
@@ -102,9 +155,23 @@ export const sessionJoinSchema = z.object({
  * Zod schema for signup validation
  */
 export const signupSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters")
+  name: z.string()
+    .transform((value) => normalizePersonName(value))
+    .refine((value) => value.length >= 2, "Name must be at least 2 characters")
+    .refine((value) => value.length <= 100, "Name must be less than 100 characters")
+    .refine((value) => /[A-Za-z0-9]/.test(value), "Name must include visible characters"),
+  email: z.string()
+    .transform((value) => sanitizeInput(value).toLowerCase())
+    .refine((value) => validateEmailAddress(value).isValid, "Please enter a valid email address"),
+  password: z.string().superRefine((value, ctx) => {
+    const result = validatePasswordStrength(value);
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.error ?? "Password does not meet the security requirements",
+      });
+    }
+  })
 });
 
 /**

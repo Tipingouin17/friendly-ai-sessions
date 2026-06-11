@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { getPasswordRequirementStatuses } from '@/utils/inputValidation';
 
 interface SignupFormFieldsProps {
   name: string;
@@ -42,6 +43,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isDisabled = isLoading || attempts >= 3;
+  const passwordRequirements = getPasswordRequirementStatuses(password);
 
   return (
     <div className="space-y-4">
@@ -123,13 +125,19 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {errors.password ? (
+        {errors.password && (
           <p className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>
-        ) : (
-          <p id="password-hint" className="text-gray-400 text-xs mt-1">
-            Must be at least 8 characters
-          </p>
         )}
+        <div id="password-hint" className="mt-2 grid grid-cols-1 gap-1 rounded-md bg-gray-50 p-3 text-xs sm:grid-cols-2">
+          {passwordRequirements.map((requirement) => (
+            <span
+              key={requirement.key}
+              className={requirement.met ? "font-medium text-green-700" : "text-gray-500"}
+            >
+              {requirement.met ? "✓" : "•"} {requirement.label}
+            </span>
+          ))}
+        </div>
       </div>
       <div>
         <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2 text-left">
@@ -170,11 +178,11 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
         </p>
       )}
 
-      <Button type="submit" className="w-full" disabled={isDisabled}>
+      <Button type="submit" className="flex w-full items-center justify-center" disabled={isDisabled}>
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating account...
+            <span>Creating account...</span>
           </>
         ) : (
           'Create account & request trial'

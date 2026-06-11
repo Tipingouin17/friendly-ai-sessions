@@ -14,9 +14,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, HelpCircle } from "lucide-react";
+import { AlertCircle, CalendarClock, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { validateScheduledStartAt } from "@/services/facilitatorService";
 
 const formatLocalDateTime = (date: Date) => {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -84,6 +85,8 @@ export const WorkshopSetup = ({
   const selectedAttendeeCount = participantCount;
   const planAttendeeLimit = maxParticipants;
   const limitReached = selectedAttendeeCount >= planAttendeeLimit;
+  const minScheduleValue = formatLocalDateTime(new Date());
+  const scheduleValidation = validateScheduledStartAt(scheduledStartAt);
   
   return <div className="space-y-6">
       <div>
@@ -161,14 +164,24 @@ export const WorkshopSetup = ({
         <label className="block text-sm font-medium mb-2 text-left">
           Session date and time
         </label>
-        <Input
-          type="datetime-local"
-          value={formatLocalDateTime(scheduledStartAt)}
-          onChange={(e) => setScheduledStartAt(parseLocalDateTime(e.target.value))}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Leave as now to start immediately, or choose a future date to schedule invitations.
-        </p>
+        <div className="relative">
+          <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="datetime-local"
+            value={formatLocalDateTime(scheduledStartAt)}
+            min={minScheduleValue}
+            onChange={(e) => setScheduledStartAt(parseLocalDateTime(e.target.value))}
+            className={scheduleValidation.isValid ? "pl-10" : "border-red-500 pl-10"}
+            aria-invalid={!scheduleValidation.isValid}
+          />
+        </div>
+        {!scheduleValidation.isValid ? (
+          <p className="text-xs text-red-600 mt-1" role="alert">{scheduleValidation.error}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-1">
+            Leave as now to start immediately, or choose a future date to schedule invitations.
+          </p>
+        )}
       </div>
 
       <div>

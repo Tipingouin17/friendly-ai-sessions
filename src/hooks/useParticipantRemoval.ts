@@ -96,6 +96,7 @@ export const useParticipantRemoval = ({
         return;
       }
       
+      const removedParticipant = data[0] as { device_id?: string | null; name?: string | null; is_host?: boolean | null };
       const newCount = Math.max(0, originalParticipants.length - 1);
       
       // Update conversations table with the new count
@@ -121,8 +122,12 @@ export const useParticipantRemoval = ({
           event_type: 'participant_removed',
           data: { 
             participant_id: participantId,
+            participant_name: removedParticipant?.name ?? null,
+            device_id: removedParticipant?.device_id ?? null,
+            is_host: removedParticipant?.is_host ?? false,
             current_count: newCount,
             removed_by: 'admin',
+            removed_by_admin: true,
             timestamp: new Date().toISOString(),
             permanent_removal: true,
             access_revoked: true,

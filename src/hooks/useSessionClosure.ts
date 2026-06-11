@@ -12,6 +12,7 @@ import { useSessionClosureValidation } from './session-closure/useSessionClosure
 import { useSessionClosureExecution } from './session-closure/useSessionClosureExecution';
 import { useReportDownloader } from './session-closure/useReportDownloader';
 import api from "@/lib/api";
+import { calculateCanonicalSessionDurationMinutes, calculateEngagementScore } from '@/utils/sessionLifecycle';
 
 interface SessionClosureResult {
   reportId: string;
@@ -136,7 +137,7 @@ export const useSessionClosure = () => {
       // 1. Fetch the conversation to get created_at for duration calculation
       const { data: convData } = await api
         .from('conversations')
-        .select('created_at')
+        .select('created_at, session_started_at')
         .eq('id', conversationId)
         .single();
 
@@ -158,16 +159,19 @@ export const useSessionClosure = () => {
 
       // 4. Compute engagement score: ratio of participants who sent at least one message
       const activeParticipants = participantCount ?? 0;
-      const engagementScore = activeParticipants > 0
-        ? Math.round((uniqueRespondents / activeParticipants) * 100) / 100
-        : 0;
+      const engagementScore = calculateEngagementScore({
+        uniqueRespondents,
+        participantCount: activeParticipants,
+      });
 
-      // 5. Compute duration in minutes from session start (created_at) to now
-      const sessionStart = convData?.created_at;
+      // 5. Compute duration from the canonical start timestamp when available.
+      // Fall back to created_at for legacy rows that predate session_started_at.
       const now = new Date().toISOString();
-      const durationMinutes = sessionStart
-        ? Math.max(1, Math.round((new Date(now).getTime() - new Date(sessionStart).getTime()) / 60000))
-        : 0;
+      const durationMinutes = calculateCanonicalSessionDurationMinutes({
+        startedAt: convData?.session_started_at,
+        createdAt: convData?.created_at,
+        endedAt: now,
+      });
 
       // The DB has a CHECK (participants >= 1) constraint, so we clamp to minimum 1.
       // A session with 0 registered participants is still valid (host ran it alone).

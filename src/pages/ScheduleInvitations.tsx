@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import api from "@/lib/api";
 import { createSessionInvitations, getScheduledStartIso, getSessionInvitations } from "@/services/facilitatorService";
+import { normalizePersonName, validateEmailAddress } from "@/utils/inputValidation";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
@@ -75,9 +76,26 @@ const ScheduleInvitations = () => {
   const scheduledStartIso = useMemo(() => getScheduledStartIso(conversation?.flow_config), [conversation]);
   const participantCapacity = Number(conversation?.participants ?? 1) - 1;
   const sessionTitle = ((conversation?.sessions as { title?: string | null } | undefined)?.title || "Scheduled session") as string;
-  const validInvitees = invitees
-    .map((invitee) => ({ name: invitee.name.trim(), email: invitee.email.trim().toLowerCase() }))
-    .filter((invitee) => invitee.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitee.email));
+  const normalizedInvitees = invitees.map((invitee, index) => {
+    const name = normalizePersonName(invitee.name);
+    const email = invitee.email.trim().toLowerCase();
+    const emailValidation = validateEmailAddress(email);
+    return {
+      index,
+      name,
+      email,
+      isValid: Boolean(name) && emailValidation.isValid,
+      error: !name ? "Name is required" : emailValidation.error,
+    };
+  });
+  const duplicateEmails = normalizedInvitees.reduce<Record<string, number>>((acc, invitee) => {
+    if (invitee.email) acc[invitee.email] = (acc[invitee.email] ?? 0) + 1;
+    return acc;
+  }, {});
+  const invalidInvitees = normalizedInvitees.filter((invitee) => !invitee.isValid || duplicateEmails[invitee.email] > 1);
+  const validInvitees = normalizedInvitees
+    .filter((invitee) => invitee.isValid && duplicateEmails[invitee.email] === 1)
+    .map((invitee) => ({ name: invitee.name, email: invitee.email }));
 
   const updateInvitee = (index: number, field: keyof InviteeDraft, value: string) => {
     setInvitees((current) => current.map((invitee, i) => (i === index ? { ...invitee, [field]: value } : invitee)));
@@ -87,8 +105,18 @@ const ScheduleInvitations = () => {
 
   const handleSubmit = async () => {
     if (!conversationId || !Number.isFinite(conversationId)) return;
+    if (invalidInvitees.length > 0) {
+      const firstInvalid = invalidInvitees[0];
+      const reason = duplicateEmails[firstInvalid.email] > 1 ? "Email addresses must be unique" : firstInvalid.error;
+      toast({
+        title: "Fix invite list",
+        description: `Row ${firstInvalid.index + 1}: ${reason}. Each invitation needs a visible name and a unique valid email address.`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (validInvitees.length === 0) {
-      toast({ title: "Add at least one participant", description: "Each invitation needs a name and a valid email address.", variant: "destructive" });
+      toast({ title: "Add at least one participant", description: "Each invitation needs a visible name and a unique valid email address.", variant: "destructive" });
       return;
     }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
@@ -170,12 +198,20 @@ const ScheduleInvitations = () => {
                 <Button type="button" variant="outline" size="sm" onClick={addInvitee}><Plus className="mr-2 h-4 w-4" /> Add participant</Button>
               </div>
               <div className="space-y-3">
-                {invitees.map((invitee, index) => (
-                  <div key={index} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
-                    <Input placeholder="Participant name" value={invitee.name} onChange={(e) => updateInvitee(index, "name", e.target.value)} />
-                    <Input type="email" placeholder="email@example.com" value={invitee.email} onChange={(e) => updateInvitee(index, "email", e.target.value)} />
-                  </div>
-                ))}
+                {invitees.map((invitee, index) => {
+                  const normalized = normalizedInvitees[index];
+                  const hasError = Boolean(normalized && (!normalized.isValid || duplicateEmails[normalized.email] > 1));
+                  const errorText = normalized && duplicateEmails[normalized.email] > 1 ? "Duplicate email" : normalized?.error;
+                  return (
+                    <div key={index} className={`rounded-2xl border p-3 ${hasError ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Input aria-invalid={hasError} placeholder="Participant name" value={invitee.name} onChange={(e) => updateInvitee(index, "name", e.target.value)} />
+                        <Input aria-invalid={hasError} type="email" placeholder="email@example.com" value={invitee.email} onChange={(e) => updateInvitee(index, "email", e.target.value)} />
+                      </div>
+                      {hasError && <p className="mt-2 text-xs font-medium text-red-700">Row {index + 1}: {errorText}</p>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -207,8 +243,13 @@ const ScheduleInvitations = () => {
                   )}
                 </div>
               )}
-              <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting || validInvitees.length === 0} onClick={handleSubmit}>
-                {isSubmitting ? "Preparing invitations…" : turnstileToken ? "Send invitations and open waiting area" : "Save invitations and open waiting area"}
+              {invalidInvitees.length > 0 && (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  Fix the highlighted invitee rows before saving invitations.
+                </p>
+              )}
+              <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting || validInvitees.length === 0 || invalidInvitees.length > 0} onClick={handleSubmit}>
+                {isSubmitting ? "Preparing invitations…" : turnstileToken ? "Send invitations and open waiting area" : "Save roster and open waiting area"}
                 {!isSubmitting && <Send className="ml-2 h-4 w-4" />}
               </Button>
             </div>

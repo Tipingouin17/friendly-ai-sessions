@@ -7,7 +7,7 @@ import { Calendar, PlusCircle, Download, ChevronLeft, ChevronRight, Bookmark, Bo
 import api from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, differenceInMinutes } from "date-fns";
+import { format } from "date-fns";
 import { Workshop } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import FacilitatorInfo from "@/components/session/FacilitatorInfo";
 import WorkshopTags from "@/components/session/WorkshopTags";
 import PageHead from "@/components/PageHead";
 import { useToast } from "@/components/ui/use-toast";
+import { calculateCanonicalSessionDurationMinutes } from "@/utils/sessionLifecycle";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -208,13 +209,11 @@ const getMostRecentIso = (...values: Array<string | null | undefined>): string |
 };
 
 const calculateInactiveDurationMinutes = (workshop: Workshop, lastActivityAt: string | null): number => {
-  const createdAt = parseTime(workshop.created_at);
-  const lastActivity = parseTime(lastActivityAt);
-
-  if (!createdAt || !lastActivity || lastActivity <= createdAt) return 0;
-
-  const minutes = Math.round((lastActivity - createdAt) / 60_000);
-  return minutes > 480 ? 0 : Math.max(1, minutes);
+  return calculateCanonicalSessionDurationMinutes({
+    startedAt: workshop.session_started_at,
+    createdAt: workshop.created_at,
+    endedAt: lastActivityAt,
+  });
 };
 
 const fetchLatestActivityAt = async (conversationId: number): Promise<string | null> => {
@@ -298,13 +297,11 @@ const calculateDuration = (workshop: Workshop): number => {
   if (workshop.session_duration_minutes && workshop.session_duration_minutes > 0) {
     return workshop.session_duration_minutes;
   }
-  if (workshop.created_at && workshop.ended_at) {
-    const diff = differenceInMinutes(new Date(workshop.ended_at), new Date(workshop.created_at));
-    // Cap at 480 minutes (8 hours) to avoid showing absurd durations for sessions
-    // that were left open for days (e.g. ended via direct DB update without proper closure)
-    return diff > 480 ? 0 : Math.max(1, diff);
-  }
-  return 0;
+  return calculateCanonicalSessionDurationMinutes({
+    startedAt: workshop.session_started_at,
+    createdAt: workshop.created_at,
+    endedAt: workshop.ended_at,
+  });
 };
 
 const getWorkshopTitle = (workshop: Workshop): string => {

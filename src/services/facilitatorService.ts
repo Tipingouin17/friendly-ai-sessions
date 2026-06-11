@@ -34,6 +34,53 @@ export interface UpcomingScheduledSession {
   invited_count: number;
 }
 
+export const MIN_SCHEDULE_LEAD_TIME_MS = 60_000;
+export const MIN_SESSION_DURATION_MINUTES = 5;
+export const MAX_SESSION_DURATION_MINUTES = 480;
+
+export const validateScheduledStartAt = (
+  scheduledStartAt?: Date,
+  nowMs = Date.now()
+): { isValid: boolean; isScheduled: boolean; error?: string; scheduledIso?: string } => {
+  if (!scheduledStartAt) {
+    return { isValid: true, isScheduled: false };
+  }
+
+  const scheduledMs = scheduledStartAt.getTime();
+  if (Number.isNaN(scheduledMs)) {
+    return { isValid: false, isScheduled: false, error: "Please choose a valid session date and time." };
+  }
+
+  if (scheduledMs < nowMs) {
+    return {
+      isValid: false,
+      isScheduled: false,
+      error: "Scheduled sessions must use a future date and time. Choose now for an immediate session or select a future start.",
+    };
+  }
+
+  if (scheduledMs > nowMs + MIN_SCHEDULE_LEAD_TIME_MS) {
+    return { isValid: true, isScheduled: true, scheduledIso: scheduledStartAt.toISOString() };
+  }
+
+  return { isValid: true, isScheduled: false };
+};
+
+export const normalizeSessionDurationMinutes = (durationMinutes?: number): number | undefined => {
+  if (durationMinutes === undefined) return undefined;
+
+  if (!Number.isFinite(durationMinutes)) {
+    throw new Error("Session duration must be a valid number of minutes.");
+  }
+
+  const normalizedDuration = Math.round(durationMinutes);
+  if (normalizedDuration < MIN_SESSION_DURATION_MINUTES || normalizedDuration > MAX_SESSION_DURATION_MINUTES) {
+    throw new Error(`Session duration must be between ${MIN_SESSION_DURATION_MINUTES} and ${MAX_SESSION_DURATION_MINUTES} minutes.`);
+  }
+
+  return normalizedDuration;
+};
+
 const getFlowConfigObject = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -128,10 +175,14 @@ export const createConversation = async (params: {
     }
   }
 
-  const scheduledIso = params.scheduledStartAt?.toISOString();
-  const isScheduled = Boolean(scheduledIso && new Date(scheduledIso).getTime() > Date.now() + 60_000);
-  const flowConfig = isScheduled
-    ? { scheduled_start_at: scheduledIso, invitation_status: "draft", invitations: [] }
+  const scheduleValidation = validateScheduledStartAt(params.scheduledStartAt);
+  if (!scheduleValidation.isValid) {
+    throw new Error(scheduleValidation.error ?? "Please choose a valid session date and time.");
+  }
+
+  const durationMinutes = normalizeSessionDurationMinutes(params.durationMinutes);
+  const flowConfig = scheduleValidation.isScheduled
+    ? { scheduled_start_at: scheduleValidation.scheduledIso, invitation_status: "draft", invitations: [] }
     : undefined;
 
   const { data, error } = await api
@@ -155,7 +206,7 @@ export const createConversation = async (params: {
       status: "active",
       user_id: params.userId,
       ...(flowConfig ? { flow_config: flowConfig } : {}),
-      ...(params.durationMinutes ? { session_duration_minutes: params.durationMinutes } : {})
+      ...(durationMinutes ? { session_duration_minutes: durationMinutes } : {})
     })
     .select('id')
     .single();
@@ -216,8 +267,27 @@ export const createSessionInvitations = async (params: {
   if (loadError) throw loadError;
 
   const existingConfig = getFlowConfigObject((conversation as Record<string, unknown>)?.flow_config);
+  const normalizedInvitees = params.invitees.map((invitee) => ({
+    name: normalizePersonName(invitee.name),
+    email: invitee.email.trim().toLowerCase(),
+  }));
+  if (normalizedInvitees.length === 0) {
+    throw new Error('At least one invitee is required.');
+  }
+  const seenEmails = new Set<string>();
+  for (const [index, invitee] of normalizedInvitees.entries()) {
+    const emailValidation = validateEmailAddress(invitee.email);
+    if (!invitee.name || !emailValidation.isValid) {
+      throw new Error(`Invitee ${index + 1} needs a visible name and a valid email address.`);
+    }
+    if (seenEmails.has(invitee.email)) {
+      throw new Error(`Invitee ${index + 1} duplicates an email address already in the list.`);
+    }
+    seenEmails.add(invitee.email);
+  }
+
   const nowIso = new Date().toISOString();
-  const invitations: ScheduledSessionInvitation[] = params.invitees.map((invitee, index) => {
+  const invitations: ScheduledSessionInvitation[] = normalizedInvitees.map((invitee, index) => {
     const tokenSource = `${params.conversationId}:${invitee.email}:${Date.now()}:${index}:${Math.random()}`;
     let token = '';
     try {

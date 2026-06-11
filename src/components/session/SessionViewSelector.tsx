@@ -142,13 +142,29 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
             payload.new &&
             payload.new.event_type === 'participant_removed' &&
             payload.new.data &&
-            typeof payload.new.data === 'object' &&
-            payload.new.data.participant_id === props.currentUserParticipantId
+            typeof payload.new.data === 'object'
           ) {
-            const eventData = payload.new.data;
-            if (!eventData.removed_by_admin && !eventData.reason) return;
+            const eventData = payload.new.data as Record<string, unknown>;
+            const removedParticipantId = Number(eventData.participant_id);
+            const currentParticipantId = Number(props.currentUserParticipantId);
+            const removedByAdmin = eventData.removed_by_admin === true || eventData.reason === 'admin_removal';
+
+            if (!Number.isFinite(removedParticipantId) || removedParticipantId !== currentParticipantId) return;
+            if (!removedByAdmin) return;
 
             isNavigatingRef.current = true;
+
+            try {
+              // Clear ALL scoped participant state immediately (mf_join_token_N,
+              // participantSessionData_N) so stale state cannot auto-rejoin the
+              // participant if navigation, reload, or mobile browser suspension
+              // interrupts the delayed redirect.
+              clearAllParticipantState();
+              localStorage.removeItem('participant_session'); // legacy key
+              sessionStorage.removeItem('isAdminSession');
+            } catch (err) {
+              console.error("Error clearing session storage:", err);
+            }
 
             toast({
               title: "Removed from session",
@@ -157,18 +173,8 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
             });
 
             setTimeout(() => {
-              try {
-                // Clear ALL scoped participant state (mf_join_token_N,
-                // participantSessionData_N) so the removed participant cannot
-                // silently rejoin using their stale cached token/slot.
-                clearAllParticipantState();
-                localStorage.removeItem('participant_session'); // legacy key
-                sessionStorage.removeItem('isAdminSession');
-              } catch (err) {
-                console.error("Error clearing session storage:", err);
-              }
-              navigate('/');
-            }, 2000);
+              window.location.href = '/';
+            }, 750);
           }
         })
         .subscribe();

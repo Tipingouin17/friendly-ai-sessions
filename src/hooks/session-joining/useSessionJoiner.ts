@@ -146,10 +146,16 @@ export function useSessionJoiner() {
       
     } catch (error: any) {
       console.error("Error joining session:", error);
-      setError(error.message || "Failed to join the session");
+      const rawMessage = error.message || "Failed to join the session";
+      const isRevokedAccess = rawMessage.toLowerCase().includes('access') && rawMessage.toLowerCase().includes('revoked');
+      const displayMessage = isRevokedAccess
+        ? "Your access to this session has been revoked by the facilitator. Please contact the facilitator if you believe this was a mistake."
+        : rawMessage;
+
+      setError(displayMessage);
       toast({
-        title: "Error",
-        description: error.message || "Failed to join the session. Please try again.",
+        title: isRevokedAccess ? "Access revoked" : "Error",
+        description: displayMessage,
         variant: "destructive",
       });
       return null;

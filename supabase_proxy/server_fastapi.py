@@ -128,6 +128,54 @@ def _verify_password(plain: str, stored_hash: str) -> bool:
 openai_client = OpenAI()
 
 # ============================================================
+# AI facilitation planning policy
+# ============================================================
+FACILITATION_PLANNING_POLICY = """INTERNAL FACILITATION PLANNING POLICY:
+Before writing the participant-facing response, form an internal facilitation plan for a world-class workshop. Use the facilitator profile, session title, objective, scope, duration, expected participant count, participant responses, and host instructions. Estimate the agenda phases, pacing, and tentative exploration depth. Decide how many substantive facilitator questions would normally be appropriate before major synthesis for this session, expressed as a flexible range rather than an exact quota.
+
+Treat this plan as adaptive guidance, not a rigid requirement. If participants provide rich, complete answers or the host asks to accelerate, you may synthesize earlier. If answers are thin, unclear, assumption-heavy, or too solution-focused, ask more probing questions. Avoid premature conclusions: before major recommendations or final wrap-up, normally explore context, examples, needs, assumptions, constraints, options, trade-offs, and success criteria.
+
+Do not reveal this internal plan unless the host explicitly asks for the facilitation plan. Use it to shape the agenda overview, pacing expectations, synthesis timing, and follow-up questions."""
+
+WELCOME_AGENDA_AND_PACING_REQUIREMENTS = """The first visible message must set expectations for the facilitation journey. Include:
+1. A warm greeting introducing yourself by name.
+2. A participant-friendly explanation of the workshop objective.
+3. A brief agenda overview: context, exploration, deeper follow-up questions, interim synthesis, and then conclusions or next steps.
+4. A pacing expectation: explain that you will adapt to the group and ask a few focused questions before major synthesis so the session can go deeper rather than rush to an answer.
+5. Light participation norms: concise but specific answers, curiosity, psychological safety, and building on different perspectives.
+6. One easy opening question aligned with the objective.
+
+Do not present a fixed numeric question quota to participants. Keep the message to 3-4 short paragraphs. Do not use markdown headers. Be professional, human, and facilitative rather than directive."""
+
+FOLLOW_UP_EXPLORATION_REQUIREMENTS = """Respond as a facilitator in the current stage of the workshop. Briefly acknowledge specific contributions and identify patterns, tensions, examples, or assumptions. Then ask one thoughtful follow-up question that deepens exploration or helps the group progress to the next useful stage.
+
+Use your internal facilitation plan to judge whether the group has enough depth for synthesis. Do not present a final conclusion, recommendation, or wrap-up unless the host explicitly asked for one, the session is clearly ready for convergence, or participant responses already provide enough context. If you synthesize, frame it as an interim synthesis and continue with one clear question."""
+
+HOST_INSTRUCTION_EXPLORATION_NOTE = (
+    "If the host instruction does not explicitly ask you to close, conclude, decide, "
+    "or produce a final output, preserve the workshop's exploration-before-convergence rhythm "
+    "and ask one useful next question."
+)
+
+
+def _format_facilitation_planning_context(duration_minutes: Any = None, participant_count: Any = None) -> str:
+    """Return compact planning context for adaptive facilitator prompt guidance."""
+    try:
+        duration_text = f"{int(duration_minutes)} minutes" if duration_minutes is not None else "unknown duration"
+    except (TypeError, ValueError):
+        duration_text = "unknown duration"
+    try:
+        participant_text = f"{int(participant_count)} expected participant(s)" if participant_count is not None else "unknown participant count"
+    except (TypeError, ValueError):
+        participant_text = "unknown participant count"
+    return (
+        "Session planning context: "
+        f"duration={duration_text}; participants={participant_text}. "
+        "Use this context to estimate a tentative agenda, pacing, and exploration-question range. "
+        "The estimate is guidance only and must adapt to live participant responses and host instructions."
+    )
+
+# ============================================================
 # App & rate limiter
 # ============================================================
 limiter = Limiter(key_func=get_remote_address)
@@ -5293,8 +5341,8 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         # Fetch conversation + session + facilitator details needed by the AI
         async with _pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT c.id, c.user_id, c.language, "
-                "s.title, s.objective, s.welcome_message, s.scope, "
+                "SELECT c.id, c.user_id, c.language, c.participants, "
+                "s.title, s.objective, s.welcome_message, s.scope, s.duration_minutes, "
                 "s.gpt_version, s.max_tokens, s.randomness, s.prompt, "
                 "f.title as facilitator_name, f.details as facilitator_details, "
                 "f.profile_picture, f.languages as facilitator_language "
@@ -5321,6 +5369,8 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _session_prompt  = row.get("prompt") or ""
         _welcome_tpl     = row.get("welcome_message") or ""
         _scope           = row.get("scope") or ""
+        _duration_minutes = row.get("duration_minutes")
+        _participant_count = row.get("participants")
         _gpt_version     = row.get("gpt_version")
         _max_tokens_cfg  = row.get("max_tokens")
         _randomness_cfg  = row.get("randomness")
@@ -5378,6 +5428,8 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _sys_parts.append(f"Session objective: {_objective}")
         if _scope:
             _sys_parts.append(f"Session scope: {_scope}")
+        _sys_parts.append(_format_facilitation_planning_context(_duration_minutes, _participant_count))
+        _sys_parts.append(FACILITATION_PLANNING_POLICY)
         _lang_instr = (
             f"\n\nLANGUAGE REQUIREMENT (MANDATORY):\nYou MUST respond exclusively in {_lang}. "
             f"Every single message must be written entirely in {_lang}."
@@ -5402,13 +5454,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         )
         if _welcome_tpl:
             _user_prompt += f"Use this as inspiration (but make it your own): {_welcome_tpl}\n"
-        _user_prompt += (
-            "Include:\n"
-            "1. A warm greeting introducing yourself by name\n"
-            "2. Brief mention of the session topic and what participants will gain\n"
-            "3. An opening question to get participants engaged and sharing\n\n"
-            "Keep it to 2-3 short paragraphs. Be enthusiastic but professional."
-        )
+        _user_prompt += WELCOME_AGENDA_AND_PACING_REQUIREMENTS
 
         # Call OpenAI (synchronous SDK — run in executor to avoid blocking event loop)
         _prompt_tokens: Optional[int] = None
@@ -5437,7 +5483,8 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             _txt = (
                 f'Welcome to "{_session_title}"! I\'m {_facilitator}, and I\'m excited to facilitate today.\n\n'
                 f"Our objective is: {_objective}\n\n"
-                "To get us started — what brings you here today, and what do you hope to take away?"
+                "We will begin by clarifying context, then explore perspectives and examples through a few focused questions before we synthesize patterns or move toward conclusions. I will adapt the pace to the group and the time available.\n\n"
+                "To get us started — what is the most important thing you want this session to help clarify or improve?"
             )
             _model_used = _model
 
@@ -5529,7 +5576,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                 """
                 SELECT c.id, c.is_session_ended, c.participants,
                        c.language as conversation_language,
-                       s.title, s.objective, s.prompt, s.scope,
+                       s.title, s.objective, s.prompt, s.scope, s.duration_minutes,
                        s.gpt_version, s.max_tokens, s.randomness,
                        f.id as facilitator_id,
                        f.title as facilitator_name, f.details as facilitator_details,
@@ -5606,6 +5653,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _objective         = row.get("objective") or "facilitate a productive discussion"
         _session_prompt    = row.get("prompt") or ""
         _scope             = row.get("scope") or ""
+        _duration_minutes  = row.get("duration_minutes")
         _gpt_version       = row.get("gpt_version")
         _max_tokens_cfg    = row.get("max_tokens")
         _randomness_cfg    = row.get("randomness")
@@ -5667,6 +5715,8 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _sys_parts.append(f"Session objective: {_objective}")
         if _scope:
             _sys_parts.append(f"Session scope: {_scope}")
+        _sys_parts.append(_format_facilitation_planning_context(_duration_minutes, expected_participants))
+        _sys_parts.append(FACILITATION_PLANNING_POLICY)
         _sys_parts.append(
             f"Your name is {_facilitator}. Always introduce yourself using this exact name.\n\n"
             "IMPORTANT RULES:\n"
@@ -5739,11 +5789,10 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             f"- Technique responsibilities: {_clip_text(_mode_ai_responsibilities, 900)}\n"
             f"- Steering instruction: {_technique_selection.get('steering_instruction')}\n"
             f"- Divergence guidance: {_divergence_note}\n\n"
-            "Based on the participants\\u2019 responses above and the selected technique:\n"
-            "1. Briefly acknowledge and synthesize the key themes from their answers.\n"
-            "2. Highlight any interesting connections or contrasts between different participants\\u2019 views when useful.\n"
-            "3. Ask the next question or give the next instruction in a way that follows the selected facilitation technique.\n\n"
-            "Keep your response to 2-3 short paragraphs. Be specific about what participants said."
+            + FOLLOW_UP_EXPLORATION_REQUIREMENTS + "\n\n"
+            "Apply the selected facilitation technique naturally when choosing the next question or instruction. "
+            "Keep your response to 2-3 short paragraphs. Be specific about what participants said. "
+            "Ask only one clear question at the end unless the selected technique explicitly requires a brief instruction instead."
         )
         # ── Call OpenAI ──────────────────────────────────────────────────────
         _prompt_tokens: Optional[int] = None
@@ -6564,6 +6613,8 @@ async def edge_function(func_name: str, request: Request):
         session_prompt = ""
         welcome_message_template = ""
         session_scope = ""
+        duration_minutes = None
+        participant_count = None
         gpt_version = None
         max_tokens_cfg = None
         randomness_cfg = None
@@ -6584,9 +6635,9 @@ async def edge_function(func_name: str, request: Request):
             try:
                 async with _pool.acquire() as conn:
                     row = await conn.fetchrow(
-                        "SELECT c.id, c.language as conversation_language, "
+                        "SELECT c.id, c.language as conversation_language, c.participants, "
                         "s.title, s.facilitator, s.objective, s.prompt, "
-                        "s.welcome_message, s.scope, s.gpt_version, s.max_tokens, s.randomness, "
+                        "s.welcome_message, s.scope, s.duration_minutes, s.gpt_version, s.max_tokens, s.randomness, "
                         "f.title as facilitator_name, f.details as facilitator_details, "
                         "f.profile_picture, f.languages as facilitator_languages, "
                         "fpc.display_name as persona_display_name, fpc.pronouns as persona_pronouns, "
@@ -6625,6 +6676,8 @@ async def edge_function(func_name: str, request: Request):
                     session_prompt = row["prompt"] or ""
                     welcome_message_template = row["welcome_message"] or ""
                     session_scope = row["scope"] or ""
+                    duration_minutes = row["duration_minutes"]
+                    participant_count = row["participants"]
                     gpt_version = row["gpt_version"]
                     max_tokens_cfg = row["max_tokens"]
                     randomness_cfg = row["randomness"]
@@ -6751,6 +6804,8 @@ async def edge_function(func_name: str, request: Request):
         system_parts.append(f"Session objective: {objective}")
         if session_scope:
             system_parts.append(f"Session scope: {session_scope}")
+        system_parts.append(_format_facilitation_planning_context(duration_minutes, participant_count))
+        system_parts.append(FACILITATION_PLANNING_POLICY)
 
         language_instruction = ""
         if facilitator_language:
@@ -6794,7 +6849,8 @@ async def edge_function(func_name: str, request: Request):
                 "HOST INSTRUCTION (HIGH PRIORITY):\n"
                 f'The session host has given you the following directive: "{host_instruction}"\n'
                 "You MUST follow this instruction in your next response. Adapt your message "
-                "accordingly while maintaining your facilitator persona."
+                "accordingly while maintaining your facilitator persona. "
+                + HOST_INSTRUCTION_EXPLORATION_NOTE
             )
 
         system_message = "\n\n".join(system_parts)
@@ -6806,13 +6862,7 @@ async def edge_function(func_name: str, request: Request):
             )
             if welcome_message_template:
                 user_prompt += f"Use this as inspiration (but make it your own): {welcome_message_template}\n"
-            user_prompt += (
-                "Include:\n"
-                "1. A warm greeting introducing yourself by name\n"
-                "2. Brief mention of the session topic and what participants will gain\n"
-                "3. An opening question to get participants engaged and sharing\n\n"
-                "Keep it to 2-3 short paragraphs. Be enthusiastic but professional."
-            )
+            user_prompt += WELCOME_AGENDA_AND_PACING_REQUIREMENTS
         elif generate_report:
             all_messages = []
             try:
@@ -6904,17 +6954,16 @@ async def edge_function(func_name: str, request: Request):
                     "- Reference specific participant contributions where relevant.\n"
                     "- Maintain your facilitator persona and tone throughout.\n"
                     "- If the instruction says to close or wrap up the session, do NOT ask another question.\n"
+                    f"- {HOST_INSTRUCTION_EXPLORATION_NOTE}\n"
                     "- Keep your response to 2-3 short paragraphs unless the instruction requires more."
                 )
             else:
                 user_prompt = (
                     f'Here is the recent conversation in our workshop "{session_title}":\n\n'
                     f"{conversation_context}\n"
-                    "Based on the participants\u2019 responses above:\n"
-                    "1. Briefly acknowledge and synthesize the key themes from their answers\n"
-                    "2. Highlight any interesting connections or contrasts between different participants\u2019 views\n"
-                    "3. Ask a thoughtful follow-up question that builds on what they shared\n\n"
-                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said."
+                    + FOLLOW_UP_EXPLORATION_REQUIREMENTS + "\n\n"
+                    "Keep your response to 2-3 short paragraphs. Be specific about what participants said. "
+                    "Ask only one clear question at the end."
                 )
 
         logger.info("[AI] Calling %s for conv=%s (start=%s, report=%s)", model, conv_id, is_session_start, generate_report)

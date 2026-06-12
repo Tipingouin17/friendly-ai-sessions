@@ -1,4 +1,4 @@
-import { strict as assert } from 'node:assert';
+import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -25,6 +25,10 @@ const entrySource = `
     validateScheduledStartAt,
     normalizeSessionDurationMinutes,
   } from '${repoRoot}/src/services/facilitatorService.ts';
+  export {
+    calculateSessionAnalyticsMetrics,
+    summarizeParticipantSnapshot,
+  } from '${repoRoot}/src/utils/sessionAnalyticsMetrics.ts';
 `;
 
 if (existsSync(tempDir)) rmSync(tempDir, { recursive: true, force: true });
@@ -130,6 +134,50 @@ test('canonical duration prefers session_started_at and clamps invalid values', 
     startedAt: '2026-01-01T10:00:00.000Z',
     endedAt: '2026-01-01T09:00:00.000Z',
   }), 1);
+});
+
+test('historical diagnostics preserve removed participants from privacy-safe event data', () => {
+  const metrics = utils.calculateSessionAnalyticsMetrics([
+    { event_type: 'participant_joined', created_at: '2026-01-01T10:00:00.000Z', data: { participant_id: 'attendee-a' } },
+    { event_type: 'participant_joined', created_at: '2026-01-01T10:01:00.000Z', data: { participant_id: 'attendee-b' } },
+    { event_type: 'message_sent', created_at: '2026-01-01T10:02:00.000Z', data: { participant_id: 'attendee-b' } },
+    { event_type: 'participant_left', created_at: '2026-01-01T10:03:00.000Z', data: { participant_id: 'attendee-b' } },
+  ], [
+    { participant_id: 'attendee-a', is_host: false },
+    { participant_id: 'host-1', is_host: true },
+  ]);
+
+  assert.equal(metrics.uniqueParticipants, 2);
+  assert.equal(metrics.participantJoins, 2);
+  assert.equal(metrics.reconnectEvents, 0);
+  assert.equal(metrics.engagementScore, 0.5);
+});
+
+test('participant snapshot excludes host rows from attendee totals', () => {
+  const snapshot = utils.summarizeParticipantSnapshot([
+    { participant_id: 'host-1', is_host: true },
+    { participant_id: 'attendee-a', is_host: false },
+    { participant_id: 'attendee-a', is_host: false },
+    { participant_id: 'attendee-b', is_host: false },
+  ]);
+
+  assert.equal(snapshot.hostParticipants, 1);
+  assert.equal(snapshot.attendeeParticipants, 2);
+  assert.equal(snapshot.totalRows, 4);
+});
+
+test('dashboard and host controls include P2 navigation and overflow affordances', () => {
+  const dashboard = readFileSync(resolve(repoRoot, 'src/pages/PastWorkshops.tsx'), 'utf8');
+  const hostHeader = readFileSync(resolve(repoRoot, 'src/components/session/host/HostHeader.tsx'), 'utf8');
+  const videoGrid = readFileSync(resolve(repoRoot, 'src/components/session/video/SessionVideoGrid.tsx'), 'utf8');
+
+  assert.match(dashboard, /fetchDashboardParticipantSnapshots/);
+  assert.match(dashboard, /new URLSearchParams\(window\.location\.search\)\.get\('tab'\)/);
+  assert.match(hostHeader, /\/past-workshops\?tab=active/);
+  assert.match(hostHeader, /aria-pressed=\{analyticsOpen\}/);
+  assert.match(videoGrid, /isMenuOpen/);
+  assert.match(videoGrid, /Pin to spotlight/);
+  assert.match(videoGrid, /aria-expanded=\{isMenuOpen\}/);
 });
 
 test('participant revocation contract is present in server and client source', () => {

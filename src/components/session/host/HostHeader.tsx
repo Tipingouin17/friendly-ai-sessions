@@ -78,10 +78,11 @@ const HostHeader: React.FC<HostHeaderProps> = ({
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const handleBack = () => {
+    const dashboardTarget = isSessionEnded ? "/past-workshops" : "/past-workshops?tab=active";
     try {
-      navigate("/past-workshops", { replace: true });
+      navigate(dashboardTarget, { replace: false });
     } catch {
-      window.location.href = "/past-workshops";
+      window.location.href = dashboardTarget;
     }
   };
 
@@ -144,7 +145,8 @@ const HostHeader: React.FC<HostHeaderProps> = ({
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
           }`}
           onClick={() => setAnalyticsOpen((prev) => !prev)}
-          title="Analytics"
+          aria-pressed={analyticsOpen}
+          title={analyticsOpen ? "Hide live analytics" : "Show live analytics"}
         >
           <BarChart3 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Analytics</span>
@@ -244,7 +246,8 @@ const HostHeader: React.FC<HostHeaderProps> = ({
             <button
               onClick={handleBack}
               className="flex items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
-              title="Back to Dashboard"
+              title={isSessionEnded ? "Back to Host Dashboard" : "Back to active sessions"}
+              aria-label={isSessionEnded ? "Back to Host Dashboard" : "Back to active sessions"}
             >
               <ChevronLeft className="h-4 w-4" />
               <LayoutDashboard className="h-4 w-4" />

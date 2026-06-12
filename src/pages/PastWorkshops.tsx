@@ -26,6 +26,7 @@ import WorkshopTags from "@/components/session/WorkshopTags";
 import PageHead from "@/components/PageHead";
 import { useToast } from "@/components/ui/use-toast";
 import { calculateCanonicalSessionDurationMinutes } from "@/utils/sessionLifecycle";
+import { summarizeParticipantSnapshot, type ParticipantSnapshot } from "@/utils/sessionAnalyticsMetrics";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -38,6 +39,8 @@ type OwnerProfile = {
   full_name: string | null;
   display_name: string | null;
 };
+
+type DashboardParticipantSnapshotByConversation = Record<number, ParticipantSnapshot>;
 
 type SessionClassificationId = 'real' | 'demo' | 'dry-run' | 'exploratory' | 'unclear';
 
@@ -340,10 +343,72 @@ const fetchActiveWorkshops = async () => {
   return autoCloseInactiveWorkshops((data || []) as Workshop[]);
 };
 
+const fetchDashboardParticipantSnapshots = async (conversationIds: number[]): Promise<DashboardParticipantSnapshotByConversation> => {
+  if (conversationIds.length === 0) return {};
+
+  const { data, error } = await api
+    .from('session_participants')
+    .select('conversation_id, participant_id, is_host')
+    .in('conversation_id', conversationIds);
+
+  if (error) {
+    console.warn('Unable to load dashboard participant roster snapshots', error);
+    return {};
+  }
+
+  const rowsByConversation = new Map<number, Array<{ participant_id: string | number | null; is_host?: boolean | null }>>();
+  (data || []).forEach((row: any) => {
+    const conversationId = Number(row.conversation_id);
+    if (!Number.isFinite(conversationId)) return;
+    const rows = rowsByConversation.get(conversationId) || [];
+    rows.push({ participant_id: row.participant_id, is_host: row.is_host });
+    rowsByConversation.set(conversationId, rows);
+  });
+
+  return Array.from(rowsByConversation.entries()).reduce<DashboardParticipantSnapshotByConversation>((acc, [conversationId, rows]) => {
+    acc[conversationId] = summarizeParticipantSnapshot(rows);
+    return acc;
+  }, {});
+};
+
+const resolveDashboardParticipantMetrics = (workshop: Workshop, isActive: boolean, snapshot?: ParticipantSnapshot) => {
+  const attendeeCapacity = Math.max((workshop.participants ?? 0) - 1, 0);
+  if (snapshot && snapshot.totalRows > 0) {
+    return {
+      attendeeCount: snapshot.attendeeParticipants,
+      totalCountForClassification: snapshot.attendeeParticipants + Math.max(snapshot.hostParticipants, 1),
+      attendeeCapacity,
+      label: isActive ? 'Live attendees' : 'Recorded attendees',
+      helper: attendeeCapacity > 0 ? `Capacity: ${attendeeCapacity}` : 'Roster snapshot from joined participants',
+    };
+  }
+
+  const hostInclusiveCurrent = Math.max(workshop.current_participants ?? 0, 0);
+  if (hostInclusiveCurrent > 0) {
+    const attendeeCount = Math.max(hostInclusiveCurrent - 1, 0);
+    return {
+      attendeeCount,
+      totalCountForClassification: attendeeCount + 1,
+      attendeeCapacity,
+      label: isActive ? 'Live attendees' : 'Saved attendees',
+      helper: attendeeCapacity > 0 ? `Capacity: ${attendeeCapacity}` : 'Derived from saved live count',
+    };
+  }
+
+  const attendeeCount = attendeeCapacity;
+  return {
+    attendeeCount,
+    totalCountForClassification: attendeeCount > 0 ? attendeeCount + 1 : 0,
+    attendeeCapacity,
+    label: attendeeCapacity > 0 ? 'Capacity fallback' : (isActive ? 'Live attendees' : 'Recorded attendees'),
+    helper: attendeeCapacity > 0 ? 'Roster unavailable; showing configured capacity' : 'No attendee snapshot saved',
+  };
+};
+
 /* ── Workshop Card ── */
-const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions, reportData, onSaveToggle, ownerProfile }: {
+const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions, reportData, onSaveToggle, ownerProfile, participantSnapshot }: {
   workshop: Workshop; isActive: boolean; canGenerateReports: boolean; canSaveSessions: boolean;
-  reportData?: Record<string, unknown>; onSaveToggle?: (id: number, saved: boolean) => void; ownerProfile?: OwnerProfile;
+  reportData?: Record<string, unknown>; onSaveToggle?: (id: number, saved: boolean) => void; ownerProfile?: OwnerProfile; participantSnapshot?: ParticipantSnapshot;
 }) => {
   const { navigateToHostSession } = useNavigateToSession();
   const { downloadReport } = useReportDownloader();
@@ -370,11 +435,10 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
     }
   };
 
-  const participantCount = isActive
-    ? (workshop.current_participants ?? workshop.participants ?? 0)
-    : (workshop.participants ?? workshop.current_participants ?? 0);
-  const attendeeCapacity = Math.max((workshop.participants ?? 0) - 1, 0);
-  const attendeeLabel = isActive ? 'Live now' : 'Final count';
+  const participantMetrics = resolveDashboardParticipantMetrics(workshop, isActive, participantSnapshot);
+  const participantCount = participantMetrics.attendeeCount;
+  const attendeeCapacity = participantMetrics.attendeeCapacity;
+  const attendeeLabel = participantMetrics.label;
   const messageCount = workshop.total_messages || 0;
   const duration = calculateDuration(workshop);
   const title = getWorkshopTitle(workshop);
@@ -386,7 +450,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
   const scheduleLabel = getScheduleLabel(scheduledStartIso);
   const ownerName = getOwnerDisplayName(ownerProfile);
   const ownerEmail = getOwnerEmail(ownerProfile);
-  const classification = classifySession({ workshop, participantCount, messageCount, duration, scheduledStartIso });
+  const classification = classifySession({ workshop, participantCount: participantMetrics.totalCountForClassification, messageCount, duration, scheduledStartIso });
 
   // Colour accent per difficulty
   const difficultyAccent: Record<string, string> = {
@@ -469,7 +533,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
               icon={<Users size={12} />}
               value={participantCount}
               label={attendeeLabel}
-              helper={attendeeCapacity > 0 ? `Seat limit: ${attendeeCapacity}` : 'Host-only or no seat limit saved'}
+              helper={participantMetrics.helper}
             />
             <MetricPill
               icon={<MessageSquare size={12} />}
@@ -560,7 +624,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
               <h4 className="text-sm font-semibold text-gray-900">Narrative summary</h4>
               <p className="mt-2 text-sm leading-6 text-gray-600">
                 “{title}” was initiated by <span className="font-medium text-gray-800">{ownerName}</span> ({ownerEmail}).
-                It recorded {participantCount} participant{participantCount === 1 ? '' : 's'}, {messageCount} saved message{messageCount === 1 ? '' : 's'},
+                It recorded {participantCount} attendee{participantCount === 1 ? '' : 's'}, {messageCount} saved message{messageCount === 1 ? '' : 's'},
                 {duration > 0 ? ` and a saved duration of ${duration} minutes.` : ' and no reliable saved duration.'}
               </p>
               <p className="mt-2 text-sm leading-6 text-gray-600">{getScheduleNarrative(workshop, scheduledStartIso)}</p>
@@ -621,7 +685,7 @@ const WorkshopCard = ({ workshop, isActive, canGenerateReports, canSaveSessions,
             <SessionAnalyticsDashboard
               conversationId={workshop.id}
               summarySnapshot={{
-                participants: participantCount,
+                participants: participantMetrics.totalCountForClassification,
                 currentParticipants: workshop.current_participants ?? null,
                 attendeeCapacity,
                 status: workshop.status ?? null,
@@ -720,7 +784,11 @@ const PastWorkshops = () => {
   const queryClient = useQueryClient();
   const { canGenerateReports, canSaveSessions } = usePlanLimits();
   const [pastPage, setPastPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [activeTab, setActiveTab] = useState<FilterTab>(() => {
+    if (typeof window === 'undefined') return 'all';
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    return requestedTab === 'active' || requestedTab === 'saved' ? requestedTab : 'all';
+  });
 
   // past-workshops: completed sessions don't change — 60 s staleTime avoids
   // redundant fetches on every visit.  The realtime channel below invalidates
@@ -746,7 +814,17 @@ const PastWorkshops = () => {
 
   // canGenerateReports and canSaveSessions come directly from usePlanLimits above
 
-  const ownerIds = Array.from(new Set([...(pastWorkshops || []), ...(activeWorkshops || [])].map(w => w.user_id).filter(Boolean)));
+  const dashboardWorkshops = [...(pastWorkshops || []), ...(activeWorkshops || [])];
+  const dashboardConversationIds = Array.from(new Set(dashboardWorkshops.map(w => w.id).filter((id): id is number => typeof id === 'number')));
+  const { data: participantSnapshots = {} } = useQuery({
+    queryKey: ['dashboard-participant-snapshots', dashboardConversationIds.join(',')],
+    enabled: dashboardConversationIds.length > 0,
+    queryFn: () => fetchDashboardParticipantSnapshots(dashboardConversationIds),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const ownerIds = Array.from(new Set(dashboardWorkshops.map(w => w.user_id).filter(Boolean)));
   const { data: ownerProfiles = [] } = useQuery({
     queryKey: ['past-workshop-owners', ownerIds.join(',')],
     enabled: ownerIds.length > 0,
@@ -800,9 +878,10 @@ const PastWorkshops = () => {
   // Use Math.max(0, ...) to guard against negative counts from race conditions.
   // Completed sessions use the saved final snapshot; active sessions use the live count.
   const totalParticipants = [
-    ...(pastWorkshops || []).map(w => w.participants ?? w.current_participants ?? 0),
-    ...(activeWorkshops || []).map(w => w.current_participants ?? w.participants ?? 0),
-  ].reduce((s, count) => s + Math.max(0, count), 0);
+          ...(pastWorkshops || []).map(w => resolveDashboardParticipantMetrics(w, false, participantSnapshots[w.id]).attendeeCount),
+      ...(activeWorkshops || []).map(w => resolveDashboardParticipantMetrics(w, true, participantSnapshots[w.id]).attendeeCount),
+    ].reduce((s, count) => s + Math.max(0, count), 0);
+
   const totalMessages = [...(pastWorkshops || []), ...(activeWorkshops || [])].reduce((s, w) => s + (w.total_messages || 0), 0);
   // Only show avg engagement when at least one session has a real score
   const sessionsWithScore = (pastWorkshops || []).filter(w => (w.participant_engagement_score ?? 0) > 0);
@@ -903,6 +982,7 @@ Past workshop cards show the saved end-of-session snapshot plus session-intellig
                       canGenerateReports={canGenerateReports}
                       canSaveSessions={canSaveSessions}
                       ownerProfile={ownerById.get(w.user_id)}
+                      participantSnapshot={participantSnapshots[w.id]}
                     />
                   ))}
                 </div>
@@ -931,6 +1011,7 @@ Past workshop cards show the saved end-of-session snapshot plus session-intellig
                         reportData={reportsData[w.id]}
                         onSaveToggle={handleSaveToggle}
                         ownerProfile={ownerById.get(w.user_id)}
+                      participantSnapshot={participantSnapshots[w.id]}
                       />
                     ))}
                   </div>

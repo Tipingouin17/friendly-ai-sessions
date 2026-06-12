@@ -184,6 +184,12 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
   const isGeneratedAvatarUrl = Boolean(participant.avatarUrl?.includes('/api/avatar'));
   const isPlaceholderAvatar = isPlaceholderAvatarUrl(participant.avatarUrl);
   const shouldRenderAvatarImage = Boolean(participant.avatarUrl && !isGeneratedAvatarUrl && !isPlaceholderAvatar && !avatarImageError);
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+
+  const handlePin = () => {
+    onPin?.(participant.id);
+    setIsMenuOpen(false);
+  };
 
   React.useEffect(() => {
     setAvatarImageError(false);
@@ -277,22 +283,45 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
       </div>
 
       {onPin && !participant.isAI && (
-        <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+        <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex group-focus-within:flex">
           <button
             type="button"
-            onClick={() => onPin(participant.id)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950/55 text-white backdrop-blur transition hover:bg-slate-950/75"
+            onClick={handlePin}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950/55 text-white backdrop-blur transition hover:bg-slate-950/75 focus:outline-none focus:ring-2 focus:ring-white/70"
             aria-label={`Pin ${participant.name}`}
+            title={`Pin ${participant.name}`}
           >
             <Pin className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950/55 text-white backdrop-blur transition hover:bg-slate-950/75"
+            onClick={() => setIsMenuOpen((open) => !open)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950/55 text-white backdrop-blur transition hover:bg-slate-950/75 focus:outline-none focus:ring-2 focus:ring-white/70"
             aria-label={`More options for ${participant.name}`}
+            aria-expanded={isMenuOpen}
+            title={`More options for ${participant.name}`}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {onPin && !participant.isAI && isMenuOpen && (
+        <div className="absolute right-2 top-10 z-20 w-56 rounded-xl border border-white/60 bg-white/95 p-2 text-xs text-slate-700 shadow-xl shadow-slate-900/20 backdrop-blur">
+          <p className="mb-1 truncate font-semibold text-slate-900">{participant.name}</p>
+          <button
+            type="button"
+            onClick={handlePin}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-medium text-indigo-700 hover:bg-indigo-50"
+          >
+            <Pin className="h-3.5 w-3.5" />
+            Pin to spotlight
+          </button>
+          <div className="mt-1 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] leading-4 text-slate-500">
+            <p>Audio: {participant.isMuted ? 'muted' : participant.isSpeaking ? 'speaking' : 'available'}</p>
+            {participant.connectionStatus && <p>Connection: {participant.connectionStatusLabel || participant.connectionStatus}</p>}
+            {showResponseStatus && <p>Response: {participant.hasResponded ? 'submitted' : 'waiting'}</p>}
+          </div>
         </div>
       )}
     </article>

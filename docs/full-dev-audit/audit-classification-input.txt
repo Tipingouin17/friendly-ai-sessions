@@ -1,0 +1,106 @@
+BRANCH
+dev
+
+HEAD
+d6fda754ad6f34e7bc183372e3017d11608fc933
+
+STATUS
+[31m??[m dev-preview-validation-notes.md
+[31m??[m diagnostics-feature-validation.md
+[31m??[m docs/audit-p2-wave-dev-validation.md
+[31m??[m docs/audit-p2-wave-hands-on-qa.md
+[31m??[m docs/audit-p2-wave-production-validation.md
+[31m??[m docs/full-dev-audit/
+[31m??[m participant-session-fix-validation.md
+
+DIAGNOSTIC FILES
+audit-classification-input.txt
+audit-regression.log
+automated-diagnostics-baseline.txt
+build.log
+hands-on-audit-notes.md
+lint.log
+pnpm-audit-prod.log
+static-pattern-scan.log
+typecheck.log
+
+KEY WARNINGS
+docs/full-dev-audit/lint.log:5:  1:1  warning  Unused eslint-disable directive (no problems were reported from 'react-refresh/only-export-components')
+docs/full-dev-audit/lint.log:8:  1:1  warning  Unused eslint-disable directive (no problems were reported from 'react-refresh/only-export-components')
+docs/full-dev-audit/lint.log:11:  243:6  warning  React Hook useEffect has an unnecessary dependency: 'maxParticipantsForSession'. Either exclude it or remove the dependency array. Outer scope values like 'maxParticipantsForSession' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+docs/full-dev-audit/lint.log:13:✖ 3 problems (0 errors, 3 warnings)
+docs/full-dev-audit/lint.log:14:  0 errors and 2 warnings potentially fixable with the `--fix` option.
+docs/full-dev-audit/pnpm-audit-prod.log:3:│ high                │ lodash vulnerable to Code Injection via `_.template`   │
+docs/full-dev-audit/pnpm-audit-prod.log:17:│ moderate            │ lodash vulnerable to Prototype Pollution via array     │
+docs/full-dev-audit/pnpm-audit-prod.log:67:4 vulnerabilities found
+docs/full-dev-audit/static-pattern-scan.log:18:src/pages/Contact.tsx:252:      console.error("Error submitting contact form:", err);
+docs/full-dev-audit/static-pattern-scan.log:26:src/pages/ForgotPassword.tsx:54:      console.error('Password reset request failed:', error);
+docs/full-dev-audit/static-pattern-scan.log:56:src/pages/PastWorkshops.tsx:355:    console.warn('Unable to load dashboard participant roster snapshots', error);
+docs/full-dev-audit/static-pattern-scan.log:75:src/pages/PastWorkshops.tsx:681:              Review analytics, privacy-safe event logs, blockers, errors, and participant drop-off clues for “{title}”.
+docs/full-dev-audit/static-pattern-scan.log:101:src/pages/Profile.tsx:58:      if (error) return { sessions: 0, participants: 0, messages: 0 };
+docs/full-dev-audit/static-pattern-scan.log:108:src/pages/RedeemAppSumo.tsx:116:        throw new Error(json.detail || json.error || 'Redemption failed. Please try again.');
+docs/full-dev-audit/static-pattern-scan.log:121:src/pages/ScheduleInvitations.tsx:148:      console.error("Error saving invitations:", error);
+docs/full-dev-audit/static-pattern-scan.log:145:src/pages/Settings.tsx:130:      if (error) throw new Error(error.message);
+docs/full-dev-audit/static-pattern-scan.log:169:src/pages/checkout/AddressAutocomplete.tsx:281:          console.error("Error fetching address suggestions:", err);
+docs/full-dev-audit/static-pattern-scan.log:170:src/pages/checkout/AddressAutocomplete.tsx:339:      console.error("Error fetching place details:", err);
+docs/full-dev-audit/static-pattern-scan.log:174:src/pages/checkout/CheckoutForm.tsx:141:        throw new Error(paymentError.message || 'Payment failed');
+docs/full-dev-audit/static-pattern-scan.log:176:src/pages/checkout/CheckoutForm.tsx:164:      console.error('Payment error:', err);
+docs/full-dev-audit/static-pattern-scan.log:182:src/pages/checkout/components/PaymentProvider.tsx:21:    console.error('Stripe publishable key is not set');
+docs/full-dev-audit/static-pattern-scan.log:184:src/pages/checkout/components/PaymentProvider.tsx:27:    console.error('Invalid Stripe publishable key format');
+docs/full-dev-audit/static-pattern-scan.log:198:src/pages/checkout/services/paymentService.tsx:98:    console.error("Subscription creation failed with status:", response.status);
+docs/full-dev-audit/static-pattern-scan.log:199:src/pages/checkout/services/paymentService.tsx:99:    throw new Error(errorData.error || 'Failed to create subscription');
+docs/full-dev-audit/static-pattern-scan.log:206:src/pages/checkout/services/paymentService.tsx:204:    console.error("Subscription confirmation failed with status:", confirmResponse.status);
+docs/full-dev-audit/static-pattern-scan.log:207:src/pages/checkout/services/paymentService.tsx:205:    throw new Error(errorData.error || 'Failed to confirm subscription');
+docs/full-dev-audit/static-pattern-scan.log:209:src/pages/checkout/utils/subscriptionUtils.tsx:25:    console.error('Error updating user profile:', updateError);
+docs/full-dev-audit/static-pattern-scan.log:250:src/components/session/AdminQrView.tsx:58:        console.error("Failed to copy link: ", err);
+docs/full-dev-audit/static-pattern-scan.log:301:src/components/session/JoinSessionContainer.tsx:133:      console.error("Error during join:", error);
+docs/full-dev-audit/static-pattern-scan.log:305:src/components/session/JoinSessionContainer.tsx:213:    console.error("Session not found or error:", error, "Conversation ID:", conversationId);
+docs/full-dev-audit/static-pattern-scan.log:397:src/components/session/ParticipantWaitingScreen.tsx:81:      console.error('[ParticipantWaitingScreen] Subscription error:', err);
+docs/full-dev-audit/static-pattern-scan.log:403:src/components/session/PreJoinMediaCheck.tsx:159:      console.error('Unable to start pre-join camera preview:', error);
+docs/full-dev-audit/static-pattern-scan.log:404:src/components/session/PreJoinMediaCheck.tsx:210:      console.error('Unable to start pre-join microphone test:', error);
+docs/full-dev-audit/static-pattern-scan.log:441:src/components/session/SessionErrorBoundary.tsx:5: * All participant-facing loading / error UI is routed through
+docs/full-dev-audit/static-pattern-scan.log:448:src/components/session/SessionErrorBoundary.tsx:112:  // An ended-session message is NOT a real error — participant stays on page.
+docs/full-dev-audit/static-pattern-scan.log:459:src/components/session/SessionFullPage.tsx:79:      console.error('Failed to notify host:', err);
+docs/full-dev-audit/static-pattern-scan.log:464:src/components/session/SessionHeader.tsx:96:        console.error('Error loading facilitator avatar in SessionHeader:', error);
+docs/full-dev-audit/static-pattern-scan.log:488:src/components/session/SessionReportView.tsx:80:        console.error('Error fetching conversation:', convError);
+docs/full-dev-audit/static-pattern-scan.log:490:src/components/session/SessionReportView.tsx:85:        console.error('Conversation not found for ID:', reportConversationId);
+docs/full-dev-audit/static-pattern-scan.log:492:src/components/session/SessionReportView.tsx:113:        console.error('Error fetching report:', reportError);
+docs/full-dev-audit/static-pattern-scan.log:494:src/components/session/SessionReportView.tsx:118:        console.error('No report found for conversation:', reportConversationId);
+docs/full-dev-audit/static-pattern-scan.log:496:src/components/session/SessionReportView.tsx:130:        console.error('Error fetching messages:', msgError);
+docs/full-dev-audit/static-pattern-scan.log:498:src/components/session/SessionReportView.tsx:135:      const { data: participants, error: partError } = await api
+docs/full-dev-audit/static-pattern-scan.log:500:src/components/session/SessionReportView.tsx:141:        console.error('Error fetching participants:', partError);
+docs/full-dev-audit/static-pattern-scan.log:520:src/components/session/SessionStartingGate.tsx:55:      console.error('[SessionStartingGate] Retry failed:', err);
+docs/full-dev-audit/static-pattern-scan.log:529:src/components/session/SessionStateHandler.tsx:116:        // Route participant errors through the unified shell so they never see
+docs/full-dev-audit/static-pattern-scan.log:531:src/components/session/SessionStateHandler.tsx:156:            console.error("Session error:", error);
+docs/full-dev-audit/static-pattern-scan.log:532:src/components/session/SessionStateHandler.tsx:192:          console.error("Session error:", error);
+docs/full-dev-audit/static-pattern-scan.log:540:src/components/session/SessionStateRenderer.tsx:126:      console.error("No conversation ID found in session provider, but no error was returned");
+docs/full-dev-audit/static-pattern-scan.log:562:src/components/session/SessionViewSelector.tsx:112:          console.error('[SessionViewSelector] waitForWelcomeMessage error:', err);
+docs/full-dev-audit/static-pattern-scan.log:572:src/components/session/SessionViewSelector.tsx:166:              console.error("Error clearing session storage:", err);
+docs/full-dev-audit/static-pattern-scan.log:576:src/components/session/SessionViewSelector.tsx:184:      console.error("Error subscribing to participant events:", err);
+docs/full-dev-audit/static-pattern-scan.log:580:src/components/session/SessionViewSelector.tsx:194:          console.error("Error removing participant events channel:", err);
+docs/full-dev-audit/static-pattern-scan.log:598:src/components/session/admin/AdminHeader.tsx:57:      console.error("Navigation error:", error);
+docs/full-dev-audit/static-pattern-scan.log:600:src/components/session/admin/AdminHeader.tsx:65:      console.error("No conversation ID available for closing session");
+docs/full-dev-audit/static-pattern-scan.log:601:src/components/session/admin/AdminHeader.tsx:86:      console.error("No conversation available for closure");
+docs/full-dev-audit/static-pattern-scan.log:638:src/components/session/admin/StartSessionButton.tsx:44:          console.error('Error fetching participants:', error);
+docs/full-dev-audit/static-pattern-scan.log:639:src/components/session/admin/StartSessionButton.tsx:49:        console.error('Exception fetching participants:', err);
+docs/full-dev-audit/static-pattern-scan.log:679:src/components/session/host/HostQrDialog.tsx:46:      console.error('Failed to copy link:', error);
+docs/full-dev-audit/static-pattern-scan.log:689:src/components/session/host/HostSessionContent.tsx:196:      console.error('Error accessing host camera:', error);
+docs/full-dev-audit/static-pattern-scan.log:716:src/components/session/host/HostSessionContent.tsx:376:      console.error('Failed to copy invite link:', error);
+docs/full-dev-audit/static-pattern-scan.log:759:src/components/session/host/PreSessionHostView.tsx:74:      console.error('Failed to copy link:', error);
+docs/full-dev-audit/static-pattern-scan.log:769:src/components/session/host/PreSessionHostView.tsx:151:      console.error('Error updating participant limit:', err);
+docs/full-dev-audit/static-pattern-scan.log:770:src/components/session/host/PreSessionHostView.tsx:152:      toast({ title: "Update failed", description: err?.message || "Could not update the participant limit.", variant: "destructive" });
+docs/full-dev-audit/static-pattern-scan.log:799:src/components/session/host/SessionAnalyticsDashboard.tsx:91:        console.error('[Analytics] Error fetching session analytics:', err);
+docs/full-dev-audit/static-pattern-scan.log:933:src/components/session/messaging/ParticipantMessagingView.tsx:571:      console.error('Failed to submit mode choice:', error);
+docs/full-dev-audit/static-pattern-scan.log:934:src/components/session/messaging/ParticipantMessagingView.tsx:657:      console.error('Error accessing participant camera:', error);
+docs/full-dev-audit/static-pattern-scan.log:935:src/components/session/messaging/ParticipantMessagingView.tsx:729:      console.error('Error accessing participant microphone:', error);
+docs/full-dev-audit/static-pattern-scan.log:1143:src/hooks/messageSender/useFacilitatorResponse.ts:34:        console.error('Error from edge function:', response.error);
+docs/full-dev-audit/static-pattern-scan.log:1144:src/hooks/messageSender/useFacilitatorResponse.ts:35:        throw new Error(response.error.message || 'Failed to get AI response');
+docs/full-dev-audit/static-pattern-scan.log:1145:src/hooks/messageSender/useFacilitatorResponse.ts:39:        console.error('No response data received from AI');
+docs/full-dev-audit/static-pattern-scan.log:1147:src/hooks/messageSender/useFacilitatorResponse.ts:59:      console.error('Error getting AI response:', error);
+docs/full-dev-audit/static-pattern-scan.log:1160:src/hooks/messageSender/useMessageSaver.ts:74:      console.error("Error saving message to database:", error);
+docs/full-dev-audit/static-pattern-scan.log:1161:src/hooks/messageSender/useMessageSaver.ts:75:      throw new Error(error.message);
+docs/full-dev-audit/static-pattern-scan.log:1173:src/hooks/session-closure/useSessionClosureExecution.ts:44:      console.error("Edge function error:", error);
+docs/full-dev-audit/static-pattern-scan.log:1174:src/hooks/session-closure/useSessionClosureExecution.ts:49:      throw new Error(`Edge function failed: ${error.message || 'Unknown error'}`);
+docs/full-dev-audit/static-pattern-scan.log:1175:src/hooks/session-closure/useSessionClosureExecution.ts:53:      console.error("Edge function returned unsuccessful result:", data);
+docs/full-dev-audit/static-pattern-scan.log:1176:src/hooks/session-closure/useSessionClosureExecution.ts:54:      throw new Error(data?.error || 'Failed to process session closure');
+docs/full-dev-audit/static-pattern-scan.log:1191:src/hooks/session-joining/useAdminOverride.ts:53:      throw new Error(error?.message || "Admin override failed");

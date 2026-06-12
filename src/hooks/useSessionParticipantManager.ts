@@ -43,8 +43,9 @@ export function useSessionParticipantManager({
 
   // Memoized values
   const currentParticipantCount = useMemo(() => participants.length, [participants.length]);
+  const maxParticipantsForSession = useMemo(() => conversation?.participants || 0, [conversation?.participants]);
   const currentAttendeeCount = useMemo(() => Math.max(currentParticipantCount - 1, 0), [currentParticipantCount]);
-  const attendeeCapacityForSession = useMemo(() => Math.max((conversation?.participants || 0) - 1, 0), [conversation?.participants]);
+  const attendeeCapacityForSession = useMemo(() => Math.max(maxParticipantsForSession - 1, 0), [maxParticipantsForSession]);
   // Fall back to the URL search param when location.state is absent (page refresh,
   // direct navigation, or mobile deep-link — React Router drops state in those cases).
   const currentUserParticipantId = useMemo(() => {
@@ -237,10 +238,10 @@ export function useSessionParticipantManager({
   // Session full detection
   useEffect(() => {
     if (isSessionFull && onSessionFull && !isScheduledWaitingRoom) {
-      logger.category('participants', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
+      logger.category('participants', `Session full detected: ${currentAttendeeCount}/${attendeeCapacityForSession} attendees`);
       onSessionFull();
     }
-  }, [isSessionFull, onSessionFull, isScheduledWaitingRoom, currentParticipantCount, maxParticipantsForSession, logger]);
+  }, [isSessionFull, onSessionFull, isScheduledWaitingRoom, currentAttendeeCount, attendeeCapacityForSession, logger]);
 
   // Force refresh function
   const forceRefreshParticipants = useCallback(() => {

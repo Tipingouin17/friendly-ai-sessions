@@ -249,7 +249,7 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
                   )}
 
                   <div>
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Already joined</p>
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Currently in waiting room</p>
                     <ParticipantAvatarStack participants={participants} totalCount={currentParticipantCount} />
                   </div>
                 </div>

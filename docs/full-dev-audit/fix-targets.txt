@@ -1,0 +1,27 @@
+ESLINT_DISABLES
+src/contexts/SessionDataContext.tsx:1:/* eslint-disable react-refresh/only-export-components */
+src/contexts/SessionStateProvider.tsx:1:/* eslint-disable react-refresh/only-export-components */
+MAX_PARTICIPANTS_DEP
+src/components/session/SessionProviderCore.tsx:107:    maxParticipantsForSession,
+src/hooks/useJoinSessionData.ts:64:    maxParticipantsForSession,
+src/hooks/useJoinSessionData.ts:124:    const effectiveMaxParticipants = maxParticipantsForSession;
+src/hooks/useJoinSessionData.ts:168:  const effectiveMaxParticipants = maxParticipantsForSession;
+src/hooks/useParticipantCounts.ts:50:  const maxParticipantsForSession = realtimeMaxCount !== null ? realtimeMaxCount : conversationMax;
+src/hooks/useParticipantCounts.ts:55:    maxParticipantsForSession,
+src/hooks/useSessionParticipantManager.ts:240:      logger.category('participants', `Session full detected: ${currentParticipantCount}/${maxParticipantsForSession}`);
+src/hooks/useSessionParticipantManager.ts:243:  }, [isSessionFull, onSessionFull, isScheduledWaitingRoom, currentParticipantCount, maxParticipantsForSession, logger]);
+src/hooks/useSessionParticipantManager.ts:257:    maxParticipantsForSession,
+src/hooks/useSessionParticipantSetup.ts:42:  const [maxParticipantsForSession, setMaxParticipantsForSession] = useState(0);
+src/hooks/useSessionParticipantSetup.ts:315:    maxParticipantsForSession,
+src/hooks/useSessionParticipants.ts:99:    maxParticipantsForSession,
+src/hooks/useSessionParticipants.ts:145:    maxParticipantsForSession,
+ALREADY_JOINED
+src/components/session/JoinSessionMain.tsx:271:              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Already joined</p>
+src/components/session/ParticipantLoadingShell.tsx:252:                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Already joined</p>
+LODASH_LOCK
+2026:  lodash.merge@4.6.2:
+2029:  lodash@4.17.23:
+4044:      lodash.merge: 4.6.2
+4220:  lodash.merge@4.6.2: {}
+4222:  lodash@4.17.23: {}
+4475:      lodash: 4.17.23

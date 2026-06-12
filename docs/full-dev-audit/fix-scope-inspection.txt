@@ -1,0 +1,88 @@
+PNPM_WHY_LODASH
+lodash@4.17.23
+└─┬ recharts@2.15.4
+  └── vite_react_shadcn_ts@0.0.0 (dependencies)
+
+Found 1 version of lodash
+LINT_WARNING_CONTEXT
+/**
+ * command
+ *
+ * UI primitive for the AIfacilitator application.
+ */
+import * as React from "react"
+import { type DialogProps } from "@radix-ui/react-dialog"
+import { Command as CommandPrimitive } from "cmdk"
+import { Search } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+
+const Command = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive
+    ref={ref}
+    className={cn(
+/**
+ * sidebar
+ *
+ * UI primitive for the AIfacilitator application.
+ */
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { VariantProps, cva } from "class-variance-authority"
+import { PanelLeft } from "lucide-react"
+
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+    );
+  }
+
+  // ── Session full ─────────────────────────────────────────────────────────
+  if (isFull && !isLoading) {
+    return (
+      <SessionFullPage
+        conversation={conversation}
+        currentParticipantCount={currentParticipantCount}
+        effectiveMaxParticipants={effectiveMaxParticipants}
+        onSpotOpened={() => {
+          // A spot opened — trigger a refetch so isFull recalculates
+          handleRetry();
+        }}
+        onRefresh={handleRetry}
+      />
+    );
+  }
+
+  // ── Main join form (shown immediately, even while loading) ───────────────
+  // The form renders with a skeleton while conversation data is loading.
+  // After joining, the button shows an inline "Preparing session…" state
+  // instead of swapping to a full-page spinner.
+  return (
+    <JoinSessionMain
+      conversation={conversation}
+      error={error}
+      isFull={false}
+      participantName={participantName}
+      onNameChange={(e) => setParticipantName(e.target.value)}
+      avatarSeed={avatarSeed}
+      onAvatarChange={() => setAvatarSeed(Math.random().toString())}
+      onJoinSession={handleJoin}
+      isTokenReady={isTokenReady}
+      isJoining={isJoining}
+      isLoading={isLoading}
+      isPreparingSession={false}
+      currentParticipantCount={currentParticipantCount}
+      effectiveMaxParticipants={effectiveMaxParticipants}
+      joinedParticipants={joinedParticipants}
+      onRetry={handleRetry}

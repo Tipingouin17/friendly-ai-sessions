@@ -1,0 +1,43 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+esbuild@0.21.5
+├─┬ vite@5.4.21
+│ ├─┬ @vitejs/plugin-react-swc@3.11.0
+│ │ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+│ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+└── vite_react_shadcn_ts@0.0.0 (devDependencies)
+
+lodash@4.17.23
+└─┬ recharts@2.15.4
+  └── vite_react_shadcn_ts@0.0.0 (dependencies)
+
+postcss@8.5.8
+├─┬ autoprefixer@10.4.27
+│ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+├─┬ postcss-import@15.1.0
+│ └─┬ tailwindcss@3.4.19
+│   ├─┬ @tailwindcss/typography@0.5.19
+│   │ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+│   ├─┬ tailwindcss-animate@1.0.7
+│   │ └── vite_react_shadcn_ts@0.0.0 (dependencies)
+│   └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+├─┬ postcss-js@4.1.0
+│ └── tailwindcss@3.4.19 [deduped]
+├─┬ postcss-load-config@6.0.1
+│ └── tailwindcss@3.4.19 [deduped]
+├─┬ postcss-nested@6.2.0
+│ └── tailwindcss@3.4.19 [deduped]
+├── tailwindcss@3.4.19 [deduped]
+├─┬ vite@5.4.21
+│ ├─┬ @vitejs/plugin-react-swc@3.11.0
+│ │ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+│ └── vite_react_shadcn_ts@0.0.0 (devDependencies)
+└── vite_react_shadcn_ts@0.0.0 (devDependencies)
+
+react-router@6.30.3
+└─┬ react-router-dom@6.30.3
+  └── vite_react_shadcn_ts@0.0.0 (dependencies)
+
+Found 1 version of esbuild
+Found 1 version of lodash
+Found 1 version of postcss
+Found 1 version of react-router

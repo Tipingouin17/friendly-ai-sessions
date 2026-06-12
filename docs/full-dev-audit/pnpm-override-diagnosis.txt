@@ -1,0 +1,69 @@
+=== pnpm version ===
+11.5.1
+=== pnpm config overrides ===
+{
+  "lodash": "^4.18.1",
+  "postcss": "^8.5.15"
+}
+=== lockfile overrides section ===
+7:overrides:
+8:  lodash: ^4.18.1
+9:  postcss: ^8.5.15
+171:      react-router-dom:
+216:        version: 10.4.27(postcss@8.5.15)
+232:      postcss:
+1581:      postcss: ^8.5.15
+2030:  lodash.merge@4.6.2:
+2033:  lodash@4.18.1:
+2152:  postcss-import@15.1.0:
+2156:      postcss: ^8.5.15
+2158:  postcss-js@4.1.0:
+2162:      postcss: ^8.5.15
+2164:  postcss-load-config@6.0.1:
+2169:      postcss: ^8.5.15
+2175:      postcss:
+2182:  postcss-nested@6.2.0:
+2186:      postcss: ^8.5.15
+2188:  postcss-selector-parser@6.0.10:
+2192:  postcss-selector-parser@6.1.2:
+2196:  postcss-value-parser@4.2.0:
+2199:  postcss@8.5.15:
+2271:  react-router-dom@6.30.4:
+3598:      postcss-selector-parser: 6.0.10
+3789:  autoprefixer@10.4.27(postcss@8.5.15):
+3795:      postcss: 8.5.15
+3796:      postcss-value-parser: 4.2.0
+4048:      lodash.merge: 4.6.2
+4224:  lodash.merge@4.6.2: {}
+4226:  lodash@4.18.1: {}
+4321:  postcss-import@15.1.0(postcss@8.5.15):
+4323:      postcss: 8.5.15
+4324:      postcss-value-parser: 4.2.0
+4328:  postcss-js@4.1.0(postcss@8.5.15):
+4331:      postcss: 8.5.15
+4333:  postcss-load-config@6.0.1(jiti@1.21.7)(postcss@8.5.15):
+4338:      postcss: 8.5.15
+4340:  postcss-nested@6.2.0(postcss@8.5.15):
+4342:      postcss: 8.5.15
+4343:      postcss-selector-parser: 6.1.2
+4345:  postcss-selector-parser@6.0.10:
+4350:  postcss-selector-parser@6.1.2:
+4355:  postcss-value-parser@4.2.0: {}
+4357:  postcss@8.5.15:
+4422:  react-router-dom@6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+4479:      lodash: 4.18.1
+4592:      postcss: 8.5.15
+4593:      postcss-import: 15.1.0(postcss@8.5.15)
+4594:      postcss-js: 4.1.0(postcss@8.5.15)
+4595:      postcss-load-config: 6.0.1(jiti@1.21.7)(postcss@8.5.15)
+4596:      postcss-nested: 6.2.0(postcss@8.5.15)
+4597:      postcss-selector-parser: 6.1.2
+4710:      postcss: 8.5.15
+=== workspace file ===
+overrides:
+  lodash: ^4.18.1
+  postcss: ^8.5.15
+
+allowBuilds:
+  '@swc/core': true
+  esbuild: true

@@ -17,9 +17,20 @@ import {
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+interface HostSessionOption {
+  id: number;
+  current_participants?: number | null;
+  scheduled_date?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  sessions?: {
+    title?: string | null;
+  } | null;
+}
+
 interface SessionsDropdownProps {
   currentSessionId: number | null;
-  activeSessions: any[];
+  activeSessions: HostSessionOption[];
   isLoading: boolean;
   onRefresh: () => void;
 }
@@ -36,6 +47,16 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
     if (sessionId !== currentSessionId) {
       navigate(`/session/host?id=${sessionId}`);
     }
+  };
+
+  const formatSessionTimestamp = (session: HostSessionOption) => {
+    const candidate = session.scheduled_date || session.created_at || session.updated_at;
+    if (!candidate) return `Session #${session.id}`;
+
+    const date = new Date(candidate);
+    if (Number.isNaN(date.getTime())) return `Session #${session.id}`;
+
+    return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · #${session.id}`;
   };
 
   return (
@@ -79,7 +100,10 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
                     {session.sessions?.title || 'Untitled Session'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {session.current_participants || 0} participants
+                    {formatSessionTimestamp(session)}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {session.current_participants || 0} {(session.current_participants || 0) === 1 ? 'participant' : 'participants'}
                   </span>
                 </div>
               </DropdownMenuItem>

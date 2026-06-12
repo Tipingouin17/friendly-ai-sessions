@@ -73,7 +73,7 @@ const ParticipantAvatarStack: React.FC<{ participants: ParticipantInfo[]; totalC
         ))}
       </div>
       <p className="text-sm text-slate-500">
-        {hiddenCount > 0 ? `+${hiddenCount} waiting for you` : `${totalCount} already joined`}
+        {hiddenCount > 0 ? `+${hiddenCount} more in the waiting room` : `${totalCount} currently in the waiting room`}
       </p>
     </div>
   );
@@ -268,7 +268,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
             )}
 
             <div className="mb-7">
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Already joined</p>
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Currently in waiting room</p>
               <ParticipantAvatarStack participants={joinedParticipants} totalCount={totalForAvatarStack} />
             </div>
 

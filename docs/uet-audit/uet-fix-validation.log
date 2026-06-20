@@ -1,0 +1,130 @@
+## UET static bootstrap validation
+Sat Jun 20 09:55:43 UTC 2026
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+## npm run build
+
+> vite_react_shadcn_ts@0.0.0 build
+> vite build && node scripts/generate-seo-pages.mjs
+
+vite v5.4.21 building for production...
+transforming...
+✓ 3624 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /home/ubuntu/friendly-ai-sessions-activation-git/src/components/CookieBanner.tsx is dynamically imported by /home/ubuntu/friendly-ai-sessions-activation-git/src/App.tsx but also statically imported by /home/ubuntu/friendly-ai-sessions-activation-git/src/lib/activationTracking.ts, /home/ubuntu/friendly-ai-sessions-activation-git/src/lib/tracking.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /home/ubuntu/friendly-ai-sessions-activation-git/src/lib/tracking.ts is dynamically imported by /home/ubuntu/friendly-ai-sessions-activation-git/src/App.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/App.tsx but also statically imported by /home/ubuntu/friendly-ai-sessions-activation-git/src/components/auth/SignupForm.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/contexts/AuthContext.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/hooks/useSessionStart.ts, /home/ubuntu/friendly-ai-sessions-activation-git/src/hooks/useWorkshopCreation.ts, /home/ubuntu/friendly-ai-sessions-activation-git/src/lib/activationTracking.ts, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/Contact.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/Index.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/OnboardingDemo.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/Pricing.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/VerifyEmail.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/checkout/CheckoutForm.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/checkout/index.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/pricing/components/EnterprisePlanCard.tsx, /home/ubuntu/friendly-ai-sessions-activation-git/src/pages/pricing/components/StandardPlanCard.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                       18.78 kB │ gzip:   5.19 kB
+dist/assets/index-BtNfm_dV.css                       168.66 kB │ gzip:  26.09 kB
+dist/assets/index-BdQq_4o_.js                          0.06 kB │ gzip:   0.08 kB
+dist/assets/skeleton-BYSoKgCw.js                       0.21 kB │ gzip:   0.18 kB
+dist/assets/useNavigateToSession-Dk9G_uWH.js           0.22 kB │ gzip:   0.17 kB
+dist/assets/index-DPahSIGb.js                          0.41 kB │ gzip:   0.31 kB
+dist/assets/debugLogger-TCPgW2-j.js                    0.43 kB │ gzip:   0.25 kB
+dist/assets/animations-Kuf9QFkd.js                     0.51 kB │ gzip:   0.22 kB
+dist/assets/textarea-BdtbwFrS.js                       0.52 kB │ gzip:   0.34 kB
+dist/assets/input-D8PWw7X6.js                          0.62 kB │ gzip:   0.38 kB
+dist/assets/separator-CQqc63h8.js                      0.71 kB │ gzip:   0.42 kB
+dist/assets/crossOriginUtils-igZUgUW-.js               0.90 kB │ gzip:   0.47 kB
+dist/assets/badge-BLmMCsvD.js                          0.94 kB │ gzip:   0.45 kB
+dist/assets/card-DQ0LAKX-.js                           1.04 kB │ gzip:   0.40 kB
+dist/assets/alert-B_1uPU8C.js                          1.07 kB │ gzip:   0.53 kB
+dist/assets/activationTracking-B1VaRLbe.js             1.16 kB │ gzip:   0.58 kB
+dist/assets/facilitatorUtils-FsAUdcRB.js               1.72 kB │ gzip:   0.76 kB
+dist/assets/progress-BcU7JHI-.js                       1.97 kB │ gzip:   0.98 kB
+dist/assets/sonner-VhFy_OcG.js                         1.99 kB │ gzip:   1.02 kB
+dist/assets/useSecureNavigation-C6pT3iT7.js            2.03 kB │ gzip:   0.74 kB
+dist/assets/usePlanLimits-DiOem5wJ.js                  2.06 kB │ gzip:   0.94 kB
+dist/assets/index-CcToOhax.js                          2.21 kB │ gzip:   0.99 kB
+dist/assets/dialog-BVXqoXsS.js                         2.30 kB │ gzip:   0.92 kB
+dist/assets/CrispChat-DCIuV7s5.js                      2.93 kB │ gzip:   1.18 kB
+dist/assets/phase3RuntimeService-D5YdSWKb.js           3.05 kB │ gzip:   1.16 kB
+dist/assets/Terms-BCtEQx9l.js                          3.07 kB │ gzip:   1.30 kB
+dist/assets/VerifyEmail-DorFJ853.js                    3.11 kB │ gzip:   1.27 kB
+dist/assets/useMutation-DljtFU96.js                    3.14 kB │ gzip:   1.30 kB
+dist/assets/ForgotPassword-CyxPFmLI.js                 3.51 kB │ gzip:   1.51 kB
+dist/assets/useUserPlan-Bo-SERY6.js                    3.60 kB │ gzip:   1.09 kB
+dist/assets/VerifyEmailSent-DvGT92-m.js                3.64 kB │ gzip:   1.49 kB
+dist/assets/Footer-8Lb20kye.js                         3.77 kB │ gzip:   1.11 kB
+dist/assets/index-CNkJ-_Ir.js                          3.99 kB │ gzip:   1.90 kB
+dist/assets/sessionLifecycle-DbKiKl-R.js               4.05 kB │ gzip:   1.55 kB
+dist/assets/avatar-C9Hkyq7d.js                         4.31 kB │ gzip:   1.92 kB
+dist/assets/alert-dialog-DNOyM9Eg.js                   4.79 kB │ gzip:   1.76 kB
+dist/assets/popover-BKH3I4tg.js                        5.32 kB │ gzip:   1.94 kB
+dist/assets/Login-91-t3lBB.js                          5.38 kB │ gzip:   2.09 kB
+dist/assets/facilitatorService-njd--Njj.js             5.50 kB │ gzip:   2.20 kB
+dist/assets/formatDistanceToNow-BOx4PYPW.js            5.69 kB │ gzip:   2.23 kB
+dist/assets/participantMediaPreferences-CkN7hdWY.js    6.01 kB │ gzip:   2.32 kB
+dist/assets/BlogIndex-sdiMnePa.js                      6.10 kB │ gzip:   2.06 kB
+dist/assets/OnboardingDemo-DCB2HeBK.js                 6.36 kB │ gzip:   2.24 kB
+dist/assets/useFacilitationAnalytics-D2Taqc7X.js       6.58 kB │ gzip:   2.52 kB
+dist/assets/en-US-DRxZ7s5C.js                          7.69 kB │ gzip:   2.74 kB
+dist/assets/RedeemAppSumo-C1N5O8k0.js                  7.74 kB │ gzip:   2.63 kB
+dist/assets/ResetPassword-BWnWZXqR.js                  7.83 kB │ gzip:   2.60 kB
+dist/assets/HomeBelowFold-BKAEbVts.js                  7.84 kB │ gzip:   2.71 kB
+dist/assets/ScheduleInvitations-BdnOUZ4b.js            7.88 kB │ gzip:   3.04 kB
+dist/assets/tooltip-BawbAII3.js                        7.95 kB │ gzip:   2.97 kB
+dist/assets/Signup-ymXY7_JG.js                         8.26 kB │ gzip:   2.91 kB
+dist/assets/Referrals-YR35B54d.js                      9.52 kB │ gzip:   3.99 kB
+dist/assets/useQuery-CtW4PU45.js                      10.49 kB │ gzip:   3.75 kB
+dist/assets/Contact-CzUNL1Xh.js                       10.60 kB │ gzip:   3.57 kB
+dist/assets/Settings-CsvHUOok.js                      11.75 kB │ gzip:   3.65 kB
+dist/assets/VsMiro-DitFHXdb.js                        12.19 kB │ gzip:   3.69 kB
+dist/assets/scroll-area-ChPWMwn9.js                   12.52 kB │ gzip:   3.95 kB
+dist/assets/format-AcmzasPm.js                        12.83 kB │ gzip:   3.38 kB
+dist/assets/About-CEFqYObp.js                         13.14 kB │ gzip:   3.82 kB
+dist/assets/DesignSprint-aShc_FWN.js                  13.46 kB │ gzip:   4.24 kB
+dist/assets/Retrospective-Cjmf51RZ.js                 13.76 kB │ gzip:   4.15 kB
+dist/assets/toaster-C_EDVlKn.js                       13.85 kB │ gzip:   4.90 kB
+dist/assets/VsSessionLab-BNeK0-j-.js                  13.93 kB │ gzip:   3.68 kB
+dist/assets/AIToolsRemoteTeams-krDbvFv7.js            14.07 kB │ gzip:   4.29 kB
+dist/assets/FAQs-BbVx8Sgg.js                          14.43 kB │ gzip:   5.32 kB
+dist/assets/StrategicPlanning-BMoE9cwo.js             15.16 kB │ gzip:   4.58 kB
+dist/assets/SessionReport-EA9RkZUA.js                 16.08 kB │ gzip:   4.22 kB
+dist/assets/index-DYQt5ArL.js                         16.68 kB │ gzip:   6.28 kB
+dist/assets/HowToUseAI-gH4baTSL.js                    16.87 kB │ gzip:   4.93 kB
+dist/assets/realtimeHelpers-C_hXUwUN.js               19.99 kB │ gzip:   5.49 kB
+dist/assets/select-C53bC3No.js                        21.10 kB │ gzip:   7.34 kB
+dist/assets/Privacy-C3vSljgj.js                       21.72 kB │ gzip:   4.26 kB
+dist/assets/Pricing-D6Is45Wd.js                       28.01 kB │ gzip:   8.23 kB
+dist/assets/index-B1swp2-M.js                         32.88 kB │ gzip:   9.42 kB
+dist/assets/Profile-B0-wZbsQ.js                       40.70 kB │ gzip:  10.68 kB
+dist/assets/useWebRTCSession-DTN9fI4a.js              41.17 kB │ gzip:  13.33 kB
+dist/assets/JoinSession-C08JzApN.js                   47.37 kB │ gzip:  12.48 kB
+dist/assets/PastWorkshops-CedGu1jp.js                 48.76 kB │ gzip:  13.74 kB
+dist/assets/index-UCH1Stv1.js                         56.66 kB │ gzip:  18.38 kB
+dist/assets/AIfacilitators-b1lvOYM3.js                57.60 kB │ gzip:  17.19 kB
+dist/assets/inputValidation-BDqX0OdF.js               81.01 kB │ gzip:  22.62 kB
+dist/assets/vendor-ui-CRyrnNpj.js                     82.19 kB │ gzip:  19.04 kB
+dist/assets/proxy-BRW9QtqD.js                        124.05 kB │ gzip:  40.54 kB
+dist/assets/SessionHost-DA8MuJ6Q.js                  125.26 kB │ gzip:  33.86 kB
+dist/assets/index-7denNnXb.js                        185.78 kB │ gzip:  56.76 kB
+dist/assets/Session-CHYnPOov.js                      198.45 kB │ gzip:  54.80 kB
+dist/assets/AdminDashboard-wmOw_-9j.js               211.52 kB │ gzip:  47.52 kB
+dist/assets/vendor-react-DVw86yKD.js                 230.92 kB │ gzip:  74.29 kB
+dist/assets/vendor-charts-wSnH_vKL.js                382.42 kB │ gzip: 103.51 kB
+✓ built in 13.65s
+Generated SEO HTML for / -> dist/index.html
+Generated SEO HTML for /about -> dist/about/index.html
+Generated SEO HTML for /pricing -> dist/pricing/index.html
+Generated SEO HTML for /faqs -> dist/faqs/index.html
+Generated SEO HTML for /contact -> dist/contact/index.html
+Generated SEO HTML for /use-cases/design-sprint -> dist/use-cases/design-sprint/index.html
+Generated SEO HTML for /use-cases/retrospective -> dist/use-cases/retrospective/index.html
+Generated SEO HTML for /use-cases/strategic-planning -> dist/use-cases/strategic-planning/index.html
+Generated SEO HTML for /compare/aifacilitator-vs-sessionlab -> dist/compare/aifacilitator-vs-sessionlab/index.html
+Generated SEO HTML for /compare/aifacilitator-vs-miro -> dist/compare/aifacilitator-vs-miro/index.html
+Generated SEO HTML for /blog -> dist/blog/index.html
+Generated SEO HTML for /blog/how-to-use-ai-for-workshop-facilitation -> dist/blog/how-to-use-ai-for-workshop-facilitation/index.html
+Generated SEO HTML for /blog/ai-tools-for-remote-teams -> dist/blog/ai-tools-for-remote-teams/index.html
+Generated SEO HTML for /privacy -> dist/privacy/index.html
+Generated SEO HTML for /terms -> dist/terms/index.html
+
+## explicit TypeScript no-emit check

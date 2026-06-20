@@ -1,9 +1,11 @@
 /**
  * Centralized acquisition and conversion tracking — GDPR-compliant.
  *
- * Scripts are only loaded when the user has given explicit consent via the
- * CookieBanner component. Consent is stored in localStorage under the key
- * "cookie_consent_v1" (see src/components/CookieBanner.tsx).
+ * Google Analytics, Google Ads, Google Tag Manager, and Clarity scripts are only
+ * loaded when the user has given explicit consent via the CookieBanner component.
+ * Microsoft UET is loaded in Consent Mode with ad storage denied by default, then
+ * updated to granted only after advertising consent. Consent is stored in
+ * localStorage under the key "cookie_consent_v1" (see src/components/CookieBanner.tsx).
  *
  * This module deliberately keeps all marketing tags behind safe wrappers so
  * application code never fails if a third-party script is blocked, delayed, or
@@ -353,9 +355,15 @@ function initClarity(analyticsConsent: boolean): void {
   appendScript('aifacilitator-clarity', `https://www.clarity.ms/tag/${encodeURIComponent(config.clarityProjectId)}`);
 }
 
-/** Load Microsoft UET tag — requires advertising consent. */
+/**
+ * Load Microsoft UET in Consent Mode on allowed marketing pages.
+ *
+ * UET must be present for Microsoft Advertising to verify the tag, but optional
+ * advertising storage remains denied until the visitor explicitly grants
+ * advertising consent.
+ */
 function initUet(advertisingConsent: boolean): void {
-  if (uetInitialized || !advertisingConsent || !hasValue(config.microsoftUetId) || typeof window === 'undefined' || typeof document === 'undefined' || isUetDisabledPath()) return;
+  if (uetInitialized || !hasValue(config.microsoftUetId) || typeof window === 'undefined' || typeof document === 'undefined' || isUetDisabledPath()) return;
 
   if (document.getElementById('aifacilitator-uet-config') || document.getElementById('microsoft-uet-script')) {
     uetInitialized = true;
@@ -390,16 +398,19 @@ export function initializeTracking(): void {
   captureAcquisitionAttribution();
 
   const consent = getStoredConsent();
+  const advertisingConsent = Boolean(consent?.advertising);
 
-  // No consent decision yet — GTM keeps Google Consent Mode defaults denied.
+  updateMicrosoftConsent(advertisingConsent);
+  initUet(advertisingConsent);
+
+  // No consent decision yet — Google/GTM/Clarity stay unloaded while Microsoft UET
+  // remains in default-denied Consent Mode.
   if (!consent) return;
 
   updateGoogleConsent(consent.analytics, consent.advertising);
-  updateMicrosoftConsent(consent.advertising);
   initGtag(consent.analytics, consent.advertising);
   initGtm(consent.analytics, consent.advertising);
   initClarity(consent.analytics);
-  initUet(consent.advertising);
 }
 
 /** Re-initialize tracking after consent is updated (called by cookie-consent-updated event). */

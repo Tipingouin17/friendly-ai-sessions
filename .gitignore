@@ -50,3 +50,4 @@ supabase_proxy/key.pem
 # Video analysis files (may contain sensitive session data)
 video_Recording*.md
 *_analysis_*.md
+.env.development

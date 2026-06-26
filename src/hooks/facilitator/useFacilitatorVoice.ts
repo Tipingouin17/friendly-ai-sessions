@@ -6,6 +6,13 @@ import type { FacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { recordTtsEvent, updateTtsEventStatus } from '@/services/facilitator/phase3RuntimeService';
 import { buildBrowserTtsSynthesisResult } from '@/services/facilitator/phase3ProviderAdapters';
 
+// ── Feature-flag env vars (set at build time via Vercel/Railway env) ──────────
+// VITE_PHASE3_TTS_PROVIDER=server  → use server neural TTS (ElevenLabs via Railway)
+// VITE_PHASE3_TTS_ENDPOINT=<url>   → absolute or relative URL for POST /api/tts/synthesize
+// When provider is not 'server' or endpoint is absent, browser SpeechSynthesis is used.
+const _TTS_PROVIDER = (import.meta.env.VITE_PHASE3_TTS_PROVIDER as string | undefined)?.trim() ?? 'browser';
+const _TTS_ENDPOINT = (import.meta.env.VITE_PHASE3_TTS_ENDPOINT as string | undefined)?.trim() ?? '';
+
 interface UseFacilitatorVoiceParams {
   conversationId?: number | null;
   facilitatorId?: number | null;
@@ -19,6 +26,12 @@ interface UseFacilitatorVoiceParams {
   locale?: string | null;
   speakingBehavior?: Record<string, unknown> | null;
   animationPreset?: string | null;
+  /** Override the server TTS endpoint for this hook instance (falls back to VITE_PHASE3_TTS_ENDPOINT). */
+  ttsEndpoint?: string | null;
+  /** Override the TTS provider for this hook instance (falls back to VITE_PHASE3_TTS_PROVIDER). */
+  ttsProvider?: string | null;
+  /** ElevenLabs voice preset name (calm_facilitator | workshop_guide | executive_moderator | creative_catalyst). */
+  voicePreset?: string | null;
 }
 
 interface SpeakParams {
@@ -217,6 +230,59 @@ const deriveBrowserSpeechSettings = (speakingBehavior?: Record<string, unknown> 
   };
 };
 
+// ── Server TTS helpers ────────────────────────────────────────────────────────
+
+interface ServerTtsResult {
+  audioUrl: string;
+  provider: string;
+  voiceId: string;
+  preset: string;
+  chars: number;
+}
+
+/**
+ * Fetch audio from the server TTS endpoint and return an object URL.
+ * Throws on network error or non-2xx response so callers can fall back.
+ */
+async function fetchServerTts(params: {
+  text: string;
+  voiceId?: string | null;
+  voicePreset?: string | null;
+  endpoint: string;
+  conversationId?: number | null;
+  messageId?: string | null;
+  metadata?: Record<string, unknown>;
+}): Promise<ServerTtsResult> {
+  const body = {
+    text: params.text,
+    voice_id: params.voiceId ?? undefined,
+    voice_preset: params.voicePreset ?? undefined,
+    conversation_id: params.conversationId ?? undefined,
+    message_id: params.messageId ?? undefined,
+    metadata: params.metadata ?? undefined,
+  };
+
+  const response = await fetch(params.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Server TTS returned ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const audioUrl = URL.createObjectURL(blob);
+  const provider = response.headers.get('X-TTS-Provider') ?? 'server';
+  const voiceId = response.headers.get('X-TTS-Voice-Id') ?? '';
+  const preset = response.headers.get('X-TTS-Preset') ?? 'default';
+  const chars = Number(response.headers.get('X-TTS-Chars') ?? params.text.length);
+
+  return { audioUrl, provider, voiceId, preset, chars };
+}
+
 export function useFacilitatorVoice({
   conversationId,
   facilitatorId,
@@ -230,24 +296,53 @@ export function useFacilitatorVoice({
   locale = null,
   speakingBehavior = null,
   animationPreset = null,
+  ttsEndpoint = null,
+  ttsProvider = null,
+  voicePreset = null,
 }: UseFacilitatorVoiceParams): FacilitatorVoiceRuntime {
   const [avatarState, setAvatarState] = React.useState<FacilitatorAvatarState>('idle');
   const [isSpeaking, setIsSpeaking] = React.useState(false);
   const activeEventIdRef = React.useRef<number | undefined>();
   const startedAtRef = React.useRef<number>(0);
   const utteranceRef = React.useRef<SpeechSynthesisUtterance | null>(null);
+  // Ref to the currently playing HTMLAudioElement for server TTS cancellation
+  const audioElementRef = React.useRef<HTMLAudioElement | null>(null);
+  // Ref to the current server TTS object URL so it can be revoked on cleanup
+  const audioObjectUrlRef = React.useRef<string | null>(null);
 
   const isSupported = Boolean(getSpeechSynthesis()) && typeof SpeechSynthesisUtterance !== 'undefined';
 
+  // Resolve effective provider and endpoint (prop overrides env var)
+  const effectiveProvider = (ttsProvider ?? _TTS_PROVIDER).trim();
+  const effectiveEndpoint = (ttsEndpoint ?? _TTS_ENDPOINT).trim();
+  const useServerTts = effectiveProvider === 'server' && Boolean(effectiveEndpoint);
+
+  const _revokeAudioUrl = React.useCallback(() => {
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
+  }, []);
+
   const cancel = React.useCallback(() => {
+    // Cancel browser TTS
     const synth = getSpeechSynthesis();
     synth?.cancel();
+    utteranceRef.current = null;
+
+    // Cancel server TTS audio element
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.src = '';
+      audioElementRef.current = null;
+    }
+    _revokeAudioUrl();
+
     setIsSpeaking(false);
     setAvatarState('idle');
-    utteranceRef.current = null;
     void updateTtsEventStatus(activeEventIdRef.current, 'cancelled');
     activeEventIdRef.current = undefined;
-  }, []);
+  }, [_revokeAudioUrl]);
 
   React.useEffect(() => cancel, [cancel]);
 
@@ -255,7 +350,142 @@ export function useFacilitatorVoice({
     if (!enabled) cancel();
   }, [cancel, enabled]);
 
-  const speak = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
+  // ── Server TTS speak path ─────────────────────────────────────────────────
+  const speakViaServer = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
+    const trimmed = text.trim();
+    const serializedMessageId = messageId != null ? String(messageId) : null;
+    if (!enabled || !trimmed || !conversationId || !effectiveEndpoint) return;
+
+    // Cancel any in-progress playback
+    cancel();
+    setAvatarState('thinking');
+    startedAtRef.current = performance.now();
+
+    const personaMetadata = {
+      ...metadata,
+      voiceGender,
+      voiceProvider: effectiveProvider,
+      voiceStyle,
+      locale,
+      speakingBehavior,
+      animationPreset,
+      voicePreset,
+      ttsPath: 'server',
+    };
+
+    // Record TTS event as queued
+    const queuedEvent = persistEvents
+      ? await recordTtsEvent({
+          conversationId,
+          facilitatorId,
+          messageId: serializedMessageId,
+          provider: effectiveProvider,
+          voiceId: defaultVoiceId,
+          textExcerpt: trimmed,
+          status: 'queued',
+          avatarState: 'thinking',
+          audioDurationMs: null,
+          metadata: personaMetadata,
+        })
+      : null;
+    activeEventIdRef.current = queuedEvent?.id;
+
+    let serverResult: ServerTtsResult | null = null;
+    try {
+      serverResult = await fetchServerTts({
+        text: trimmed,
+        voiceId: defaultVoiceId,
+        voicePreset: voicePreset,
+        endpoint: effectiveEndpoint,
+        conversationId,
+        messageId: serializedMessageId,
+        metadata: personaMetadata,
+      });
+    } catch (fetchError) {
+      // Server TTS failed — record fallback reason and fall through to browser TTS
+      const fallbackReason = fetchError instanceof Error ? fetchError.message : 'server_tts_fetch_failed';
+      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+        metadata: { ...personaMetadata, fallbackReason, fallbackTo: 'browser_speech_synthesis' },
+      });
+      activeEventIdRef.current = undefined;
+      // Silent fallback: do not toast; just use browser TTS
+      await speakViaBrowser({ text, messageId, metadata: { ...metadata, fallbackReason, fallbackFrom: 'server' } });
+      return;
+    }
+
+    // Store object URL for cleanup
+    audioObjectUrlRef.current = serverResult.audioUrl;
+
+    const audio = new Audio(serverResult.audioUrl);
+    audioElementRef.current = audio;
+
+    void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
+      metadata: {
+        ...personaMetadata,
+        characterCount: trimmed.length,
+        provider: serverResult.provider,
+        voiceId: serverResult.voiceId,
+        voicePreset: serverResult.preset,
+      },
+    });
+
+    audio.onplay = () => {
+      setIsSpeaking(true);
+      setAvatarState('speaking');
+    };
+
+    audio.onended = () => {
+      const durationMs = Math.round(performance.now() - startedAtRef.current);
+      setIsSpeaking(false);
+      setAvatarState('idle');
+      audioElementRef.current = null;
+      _revokeAudioUrl();
+      void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
+        audio_duration_ms: durationMs,
+        metadata: {
+          ...personaMetadata,
+          characterCount: trimmed.length,
+          provider: serverResult!.provider,
+          voiceId: serverResult!.voiceId,
+          voicePreset: serverResult!.preset,
+          latencyMs: Math.round(performance.now() - startedAtRef.current - durationMs),
+        },
+      });
+      activeEventIdRef.current = undefined;
+    };
+
+    audio.onerror = () => {
+      setIsSpeaking(false);
+      setAvatarState('error');
+      audioElementRef.current = null;
+      _revokeAudioUrl();
+      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+        metadata: { ...personaMetadata, characterCount: trimmed.length, audioPlaybackError: true },
+      });
+      activeEventIdRef.current = undefined;
+    };
+
+    try {
+      await audio.play();
+    } catch (playError) {
+      setIsSpeaking(false);
+      setAvatarState('error');
+      audioElementRef.current = null;
+      _revokeAudioUrl();
+      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+        metadata: {
+          ...personaMetadata,
+          characterCount: trimmed.length,
+          error: playError instanceof Error ? playError.message : 'audio_play_failed',
+        },
+      });
+      activeEventIdRef.current = undefined;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animationPreset, cancel, conversationId, defaultVoiceId, effectiveEndpoint, effectiveProvider, enabled, facilitatorId, locale, persistEvents, speakingBehavior, voiceGender, voicePreset, voiceStyle, _revokeAudioUrl]);
+
+  // ── Browser TTS speak path ────────────────────────────────────────────────
+  const speakViaBrowser = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
     const trimmed = text.trim();
     const serializedMessageId = messageId != null ? String(messageId) : null;
     if (!enabled || !trimmed || !conversationId) return;
@@ -282,6 +512,7 @@ export function useFacilitatorVoice({
       speechRate: personaSpeechSettings.rate,
       speechPitch: personaSpeechSettings.pitch,
       speechVolume: personaSpeechSettings.volume,
+      ttsPath: 'browser',
     };
 
     const synthesisPlan = buildBrowserTtsSynthesisResult({
@@ -369,6 +600,15 @@ export function useFacilitatorVoice({
       toast.error('Could not start facilitator voice playback.');
     }
   }, [animationPreset, conversationId, defaultVoiceId, enabled, facilitatorId, lipSyncEnabled, locale, persistEvents, speakingBehavior, voiceGender, voiceProvider, voiceStyle]);
+
+  // ── Unified speak entry point ─────────────────────────────────────────────
+  const speak = React.useCallback(async (params: SpeakParams) => {
+    if (useServerTts) {
+      await speakViaServer(params);
+    } else {
+      await speakViaBrowser(params);
+    }
+  }, [useServerTts, speakViaServer, speakViaBrowser]);
 
   return {
     isSupported,

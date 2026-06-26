@@ -24,6 +24,7 @@ import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCConnectionStatus, type WebRTCPeerStatus } from '@/hooks/useWebRTCSession';
 import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
 import { persistParticipantMediaPreferences, readParticipantMediaPreferences } from '@/utils/participantMediaPreferences';
+import { prepareFacilitatorSpeechText } from '@/utils/prepareFacilitatorSpeechText';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -933,8 +934,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
       lastSpokenAssistantMessageRef.current = messageId;
       if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
+      const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
       void voiceRuntime.speak({
-        text: lastAssistantMessage.content,
+        text: spokenText || lastAssistantMessage.content,
         messageId,
         metadata: { source: 'participant_messaging_view' },
       });

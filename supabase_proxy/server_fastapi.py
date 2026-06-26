@@ -137,6 +137,16 @@ Treat this plan as adaptive guidance, not a rigid requirement. If participants p
 
 Do not reveal this internal plan unless the host explicitly asks for the facilitation plan. Use it to shape the agenda overview, pacing expectations, synthesis timing, and follow-up questions."""
 
+SPOKEN_DELIVERY_POLICY = (
+    "SPOKEN DELIVERY POLICY:\n"
+    "This response will be spoken aloud in a live meeting. Rewrite it for natural speech. "
+    "Use warm, simple, conversational phrasing. Keep it brief: normally 10\u201325 seconds, "
+    "maximum 35 seconds unless explicitly summarising. Use one idea per sentence. "
+    "Avoid lists, markdown, formal essay structure, generic filler, and overly perfect corporate phrasing. "
+    "Start with a brief acknowledgement only when it reflects something specific that was just said. "
+    "End with one clear question or invitation."
+)
+
 WELCOME_AGENDA_AND_PACING_REQUIREMENTS = """The first visible message must set expectations for the facilitation journey. Include:
 1. A warm greeting introducing yourself by name.
 2. A participant-friendly explanation of the workshop objective.
@@ -174,6 +184,23 @@ def _format_facilitation_planning_context(duration_minutes: Any = None, particip
         "Use this context to estimate a tentative agenda, pacing, and exploration-question range. "
         "The estimate is guidance only and must adapt to live participant responses and host instructions."
     )
+
+def _format_session_setup_context(participant_description: Optional[str]) -> str:
+    """Return a system-prompt block grounding the AI in the host's brainstorm/setup context.
+
+    Returns an empty string when no context was provided so callers can gate on truthiness.
+    """
+    if not participant_description or not participant_description.strip():
+        return ""
+    return (
+        "\nSESSION SETUP CONTEXT FROM HOST:\n"
+        "The host provided this context before the session started:\n"
+        f'"{participant_description.strip()}"\n\n'
+        "Use this context as grounding for the agenda, examples, assumptions, vocabulary, and "
+        "follow-up questions. Do not ignore it. If the live discussion diverges, connect back "
+        "to this context when useful, but do not force it unnaturally."
+    )
+
 
 # ============================================================
 # App & rate limiter
@@ -5341,7 +5368,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         # Fetch conversation + session + facilitator details needed by the AI
         async with _pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT c.id, c.user_id, c.language, c.participants, "
+                "SELECT c.id, c.user_id, c.language, c.participants, c.participant_description, "
                 "s.title, s.objective, s.welcome_message, s.scope, s.duration_minutes, "
                 "s.gpt_version, s.max_tokens, s.randomness, s.prompt, "
                 "f.title as facilitator_name, f.details as facilitator_details, "
@@ -5369,6 +5396,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _session_prompt  = row.get("prompt") or ""
         _welcome_tpl     = row.get("welcome_message") or ""
         _scope           = row.get("scope") or ""
+        _participant_description = row.get("participant_description") or ""
         _duration_minutes = row.get("duration_minutes")
         _participant_count = row.get("participants")
         _gpt_version     = row.get("gpt_version")
@@ -5428,6 +5456,9 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _sys_parts.append(f"Session objective: {_objective}")
         if _scope:
             _sys_parts.append(f"Session scope: {_scope}")
+        _setup_ctx = _format_session_setup_context(_participant_description)
+        if _setup_ctx:
+            _sys_parts.append(_setup_ctx)
         _sys_parts.append(_format_facilitation_planning_context(_duration_minutes, _participant_count))
         _sys_parts.append(FACILITATION_PLANNING_POLICY)
         _lang_instr = (
@@ -5454,6 +5485,12 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         )
         if _welcome_tpl:
             _user_prompt += f"Use this as inspiration (but make it your own): {_welcome_tpl}\n"
+        if _participant_description and _participant_description.strip():
+            _user_prompt += (
+                "\nIMPORTANT: In the welcome message, briefly reflect the setup context provided by the host in natural "
+                "participant-facing language. The opening question must connect directly to that context, "
+                "not only to the generic session objective.\n"
+            )
         _user_prompt += WELCOME_AGENDA_AND_PACING_REQUIREMENTS
 
         # Call OpenAI (synchronous SDK — run in executor to avoid blocking event loop)
@@ -5576,14 +5613,17 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                 """
                 SELECT c.id, c.is_session_ended, c.participants,
                        c.language as conversation_language,
+                       c.participant_description,
                        s.title, s.objective, s.prompt, s.scope, s.duration_minutes,
                        s.gpt_version, s.max_tokens, s.randomness,
                        f.id as facilitator_id,
                        f.title as facilitator_name, f.details as facilitator_details,
-                       f.profile_picture, f.languages as facilitator_languages
+                       f.profile_picture, f.languages as facilitator_languages,
+                       COALESCE(cfg.tts_avatar_enabled, TRUE) as tts_avatar_enabled
                 FROM conversations c
                 LEFT JOIN sessions s ON s.id = c.sessions_id
                 LEFT JOIN facilitators f ON f.id = s.facilitator
+                LEFT JOIN configurations cfg ON cfg.user_id = s.user_id
                 WHERE c.id = $1
                 """,
                 conv_id
@@ -5653,6 +5693,8 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _objective         = row.get("objective") or "facilitate a productive discussion"
         _session_prompt    = row.get("prompt") or ""
         _scope             = row.get("scope") or ""
+        _participant_description = row.get("participant_description") or ""
+        _tts_avatar_enabled = bool(row.get("tts_avatar_enabled", True))
         _duration_minutes  = row.get("duration_minutes")
         _gpt_version       = row.get("gpt_version")
         _max_tokens_cfg    = row.get("max_tokens")
@@ -5715,8 +5757,13 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _sys_parts.append(f"Session objective: {_objective}")
         if _scope:
             _sys_parts.append(f"Session scope: {_scope}")
+        _setup_ctx = _format_session_setup_context(_participant_description)
+        if _setup_ctx:
+            _sys_parts.append(_setup_ctx)
         _sys_parts.append(_format_facilitation_planning_context(_duration_minutes, expected_participants))
         _sys_parts.append(FACILITATION_PLANNING_POLICY)
+        if _tts_avatar_enabled:
+            _sys_parts.append(SPOKEN_DELIVERY_POLICY)
         _sys_parts.append(
             f"Your name is {_facilitator}. Always introduce yourself using this exact name.\n\n"
             "IMPORTANT RULES:\n"
@@ -6533,6 +6580,7 @@ async def edge_function(func_name: str, request: Request):
         is_session_start = data.get("sessionStart", False)
         generate_report = data.get("generateReport", False)
         host_instruction = (data.get("hostInstruction") or "").strip()
+        voice_enabled = bool(data.get("voiceEnabled", False))
 
         # ── SECURITY LAYER 1: JWT Authentication ──────────────────────────────
         # Extract the caller's identity from the JWT in the Authorization header.
@@ -6613,6 +6661,7 @@ async def edge_function(func_name: str, request: Request):
         session_prompt = ""
         welcome_message_template = ""
         session_scope = ""
+        participant_description = ""
         duration_minutes = None
         participant_count = None
         gpt_version = None
@@ -6635,7 +6684,7 @@ async def edge_function(func_name: str, request: Request):
             try:
                 async with _pool.acquire() as conn:
                     row = await conn.fetchrow(
-                        "SELECT c.id, c.language as conversation_language, c.participants, "
+                        "SELECT c.id, c.language as conversation_language, c.participants, c.participant_description, "
                         "s.title, s.facilitator, s.objective, s.prompt, "
                         "s.welcome_message, s.scope, s.duration_minutes, s.gpt_version, s.max_tokens, s.randomness, "
                         "f.title as facilitator_name, f.details as facilitator_details, "
@@ -6678,6 +6727,7 @@ async def edge_function(func_name: str, request: Request):
                     session_scope = row["scope"] or ""
                     duration_minutes = row["duration_minutes"]
                     participant_count = row["participants"]
+                    participant_description = row["participant_description"] or ""
                     gpt_version = row["gpt_version"]
                     max_tokens_cfg = row["max_tokens"]
                     randomness_cfg = row["randomness"]
@@ -6804,9 +6854,13 @@ async def edge_function(func_name: str, request: Request):
         system_parts.append(f"Session objective: {objective}")
         if session_scope:
             system_parts.append(f"Session scope: {session_scope}")
+        _setup_ctx = _format_session_setup_context(participant_description)
+        if _setup_ctx:
+            system_parts.append(_setup_ctx)
         system_parts.append(_format_facilitation_planning_context(duration_minutes, participant_count))
         system_parts.append(FACILITATION_PLANNING_POLICY)
-
+        if voice_enabled:
+            system_parts.append(SPOKEN_DELIVERY_POLICY)
         language_instruction = ""
         if facilitator_language:
             language_instruction = (
@@ -9058,3 +9112,114 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3333
     logger.info("Starting MyFacilitator FastAPI proxy v3 on port %d...", port)
     uvicorn.run("server_fastapi:app", host="0.0.0.0", port=port, reload=False, workers=1)
+
+
+# ============================================================
+# Neural TTS endpoint (Workstream 3 — M6)
+# ============================================================
+# Activated via VITE_PHASE3_TTS_PROVIDER=server and
+# VITE_PHASE3_TTS_ENDPOINT=/api/tts/synthesize on the frontend.
+# Falls back gracefully: if PHASE3_TTS_API_KEY is not set or the
+# upstream call fails, the frontend is expected to fall back to
+# browser SpeechSynthesis.
+
+from pydantic import BaseModel as _PydanticBaseModel
+
+class TtsSynthesizeRequest(_PydanticBaseModel):
+    text: str
+    voice_id: Optional[str] = None
+    model_id: Optional[str] = None
+    voice_preset: Optional[str] = None  # calm_facilitator | workshop_guide | executive_moderator | creative_catalyst
+    conversation_id: Optional[int] = None
+    message_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+# Voice preset → ElevenLabs voice settings mapping
+_VOICE_PRESET_SETTINGS: Dict[str, Dict] = {
+    "calm_facilitator":    {"stability": 0.72, "similarity_boost": 0.80, "style": 0.10, "use_speaker_boost": True},
+    "workshop_guide":      {"stability": 0.65, "similarity_boost": 0.78, "style": 0.20, "use_speaker_boost": True},
+    "executive_moderator": {"stability": 0.80, "similarity_boost": 0.82, "style": 0.05, "use_speaker_boost": False},
+    "creative_catalyst":   {"stability": 0.55, "similarity_boost": 0.75, "style": 0.35, "use_speaker_boost": True},
+}
+_DEFAULT_VOICE_SETTINGS: Dict = {"stability": 0.65, "similarity_boost": 0.78, "style": 0.15, "use_speaker_boost": True}
+
+# Default ElevenLabs voice ID (Rachel — warm, clear, English)
+_DEFAULT_ELEVEN_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+_DEFAULT_ELEVEN_MODEL    = "eleven_turbo_v2_5"
+
+@app.post("/api/tts/synthesize")
+async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
+    """
+    Server-backed neural TTS synthesis endpoint.
+
+    Accepts a JSON body with `text` (required) and optional `voice_id`,
+    `model_id`, `voice_preset`, `conversation_id`, `message_id`, and
+    `metadata`. Returns audio/mpeg binary on success.
+
+    The endpoint requires PHASE3_TTS_API_KEY (ElevenLabs key) to be set
+    in the Railway environment. If it is absent or the upstream call fails,
+    it returns HTTP 503 so the frontend can fall back to browser TTS.
+    """
+    import httpx as _httpx
+
+    api_key = os.environ.get("PHASE3_TTS_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("[TTS] PHASE3_TTS_API_KEY not configured — returning 503 for browser fallback")
+        raise HTTPException(status_code=503, detail="TTS provider not configured")
+
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+
+    # Hard cap to prevent runaway audio generation (~35 s at average speaking rate)
+    MAX_CHARS = 2500
+    if len(text) > MAX_CHARS:
+        text = text[:MAX_CHARS]
+        logger.warning("[TTS] Text truncated to %d chars", MAX_CHARS)
+
+    voice_id = (req.voice_id or _DEFAULT_ELEVEN_VOICE_ID).strip()
+    model_id = (req.model_id or _DEFAULT_ELEVEN_MODEL).strip()
+    settings = _VOICE_PRESET_SETTINGS.get(req.voice_preset or "", _DEFAULT_VOICE_SETTINGS)
+
+    payload = {
+        "text": text,
+        "model_id": model_id,
+        "voice_settings": settings,
+    }
+
+    eleven_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+
+    try:
+        async with _httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(eleven_url, json=payload, headers=headers)
+        if resp.status_code != 200:
+            logger.error("[TTS] ElevenLabs returned %d: %s", resp.status_code, resp.text[:200])
+            raise HTTPException(status_code=502, detail=f"TTS provider error: {resp.status_code}")
+        audio_bytes = resp.content
+    except _httpx.TimeoutException:
+        logger.error("[TTS] ElevenLabs request timed out")
+        raise HTTPException(status_code=504, detail="TTS provider timed out")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[TTS] Unexpected error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail="TTS provider error")
+
+    from fastapi.responses import Response as _FastAPIResponse
+    return _FastAPIResponse(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "X-TTS-Provider": "elevenlabs",
+            "X-TTS-Voice-Id": voice_id,
+            "X-TTS-Model": model_id,
+            "X-TTS-Preset": req.voice_preset or "default",
+            "X-TTS-Chars": str(len(text)),
+        },
+    )

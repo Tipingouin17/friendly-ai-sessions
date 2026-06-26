@@ -12,6 +12,7 @@ import { useMessageSaver } from "./messageSender/useMessageSaver";
 import { useEnhancedSessionLogger } from "./useEnhancedSessionLogger";
 import { useResponseCollection } from "./useResponseCollection";
 import api from "@/lib/api";
+import type { FacilitationMode } from "./useFloorControl";
 
 type UseMessageSenderProps = {
   currentConversationId: number | null;
@@ -29,6 +30,22 @@ type UseMessageSenderProps = {
   participants: any[];
   isAnonymous: boolean;
   conversation: any;
+  /**
+   * Floor-control gate: when provided, the fallback timer only fires if
+   * isSafeToSpeak() returns true. Prevents AI from interrupting speech or TTS.
+   */
+  isSafeToSpeak?: () => boolean;
+  /**
+   * Returns elapsed silence in ms since last speech ended, for logging.
+   */
+  getSilenceElapsedMs?: () => number | null;
+  /**
+   * Current facilitation mode.
+   * 'manual'    — AI never speaks unless the host explicitly triggers it.
+   * 'balanced'  — AI waits for clear silence + all expected answers (default).
+   * 'proactive' — Legacy behavior: fixed-timer trigger.
+   */
+  facilitationMode?: FacilitationMode;
 };
 
 export const useMessageSender = ({
@@ -36,7 +53,10 @@ export const useMessageSender = ({
   sessionState,
   participants,
   isAnonymous,
-  conversation
+  conversation,
+  isSafeToSpeak,
+  getSilenceElapsedMs,
+  facilitationMode = 'balanced',
 }: UseMessageSenderProps) => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,10 +212,20 @@ export const useMessageSender = ({
         { participant_id: currentParticipant, message_length: sentMessage.length }
       );
       
+      // ── Floor-control gate ─────────────────────────────────────────────────
       // Primary continuation remains server/host-driven. As a resilience fallback,
       // the participant checks shortly after sending whether all expected answers
       // are present and whether no facilitator message has appeared yet. This keeps
       // single-participant and host-tab-closed sessions from getting stuck.
+      //
+      // In manual mode, skip the fallback entirely — the host drives all AI turns.
+      if (facilitationMode === 'manual') {
+        logParticipantDiagnostic('participant_continuation_skipped_manual_mode', {
+          facilitation_mode: facilitationMode,
+        });
+        return;
+      }
+
       window.setTimeout(async () => {
         if (continuationInProgressRef.current || !currentConversationId) return;
 
@@ -260,6 +290,23 @@ export const useMessageSender = ({
             return;
           }
 
+          // ── Floor-control safe-to-speak check ─────────────────────────────
+          // If a floor-control gate is provided, verify the floor is idle before
+          // invoking. This prevents the fallback from firing while a human is
+          // speaking or TTS is currently playing.
+          const silenceMs = getSilenceElapsedMs ? (getSilenceElapsedMs() ?? 4500) : 4500;
+          const floorIdle = isSafeToSpeak ? isSafeToSpeak() : true;
+          const triggerSource: 'auto' | 'timeout_fallback' = floorIdle ? 'auto' : 'timeout_fallback';
+
+          if (!floorIdle) {
+            logParticipantDiagnostic('participant_continuation_skipped_floor_not_idle', {
+              trigger_source: triggerSource,
+              silence_ms: silenceMs,
+              facilitation_mode: facilitationMode,
+            });
+            return;
+          }
+
           continuationInProgressRef.current = true;
           const facilitatorContext = latestMessages.map(message => {
             let content = '';
@@ -284,6 +331,9 @@ export const useMessageSender = ({
             respondent_count: respondentKeys.size,
             expected_participants: expectedParticipants,
             message_count: latestMessages.length,
+            trigger_source: triggerSource,
+            silence_ms: silenceMs,
+            facilitation_mode: facilitationMode,
           });
 
           const { error: invokeError } = await api.functions.invoke('handle-facilitator-response', {
@@ -292,6 +342,13 @@ export const useMessageSender = ({
               conversationId: currentConversationId,
               sessionStart: false,
               generateReport: false,
+              // Floor-control metadata (Step 4 of WS2 brief)
+              triggerSource,
+              hostTriggered: false,
+              turnComplete: true,
+              silenceMs,
+              facilitationMode,
+              autoInterventionAllowed: facilitationMode !== 'manual',
             },
           });
 
@@ -351,7 +408,10 @@ export const useMessageSender = ({
       logParticipantDiagnostic,
       recordParticipantResponse,
     stopWaitingForResponses,
-    startResponseCollection
+    startResponseCollection,
+    facilitationMode,
+    isSafeToSpeak,
+    getSilenceElapsedMs,
   ]);
 
   return {

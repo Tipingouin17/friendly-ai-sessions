@@ -106,6 +106,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // from this point forward.
       initializedRef.current = true;
       setLoading(false);
+    }).catch(() => {
+      // Network failure or Supabase cold-start: ensure the app never stays
+      // stuck on the loading screen indefinitely. Treat as unauthenticated.
+      setUser(null);
+      setSession(null);
+      initializedRef.current = true;
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

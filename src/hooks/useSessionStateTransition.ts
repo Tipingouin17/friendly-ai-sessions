@@ -95,10 +95,15 @@ export function useSessionStateTransition({
     };
   }, [props.currentConversationId, props.currentUserParticipantId, isAdmin, navigate, toast, sessionStarted]);
   
-  // Calculate values from conversation and participants if available
-  const currentParticipants = props.conversation?.current_participants || 
+  // Calculate values from conversation and participants if available.
+  // The DB stores participants as host-inclusive (host + attendees).
+  // Subtract 1 from both current and max so participant-facing UI shows
+  // attendee-only counts (consistent with JoinSessionMain BUG 3 fix).
+  const rawCurrentParticipants = props.conversation?.current_participants || 
                              props.participants?.length || 0;
-  const maxParticipants = props.conversation?.participants || 0;
+  const rawMaxParticipants = props.conversation?.participants || 0;
+  const currentParticipants = Math.max(rawCurrentParticipants - 1, 0);
+  const maxParticipants = rawMaxParticipants > 0 ? Math.max(rawMaxParticipants - 1, 0) : 0;
   const isSessionFull = maxParticipants > 0 && currentParticipants >= maxParticipants;
   
   // Full capacity no longer starts the room locally. The redesigned waiting-room

@@ -6,6 +6,7 @@
 
 import api from "@/lib/api";
 import type { FacilitatorTool, FacilitatorToolAssignment, FacilitatorToolConfig } from "@/types/facilitator";
+import { normalizePersonName, validateEmailAddress } from "@/utils/inputValidation";
 
 export interface ScheduledSessionInvitation {
   id: string;

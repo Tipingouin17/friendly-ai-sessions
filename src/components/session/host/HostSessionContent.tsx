@@ -675,7 +675,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
             <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}
-              currentParticipantCount={actualParticipantCount}
+              currentParticipantCount={humanParticipantCount}
               conversationData={conversationData}
               isWaitingForResponses={isWaitingForResponses}
               responseCount={responseCount}

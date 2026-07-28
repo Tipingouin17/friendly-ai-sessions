@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { useFacilitatorToolbox } from "@/hooks/useFacilitatorToolbox";
 import { useFacilitationModeOrchestrator } from "@/hooks/useFacilitationModeOrchestrator";
+import { useSessionStatus } from "@/hooks/useSessionStatus";
 import type { FacilitatorModeAssignment } from "@/services/modeOrchestratorService";
 
 export function useSessionHostLogic() {
@@ -50,6 +51,13 @@ export function useSessionHostLogic() {
     const modeOrchestrator = useFacilitationModeOrchestrator(conversationData, {
         conversationId: currentConversationId,
     });
+
+    // Wire the session-status realtime subscription so that any UPDATE to the
+    // conversations row (including current_participants increments when a
+    // participant joins) immediately triggers a refetch of conversationData.
+    // Without this the host page sees stale current_participants = 0 and the
+    // Start Session button stays disabled even when participants are waiting.
+    useSessionStatus(currentConversationId, refetchConversation);
 
     // 4. Session Interface (Start/Stop) - Moved up for dependencies
     const { handleStartSession, isSessionStarted: isInterfaceSessionStarted } = useSessionInterface(currentConversationId, conversationData);

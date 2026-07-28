@@ -192,10 +192,14 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
     );
   }
 
-  const participantCountLabel = effectiveMaxParticipants > 0
-    ? `${currentParticipantCount} / ${effectiveMaxParticipants} joined`
-    : `${currentParticipantCount} joined`;
-  const totalForAvatarStack = Math.max(currentParticipantCount, joinedParticipants.length);
+  // The DB counts the host row, so subtract 1 from both current and max
+  // before showing attendee-facing numbers.
+  const displayCurrentCount = Math.max(currentParticipantCount - 1, 0);
+  const displayMaxCount = effectiveMaxParticipants > 0 ? Math.max(effectiveMaxParticipants - 1, 0) : 0;
+  const participantCountLabel = displayMaxCount > 0
+    ? `${displayCurrentCount} / ${displayMaxCount} joined`
+    : `${displayCurrentCount} joined`;
+  const totalForAvatarStack = Math.max(displayCurrentCount, joinedParticipants.length);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] flex items-start justify-center px-4 pt-8 pb-6 sm:items-center">

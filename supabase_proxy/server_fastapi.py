@@ -123,9 +123,29 @@ def _verify_password(plain: str, stored_hash: str) -> bool:
 
 
 # ============================================================
-# OpenAI client
+# OpenAI client — dynamic, DB-key-aware
 # ============================================================
-openai_client = OpenAI()
+# The admin can set the OpenAI API key via the admin panel (configurations.default_gpt_token).
+# We fetch it fresh from the DB on every call so it persists across Railway restarts
+# and takes effect immediately after being changed — no redeploy needed.
+# Falls back to the OPENAI_API_KEY environment variable if the DB value is empty.
+async def _get_openai_client() -> OpenAI:
+    """Return an OpenAI client using the admin-configured API key from the DB,
+    falling back to the OPENAI_API_KEY environment variable."""
+    api_key: Optional[str] = None
+    if _pool:
+        try:
+            async with _pool.acquire() as _key_conn:
+                _key_row = await _key_conn.fetchrow(
+                    "SELECT default_gpt_token FROM configurations LIMIT 1"
+                )
+            if _key_row and _key_row["default_gpt_token"]:
+                api_key = str(_key_row["default_gpt_token"]).strip() or None
+        except Exception:
+            pass  # Fall through to env var
+    if api_key:
+        return OpenAI(api_key=api_key)
+    return OpenAI()  # Uses OPENAI_API_KEY env var
 
 # ============================================================
 # AI facilitation planning policy
@@ -695,7 +715,8 @@ async def _select_facilitation_technique(conv_id: int, conn_pool: asyncpg.Pool, 
             mode[key] = _safe_json_value(mode.get(key), default)
 
     participant_messages = [dict(r) for r in recent_participant_rows]
-    compressed_messages = _compress_messages_for_context(participant_messages, "gpt-4.1-nano", openai_client)
+    _oai_client_compress1 = await _get_openai_client()
+    compressed_messages = _compress_messages_for_context(participant_messages, "gpt-4.1-nano", _oai_client_compress1)
     answer_lines = []
     for msg in compressed_messages:
         name = msg.get("name") or "Participant"
@@ -798,9 +819,10 @@ Respond with this exact JSON shape:
 }}
 """.strip()
 
+    _oai_client_selector = await _get_openai_client()
     try:
         def _call_selector():
-            return openai_client.chat.completions.create(
+            return _oai_client_selector.chat.completions.create(
                 model="gpt-4.1-nano",
                 messages=[
                     {"role": "system", "content": selector_system},
@@ -5497,9 +5519,10 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
+        _oai_client_welcome = await _get_openai_client()
         try:
             def _call_openai():
-                return openai_client.chat.completions.create(
+                return _oai_client_welcome.chat.completions.create(
                     model=_model,
                     messages=[
                         {"role": "system", "content": _system_msg},
@@ -5845,9 +5868,10 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
+        _oai_client_bg = await _get_openai_client()
         try:
             def _call_openai_bg():
-                return openai_client.chat.completions.create(
+                return _oai_client_bg.chat.completions.create(
                     model=_model,
                     messages=[
                         {"role": "system", "content": _system_msg},
@@ -6926,7 +6950,8 @@ async def edge_function(func_name: str, request: Request):
             except Exception as e:
                 log_session.error("error fetching messages for report: %s", e, exc_info=True)
             # Pre-compress long participant messages to fit within model context budget
-            all_messages = _compress_messages_for_context(list(all_messages), model, openai_client)
+            _oai_client_compress2 = await _get_openai_client()
+            all_messages = _compress_messages_for_context(list(all_messages), model, _oai_client_compress2)
             conversation_text = ""
             for msg in all_messages:
                 content = msg.get("content", {})
@@ -7025,8 +7050,9 @@ async def edge_function(func_name: str, request: Request):
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
+        _oai_client_main = await _get_openai_client()
         try:
-            response = openai_client.chat.completions.create(
+            response = _oai_client_main.chat.completions.create(
                 model=model,
                 messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt}],
                 max_tokens=max_tokens,
@@ -7807,7 +7833,8 @@ async def edge_function(func_name: str, request: Request):
                     except Exception:
                         pass
                     # Pre-compress long participant messages before building transcript
-                    all_msgs = _compress_messages_for_context(all_msgs, _pre_model, openai_client)
+                    _oai_client_compress3 = await _get_openai_client()
+                    all_msgs = _compress_messages_for_context(all_msgs, _pre_model, _oai_client_compress3)
                     transcript = ""
                     for msg in all_msgs:
                         content = msg.get("content", {})
@@ -7830,8 +7857,9 @@ async def edge_function(func_name: str, request: Request):
                     _report_prompt_tokens: Optional[int] = None
                     _report_completion_tokens: Optional[int] = None
                     _report_model_used: Optional[str] = None
+                    _oai_client_report = await _get_openai_client()
                     try:
-                        resp = openai_client.chat.completions.create(
+                        resp = _oai_client_report.chat.completions.create(
                             model=_report_model,
                             messages=[
                                 {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
@@ -8174,8 +8202,7 @@ async def edge_function(func_name: str, request: Request):
             _tw_model: Optional[str] = None
             if conv_lang_code != "en":
                 try:
-                    from openai import OpenAI as _OAI
-                    _client = _OAI()
+                    _client = await _get_openai_client()
                     _resp = _client.chat.completions.create(
                         model=DEFAULT_AI_MODEL,
                         messages=[

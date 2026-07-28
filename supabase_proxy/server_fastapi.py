@@ -129,9 +129,46 @@ def _verify_password(plain: str, stored_hash: str) -> bool:
 # We fetch it fresh from the DB on every call so it persists across Railway restarts
 # and takes effect immediately after being changed — no redeploy needed.
 # Falls back to the OPENAI_API_KEY environment variable if the DB value is empty.
-async def _get_openai_client() -> OpenAI:
-    """Return an OpenAI client using the admin-configured API key from the DB,
-    falling back to the OPENAI_API_KEY environment variable."""
+async def _get_openai_client(model: str = "") -> OpenAI:
+    """Return an OpenAI-compatible client for the given model.
+
+    - For Gemini models: uses the gemini_api_key from the configurations table
+      and routes to Google's OpenAI-compatible endpoint.
+      Falls back to the GEMINI_API_KEY environment variable.
+    - For all other models (OpenAI GPT family): uses the default_gpt_token from
+      the configurations table. Falls back to the OPENAI_API_KEY env var.
+
+    The key is fetched fresh from the DB on every call so it persists across
+    Railway restarts and takes effect immediately after admin changes it.
+    """
+    _is_gemini = model.lower().startswith("gemini")
+
+    if _is_gemini:
+        # ── Google Gemini via OpenAI-compatible endpoint ──────────────────────
+        gemini_key: Optional[str] = None
+        if _pool:
+            try:
+                async with _pool.acquire() as _key_conn:
+                    _key_row = await _key_conn.fetchrow(
+                        "SELECT gemini_api_key FROM configurations LIMIT 1"
+                    )
+                if _key_row and _key_row["gemini_api_key"]:
+                    gemini_key = str(_key_row["gemini_api_key"]).strip() or None
+            except Exception:
+                pass  # Fall through to env var
+        if not gemini_key:
+            gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not gemini_key:
+            raise ValueError(
+                "Gemini model selected but no Google API key configured. "
+                "Please add your Google API key in Admin → System Settings → Google API Key."
+            )
+        return OpenAI(
+            api_key=gemini_key,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+
+    # ── OpenAI GPT family ─────────────────────────────────────────────────────
     api_key: Optional[str] = None
     if _pool:
         try:
@@ -715,7 +752,7 @@ async def _select_facilitation_technique(conv_id: int, conn_pool: asyncpg.Pool, 
             mode[key] = _safe_json_value(mode.get(key), default)
 
     participant_messages = [dict(r) for r in recent_participant_rows]
-    _oai_client_compress1 = await _get_openai_client()
+    _oai_client_compress1 = await _get_openai_client("gpt-4.1-nano")
     compressed_messages = _compress_messages_for_context(participant_messages, "gpt-4.1-nano", _oai_client_compress1)
     answer_lines = []
     for msg in compressed_messages:
@@ -819,7 +856,7 @@ Respond with this exact JSON shape:
 }}
 """.strip()
 
-    _oai_client_selector = await _get_openai_client()
+    _oai_client_selector = await _get_openai_client("gpt-4.1-nano")
     try:
         def _call_selector():
             return _oai_client_selector.chat.completions.create(
@@ -1931,6 +1968,13 @@ async def run_startup_migrations() -> None:
             ON activation_user_state(activation_status, updated_at DESC);
         CREATE INDEX IF NOT EXISTS activation_user_state_session_idx
             ON activation_user_state(activation_session_id);
+        """,
+        # 2026-07-28: Add gemini_api_key to configurations so Gemini models can be
+        # used alongside OpenAI models. The key is stored separately because Google
+        # uses a different API endpoint and authentication scheme.
+        """
+        ALTER TABLE configurations
+            ADD COLUMN IF NOT EXISTS gemini_api_key TEXT DEFAULT NULL;
         """,
     ]
 
@@ -5519,7 +5563,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _oai_client_welcome = await _get_openai_client()
+        _oai_client_welcome = await _get_openai_client(_model)
         try:
             def _call_openai():
                 return _oai_client_welcome.chat.completions.create(
@@ -5868,7 +5912,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _oai_client_bg = await _get_openai_client()
+        _oai_client_bg = await _get_openai_client(_model)
         try:
             def _call_openai_bg():
                 return _oai_client_bg.chat.completions.create(
@@ -6950,7 +6994,7 @@ async def edge_function(func_name: str, request: Request):
             except Exception as e:
                 log_session.error("error fetching messages for report: %s", e, exc_info=True)
             # Pre-compress long participant messages to fit within model context budget
-            _oai_client_compress2 = await _get_openai_client()
+            _oai_client_compress2 = await _get_openai_client("gpt-4.1-nano")
             all_messages = _compress_messages_for_context(list(all_messages), model, _oai_client_compress2)
             conversation_text = ""
             for msg in all_messages:
@@ -7050,7 +7094,7 @@ async def edge_function(func_name: str, request: Request):
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _oai_client_main = await _get_openai_client()
+        _oai_client_main = await _get_openai_client(model)
         try:
             response = _oai_client_main.chat.completions.create(
                 model=model,
@@ -7833,7 +7877,7 @@ async def edge_function(func_name: str, request: Request):
                     except Exception:
                         pass
                     # Pre-compress long participant messages before building transcript
-                    _oai_client_compress3 = await _get_openai_client()
+                    _oai_client_compress3 = await _get_openai_client("gpt-4.1-nano")
                     all_msgs = _compress_messages_for_context(all_msgs, _pre_model, _oai_client_compress3)
                     transcript = ""
                     for msg in all_msgs:
@@ -7857,7 +7901,7 @@ async def edge_function(func_name: str, request: Request):
                     _report_prompt_tokens: Optional[int] = None
                     _report_completion_tokens: Optional[int] = None
                     _report_model_used: Optional[str] = None
-                    _oai_client_report = await _get_openai_client()
+                    _oai_client_report = await _get_openai_client(_report_model)
                     try:
                         resp = _oai_client_report.chat.completions.create(
                             model=_report_model,
@@ -8202,7 +8246,7 @@ async def edge_function(func_name: str, request: Request):
             _tw_model: Optional[str] = None
             if conv_lang_code != "en":
                 try:
-                    _client = await _get_openai_client()
+                    _client = await _get_openai_client(DEFAULT_AI_MODEL)
                     _resp = _client.chat.completions.create(
                         model=DEFAULT_AI_MODEL,
                         messages=[

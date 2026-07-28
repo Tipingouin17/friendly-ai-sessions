@@ -26,6 +26,7 @@ import {
 interface Config {
     id: number;
     default_gpt_token: string | null;
+    gemini_api_key: string | null;
     default_ai_model: string | null;
     default_currency: string;
     google_capcha_key: string | null;
@@ -95,6 +96,7 @@ export const SystemSettings = () => {
 
     const [form, setForm] = useState<Partial<Config>>({
         default_gpt_token: "",
+        gemini_api_key: "",
         default_ai_model: "gpt-4.1-mini",
         default_currency: "USD",
         google_capcha_key: "",
@@ -134,6 +136,7 @@ export const SystemSettings = () => {
         if (config) {
             setForm({
                 default_gpt_token: config.default_gpt_token ?? "",
+                gemini_api_key: config.gemini_api_key ?? "",
                 default_ai_model: config.default_ai_model ?? "gpt-4.1-mini",
                 default_currency: config.default_currency ?? "USD",
                 google_capcha_key: config.google_capcha_key ?? "",
@@ -164,6 +167,7 @@ export const SystemSettings = () => {
                 .from("configurations")
                 .update({
                     default_gpt_token: form.default_gpt_token || null,
+                    gemini_api_key: form.gemini_api_key || null,
                     default_ai_model: form.default_ai_model || "gpt-4.1-mini",
                     default_currency: form.default_currency ?? "USD",
                     google_capcha_key: form.google_capcha_key || null,
@@ -307,14 +311,35 @@ export const SystemSettings = () => {
                                         </div>
                                         <Separator />
                                         <div className="space-y-1.5">
-                                            <Label className="font-semibold">Default OpenAI API Token</Label>
-                                            <p className="text-xs text-gray-500">Used as the fallback API key for all AI sessions</p>
+                                            <Label className="font-semibold">OpenAI API Key</Label>
+                                            <p className="text-xs text-gray-500">Used for all GPT-4.1 models (Nano, Mini, Full). Required when any GPT model is selected.</p>
                                             <div className="relative">
                                                 <Input
                                                     type={showToken ? "text" : "password"}
                                                     value={form.default_gpt_token ?? ""}
                                                     onChange={e => handleChange("default_gpt_token", e.target.value)}
                                                     placeholder="sk-..."
+                                                    className="pr-10 font-mono text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowToken(v => !v)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-1.5">
+                                            <Label className="font-semibold">Google API Key</Label>
+                                            <p className="text-xs text-gray-500">Required when Gemini 2.5 Flash is selected. Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">aistudio.google.com</a>.</p>
+                                            <div className="relative">
+                                                <Input
+                                                    type={showToken ? "text" : "password"}
+                                                    value={form.gemini_api_key ?? ""}
+                                                    onChange={e => handleChange("gemini_api_key", e.target.value)}
+                                                    placeholder="AIza..."
                                                     className="pr-10 font-mono text-sm"
                                                 />
                                                 <button
@@ -624,6 +649,7 @@ export const SystemSettings = () => {
                                             if (config) {
                                                 setForm({
                                                     default_gpt_token: config.default_gpt_token ?? "",
+                                                    gemini_api_key: config.gemini_api_key ?? "",
                                                     default_currency: config.default_currency ?? "USD",
                                                     google_capcha_key: config.google_capcha_key ?? "",
                                                     secret_message: config.secret_message ?? "",

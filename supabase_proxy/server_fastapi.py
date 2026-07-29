@@ -4196,6 +4196,82 @@ async def admin_cost_analytics(request: Request):
 
 
 # ============================================================
+# Admin KPI analytics endpoint (used by AnalyticsDashboard)
+# ============================================================
+@app.get("/admin/analytics")
+async def admin_kpi_analytics(request: Request):
+    """Return all KPI data for the admin analytics dashboard. Requires admin JWT."""
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    try:
+        async with _pool.acquire() as conn:
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            fourteen_days_ago = datetime.utcnow() - timedelta(days=14)
+            kpi_row = dict(await conn.fetchrow(
+                "SELECT "
+                "(SELECT COUNT(*) FROM profiles) AS total_users, "
+                "(SELECT COUNT(*) FROM profiles WHERE updated_at >= $1) AS active_users, "
+                "(SELECT COUNT(*) FROM conversations) AS total_sessions, "
+                "(SELECT COUNT(*) FROM conversations WHERE is_session_ended IS NOT TRUE "
+                " AND session_started = TRUE AND (status = 'active' OR status IS NULL)) AS active_sessions, "
+                "(SELECT COUNT(*) FROM messages) AS total_messages, "
+                "(SELECT COALESCE(AVG(session_duration_minutes), 0) FROM conversations "
+                " WHERE session_duration_minutes > 0) AS avg_session_duration",
+                thirty_days_ago
+            ))
+            recent_profiles = [dict(r) for r in await conn.fetch(
+                "SELECT id, created_at FROM profiles WHERE created_at >= $1", thirty_days_ago
+            )]
+            total_users = int(kpi_row["total_users"] or 0)
+            baseline = total_users - len(recent_profiles)
+            user_growth = []
+            for i in range(29, -1, -1):
+                day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
+                day_end = day_start + timedelta(days=1)
+                joined = sum(1 for p in recent_profiles if p["created_at"].replace(tzinfo=None) < day_end)
+                user_growth.append({"date": day_start.strftime("%b %d"), "users": baseline + joined})
+            facilitator_rows = [dict(r) for r in await conn.fetch(
+                "SELECT COALESCE(s.title, 'Other') AS name, COUNT(*) AS count "
+                "FROM conversations c LEFT JOIN sessions s ON c.sessions_id = s.id "
+                "GROUP BY s.title ORDER BY count DESC LIMIT 10"
+            )]
+            sessions_by_facilitator = [{"name": r["name"], "count": int(r["count"])} for r in facilitator_rows]
+            plan_rows = [dict(r) for r in await conn.fetch(
+                "SELECT COALESCE(pl.title, 'Free') AS name, COUNT(pr.id) AS value "
+                "FROM profiles pr LEFT JOIN plans pl ON pr.current_plan_id = pl.id "
+                "GROUP BY pl.title HAVING COUNT(pr.id) > 0 ORDER BY value DESC"
+            )]
+            plan_distribution = [{"name": r["name"], "value": int(r["value"])} for r in plan_rows]
+            recent_convs = [dict(r) for r in await conn.fetch(
+                "SELECT id, created_at FROM conversations WHERE created_at >= $1", fourteen_days_ago
+            )]
+            recent_msgs = [dict(r) for r in await conn.fetch(
+                "SELECT id, created_at FROM messages WHERE created_at >= $1", fourteen_days_ago
+            )]
+            recent_activity = []
+            for i in range(13, -1, -1):
+                day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
+                day_end = day_start + timedelta(days=1)
+                sessions_count = sum(1 for c in recent_convs if day_start <= c["created_at"].replace(tzinfo=None) < day_end)
+                messages_count = sum(1 for m in recent_msgs if day_start <= m["created_at"].replace(tzinfo=None) < day_end)
+                recent_activity.append({"date": day_start.strftime("%b %d"), "sessions": sessions_count, "messages": messages_count})
+        return {
+            "totalUsers": total_users,
+            "activeUsers": int(kpi_row["active_users"] or 0),
+            "totalSessions": int(kpi_row["total_sessions"] or 0),
+            "activeSessions": int(kpi_row["active_sessions"] or 0),
+            "totalMessages": int(kpi_row["total_messages"] or 0),
+            "avgSessionDuration": round(float(kpi_row["avg_session_duration"] or 0)),
+            "userGrowth": user_growth,
+            "sessionsByFacilitator": sessions_by_facilitator,
+            "planDistribution": plan_distribution,
+            "recentActivity": recent_activity,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
+# ============================================================
 # Admin marketing analytics endpoint
 # ============================================================
 

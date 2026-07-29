@@ -4,7 +4,7 @@
  * Admin component for the AIfacilitator application.
  */
 import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { EDGE_FUNCTION_URL } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     TrendingUp,
@@ -32,7 +32,7 @@ import {
     Legend,
     ResponsiveContainer
 } from "recharts";
-import { format, subDays, startOfDay } from "date-fns";
+
 
 interface AnalyticsData {
     totalUsers: number;
@@ -54,121 +54,25 @@ export const AnalyticsDashboard = () => {
     const { data: analytics, isLoading } = useQuery({
         queryKey: ['admin-analytics'],
         queryFn: async (): Promise<AnalyticsData> => {
-            // ── Batch all reads into 6 parallel requests ──────────────────────────
-            // Previously this fired 44+ sequential HTTP requests (N+1 loops).
-            // Now we fetch the raw data once and group client-side.
-            const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-            const fourteenDaysAgo = subDays(new Date(), 14).toISOString();
-
-            const [
-                { count: totalUsers },
-                { count: activeUsers },
-                { data: allConversations },
-                { count: totalMessages },
-                { data: recentProfilesRaw },
-                { data: recentConversationsRaw },
-                { data: recentMessagesRaw },
-                { data: plansData },
-            ] = await Promise.all([
-                api.from('profiles').select('*', { count: 'exact', head: true }),
-                api.from('profiles').select('*', { count: 'exact', head: true }).gte('updated_at', thirtyDaysAgo),
-                api.from('conversations').select('id, created_at, status, is_session_ended, session_started, session_duration_minutes, sessions_id, sessions(title), user_id'),
-                api.from('messages').select('*', { count: 'exact', head: true }),
-                api.from('profiles').select('id, created_at, current_plan_id').gte('created_at', thirtyDaysAgo),
-                api.from('conversations').select('id, created_at').gte('created_at', fourteenDaysAgo),
-                api.from('messages').select('id, created_at').gte('created_at', fourteenDaysAgo),
-                api.from('plans').select('id, title'),
-            ]);
-
-            // ── Derived KPIs ───────────────────────────────────────────────────────
-            const activeSessions = (allConversations || []).filter(c => (
-                !c.is_session_ended &&
-                c.session_started === true &&
-                (c.status === 'active' || c.status == null)
-            )).length;
-            const totalSessions = (allConversations || []).length;
-
-            const validDurations = (allConversations || []).filter(
-                c => c.session_duration_minutes && c.session_duration_minutes > 0
-            );
-            const avgSessionDuration = validDurations.length > 0
-                ? validDurations.reduce((sum, c) => sum + (c.session_duration_minutes || 0), 0) / validDurations.length
-                : 0;
-
-            // ── User growth: cumulative count per day for last 30 days ─────────────
-            // We only have profiles created in the last 30 days; for days before that
-            // we use (totalUsers - recentProfilesRaw.length) as the baseline.
-            const baseline = (totalUsers || 0) - (recentProfilesRaw?.length || 0);
-            const userGrowthData: Array<{ date: string; users: number }> = [];
-            for (let i = 29; i >= 0; i--) {
-                const dayStart = startOfDay(subDays(new Date(), i));
-                const dayEnd = startOfDay(subDays(new Date(), i - 1));
-                const dayStartMs = dayStart.getTime();
-                const dayEndMs = dayEnd.getTime();
-                const joinedByDay = (recentProfilesRaw || []).filter(p => {
-                    const t = new Date(p.created_at).getTime();
-                    return t < dayEndMs;
-                }).length;
-                userGrowthData.push({
-                    date: format(dayStart, 'MMM dd'),
-                    users: baseline + joinedByDay
-                });
-                void dayStartMs; // suppress unused warning
-            }
-
-            // ── Sessions by facilitator ────────────────────────────────────────────
-            const facilitatorCounts: Record<string, number> = {};
-            (allConversations || []).forEach(session => {
-                const title = (session.sessions as { title?: string } | null)?.title || 'Other';
-                facilitatorCounts[title] = (facilitatorCounts[title] || 0) + 1;
+            // Fetch all KPI data from the backend in a single authenticated call.
+            // This bypasses Supabase RLS restrictions and works correctly on all devices.
+            const token = (() => {
+                try {
+                    const session = JSON.parse(localStorage.getItem("mf_session") || "null");
+                    return session?.access_token || "";
+                } catch { return ""; }
+            })();
+            const res = await fetch(`${EDGE_FUNCTION_URL}/admin/analytics`, {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+                },
             });
-            const sessionsByFacilitator = Object.entries(facilitatorCounts)
-                .map(([name, count]) => ({ name, count }))
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 10);
-
-            // ── Plan distribution (uses current_plan_id + plans table, not role) ──
-            const planCountMap: Record<string, number> = {};
-            const allProfilesForPlan = await api.from('profiles').select('current_plan_id');
-            (allProfilesForPlan.data || []).forEach(p => {
-                const plan = (plansData || []).find(pl => pl.id === p.current_plan_id);
-                const label = plan?.title || 'Free';
-                planCountMap[label] = (planCountMap[label] || 0) + 1;
-            });
-            const planDistribution = Object.entries(planCountMap)
-                .filter(([, v]) => v > 0)
-                .map(([name, value]) => ({ name, value }));
-
-            // ── Recent activity: last 14 days, client-side grouping ────────────────
-            const recentActivity: Array<{ date: string; sessions: number; messages: number }> = [];
-            for (let i = 13; i >= 0; i--) {
-                const dayStart = startOfDay(subDays(new Date(), i));
-                const dayEnd = startOfDay(subDays(new Date(), i - 1));
-                const dayStartMs = dayStart.getTime();
-                const dayEndMs = dayEnd.getTime();
-                const sessions = (recentConversationsRaw || []).filter(c => {
-                    const t = new Date(c.created_at).getTime();
-                    return t >= dayStartMs && t < dayEndMs;
-                }).length;
-                const messages = (recentMessagesRaw || []).filter(m => {
-                    const t = new Date(m.created_at).getTime();
-                    return t >= dayStartMs && t < dayEndMs;
-                }).length;
-                recentActivity.push({ date: format(dayStart, 'MMM dd'), sessions, messages });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err?.detail || `Analytics request failed with HTTP ${res.status}`);
             }
-
-            return {
-                totalUsers: totalUsers || 0,
-                activeUsers: activeUsers || 0,
-                totalSessions,
-                activeSessions,
-                totalMessages: totalMessages || 0,
-                avgSessionDuration: Math.round(avgSessionDuration),
-                userGrowth: userGrowthData,
-                sessionsByFacilitator,
-                planDistribution,
-                recentActivity
-            };
+            return res.json() as Promise<AnalyticsData>;
         },
         staleTime: 60_000,       // 1 minute — matches refetchInterval
         refetchInterval: 60_000,

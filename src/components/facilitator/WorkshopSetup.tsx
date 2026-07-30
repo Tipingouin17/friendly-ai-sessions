@@ -4,6 +4,7 @@
  * Facilitator component for the AIfacilitator application.
  */
 
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { createLogger } from '@/utils/debugLogger';
 
@@ -27,6 +28,112 @@ const formatLocalDateTime = (date: Date) => {
 const parseLocalDateTime = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+// ── SessionTimePicker ────────────────────────────────────────────────────────
+interface SessionTimePickerProps {
+  scheduledStartAt: Date;
+  setScheduledStartAt: (date: Date) => void;
+  minScheduleValue: string;
+  scheduleValidation: { isValid: boolean; isScheduled: boolean; error?: string };
+}
+
+const SessionTimePicker: React.FC<SessionTimePickerProps> = ({
+  scheduledStartAt,
+  setScheduledStartAt,
+  minScheduleValue,
+  scheduleValidation,
+}) => {
+  // Determine if the user has explicitly chosen a future scheduled time
+  // (more than 1 minute ahead of now)
+  const isScheduledMode = React.useMemo(() => {
+    const diffMs = scheduledStartAt.getTime() - Date.now();
+    return diffMs > 60_000;
+  }, [scheduledStartAt]);
+
+  const handleSelectNow = () => {
+    setScheduledStartAt(new Date());
+  };
+
+  const handleSelectSchedule = () => {
+    // Default to tomorrow at the same hour, rounded to the next 30 min
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setMinutes(tomorrow.getMinutes() >= 30 ? 60 : 30, 0, 0);
+    setScheduledStartAt(tomorrow);
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-3 text-left">Session date and time</label>
+
+      {/* Toggle pill */}
+      <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1 mb-3">
+        <button
+          type="button"
+          onClick={handleSelectNow}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+            !isScheduledMode
+              ? 'bg-white shadow-sm text-indigo-700 border border-indigo-200'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span className="text-base">⚡</span>
+          Start Now
+        </button>
+        <button
+          type="button"
+          onClick={handleSelectSchedule}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+            isScheduledMode
+              ? 'bg-white shadow-sm text-indigo-700 border border-indigo-200'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <CalendarClock className="h-4 w-4" />
+          Schedule for Later
+        </button>
+      </div>
+
+      {/* Datetime picker — only shown in scheduled mode */}
+      {isScheduledMode && (
+        <div className="space-y-1.5">
+          <div className="relative">
+            <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="datetime-local"
+              value={(() => {
+                const pad = (n: number) => String(n).padStart(2, '0');
+                const d = scheduledStartAt;
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+              })()}
+              min={minScheduleValue}
+              onChange={(e) => {
+                const parsed = new Date(e.target.value);
+                if (!Number.isNaN(parsed.getTime())) setScheduledStartAt(parsed);
+              }}
+              className={scheduleValidation.isValid ? 'pl-10' : 'border-red-500 pl-10'}
+              aria-invalid={!scheduleValidation.isValid}
+            />
+          </div>
+          {!scheduleValidation.isValid ? (
+            <p className="text-xs text-red-600" role="alert">{scheduleValidation.error}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Participants will receive an invitation with this scheduled time.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* "Start Now" confirmation hint */}
+      {!isScheduledMode && (
+        <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          The session will open immediately when you click <strong>Create Session</strong>.
+        </p>
+      )}
+    </div>
+  );
 };
 
 interface WorkshopSetupProps {
@@ -160,29 +267,12 @@ export const WorkshopSetup = ({
       </div>
 
 
-      <div>
-        <label className="block text-sm font-medium mb-2 text-left">
-          Session date and time
-        </label>
-        <div className="relative">
-          <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="datetime-local"
-            value={formatLocalDateTime(scheduledStartAt)}
-            min={minScheduleValue}
-            onChange={(e) => setScheduledStartAt(parseLocalDateTime(e.target.value))}
-            className={scheduleValidation.isValid ? "pl-10" : "border-red-500 pl-10"}
-            aria-invalid={!scheduleValidation.isValid}
-          />
-        </div>
-        {!scheduleValidation.isValid ? (
-          <p className="text-xs text-red-600 mt-1" role="alert">{scheduleValidation.error}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-1">
-            Leave as now to start immediately, or choose a future date to schedule invitations.
-          </p>
-        )}
-      </div>
+      <SessionTimePicker
+        scheduledStartAt={scheduledStartAt}
+        setScheduledStartAt={setScheduledStartAt}
+        minScheduleValue={minScheduleValue}
+        scheduleValidation={scheduleValidation}
+      />
 
       <div>
         <label className="block text-sm font-medium mb-2 text-left">

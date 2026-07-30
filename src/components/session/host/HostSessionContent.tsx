@@ -23,6 +23,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { useWebRTCSession, type WebRTCPeerStatus } from "@/hooks/useWebRTCSession";
 import { inferFacilitatorVoiceGender } from "@/utils/facilitatorVoiceGender";
 import { getScheduledStartIso, getSessionInvitations } from "@/services/facilitatorService";
+import { useFacilitatorVoice } from "@/hooks/facilitator/useFacilitatorVoice";
+import { usePhase3RuntimeSettings } from "@/hooks/facilitator/usePhase3RuntimeSettings";
 
 interface HostSessionContentProps {
   sessionMessages: Message[];
@@ -256,6 +258,42 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }), [facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title]);
   const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
+
+  // ── Autoplay unlock (browser blocks audio until a user gesture) ──
+  const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+  const handleUnlockAudio = React.useCallback(() => {
+    // Resume any suspended AudioContext and mark audio as unlocked
+    try {
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
+    } catch (_) { /* ignore */ }
+    setAudioUnlocked(true);
+  }, []);
+
+  // ── Host-side ElevenLabs TTS (so the host hears the AI facilitator voice) ──
+  const { data: phase3Settings } = usePhase3RuntimeSettings();
+  const facilitatorId = (conversationData?.sessions?.facilitator_details as { id?: number } | undefined)?.id ?? null;
+  const hostVoiceRuntime = useFacilitatorVoice({
+    conversationId: currentConversationId,
+    facilitatorId,
+    enabled: Boolean(phase3Settings?.tts_avatar_enabled) && audioUnlocked,
+    defaultVoiceId: phase3Settings?.tts_default_voice_id ?? null,
+    voiceGender: facilitatorVoiceGender,
+    lipSyncEnabled: false,
+    persistEvents: false,
+    ttsProvider: 'server',
+    ttsEndpoint: `${import.meta.env.VITE_API_URL ?? ''}/api/tts/synthesize`,
+  });
+
+  // Trigger TTS whenever a new assistant message arrives
+  const lastSpokenMessageIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!latestSessionMessage || latestSessionMessage.sender !== 'assistant') return;
+    const msgId = String(latestSessionMessage.id ?? latestSessionMessage.timestamp ?? latestSessionMessage.content?.slice(0, 20));
+    if (lastSpokenMessageIdRef.current === msgId) return;
+    lastSpokenMessageIdRef.current = msgId;
+    void hostVoiceRuntime.speak({ text: latestSessionMessage.content ?? '', messageId: msgId });
+  }, [latestSessionMessage, hostVoiceRuntime]);
   const respondedParticipantIds = new Set(
     sessionMessages
       .filter((message) => message.sender === "user" && message.participant)
@@ -269,7 +307,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       avatarUrl: facilitatorDetails?.profile_picture,
       isAI: true,
       isMuted: false,
-      isSpeaking: latestSessionMessage?.sender === 'assistant',
+      isSpeaking: hostVoiceRuntime.isSpeaking || latestSessionMessage?.sender === 'assistant',
       accentColor: 'rgb(217 119 6)',
     },
     {
@@ -563,6 +601,26 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 
   return (
     <div className="host-session-cockpit session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900">
+      {/* Audio unlock banner — shown until the host clicks to enable audio */}
+      {!audioUnlocked && (
+        <div
+          role="banner"
+          className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-indigo-600 px-4 py-2.5 text-white shadow-md transition-opacity hover:bg-indigo-700"
+          onClick={handleUnlockAudio}
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <span className="text-lg">🔊</span>
+            <span>Click here to enable AI facilitator voice audio</span>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
+            onClick={handleUnlockAudio}
+          >
+            Enable Audio
+          </button>
+        </div>
+      )}
       <PanelGroup direction="horizontal" className="min-h-0 flex-1 gap-0 rounded-[1.5rem]">
         <Panel defaultSize={20} minSize={16} maxSize={24} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-l-[1.5rem]">

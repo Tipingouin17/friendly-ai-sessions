@@ -342,6 +342,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   submitModeInput,
 }) => {
   const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
+  const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+  const handleUnlockAudio = React.useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
+    } catch (_) { /* ignore */ }
+    setAudioUnlocked(true);
+  }, []);
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
@@ -440,7 +448,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const voiceRuntime = useFacilitatorVoice({
     conversationId,
     facilitatorId,
-    enabled: viewMode === 'participant' && ttsAvatarEnabled,
+    enabled: viewMode === 'participant' && ttsAvatarEnabled && audioUnlocked,
     defaultVoiceId: facilitatorPersonaConfig?.voice_id ?? phase3Settings?.tts_default_voice_id ?? null,
     voiceGender: facilitatorVoiceGender,
     lipSyncEnabled: phase3Settings?.tts_lip_sync_enabled ?? true,
@@ -450,6 +458,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     locale: facilitatorPersonaConfig?.locale ?? phase3Settings?.speech_default_language ?? conversationData?.language ?? null,
     speakingBehavior: personaSpeakingBehavior,
     animationPreset: facilitatorPersonaConfig?.animation_preset ?? null,
+    // Force ElevenLabs server TTS via Railway backend
+    ttsProvider: 'server',
+    ttsEndpoint: `${import.meta.env.VITE_API_URL ?? ''}/api/tts/synthesize`,
   });
   const runtimeAvatarState = voiceRuntime.isSpeaking
     ? voiceRuntime.runtimeAvatarState
@@ -1054,6 +1065,26 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
+      {/* Audio unlock banner — shown until the participant clicks to enable audio */}
+      {!audioUnlocked && viewMode === 'participant' && ttsAvatarEnabled && (
+        <div
+          role="banner"
+          className="shrink-0 flex cursor-pointer items-center justify-between gap-3 bg-indigo-600 px-4 py-2.5 text-white transition-opacity hover:bg-indigo-700"
+          onClick={handleUnlockAudio}
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <span className="text-lg">🔊</span>
+            <span>Tap here to hear the AI facilitator’s voice</span>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
+            onClick={handleUnlockAudio}
+          >
+            Enable Audio
+          </button>
+        </div>
+      )}
       <div className="session-glass-panel shrink-0 rounded-b-[1.5rem] border-b border-slate-200 px-3 py-2 md:rounded-b-[1.75rem] md:px-4 md:py-3">
         <div className="flex items-center gap-3">
           <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600 sm:flex">

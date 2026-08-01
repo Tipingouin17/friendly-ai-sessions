@@ -351,10 +351,18 @@ const InputFooter = ({
     <div className="mx-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm sm:mx-4">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-600"><Mic className="h-5 w-5" /></div>
-          <div className="min-w-0"><p className="text-sm font-black text-slate-950">You're live — speak freely</p><p className="text-xs leading-relaxed text-slate-600">The AI facilitator is listening to the room. Everyone can speak at the same time.</p></div>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ${isRecording ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.3)]' : 'border-indigo-200 bg-indigo-50 text-indigo-600'}`}>
+            <Mic className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-950">You're live — speak freely</p>
+            <p className="text-xs leading-relaxed text-slate-600">The AI facilitator is listening to the room. Everyone can speak at the same time.</p>
+          </div>
         </div>
-        <QuickReactions onReaction={onReaction} compact={isMobile} />
+        <div className="flex items-center gap-2">
+          <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Click mic to speak'} />
+          <QuickReactions onReaction={onReaction} compact={isMobile} />
+        </div>
       </div>
       <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
     </div>

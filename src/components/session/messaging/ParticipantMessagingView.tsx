@@ -1017,6 +1017,38 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     });
   }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveModeKey, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
 
+  // ── Auto-mic: activate speech recognition when open discussion mode opens ──
+  // When the facilitator transitions to open discussion, the floor is open for
+  // everyone to speak simultaneously. We auto-start the browser speech recognition
+  // so participants don't need to manually click the mic button — mirroring the
+  // experience of a real meeting where the mic is live when the floor is open.
+  const prevModeKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const prevMode = prevModeKeyRef.current;
+    prevModeKeyRef.current = effectiveModeKey;
+    // Only auto-start on the transition INTO open_discussion, not on every render
+    if (!isOpenDiscussionMode) return;
+    if (prevMode === 'open_discussion') return;
+    if (!speechStackEnabled) return;
+    if (aiIsSpeaking) return; // wait until AI finishes speaking
+    if (isRecording) return; // already recording
+    // Small delay so the mode transition animation completes first
+    const timer = window.setTimeout(() => {
+      setIsRecording(true);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [isOpenDiscussionMode, speechStackEnabled, aiIsSpeaking, isRecording, setIsRecording, effectiveModeKey]);
+
+  // ── Open discussion conversation history ─────────────────────────────────
+  // Show the last few messages from the open discussion in the main view so
+  // participants can see what has been said (their own messages + others).
+  const openDiscussionRecentMessages = React.useMemo(() => {
+    if (!isOpenDiscussionMode) return [];
+    return [...messages]
+      .filter((m) => !m.isPrivateToHost)
+      .slice(-8);
+  }, [isOpenDiscussionMode, messages]);
+
   const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile') => {
     const isMobilePanel = panelVariant === 'mobile';
 
@@ -1176,6 +1208,39 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     Your answer has been submitted. Waiting for the rest of the room before the facilitator continues.
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Open discussion: live conversation history in the main view */}
+            {isOpenDiscussionMode && openDiscussionRecentMessages.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Live discussion</p>
+                {openDiscussionRecentMessages.map((msg) => {
+                  const isOwn = msg.sender === 'user' && (effectiveParticipantId === 0 || String(msg.participant) === String(effectiveParticipantId));
+                  const isAI = msg.sender === 'assistant';
+                  const displayName = isAI
+                    ? (facilitatorName || 'AI Facilitator')
+                    : isOwn
+                    ? 'You'
+                    : resolveParticipantDisplayName(msg.participant, (msg as Message & { displayName?: string }).displayName || msg.name);
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
+                        isAI
+                          ? 'session-soft-panel border-indigo-100 bg-indigo-50/60 text-slate-800'
+                          : isOwn
+                          ? 'ml-4 border border-emerald-200 bg-emerald-50 text-emerald-900'
+                          : 'border border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <span className={`mr-2 text-[11px] font-bold ${
+                        isAI ? 'text-indigo-600' : isOwn ? 'text-emerald-700' : 'text-slate-500'
+                      }`}>{displayName}</span>
+                      {msg.content}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

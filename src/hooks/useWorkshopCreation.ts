@@ -186,6 +186,7 @@ export const useWorkshopCreation = () => {
     scheduledStartAt,
     setScheduledStartAt,
     isScheduled,
+    scheduleValidation,
     isSubmitting,
     handleNext,
     handlePrevious,

@@ -77,6 +77,7 @@ const AIfacilitators = () => {
     scheduledStartAt,
     setScheduledStartAt,
     isScheduled,
+    scheduleValidation,
     handleNext,
     handlePrevious,
     handleSubmit,
@@ -181,7 +182,9 @@ const AIfacilitators = () => {
   const isStep3Disabled = !selectedWorkshop; // Only disable if no workshop selected
 
   // Only creation of new sessions should be blocked by session limit
-  const isSubmitDisabled = hasReachedSessionLimit || !selectedWorkshop || !description.trim() || !agreed;
+  const isSubmitDisabled = hasReachedSessionLimit || !selectedWorkshop || !description.trim() || !agreed
+    || (isScheduled && !scheduleValidation.isValid)
+    || (durationMinutes !== "" && (Number(durationMinutes) < 5 || Number(durationMinutes) > 480));
 
   return (
     <div className="min-h-screen bg-gray-50">

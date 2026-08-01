@@ -286,9 +286,14 @@ export const WorkshopSetup = ({
           onChange={(e) => setDurationMinutes(e.target.value === "" ? "" : Number(e.target.value))}
           placeholder={defaultDurationMinutes ? `Default: ${defaultDurationMinutes} min` : "e.g. 60 (optional)"}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          The AI facilitator will begin wrapping up 10 minutes before the session ends.
-        </p>
+        {durationMinutes !== "" && (Number(durationMinutes) < 5 || Number(durationMinutes) > 480) && (
+          <p className="text-xs text-red-600 mt-1" role="alert">Duration must be between 5 and 480 minutes.</p>
+        )}
+        {(durationMinutes === "" || (Number(durationMinutes) >= 5 && Number(durationMinutes) <= 480)) && (
+          <p className="text-xs text-muted-foreground mt-1">
+            The AI facilitator will begin wrapping up 10 minutes before the session ends.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -300,5 +305,6 @@ export const WorkshopSetup = ({
           </a>
         </label>
       </div>
-    </div>;
+    </div>
+  );
 };

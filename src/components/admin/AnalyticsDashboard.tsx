@@ -15,8 +15,11 @@ import {
     Calendar,
     Zap,
     Target,
-    Loader2
+    Loader2,
+    AlertCircle,
+    RefreshCw
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
     LineChart,
     Line,
@@ -51,7 +54,7 @@ const COLORS = ['#8b5cf6', '#6366f1', '#3b82f6', '#06b6d4', '#10b981'];
 
 export const AnalyticsDashboard = () => {
     // Fetch analytics data
-    const { data: analytics, isLoading } = useQuery({
+    const { data: analytics, isLoading, isError, error, refetch } = useQuery({
         queryKey: ['admin-analytics'],
         queryFn: async (): Promise<AnalyticsData> => {
             // Fetch all KPI data from the backend in a single authenticated call.
@@ -87,6 +90,23 @@ export const AnalyticsDashboard = () => {
         );
     }
 
+    if (isError) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-4 p-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+                    <AlertCircle className="h-7 w-7 text-red-500" />
+                </div>
+                <div>
+                    <p className="text-base font-semibold text-slate-900">Failed to load analytics</p>
+                    <p className="mt-1 text-sm text-slate-500">{(error as Error)?.message || 'Could not reach the analytics server. Check that the Railway backend is running.'}</p>
+                </div>
+                <Button variant="outline" onClick={() => void refetch()} className="gap-2">
+                    <RefreshCw className="h-4 w-4" /> Retry
+                </Button>
+            </div>
+        );
+    }
+
     const planDistribution = analytics?.planDistribution ?? [];
     const planDistributionTotal = planDistribution.reduce((sum, item) => sum + item.value, 0);
     const hasPlanDistribution = planDistributionTotal > 0;
@@ -109,7 +129,7 @@ export const AnalyticsDashboard = () => {
                             Total Users
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-purple-900">
-                            {analytics?.totalUsers.toLocaleString()}
+                            {analytics?.totalUsers?.toLocaleString() ?? '—'}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -126,7 +146,7 @@ export const AnalyticsDashboard = () => {
                             Total Sessions
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-indigo-900">
-                            {analytics?.totalSessions.toLocaleString()}
+                            {analytics?.totalSessions?.toLocaleString() ?? '—'}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -143,7 +163,7 @@ export const AnalyticsDashboard = () => {
                             Total Messages
                         </CardDescription>
                         <CardTitle className="text-3xl font-bold text-blue-900">
-                            {analytics?.totalMessages.toLocaleString()}
+                            {analytics?.totalMessages?.toLocaleString() ?? '—'}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>

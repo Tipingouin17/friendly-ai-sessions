@@ -342,12 +342,16 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   submitModeInput,
 }) => {
   const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
-  const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+  const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
+    // Persist across re-renders within the same browser tab session
+    try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
+  });
   const handleUnlockAudio = React.useCallback(() => {
     try {
       const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
     } catch (_) { /* ignore */ }
+    try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
     setAudioUnlocked(true);
   }, []);
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
@@ -1023,21 +1027,39 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   // so participants don't need to manually click the mic button — mirroring the
   // experience of a real meeting where the mic is live when the floor is open.
   const prevModeKeyRef = React.useRef<string | null>(null);
+  // pendingAutoMicRef: set to true when we enter open_discussion while AI is
+  // still speaking. Effect 2 fires the mic once AI stops.
+  const pendingAutoMicRef = React.useRef(false);
+  // Effect 1: detect the mode transition INTO open_discussion
   React.useEffect(() => {
     const prevMode = prevModeKeyRef.current;
     prevModeKeyRef.current = effectiveModeKey;
-    // Only auto-start on the transition INTO open_discussion, not on every render
-    if (!isOpenDiscussionMode) return;
-    if (prevMode === 'open_discussion') return;
+    if (!isOpenDiscussionMode) { pendingAutoMicRef.current = false; return; }
+    if (prevMode === 'open_discussion') return; // already in this mode, no transition
     if (!speechStackEnabled) return;
-    if (aiIsSpeaking) return; // wait until AI finishes speaking
-    if (isRecording) return; // already recording
-    // Small delay so the mode transition animation completes first
-    const timer = window.setTimeout(() => {
-      setIsRecording(true);
-    }, 800);
+    if (isRecording) return;
+    if (aiIsSpeaking) {
+      // Defer: AI is still speaking, fire mic once it stops
+      pendingAutoMicRef.current = true;
+      return;
+    }
+    pendingAutoMicRef.current = false;
+    const timer = window.setTimeout(() => setIsRecording(true), 800);
     return () => window.clearTimeout(timer);
-  }, [isOpenDiscussionMode, speechStackEnabled, aiIsSpeaking, isRecording, setIsRecording, effectiveModeKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveModeKey, isOpenDiscussionMode, speechStackEnabled]);
+  // Effect 2: fire deferred auto-mic once AI finishes speaking
+  React.useEffect(() => {
+    if (!pendingAutoMicRef.current) return;
+    if (aiIsSpeaking) return;
+    if (!isOpenDiscussionMode || !speechStackEnabled || isRecording) {
+      pendingAutoMicRef.current = false;
+      return;
+    }
+    pendingAutoMicRef.current = false;
+    const timer = window.setTimeout(() => setIsRecording(true), 800);
+    return () => window.clearTimeout(timer);
+  }, [aiIsSpeaking, isOpenDiscussionMode, speechStackEnabled, isRecording, setIsRecording]);
 
   // ── Open discussion conversation history ─────────────────────────────────
   // Show the last few messages from the open discussion in the main view so

@@ -260,13 +260,16 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
 
   // ── Autoplay unlock (browser blocks audio until a user gesture) ──
-  const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+  const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
+    try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
+  });
   const handleUnlockAudio = React.useCallback(() => {
     // Resume any suspended AudioContext and mark audio as unlocked
     try {
       const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
     } catch (_) { /* ignore */ }
+    try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
     setAudioUnlocked(true);
   }, []);
 

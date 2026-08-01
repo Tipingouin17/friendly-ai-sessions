@@ -36,11 +36,72 @@ export const normalizePersonName = (input: string): string => {
   return normalizeWhitespace(sanitizeInput(input));
 };
 
-export const validateEmailAddress = (email: string): { isValid: boolean; error?: string } => {
+/**
+ * Known typo domains mapped to their correct counterpart.
+ * Catches the most common registration mistakes (e.g. "gamil.com" → "gmail.com").
+ */
+const TYPO_DOMAIN_MAP: Record<string, string> = {
+  // Gmail typos
+  'gamil.com': 'gmail.com',
+  'gmial.com': 'gmail.com',
+  'gmai.com': 'gmail.com',
+  'gmali.com': 'gmail.com',
+  'gmaill.com': 'gmail.com',
+  'gmail.co': 'gmail.com',
+  'gmail.cm': 'gmail.com',
+  'gmail.con': 'gmail.com',
+  'gmail.cmo': 'gmail.com',
+  'gnail.com': 'gmail.com',
+  'gmailcom': 'gmail.com',
+  // Yahoo typos
+  'yaho.com': 'yahoo.com',
+  'yahooo.com': 'yahoo.com',
+  'yahoo.co': 'yahoo.com',
+  'yahoo.cm': 'yahoo.com',
+  'yhoo.com': 'yahoo.com',
+  'yhaoo.com': 'yahoo.com',
+  // Hotmail typos
+  'hotmial.com': 'hotmail.com',
+  'hotmal.com': 'hotmail.com',
+  'hotmai.com': 'hotmail.com',
+  'hotmil.com': 'hotmail.com',
+  'hotmail.co': 'hotmail.com',
+  'hotmail.cm': 'hotmail.com',
+  // Outlook typos
+  'outloook.com': 'outlook.com',
+  'outlok.com': 'outlook.com',
+  'outloo.com': 'outlook.com',
+  'outlook.co': 'outlook.com',
+  // iCloud typos
+  'iclould.com': 'icloud.com',
+  'icoud.com': 'icloud.com',
+  'iclod.com': 'icloud.com',
+};
+
+/**
+ * Returns the suggested correction if the domain looks like a typo, or null otherwise.
+ */
+export const getSuggestedEmailDomain = (email: string): string | null => {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex === -1) return null;
+  const domain = email.slice(atIndex + 1).toLowerCase();
+  return TYPO_DOMAIN_MAP[domain] ?? null;
+};
+
+export const validateEmailAddress = (email: string): { isValid: boolean; error?: string; suggestion?: string } => {
   const normalized = sanitizeInput(email).toLowerCase();
   if (!normalized) return { isValid: false, error: 'Email address is required' };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+  if (!/^[^s@]+@[^s@]+\.[^s@]+$/.test(normalized)) {
     return { isValid: false, error: 'Please enter a valid email address' };
+  }
+  const suggestion = getSuggestedEmailDomain(normalized);
+  if (suggestion) {
+    const local = normalized.split('@')[0];
+    return {
+      isValid: false,
+      error: `Did you mean ${local}@${suggestion}? Please check your email address.`,
+      suggestion: `${local}@${suggestion}`,
+    };
   }
   return { isValid: true };
 };

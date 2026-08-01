@@ -4,11 +4,11 @@
  * Auth component for the AIfacilitator application.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
-import { getPasswordRequirementStatuses } from '@/utils/inputValidation';
+import { getPasswordRequirementStatuses, validateEmailAddress } from '@/utils/inputValidation';
 
 interface SignupFormFieldsProps {
   name: string;
@@ -41,9 +41,35 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailWarning, setEmailWarning] = useState<{ message: string; suggestion: string | null } | null>(null);
 
   const isDisabled = isLoading || attempts >= 3;
   const passwordRequirements = getPasswordRequirementStatuses(password);
+
+  // Validate email on blur — catches typos and invalid domains
+  const handleEmailBlur = useCallback(() => {
+    if (!email) { setEmailWarning(null); return; }
+    const result = validateEmailAddress(email);
+    if (!result.isValid && result.error) {
+      setEmailWarning({ message: result.error, suggestion: result.suggestion ?? null });
+    } else {
+      setEmailWarning(null);
+    }
+  }, [email]);
+
+  // Clear warning as soon as the user starts editing again
+  const handleEmailChange = useCallback((value: string) => {
+    onEmailChange(value);
+    if (emailWarning) setEmailWarning(null);
+  }, [onEmailChange, emailWarning]);
+
+  // One-click fix: replace the typo with the suggested address
+  const applyEmailSuggestion = useCallback(() => {
+    if (emailWarning?.suggestion) {
+      onEmailChange(emailWarning.suggestion);
+      setEmailWarning(null);
+    }
+  }, [emailWarning, onEmailChange]);
 
   return (
     <div className="space-y-4">
@@ -84,9 +110,11 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
           type="email" 
           placeholder="Enter your email" 
           value={email} 
-          onChange={e => onEmailChange(e.target.value)} 
-          className={errors.email ? "border-red-500" : ""}
-          aria-invalid={!!errors.email}
+          onChange={e => handleEmailChange(e.target.value)}
+          onBlur={handleEmailBlur}
+          className={errors.email || emailWarning ? "border-red-500" : ""}
+          aria-invalid={!!errors.email || !!emailWarning}
+          aria-describedby={emailWarning ? "email-warning" : undefined}
           autoComplete="email"
           maxLength={255}
           disabled={isDisabled}
@@ -94,6 +122,26 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
         />
         {errors.email && (
           <p className="text-red-500 text-xs mt-1" role="alert">{errors.email}</p>
+        )}
+        {!errors.email && emailWarning && (
+          <div
+            id="email-warning"
+            className="mt-1 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800"
+            role="alert"
+          >
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <span className="flex-1">{emailWarning.message}</span>
+            {emailWarning.suggestion && (
+              <button
+                type="button"
+                onClick={applyEmailSuggestion}
+                className="ml-1 shrink-0 font-semibold underline hover:text-amber-900 focus:outline-none"
+                aria-label={`Use ${emailWarning.suggestion} instead`}
+              >
+                Fix it
+              </button>
+            )}
+          </div>
         )}
       </div>
       <div>

@@ -195,7 +195,8 @@ export const WorkshopSetup = ({
   const minScheduleValue = formatLocalDateTime(new Date());
   const scheduleValidation = validateScheduledStartAt(scheduledStartAt);
   
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium mb-2 text-left">
           Number of participants 

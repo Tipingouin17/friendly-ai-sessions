@@ -129,7 +129,7 @@ export function useHostParticipantManager({
       try {
         const { data, error: err } = await api
           .from('conversations')
-          .select('current_participants, participants, session_started, session_started_at')
+          .select('current_participants, participants, session_started')
           .eq('id', conversationId)
           .single();
         if (err) { setPollingActive(false); setIsConnected(false); return; }
@@ -233,7 +233,7 @@ export function useHostParticipantManager({
     try {
       const { data, error: err } = await api
         .from('conversations')
-        .select('current_participants, participants, session_started, session_started_at')
+        .select('current_participants, participants, session_started')
         .eq('id', conversationId)
         .single();
       if (err) { logger.category('admin', 'Error fetching initial data:', err); return; }

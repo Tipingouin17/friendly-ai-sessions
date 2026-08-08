@@ -1976,6 +1976,48 @@ async def run_startup_migrations() -> None:
         ALTER TABLE configurations
             ADD COLUMN IF NOT EXISTS gemini_api_key TEXT DEFAULT NULL;
         """,
+        # 2026-08-08: Assign ElevenLabs voice IDs to facilitator personas based on
+        # gender_presentation and tone so each facilitator has a distinct,
+        # character-appropriate neural voice. Voice IDs are from the ElevenLabs
+        # pre-built voice library (English, high-quality):
+        #   Rachel  21m00Tcm4TlvDq8ikWAM  warm feminine, calm/coaching
+        #   Domi    AZnzlk1XvdvUeBnXmlld  energetic feminine, creative/innovative
+        #   Bella   EXAVITQu4vr4xnSDxMaL  soft feminine, empathetic default
+        #   Elli    MF3mGyEYCl7XYWbV9V6O  clear feminine, professional/executive
+        #   Adam    pNInz6obpgDQGcFmaJgB  authoritative masculine, strategic
+        #   Antoni  ErXwobaYiN019PkySvjV  warm masculine, agile/collaborative
+        #   Josh    TxGEqnHWrfWFTfGW9XjX  deep masculine, executive default
+        #   Arnold  VR6AewLTigWG4xSOukaG  strong masculine, energetic/creative
+        """
+        UPDATE facilitator_persona_configs
+        SET voice_id = CASE
+            WHEN voice_id IS NOT NULL AND voice_id <> '' THEN voice_id
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                 AND lower(COALESCE(tone,'')) ~ '(calm|warm|coach|empath|support|nurtur)'
+                 THEN '21m00Tcm4TlvDq8ikWAM'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                 AND lower(COALESCE(tone,'')) ~ '(energet|creat|innovat|dynamic|vibrant)'
+                 THEN 'AZnzlk1XvdvUeBnXmlld'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                 AND lower(COALESCE(tone,'')) ~ '(profess|execut|formal|authorit|precise)'
+                 THEN 'MF3mGyEYCl7XYWbV9V6O'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                 THEN 'EXAVITQu4vr4xnSDxMaL'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                 AND lower(COALESCE(tone,'')) ~ '(strateg|execut|formal|authorit|leader)'
+                 THEN 'pNInz6obpgDQGcFmaJgB'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                 AND lower(COALESCE(tone,'')) ~ '(agile|collab|team|coach|facilit|warm)'
+                 THEN 'ErXwobaYiN019PkySvjV'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                 AND lower(COALESCE(tone,'')) ~ '(energet|creat|innovat|dynamic|catalyst)'
+                 THEN 'VR6AewLTigWG4xSOukaG'
+            WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                 THEN 'TxGEqnHWrfWFTfGW9XjX'
+            ELSE '21m00Tcm4TlvDq8ikWAM'
+        END
+        WHERE voice_id IS NULL OR voice_id = '';
+        """,
     ]
 
     try:
@@ -9324,7 +9366,31 @@ async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
         text = text[:MAX_CHARS]
         logger.warning("[TTS] Text truncated to %d chars", MAX_CHARS)
 
-    voice_id = (req.voice_id or _DEFAULT_ELEVEN_VOICE_ID).strip()
+    # Resolve voice_id: explicit request > DB persona lookup > default
+    # When conversation_id is provided and no explicit voice_id is given,
+    # look up the facilitator's persona voice_id from the DB so each
+    # facilitator speaks with their own character-appropriate voice.
+    resolved_voice_id: Optional[str] = (req.voice_id or "").strip() or None
+    if not resolved_voice_id and req.conversation_id and _pool:
+        try:
+            async with _pool.acquire() as _vc:
+                _vrow = await _vc.fetchrow(
+                    """
+                    SELECT fpc.voice_id
+                    FROM conversations c
+                    JOIN sessions s ON s.id = c.sessions_id
+                    JOIN facilitator_persona_configs fpc ON fpc.facilitator_id = s.facilitator
+                    WHERE c.id = $1
+                    LIMIT 1
+                    """,
+                    int(req.conversation_id),
+                )
+            if _vrow and _vrow["voice_id"]:
+                resolved_voice_id = str(_vrow["voice_id"]).strip() or None
+                logger.debug("[TTS] Using persona voice_id=%s for conv %s", resolved_voice_id, req.conversation_id)
+        except Exception as _ve:
+            logger.warning("[TTS] Could not look up persona voice_id: %s", _ve)
+    voice_id = resolved_voice_id or _DEFAULT_ELEVEN_VOICE_ID
     model_id = (req.model_id or _DEFAULT_ELEVEN_MODEL).strip()
     settings = _VOICE_PRESET_SETTINGS.get(req.voice_preset or "", _DEFAULT_VOICE_SETTINGS)
 

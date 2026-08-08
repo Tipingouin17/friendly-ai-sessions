@@ -23,7 +23,7 @@ export const useWorkshopCreation = () => {
   const [language, setLanguage] = useState("en");
   const [agreed, setAgreed] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState<number | "">("");
-  const [scheduledStartAt, setScheduledStartAt] = useState<Date>(() => new Date());
+  const [scheduledStartAt, setScheduledStartAt] = useState<Date | undefined>(undefined);
   /** True while the session creation API call (+ OpenAI) is in-flight */
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();

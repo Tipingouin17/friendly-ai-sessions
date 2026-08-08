@@ -32,8 +32,8 @@ const parseLocalDateTime = (value: string) => {
 
 // ── SessionTimePicker ────────────────────────────────────────────────────────
 interface SessionTimePickerProps {
-  scheduledStartAt: Date;
-  setScheduledStartAt: (date: Date) => void;
+  scheduledStartAt: Date | undefined;
+  setScheduledStartAt: (date: Date | undefined) => void;
   minScheduleValue: string;
   scheduleValidation: { isValid: boolean; isScheduled: boolean; error?: string };
 }
@@ -44,15 +44,16 @@ const SessionTimePicker: React.FC<SessionTimePickerProps> = ({
   minScheduleValue,
   scheduleValidation,
 }) => {
-  // Determine if the user has explicitly chosen a future scheduled time
-  // (more than 1 minute ahead of now)
+  // isScheduledMode: true only when user has picked a future date (> 1 min ahead)
   const isScheduledMode = React.useMemo(() => {
+    if (!scheduledStartAt) return false;
     const diffMs = scheduledStartAt.getTime() - Date.now();
     return diffMs > 60_000;
   }, [scheduledStartAt]);
 
   const handleSelectNow = () => {
-    setScheduledStartAt(new Date());
+    // Pass undefined so validateScheduledStartAt returns { isValid: true, isScheduled: false }
+    setScheduledStartAt(undefined);
   };
 
   const handleSelectSchedule = () => {
@@ -96,7 +97,7 @@ const SessionTimePicker: React.FC<SessionTimePickerProps> = ({
       </div>
 
       {/* Datetime picker — only shown in scheduled mode */}
-      {isScheduledMode && (
+      {isScheduledMode && scheduledStartAt && (
         <div className="space-y-1.5">
           <div className="relative">
             <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -148,8 +149,8 @@ interface WorkshopSetupProps {
   durationMinutes: number | "";
   setDurationMinutes: (v: number | "") => void;
   defaultDurationMinutes?: number | null;
-  scheduledStartAt: Date;
-  setScheduledStartAt: (date: Date) => void;
+  scheduledStartAt: Date | undefined;
+  setScheduledStartAt: (date: Date | undefined) => void;
 }
 
 export const WorkshopSetup = ({

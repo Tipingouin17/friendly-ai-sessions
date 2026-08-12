@@ -7819,11 +7819,11 @@ async def edge_function(func_name: str, request: Request):
                                 conv_id,
                                 participant_row_id,
                                 participant_slot,
-                                json.dumps({
+                                {
                                     "submitted": True,
                                     "input_type": input_type,
                                     "content": input_content,
-                                }),
+                                },
                             )
                         active_row = await conn.fetchrow(
                             "SELECT * FROM session_active_modes WHERE id = $1 AND conversation_id = $2",

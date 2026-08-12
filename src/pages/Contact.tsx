@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
-import api from "@/lib/api";
+import api, { EDGE_FUNCTION_URL } from "@/lib/api";
 import PageHead from "@/components/PageHead";
 import { trackContactLead } from "@/lib/tracking";
 
@@ -74,12 +74,10 @@ const Contact = () => {
   useEffect(() => {
     const fetchContactInfo = async () => {
       try {
-        const { data, error } = await api
-          .from("configurations")
-          .select("contact_email, business_hours, contact_address")
-          .limit(1)
-          .single();
-        if (!error && data) {
+        const response = await fetch(`${EDGE_FUNCTION_URL}/api/contact-info`);
+        if (!response.ok) return;
+        const data = await response.json() as ContactInfo;
+        if (data) {
           setContactInfo({
             contact_email: (data as ContactInfo).contact_email || DEFAULT_CONTACT_INFO.contact_email,
             business_hours: (data as ContactInfo).business_hours || DEFAULT_CONTACT_INFO.business_hours,

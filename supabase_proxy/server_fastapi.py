@@ -10,8 +10,7 @@ import re
 import csv
 import io
 import zipfile
-import xml.etree.ElementTree as ET
-from xml.sax.saxutils import escape as _xml_escape
+from defusedxml import ElementTree as ET
 import json
 import uuid
 import time
@@ -2018,6 +2017,35 @@ async def run_startup_migrations() -> None:
         END
         WHERE voice_id IS NULL OR voice_id = '';
         """,
+        # 2026-08-12: Repair legacy OpenAI voice labels (for example, shimmer)
+        # that cannot be used as ElevenLabs voice IDs. Preserve any explicit
+        # ElevenLabs/custom mapping; map only legacy or unset providers.
+        """
+        UPDATE facilitator_persona_configs
+        SET
+            voice_id = CASE
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                     AND lower(COALESCE(tone,'')) ~ '(energet|creat|innovat|dynamic|vibrant)'
+                    THEN 'AZnzlk1XvdvUeBnXmlld'
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                     AND lower(COALESCE(tone,'')) ~ '(profess|execut|formal|authorit|precise)'
+                    THEN 'MF3mGyEYCl7XYWbV9V6O'
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%feminine%'
+                    THEN '21m00Tcm4TlvDq8ikWAM'
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                     AND lower(COALESCE(tone,'')) ~ '(strateg|execut|formal|authorit|leader)'
+                    THEN 'pNInz6obpgDQGcFmaJgB'
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                     AND lower(COALESCE(tone,'')) ~ '(energet|creat|innovat|dynamic|catalyst)'
+                    THEN 'VR6AewLTigWG4xSOukaG'
+                WHEN lower(COALESCE(gender_presentation,'')) LIKE '%masculine%'
+                    THEN 'ErXwobaYiN019PkySvjV'
+                ELSE '21m00Tcm4TlvDq8ikWAM'
+            END,
+            voice_provider = 'elevenlabs',
+            updated_at = NOW()
+        WHERE COALESCE(lower(voice_provider), '') NOT IN ('elevenlabs', 'custom_elevenlabs');
+        """,
     ]
 
     try:
@@ -2394,6 +2422,32 @@ TABLE_PK: Dict[str, str] = {
 }
 
 
+_SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _require_safe_sql_identifier(identifier: str, label: str = "identifier") -> str:
+    """Return a validated SQL identifier or reject unsafe HTTP-controlled input.
+
+    Values are always bound as query parameters; table, column, order, and conflict
+    identifiers cannot be parameterized by PostgreSQL and therefore require this
+    strict allowlist-style syntax guard before interpolation.
+    """
+    candidate = str(identifier or "").strip()
+    if not _SQL_IDENTIFIER_RE.fullmatch(candidate):
+        raise HTTPException(status_code=400, detail=f"Invalid {label}")
+    return candidate
+
+
+def _require_safe_payload_keys(data: Any) -> None:
+    """Validate object keys used as SQL columns in REST insert/update paths."""
+    rows = data if isinstance(data, list) else [data]
+    for row in rows:
+        if not isinstance(row, dict) or not row:
+            raise HTTPException(status_code=400, detail="Expected a non-empty JSON object")
+        for key in row.keys():
+            _require_safe_sql_identifier(str(key), "column name")
+
+
 def _split_top_level(s: str, sep: str = ",") -> List[str]:
     """Split string on sep only at depth 0 (not inside parentheses)."""
     parts, depth, current = [], 0, []
@@ -2430,7 +2484,8 @@ def _parse_select(select_str: str):
         if "(" in part:
             joins.append(part)
         else:
-            cols.append(part.split(":")[0].strip())
+            column = part.split(":")[0].strip()
+            cols.append(_require_safe_sql_identifier(column, "select column"))
     return cols or ["*"], joins
 
 
@@ -2447,13 +2502,14 @@ def _parse_join(join_str: str):
     m = re.match(r'^(?:(\w+):)?([\w]+)(?:![\w]+)?\((.+)\)$', join_str, re.DOTALL)
     if not m:
         return None
-    alias, table, cols_str = m.group(1), m.group(2), m.group(3)
+    alias, table, cols_str = m.group(1), _require_safe_sql_identifier(m.group(2), "join table"), m.group(3)
     sub_cols, sub_joins = [], []
     for part in _split_top_level(cols_str):
         if "(" in part:
             sub_joins.append(part)
         else:
-            sub_cols.append(part.split(":")[0].strip())
+            column = part.split(":")[0].strip()
+            sub_cols.append(_require_safe_sql_identifier(column, "join select column"))
     return {
         "table": table,
         "alias": alias or table,
@@ -2614,6 +2670,7 @@ def build_where(params: dict, table: str | None = None):
     for key, value in params.items():
         if key in ("select", "order", "limit", "offset", "on_conflict", "columns", "count"):
             continue
+        key = _require_safe_sql_identifier(key, "filter column")
         if value.startswith("eq."):
             wc.append(f'"{key}" = %s'); wv.append(_filter_value(key, value[3:]))
         elif value.startswith("neq."):
@@ -2657,16 +2714,18 @@ def build_order(order_str: str) -> str:
     if not order_str:
         return ""
     parts = []
-    for o in order_str.split(","):
-        o = o.strip()
-        if ".desc" in o:
-            col = o.replace(".desc", "").replace(".nullslast", "").replace(".nullsfirst", "")
-            parts.append(f'"{col}" DESC')
-        elif ".asc" in o:
-            col = o.replace(".asc", "").replace(".nullslast", "").replace(".nullsfirst", "")
-            parts.append(f'"{col}" ASC')
-        else:
-            parts.append(f'"{o}" ASC')
+    for raw_order in order_str.split(","):
+        order_item = raw_order.strip()
+        match = re.fullmatch(
+            r"([A-Za-z_][A-Za-z0-9_]*)(?:\.(asc|desc))?(?:\.(?:nullsfirst|nullslast))?",
+            order_item,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            raise HTTPException(status_code=400, detail="Invalid order column")
+        col = _require_safe_sql_identifier(match.group(1), "order column")
+        direction = (match.group(2) or "asc").upper()
+        parts.append(f'"{col}" {direction}')
     return "ORDER BY " + ", ".join(parts)
 
 
@@ -3962,16 +4021,36 @@ async def rpc_call(func_name: str, request: Request):
 #   - Participants may read conversations for their session via
 #     X-Join-Token (needed to display session info during the session).
 # ============================================================
-SECURE_CONV_TABLES = {"messages", "session_participants", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
+SECURE_CONV_TABLES = {
+    "messages", "session_participants", "session_events", "facilitator_tts_events",
+    "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs",
+}
 SECURE_REPORT_TABLES = {"session_reports"}
 # referrals is filtered by referrer_id (the owner column) just like user_id tables
 SECURE_DIRECT_TABLES = {"conversations", "sessions", "facilitators", "referrals", "login_activity", "user_sessions", "security_audit_log", "activation_events", "activation_user_state"}
 # Tables participants may read with a valid join token (no auth required)
-PARTICIPANT_READABLE_TABLES = {"messages", "session_participants", "conversations", "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
+PARTICIPANT_READABLE_TABLES = {
+    "messages", "session_participants", "session_events", "facilitator_tts_events", "conversations",
+    "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs",
+}
 # Toolbox tables are publicly readable through the proxy for runtime UX, but mutations are admin-only.
 TOOLBOX_TABLES = {"facilitator_tools", "facilitator_tool_access"}
 MODE_ADMIN_TABLES = {"facilitation_modes", "facilitator_mode_access"}
 MODE_SESSION_TABLES = {"session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs"}
+# Only these known application tables may be addressed through the generic REST
+# compatibility layer. New tables require an explicit policy review before exposure.
+REST_EXPOSED_TABLES = {
+    "conversations", "sessions", "messages", "profiles", "facilitators", "plans", "faqs",
+    "session_participants", "session_events", "session_reports", "facilitator_tts_events",
+    "session_active_modes", "session_mode_events", "mode_participant_states", "mode_inputs",
+    "facilitation_modes", "facilitator_mode_access", "facilitator_tool_access", "facilitator_tools",
+    "plan_restrictions", "referrals", "login_activity", "user_sessions", "security_audit_log",
+    "contact_form", "configurations", "facilitator_persona_configs",
+}
+# These tables contain operational configuration, credentials, or administrative
+# correspondence and must never be queried directly by an anonymous session.
+REST_ADMIN_ONLY_TABLES = {"configurations", "facilitator_persona_configs", "contact_form"}
+
 MODE_EVENT_TYPES = {
     "mode.recommended",
     "mode.started",
@@ -4008,6 +4087,36 @@ async def _validate_join_token(token: str, conversation_id: str | int | None, co
         return row is not None
     except Exception:
         return False
+
+
+async def _require_conversation_access(request: Request, conversation_id: int) -> None:
+    """Require host/admin ownership or a valid participant join token for a session."""
+    try:
+        conv_id = int(conversation_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="A valid conversation_id is required")
+
+    user = get_current_user(request)
+    if user:
+        role = str(user.get("role") or "")
+        user_id = user.get("sub") or user.get("id")
+        if role == "admin":
+            return
+        if user_id:
+            async with _pool.acquire() as conn:
+                owns_conversation = await conn.fetchval(
+                    'SELECT EXISTS(SELECT 1 FROM public."conversations" WHERE id = $1 AND user_id = $2::uuid)',
+                    conv_id,
+                    str(user_id),
+                )
+            if owns_conversation:
+                return
+
+    join_token = request.headers.get("x-join-token", "").strip()
+    if join_token and await _validate_join_token(join_token, conv_id):
+        return
+    raise HTTPException(status_code=403, detail="Session access is required")
+
 
 # ============================================================
 # Public endpoint to re-run safe startup migrations (all idempotent)
@@ -6139,6 +6248,9 @@ async def revoke_user_session(session_id: str, request: Request):
 
 @app.api_route("/rest/v1/{table}", methods=["GET", "POST", "PATCH", "DELETE", "HEAD"])
 async def rest_table(table: str, request: Request):
+    table = _require_safe_sql_identifier(table, "table name")
+    if table not in REST_EXPOSED_TABLES:
+        raise HTTPException(status_code=404, detail="Unknown REST resource")
     params = dict(request.query_params)
     # ── Comprehensive request logging ────────────────────────────────────────
     _has_token = bool(request.headers.get("x-join-token", "").strip())
@@ -6166,6 +6278,13 @@ async def rest_table(table: str, request: Request):
     requesting_user_role = requesting_user.get("role", "") if requesting_user else ""
     is_admin_user = requesting_user_role == "admin"
     join_token_header = request.headers.get("x-join-token", "").strip()
+
+    if table in REST_ADMIN_ONLY_TABLES and not is_admin_user:
+        log_req.warning("REST %s /%s -> 403 (admin-only resource)", request.method, table)
+        return JSONResponse(
+            content={"error": "Admin access required", "code": "PGRST403"},
+            status_code=403,
+        )
 
     if request.method in ("POST", "PATCH", "DELETE") and table in TOOLBOX_TABLES and not is_admin_user:
         log_req.warning(
@@ -6405,6 +6524,7 @@ async def rest_table(table: str, request: Request):
                 data = await request.json()
                 if not data:
                     raise HTTPException(400, "No data")
+                _require_safe_payload_keys(data)
                 # H8: Validate join token for unauthenticated participant POST to messages.
                 # This prevents ghost participants from a previous conversation from
                 # accidentally posting messages to a different conversation.
@@ -6524,6 +6644,8 @@ async def rest_table(table: str, request: Request):
                     cols = ", ".join([f'"{k}"' for k in data.keys()])
                     ph = ", ".join([f'${i+1}' for i in range(len(data))])
                     oc = params.get("on_conflict", "")
+                    if oc:
+                        oc = _require_safe_sql_identifier(oc, "conflict column")
                     sql = f'INSERT INTO public."{table}" ({cols}) VALUES ({ph})'
                     if oc:
                         uc = ", ".join([f'"{k}" = EXCLUDED."{k}"' for k in data.keys() if k != oc])
@@ -6584,6 +6706,7 @@ async def rest_table(table: str, request: Request):
                 data = await request.json()
                 if not data:
                     raise HTTPException(400, "No data")
+                _require_safe_payload_keys(data)
                 wc, wv = build_where(params, table)
                 # Build SET clause with asyncpg positional params
                 set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(data.keys())]
@@ -9083,33 +9206,30 @@ class SSEManager:
 sse_manager = SSEManager()
 
 
+@app.post("/api/realtime-ticket")
+async def issue_realtime_ticket(request: Request):
+    """Issue a short-lived ticket for one authorized conversation SSE stream."""
+    try:
+        body = await request.json()
+        conversation_id = int(body.get("conversation_id"))
+    except (TypeError, ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="A valid conversation_id is required")
+    await _require_conversation_access(request, conversation_id)
+    ticket = jwt.encode(
+        {"scope": "realtime", "conversation_id": conversation_id, "exp": int(time.time()) + 300},
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+    return {"ticket": ticket, "expires_in": 300}
+
+
 @app.get("/realtime/v1/sse")
-async def realtime_sse(request: Request, apikey: str = Query(""), topic: str = Query("")):
+async def realtime_sse(request: Request, topic: str = Query(""), ticket: str = Query("")):
     """
     SSE endpoint — CDN-compatible alternative to WebSocket realtime.
     The client subscribes by passing ?apikey=<jwt>&topic=<channel_topic>.
     Events are delivered as SSE data lines containing JSON payloads.
     """
-    # Validate JWT (same logic as WebSocket endpoint)
-    sse_auth_ok = False
-    if apikey:
-        try:
-            jwt.decode(apikey, JWT_SECRET, algorithms=["HS256"])
-            sse_auth_ok = True
-        except Exception:
-            try:
-                payload_unverified = jwt.decode(
-                    apikey,
-                    options={"verify_signature": False},
-                    algorithms=["HS256"]
-                )
-                if payload_unverified.get("role") == "anon":
-                    sse_auth_ok = True
-            except Exception:
-                pass
-    if not sse_auth_ok:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
-
     # Extract conversation_id from topic (same regex logic as WebSocket handler)
     conv_id: Optional[str] = None
     if topic:
@@ -9131,6 +9251,13 @@ async def realtime_sse(request: Request, apikey: str = Query(""), topic: str = Q
 
     if not conv_id:
         return JSONResponse({"error": "could not extract conversation_id from topic"}, status_code=400)
+
+    try:
+        ticket_claims = jwt.decode(ticket, JWT_SECRET, algorithms=["HS256"])
+        if ticket_claims.get("scope") != "realtime" or str(ticket_claims.get("conversation_id")) != str(conv_id):
+            raise ValueError("ticket scope mismatch")
+    except Exception:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     q = await sse_manager.subscribe(conv_id, topic)
     log_ws.info("[sse] client connected topic=%r conv=%s", topic, conv_id)
@@ -9336,6 +9463,37 @@ _DEFAULT_VOICE_SETTINGS: Dict = {"stability": 0.65, "similarity_boost": 0.78, "s
 _DEFAULT_ELEVEN_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
 _DEFAULT_ELEVEN_MODEL    = "eleven_turbo_v2_5"
 
+@app.get("/api/runtime-settings")
+async def api_runtime_settings():
+    """Return only non-sensitive runtime feature settings needed by session clients."""
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT speech_stack_enabled, speech_default_language, tts_avatar_enabled,
+                   tts_default_voice_id, tts_lip_sync_enabled, facilitation_analytics_enabled
+            FROM configurations
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT 1
+            """
+        )
+    return serialize_row(dict(row)) if row else {}
+
+
+@app.get("/api/contact-info")
+async def api_contact_info():
+    """Return only the public business contact fields configured by an administrator."""
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT contact_email, business_hours, contact_address
+            FROM configurations
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT 1
+            """
+        )
+    return serialize_row(dict(row)) if row else {}
+
+
 @app.post("/api/tts/synthesize")
 async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
     """
@@ -9359,6 +9517,9 @@ async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
     text = (req.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
+    if req.conversation_id is None:
+        raise HTTPException(status_code=400, detail="conversation_id is required for TTS synthesis")
+    await _require_conversation_access(request, int(req.conversation_id))
 
     # Hard cap to prevent runaway audio generation (~35 s at average speaking rate)
     MAX_CHARS = 2500
@@ -9366,32 +9527,32 @@ async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
         text = text[:MAX_CHARS]
         logger.warning("[TTS] Text truncated to %d chars", MAX_CHARS)
 
-    # Resolve voice_id: explicit request > DB persona lookup > default
-    # When conversation_id is provided and no explicit voice_id is given,
-    # look up the facilitator's persona voice_id from the DB so each
-    # facilitator speaks with their own character-appropriate voice.
-    resolved_voice_id: Optional[str] = (req.voice_id or "").strip() or None
-    if not resolved_voice_id and req.conversation_id and _pool:
-        try:
-            async with _pool.acquire() as _vc:
-                _vrow = await _vc.fetchrow(
-                    """
-                    SELECT fpc.voice_id
-                    FROM conversations c
-                    JOIN sessions s ON s.id = c.sessions_id
-                    JOIN facilitator_persona_configs fpc ON fpc.facilitator_id = s.facilitator
-                    WHERE c.id = $1
-                    LIMIT 1
-                    """,
-                    int(req.conversation_id),
-                )
-            if _vrow and _vrow["voice_id"]:
-                resolved_voice_id = str(_vrow["voice_id"]).strip() or None
-                logger.debug("[TTS] Using persona voice_id=%s for conv %s", resolved_voice_id, req.conversation_id)
-        except Exception as _ve:
-            logger.warning("[TTS] Could not look up persona voice_id: %s", _ve)
+    # Persona voices are selected server-side from the conversation's facilitator.
+    # Do not trust a client-supplied voice_id: it could bypass persona policy or
+    # request arbitrary paid provider voices.
+    resolved_voice_id: Optional[str] = None
+    try:
+        async with _pool.acquire() as _vc:
+            _vrow = await _vc.fetchrow(
+                """
+                SELECT fpc.voice_id
+                FROM conversations c
+                JOIN sessions s ON s.id = c.sessions_id
+                LEFT JOIN facilitator_persona_configs fpc ON fpc.facilitator_id = s.facilitator
+                WHERE c.id = $1
+                LIMIT 1
+                """,
+                int(req.conversation_id),
+            )
+        if _vrow and _vrow["voice_id"]:
+            resolved_voice_id = str(_vrow["voice_id"]).strip() or None
+            logger.debug("[TTS] Resolved persona voice for conversation %s", req.conversation_id)
+    except Exception as _ve:
+        logger.warning("[TTS] Could not look up persona voice: %s", _ve)
     voice_id = resolved_voice_id or _DEFAULT_ELEVEN_VOICE_ID
-    model_id = (req.model_id or _DEFAULT_ELEVEN_MODEL).strip()
+    # Keep model choice server-controlled to prevent clients from selecting an
+    # unreviewed or higher-cost provider model.
+    model_id = _DEFAULT_ELEVEN_MODEL
     settings = _VOICE_PRESET_SETTINGS.get(req.voice_preset or "", _DEFAULT_VOICE_SETTINGS)
 
     payload = {
@@ -9410,6 +9571,14 @@ async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
     try:
         async with _httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(eleven_url, json=payload, headers=headers)
+            # A stale or deleted custom persona voice must not result in silence.
+            # Retry the verified platform fallback once, then surface an error only
+            # if ElevenLabs itself remains unavailable.
+            if resp.status_code != 200 and voice_id != _DEFAULT_ELEVEN_VOICE_ID:
+                logger.warning("[TTS] Persona voice unavailable for conversation %s; retrying verified fallback", req.conversation_id)
+                voice_id = _DEFAULT_ELEVEN_VOICE_ID
+                eleven_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+                resp = await client.post(eleven_url, json=payload, headers=headers)
         if resp.status_code != 200:
             logger.error("[TTS] ElevenLabs returned %d: %s", resp.status_code, resp.text[:200])
             raise HTTPException(status_code=502, detail=f"TTS provider error: {resp.status_code}")

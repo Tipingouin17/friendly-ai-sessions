@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { EDGE_FUNCTION_URL } from '@/lib/api';
 import type { Phase3RuntimeSettings } from '@/types/facilitator';
 
 export const DEFAULT_PHASE3_RUNTIME_SETTINGS: Required<Phase3RuntimeSettings> = {
@@ -37,19 +37,17 @@ export function usePhase3RuntimeSettings(conversationLanguage?: string | null) {
   return useQuery<Required<Phase3RuntimeSettings>, Error>({
     queryKey: ['phase3-runtime-settings', conversationLanguage ?? 'default'],
     queryFn: async () => {
-      const { data, error } = await api
-        .from<ConfigurationRow>('configurations')
-        .select('speech_stack_enabled,speech_default_language,tts_avatar_enabled,tts_default_voice_id,tts_lip_sync_enabled,facilitation_analytics_enabled')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('[usePhase3RuntimeSettings] Falling back to defaults:', error.message);
+      try {
+        const response = await fetch(`${EDGE_FUNCTION_URL}/api/runtime-settings`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error(`Runtime settings request failed (${response.status})`);
+        const data = await response.json() as ConfigurationRow;
+        return normalizePhase3RuntimeSettings(data, conversationLanguage);
+      } catch (error) {
+        console.warn('[usePhase3RuntimeSettings] Falling back to defaults:', error);
         return normalizePhase3RuntimeSettings(null, conversationLanguage);
       }
-
-      return normalizePhase3RuntimeSettings(data, conversationLanguage);
     },
     staleTime: 60_000,
     gcTime: 5 * 60_000,

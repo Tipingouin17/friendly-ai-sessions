@@ -36,18 +36,36 @@ function getRailwayRealtimeProxyPrefix(): string | null {
   return null;
 }
 
-function buildRealtimeSseUrl(topic: string, token: string | null): string {
-  // Native EventSource cannot send custom Authorization headers. Keep user JWTs
-  // out of browser-visible URLs by authenticating the SSE transport with the
-  // public anon key only; session/participant authorization remains enforced by
-  // the REST endpoints that create or mutate data.
-  const params = new URLSearchParams({
-    apikey: token || ANON_KEY,
-    topic,
-  });
+function buildRealtimeSseUrl(topic: string, ticket: string): string {
+  // EventSource cannot send custom headers. The one-use browser-visible query
+  // value is therefore a short-lived, conversation-scoped ticket—not a JWT or
+  // a reusable public API key.
+  const params = new URLSearchParams({ topic, ticket });
   const proxyPrefix = getRailwayRealtimeProxyPrefix();
   const baseUrl = proxyPrefix ? `${proxyPrefix}/realtime/v1/sse` : `${API_URL}/realtime/v1/sse`;
   return `${baseUrl}?${params.toString()}`;
+}
+
+async function requestRealtimeTicket(topic: string): Promise<string> {
+  const conversationId = extractRealtimeConversationId(topic);
+  if (!conversationId) throw new Error('Realtime topics must include a conversation id');
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  } else {
+    const joinToken = getJoinToken(conversationId);
+    if (joinToken) headers['X-Join-Token'] = joinToken;
+  }
+
+  const response = await fetch(`${API_URL}/api/realtime-ticket`, {
+    method: 'POST', headers, body: JSON.stringify({ conversation_id: Number(conversationId) }),
+  });
+  if (!response.ok) throw new Error(`Realtime ticket request failed (${response.status})`);
+  const payload = await response.json() as { ticket?: string };
+  if (!payload.ticket) throw new Error('Realtime ticket response was missing a ticket');
+  return payload.ticket;
 }
 
 function extractRealtimeConversationId(topic: string): string | null {
@@ -964,6 +982,7 @@ class SharedSSEManager {
   private channels = new Map<string, RealtimeChannelImpl>();
   private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private retryCounts = new Map<string, number>();
+  private opening = new Set<string>();
   private readonly MAX_BACKOFF_MS = 60_000;
 
   register(ch: RealtimeChannelImpl): void {
@@ -995,14 +1014,17 @@ class SharedSSEManager {
     this.channels.delete(ch.getTopic());
   }
 
-  private openSSE(topic: string): void {
-    if (this.connections.has(topic)) return;
-    const token = ANON_KEY;
-    const url = buildRealtimeSseUrl(topic, token);
-    const es = new EventSource(url);
-    this.connections.set(topic, es);
+  private async openSSE(topic: string): Promise<void> {
+    if (this.connections.has(topic) || this.opening.has(topic)) return;
+    this.opening.add(topic);
+    try {
+      const ticket = await requestRealtimeTicket(topic);
+      if (!this.channels.has(topic)) return;
+      const url = buildRealtimeSseUrl(topic, ticket);
+      const es = new EventSource(url);
+      this.connections.set(topic, es);
 
-    es.onmessage = (ev: MessageEvent) => {
+      es.onmessage = (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
         const msgTopic = (msg.topic as string) || topic;
@@ -1032,12 +1054,19 @@ class SharedSSEManager {
       } catch { /* ignore */ }
     };
 
-    es.onerror = () => {
+      es.onerror = () => {
+        const ch = this.channels.get(topic);
+        ch?.notifyStatus("CHANNEL_ERROR");
+        this.closeSSE(topic);
+        this.scheduleReconnect(topic);
+      };
+    } catch {
       const ch = this.channels.get(topic);
       ch?.notifyStatus("CHANNEL_ERROR");
-      this.closeSSE(topic);
       this.scheduleReconnect(topic);
-    };
+    } finally {
+      this.opening.delete(topic);
+    }
   }
 
   private closeSSE(topic: string): void {

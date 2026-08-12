@@ -91,7 +91,7 @@ export const getSuggestedEmailDomain = (email: string): string | null => {
 export const validateEmailAddress = (email: string): { isValid: boolean; error?: string; suggestion?: string } => {
   const normalized = sanitizeInput(email).toLowerCase();
   if (!normalized) return { isValid: false, error: 'Email address is required' };
-  if (!/^[^s@]+@[^s@]+\.[^s@]+$/.test(normalized)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
     return { isValid: false, error: 'Please enter a valid email address' };
   }
   const suggestion = getSuggestedEmailDomain(normalized);

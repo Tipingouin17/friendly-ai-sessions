@@ -5,6 +5,7 @@ import type { FacilitatorAvatarState } from '@/types/facilitator';
 import type { FacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { recordTtsEvent, updateTtsEventStatus } from '@/services/facilitator/phase3RuntimeService';
 import { buildBrowserTtsSynthesisResult } from '@/services/facilitator/phase3ProviderAdapters';
+import { api, getJoinToken } from '@/lib/api';
 
 // ── Feature-flag env vars (set at build time via Vercel/Railway env) ──────────
 // VITE_PHASE3_TTS_PROVIDER=server  → use server neural TTS (ElevenLabs via Railway)
@@ -262,9 +263,18 @@ async function fetchServerTts(params: {
     metadata: params.metadata ?? undefined,
   };
 
+  const { data: { session } } = await api.auth.getSession();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  } else {
+    const joinToken = getJoinToken(params.conversationId != null ? String(params.conversationId) : null);
+    if (joinToken) headers['X-Join-Token'] = joinToken;
+  }
+
   const response = await fetch(params.endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(20_000),
   });

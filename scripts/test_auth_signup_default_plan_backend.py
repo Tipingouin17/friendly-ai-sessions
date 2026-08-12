@@ -55,6 +55,12 @@ class FakeConnection:
             return self.db.free_plan
         raise AssertionError(f"Unhandled SQL in harness: {compact_sql}")
 
+    async def fetchval(self, sql: str, *args):
+        compact_sql = " ".join(sql.split())
+        if "information_schema.tables" in compact_sql and "marketing_user_attribution" in compact_sql:
+            return False
+        raise AssertionError(f"Unhandled fetchval SQL in harness: {compact_sql}")
+
     async def execute(self, sql: str, *args):
         self.db.executed.append((" ".join(sql.split()), args))
         return "OK"

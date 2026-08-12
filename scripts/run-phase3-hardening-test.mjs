@@ -118,7 +118,7 @@ const participantViewSource = fs.readFileSync(
 assert.match(participantViewSource, /usePhase3RuntimeSettings/, 'participant runtime should load Phase 3 admin settings');
 assert.match(participantViewSource, /phase3RuntimeReady = !isPhase3SettingsPending/, 'participant runtime should wait for settings before enabling Phase 3 features');
 assert.match(participantViewSource, /enabled:\s*viewMode === 'participant' && ttsAvatarEnabled/, 'voice runtime should be gated by normalized settings');
-assert.match(participantViewSource, /speechEnabled=\{speechStackEnabled\}/, 'visible speech capture should be gated by normalized settings');
+assert.match(participantViewSource, /speechEnabled=\{speechStackEnabled && !aiIsSpeaking\}/, 'visible speech capture should require normalized settings and pause while AI audio is speaking');
 
 const envExampleSource = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
 for (const expected of [

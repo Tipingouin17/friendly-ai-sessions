@@ -105,7 +105,7 @@ assertContains(inputFooter, 'aria-pressed={handRaised || floorGranted}', 'adapti
 assertContains(inputFooter, 'Silent response mode is active', 'adaptive footer announces silent response privacy to screen readers');
 assertContains(inputFooter, 'Facilitation mode changed. Unsaved draft input was cleared.', 'adaptive footer announces mode transitions and draft clearing');
 assertContains(inputFooter, 'motion-reduce:transition-none', 'adaptive footer respects reduced motion preferences');
-assertContains(participantView, 'speechEnabled={speechStackEnabled}', 'participant speech runtime plumbing');
+assertContains(participantView, 'speechEnabled={speechStackEnabled && !aiIsSpeaking}', 'participant speech runtime requires enabled settings and pauses during AI speech');
 assertContains(participantView, 'hasTtsEventForMessage', 'participant skips facilitator TTS replay after refresh when a TTS event already exists');
 assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
@@ -220,7 +220,8 @@ assertContains(phase3RuntimeService, ".eq('message_id', serializedMessageId)", '
 assertContains(apiClient, 'RAILWAY_DEV_PROXY_PREFIX = "/__railway_dev"', 'API client defines same-origin dev Railway realtime proxy prefix');
 assertContains(apiClient, 'RAILWAY_PROD_PROXY_PREFIX = "/__railway_prod"', 'API client defines same-origin production Railway realtime proxy prefix');
 assertContains(apiClient, 'getRailwayRealtimeProxyPrefix', 'API client selects a same-origin realtime proxy on deployed browser origins');
-assertContains(apiClient, 'buildRealtimeSseUrl(topic, token)', 'SSE subscriptions use centralized realtime URL construction');
+assertContains(apiClient, 'requestRealtimeTicket(topic)', 'SSE subscriptions acquire an authorized conversation-scoped ticket');
+assertContains(apiClient, 'buildRealtimeSseUrl(topic, ticket)', 'SSE subscriptions use centralized scoped-ticket URL construction');
 assertContains(apiClient, 'new EventSource(url)', 'Realtime manager opens EventSource using the CORS-safe URL');
 assertContains(apiClient, 'private normalizeFilterValue(col: string, val: unknown): unknown', 'API query builder centralizes table-specific filter serialization');
 assertContains(apiClient, "this.s.table === 'facilitator_tts_events' && col === 'message_id'", 'API query builder serializes facilitator TTS message_id filters as strings');

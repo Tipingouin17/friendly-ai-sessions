@@ -443,9 +443,15 @@ const InputFooter = ({
   const renderDebatePanel = () => (
     <div className="mx-3 rounded-2xl border border-red-200 bg-red-50/40 p-3 shadow-sm sm:mx-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button type="button" onClick={handleHandRaiseToggle} aria-pressed={handRaised || floorGranted} disabled={floorGranted} className={`session-control-button inline-flex h-12 w-fit items-center gap-2 rounded-2xl border px-4 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none ${floorGranted ? 'border-emerald-300 bg-white text-emerald-800' : handRaised ? 'border-red-400 bg-white text-red-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-red-300 hover:bg-red-50'}`}><Hand className="h-4 w-4" />{floorGranted ? 'Floor granted' : handRaised ? 'Hand raised' : 'Raise hand to speak'}</button>
+        <button type="button" onClick={handleHandRaiseToggle} aria-pressed={handRaised || floorGranted} disabled={floorGranted} className={`session-control-button inline-flex h-12 w-fit items-center gap-2 rounded-2xl border px-4 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none ${floorGranted ? 'border-emerald-300 bg-white text-emerald-800' : handRaised ? 'border-red-400 bg-white text-red-900 shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-red-300 hover:bg-red-50'}`}><Hand className="h-4 w-4" />{floorGranted ? 'Floor granted — share your point' : handRaised ? 'Hand raised' : 'Raise hand to speak'}</button>
         <div className="flex items-center gap-2"><span className="text-xs font-semibold text-slate-500">React:</span><QuickReactions onReaction={onReaction} compact={isMobile} /></div>
       </div>
+      {floorGranted && (
+        <div className="mt-3 border-t border-red-100 pt-3">
+          <p className="mb-2 text-xs font-semibold text-emerald-800">You have the floor. Share your concise point with the room.</p>
+          <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder="Share your point with the room…" disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
+        </div>
+      )}
     </div>
   );
 

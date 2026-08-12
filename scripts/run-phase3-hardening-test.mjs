@@ -134,6 +134,8 @@ assert.match(sessionRoomStateSource, /if \(Number\.isFinite\(participantSlot\) &
 
 const inputFooterSource = fs.readFileSync(path.join(root, 'src/components/session/InputFooter.tsx'), 'utf8');
 assert.match(inputFooterSource, /modeKey === 'debate' \|\| modeKey === 'debate_panel'/, 'backend Debate / Panel mode keys must render the controlled raise-hand composer');
+assert.match(inputFooterSource, /\{floorGranted && \(/, 'a Debate participant granted the floor must receive an input composer');
+assert.match(inputFooterSource, /Share your point with the room/, 'the granted Debate composer must clearly explain the participant action');
 
 const hostViewSource = fs.readFileSync(path.join(root, 'src/components/session/messaging/SimplifiedHostMessagingView.tsx'), 'utf8');
 assert.match(hostViewSource, /Speaker queue/, 'Debate / Panel must provide a visible host speaker queue');

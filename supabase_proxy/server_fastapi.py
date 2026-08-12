@@ -2485,7 +2485,7 @@ def _parse_select(select_str: str):
             joins.append(part)
         else:
             column = part.split(":")[0].strip()
-            cols.append(_require_safe_sql_identifier(column, "select column"))
+            cols.append("*" if column == "*" else _require_safe_sql_identifier(column, "select column"))
     return cols or ["*"], joins
 
 
@@ -2509,7 +2509,7 @@ def _parse_join(join_str: str):
             sub_joins.append(part)
         else:
             column = part.split(":")[0].strip()
-            sub_cols.append(_require_safe_sql_identifier(column, "join select column"))
+            sub_cols.append("*" if column == "*" else _require_safe_sql_identifier(column, "join select column"))
     return {
         "table": table,
         "alias": alias or table,

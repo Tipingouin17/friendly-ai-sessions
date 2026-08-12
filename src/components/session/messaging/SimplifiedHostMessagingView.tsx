@@ -148,7 +148,9 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     }
   }, []);
 
-  const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
+  // The backend resolves the approved ElevenLabs voice from the selected facilitator persona.
+  // A gender/default label is less accurate than the actual routing behavior.
+  const facilitatorVoiceLabel = 'Persona-matched voice';
   const enabledToolCount = enabledTools.length;
   const capabilitiesSummary = toolboxError
     ? 'Tool context unavailable; the facilitator will continue from the live transcript.'
@@ -349,7 +351,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                     <h2 className="mt-1 font-display text-lg font-bold leading-snug tracking-tight text-slate-950">Guide the room from one clear command surface.</h2>
                     <div className="mt-2.5 flex flex-wrap gap-1.5 text-xs">
                       <span className="session-chip border-indigo-200 bg-white/80 text-indigo-700">{activeModeDefinition?.display_name || 'Open Discussion'}</span>
-                      <span className="session-chip border-slate-200 bg-white/80 text-slate-600">TTS: {facilitatorVoiceGenderLabel}</span>
+                      <span className="session-chip border-slate-200 bg-white/80 text-slate-600">TTS: {facilitatorVoiceLabel}</span>
                       {isWaitingForResponses && <span className="session-chip border-amber-200 bg-white/80 text-amber-700">Collecting responses</span>}
                       {isSessionPaused && <span className="session-chip border-amber-200 bg-white/80 text-amber-700">Paused</span>}
                       {isSessionEnded && <span className="session-chip border-slate-200 bg-white/80 text-slate-700">Ended</span>}

@@ -256,7 +256,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     description: facilitatorDetails?.description,
     profilePicture: facilitatorDetails?.profile_picture,
   }), [facilitatorDetails?.description, facilitatorDetails?.details, facilitatorDetails?.profile_picture, facilitatorDetails?.title]);
-  const facilitatorVoiceGenderLabel = facilitatorVoiceGender === 'female' ? 'Female voice' : facilitatorVoiceGender === 'male' ? 'Male voice' : 'Default voice';
+  // ElevenLabs voice selection is resolved from the selected facilitator persona on the server.
+  // Do not label it as a generic default, which would be misleading to the host.
+  const facilitatorVoiceLabel = 'Persona-matched voice';
   const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
 
   // ── Autoplay unlock (browser blocks audio until a user gesture) ──
@@ -646,7 +648,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <span className="h-14 w-0.5 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={60} minSize={48} className="min-h-0">
+        <Panel defaultSize={54} minSize={44} className="min-h-0">
           <div className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200">
             {isSessionStarted && (
             <section className="session-avatar-stage flex h-full min-h-0 flex-col p-3" aria-label="Host multi-video gallery">
@@ -728,11 +730,11 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <span className="h-14 w-0.5 rounded-full bg-slate-200 transition group-hover:bg-indigo-300" />
         </PanelResizeHandle>
 
-        <Panel defaultSize={20} minSize={18} maxSize={24} className="min-h-0">
+        <Panel defaultSize={26} minSize={22} maxSize={34} className="min-h-0">
           <aside className="session-glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-r-[1.5rem]">
             <h2 className="sr-only">Session pulse</h2>
             <p className="sr-only">Facilitator voice</p>
-            <p className="sr-only">TTS: {facilitatorVoiceGenderLabel}</p>
+            <p className="sr-only">TTS: {facilitatorVoiceLabel}</p>
             <SimplifiedHostMessagingView
               messages={sessionMessages || []}
               participantColors={participantColors}

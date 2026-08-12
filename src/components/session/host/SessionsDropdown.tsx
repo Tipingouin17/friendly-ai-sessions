@@ -69,7 +69,7 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 bg-white z-50">
         <DropdownMenuLabel className="flex items-center justify-between">
-          Active Sessions
+          Open sessions
           <Button
             variant="ghost"
             size="sm"
@@ -84,7 +84,7 @@ const SessionsDropdown: React.FC<SessionsDropdownProps> = ({
         
         {activeSessions.length === 0 ? (
           <DropdownMenuItem disabled>
-            No other active sessions
+            No other open sessions
           </DropdownMenuItem>
         ) : (
           activeSessions

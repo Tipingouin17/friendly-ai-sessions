@@ -360,6 +360,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
   const [, setCameraError] = React.useState<string | null>(null);
   const [submittingChoiceId, setSubmittingChoiceId] = React.useState<string | null>(null);
+  const [localDebateHandRaised, setLocalDebateHandRaised] = React.useState(false);
   const [submittedChoiceId, setSubmittedChoiceId] = React.useState<string | null>(null);
   const [modeInputError, setModeInputError] = React.useState<string | null>(null);
   const localCameraStreamRef = React.useRef<MediaStream | null>(null);
@@ -564,6 +565,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   }, [effectiveParticipantId, filteredMessages]);
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
   const modeState = participantModeState?.state as Record<string, unknown> | null | undefined;
+
+  React.useEffect(() => {
+    setLocalDebateHandRaised(Boolean(modeState?.hand_raised));
+  }, [activeMode?.id, modeState?.hand_raised]);
   const modeStateSubmitted = Boolean(modeState?.submitted);
   const modeResponsePreview = React.useMemo(() => {
     const content = modeState?.content;
@@ -1393,10 +1398,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 modeInputError={modeInputError}
                 onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
                 onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
-                handRaiseState={Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)}
+                handRaiseState={localDebateHandRaised || Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)}
                 floorGranted={Boolean(participantModeState?.is_current_speaker || participantModeState?.can_speak)}
                 onHandRaiseToggle={async (raised) => {
                   if (!activeMode || !effectiveParticipantId) return;
+                  const previousHandRaised = localDebateHandRaised;
+                  setLocalDebateHandRaised(raised);
                   try {
                     await updateModeParticipantState({
                       conversationId,
@@ -1409,6 +1416,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                       allowedActions: raised ? ['lower_hand'] : ['raise_hand'],
                     });
                   } catch (error) {
+                    setLocalDebateHandRaised(previousHandRaised);
                     console.warn('Unable to update Debate hand-raise state:', error);
                   }
                 }}

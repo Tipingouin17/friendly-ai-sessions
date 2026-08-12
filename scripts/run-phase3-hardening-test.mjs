@@ -124,6 +124,8 @@ assert.match(participantViewSource, /visibility: isSilentResponseMode \? 'privat
 assert.match(participantViewSource, /onSendMessage=\{\(\) => \{ void handleModeAwareTextSubmit\(\); \}\}/, 'the participant composer must use the mode-aware submission path');
 assert.match(participantViewSource, /onHandRaiseToggle=\{async \(raised\)/, 'Debate / Panel must wire a participant hand-raise callback');
 assert.match(participantViewSource, /updateModeParticipantState\(/, 'Debate / Panel hand raises must use the secured mode-state transport');
+assert.match(participantViewSource, /setLocalDebateHandRaised\(raised\)/, 'Debate / Panel hand raises must acknowledge immediately while the state update is in flight');
+assert.match(participantViewSource, /modeState\?\.hand_raised/, 'Debate / Panel hand raises must restore from persisted participant state after refresh');
 
 const inputFooterSource = fs.readFileSync(path.join(root, 'src/components/session/InputFooter.tsx'), 'utf8');
 assert.match(inputFooterSource, /modeKey === 'debate' \|\| modeKey === 'debate_panel'/, 'backend Debate / Panel mode keys must render the controlled raise-hand composer');

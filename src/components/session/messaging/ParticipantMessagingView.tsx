@@ -63,6 +63,7 @@ interface ParticipantMessagingViewProps {
   isLoadingModes?: boolean;
   modeError?: string | null;
   submitModeInput?: (params: {
+    participantId?: number;
     inputType: string;
     content: Record<string, unknown>;
     visibility?: ModeInput["visibility"];
@@ -579,6 +580,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     setSubmittingChoiceId(choice.id);
     try {
       await submitModeInput({
+        participantId: effectiveParticipantId,
         inputType,
         content: {
           choice: choice.label,
@@ -613,6 +615,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     setSubmittingChoiceId('text-response');
     try {
       await submitModeInput({
+        participantId: effectiveParticipantId,
         inputType: 'text_response',
         content: {
           text,
@@ -1025,6 +1028,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     if (isOpenDiscussionMode && submitModeInput) {
       void submitModeInput({
+        participantId: effectiveParticipantId,
         inputType: 'voice_transcript',
         content: {
           transcript: payload.transcript,
@@ -1384,6 +1388,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 onReaction={(reaction) => {
                   if (isOpenDiscussionMode && submitModeInput) {
                     void submitModeInput({
+                      participantId: effectiveParticipantId,
                       inputType: 'reaction',
                       content: {
                         reaction,

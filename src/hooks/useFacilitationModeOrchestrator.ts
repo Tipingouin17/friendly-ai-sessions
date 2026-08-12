@@ -274,6 +274,7 @@ export const useFacilitationModeOrchestrator = (
   }, [activeMode, applyResponse, conversationId]);
 
   const submitInput = useCallback(async (params: {
+    participantId?: number | null;
     inputType: string;
     content: Record<string, unknown>;
     visibility?: ModeInput["visibility"];
@@ -282,7 +283,7 @@ export const useFacilitationModeOrchestrator = (
     const response = await submitModeInput({
       conversationId,
       activeModeId: activeMode.id,
-      participantId: options.participantId ?? undefined,
+      participantId: params.participantId ?? options.participantId ?? undefined,
       inputType: params.inputType,
       content: params.content,
       visibility: params.visibility,

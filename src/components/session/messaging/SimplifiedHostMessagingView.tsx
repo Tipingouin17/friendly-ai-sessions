@@ -15,7 +15,15 @@ import { Message, ParticipantInfo } from '@/types/chat';
 import type { ConversationWithSession } from '@/types/database';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
 import type { FacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
-import type { FacilitatorModeAssignment, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
+import {
+  subscribeToModeOrchestrator,
+  updateModeParticipantState,
+  type FacilitatorModeAssignment,
+  type ModeParticipantState,
+  type SessionActiveMode,
+  type SessionModeEvent,
+} from '@/services/modeOrchestratorService';
+import { api } from '@/lib/api';
 import PreSessionHostView from '@/components/session/host/PreSessionHostView';
 import {
   MessageSquare, Wand2, SendHorizonal,
@@ -91,6 +99,8 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   const [isPostGenerationCooldown, setIsPostGenerationCooldown] = useState(false);
   const continuationFallbackTimeoutRef = React.useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [inactivityDismissed, setInactivityDismissed] = useState(false);
+  const [debateQueue, setDebateQueue] = useState<ModeParticipantState[]>([]);
+  const [grantingParticipantSlot, setGrantingParticipantSlot] = useState<number | null>(null);
 
   // Inactivity timer — purely indicative, never auto-triggers anything
   const { elapsedSeconds, isInactive, pendingCount, resetTimer } = useInactivityTimer({
@@ -159,6 +169,64 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
     if (!isInactive) setInactivityDismissed(false);
   }, [isInactive]);
 
+  const activeModeDefinition = activeMode?.facilitation_mode;
+  const isDebatePanelMode = activeModeDefinition?.mode_key === 'debate_panel' || activeModeDefinition?.mode_key === 'debate';
+
+  const refreshDebateQueue = React.useCallback(async () => {
+    if (!activeMode?.id || !isDebatePanelMode) {
+      setDebateQueue([]);
+      return;
+    }
+    const { data, error } = await api
+      .from<ModeParticipantState>('mode_participant_states')
+      .select('*')
+      .eq('active_mode_id', activeMode.id);
+    if (error) throw new Error(error.message);
+    setDebateQueue(((data as ModeParticipantState[] | null) ?? []).filter((state) => {
+      const details = state.state as Record<string, unknown> | null | undefined;
+      return Boolean(details?.hand_raised) || Boolean(state.is_current_speaker || state.can_speak);
+    }));
+  }, [activeMode?.id, isDebatePanelMode]);
+
+  React.useEffect(() => {
+    if (!conversationId || !isDebatePanelMode) {
+      setDebateQueue([]);
+      return;
+    }
+    void refreshDebateQueue().catch((error) => console.warn('Unable to load Debate queue:', error));
+    const channel = subscribeToModeOrchestrator(conversationId, () => {
+      void refreshDebateQueue().catch((error) => console.warn('Unable to refresh Debate queue:', error));
+    });
+    return () => { void channel.unsubscribe(); };
+  }, [conversationId, isDebatePanelMode, refreshDebateQueue]);
+
+  const grantDebateFloor = async (target: ModeParticipantState) => {
+    if (!conversationId || !activeMode?.id) return;
+    const targetSlot = target.participant_slot ?? target.participant_id;
+    if (!targetSlot) return;
+    setGrantingParticipantSlot(targetSlot);
+    try {
+      await Promise.all(debateQueue.map((entry) => {
+        const entrySlot = entry.participant_slot ?? entry.participant_id;
+        const isTarget = entrySlot === targetSlot;
+        return updateModeParticipantState({
+          conversationId,
+          activeModeId: activeMode.id,
+          participantId: entrySlot,
+          state: { ...((entry.state as Record<string, unknown> | null) ?? {}), hand_raised: !isTarget ? false : false, floor_granted: isTarget },
+          canSpeak: isTarget,
+          isCurrentSpeaker: isTarget,
+          isNext: false,
+          canSubmit: isTarget,
+          allowedActions: isTarget ? ['submit_response'] : ['raise_hand'],
+        });
+      }));
+      await refreshDebateQueue();
+    } finally {
+      setGrantingParticipantSlot(null);
+    }
+  };
+
   // Show pre-session view if session hasn't started
   if (!isSessionStarted) {
     return (
@@ -205,8 +273,6 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
       setIsSending(false);
     }
   };
-
-  const activeModeDefinition = activeMode?.facilitation_mode;
 
   const quickInstructions = [
     {
@@ -304,6 +370,34 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   </div>
                 </div>
               </div>
+
+              {isDebatePanelMode && (
+                <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50/60 p-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-fuchsia-700">Speaker queue</p>
+                      <p className="mt-1 text-xs text-slate-600">Grant the floor to one raised hand at a time.</p>
+                    </div>
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-fuchsia-700">{debateQueue.filter((entry) => Boolean((entry.state as Record<string, unknown> | null)?.hand_raised)).length} raised</span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {debateQueue.length === 0 ? (
+                      <p className="rounded-xl bg-white/80 px-3 py-2 text-xs text-slate-500">No participants are waiting to speak.</p>
+                    ) : debateQueue.map((entry) => {
+                      const slot = entry.participant_slot ?? entry.participant_id;
+                      const details = entry.state as Record<string, unknown> | null | undefined;
+                      const participant = participants.find((candidate) => candidate.id === slot);
+                      const name = participant?.name || `Participant ${slot}`;
+                      const hasFloor = Boolean(entry.is_current_speaker || entry.can_speak);
+                      const isRaised = Boolean(details?.hand_raised);
+                      return <div key={entry.id ?? slot} className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2">
+                        <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-900">{name}</p><p className="text-[11px] text-slate-500">{hasFloor ? 'Currently speaking' : isRaised ? 'Hand raised' : 'Waiting'}</p></div>
+                        <Button size="sm" variant={hasFloor ? 'outline' : 'default'} disabled={hasFloor || grantingParticipantSlot === slot} onClick={() => void grantDebateFloor(entry)} className="h-8 rounded-lg text-xs">{hasFloor ? 'Floor granted' : grantingParticipantSlot === slot ? 'Granting…' : 'Grant floor'}</Button>
+                      </div>;
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Response Collection Progress */}
               {isWaitingForResponses && (

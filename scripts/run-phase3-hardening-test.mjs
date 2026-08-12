@@ -135,6 +135,11 @@ assert.match(sessionRoomStateSource, /if \(Number\.isFinite\(participantSlot\) &
 const inputFooterSource = fs.readFileSync(path.join(root, 'src/components/session/InputFooter.tsx'), 'utf8');
 assert.match(inputFooterSource, /modeKey === 'debate' \|\| modeKey === 'debate_panel'/, 'backend Debate / Panel mode keys must render the controlled raise-hand composer');
 
+const hostViewSource = fs.readFileSync(path.join(root, 'src/components/session/messaging/SimplifiedHostMessagingView.tsx'), 'utf8');
+assert.match(hostViewSource, /Speaker queue/, 'Debate / Panel must provide a visible host speaker queue');
+assert.match(hostViewSource, /Grant floor/, 'Debate / Panel must let the host grant the controlled floor');
+assert.match(hostViewSource, /updateModeParticipantState\(/, 'host floor grants must use the secured participant-state transport');
+
 const envExampleSource = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
 for (const expected of [
   'VITE_PHASE3_STT_PROVIDER',

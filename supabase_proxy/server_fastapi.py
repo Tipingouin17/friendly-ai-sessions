@@ -7639,7 +7639,7 @@ async def edge_function(func_name: str, request: Request):
                 participant_row_id = None
                 if participant_slot is not None:
                     participant_row = await conn.fetchrow(
-                        "SELECT id FROM session_participants WHERE conversation_id = $1 AND participant_id = $2",
+                        "SELECT id, name FROM session_participants WHERE conversation_id = $1 AND participant_id = $2",
                         conv_id,
                         participant_slot,
                     )
@@ -7667,6 +7667,7 @@ async def edge_function(func_name: str, request: Request):
 
                 active_row = None
                 participant_state_row = None
+                public_message_row = None
                 approving_existing_mode = event_type == "mode.started" and active_mode_id is not None
                 event_payload = dict(payload)
                 # The established client contract sends structured mode-input fields
@@ -7825,6 +7826,30 @@ async def edge_function(func_name: str, request: Request):
                                     "content": input_content,
                                 },
                             )
+                        # Public modes promise an attributed room transcript. Mirror a
+                        # participant's text response into `messages` so hosts and other
+                        # attendees can review it in real time. Private mode inputs stay
+                        # exclusively in `mode_inputs` for later synthesis.
+                        response_text = input_content.get("text") if isinstance(input_content, dict) else None
+                        privacy_model = str(mode_row["privacy_model"] or "") if mode_row else ""
+                        if privacy_model.startswith("public") and isinstance(response_text, str) and response_text.strip():
+                            participant_name = str(participant_row["name"] or f"Participant {participant_slot}")
+                            transcript_content = {
+                                "text": response_text.strip(),
+                                "participant_id": participant_slot,
+                                "name": participant_name,
+                                "is_anonymous": False,
+                                "mode_key": str(mode_row["mode_key"]),
+                            }
+                            public_message_row = await conn.fetchrow(
+                                "INSERT INTO messages (conversation_id, content, role, name, participant_id) "
+                                "VALUES ($1, $2::jsonb, 'user', $3, $4) RETURNING *",
+                                conv_id,
+                                json.dumps(transcript_content),
+                                participant_name,
+                                participant_slot,
+                            )
+
                         active_row = await conn.fetchrow(
                             "SELECT * FROM session_active_modes WHERE id = $1 AND conversation_id = $2",
                             active_mode_id,
@@ -7856,6 +7881,18 @@ async def edge_function(func_name: str, request: Request):
                     # successful input and incorrectly falls back to open discussion.
                     active_result["facilitation_mode"] = serialize_row(dict(mode_row))
                 participant_state_result = serialize_row(dict(participant_state_row)) if participant_state_row else None
+                public_message_result = serialize_row(dict(public_message_row)) if public_message_row else None
+                if public_message_result:
+                    asyncio.create_task(manager.broadcast(str(conv_id), {
+                        "event": "INSERT",
+                        "payload": {
+                            "eventType": "INSERT",
+                            "new": public_message_result,
+                            "old": {},
+                            "table": "messages",
+                            "schema": "public",
+                        },
+                    }))
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "INSERT",
                     "payload": {
@@ -7884,6 +7921,7 @@ async def edge_function(func_name: str, request: Request):
                     "active_mode": active_result,
                     "participantState": participant_state_result,
                     "participant_state": participant_state_result,
+                    "public_message": public_message_result,
                 }
         except HTTPException:
             raise

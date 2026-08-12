@@ -236,13 +236,13 @@ export const fetchActiveSessionMode = async (conversationId: number): Promise<Se
 
 export const fetchModeParticipantState = async (
   activeModeId: number,
-  participantId: number
+  participantSlot: number
 ): Promise<ModeParticipantState | null> => {
   const { data, error } = await api
     .from("mode_participant_states")
     .select("*")
     .eq("active_mode_id", activeModeId)
-    .eq("participant_id", participantId)
+    .eq("participant_slot", participantSlot)
     .maybeSingle();
 
   if (error) throw error;

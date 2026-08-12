@@ -561,11 +561,16 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       .reverse()
       .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || String(message.participant) === participantKey)) ?? null;
   }, [effectiveParticipantId, filteredMessages]);
-  const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
+  const hasSubmittedModeChoice = Boolean(submittedChoiceId);
+  const modeStateSubmitted = Boolean((participantModeState?.state as Record<string, unknown> | null | undefined)?.submitted);
+  // Chat responses belong to the open discussion only. Structured modes retain
+  // their own completion state so a previous turn cannot disable the next mode.
+  const hasRegisteredResponse = isOpenDiscussionMode
+    ? Boolean(hasAnswered || latestOwnParticipantMessage)
+    : Boolean(modeStateSubmitted || hasSubmittedModeChoice);
   const participantResponseTotal = participantPeers.length > 0 ? participantPeers.length : Math.max(currentParticipantCount, participants.length, 0);
   const responseTotal = Math.max(totalParticipants, participantResponseTotal, 1);
-  const hasSubmittedModeChoice = Boolean(submittedChoiceId);
-  const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, (hasRegisteredResponse || hasSubmittedModeChoice) ? 1 : 0));
+  const effectiveResponseCount = Math.min(responseTotal, Math.max(isOpenDiscussionMode ? responseCount : 0, hasRegisteredResponse ? 1 : 0));
   const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const modeComposerDisabled = Boolean((activeMode || techniqueModeContext) && (!modeCanSubmit || (modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice)) || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
   const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice, inputType: 'vote' | 'reflection_word' = 'vote') => {

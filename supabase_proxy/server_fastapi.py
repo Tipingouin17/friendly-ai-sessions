@@ -1740,6 +1740,14 @@ async def run_startup_migrations() -> None:
         ON CONFLICT (facilitator_id, mode_id) DO NOTHING;
         """,
 
+        # 2026-08-12: retain the browser participant slot alongside the stable FK row in mode state.
+        """
+        ALTER TABLE mode_participant_states
+            ADD COLUMN IF NOT EXISTS participant_slot INTEGER;
+        CREATE INDEX IF NOT EXISTS idx_mode_participant_states_slot
+            ON mode_participant_states(conversation_id, active_mode_id, participant_slot);
+        """,
+
         # 2026-05-23: Phase 3 speech stack, avatar/TTS events, and analytics snapshots.
         """
         CREATE TABLE IF NOT EXISTS session_speech_turns (
@@ -7614,6 +7622,22 @@ async def edge_function(func_name: str, request: Request):
                 if auth_mode == "join_token" and event_type in host_only_events:
                     raise HTTPException(403, detail={"code": "host_required", "message": "Only the host or an administrator can change facilitation mode lifecycle"})
 
+                # Browser participant IDs are session-local slots, whereas mode tables
+                # reference the stable `session_participants.id` primary key. Resolve
+                # once at the boundary so structured responses never violate FK
+                # constraints and can be reloaded by the same participant slot.
+                participant_slot = participant_id
+                participant_row_id = None
+                if participant_slot is not None:
+                    participant_row = await conn.fetchrow(
+                        "SELECT id FROM session_participants WHERE conversation_id = $1 AND participant_id = $2",
+                        conv_id,
+                        participant_slot,
+                    )
+                    if not participant_row:
+                        raise HTTPException(400, detail={"code": "participant_not_found", "message": "The participant is not registered for this session"})
+                    participant_row_id = participant_row["id"]
+
                 mode_row = None
                 if mode_id is not None:
                     mode_row = await conn.fetchrow("SELECT * FROM facilitation_modes WHERE id = $1 AND is_active = TRUE", mode_id)
@@ -7633,6 +7657,7 @@ async def edge_function(func_name: str, request: Request):
                     raise HTTPException(400, detail={"code": "mode_required", "message": "A valid modeKey or modeId is required"})
 
                 active_row = None
+                participant_state_row = None
                 approving_existing_mode = event_type == "mode.started" and active_mode_id is not None
                 event_payload = dict(payload)
                 async with conn.transaction():
@@ -7690,16 +7715,17 @@ async def edge_function(func_name: str, request: Request):
                                 mode_id = active_row["mode_id"]
                     elif event_type == "participant.state.updated" and active_mode_id is not None and participant_id is not None:
                         state_body = event_payload.get("state") if isinstance(event_payload.get("state"), dict) else event_payload
-                        await conn.execute(
+                        participant_state_row = await conn.fetchrow(
                             "INSERT INTO mode_participant_states "
-                            "(active_mode_id, conversation_id, participant_id, can_speak, is_current_speaker, is_next, can_submit, remaining_time, allowed_actions, state, updated_at) "
-                            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, NOW()) "
+                            "(active_mode_id, conversation_id, participant_id, participant_slot, can_speak, is_current_speaker, is_next, can_submit, remaining_time, allowed_actions, state, updated_at) "
+                            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, NOW()) "
                             "ON CONFLICT (active_mode_id, participant_id) DO UPDATE SET "
-                            "can_speak = EXCLUDED.can_speak, is_current_speaker = EXCLUDED.is_current_speaker, is_next = EXCLUDED.is_next, can_submit = EXCLUDED.can_submit, "
-                            "remaining_time = EXCLUDED.remaining_time, allowed_actions = EXCLUDED.allowed_actions, state = EXCLUDED.state, updated_at = NOW()",
+                            "participant_slot = EXCLUDED.participant_slot, can_speak = EXCLUDED.can_speak, is_current_speaker = EXCLUDED.is_current_speaker, is_next = EXCLUDED.is_next, can_submit = EXCLUDED.can_submit, "
+                            "remaining_time = EXCLUDED.remaining_time, allowed_actions = EXCLUDED.allowed_actions, state = EXCLUDED.state, updated_at = NOW() RETURNING *",
                             active_mode_id,
                             conv_id,
-                            participant_id,
+                            participant_row_id,
+                            participant_slot,
                             bool(event_payload.get("canSpeak", event_payload.get("can_speak", True))),
                             bool(event_payload.get("isCurrentSpeaker", event_payload.get("is_current_speaker", False))),
                             bool(event_payload.get("isNext", event_payload.get("is_next", False))),
@@ -7711,6 +7737,8 @@ async def edge_function(func_name: str, request: Request):
                     elif event_type == "mode.input.submitted":
                         if active_mode_id is None:
                             raise HTTPException(400, detail={"code": "active_mode_required", "message": "activeModeId is required for mode input submissions"})
+                        if participant_row_id is None or participant_slot is None:
+                            raise HTTPException(400, detail={"code": "participant_required", "message": "participantId is required for mode input submissions"})
                         input_content = event_payload.get("content") if isinstance(event_payload.get("content"), dict) else event_payload
                         input_type = event_payload.get("inputType") or event_payload.get("input_type") or "response"
                         visibility = event_payload.get("visibility") or "private_until_synthesis"
@@ -7723,11 +7751,26 @@ async def edge_function(func_name: str, request: Request):
                             active_mode_id,
                             conv_id,
                             mode_id,
-                            participant_id,
+                            participant_row_id,
                             input_type,
                             visibility,
                             json.dumps(input_content),
                         )
+                        # A structured response belongs to the active mode rather than
+                        # the global chat transcript. Persist mode-local completion so a
+                        # later mode starts cleanly and page refreshes retain progress.
+                        if mode_row and str(mode_row["mode_key"]) != "open_discussion":
+                            participant_state_row = await conn.fetchrow(
+                                "INSERT INTO mode_participant_states "
+                                "(active_mode_id, conversation_id, participant_id, participant_slot, can_speak, is_current_speaker, is_next, can_submit, allowed_actions, state, updated_at) "
+                                "VALUES ($1, $2, $3, $4, FALSE, FALSE, FALSE, FALSE, '[]'::jsonb, '{\"submitted\": true}'::jsonb, NOW()) "
+                                "ON CONFLICT (active_mode_id, participant_id) DO UPDATE SET "
+                                "participant_slot = EXCLUDED.participant_slot, can_submit = FALSE, state = mode_participant_states.state || EXCLUDED.state, updated_at = NOW() RETURNING *",
+                                active_mode_id,
+                                conv_id,
+                                participant_row_id,
+                                participant_slot,
+                            )
 
                     event_row = await conn.fetchrow(
                         "INSERT INTO session_mode_events "
@@ -7736,7 +7779,7 @@ async def edge_function(func_name: str, request: Request):
                         conv_id,
                         active_mode_id,
                         mode_id,
-                        participant_id,
+                        participant_row_id,
                         event_type,
                         json.dumps(event_payload),
                         reason,
@@ -7748,6 +7791,7 @@ async def edge_function(func_name: str, request: Request):
 
                 event_result = serialize_row(dict(event_row)) if event_row else {}
                 active_result = serialize_row(dict(active_row)) if active_row else None
+                participant_state_result = serialize_row(dict(participant_state_row)) if participant_state_row else None
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "INSERT",
                     "payload": {
@@ -7769,7 +7813,14 @@ async def edge_function(func_name: str, request: Request):
                             "schema": "public",
                         },
                     }))
-                return {"success": True, "event": event_result, "activeMode": active_result}
+                return {
+                    "success": True,
+                    "event": event_result,
+                    "activeMode": active_result,
+                    "active_mode": active_result,
+                    "participantState": participant_state_result,
+                    "participant_state": participant_state_result,
+                }
         except HTTPException:
             raise
         except Exception as e:

@@ -30,6 +30,14 @@ export const useSessionRoomState = ({
   welcomeMessage,
   isAdmin
 }: UseSessionRoomStateProps) => {
+  const resolvedModeParticipantId = useMemo(() => {
+    if (typeof currentUserParticipantId === 'number' && currentUserParticipantId > 0) return currentUserParticipantId;
+    if (typeof window === 'undefined') return null;
+    const rawParticipantId = new URLSearchParams(window.location.search).get('participantId');
+    const participantId = rawParticipantId ? Number.parseInt(rawParticipantId, 10) : NaN;
+    return Number.isFinite(participantId) && participantId > 0 ? participantId : null;
+  }, [currentUserParticipantId]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -37,7 +45,7 @@ export const useSessionRoomState = ({
   const toolbox = useFacilitatorToolbox(conversation);
   const modeOrchestrator = useFacilitationModeOrchestrator(conversation, {
     conversationId,
-    participantId: currentUserParticipantId,
+    participantId: resolvedModeParticipantId,
     realtime: true,
   });
   

@@ -564,9 +564,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hasRegisteredResponse = Boolean(hasAnswered || latestOwnParticipantMessage);
   const participantResponseTotal = participantPeers.length > 0 ? participantPeers.length : Math.max(currentParticipantCount, participants.length, 0);
   const responseTotal = Math.max(totalParticipants, participantResponseTotal, 1);
-  const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, hasRegisteredResponse ? 1 : 0));
-  const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
+  const effectiveResponseCount = Math.min(responseTotal, Math.max(responseCount, (hasRegisteredResponse || hasSubmittedModeChoice) ? 1 : 0));
+  const responseProgress = Math.min(100, Math.round((effectiveResponseCount / responseTotal) * 100));
   const modeComposerDisabled = Boolean((activeMode || techniqueModeContext) && (!modeCanSubmit || (modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice)) || (isRoundRobinMode && !participantModeState?.is_current_speaker)));
   const handleSubmitModeChoice = React.useCallback(async (choice: ModeChoice, inputType: 'vote' | 'reflection_word' = 'vote') => {
     if (!submitModeInput || !modeCanSubmit || hasRegisteredResponse || submittingChoiceId) return;
@@ -590,6 +590,42 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       setSubmittingChoiceId(null);
     }
   }, [effectiveModeKey, hasRegisteredResponse, modeCanSubmit, submitModeInput, submittingChoiceId]);
+
+  const handleModeAwareTextSubmit = React.useCallback(async () => {
+    const text = inputMessage.trim();
+    const shouldUseModePipeline = Boolean(activeMode && submitModeInput && !isOpenDiscussionMode);
+
+    if (!shouldUseModePipeline) {
+      onSendMessage();
+      return;
+    }
+
+    const participantHasFloor = !isRoundRobinMode || Boolean(participantModeState?.is_current_speaker);
+    const alreadySubmitted = modeBlocksAfterResponse && (hasRegisteredResponse || hasSubmittedModeChoice);
+    if (!text || !modeCanSubmit || !participantHasFloor || alreadySubmitted || submittingChoiceId) return;
+
+    setModeInputError(null);
+    setSubmittingChoiceId('text-response');
+    try {
+      await submitModeInput({
+        inputType: 'text_response',
+        content: {
+          text,
+          modeKey: effectiveModeKey,
+          source: 'participant_text_composer',
+        },
+        visibility: isSilentResponseMode ? 'private_until_synthesis' : 'attributed',
+      });
+      setSubmittedChoiceId('text-response');
+      setInputMessage('');
+    } catch (error) {
+      console.error('Failed to submit mode text response:', error);
+      setModeInputError('We could not submit that response. Please try again.');
+    } finally {
+      setSubmittingChoiceId(null);
+    }
+  }, [activeMode, effectiveModeKey, hasRegisteredResponse, hasSubmittedModeChoice, inputMessage, isOpenDiscussionMode, isRoundRobinMode, isSilentResponseMode, modeBlocksAfterResponse, modeCanSubmit, onSendMessage, participantModeState?.is_current_speaker, setInputMessage, submitModeInput, submittingChoiceId]);
+
   React.useEffect(() => {
     setSubmittedChoiceId(null);
     setModeInputError(null);
@@ -1293,7 +1329,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 participants={participantPeers}
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
-                onSendMessage={onSendMessage}
+                onSendMessage={() => { void handleModeAwareTextSubmit(); }}
                 isRecording={isRecording}
                 setIsRecording={setIsRecording}
                 currentUserParticipantId={effectiveParticipantId}

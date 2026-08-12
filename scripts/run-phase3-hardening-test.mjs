@@ -127,6 +127,10 @@ assert.match(participantViewSource, /updateModeParticipantState\(/, 'Debate / Pa
 assert.match(participantViewSource, /setLocalDebateHandRaised\(raised\)/, 'Debate / Panel hand raises must acknowledge immediately while the state update is in flight');
 assert.match(participantViewSource, /modeState\?\.hand_raised/, 'Debate / Panel hand raises must restore from persisted participant state after refresh');
 
+const sessionRoomStateSource = fs.readFileSync(path.join(root, 'src/hooks/useSessionRoomState.ts'), 'utf8');
+assert.match(sessionRoomStateSource, /get\('participantId'\)/, 'structured mode state must read the session-local participant slot from the join URL');
+assert.match(sessionRoomStateSource, /if \(Number\.isFinite\(participantSlot\) && participantSlot > 0\) return participantSlot/, 'the join URL participant slot must take precedence over an internal database row ID');
+
 const inputFooterSource = fs.readFileSync(path.join(root, 'src/components/session/InputFooter.tsx'), 'utf8');
 assert.match(inputFooterSource, /modeKey === 'debate' \|\| modeKey === 'debate_panel'/, 'backend Debate / Panel mode keys must render the controlled raise-hand composer');
 

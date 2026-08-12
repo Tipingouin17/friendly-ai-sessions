@@ -31,11 +31,14 @@ export const useSessionRoomState = ({
   isAdmin
 }: UseSessionRoomStateProps) => {
   const resolvedModeParticipantId = useMemo(() => {
-    if (typeof currentUserParticipantId === 'number' && currentUserParticipantId > 0) return currentUserParticipantId;
-    if (typeof window === 'undefined') return null;
-    const rawParticipantId = new URLSearchParams(window.location.search).get('participantId');
-    const participantId = rawParticipantId ? Number.parseInt(rawParticipantId, 10) : NaN;
-    return Number.isFinite(participantId) && participantId > 0 ? participantId : null;
+    if (typeof window !== 'undefined') {
+      const rawParticipantId = new URLSearchParams(window.location.search).get('participantId');
+      const participantSlot = rawParticipantId ? Number.parseInt(rawParticipantId, 10) : NaN;
+      if (Number.isFinite(participantSlot) && participantSlot > 0) return participantSlot;
+    }
+    return typeof currentUserParticipantId === 'number' && currentUserParticipantId > 0
+      ? currentUserParticipantId
+      : null;
   }, [currentUserParticipantId]);
 
   const [messages, setMessages] = useState<Message[]>([]);

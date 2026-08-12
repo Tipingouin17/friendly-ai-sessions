@@ -2161,7 +2161,10 @@ app.add_middleware(
         "baggage", "sentry-trace",
         "x-join-token", "x-migration-secret",
     ],
-    expose_headers=["Content-Range", "X-Total-Count", "X-Request-Id"],
+    expose_headers=[
+        "Content-Range", "X-Total-Count", "X-Request-Id",
+        "X-TTS-Provider", "X-TTS-Voice-Id", "X-TTS-Model", "X-TTS-Preset", "X-TTS-Chars",
+    ],
 )
 
 

@@ -7716,6 +7716,35 @@ async def edge_function(func_name: str, request: Request):
                             _jwt_user_id,
                             )
                             active_mode_id = active_row["id"]
+
+                        # A round-robin has a single active floor. Seed per-participant
+                        # state when the host starts or approves the mode so the first
+                        # attendee is never shown as waiting for a non-existent speaker.
+                        if (
+                            event_type == "mode.started"
+                            and active_row
+                            and active_row["status"] == "active"
+                            and mode_row
+                            and str(mode_row["mode_key"]) == "round_robin"
+                        ):
+                            await conn.execute(
+                                "INSERT INTO mode_participant_states "
+                                "(active_mode_id, conversation_id, participant_id, participant_slot, can_speak, is_current_speaker, is_next, can_submit, allowed_actions, state, updated_at) "
+                                "SELECT $1, $2, sp.id, sp.participant_id, "
+                                "sp.participant_id = (SELECT MIN(participant_id) FROM session_participants WHERE conversation_id = $2 AND participant_id > 0), "
+                                "sp.participant_id = (SELECT MIN(participant_id) FROM session_participants WHERE conversation_id = $2 AND participant_id > 0), "
+                                "FALSE, "
+                                "sp.participant_id = (SELECT MIN(participant_id) FROM session_participants WHERE conversation_id = $2 AND participant_id > 0), "
+                                "CASE WHEN sp.participant_id = (SELECT MIN(participant_id) FROM session_participants WHERE conversation_id = $2 AND participant_id > 0) "
+                                "THEN '[\"voice_transcript\",\"text_response\"]'::jsonb ELSE '[]'::jsonb END, "
+                                "'{}'::jsonb, NOW() "
+                                "FROM session_participants sp WHERE sp.conversation_id = $2 AND sp.participant_id > 0 "
+                                "ON CONFLICT (active_mode_id, participant_id) DO UPDATE SET "
+                                "participant_slot = EXCLUDED.participant_slot, can_speak = EXCLUDED.can_speak, is_current_speaker = EXCLUDED.is_current_speaker, "
+                                "is_next = EXCLUDED.is_next, can_submit = EXCLUDED.can_submit, allowed_actions = EXCLUDED.allowed_actions, updated_at = NOW()",
+                                active_mode_id,
+                                conv_id,
+                            )
                     elif event_type in ("mode.ended", "mode.rejected"):
                         if active_mode_id is None:
                             active_row = await conn.fetchrow(

@@ -86,6 +86,12 @@ class FakeConnection:
     def transaction(self):
         return FakeTransaction()
 
+    async def execute(self, sql: str, *args):
+        compact_sql = " ".join(sql.split())
+        if "INSERT INTO mode_participant_states" in compact_sql:
+            return "INSERT 0 1"
+        raise AssertionError(f"Unhandled execute SQL in harness: {compact_sql}")
+
     async def fetchrow(self, sql: str, *args):
         compact_sql = " ".join(sql.split())
 

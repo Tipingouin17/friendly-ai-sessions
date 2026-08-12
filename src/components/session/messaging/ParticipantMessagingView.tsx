@@ -22,7 +22,7 @@ import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
 import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCConnectionStatus, type WebRTCPeerStatus } from '@/hooks/useWebRTCSession';
-import type { FacilitatorModeAssignment, ModeInput, ModeParticipantState, SessionActiveMode, SessionModeEvent } from '@/services/modeOrchestratorService';
+import { updateModeParticipantState, type FacilitatorModeAssignment, type ModeInput, type ModeParticipantState, type SessionActiveMode, type SessionModeEvent } from '@/services/modeOrchestratorService';
 import { persistParticipantMediaPreferences, readParticipantMediaPreferences } from '@/utils/participantMediaPreferences';
 import { prepareFacilitatorSpeechText } from '@/utils/prepareFacilitatorSpeechText';
 
@@ -1393,6 +1393,25 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 modeInputError={modeInputError}
                 onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
                 onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
+                handRaiseState={Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)}
+                floorGranted={Boolean(participantModeState?.is_current_speaker || participantModeState?.can_speak)}
+                onHandRaiseToggle={async (raised) => {
+                  if (!activeMode || !effectiveParticipantId) return;
+                  try {
+                    await updateModeParticipantState({
+                      conversationId,
+                      activeModeId: activeMode.id,
+                      participantId: effectiveParticipantId,
+                      state: { ...(participantModeState?.state as Record<string, unknown> | undefined), hand_raised: raised },
+                      canSpeak: false,
+                      isCurrentSpeaker: false,
+                      canSubmit: true,
+                      allowedActions: raised ? ['lower_hand'] : ['raise_hand'],
+                    });
+                  } catch (error) {
+                    console.warn('Unable to update Debate hand-raise state:', error);
+                  }
+                }}
                 onReaction={(reaction) => {
                   if (isOpenDiscussionMode && submitModeInput) {
                     void submitModeInput({

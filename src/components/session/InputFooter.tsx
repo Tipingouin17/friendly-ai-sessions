@@ -455,7 +455,7 @@ const InputFooter = ({
     if (modeKey === 'round_robin') return renderRoundRobinPanel();
     if (modeKey === 'silent_individual_response') return renderSilentResponsePanel();
     if (modeKey === 'reflection_checkin') return renderReflectionPanel();
-    if (modeKey === 'debate') return renderDebatePanel();
+    if (modeKey === 'debate' || modeKey === 'debate_panel') return renderDebatePanel();
     return renderOpenDiscussionPanel();
   };
 

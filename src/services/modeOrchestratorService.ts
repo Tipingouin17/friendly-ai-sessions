@@ -142,6 +142,12 @@ export interface ModeEventRequest {
   input_type?: string;
   visibility?: ModeInput["visibility"];
   content?: Record<string, unknown>;
+  state?: Record<string, unknown>;
+  can_speak?: boolean;
+  is_current_speaker?: boolean;
+  is_next?: boolean;
+  can_submit?: boolean;
+  allowed_actions?: string[];
 }
 
 export interface ModeEventResponse {
@@ -379,6 +385,29 @@ export const submitModeInput = async (params: {
   input_type: params.inputType,
   content: params.content,
   visibility: params.visibility,
+});
+
+export const updateModeParticipantState = async (params: {
+  conversationId: number;
+  activeModeId: number;
+  participantId: number;
+  state: Record<string, unknown>;
+  canSpeak?: boolean;
+  isCurrentSpeaker?: boolean;
+  isNext?: boolean;
+  canSubmit?: boolean;
+  allowedActions?: string[];
+}): Promise<ModeEventResponse> => sendModeEvent({
+  conversation_id: params.conversationId,
+  event_type: "participant.state.updated",
+  active_mode_id: params.activeModeId,
+  participant_id: params.participantId,
+  state: params.state,
+  can_speak: params.canSpeak,
+  is_current_speaker: params.isCurrentSpeaker,
+  is_next: params.isNext,
+  can_submit: params.canSubmit,
+  allowed_actions: params.allowedActions,
 });
 
 export const subscribeToModeOrchestrator = (

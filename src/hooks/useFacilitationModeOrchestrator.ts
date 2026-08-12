@@ -11,6 +11,7 @@ import {
   startFacilitationMode,
   submitModeInput,
   subscribeToModeOrchestrator,
+  updateModeParticipantState,
   type FacilitatorModeAssignment,
   type ModeEventResponse,
   type ModeInput,
@@ -292,6 +293,33 @@ export const useFacilitationModeOrchestrator = (
     return response;
   }, [activeMode, applyResponse, conversationId, options.participantId]);
 
+  const updateParticipantState = useCallback(async (params: {
+    participantId?: number | null;
+    state: Record<string, unknown>;
+    canSpeak?: boolean;
+    isCurrentSpeaker?: boolean;
+    isNext?: boolean;
+    canSubmit?: boolean;
+    allowedActions?: string[];
+  }) => {
+    if (!conversationId || !activeMode) throw new Error("No active facilitation mode is available for participant state.");
+    const participantId = params.participantId ?? options.participantId;
+    if (!participantId) throw new Error("No participant is available for mode state.");
+    const response = await updateModeParticipantState({
+      conversationId,
+      activeModeId: activeMode.id,
+      participantId,
+      state: params.state,
+      canSpeak: params.canSpeak,
+      isCurrentSpeaker: params.isCurrentSpeaker,
+      isNext: params.isNext,
+      canSubmit: params.canSubmit,
+      allowedActions: params.allowedActions,
+    });
+    applyResponse(response);
+    return response;
+  }, [activeMode, applyResponse, conversationId, options.participantId]);
+
   const modeInstruction = useMemo(
     () => buildModeOrchestratorInstruction(enabledModes, activeMode),
     [activeMode, enabledModes]
@@ -314,5 +342,6 @@ export const useFacilitationModeOrchestrator = (
     endMode,
     rejectMode,
     submitInput,
+    updateParticipantState,
   };
 };

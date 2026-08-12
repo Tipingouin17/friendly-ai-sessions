@@ -122,6 +122,11 @@ assert.match(participantViewSource, /speechEnabled=\{speechStackEnabled && !aiIs
 assert.match(participantViewSource, /const handleModeAwareTextSubmit/, 'structured participant text should have a dedicated mode-aware submission path');
 assert.match(participantViewSource, /visibility: isSilentResponseMode \? 'private_until_synthesis' : 'attributed'/, 'silent responses must persist as private mode inputs until synthesis');
 assert.match(participantViewSource, /onSendMessage=\{\(\) => \{ void handleModeAwareTextSubmit\(\); \}\}/, 'the participant composer must use the mode-aware submission path');
+assert.match(participantViewSource, /onHandRaiseToggle=\{async \(raised\)/, 'Debate / Panel must wire a participant hand-raise callback');
+assert.match(participantViewSource, /updateModeParticipantState\(/, 'Debate / Panel hand raises must use the secured mode-state transport');
+
+const inputFooterSource = fs.readFileSync(path.join(root, 'src/components/session/InputFooter.tsx'), 'utf8');
+assert.match(inputFooterSource, /modeKey === 'debate' \|\| modeKey === 'debate_panel'/, 'backend Debate / Panel mode keys must render the controlled raise-hand composer');
 
 const envExampleSource = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
 for (const expected of [

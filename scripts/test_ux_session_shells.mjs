@@ -46,7 +46,7 @@ assertContains(participantView, 'latestOwnParticipantMessage', 'participant regi
 assertContains(participantView, 'String(message.participant) === participantKey', 'participant response registration tolerates numeric participant ids');
 assertContains(participantView, 'Your response is registered', 'participant visible response confirmation');
 assertContains(participantView, 'effectiveResponseCount', 'participant response counter uses local registration fallback');
-assertContains(participantView, 'Math.max(responseCount, hasRegisteredResponse ? 1 : 0)', 'participant local response counter does not remain at zero after own reply registers');
+assertContains(participantView, 'Math.max(isOpenDiscussionMode ? responseCount : 0, hasRegisteredResponse ? 1 : 0)', 'participant local response counter preserves own completion without leaking prior open-discussion counts into structured modes');
 assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
 assertContains(participantView, "aria-pressed={sidebarTab === 'people'}", 'participant mobile People tab exposes active pressed state');
 assertContains(participantView, "aria-pressed={sidebarTab === 'chat'}", 'participant mobile Chat tab exposes active pressed state');

@@ -2827,6 +2827,15 @@ class ConnectionManager:
                 dead.append(ws)
         for ws in dead:
             await self.disconnect(ws, conversation_id)
+        # Browser clients use CDN-compatible SSE rather than Railway WebSockets.
+        # Keep the legacy broadcaster as the single fan-out point so every
+        # existing realtime event is delivered to both transports.
+        try:
+            await sse_manager.broadcast(conversation_id, payload)
+        except NameError:
+            # The manager is instantiated before the SSE manager during module
+            # initialization; no broadcasts occur until application startup.
+            pass
 
     async def broadcast_all(self, payload: dict):
         """Broadcast to every connected client."""
@@ -8824,16 +8833,6 @@ async def edge_function(func_name: str, request: Request):
                 "is_rejoining": is_rejoining,
                 "created_at": datetime.utcnow().isoformat(),
             }
-            asyncio.create_task(sse_manager.broadcast(str(conversation_id), {
-                "event": "INSERT",
-                "payload": {
-                    "eventType": "INSERT",
-                    "new": _participant_broadcast,
-                    "old": {},
-                    "table": "session_participants",
-                    "schema": "public",
-                },
-            }))
             asyncio.create_task(manager.broadcast(str(conversation_id), {
                 "event": "INSERT",
                 "payload": {

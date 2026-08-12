@@ -563,7 +563,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       .find((message) => message.sender === 'user' && (effectiveParticipantId === 0 || String(message.participant) === participantKey)) ?? null;
   }, [effectiveParticipantId, filteredMessages]);
   const hasSubmittedModeChoice = Boolean(submittedChoiceId);
-  const modeStateSubmitted = Boolean((participantModeState?.state as Record<string, unknown> | null | undefined)?.submitted);
+  const modeState = participantModeState?.state as Record<string, unknown> | null | undefined;
+  const modeStateSubmitted = Boolean(modeState?.submitted);
+  const modeResponsePreview = React.useMemo(() => {
+    const content = modeState?.content;
+    if (!content || typeof content !== 'object' || Array.isArray(content)) return null;
+    const record = content as Record<string, unknown>;
+    const candidate = record.text ?? record.choice ?? record.value ?? record.transcript;
+    return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null;
+  }, [modeState]);
   // Chat responses belong to the open discussion only. Structured modes retain
   // their own completion state so a previous turn cannot disable the next mode.
   const hasRegisteredResponse = isOpenDiscussionMode
@@ -1266,9 +1274,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   <CheckCircle2 className="h-4 w-4" />
                   Your response is registered
                 </div>
-                {latestOwnParticipantMessage ? (
+                {(isOpenDiscussionMode ? latestOwnParticipantMessage?.content : modeResponsePreview) ? (
                   <blockquote className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-700">
-                    {latestOwnParticipantMessage.content}
+                    {isOpenDiscussionMode ? latestOwnParticipantMessage?.content : modeResponsePreview}
                   </blockquote>
                 ) : (
                   <p className="text-sm leading-relaxed text-emerald-700">

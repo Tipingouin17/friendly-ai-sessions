@@ -7774,13 +7774,18 @@ async def edge_function(func_name: str, request: Request):
                             participant_state_row = await conn.fetchrow(
                                 "INSERT INTO mode_participant_states "
                                 "(active_mode_id, conversation_id, participant_id, participant_slot, can_speak, is_current_speaker, is_next, can_submit, allowed_actions, state, updated_at) "
-                                "VALUES ($1, $2, $3, $4, FALSE, FALSE, FALSE, FALSE, '[]'::jsonb, '{\"submitted\": true}'::jsonb, NOW()) "
+                                "VALUES ($1, $2, $3, $4, FALSE, FALSE, FALSE, FALSE, '[]'::jsonb, $5::jsonb, NOW()) "
                                 "ON CONFLICT (active_mode_id, participant_id) DO UPDATE SET "
                                 "participant_slot = EXCLUDED.participant_slot, can_submit = FALSE, state = mode_participant_states.state || EXCLUDED.state, updated_at = NOW() RETURNING *",
                                 active_mode_id,
                                 conv_id,
                                 participant_row_id,
                                 participant_slot,
+                                json.dumps({
+                                    "submitted": True,
+                                    "input_type": input_type,
+                                    "content": input_content,
+                                }),
                             )
                         active_row = await conn.fetchrow(
                             "SELECT * FROM session_active_modes WHERE id = $1 AND conversation_id = $2",

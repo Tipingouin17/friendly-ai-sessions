@@ -125,6 +125,7 @@ assert.match(participantViewSource, /onSendMessage=\{\(\) => \{ void handleModeA
 assert.match(participantViewSource, /onHandRaiseToggle=\{async \(raised\)/, 'Debate / Panel must wire a participant hand-raise callback');
 assert.match(participantViewSource, /updateModeParticipantState\(/, 'Debate / Panel hand raises must use the secured mode-state transport');
 assert.match(participantViewSource, /setLocalDebateHandRaised\(raised\)/, 'Debate / Panel hand raises must acknowledge immediately while the state update is in flight');
+assert.match(participantViewSource, /\? 'raised'\s*:\s*'idle'/, 'Debate / Panel hand raises must pass the semantic raised or idle state expected by the composer');
 assert.match(participantViewSource, /modeState\?\.hand_raised/, 'Debate / Panel hand raises must restore from persisted participant state after refresh');
 
 const sessionRoomStateSource = fs.readFileSync(path.join(root, 'src/hooks/useSessionRoomState.ts'), 'utf8');

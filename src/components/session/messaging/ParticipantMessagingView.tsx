@@ -1398,7 +1398,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 modeInputError={modeInputError}
                 onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
                 onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
-                handRaiseState={localDebateHandRaised || Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)}
+                handRaiseState={
+                  participantModeState?.is_current_speaker || participantModeState?.can_speak
+                    ? 'floor_granted'
+                    : localDebateHandRaised || Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)
+                      ? 'raised'
+                      : 'idle'
+                }
                 floorGranted={Boolean(participantModeState?.is_current_speaker || participantModeState?.can_speak)}
                 onHandRaiseToggle={async (raised) => {
                   if (!activeMode || !effectiveParticipantId) return;

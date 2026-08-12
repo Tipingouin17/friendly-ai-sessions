@@ -7660,6 +7660,17 @@ async def edge_function(func_name: str, request: Request):
                 participant_state_row = None
                 approving_existing_mode = event_type == "mode.started" and active_mode_id is not None
                 event_payload = dict(payload)
+                # The established client contract sends structured mode-input fields
+                # at the request root. Preserve those values when no nested payload
+                # was supplied so content, visibility, and state are never discarded.
+                for field in (
+                    "inputType", "input_type", "content", "visibility", "state",
+                    "canSpeak", "can_speak", "isCurrentSpeaker", "is_current_speaker",
+                    "isNext", "is_next", "canSubmit", "can_submit",
+                    "remainingTime", "remaining_time", "allowedActions", "allowed_actions",
+                ):
+                    if field in data and field not in event_payload:
+                        event_payload[field] = data[field]
                 async with conn.transaction():
                     if event_type in ("mode.recommended", "mode.started"):
                         if approving_existing_mode:
@@ -7771,6 +7782,11 @@ async def edge_function(func_name: str, request: Request):
                                 participant_row_id,
                                 participant_slot,
                             )
+                        active_row = await conn.fetchrow(
+                            "SELECT * FROM session_active_modes WHERE id = $1 AND conversation_id = $2",
+                            active_mode_id,
+                            conv_id,
+                        )
 
                     event_row = await conn.fetchrow(
                         "INSERT INTO session_mode_events "

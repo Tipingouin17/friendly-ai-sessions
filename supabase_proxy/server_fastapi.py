@@ -7807,6 +7807,11 @@ async def edge_function(func_name: str, request: Request):
 
                 event_result = serialize_row(dict(event_row)) if event_row else {}
                 active_result = serialize_row(dict(active_row)) if active_row else None
+                if active_result and mode_row:
+                    # Mirror the relation returned by the standard active-mode query.
+                    # Without it, the client cannot resolve the mode key after a
+                    # successful input and incorrectly falls back to open discussion.
+                    active_result["facilitation_mode"] = serialize_row(dict(mode_row))
                 participant_state_result = serialize_row(dict(participant_state_row)) if participant_state_row else None
                 asyncio.create_task(manager.broadcast(str(conv_id), {
                     "event": "INSERT",

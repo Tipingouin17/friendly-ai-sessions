@@ -56,6 +56,12 @@ class FakeConnection:
     def __init__(self, db: FakeDB):
         self.db = db
 
+    async def fetchval(self, sql: str, *args):
+        compact_sql = " ".join(sql.split())
+        if "SELECT EXISTS" in compact_sql and "FROM public.conversations c" in compact_sql:
+            return args[0] == CONVERSATION_ID
+        raise AssertionError(f"Unhandled scalar SQL in harness: {compact_sql}")
+
     async def fetchrow(self, sql: str, *args):
         compact_sql = " ".join(sql.split())
         if "FROM conversations c" in compact_sql and "LEFT JOIN messages m" in compact_sql:
@@ -97,25 +103,32 @@ class FakePool:
 
 
 class FakeRequest:
-    def __init__(self, body: dict[str, Any]):
+    def __init__(self, body: dict[str, Any], authenticated: bool = True):
         self._body = body
         self.headers = {"content-type": "application/json"}
+        if authenticated:
+            token = server.jwt.encode(
+                {"sub": "host-user", "role": "authenticated", "exp": 4_000_000_000},
+                server.JWT_SECRET,
+                algorithm="HS256",
+            )
+            self.headers["authorization"] = f"Bearer {token}"
 
     async def json(self):
         return self._body
 
 
-async def invoke(body: dict[str, Any]):
-    request = FakeRequest(body)
+async def invoke(body: dict[str, Any], authenticated: bool = True):
+    request = FakeRequest(body, authenticated=authenticated)
     endpoint = server.edge_function
     while hasattr(endpoint, "__wrapped__"):
         endpoint = endpoint.__wrapped__
     return await endpoint("generate-ai-welcome", request)
 
 
-async def expect_http_error(name: str, status_code: int, body: dict[str, Any]):
+async def expect_http_error(name: str, status_code: int, body: dict[str, Any], authenticated: bool = True):
     try:
-        await invoke(body)
+        await invoke(body, authenticated=authenticated)
     except server.HTTPException as exc:
         assert exc.status_code == status_code, f"{name}: expected {status_code}, got {exc.status_code}"
         return
@@ -147,6 +160,8 @@ async def main():
 
     await expect_http_error("invalid conversation id", 400, {"conversationId": "not-an-int"})
 
+    await expect_http_error("welcome generation requires host authentication", 401, {"conversationId": CONVERSATION_ID}, authenticated=False)
+
     generated = await invoke({"conversationId": CONVERSATION_ID})
     assert generated["success"] is True
     assert generated["generated"] is True
@@ -165,7 +180,7 @@ async def main():
     assert "align on the next product milestone" in fallback["message"]
     assert db.helper_calls == [CONVERSATION_ID, CONVERSATION_ID]
 
-    await expect_http_error("missing conversation", 404, {"conversationId": 999})
+    await expect_http_error("unauthorized conversation", 403, {"conversationId": 999})
 
     print("GENERATE_AI_WELCOME_HARNESS_PASS")
     print(f"helper_calls={db.helper_calls}")

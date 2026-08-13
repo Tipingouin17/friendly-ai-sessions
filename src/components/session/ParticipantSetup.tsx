@@ -52,7 +52,8 @@ const ParticipantSetup = ({
   const handleNext = () => {
     // Update current participant info
     const [variant, paletteIndex] = selectedAvatar.split(':');
-    const avatarUrl = `/api/avatar?name=${nameInput || 'Anonymous'}&variant=${variant}&palette=${paletteIndex}`;
+    const avatarName = encodeURIComponent(nameInput || 'Anonymous');
+    const avatarUrl = `/api/avatar?name=${avatarName}&variant=${variant}&palette=${paletteIndex}`;
     
     setParticipants(prev => 
       prev.map(p => 
@@ -73,7 +74,8 @@ const ParticipantSetup = ({
       onComplete(participants.map((p, i) => {
         if (p.id === participantCount) {
           const [variant, paletteIndex] = selectedAvatar.split(':');
-          const avatarUrl = `/api/avatar?name=${nameInput || 'Anonymous'}&variant=${variant}&palette=${paletteIndex}`;
+          const avatarName = encodeURIComponent(nameInput || 'Anonymous');
+          const avatarUrl = `/api/avatar?name=${avatarName}&variant=${variant}&palette=${paletteIndex}`;
           return { ...p, name: nameInput || `Anonymous ${p.id}`, avatar: avatarUrl };
         }
         return p;
@@ -96,8 +98,9 @@ const ParticipantSetup = ({
       </div>
       
       <div className="w-full mb-6">
-        <label className="block text-gray-700 mb-2">Participant Name</label>
+        <label htmlFor="participant-name" className="block text-gray-700 mb-2">Participant Name</label>
         <Input
+          id="participant-name"
           placeholder={`Participant ${currentStep}`}
           value={nameInput}
           onChange={(e) => setNameInput(e.target.value)}

@@ -71,19 +71,19 @@ export const StandardPlanCard = ({
     const restrictions = plan.plan_table_details;
     if (!restrictions) return features;
 
-    if (restrictions.facilitator_limit) {
+    if (restrictions.facilitator_limit !== null && restrictions.facilitator_limit !== undefined) {
       const isUnlimited = restrictions.facilitator_limit >= 999999;
       features.push(isUnlimited ? 'Unlimited facilitators' : `${restrictions.facilitator_limit} ${restrictions.facilitator_limit === 1 ? 'facilitator' : 'facilitators'}`);
     }
-    if (restrictions.session_limit) {
+    if (restrictions.session_limit !== null && restrictions.session_limit !== undefined) {
       const isUnlimited = restrictions.session_limit >= 999999;
       features.push(isUnlimited ? 'Unlimited sessions per month' : `${restrictions.session_limit} sessions per month`);
     }
-    if (restrictions.max_participants) {
+    if (restrictions.max_participants !== null && restrictions.max_participants !== undefined) {
       const isUnlimited = restrictions.max_participants >= 999999;
       features.push(isUnlimited ? 'Unlimited participants per session' : `Up to ${restrictions.max_participants} participants per session`);
     }
-    if (restrictions.question_limit) {
+    if (restrictions.question_limit !== null && restrictions.question_limit !== undefined) {
       const isUnlimited = restrictions.question_limit >= 999999;
       features.push(isUnlimited ? 'Unlimited questions per session' : `Up to ${restrictions.question_limit} questions per session`);
     }

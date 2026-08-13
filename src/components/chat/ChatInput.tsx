@@ -234,6 +234,7 @@ const ChatInput = ({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
+            aria-label={placeholder || 'Chat message input'}
             disabled={disabled}
             rows={1}
             className={`w-full resize-none rounded-2xl border bg-slate-50 px-3 py-2 text-sm leading-[20px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 sm:leading-[22px] ${

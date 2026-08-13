@@ -58,6 +58,7 @@ globalThis.localStorage ??= {
   getItem(key) { return this._data.get(key) ?? null; },
   setItem(key, value) { this._data.set(key, String(value)); },
   removeItem(key) { this._data.delete(key); },
+  clear() { this._data.clear(); },
   key(index) { return Array.from(this._data.keys())[index] ?? null; },
 };
 globalThis.sessionStorage ??= {
@@ -81,6 +82,13 @@ const test = (name, fn) => {
     throw error;
   }
 };
+
+test('localStorage polyfill matches the Web Storage clear contract', () => {
+  localStorage.setItem('audit-key', 'value');
+  localStorage.clear();
+  assert.equal(localStorage.getItem('audit-key'), null);
+  assert.equal(localStorage.length, 0);
+});
 
 test('signup rejects whitespace-only names', () => {
   const result = utils.signupSchema.safeParse({ name: '     ', email: 'qa@example.com', password: 'Strong!234' });
@@ -189,6 +197,21 @@ test('participant revocation contract is present in server and client source', (
   assert.match(removalHook, /participant_removed/);
   assert.match(removalHook, /device_id/);
   assert.match(viewSelector, /Removed from session|removed from this session/i);
+});
+
+test('source-audit session security boundaries remain enforced', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const modeService = readFileSync(resolve(repoRoot, 'src/services/modeOrchestratorService.ts'), 'utf8');
+  const qrDialog = readFileSync(resolve(repoRoot, 'src/components/session/admin/AdminQrDialog.tsx'), 'utf8');
+
+  assert.match(server, /async def _require_conversation_host_access/);
+  assert.match(server, /A conversation_id=eq\.<id> filter is required for session data updates/);
+  assert.match(server, /await websocket\.close\(code=1008/);
+  assert.match(server, /def _safe_storage_path/);
+  assert.match(server, /Administrators manage/);
+  assert.match(modeService, /Number\.isSafeInteger\(normalizedConversationId\)/);
+  assert.match(qrDialog, /QRCodeSVG/);
+  assert.doesNotMatch(qrDialog, /api\.qrserver\.com/);
 });
 
 console.log('\nAudit stabilization regression tests passed.');

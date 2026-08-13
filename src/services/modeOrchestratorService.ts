@@ -414,10 +414,18 @@ export const subscribeToModeOrchestrator = (
   conversationId: number,
   onChange: (payload: RealtimePayload<Record<string, unknown>>) => void,
   onStatus?: (status: string) => void
-): RealtimeChannel => api
-  .channel(`session-mode-${conversationId}`)
-  .on("postgres_changes", { event: "*", schema: "public", table: "session_active_modes", filter: `conversation_id=eq.${conversationId}` }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "session_mode_events", filter: `conversation_id=eq.${conversationId}` }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "mode_participant_states", filter: `conversation_id=eq.${conversationId}` }, onChange)
-  .on("postgres_changes", { event: "*", schema: "public", table: "mode_inputs", filter: `conversation_id=eq.${conversationId}` }, onChange)
-  .subscribe((status) => onStatus?.(status));
+): RealtimeChannel => {
+  const normalizedConversationId = Number(conversationId);
+  if (!Number.isSafeInteger(normalizedConversationId) || normalizedConversationId < 1) {
+    throw new Error('A valid conversation id is required for realtime mode updates.');
+  }
+
+  const filter = `conversation_id=eq.${normalizedConversationId}`;
+  return api
+    .channel(`session-mode-${normalizedConversationId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "session_active_modes", filter }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "session_mode_events", filter }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "mode_participant_states", filter }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "mode_inputs", filter }, onChange)
+    .subscribe((status) => onStatus?.(status));
+};

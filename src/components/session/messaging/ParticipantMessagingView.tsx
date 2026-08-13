@@ -609,7 +609,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     } finally {
       setSubmittingChoiceId(null);
     }
-  }, [effectiveModeKey, hasRegisteredResponse, modeCanSubmit, submitModeInput, submittingChoiceId]);
+  }, [effectiveModeKey, effectiveParticipantId, hasRegisteredResponse, modeCanSubmit, submitModeInput, submittingChoiceId]);
 
   const handleModeAwareTextSubmit = React.useCallback(async () => {
     const text = inputMessage.trim();
@@ -645,7 +645,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     } finally {
       setSubmittingChoiceId(null);
     }
-  }, [activeMode, effectiveModeKey, hasRegisteredResponse, hasSubmittedModeChoice, inputMessage, isOpenDiscussionMode, isRoundRobinMode, isSilentResponseMode, modeBlocksAfterResponse, modeCanSubmit, onSendMessage, participantModeState?.is_current_speaker, setInputMessage, submitModeInput, submittingChoiceId]);
+  }, [activeMode, effectiveModeKey, effectiveParticipantId, hasRegisteredResponse, hasSubmittedModeChoice, inputMessage, isOpenDiscussionMode, isRoundRobinMode, isSilentResponseMode, modeBlocksAfterResponse, modeCanSubmit, onSendMessage, participantModeState?.is_current_speaker, setInputMessage, submitModeInput, submittingChoiceId]);
 
   React.useEffect(() => {
     setSubmittedChoiceId(null);

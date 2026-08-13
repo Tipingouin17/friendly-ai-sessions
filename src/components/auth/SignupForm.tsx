@@ -107,7 +107,7 @@ export const SignupForm: React.FC = () => {
           : (error as { message?: string })?.message ?? "An error occurred during signup";
 
       // Map backend error codes to user-friendly messages
-      let friendlyMessage = rawMessage;
+      let friendlyMessage = "Signup failed. Please try again, or contact support if the problem persists.";
       if (
         rawMessage.toLowerCase().includes('user_already_exists') ||
         rawMessage.toLowerCase().includes('already registered') ||

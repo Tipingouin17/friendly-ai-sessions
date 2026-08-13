@@ -32,6 +32,16 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
       });
       return;
     }
+
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      toast({
+        title: "Name required",
+        description: "Enter a facilitator name before creating it.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsLoading(true);
     
@@ -44,8 +54,8 @@ export const useFacilitatorCreation = (onSuccess: () => void) => {
       const { data: facilitator, error } = await api
         .from('facilitators')
         .insert({
-          title,
-          details,
+          title: normalizedTitle,
+          details: details.trim(),
           profile_picture: null, // We'll handle the profile picture separately
           lock: false,
           user_id: user!.id,

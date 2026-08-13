@@ -93,16 +93,16 @@ export const usePlanLimits = (): PlanLimits => {
     ? Infinity
     : (rawParticipantLimit !== undefined && rawParticipantLimit >= 999999)
       ? Infinity
-      : (rawParticipantLimit || 5);
+      : (rawParticipantLimit ?? 5);
 
   // Get the maximum questions per session with a default of 10
   // Treat very large values (999999+) as effectively unlimited
   const rawQuestionLimit = planRestrictions?.question_limit;
   const maxQuestionsPerSession = rawQuestionLimit === null
     ? Infinity
-    : (rawQuestionLimit && rawQuestionLimit >= 999999)
+    : (rawQuestionLimit !== undefined && rawQuestionLimit >= 999999)
       ? Infinity
-      : (rawQuestionLimit || 10);
+      : (rawQuestionLimit ?? 10);
 
   // Check if the user can create custom facilitators based on the plan
   const canCreateCustomFacilitators = !!planRestrictions?.customisable_facilitators;

@@ -168,7 +168,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
             aria-label={showPassword ? "Hide password" : "Show password"}
-            tabIndex={-1}
+            aria-pressed={showPassword}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -210,7 +210,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
             aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-            tabIndex={-1}
+            aria-pressed={showConfirmPassword}
           >
             {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -222,7 +222,7 @@ export const SignupFormFields: React.FC<SignupFormFieldsProps> = ({
 
       {attempts >= 3 && (
         <p className="text-indigo-600 text-xs text-center">
-          Too many attempts. Please wait a few minutes before trying again.
+          Too many attempts. Please wait 5 minutes before trying again.
         </p>
       )}
 

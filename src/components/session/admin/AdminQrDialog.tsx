@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Copy, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface AdminQrDialogProps {
@@ -39,12 +40,33 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
     }
   }, [conversationId, joinToken]);
 
-  const onCopyLink = () => {
-    if (joinUrl) {
-      navigator.clipboard.writeText(joinUrl);
+  const onCopyLink = async () => {
+    if (!joinUrl) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(joinUrl);
+      } else {
+        const fallbackInput = document.createElement('textarea');
+        fallbackInput.value = joinUrl;
+        fallbackInput.setAttribute('readonly', '');
+        fallbackInput.style.position = 'fixed';
+        fallbackInput.style.opacity = '0';
+        document.body.appendChild(fallbackInput);
+        fallbackInput.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(fallbackInput);
+        if (!copied) throw new Error('Clipboard fallback was rejected');
+      }
       toast({
         title: "Link copied",
         description: "Session join link copied to clipboard",
+      });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Unable to copy the link. Please copy it manually.",
+        variant: "destructive",
       });
     }
   };
@@ -77,10 +99,13 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
           {joinUrl && (
             <>
               <div className="w-full flex justify-center bg-white p-3 rounded-lg border">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}`} 
-                  alt="Session QR Code" 
-                  className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                <QRCodeSVG
+                  value={joinUrl}
+                  title="Session QR Code"
+                  size={208}
+                  level="M"
+                  includeMargin
+                  className="h-48 w-48 sm:h-52 sm:w-52"
                 />
               </div>
               
@@ -93,7 +118,8 @@ const AdminQrDialog: React.FC<AdminQrDialogProps> = ({
                     variant="ghost" 
                     size="sm"
                     className="ml-2 h-8 w-8 p-0 flex-shrink-0" 
-                    onClick={onCopyLink}
+                    onClick={() => { void onCopyLink(); }}
+                    aria-label="Copy session join link"
                   >
                     <Copy className="h-3 w-3" />
                   </Button>

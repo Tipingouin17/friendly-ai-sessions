@@ -31,6 +31,14 @@ import {
   Activity, Clock
 } from 'lucide-react';
 
+const formatMessageTime = (value: unknown): string => {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 interface SimplifiedHostMessagingViewProps {
   messages: Message[];
   participantColors: { [key: string]: string };
@@ -567,7 +575,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                             }
                           </span>
                           <span className="text-[10px] text-slate-500">
-                            {message.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
+                            {formatMessageTime(message.timestamp)}
                           </span>
                         </div>
                         <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${

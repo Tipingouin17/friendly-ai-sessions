@@ -24,6 +24,7 @@ import asyncio
 import logging
 import sys
 from urllib.parse import quote
+from pathlib import Path as FilePath
 import bcrypt as _bcrypt
 from datetime import date, datetime, timedelta
 
@@ -2054,6 +2055,42 @@ async def run_startup_migrations() -> None:
             updated_at = NOW()
         WHERE COALESCE(lower(voice_provider), '') NOT IN ('elevenlabs', 'custom_elevenlabs');
         """,
+        # 2026-08-13: Restrict direct client access to session orchestration,
+        # speech telemetry, and facilitator capability matrices. The Railway
+        # service is the audited access boundary; browser requests use scoped
+        # endpoints and must not receive tenant-wide Supabase table policies.
+        """
+        DO $$
+        DECLARE
+            target_table TEXT;
+            existing_policy RECORD;
+        BEGIN
+            FOREACH target_table IN ARRAY ARRAY[
+                'session_active_modes', 'session_mode_events', 'mode_participant_states',
+                'mode_inputs', 'facilitator_runtime_events', 'facilitator_meeting_snapshots',
+                'session_speech_turns', 'facilitator_tts_events',
+                'session_facilitation_analytics', 'facilitator_mode_access',
+                'facilitator_tool_access'
+            ] LOOP
+                IF to_regclass(format('public.%I', target_table)) IS NOT NULL THEN
+                    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', target_table);
+                    FOR existing_policy IN
+                        SELECT policyname
+                        FROM pg_policies
+                        WHERE schemaname = 'public' AND tablename = target_table
+                    LOOP
+                        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', existing_policy.policyname, target_table);
+                    END LOOP;
+                    EXECUTE format(
+                        'CREATE POLICY %I ON public.%I FOR ALL TO authenticated USING ((auth.jwt() ->> ''role'') = ''admin'') WITH CHECK ((auth.jwt() ->> ''role'') = ''admin'')',
+                        'Administrators manage ' || target_table,
+                        target_table
+                    );
+                END IF;
+            END LOOP;
+        END
+        $$;
+        """,
     ]
 
     try:
@@ -4007,7 +4044,10 @@ async def rpc_call(func_name: str, request: Request):
                 return bool(result[0]) if result else False
             # Generic RPC
             if data:
-                param_names = ", ".join([f"{k} := ${i+1}" for i, k in enumerate(data.keys())])
+                param_names = ", ".join([
+                    f"{_require_safe_sql_identifier(str(k), 'RPC parameter name')} := ${i + 1}"
+                    for i, k in enumerate(data.keys())
+                ])
                 result = await conn.fetchrow(f"SELECT * FROM public.{func_name}({param_names})", *list(data.values()))
             else:
                 result = await conn.fetchrow(f"SELECT * FROM public.{func_name}()")
@@ -4136,6 +4176,45 @@ async def _require_conversation_access(request: Request, conversation_id: int) -
     if join_token and await _validate_join_token(join_token, conv_id):
         return
     raise HTTPException(status_code=403, detail="Session access is required")
+
+
+async def _require_conversation_host_access(request: Request, conversation_id: int) -> dict:
+    """Require a non-banned conversation owner or administrator; participant tokens are intentionally insufficient."""
+    try:
+        conv_id = int(conversation_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="A valid conversation_id is required")
+
+    user = _require_current_user(request)
+    user_id = user.get("sub") or user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    async with _pool.acquire() as conn:
+        allowed = await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM public.conversations c
+                LEFT JOIN public.profiles p ON p.id = $2::uuid
+                WHERE c.id = $1
+                  AND (c.user_id = $2::uuid OR p.role = 'admin')
+            )
+            """,
+            conv_id,
+            str(user_id),
+        )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Host or administrator access is required")
+    return user
+
+
+def _extract_eq_filter(value: Any) -> Optional[str]:
+    """Return a scalar value from the compact PostgREST `eq.<value>` filter form."""
+    candidate = str(value or "").strip()
+    if candidate.startswith("eq."):
+        candidate = candidate[3:]
+    return candidate or None
 
 
 # ============================================================
@@ -5444,39 +5523,40 @@ async def admin_delete_user(user_id: str, request: Request):
         raise HTTPException(400, "Admins cannot delete their own account")
     try:
         async with _pool.acquire() as conn:
-            # Fetch email before deletion for cache cleanup
-            profile = await conn.fetchrow("SELECT email FROM profiles WHERE id = $1::uuid", user_id)
-            if not profile:
-                raise HTTPException(404, "User not found")
-            email = profile["email"]
+            async with conn.transaction():
+                # Fetch email before deletion for cache cleanup
+                profile = await conn.fetchrow("SELECT email FROM profiles WHERE id = $1::uuid", user_id)
+                if not profile:
+                    raise HTTPException(404, "User not found")
+                email = profile["email"]
 
-            # Cascade delete in correct FK order
-            await conn.execute(
-                "DELETE FROM messages WHERE conversation_id IN "
-                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
-                user_id,
-            )
-            await conn.execute(
-                "DELETE FROM session_events WHERE conversation_id IN "
-                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
-                user_id,
-            )
-            await conn.execute(
-                "DELETE FROM session_reports WHERE conversation_id IN "
-                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
-                user_id,
-            )
-            await conn.execute(
-                "DELETE FROM session_participants WHERE conversation_id IN "
-                "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
-                user_id,
-            )
-            await conn.execute("DELETE FROM conversations WHERE user_id = $1::uuid", user_id)
-            await conn.execute("DELETE FROM sessions WHERE user_id = $1::uuid", user_id)
-            await conn.execute("DELETE FROM facilitators WHERE user_id = $1::uuid", user_id)
-            await conn.execute("DELETE FROM login_activity WHERE user_id = $1::uuid", user_id)
-            await conn.execute("DELETE FROM email_verification_tokens WHERE user_id = $1::uuid", user_id)
-            await conn.execute("DELETE FROM profiles WHERE id = $1::uuid", user_id)
+                # Cascade delete in correct FK order
+                await conn.execute(
+                    "DELETE FROM messages WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM session_events WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM session_reports WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                await conn.execute(
+                    "DELETE FROM session_participants WHERE conversation_id IN "
+                    "(SELECT id FROM conversations WHERE user_id = $1::uuid)",
+                    user_id,
+                )
+                await conn.execute("DELETE FROM conversations WHERE user_id = $1::uuid", user_id)
+                await conn.execute("DELETE FROM sessions WHERE user_id = $1::uuid", user_id)
+                await conn.execute("DELETE FROM facilitators WHERE user_id = $1::uuid", user_id)
+                await conn.execute("DELETE FROM login_activity WHERE user_id = $1::uuid", user_id)
+                await conn.execute("DELETE FROM email_verification_tokens WHERE user_id = $1::uuid", user_id)
+                await conn.execute("DELETE FROM profiles WHERE id = $1::uuid", user_id)
 
         # Clean up in-memory caches
         _BANNED_USERS_CACHE.pop(user_id, None)
@@ -6545,6 +6625,32 @@ async def rest_table(table: str, request: Request):
                 if not data:
                     raise HTTPException(400, "No data")
                 _require_safe_payload_keys(data)
+
+                # Direct writes to tables linked to a conversation must be scoped to
+                # that conversation. Participants may submit only ordinary user
+                # messages with their valid join token; all lifecycle, state, and
+                # analytics mutations remain host/admin operations through their
+                # dedicated endpoints.
+                if table in SECURE_CONV_TABLES:
+                    mutation_rows = data if isinstance(data, list) else [data]
+                    for mutation_row in mutation_rows:
+                        conversation_id = mutation_row.get("conversation_id") if isinstance(mutation_row, dict) else None
+                        try:
+                            conversation_id = int(conversation_id)
+                        except (TypeError, ValueError):
+                            raise HTTPException(400, "conversation_id is required for session data mutations")
+
+                        participant_message = (
+                            table == "messages"
+                            and str(mutation_row.get("role") or "user") == "user"
+                            and bool(join_token_header)
+                        )
+                        if participant_message:
+                            if not await _validate_join_token(join_token_header, conversation_id):
+                                raise HTTPException(403, "Invalid session token")
+                        else:
+                            await _require_conversation_host_access(request, conversation_id)
+
                 # H8: Validate join token for unauthenticated participant POST to messages.
                 # This prevents ghost participants from a previous conversation from
                 # accidentally posting messages to a different conversation.
@@ -6727,6 +6833,11 @@ async def rest_table(table: str, request: Request):
                 if not data:
                     raise HTTPException(400, "No data")
                 _require_safe_payload_keys(data)
+                if table in SECURE_CONV_TABLES:
+                    conversation_id = _extract_eq_filter(params.get("conversation_id"))
+                    if not conversation_id:
+                        raise HTTPException(400, "A conversation_id=eq.<id> filter is required for session data updates")
+                    await _require_conversation_host_access(request, int(conversation_id))
                 wc, wv = build_where(params, table)
                 # Build SET clause with asyncpg positional params
                 set_parts = [f'"{k}" = ${i+1}' for i, k in enumerate(data.keys())]
@@ -6787,6 +6898,11 @@ async def rest_table(table: str, request: Request):
                 return rows[0] if len(rows) == 1 else rows
 
             if request.method == "DELETE":
+                if table in SECURE_CONV_TABLES:
+                    conversation_id = _extract_eq_filter(params.get("conversation_id"))
+                    if not conversation_id:
+                        raise HTTPException(400, "A conversation_id=eq.<id> filter is required for session data deletion")
+                    await _require_conversation_host_access(request, int(conversation_id))
                 wc, wv = build_where(params, table)
                 new_wc_parts = []
                 for i, clause in enumerate(wc):
@@ -7493,6 +7609,7 @@ async def edge_function(func_name: str, request: Request):
             conv_id_int = int(conv_id_raw)
         except (TypeError, ValueError):
             raise HTTPException(400, detail={"error": "invalid_conversation_id", "message": "conversationId must be an integer"})
+        await _require_conversation_host_access(request, conv_id_int)
 
         # Reuse the production welcome helper. It is intentionally idempotent:
         # if a welcome/message already exists, it exits without double-writing.
@@ -8493,12 +8610,24 @@ async def edge_function(func_name: str, request: Request):
             intent = stripe_lib.PaymentIntent.retrieve(payment_intent_id)
             if intent.status not in ("succeeded", "processing"):
                 raise HTTPException(400, f"Payment not completed. Status: {intent.status}")
+            intent_metadata = dict(intent.metadata or {})
+            if str(intent_metadata.get("user_id") or "") != str(user_id):
+                raise HTTPException(403, "This payment does not belong to the authenticated account")
+            trusted_plan_id = intent_metadata.get("plan_id")
+            if not trusted_plan_id:
+                raise HTTPException(400, "Payment is missing its associated plan")
+            try:
+                trusted_plan_id = int(trusted_plan_id)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Payment contains an invalid plan")
+            if plan_id is not None and str(plan_id) != str(trusted_plan_id):
+                raise HTTPException(400, "Requested plan does not match the payment")
             async with _pool.acquire() as conn:
                 await conn.execute(
                     "UPDATE profiles SET current_plan_id = $1, subscription_status = 'active', stripe_customer_id = COALESCE($2, stripe_customer_id), stripe_subscription_id = $3, plan_upgraded_at = COALESCE(plan_upgraded_at, NOW()), updated_at = NOW() WHERE id = $4",
-                    plan_id, customer_id, payment_intent_id, user_id,
+                    trusted_plan_id, intent.customer, payment_intent_id, user_id,
                 )
-            return {"success": True, "status": "active", "planId": plan_id}
+            return {"success": True, "status": "active", "planId": trusted_plan_id}
         except stripe_lib.error.StripeError as se:
             raise HTTPException(400, str(se))
 
@@ -8595,10 +8724,14 @@ async def edge_function(func_name: str, request: Request):
 
     # ── create-portal-session ──────────────────────────────────
     elif func_name == "create-portal-session":
-        user_id = data.get("userId")
+        caller = _require_current_user(request)
+        user_id = caller.get("sub") or caller.get("id")
+        requested_user_id = data.get("userId")
+        if requested_user_id and str(requested_user_id) != str(user_id):
+            raise HTTPException(403, "A billing portal can only be created for the authenticated account")
         return_url = data.get("returnUrl", f"{SITE_URL}/settings")
         if not user_id:
-            raise HTTPException(400, "Missing userId")
+            raise HTTPException(401, "Authentication required")
         try:
             async with _pool.acquire() as conn:
                 profile = await conn.fetchrow("SELECT stripe_customer_id FROM profiles WHERE id = $1", user_id)
@@ -8615,6 +8748,11 @@ async def edge_function(func_name: str, request: Request):
         conv_id = data.get("conversationId")
         if not conv_id:
             raise HTTPException(400, "Missing conversationId")
+        try:
+            conv_id = int(conv_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "conversationId must be an integer")
+        await _require_conversation_host_access(request, conv_id)
         try:
             async with _pool.acquire() as conn:
                 row = await conn.fetchrow(
@@ -9061,6 +9199,11 @@ async def edge_function(func_name: str, request: Request):
 
         if not conversation_id or not isinstance(invitees, list) or not invitees:
             raise HTTPException(400, detail={"error": "conversation_id and at least one invitee are required."})
+        try:
+            conversation_id = int(conversation_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"error": "conversation_id must be an integer."})
+        await _require_conversation_host_access(request, conversation_id)
         if not cf_token:
             raise HTTPException(400, detail={"error": "Turnstile token is required."})
         if not EMAIL_ENABLED:
@@ -9248,17 +9391,41 @@ async def stripe_webhook(request: Request):
 # ============================================================
 # Storage
 # ============================================================
+_STORAGE_SEGMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _safe_storage_path(*parts: str) -> FilePath:
+    """Resolve a storage object path while rejecting traversal and absolute paths."""
+    base = FilePath(STORAGE_DIR).resolve()
+    safe_parts: list[str] = []
+    for part in parts:
+        candidate = FilePath(str(part))
+        if candidate.is_absolute() or any(segment in {"", ".", ".."} for segment in candidate.parts):
+            raise HTTPException(400, "Invalid storage object path")
+        safe_parts.extend(candidate.parts)
+    target = base.joinpath(*safe_parts).resolve()
+    try:
+        target.relative_to(base)
+    except ValueError:
+        raise HTTPException(400, "Invalid storage object path")
+    return target
+
+
+def _require_safe_storage_bucket(bucket: str) -> str:
+    normalized = str(bucket or "").strip()
+    if not _STORAGE_SEGMENT_RE.fullmatch(normalized):
+        raise HTTPException(400, "Invalid storage bucket")
+    return normalized
+
+
 @app.get("/storage/v1/object/public/{filepath:path}")
 async def storage_public(filepath: str, request: Request):
-    full_path = os.path.join(STORAGE_DIR, filepath)
-    if not os.path.exists(full_path):
+    full_path = _safe_storage_path(filepath)
+    if not full_path.is_file():
         raise HTTPException(404, "File not found")
-    origin = request.headers.get("origin", "*")
     response = FileResponse(full_path)
-    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Origin"] = SITE_URL
     response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Cache-Control"] = "public, max-age=86400"
     return response
 
@@ -9266,25 +9433,35 @@ async def storage_public(filepath: str, request: Request):
 @app.post("/storage/v1/object/{bucket}/{filepath:path}")
 @app.put("/storage/v1/object/{bucket}/{filepath:path}")
 async def storage_upload(bucket: str, filepath: str, request: Request):
-    os.makedirs(os.path.join(STORAGE_DIR, bucket), exist_ok=True)
+    _require_current_user(request)
+    bucket = _require_safe_storage_bucket(bucket)
+    content_length = request.headers.get("content-length")
+    max_upload_bytes = 10 * 1024 * 1024
+    if content_length:
+        try:
+            declared_length = int(content_length)
+        except ValueError:
+            raise HTTPException(400, "Invalid Content-Length header")
+        if declared_length < 0 or declared_length > max_upload_bytes:
+            raise HTTPException(413, "Storage uploads are limited to 10 MB")
     body = await request.body()
+    if len(body) > max_upload_bytes:
+        raise HTTPException(413, "Storage uploads are limited to 10 MB")
+    target = _safe_storage_path(bucket, filepath)
+    target.parent.mkdir(parents=True, exist_ok=True)
     if body:
-        fp = os.path.join(STORAGE_DIR, bucket, filepath)
-        os.makedirs(os.path.dirname(fp), exist_ok=True)
-        with open(fp, "wb") as f:
-            f.write(body)
+        with target.open("wb") as storage_file:
+            storage_file.write(body)
     return {"Key": f"{bucket}/{filepath}", "Id": str(uuid.uuid4())}
 
 
 @app.head("/storage/v1/object/public/{bucket}/{filepath:path}")
 async def storage_head(bucket: str, filepath: str, request: Request):
-    exists = os.path.exists(os.path.join(STORAGE_DIR, bucket, filepath))
-    origin = request.headers.get("origin", "*")
+    bucket = _require_safe_storage_bucket(bucket)
+    exists = _safe_storage_path(bucket, filepath).is_file()
     headers = {
-        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Origin": SITE_URL,
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Credentials": "true",
     }
     return Response(status_code=200 if exists else 404, headers=headers)
 
@@ -9446,6 +9623,14 @@ async def realtime_websocket(websocket: WebSocket):
     Clients subscribe to channels (e.g. 'realtime:public:messages:conversation_id=eq.<id>')
     and receive INSERT/UPDATE/DELETE events for that conversation.
     """
+    # Production clients use the scoped-ticket SSE endpoint above.  This legacy
+    # Supabase-compatible WebSocket transport cannot safely carry participant
+    # join-token authorization, so it is deliberately closed rather than
+    # accepting unsigned anonymous tokens.
+    await websocket.close(code=1008, reason="Use the scoped realtime SSE endpoint")
+    return
+
+    # Legacy implementation retained below for reference only.
     # Extract conversation_id from query params (apikey is the JWT)
     query_params = dict(websocket.query_params)
     apikey = query_params.get("apikey", "")

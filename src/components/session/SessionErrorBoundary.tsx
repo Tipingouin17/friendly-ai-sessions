@@ -117,10 +117,12 @@ const SessionErrorBoundary: React.FC<SessionErrorBoundaryProps> = ({
   // connectionAttempts is incremented every 5 s when WS is disconnected.
   // Railway closes idle WS connections after ~60 s (~12 cycles before stable).
   // Use >= 8 to avoid false positives during normal WS reconnection cycles.
+  const hasLastAttemptTimestamp = typeof lastAttemptTime === 'number' && lastAttemptTime > 0;
   const waitedTooLong =
     connectionAttempts >= 8 ||
     (isLoading &&
       !hasInitializedProvider &&
+      hasLastAttemptTimestamp &&
       Date.now() - lastAttemptTime > 30000);
 
   if (hasError || waitedTooLong) {

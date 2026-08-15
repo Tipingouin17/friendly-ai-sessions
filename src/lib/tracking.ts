@@ -59,6 +59,7 @@ const DEFAULT_GOOGLE_ADS_CONTACT_CONVERSION_LABEL = '4PthCKTk6q0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL = 'dFKvCLrn8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_BEGIN_CHECKOUT_CONVERSION_LABEL = 'Y_4DCL3n8K0cEKLkvdRD';
 const DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL = 'KEhxCMDn8K0cEKLkvdRD';
+const DEFAULT_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL = 'wPD4CNXXj-IcEKLkvdRD';
 const DEFAULT_GTM_CONTAINER_ID = 'GTM-NK8ZJFW2';
 const DEFAULT_MICROSOFT_UET_ID = '343251742';
 const ATTRIBUTION_STORAGE_KEY = 'aifacilitator_acquisition_attribution_v1';
@@ -80,7 +81,9 @@ const config = {
   googleAdsPurchaseConversionLabel:
     (import.meta.env.VITE_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL as string | undefined) ||
     DEFAULT_GOOGLE_ADS_PURCHASE_CONVERSION_LABEL,
-  googleAdsSessionCreatedConversionLabel: import.meta.env.VITE_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL as string | undefined,
+  googleAdsSessionCreatedConversionLabel:
+    (import.meta.env.VITE_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL as string | undefined) ||
+    DEFAULT_GOOGLE_ADS_SESSION_CREATED_CONVERSION_LABEL,
   gtmContainerId: (import.meta.env.VITE_GTM_CONTAINER_ID as string | undefined) || DEFAULT_GTM_CONTAINER_ID,
   microsoftUetId: (import.meta.env.VITE_MICROSOFT_UET_ID as string | undefined) || DEFAULT_MICROSOFT_UET_ID,
   clarityProjectId: import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined,

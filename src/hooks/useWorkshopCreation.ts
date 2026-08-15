@@ -12,9 +12,9 @@ import { createConversation, validateScheduledStartAt } from "@/services/facilit
 import { useNavigateToSession } from "@/hooks/session-joining/useNavigateToSession";
 import { useNavigate } from "react-router-dom";
 import { recordActivationEventBeacon } from "@/lib/activationTracking";
-import { trackSessionCreated } from "@/lib/tracking";
+import { trackActivationDemoCompleted, trackSessionCreated } from "@/lib/tracking";
 
-export const useWorkshopCreation = () => {
+export const useWorkshopCreation = (activationMode?: string | null) => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [selectedFacilitator, setSelectedFacilitator] = useState<number | null>(null);
   const [selectedWorkshop, setSelectedWorkshop] = useState<number | null>(null);
@@ -131,6 +131,14 @@ export const useWorkshopCreation = () => {
             ...eventParameters,
           });
 
+          if (activationMode === 'demo') {
+            trackActivationDemoCompleted('onboarding_demo_workshop_created');
+            recordActivationEventBeacon('activation_demo_completed', {
+              activation_step: 'demo_completed',
+              source: 'onboarding_demo_workshop_created',
+              ...eventParameters,
+            });
+          }
 
         if (currentScheduleValidation.isScheduled) {
           navigate(`/schedule-invitations?id=${data.id}`);

@@ -619,6 +619,19 @@ export function trackInviteParticipantsIntent(source = 'onboarding_demo'): void 
   trackMicrosoftEvent('invite_participants_intent', parameters);
 }
 
+/** Record completion of the guided solo-demo setup after a demo workshop is created. */
+export function trackActivationDemoCompleted(source = 'onboarding_demo_workshop_created'): void {
+  const parameters = {
+    event_category: 'activation',
+    event_label: source,
+    activation_step: 'demo_completed',
+    source,
+  };
+
+  trackGa4Event('activation_demo_completed', parameters);
+  trackMicrosoftEvent('activation_demo_completed', parameters);
+}
+
 export function trackFirstRealSessionStarted(source = 'session_start'): void {
   const parameters = {
     event_category: 'activation',

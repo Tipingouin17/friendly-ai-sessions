@@ -37,6 +37,9 @@ const AIfacilitators = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasAppliedOnboardingPreset, setHasAppliedOnboardingPreset] = useState(false);
   const [searchParams] = useSearchParams();
+  const onboardingMode = searchParams.get("onboarding");
+  const isOnboardingDemo = onboardingMode === "demo";
+  const isOnboardingInvite = onboardingMode === "invite";
 
   // Must be declared before the useEffect that uses it to avoid TDZ error
   const { hasSeenWelcome, setHasSeenWelcome } = useOnboarding();
@@ -83,7 +86,7 @@ const AIfacilitators = () => {
     handleSubmit,
     handleUpgradePlan,
     isSubmitting
-  } = useWorkshopCreation();
+  } = useWorkshopCreation(onboardingMode);
 
   const {
     hasReachedSessionLimit,
@@ -96,9 +99,6 @@ const AIfacilitators = () => {
 
   const { currentPlanId } = useUserPlan();
   const { user } = useAuth();
-  const onboardingMode = searchParams.get("onboarding");
-  const isOnboardingDemo = onboardingMode === "demo";
-  const isOnboardingInvite = onboardingMode === "invite";
 
   // Map a plan ID to its effective access tier for facilitator lock checks.
   // Mirrors the same logic in FacilitatorCarousel.tsx.

@@ -656,6 +656,10 @@ export function trackSessionCreated(parameters: Record<string, unknown>): void {
   };
 
   trackGa4Event('session_created', conversionParameters);
+  trackGa4Event('first_workshop_created', {
+    ...conversionParameters,
+    activation_step: 'first_workshop_created',
+  });
   if (config.googleAdsSessionCreatedConversionLabel) {
     trackGoogleAdsConversion(config.googleAdsSessionCreatedConversionLabel, conversionParameters);
   }

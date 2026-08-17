@@ -214,4 +214,30 @@ test('source-audit session security boundaries remain enforced', () => {
   assert.doesNotMatch(qrDialog, /api\.qrserver\.com/);
 });
 
+test('mobile lifecycle paths do not strand a participant behind a welcome gate or unexplained voice failure', () => {
+  const viewSelector = readFileSync(resolve(repoRoot, 'src/components/session/SessionViewSelector.tsx'), 'utf8');
+  const planLimits = readFileSync(resolve(repoRoot, 'src/hooks/usePlanLimits.ts'), 'utf8');
+  const chatInput = readFileSync(resolve(repoRoot, 'src/components/chat/ChatInput.tsx'), 'utf8');
+
+  assert.match(viewSelector, /else if \(sessionStartedInDB\) \{/);
+  assert.match(viewSelector, /welcome message is an enhancement, not a prerequisite/i);
+  assert.ok(viewSelector.indexOf('else if (sessionStartedInDB)') < viewSelector.indexOf("phase = 'ai_generating'"));
+  assert.doesNotMatch(planLimits, /Failed to fetch facilitator count/);
+  assert.match(planLimits, /retry: 1/);
+  assert.match(chatInput, /Voice typing is not available in this browser/);
+});
+
+test('no-report session stop uses the authenticated atomic lifecycle endpoint', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const closureHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionClosure.ts'), 'utf8');
+
+  assert.match(server, /elif func_name == "stop-session"/);
+  assert.match(server, /Only the session host can end this session/);
+  assert.match(server, /already_ended/);
+  assert.match(server, /INSERT INTO session_events/);
+  assert.match(server, /is_session_ended": True, "status": "completed"/);
+  assert.match(closureHook, /functions\.invoke\('stop-session'/);
+  assert.doesNotMatch(closureHook, /\.from\('conversations'\)\s*\.update\(/);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

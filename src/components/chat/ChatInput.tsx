@@ -290,6 +290,12 @@ const ChatInput = ({
         </button>
       </div>
 
+      {speechEnabled && speechSupported === false && (
+        <p className="mt-1 px-1 text-xs leading-relaxed text-slate-500" role="status">
+          Voice typing is not available in this browser. You can still send your response by typing it below.
+        </p>
+      )}
+
       {/* Character counter — only shown when typing */}
       {charCount > 0 && (
         <div className={`mt-1 text-right text-xs pr-1 ${

@@ -8306,6 +8306,98 @@ async def edge_function(func_name: str, request: Request):
             log_session.error("facilitator-ingest-stream-event error for conv=%s: %s", conv_id, e, exc_info=True)
             raise HTTPException(500, detail={"code": "stream_ingest_failed", "message": "Could not persist facilitator runtime event"})
 
+    # ── stop-session ───────────────────────────────────────────
+    elif func_name == "stop-session":
+        # Fast, idempotent session closure for the host's "End session without
+        # report" action.  Lifecycle writes and the participant notification are
+        # performed on the server so a mobile client cannot be stranded by a
+        # failed sequence of browser-side reads, counts, and generic PATCH calls.
+        caller = get_current_user(request)
+        caller_id = (caller.get("sub") or caller.get("id")) if caller else None
+        if not caller_id:
+            raise HTTPException(401, "Authentication required")
+
+        try:
+            conversation_id = int(data.get("conversation_id"))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "A valid conversation_id is required")
+
+        async with _pool.acquire() as conn:
+            existing = await conn.fetchrow(
+                "SELECT id, user_id, is_session_ended, ended_at, total_messages, participants "
+                "FROM conversations WHERE id = $1",
+                conversation_id,
+            )
+            if not existing:
+                raise HTTPException(404, "Session not found")
+            if str(existing["user_id"]) != str(caller_id):
+                raise HTTPException(403, "Only the session host can end this session")
+
+            # Treat a repeated mobile tap or a retry after a dropped response as
+            # a successful, already-completed operation rather than an error.
+            if existing["is_session_ended"]:
+                return {
+                    "success": True,
+                    "already_ended": True,
+                    "conversation_id": conversation_id,
+                    "ended_at": existing["ended_at"].isoformat() if existing["ended_at"] else None,
+                    "message_count": int(existing["total_messages"] or 0),
+                    "participant_count": int(existing["participants"] or 0),
+                }
+
+            async with conn.transaction():
+                message_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM messages WHERE conversation_id = $1",
+                    conversation_id,
+                )
+                participant_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM session_participants WHERE conversation_id = $1",
+                    conversation_id,
+                )
+                active_respondents = await conn.fetchval(
+                    "SELECT COUNT(DISTINCT COALESCE(NULLIF(name, ''), user_id::text)) "
+                    "FROM messages WHERE conversation_id = $1 AND role = 'user'",
+                    conversation_id,
+                )
+                participant_count = int(participant_count or 0)
+                message_count = int(message_count or 0)
+                engagement_score = round((int(active_respondents or 0) / participant_count) * 100, 2) if participant_count else 0
+                closed = await conn.fetchrow(
+                    "UPDATE conversations SET is_session_ended = TRUE, status = 'completed', ended_at = NOW(), "
+                    "total_messages = $1, participants = $2, participant_engagement_score = $3, "
+                    "session_duration_minutes = GREATEST(0, CEIL(EXTRACT(EPOCH FROM (NOW() - created_at)) / 60.0)::integer) "
+                    "WHERE id = $4 RETURNING ended_at",
+                    message_count,
+                    max(1, participant_count),
+                    engagement_score,
+                    conversation_id,
+                )
+                await conn.execute(
+                    "INSERT INTO session_events (conversation_id, event_type, data) VALUES ($1, 'session_ended', $2)",
+                    conversation_id,
+                    json.dumps({"ended_by": str(caller_id), "report_generated": False}),
+                )
+
+        ended_at = closed["ended_at"].isoformat() if closed and closed["ended_at"] else None
+        asyncio.create_task(manager.broadcast(str(conversation_id), {
+            "event": "UPDATE",
+            "payload": {
+                "eventType": "UPDATE",
+                "new": {"id": str(conversation_id), "is_session_ended": True, "status": "completed", "ended_at": ended_at},
+                "old": {},
+                "table": "conversations",
+                "schema": "public",
+            },
+        }))
+        return {
+            "success": True,
+            "already_ended": False,
+            "conversation_id": conversation_id,
+            "ended_at": ended_at,
+            "message_count": message_count,
+            "participant_count": participant_count,
+        }
+
     # ── close-session-and-generate-report ─────────────────────
     elif func_name == "close-session-and-generate-report":
         # ── Security: extract user from JWT, not from untrusted request body ──

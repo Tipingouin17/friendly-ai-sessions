@@ -12,7 +12,6 @@ import { useSessionClosureValidation } from './session-closure/useSessionClosure
 import { useSessionClosureExecution } from './session-closure/useSessionClosureExecution';
 import { useReportDownloader } from './session-closure/useReportDownloader';
 import api from "@/lib/api";
-import { calculateCanonicalSessionDurationMinutes, calculateEngagementScore } from '@/utils/sessionLifecycle';
 
 interface SessionClosureResult {
   reportId: string;
@@ -130,69 +129,13 @@ export const useSessionClosure = () => {
     }, 30000);
 
     try {
-      // Reuse the same validation (ownership + not-already-ended checks)
-      await validateSessionClosure(conversationId);
-
-      // --- Compute session stats before closing ---
-      // 1. Fetch the conversation to get created_at for duration calculation
-      const { data: convData } = await api
-        .from('conversations')
-        .select('created_at, session_started_at')
-        .eq('id', conversationId)
-        .single();
-
-      // 2. Count all messages in this conversation
-      const { data: allMessages } = await api
-        .from('messages')
-        .select('id, role, user_id')
-        .eq('conversation_id', conversationId);
-
-      const totalMessages = allMessages?.length ?? 0;
-      const userMessages = allMessages?.filter(m => m.role === 'user') ?? [];
-      const uniqueRespondents = new Set(userMessages.map(m => m.user_id).filter(Boolean)).size;
-
-      // 3. Count participants
-      const { count: participantCount } = await api
-        .from('session_participants')
-        .select('id', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId);
-
-      // 4. Compute engagement score: ratio of participants who sent at least one message
-      const activeParticipants = participantCount ?? 0;
-      const engagementScore = calculateEngagementScore({
-        uniqueRespondents,
-        participantCount: activeParticipants,
+      // End the room through one authenticated, idempotent server operation.
+      // This avoids a mobile browser having to complete a sequence of separate
+      // reads, count queries, and a generic PATCH before participants can leave.
+      const { error } = await api.functions.invoke('stop-session', {
+        body: { conversation_id: conversationId },
       });
-
-      // 5. Compute duration from the canonical start timestamp when available.
-      // Fall back to created_at for legacy rows that predate session_started_at.
-      const now = new Date().toISOString();
-      const durationMinutes = calculateCanonicalSessionDurationMinutes({
-        startedAt: convData?.session_started_at,
-        createdAt: convData?.created_at,
-        endedAt: now,
-      });
-
-      // The DB has a CHECK (participants >= 1) constraint, so we clamp to minimum 1.
-      // A session with 0 registered participants is still valid (host ran it alone).
-      const participantsForDb = Math.max(1, activeParticipants);
-
-      // Mark the conversation as ended with all stats
-      const { error } = await api
-        .from('conversations')
-        .update({
-          is_session_ended: true,
-          ended_at: now,
-          total_messages: totalMessages,
-          participants: participantsForDb,
-          participant_engagement_score: engagementScore,
-          session_duration_minutes: durationMinutes,
-        })
-        .eq('id', conversationId);
-
-      if (error) {
-        throw new Error(`Failed to stop session: ${error.message}`);
-      }
+      if (error) throw new Error(error.message || 'Failed to stop session');
 
       setClosureProgress('Session stopped.');
 

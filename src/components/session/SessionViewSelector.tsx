@@ -250,9 +250,15 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     let phase: ParticipantLoadingPhase;
 
     if (isParticipantLoading) {
-      // Data still loading — keep the shell mounted with connecting phase
-      // (same component instance, no unmount/remount = no flash)
+      // Data is still loading — keep the shell mounted with connecting phase
+      // (same component instance, no unmount/remount = no flash).
       phase = 'connecting';
+    } else if (sessionStartedInDB) {
+      // A welcome message is an enhancement, not a prerequisite for joining a
+      // live workshop.  Blocking the room here stranded mobile participants
+      // when an LLM/realtime notification was delayed.  SessionView subscribes
+      // to messages itself, so a welcome generated moments later still appears.
+      return <SessionView props={props} isAdmin={isAdmin} />;
     } else if (!sessionStartedInDB) {
       // Host hasn't started the session yet
       phase = 'waiting_host';

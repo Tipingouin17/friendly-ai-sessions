@@ -11,7 +11,6 @@ const log = createLogger('usePlanLimits', 'plan');
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { useUserPlan } from "./useUserPlan";
-import { useToast } from "@/components/ui/use-toast";
 
 export interface PlanLimits {
   hasReachedFacilitatorLimit: boolean;
@@ -35,8 +34,6 @@ export interface PlanLimits {
 export const usePlanLimits = (): PlanLimits => {
   const { user } = useAuth();
   const { planRestrictions, plan, isLoading: planLoading } = useUserPlan();
-  const { toast } = useToast();
-
   const { data: counts, isLoading: countsLoading } = useQuery({
     queryKey: ['userUsage', user?.id],
     staleTime: 5 * 60 * 1000, // 5 minutes — counts don't change often
@@ -54,14 +51,12 @@ export const usePlanLimits = (): PlanLimits => {
         api.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', startOfMonth)
       ]);
 
-      if (facilitatorResult.error) {
-        toast({ title: "Error", description: "Failed to fetch facilitator count", variant: "destructive" });
-        throw facilitatorResult.error;
-      }
-      if (sessionResult.error) {
-        toast({ title: "Error", description: "Failed to fetch session count", variant: "destructive" });
-        throw sessionResult.error;
-      }
+      // Usage counts support plan-limit hints; they must never interrupt an
+      // active workshop with a destructive toast.  The server remains the
+      // authoritative enforcement point for protected creation and message
+      // actions, while callers can safely render their normal loading state.
+      if (facilitatorResult.error) throw facilitatorResult.error;
+      if (sessionResult.error) throw sessionResult.error;
 
       return {
         facilitatorCount: facilitatorResult.count || 0,
@@ -69,6 +64,7 @@ export const usePlanLimits = (): PlanLimits => {
       };
     },
     enabled: !!user && !planLoading,
+    retry: 1,
   });
 
   const isLoading = planLoading || countsLoading;

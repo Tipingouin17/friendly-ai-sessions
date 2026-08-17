@@ -91,9 +91,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error('getUser timeout')), 5000)
             ),
-          ]) as Promise<{ data: { user: import('@/lib/api').ApiUser | null } }>;
-          const { data: { user: freshUser } } = await getUserWithTimeout;
-          setUser(freshUser ?? existingSession.user);
+          ]) as ReturnType<typeof api.auth.getUser>;
+          const { data: { user: freshUser }, error: freshUserError } = await getUserWithTimeout;
+
+          // A locally persisted session is not proof that its token is still
+          // accepted by Railway. Continuing with a rejected token made every
+          // protected page issue failing data requests and appear to be stuck
+          // loading. Clear only explicit auth failures; transient network
+          // failures still retain the cached session in the catch block.
+          if (freshUserError?.status === 401 || freshUserError?.status === 403) {
+            await api.auth.signOut();
+            setSession(null);
+            setUser(null);
+          } else {
+            setUser(freshUser ?? existingSession.user);
+          }
         } catch {
           // Backend slow or unreachable — fall back to cached session user
           setUser(existingSession.user);

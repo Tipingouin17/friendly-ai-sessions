@@ -240,4 +240,15 @@ test('no-report session stop uses the authenticated atomic lifecycle endpoint', 
   assert.doesNotMatch(closureHook, /\.from\('conversations'\)\s*\.update\(/);
 });
 
+test('protected desktop routes clear explicitly rejected cached sessions instead of loading with a stale token', () => {
+  const authContext = readFileSync(resolve(repoRoot, 'src/contexts/AuthContext.tsx'), 'utf8');
+  const protectedRoute = readFileSync(resolve(repoRoot, 'src/components/ProtectedRoute.tsx'), 'utf8');
+
+  assert.match(authContext, /freshUserError\?\.status === 401/);
+  assert.match(authContext, /freshUserError\?\.status === 403/);
+  assert.match(authContext, /await api\.auth\.signOut\(\)/);
+  assert.match(authContext, /setSession\(null\);\s*setUser\(null\);/s);
+  assert.match(protectedRoute, /Navigate to="\/login"/);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

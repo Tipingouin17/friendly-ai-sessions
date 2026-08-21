@@ -11,36 +11,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
-const hasStartedSession = (conversationLike: any): boolean => {
-  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
-};
-
-const isMissingSessionStartedAtColumn = (error: { message?: string; details?: string; hint?: string; code?: string } | null): boolean => {
-  if (!error) return false;
-  const combined = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ').toLowerCase();
-  return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
-};
-
-const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
-  // The deployed Railway/PostgREST-compatible backend currently persists the
-  // lifecycle signal with `session_started`. Some historical frontend builds
-  // also probed `session_started_at`, but that column is not guaranteed to
-  // exist in every environment and can make the backend return HTTP 400 before
-  // the host can enter the live room. Verification should therefore read the
-  // canonical shared flag only.
-  const { data, error } = await api
-    .from('conversations')
-    .select('id,session_started')
-    .eq('id', conversationId)
-    .single();
-
-  if (error) {
-    throw new Error(error.message || 'Unable to verify that the session started');
-  }
-
-  return hasStartedSession(data);
-};
-
 export function useSessionInterface(
   conversationId: number | null,
   conversation?: ConversationWithSession | null
@@ -155,20 +125,11 @@ export function useSessionInterface(
     sessionStorage.setItem('isHostSession', 'true');
 
     try {
-      const { error } = await api
-        .from('conversations')
-        .update({
-          session_started: true,
-        })
-        .eq('id', conversationId);
-
-      if (error) {
-        throw new Error(error.message || "Failed to start session");
-      }
-
-      const persistedStartConfirmed = await verifyPersistedSessionStart(conversationId);
-      if (!persistedStartConfirmed) {
-        throw new Error("Session start was not persisted by the backend");
+      const { data, error } = await api.functions.invoke('start-session', {
+        body: { conversationId },
+      });
+      if (error || !data?.success) {
+        throw error ?? new Error(data?.message || "Failed to start session");
       }
 
       setIsSessionStarted(true);
@@ -176,7 +137,7 @@ export function useSessionInterface(
       lastSessionStarted.current = true;
       toast({
         title: "Session started",
-        description: "The session has been successfully started.",
+        description: "The room is live. Your facilitator is preparing the welcome message.",
       });
       await navigateToHostSession(conversationId);
     } catch (err) {

@@ -16,38 +16,6 @@ interface UseSessionStartProps {
   conversationData: any;
 }
 
-const hasStartedSession = (conversationLike: any): boolean => {
-  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
-};
-
-const isMissingSessionStartedAtColumn = (error: { message?: string; details?: string; hint?: string; code?: string } | null): boolean => {
-  if (!error) return false;
-  const combined = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ').toLowerCase();
-  return combined.includes('session_started_at') && (combined.includes('column') || combined.includes('does not exist'));
-};
-
-const verifyPersistedSessionStart = async (conversationId: number): Promise<boolean> => {
-  let { data, error } = await api
-    .from('conversations')
-    .select('id,session_started,session_started_at')
-    .eq('id', conversationId)
-    .single();
-
-  if (isMissingSessionStartedAtColumn(error)) {
-    ({ data, error } = await api
-      .from('conversations')
-      .select('id,session_started')
-      .eq('id', conversationId)
-      .single());
-  }
-
-  if (error) {
-    throw new Error(error.message || 'Unable to verify that the session started');
-  }
-
-  return hasStartedSession(data);
-};
-
 export const useSessionStart = ({
   conversationId,
   participants,
@@ -82,89 +50,32 @@ export const useSessionStart = ({
         language: conversationData?.language
       });
 
-      // First, mark the session as started in the database
-      const dbUpdateStart = performance.now();
-      let { error: updateError } = await api
-        .from('conversations')
-        .update({
-          session_started: true,
-          session_started_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
-
-      if (isMissingSessionStartedAtColumn(updateError)) {
-        logger.warn('session_started_at column is unavailable; falling back to session_started only.');
-        ({ error: updateError } = await api
-          .from('conversations')
-          .update({
-            session_started: true
-          })
-          .eq('id', conversationId));
-      }
-
-      const dbUpdateDuration = performance.now() - dbUpdateStart;
-      logger.category('session', `💾 Database update completed in ${dbUpdateDuration.toFixed(2)}ms`);
-
-      if (updateError) {
-        logger.error('❌ Error updating session_started:', updateError);
-        throw updateError;
-      }
-
-      const persistedStartConfirmed = await verifyPersistedSessionStart(conversationId);
-      if (!persistedStartConfirmed) {
-        throw new Error('Session start was not persisted by the backend');
-      }
-
-      logger.category('session', '✅ Session marked as started in database');
-
-      // Generate the initial facilitator welcome message
-      logger.category('session', '🤖 Generating initial facilitator welcome message');
-
-      const aiRequestStart = performance.now();
-      const requestPayload = {
-        messages: [], // Empty for initial welcome message
-        conversationId: conversationId,
-        generateReport: false,
-        sessionStart: true // Flag to indicate this is the session start
-      };
-
-      logger.category('session', '📤 Edge function request payload:', requestPayload);
-
-      const { data: responseData, error: responseError } = await api.functions.invoke(
-        'handle-facilitator-response',
-        {
-          body: requestPayload
-        }
+      // One server-owned lifecycle operation commits the room transition and
+      // schedules the welcome in the background.  Do not wait for an LLM here:
+      // doing so freezes host UI and delays every participant transition.
+      const lifecycleStart = performance.now();
+      const { data: lifecycleData, error: lifecycleError } = await api.functions.invoke(
+        'start-session',
+        { body: { conversationId } },
       );
+      const lifecycleDuration = performance.now() - lifecycleStart;
 
-      const aiRequestDuration = performance.now() - aiRequestStart;
-      logger.category('session', `⚡ Edge function call completed in ${aiRequestDuration.toFixed(2)}ms`);
-
-      if (responseError) {
-        logger.error('❌ Error generating welcome message:', {
-          error: responseError,
-          duration: aiRequestDuration,
-          requestPayload
+      if (lifecycleError || !lifecycleData?.success) {
+        logger.error('❌ Error starting server-owned session lifecycle:', {
+          error: lifecycleError,
+          response: lifecycleData,
+          duration: lifecycleDuration,
         });
-        throw responseError;
+        throw lifecycleError ?? new Error(lifecycleData?.message || 'Failed to start the session');
       }
-
-      logger.category('session', '✅ Welcome message generated successfully:', {
-        responseData,
-        contentLength: responseData?.content?.length,
-        generationMethod: responseData?.metrics?.generationMethod,
-        hasAvatar: !!responseData?.avatar,
-        facilitatorContext: responseData?.facilitator_context,
-        sessionContext: responseData?.session_context
-      });
 
       const totalDuration = performance.now() - startTime;
-      logger.category('session', `🎯 Session start completed in ${totalDuration.toFixed(2)}ms total`);
+      logger.category('session', `🎯 Session made live in ${totalDuration.toFixed(2)}ms; welcome scheduled server-side`);
       trackFirstRealSessionStarted('session_start');
 
       toast({
         title: "Session started",
-        description: "The session has been started and participants will receive the welcome message.",
+        description: "The room is live. Your facilitator is preparing the welcome message.",
       });
 
       return true;

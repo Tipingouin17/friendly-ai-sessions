@@ -337,12 +337,30 @@ test('welcome generation is server-owned, atomically claimed, and cannot be dupl
 
   assert.match(server, /welcome_already_claimed/);
   assert.match(server, /SET welcome_message_status = 'ai_generating'/);
-  assert.match(server, /Welcome generation belongs exclusively to the host's atomic/);
+  assert.match(server, /A single database state transition is the welcome ownership lock/);
   assert.doesNotMatch(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(conversation_id\)\)/);
   assert.doesNotMatch(fetcher, /sessionStart:\s*true/);
   assert.doesNotMatch(fetcher, /Client-side fallback if Edge Function fails/);
   assert.doesNotMatch(recovery, /api\.functions\.invoke\('handle-facilitator-response'/);
   assert.doesNotMatch(recovery, /welcome_message_status: 'pending'/);
+});
+
+test('server-owned session start is immediate, singular, and does not block on a model response', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const startHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionStart.ts'), 'utf8');
+  const sessionInterface = readFileSync(resolve(repoRoot, 'src/hooks/useSessionInterface.ts'), 'utf8');
+  const statusHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionStatus.ts'), 'utf8');
+
+  assert.match(server, /elif func_name == "start-session"/);
+  assert.match(server, /await _require_conversation_host_access\(request, start_conversation_id\)/);
+  assert.match(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(start_conversation_id\)\)/);
+  assert.match(server, /await asyncio\.to_thread\(_call_facilitator_model\)/);
+  assert.match(startHook, /functions\.invoke\(\s*'start-session'/s);
+  assert.doesNotMatch(startHook, /handle-facilitator-response/);
+  assert.match(sessionInterface, /functions\.invoke\('start-session'/);
+  assert.doesNotMatch(sessionInterface, /\.from\('conversations'\)\s*\.update\(/s);
+  assert.match(statusHook, /const announcedSessionStarts = new Set<number>\(\)/);
+  assert.match(statusHook, /!announcedSessionStarts\.has\(conversationId\)/);
 });
 
 test('session-start and mobile media feedback remain singular and truthful', () => {

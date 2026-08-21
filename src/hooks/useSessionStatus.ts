@@ -10,6 +10,11 @@ import { useToast } from "@/components/ui/use-toast";
 import api, { getJoinToken } from "@/lib/api";
 import { removeChannel } from "@/utils/realtimeHelpers";
 
+// A session can be observed by nested host/participant shells at the same time.
+// Keep start notifications browser-local and conversation-scoped so duplicate
+// realtime subscriptions cannot produce duplicate user-facing toasts.
+const announcedSessionStarts = new Set<number>();
+
 export function useSessionStatus(conversationId: number | null, refetch: () => void) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -81,8 +86,9 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
         if (payload.new.is_session_ended || payload.new.status !== 'active') {
           handleSessionEnd();
         }
-        if (payload.new.session_started && !payload.old?.session_started) {
-          toast({ title: "Session Started", description: "The session has been started." });
+        if (payload.new.session_started && !payload.old?.session_started && !announcedSessionStarts.has(conversationId)) {
+          announcedSessionStarts.add(conversationId);
+          toast({ title: "Session Started", description: "The host has started the session." });
         }
         refetch();
       })

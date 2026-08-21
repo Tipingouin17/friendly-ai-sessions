@@ -5835,29 +5835,32 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
     sessionStart=True so the AI produces a personalised welcome message.
     """
     try:
-        # Check if a welcome message already exists for this conversation
-        async with _pool.acquire() as conn:
-            _cnt_row = await conn.fetchrow(
-                "SELECT COUNT(*) FROM messages WHERE conversation_id = $1",
-                conv_id
+        # A single database state transition is the welcome ownership lock.  The
+        # old message-count and process-local lock could race with the host
+        # start request or another Railway worker, producing two greetings.
+        async with _acquire_lifecycle_connection("welcome generation claim") as claim_conn:
+            claim = await claim_conn.fetchrow(
+                """
+                UPDATE conversations
+                SET welcome_message_status = 'ai_generating'
+                WHERE id = $1
+                  AND session_started = TRUE
+                  AND COALESCE(is_session_ended, FALSE) = FALSE
+                  AND NOT EXISTS (
+                    SELECT 1 FROM messages
+                    WHERE conversation_id = $1 AND role = 'assistant'
+                  )
+                  AND COALESCE(welcome_message_status, 'pending')
+                      NOT IN ('ai_generating', 'ai_ready', 'template_ready', 'fallback_ready')
+                RETURNING id
+                """,
+                conv_id,
             )
-        msg_count = _cnt_row[0] if _cnt_row else 0
-
-        if msg_count > 0:
-            # Message already exists — nothing to do
+        if not claim:
             return
 
-        # Idempotency guard: skip if welcome generation is already in progress.
-        # Use a SEPARATE key from the facilitator-response lock so that a fast
-        # participant message (sent within 10 s of joining) is never blocked.
-        _now = time.time()
-        _lock_key = f"welcome_lock_{conv_id}"
-        _last = _ai_response_locks.get(_lock_key, 0)
-        if _now - _last < 10:
-            return
-        _ai_response_locks[_lock_key] = _now
         # Fetch conversation + session + facilitator details needed by the AI
-        async with _pool.acquire() as conn:
+        async with _acquire_lifecycle_connection("welcome context") as conn:
             row = await conn.fetchrow(
                 "SELECT c.id, c.user_id, c.language, c.participants, c.participant_description, "
                 "s.title, s.objective, s.welcome_message, s.scope, s.duration_minutes, "
@@ -7143,6 +7146,51 @@ async def edge_function(func_name: str, request: Request):
             except Exception:
                 raise HTTPException(500, str(se))
 
+    # ── start-session ───────────────────────────────────────────
+    elif func_name == "start-session":
+        raw_conversation_id = data.get("conversationId") or data.get("conversation_id")
+        try:
+            start_conversation_id = int(raw_conversation_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={"code": "invalid_conversation_id", "message": "A valid conversation ID is required to start the session."})
+
+        # Only the owning host or an administrator can make a room live.  A
+        # participant join token deliberately cannot start a workshop.
+        await _require_conversation_host_access(request, start_conversation_id)
+        async with _acquire_lifecycle_connection("start session") as start_conn:
+            started_row = await start_conn.fetchrow(
+                """
+                UPDATE conversations
+                SET session_started = TRUE
+                WHERE id = $1
+                  AND COALESCE(is_session_ended, FALSE) = FALSE
+                RETURNING id, session_started, is_session_ended, welcome_message_status
+                """,
+                start_conversation_id,
+            )
+        if not started_row:
+            raise HTTPException(404, detail={"code": "session_not_startable", "message": "This session could not be started because it is unavailable or already closed."})
+
+        started_payload = serialize_row(dict(started_row))
+        # The room transition must never wait on an LLM.  The server owns the
+        # one-time welcome claim and performs generation in the background.
+        asyncio.create_task(_maybe_generate_welcome_message(start_conversation_id))
+        asyncio.create_task(manager.broadcast(str(start_conversation_id), {
+            "event": "UPDATE",
+            "payload": {
+                "eventType": "UPDATE",
+                "new": started_payload,
+                "old": {"session_started": False},
+                "table": "conversations",
+                "schema": "public",
+            },
+        }))
+        return {
+            "success": True,
+            "conversation": started_payload,
+            "welcome": "scheduled",
+        }
+
     # ── handle-facilitator-response ────────────────────────────
     elif func_name == "handle-facilitator-response":
         conv_id = data.get("conversationId")
@@ -7150,6 +7198,20 @@ async def edge_function(func_name: str, request: Request):
         generate_report = data.get("generateReport", False)
         host_instruction = (data.get("hostInstruction") or "").strip()
         voice_enabled = bool(data.get("voiceEnabled", False))
+
+        # Legacy session-start callers are retained for compatibility, but they
+        # may no longer synchronously generate content.  The room must become
+        # live immediately and the one server-owned background job owns the
+        # atomic welcome claim.  A participant token cannot schedule a workshop
+        # greeting on behalf of the host.
+        if conv_id and is_session_start:
+            try:
+                lifecycle_conversation_id = int(conv_id)
+            except (TypeError, ValueError):
+                raise HTTPException(400, detail={"code": "invalid_conversation_id", "message": "A valid conversation ID is required."})
+            await _require_conversation_host_access(request, lifecycle_conversation_id)
+            asyncio.create_task(_maybe_generate_welcome_message(lifecycle_conversation_id))
+            return {"success": True, "scheduled": True, "reason": "server_owned_welcome"}
 
         # ── SECURITY LAYER 1: JWT Authentication ──────────────────────────────
         # Extract the caller's identity from the JWT in the Authorization header.
@@ -7646,12 +7708,19 @@ async def edge_function(func_name: str, request: Request):
         _model_used: Optional[str] = None
         _oai_client_main = await _get_openai_client(model)
         try:
-            response = _oai_client_main.chat.completions.create(
-                model=model,
-                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt}],
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            def _call_facilitator_model():
+                return _oai_client_main.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt}],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+
+            # The OpenAI-compatible SDK is synchronous.  Running it on the
+            # FastAPI event loop freezes every concurrent session request while
+            # a welcome or reply is generated, which is visible as stalled
+            # joins, duplicate recovery paths, and broken realtime state.
+            response = await asyncio.to_thread(_call_facilitator_model)
             txt = response.choices[0].message.content.strip()
             logger.debug("[AI] Response received (%d chars)", len(txt))
             # Capture token usage for cost tracking

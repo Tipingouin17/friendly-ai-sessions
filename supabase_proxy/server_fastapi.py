@@ -7162,11 +7162,10 @@ async def edge_function(func_name: str, request: Request):
                 """
                 UPDATE conversations
                 SET session_started = TRUE,
-                    session_started_at = COALESCE(session_started_at, NOW()),
                     status = 'active'
                 WHERE id = $1
                   AND COALESCE(is_session_ended, FALSE) = FALSE
-                RETURNING id, session_started, session_started_at, status, is_session_ended, welcome_message_status
+                RETURNING id, session_started, status, is_session_ended, welcome_message_status
                 """,
                 start_conversation_id,
             )

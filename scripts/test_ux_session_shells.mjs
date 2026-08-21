@@ -107,9 +107,12 @@ assertContains(inputFooter, 'Silent response mode is active', 'adaptive footer a
 assertContains(inputFooter, 'Facilitation mode changed. Unsaved draft input was cleared.', 'adaptive footer announces mode transitions and draft clearing');
 assertContains(inputFooter, 'motion-reduce:transition-none', 'adaptive footer respects reduced motion preferences');
 assertContains(participantView, 'speechEnabled={speechStackEnabled && !aiIsSpeaking}', 'participant speech runtime requires enabled settings and pauses during AI speech');
-assertContains(participantView, 'hasTtsEventForMessage', 'participant skips facilitator TTS replay after refresh when a TTS event already exists');
+assertNotContains(participantView, 'hasTtsEventForMessage', 'participant playback is not suppressed by a different device\'s persisted TTS event');
+assertContains(participantView, 'facilitator-tts-spoken:${conversationId}:${messageId}', 'participant replay guard remains scoped to the local browser session');
 assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
+assertContains(participantView, 'Enable facilitator audio', 'participant exposes an explicit mobile audio-enable state');
+assertContains(participantView, 'Play latest reply', 'participant exposes a visible replay action for facilitator audio');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');
 assertContains(hostContent, 'session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900', 'host redesigned light command-center surface');

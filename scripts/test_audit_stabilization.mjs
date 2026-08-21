@@ -265,4 +265,25 @@ test('authentication critical path remains bounded and reports retryable service
   assert.match(login, /Sign-in is taking longer than expected\. Please wait a few seconds and try again\./);
 });
 
+test('mobile facilitator voice remains enabled, replayable, and independently audible on every authorized device', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const participantView = readFileSync(resolve(repoRoot, 'src/components/session/messaging/ParticipantMessagingView.tsx'), 'utf8');
+  const hostContent = readFileSync(resolve(repoRoot, 'src/components/session/host/HostSessionContent.tsx'), 'utf8');
+  const voiceHook = readFileSync(resolve(repoRoot, 'src/hooks/facilitator/useFacilitatorVoice.ts'), 'utf8');
+
+  assert.match(server, /"tts_avatar_enabled": True/);
+  assert.match(server, /"speech_stack_enabled": True/);
+  assert.match(participantView, /phase3Settings\?\.tts_avatar_enabled !== false/);
+  assert.match(participantView, /!audioUnlocked \|\| !lastAssistantMessage/);
+  assert.doesNotMatch(participantView, /hasTtsEventForMessage/);
+  assert.match(participantView, /Enable facilitator audio/);
+  assert.match(participantView, /Play latest reply/);
+  assert.match(participantView, /Facilitator audio is ready/);
+  assert.match(hostContent, /!audioUnlocked \|\| !latestFacilitatorMessage/);
+  assert.match(hostContent, /Play latest reply/);
+  assert.match(voiceHook, /FacilitatorVoicePlaybackState/);
+  assert.match(voiceHook, /unlockAudio/);
+  assert.match(voiceHook, /data:audio\/wav;base64/);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

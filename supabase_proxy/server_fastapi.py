@@ -9927,7 +9927,19 @@ async def api_runtime_settings():
             LIMIT 1
             """
         )
-    return serialize_row(dict(row)) if row else {}
+    if row:
+        return serialize_row(dict(row))
+    # A missing administrator configuration must not silently disable the core
+    # session experience. These are safe product defaults; an existing row with
+    # an explicit false value still remains an administrator-controlled opt-out.
+    return {
+        "speech_stack_enabled": True,
+        "speech_default_language": "en-US",
+        "tts_avatar_enabled": True,
+        "tts_default_voice_id": _DEFAULT_ELEVEN_VOICE_ID,
+        "tts_lip_sync_enabled": True,
+        "facilitation_analytics_enabled": False,
+    }
 
 
 @app.get("/api/contact-info")

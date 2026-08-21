@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { CalendarClock, Check, Copy, LayoutGrid, Mail, MonitorUp, Play, QrCode, Users, Video, VideoOff, Wifi } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, Copy, LayoutGrid, Loader2, Mail, MonitorUp, Play, QrCode, Users, Video, VideoOff, Volume2, Wifi } from "lucide-react";
 import SimplifiedHostMessagingView from "@/components/session/messaging/SimplifiedHostMessagingView";
 import HostParticipantList from "@/components/session/HostParticipantList";
 import ParticipantAvatar from "@/components/chat/avatars/ParticipantAvatar";
@@ -259,29 +259,22 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   // ElevenLabs voice selection is resolved from the selected facilitator persona on the server.
   // Do not label it as a generic default, which would be misleading to the host.
   const facilitatorVoiceLabel = 'Persona-matched voice';
-  const latestSessionMessage = sessionMessages[sessionMessages.length - 1];
+  const latestFacilitatorMessage = React.useMemo(
+    () => [...sessionMessages].reverse().find((message) => message.sender === 'assistant') ?? null,
+    [sessionMessages]
+  );
 
   // ── Autoplay unlock (browser blocks audio until a user gesture) ──
   const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
     try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
   });
-  const handleUnlockAudio = React.useCallback(() => {
-    // Resume any suspended AudioContext and mark audio as unlocked
-    try {
-      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
-    } catch (_) { /* ignore */ }
-    try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
-    setAudioUnlocked(true);
-  }, []);
-
   // ── Host-side ElevenLabs TTS (so the host hears the AI facilitator voice) ──
   const { data: phase3Settings } = usePhase3RuntimeSettings();
   const facilitatorId = (conversationData?.sessions?.facilitator_details as { id?: number } | undefined)?.id ?? null;
   const hostVoiceRuntime = useFacilitatorVoice({
     conversationId: currentConversationId,
     facilitatorId,
-    enabled: Boolean(phase3Settings?.tts_avatar_enabled) && audioUnlocked,
+    enabled: phase3Settings?.tts_avatar_enabled !== false && audioUnlocked,
     defaultVoiceId: phase3Settings?.tts_default_voice_id ?? null,
     voiceGender: facilitatorVoiceGender,
     lipSyncEnabled: false,
@@ -290,15 +283,30 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     ttsEndpoint: `${import.meta.env.VITE_API_URL ?? ''}/api/tts/synthesize`,
   });
 
-  // Trigger TTS whenever a new assistant message arrives
+  const handleEnableHostAudio = React.useCallback(() => {
+    void hostVoiceRuntime.unlockAudio().finally(() => {
+      try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
+      setAudioUnlocked(true);
+    });
+  }, [hostVoiceRuntime]);
+
+  // Trigger TTS whenever a new assistant message arrives.
   const lastSpokenMessageIdRef = React.useRef<string | null>(null);
+  const replayLatestFacilitatorReply = React.useCallback(() => {
+    if (!latestFacilitatorMessage) return;
+    const msgId = String(latestFacilitatorMessage.id ?? latestFacilitatorMessage.timestamp ?? latestFacilitatorMessage.content?.slice(0, 20));
+    void hostVoiceRuntime.speak({ text: latestFacilitatorMessage.content ?? '', messageId: msgId });
+  }, [hostVoiceRuntime, latestFacilitatorMessage]);
   React.useEffect(() => {
-    if (!latestSessionMessage || latestSessionMessage.sender !== 'assistant') return;
-    const msgId = String(latestSessionMessage.id ?? latestSessionMessage.timestamp ?? latestSessionMessage.content?.slice(0, 20));
+    // Preserve the newest facilitator response until the host has performed
+    // a real audio-unlock gesture; otherwise the replay guard consumes it
+    // before browser autoplay is permitted.
+    if (!audioUnlocked || !latestFacilitatorMessage) return;
+    const msgId = String(latestFacilitatorMessage.id ?? latestFacilitatorMessage.timestamp ?? latestFacilitatorMessage.content?.slice(0, 20));
     if (lastSpokenMessageIdRef.current === msgId) return;
     lastSpokenMessageIdRef.current = msgId;
-    void hostVoiceRuntime.speak({ text: latestSessionMessage.content ?? '', messageId: msgId });
-  }, [latestSessionMessage, hostVoiceRuntime]);
+    void hostVoiceRuntime.speak({ text: latestFacilitatorMessage.content ?? '', messageId: msgId });
+  }, [audioUnlocked, hostVoiceRuntime, latestFacilitatorMessage]);
   const respondedParticipantIds = new Set(
     sessionMessages
       .filter((message) => message.sender === "user" && message.participant)
@@ -312,7 +320,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
       avatarUrl: facilitatorDetails?.profile_picture,
       isAI: true,
       isMuted: false,
-      isSpeaking: hostVoiceRuntime.isSpeaking || latestSessionMessage?.sender === 'assistant',
+      isSpeaking: hostVoiceRuntime.isSpeaking,
       accentColor: 'rgb(217 119 6)',
     },
     {
@@ -611,7 +619,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         <div
           role="banner"
           className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-indigo-600 px-4 py-2.5 text-white shadow-md transition-opacity hover:bg-indigo-700"
-          onClick={handleUnlockAudio}
+          onClick={handleEnableHostAudio}
         >
           <div className="flex items-center gap-2 text-sm font-medium">
             <span className="text-lg">🔊</span>
@@ -620,10 +628,31 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
           <button
             type="button"
             className="rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
-            onClick={handleUnlockAudio}
+            onClick={handleEnableHostAudio}
           >
             Enable Audio
           </button>
+        </div>
+      )}
+      {audioUnlocked && (
+        <div role="status" aria-live="polite" className={`mb-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${
+          hostVoiceRuntime.playbackState === 'failed' || hostVoiceRuntime.playbackState === 'blocked'
+            ? 'border-rose-200 bg-rose-50 text-rose-900'
+            : hostVoiceRuntime.playbackState === 'playing'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+              : 'border-indigo-200 bg-indigo-50 text-indigo-950'
+        }`}>
+          <div className="flex min-w-0 items-center gap-2">
+            {hostVoiceRuntime.playbackState === 'preparing' ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              : hostVoiceRuntime.playbackState === 'failed' || hostVoiceRuntime.playbackState === 'blocked' ? <AlertTriangle className="h-4 w-4 shrink-0" />
+                : <Volume2 className="h-4 w-4 shrink-0" />}
+            <span className="truncate font-semibold">{hostVoiceRuntime.playbackState === 'preparing' ? 'Preparing facilitator voice…' : hostVoiceRuntime.playbackState === 'playing' ? 'Facilitator voice is playing' : hostVoiceRuntime.playbackError ?? 'Facilitator audio is ready'}</span>
+          </div>
+          {latestFacilitatorMessage && (
+            <button type="button" onClick={replayLatestFacilitatorReply} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-current/20 bg-white/80 px-2.5 py-1.5 text-xs font-bold hover:bg-white active:scale-95">
+              <Play className="h-3.5 w-3.5 fill-current" /> Play latest reply
+            </button>
+          )}
         </div>
       )}
       <PanelGroup direction="horizontal" className="min-h-0 flex-1 gap-0 rounded-[1.5rem]">

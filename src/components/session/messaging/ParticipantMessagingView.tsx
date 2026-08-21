@@ -13,11 +13,11 @@ import type { ConversationWithSession, DbFacilitatorPersonaConfig } from '@/type
 import type { UseStreamingFacilitatorRuntimeResult } from '@/hooks/facilitator/useStreamingFacilitatorRuntime';
 import InputFooter from '@/components/session/InputFooter';
 import { useMessageProcessor } from '@/hooks/useMessageProcessor';
-import { Captions, CheckCircle2, Home, MessageSquare, Mic, MicOff, Sparkles, Users, Video, VideoOff } from 'lucide-react';
+import { AlertTriangle, Captions, CheckCircle2, Home, Loader2, MessageSquare, Mic, MicOff, Play, Sparkles, Users, Video, VideoOff, Volume2 } from 'lucide-react';
 import FacilitatorAvatar from '@/components/chat/avatars/FacilitatorAvatar';
 import { SessionVideoGrid, type SessionVideoParticipant } from '@/components/session/video/SessionVideoGrid';
 import type { FacilitatorToolAssignment } from '@/types/facilitator';
-import { hasTtsEventForMessage, recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
+import { recordSpeechTurn } from '@/services/facilitator/phase3RuntimeService';
 import { useFacilitatorVoice } from '@/hooks/facilitator/useFacilitatorVoice';
 import { usePhase3RuntimeSettings } from '@/hooks/facilitator/usePhase3RuntimeSettings';
 import { inferFacilitatorVoiceGender } from '@/utils/facilitatorVoiceGender';
@@ -88,7 +88,7 @@ const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
   if (status === 'disconnected') return 'Reconnecting';
   if (status === 'unsupported') return 'Unsupported';
   if (status === 'idle') return 'Camera off';
-  return 'Connecting';
+  return 'Video connecting';
 };
 
 const formatRoomConnectionLabel = (status: WebRTCConnectionStatus): string => {
@@ -342,19 +342,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   modeError = null,
   submitModeInput,
 }) => {
-  const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('people');
+  // On phones the conversation is the primary task; people/video remains one tap away.
+  const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('chat');
   const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
     // Persist across re-renders within the same browser tab session
     try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
   });
-  const handleUnlockAudio = React.useCallback(() => {
-    try {
-      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) { const ctx = new AudioCtx(); void ctx.resume(); }
-    } catch (_) { /* ignore */ }
-    try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
-    setAudioUnlocked(true);
-  }, []);
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
@@ -449,7 +442,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const { data: phase3Settings, isPlaceholderData: isPhase3SettingsPending } = usePhase3RuntimeSettings(conversationData?.language);
   const phase3RuntimeReady = !isPhase3SettingsPending;
   const speechStackEnabled = Boolean(phase3RuntimeReady && phase3Settings?.speech_stack_enabled);
-  const ttsAvatarEnabled = Boolean(phase3RuntimeReady && phase3Settings?.tts_avatar_enabled);
+  // Absence of an admin configuration row must fall back to the product default.
+  // An explicit false remains the administrator-controlled way to disable voice.
+  const ttsAvatarEnabled = Boolean(phase3RuntimeReady && phase3Settings?.tts_avatar_enabled !== false);
   const analyticsPersistenceEnabled = Boolean(phase3RuntimeReady && phase3Settings?.facilitation_analytics_enabled);
   const voiceRuntime = useFacilitatorVoice({
     conversationId,
@@ -468,6 +463,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     ttsProvider: 'server',
     ttsEndpoint: `${import.meta.env.VITE_API_URL ?? ''}/api/tts/synthesize`,
   });
+  const handleEnableFacilitatorAudio = React.useCallback(() => {
+    void voiceRuntime.unlockAudio().finally(() => {
+      try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
+      setAudioUnlocked(true);
+    });
+  }, [voiceRuntime]);
+
   const runtimeAvatarState = voiceRuntime.isSpeaking
     ? voiceRuntime.runtimeAvatarState
     : facilitatorRuntime?.avatarState ?? null;
@@ -549,9 +551,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     return Number.isFinite(numericParticipantId) && numericParticipantId > 0 ? `Participant ${numericParticipantId}` : 'Participant';
   }, [participantPeers, participantNames]);
 
-  const latestParticipantMessages = React.useMemo(() => {
+  const recentChatMessages = React.useMemo(() => {
     return [...messages]
-      .filter((message) => message.sender !== 'assistant' && !message.isPrivateToHost)
+      .filter((message) => !message.isPrivateToHost)
       .slice(-12);
   }, [messages]);
   const latestOwnParticipantMessage = React.useMemo(() => {
@@ -977,9 +979,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
   const lastAssistantMessage = latestAssistantMessage;
+  const replayLatestFacilitatorReply = React.useCallback(() => {
+    if (!lastAssistantMessage) return;
+    const messageId = String(lastAssistantMessage.id);
+    const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
+    void voiceRuntime.speak({
+      text: spokenText || lastAssistantMessage.content,
+      messageId,
+      metadata: { source: 'participant_manual_tts_replay' },
+    });
+  }, [lastAssistantMessage, voiceRuntime]);
 
   React.useEffect(() => {
-    if (!phase3RuntimeReady || !ttsAvatarEnabled || !lastAssistantMessage || !conversationId) return;
+    // Do not consume the local replay guard until a real user gesture has
+    // unlocked audio. Otherwise the first facilitator reply is permanently
+    // skipped on mobile before playback is permitted.
+    if (!phase3RuntimeReady || !ttsAvatarEnabled || !audioUnlocked || !lastAssistantMessage || !conversationId) return;
     const messageId = String(lastAssistantMessage.id);
     const browserReplayKey = `facilitator-tts-spoken:${conversationId}:${messageId}`;
     if (lastSpokenAssistantMessageRef.current === messageId) return;
@@ -988,37 +1003,18 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       return;
     }
 
-    let cancelled = false;
-    const maybeSpeakLatestAssistantMessage = async () => {
-      if (analyticsPersistenceEnabled) {
-        try {
-          const alreadySpoken = await hasTtsEventForMessage(conversationId, messageId);
-          if (cancelled) return;
-          if (alreadySpoken) {
-            lastSpokenAssistantMessageRef.current = messageId;
-            if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
-            return;
-          }
-        } catch (error) {
-          console.warn('Unable to verify facilitator TTS replay state; using browser-session guard.', error);
-        }
-      }
-
-      lastSpokenAssistantMessageRef.current = messageId;
-      if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
-      const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
-      void voiceRuntime.speak({
-        text: spokenText || lastAssistantMessage.content,
-        messageId,
-        metadata: { source: 'participant_messaging_view' },
-      });
-    };
-
-    void maybeSpeakLatestAssistantMessage();
-    return () => {
-      cancelled = true;
-    };
-  }, [analyticsPersistenceEnabled, conversationId, lastAssistantMessage, phase3RuntimeReady, ttsAvatarEnabled, voiceRuntime]);
+    // Playback is intentionally browser-local. A facilitator message is shared
+    // with the room, but every authorized device must hear it; a persisted
+    // analytics event from another participant must never suppress this client.
+    lastSpokenAssistantMessageRef.current = messageId;
+    if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
+    const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
+    void voiceRuntime.speak({
+      text: spokenText || lastAssistantMessage.content,
+      messageId,
+      metadata: { source: 'participant_messaging_view' },
+    });
+  }, [audioUnlocked, conversationId, lastAssistantMessage, phase3RuntimeReady, ttsAvatarEnabled, voiceRuntime]);
 
   const handleSpeechInterim = React.useCallback((payload: { transcript: string; confidence: number | null }) => {
     if (!speechStackEnabled) return;
@@ -1154,12 +1150,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     return (
       <div className={isMobilePanel ? 'max-h-[32dvh] overflow-y-auto p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
-        {latestParticipantMessages.length > 0 ? (
+        {recentChatMessages.length > 0 ? (
           <div className="space-y-3">
-            {latestParticipantMessages.map((message) => (
+            {recentChatMessages.map((message) => (
               <div key={message.id} className="session-soft-panel rounded-2xl p-3">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-indigo-600">{message.sender === 'admin' ? 'Host' : resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
+                  <span className="truncate text-xs font-semibold text-indigo-600">{message.sender === 'assistant' ? facilitatorName : message.sender === 'admin' ? 'Host' : resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
                   <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
                 </div>
                 <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
@@ -1177,25 +1173,54 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
-      {/* Audio unlock banner — shown until the participant clicks to enable audio */}
-      {!audioUnlocked && viewMode === 'participant' && ttsAvatarEnabled && (
-        <div
-          role="banner"
-          className="shrink-0 flex cursor-pointer items-center justify-between gap-3 bg-indigo-600 px-4 py-2.5 text-white transition-opacity hover:bg-indigo-700"
-          onClick={handleUnlockAudio}
+      {/* Persistent, human-readable facilitator audio state for real mobile devices. */}
+      {viewMode === 'participant' && (
+        <section
+          role="status"
+          aria-live="polite"
+          className={`shrink-0 border-b px-3 py-2.5 ${
+            !ttsAvatarEnabled
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked'
+                ? 'border-rose-200 bg-rose-50 text-rose-900'
+                : voiceRuntime.playbackState === 'playing'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-indigo-200 bg-indigo-50 text-indigo-950'
+          }`}
         >
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <span className="text-lg">🔊</span>
-            <span>Tap here to hear the AI facilitator’s voice</span>
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {voiceRuntime.playbackState === 'preparing' ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                : voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked' ? <AlertTriangle className="h-5 w-5 shrink-0" />
+                  : <Volume2 className="h-5 w-5 shrink-0" />}
+              <div className="min-w-0">
+                <p className="text-sm font-bold">
+                  {!ttsAvatarEnabled ? 'Facilitator voice is unavailable'
+                    : !audioUnlocked ? 'Enable facilitator audio'
+                    : voiceRuntime.playbackState === 'preparing' ? 'Preparing the facilitator voice…'
+                    : voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking'
+                    : voiceRuntime.playbackState === 'blocked' ? 'Audio needs your tap'
+                    : voiceRuntime.playbackState === 'failed' ? 'Facilitator voice could not play'
+                    : 'Facilitator audio is ready'}
+                </p>
+                <p className="truncate text-xs opacity-80">
+                  {!ttsAvatarEnabled ? 'Voice was disabled in the session configuration.'
+                    : !audioUnlocked ? 'Tap Enable audio once, then every facilitator reply can play on this phone.'
+                    : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'The facilitator will speak when the next reply is ready.')}
+                </p>
+              </div>
+            </div>
+            {!audioUnlocked && ttsAvatarEnabled ? (
+              <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
+                <Volume2 className="h-4 w-4" /> Enable audio
+              </button>
+            ) : lastAssistantMessage && ttsAvatarEnabled ? (
+              <button type="button" onClick={replayLatestFacilitatorReply} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-current/20 bg-white/80 px-3 py-2 text-xs font-bold shadow-sm transition hover:bg-white active:scale-95">
+                <Play className="h-4 w-4 fill-current" /> Play latest reply
+              </button>
+            ) : null}
           </div>
-          <button
-            type="button"
-            className="rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
-            onClick={handleUnlockAudio}
-          >
-            Enable Audio
-          </button>
-        </div>
+        </section>
       )}
       <div className="session-glass-panel shrink-0 rounded-b-[1.5rem] border-b border-slate-200 px-3 py-2 md:rounded-b-[1.75rem] md:px-4 md:py-3">
         <div className="flex items-center gap-3">
@@ -1477,7 +1502,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/40">
           <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5">
             <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Chat'}</span>
-            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount}/${maxParticipants} present` : `${latestParticipantMessages.length} recent`}</span>
+            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount}/${maxParticipants} present` : `${recentChatMessages.length} recent`}</span>
           </div>
           {sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}
         </div>

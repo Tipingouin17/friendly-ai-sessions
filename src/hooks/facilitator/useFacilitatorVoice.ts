@@ -41,11 +41,18 @@ interface SpeakParams {
   metadata?: Record<string, unknown>;
 }
 
+export type FacilitatorVoicePlaybackState = 'idle' | 'preparing' | 'playing' | 'blocked' | 'failed';
+
 export interface FacilitatorVoiceRuntime {
   isSupported: boolean;
   isSpeaking: boolean;
+  /** Human-visible lifecycle state for server/browser synthesis and playback. */
+  playbackState: FacilitatorVoicePlaybackState;
+  playbackError: string | null;
   avatarState: FacilitatorAvatarState;
   runtimeAvatarState: RuntimeAvatarState;
+  /** Prime AudioContext and HTMLMedia playback during a real user gesture. */
+  unlockAudio: () => Promise<boolean>;
   speak: (params: SpeakParams) => Promise<void>;
   cancel: () => void;
 }
@@ -312,6 +319,8 @@ export function useFacilitatorVoice({
 }: UseFacilitatorVoiceParams): FacilitatorVoiceRuntime {
   const [avatarState, setAvatarState] = React.useState<FacilitatorAvatarState>('idle');
   const [isSpeaking, setIsSpeaking] = React.useState(false);
+  const [playbackState, setPlaybackState] = React.useState<FacilitatorVoicePlaybackState>('idle');
+  const [playbackError, setPlaybackError] = React.useState<string | null>(null);
   const activeEventIdRef = React.useRef<number | undefined>();
   const startedAtRef = React.useRef<number>(0);
   const utteranceRef = React.useRef<SpeechSynthesisUtterance | null>(null);
@@ -350,6 +359,8 @@ export function useFacilitatorVoice({
 
     setIsSpeaking(false);
     setAvatarState('idle');
+    setPlaybackState('idle');
+    setPlaybackError(null);
     void updateTtsEventStatus(activeEventIdRef.current, 'cancelled');
     activeEventIdRef.current = undefined;
   }, [_revokeAudioUrl]);
@@ -360,6 +371,36 @@ export function useFacilitatorVoice({
     if (!enabled) cancel();
   }, [cancel, enabled]);
 
+  const unlockAudio = React.useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+    let unlocked = false;
+    try {
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const context = new AudioCtx();
+        await context.resume();
+        unlocked = context.state === 'running';
+        void context.close();
+      }
+    } catch {
+      // HTMLMedia playback below is the more important mobile unlock path.
+    }
+    try {
+      // iOS Safari associates this silent HTMLMediaElement playback with the
+      // current tap, allowing later ElevenLabs audio to begin programmatically.
+      const primer = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+      primer.muted = true;
+      await primer.play();
+      primer.pause();
+      primer.removeAttribute('src');
+      primer.load();
+      unlocked = true;
+    } catch {
+      // The caller still receives a visible retry path if the browser refuses.
+    }
+    return unlocked;
+  }, []);
+
   // ── Server TTS speak path ─────────────────────────────────────────────────
   const speakViaServer = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
     const trimmed = text.trim();
@@ -369,6 +410,8 @@ export function useFacilitatorVoice({
     // Cancel any in-progress playback
     cancel();
     setAvatarState('thinking');
+    setPlaybackState('preparing');
+    setPlaybackError(null);
     startedAtRef.current = performance.now();
 
     const personaMetadata = {
@@ -442,12 +485,15 @@ export function useFacilitatorVoice({
     audio.onplay = () => {
       setIsSpeaking(true);
       setAvatarState('speaking');
+      setPlaybackState('playing');
+      setPlaybackError(null);
     };
 
     audio.onended = () => {
       const durationMs = Math.round(performance.now() - startedAtRef.current);
       setIsSpeaking(false);
       setAvatarState('idle');
+      setPlaybackState('idle');
       audioElementRef.current = null;
       _revokeAudioUrl();
       void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
@@ -467,6 +513,8 @@ export function useFacilitatorVoice({
     audio.onerror = () => {
       setIsSpeaking(false);
       setAvatarState('error');
+      setPlaybackState('failed');
+      setPlaybackError('The facilitator voice could not be played on this device.');
       audioElementRef.current = null;
       _revokeAudioUrl();
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
@@ -480,6 +528,11 @@ export function useFacilitatorVoice({
     } catch (playError) {
       setIsSpeaking(false);
       setAvatarState('error');
+      const isAutoplayBlocked = playError instanceof DOMException && playError.name === 'NotAllowedError';
+      setPlaybackState(isAutoplayBlocked ? 'blocked' : 'failed');
+      setPlaybackError(isAutoplayBlocked
+        ? 'Tap Enable audio, then use Play latest reply.'
+        : 'The facilitator voice could not be played on this device.');
       audioElementRef.current = null;
       _revokeAudioUrl();
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
@@ -508,6 +561,8 @@ export function useFacilitatorVoice({
 
     synth.cancel();
     setAvatarState('thinking');
+    setPlaybackState('preparing');
+    setPlaybackError(null);
     startedAtRef.current = performance.now();
 
     const personaSpeechSettings = deriveBrowserSpeechSettings(speakingBehavior, voiceStyle);
@@ -563,6 +618,8 @@ export function useFacilitatorVoice({
     utterance.onstart = () => {
       setIsSpeaking(true);
       setAvatarState('speaking');
+      setPlaybackState('playing');
+      setPlaybackError(null);
       void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
         metadata: { ...personaMetadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, selectedVoiceLang: selectedVoice?.lang ?? null, lipSyncEnabled },
       });
@@ -572,6 +629,7 @@ export function useFacilitatorVoice({
       const durationMs = Math.round(performance.now() - startedAtRef.current);
       setIsSpeaking(false);
       setAvatarState('idle');
+      setPlaybackState('idle');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
         audio_duration_ms: durationMs,
@@ -583,6 +641,8 @@ export function useFacilitatorVoice({
     utterance.onerror = () => {
       setIsSpeaking(false);
       setAvatarState('error');
+      setPlaybackState('failed');
+      setPlaybackError('The facilitator voice could not be played on this device.');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
         metadata: { ...personaMetadata, characterCount: trimmed.length, voiceName: selectedVoice?.name ?? null, selectedVoiceLang: selectedVoice?.lang ?? null, lipSyncEnabled },
@@ -595,6 +655,8 @@ export function useFacilitatorVoice({
     } catch (error) {
       setIsSpeaking(false);
       setAvatarState('error');
+      setPlaybackState('failed');
+      setPlaybackError('The facilitator voice could not be started on this device.');
       utteranceRef.current = null;
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
         metadata: {
@@ -623,8 +685,11 @@ export function useFacilitatorVoice({
   return {
     isSupported,
     isSpeaking,
+    playbackState,
+    playbackError,
     avatarState,
     runtimeAvatarState: toRuntimeAvatarState(avatarState),
+    unlockAudio,
     speak,
     cancel,
   };

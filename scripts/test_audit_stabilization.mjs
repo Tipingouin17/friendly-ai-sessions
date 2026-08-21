@@ -352,7 +352,10 @@ test('server-owned session start is immediate, singular, and does not block on a
   const statusHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionStatus.ts'), 'utf8');
 
   assert.match(server, /elif func_name == "start-session"/);
-  assert.match(server, /SET session_started = TRUE,\s*session_started_at = COALESCE\(session_started_at, NOW\(\)\),\s*status = 'active'/s);
+  assert.match(server, /SET session_started = TRUE,\s*status = 'active'/s);
+  const startSessionSection = server.match(/elif func_name == "start-session":([\s\S]*?)\n    # ──/);
+  assert.ok(startSessionSection, 'start-session handler must remain present');
+  assert.doesNotMatch(startSessionSection[1], /session_started_at/);
   assert.match(server, /await _require_conversation_host_access\(request, start_conversation_id\)/);
   assert.match(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(start_conversation_id\)\)/);
   assert.match(server, /await asyncio\.to_thread\(_call_facilitator_model\)/);

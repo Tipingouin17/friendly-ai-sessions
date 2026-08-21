@@ -251,4 +251,18 @@ test('protected desktop routes clear explicitly rejected cached sessions instead
   assert.match(protectedRoute, /Navigate to="\/login"/);
 });
 
+test('authentication critical path remains bounded and reports retryable service pressure clearly', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const login = readFileSync(resolve(repoRoot, 'src/pages/Login.tsx'), 'utf8');
+
+  assert.match(server, /async def _acquire_auth_connection\(operation: str\)/);
+  assert.match(server, /asyncio\.timeout\(5\)/);
+  assert.match(server, /auth_service_busy/);
+  assert.match(server, /async with _acquire_auth_connection\("credential lookup"\)/);
+  assert.match(server, /await asyncio\.to_thread\(_verify_password, password, stored_hash\)/);
+  assert.match(server, /await asyncio\.to_thread\(\s*_oai_client_report\.chat\.completions\.create,/s);
+  assert.match(login, /Sign-in is temporarily busy\. Please wait a few seconds and try again\./);
+  assert.match(login, /Sign-in is taking longer than expected\. Please wait a few seconds and try again\./);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

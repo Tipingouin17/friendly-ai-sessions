@@ -53,10 +53,22 @@ const Login = () => {
     } catch (error: unknown) {
       let errorMessage = "Please check your credentials and try again";
       if (error instanceof Error) {
-        errorMessage = error.message;
+        const msg = error.message;
+        if (/abort|timed out|timeout/i.test(msg)) {
+          errorMessage = 'Sign-in is taking longer than expected. Please wait a few seconds and try again.';
+        } else if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network')) {
+          errorMessage = 'Unable to connect. Please check your internet connection and try again.';
+        } else {
+          errorMessage = msg;
+        }
       } else if (error && typeof error === 'object' && 'message' in error) {
-        const msg = (error as { message: string }).message;
-        if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network')) {
+        const apiError = error as { message: string; code?: string; status?: number };
+        const msg = apiError.message;
+        if (apiError.code === 'auth_service_busy' || apiError.code === 'auth_service_unavailable' || apiError.status === 503) {
+          errorMessage = 'Sign-in is temporarily busy. Please wait a few seconds and try again.';
+        } else if (/abort|timed out|timeout/i.test(msg)) {
+          errorMessage = 'Sign-in is taking longer than expected. Please wait a few seconds and try again.';
+        } else if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network')) {
           errorMessage = 'Unable to connect. Please check your internet connection and try again.';
         } else {
           errorMessage = msg;

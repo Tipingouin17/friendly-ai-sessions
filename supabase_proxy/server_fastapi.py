@@ -936,6 +936,32 @@ ALLOWED_RPC_FUNCTIONS = {
 _pool: Optional[asyncpg.Pool] = None
 
 
+@asynccontextmanager
+async def _acquire_auth_connection(operation: str):
+    """Acquire a database connection for an authentication request within a strict budget.
+
+    Login is a critical path.  If a long-running workload has temporarily
+    exhausted the shared database pool, returning a structured 503 lets the
+    browser explain the condition and retry; waiting indefinitely causes the
+    frontend request to be aborted with no useful user-facing diagnosis.
+    """
+    if _pool is None:
+        raise HTTPException(
+            503,
+            detail={"code": "auth_service_unavailable", "message": "Sign-in is temporarily unavailable. Please try again shortly."},
+        )
+    try:
+        async with asyncio.timeout(5):
+            async with _pool.acquire() as conn:
+                yield conn
+    except TimeoutError as exc:
+        log_auth.warning("authentication database operation timed out: %s", operation)
+        raise HTTPException(
+            503,
+            detail={"code": "auth_service_busy", "message": "Sign-in is temporarily busy. Please wait a few seconds and try again."},
+        ) from exc
+
+
 def _build_dsn() -> str:
     """Build a PostgreSQL DSN string from environment variables."""
     if DB_URL:
@@ -3141,9 +3167,9 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     if not user:
         # Slow path: look up credentials in the DB
         try:
-            async with _pool.acquire() as conn:
+            async with _acquire_auth_connection("credential lookup") as conn:
                 row = await conn.fetchrow(
-                    "SELECT id, email, password_hash, created_at, banned FROM profiles "
+                    "SELECT id, email, password_hash, created_at, banned, role, email_verified FROM profiles "
                     "WHERE email = $1",
                     email,
                 )
@@ -3162,6 +3188,8 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                         else str(row["created_at"])
                     ),
                     "email_confirmed_at": datetime.utcnow().isoformat(),
+                    "email_verified": bool(row["email_verified"]),
+                    "role": row["role"] or "free",
                 }
                 USERS[email] = user
         except HTTPException:
@@ -3171,7 +3199,10 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     # Reject if user not found OR password does not match.
     # _verify_password handles both bcrypt and legacy SHA-256 hashes transparently.
     stored_hash = (user or {}).get("password", "")
-    if not user or not stored_hash or not _verify_password(password, stored_hash):
+    # bcrypt verification is CPU-bound; run it off the event loop so a burst
+    # of sign-ins cannot freeze unrelated HTTP handlers or health checks.
+    password_matches = bool(user and stored_hash and await asyncio.to_thread(_verify_password, password, stored_hash))
+    if not password_matches:
         raise HTTPException(400, detail={"code": "invalid_credentials", "message": "Invalid email or password"})
     # Check email verification status — block login if not yet verified.
     # We check both the in-memory flag (fast path) and the DB (authoritative).
@@ -3179,7 +3210,7 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     if not email_verified_in_memory:
         # Double-check against DB in case memory is stale
         try:
-            async with _pool.acquire() as _ev_conn:
+            async with _acquire_auth_connection("email verification check") as _ev_conn:
                 ev_row = await _ev_conn.fetchrow(
                     "SELECT email_verified FROM profiles WHERE email = $1", email
                 )
@@ -3202,9 +3233,9 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
     # Transparent bcrypt upgrade: if the stored hash is legacy SHA-256, re-hash with bcrypt
     # and persist immediately so the account is protected on the next login.
     if len(stored_hash) == 64 and all(c in '0123456789abcdef' for c in stored_hash):
-        new_hash = _hash_password(password)
+        new_hash = await asyncio.to_thread(_hash_password, password)
         try:
-            async with _pool.acquire() as _upg_conn:
+            async with _acquire_auth_connection("password hash upgrade") as _upg_conn:
                 await _upg_conn.execute(
                     "UPDATE profiles SET password_hash = $1, updated_at = NOW() WHERE email = $2",
                     new_hash, email
@@ -3215,29 +3246,16 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
         except Exception as _upg_err:
             log_auth.warning("Password upgrade failed for %s: %s", email, _upg_err)
 
-    # Look up the user's profile role so admins get the correct JWT claim
-    # Also backfill email if it's null (for users created before email column was added)
-    profile_role = "free"
-    try:
-        async with _pool.acquire() as conn_role:
-            role_row = await conn_role.fetchrow("SELECT id, role, email FROM profiles WHERE id = $1::uuid", user["id"])
-            if role_row:
-                profile_role = role_row["role"] or "free"
-                # Backfill email if missing
-                if not role_row["email"] and email:
-                    await conn_role.execute(
-                        "UPDATE profiles SET email = $1, updated_at = NOW() WHERE id = $2::uuid",
-                        email, user["id"]
-                    )
-    except Exception as e:
-        log_auth.error("login role lookup error: %s", e, exc_info=True)
+    # The DB lookup above already returns the authoritative role. Avoid a
+    # second round trip on the login critical path.
+    profile_role = user.get("role") or "free"
 
     token = _make_token(user["id"], user["email"], profile_role)
     # Record login activity for the Profile security modal
     try:
         ip_addr = request.headers.get("x-forwarded-for", request.headers.get("x-real-ip", "")).split(",")[0].strip() or None
         user_agent = request.headers.get("user-agent", "")[:512] or None
-        async with _pool.acquire() as _la_conn:
+        async with _acquire_auth_connection("login activity") as _la_conn:
             await _la_conn.execute(
                 "INSERT INTO login_activity (id, user_id, ip_address, user_agent, success, created_at) "
                 "VALUES ($1, $2::uuid, $3, $4, TRUE, NOW())",
@@ -3262,13 +3280,17 @@ async def auth_token(request: Request, grant_type: str = Query(default="password
                 _os = _o
                 break
         _sess_token = str(uuid.uuid4())
-        # Mark all previous sessions as not current
-        await conn.execute("UPDATE user_sessions SET is_current = FALSE WHERE user_id = $1::uuid", user_id)
-        await conn.execute(
-            "INSERT INTO user_sessions (user_id, session_token, device_type, browser, os, ip_address, user_agent, is_current) "
-            "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, TRUE)",
-            user_id, _sess_token, _device_type, _browser, _os, _ip, _ua
-        )
+        # Mark all previous sessions as not current, then persist the current
+        # device record through a live bounded connection. The old code reused
+        # a released credential-lookup connection and an undefined user_id.
+        async with _acquire_auth_connection("device session update") as _us_conn:
+            async with _us_conn.transaction():
+                await _us_conn.execute("UPDATE user_sessions SET is_current = FALSE WHERE user_id = $1::uuid", user["id"])
+                await _us_conn.execute(
+                    "INSERT INTO user_sessions (user_id, session_token, device_type, browser, os, ip_address, user_agent, is_current) "
+                    "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, TRUE)",
+                    user["id"], _sess_token, _device_type, _browser, _os, _ip, _ua
+                )
     except Exception as _us_err:
         log_auth.warning("user_sessions insert failed (non-fatal): %s", _us_err)
     return _make_user_response(user, token, role=profile_role)
@@ -8484,7 +8506,12 @@ async def edge_function(func_name: str, request: Request):
                         pass
                     # Pre-compress long participant messages before building transcript
                     _oai_client_compress3 = await _get_openai_client("gpt-4.1-nano")
-                    all_msgs = _compress_messages_for_context(all_msgs, _pre_model, _oai_client_compress3)
+                    # Compression performs synchronous provider calls. Run it on
+                    # a worker thread so the FastAPI event loop remains free for
+                    # login, join, and realtime requests while a report is built.
+                    all_msgs = await asyncio.to_thread(
+                        _compress_messages_for_context, all_msgs, _pre_model, _oai_client_compress3
+                    )
                     transcript = ""
                     for msg in all_msgs:
                         content = msg.get("content", {})
@@ -8509,7 +8536,8 @@ async def edge_function(func_name: str, request: Request):
                     _report_model_used: Optional[str] = None
                     _oai_client_report = await _get_openai_client(_report_model)
                     try:
-                        resp = _oai_client_report.chat.completions.create(
+                        resp = await asyncio.to_thread(
+                            _oai_client_report.chat.completions.create,
                             model=_report_model,
                             messages=[
                                 {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},

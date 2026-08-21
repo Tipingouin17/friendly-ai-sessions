@@ -376,4 +376,30 @@ test('tokenized Android invitation reads stay bounded and fail with a clear reco
   assert.match(joinMain, /The session is taking longer than expected to load/);
 });
 
+test('interactive host reads remain bounded and facilitators expose a retryable recovery state', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const facilitators = readFileSync(resolve(repoRoot, 'src/pages/AIfacilitators.tsx'), 'utf8');
+
+  assert.match(server, /async def _acquire_interactive_read_connection\(operation: str\)/);
+  assert.match(server, /read_service_busy/);
+  assert.match(server, /_acquire_interactive_read_connection\(f"REST \{table\} read"\)/);
+  assert.match(server, /_acquire_auth_connection\("profile metadata"\)/);
+  assert.match(facilitators, /error: facilitatorsError/);
+  assert.match(facilitators, /refetch: refetchFacilitators/);
+  assert.match(facilitators, /Facilitators could not be loaded/);
+  assert.match(facilitators, /Retry facilitators/);
+  assert.match(facilitators, /retry: 1/);
+});
+
+test('report generation releases its read connection before external model work', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const releaseMarker = server.indexOf('Release the read connection before external model work.');
+  const modelWork = server.indexOf('await asyncio.to_thread(\n                    _compress_messages_for_context');
+  const firstReportRead = server.indexOf('SELECT s.title, s.objective FROM conversations c');
+
+  assert.ok(firstReportRead >= 0 && modelWork > firstReportRead);
+  assert.ok(releaseMarker > modelWork);
+  assert.match(server, /async with _pool\.acquire\(\) as conn:\n                    async with conn\.transaction\(\):\n                        _rep_row/s);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

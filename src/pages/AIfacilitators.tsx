@@ -128,12 +128,16 @@ const AIfacilitators = () => {
 
   const {
     data: facilitators = [],
-    isLoading: isFacilitatorsLoading
+    isLoading: isFacilitatorsLoading,
+    error: facilitatorsError,
+    refetch: refetchFacilitators,
   } = useQuery({
     queryKey: ['facilitators'],
     queryFn: fetchFacilitators,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1_000,
     refetchOnWindowFocus: false,
   });
 
@@ -265,14 +269,30 @@ const AIfacilitators = () => {
           <div className="space-y-4 md:space-y-6">
             {/* Step 1: Facilitator Selection */}
             <div className={`transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
-              <FacilitatorSelection
-                facilitators={facilitators}
-                selectedFacilitator={selectedFacilitator}
-                onSelect={setSelectedFacilitator}
-                isLoading={isFacilitatorsLoading}
-                upcomingScheduledSessions={upcomingScheduledSessions}
-                isLoadingUpcomingSessions={isUpcomingScheduledSessionsLoading}
-              />
+              {facilitatorsError ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center" role="alert">
+                  <p className="text-base font-semibold text-amber-950">Facilitators could not be loaded</p>
+                  <p className="mt-2 text-sm leading-6 text-amber-900">
+                    The service is temporarily busy. Your workshop data is safe; please retry the list.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { void refetchFacilitators(); }}
+                    className="mt-4 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  >
+                    Retry facilitators
+                  </button>
+                </div>
+              ) : (
+                <FacilitatorSelection
+                  facilitators={facilitators}
+                  selectedFacilitator={selectedFacilitator}
+                  onSelect={setSelectedFacilitator}
+                  isLoading={isFacilitatorsLoading}
+                  upcomingScheduledSessions={upcomingScheduledSessions}
+                  isLoadingUpcomingSessions={isUpcomingScheduledSessionsLoading}
+                />
+              )}
             </div>
 
             {/* Step 2: Workshop Selection */}

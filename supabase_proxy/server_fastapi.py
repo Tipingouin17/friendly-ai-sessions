@@ -1012,6 +1012,32 @@ async def _acquire_join_connection(operation: str):
         ) from exc
 
 
+@asynccontextmanager
+async def _acquire_interactive_read_connection(operation: str):
+    """Acquire a shared database connection for an interactive browser read.
+
+    Host navigation (facilitators, workshops, profile metadata) must receive a
+    bounded retryable response during temporary pool pressure. Leaving generic
+    reads unbounded strands the UI on skeletons even though the process health
+    endpoint remains available.
+    """
+    if _pool is None:
+        raise HTTPException(
+            503,
+            detail={"code": "read_service_unavailable", "message": "The service is temporarily unavailable. Please try again shortly."},
+        )
+    try:
+        async with asyncio.timeout(6):
+            async with _pool.acquire() as conn:
+                yield conn
+    except TimeoutError as exc:
+        log_db.warning("interactive database read timed out: %s", operation)
+        raise HTTPException(
+            503,
+            detail={"code": "read_service_busy", "message": "The service is temporarily busy. Please wait a few seconds and try again."},
+        ) from exc
+
+
 def _build_dsn() -> str:
     """Build a PostgreSQL DSN string from environment variables."""
     if DB_URL:
@@ -3416,7 +3442,7 @@ async def auth_user(request: Request):
     user_meta: dict = {}
     profile_created_at = datetime.utcnow().isoformat()
     try:
-        async with _pool.acquire() as _meta_conn:
+        async with _acquire_auth_connection("profile metadata") as _meta_conn:
             row = await _meta_conn.fetchrow(
                 "SELECT full_name, display_name, bio, phone, timezone, profile_language, "
                 "avatar_url, created_at, setting_email_notifications, setting_workshop_reminders, "
@@ -6543,6 +6569,8 @@ async def rest_table(table: str, request: Request):
         connection_context = (
             _acquire_join_connection("participant invitation read")
             if request.method in ("GET", "HEAD") and table == "conversations" and join_token_header
+            else _acquire_interactive_read_connection(f"REST {table} read")
+            if request.method in ("GET", "HEAD")
             else _pool.acquire()
         )
         async with connection_context as conn:
@@ -8627,66 +8655,69 @@ async def edge_function(func_name: str, request: Request):
                             )
                     except Exception:
                         pass
-                    # Pre-compress long participant messages before building transcript
-                    _oai_client_compress3 = await _get_openai_client("gpt-4.1-nano")
-                    # Compression performs synchronous provider calls. Run it on
-                    # a worker thread so the FastAPI event loop remains free for
-                    # login, join, and realtime requests while a report is built.
-                    all_msgs = await asyncio.to_thread(
-                        _compress_messages_for_context, all_msgs, _pre_model, _oai_client_compress3
+                # Pre-compress long participant messages before building transcript
+                _oai_client_compress3 = await _get_openai_client("gpt-4.1-nano")
+                # Compression performs synchronous provider calls. Run it on
+                # a worker thread so the FastAPI event loop remains free for
+                # login, join, and realtime requests while a report is built.
+                all_msgs = await asyncio.to_thread(
+                    _compress_messages_for_context, all_msgs, _pre_model, _oai_client_compress3
+                )
+                transcript = ""
+                for msg in all_msgs:
+                    content = msg.get("content", {})
+                    if isinstance(content, str):
+                        try:
+                            content = json.loads(content)
+                        except Exception:
+                            content = {"text": content}
+                    text = content.get("text", str(content))
+                    transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
+                # Apply per-model context budget truncation
+                _report_model = _pre_model
+                transcript, _eos_truncated = _truncate_transcript_to_budget(transcript, _report_model)
+                _truncation_suffix = (
+                    "\n\n> **Note:** Some earlier messages were omitted to fit the AI model's context window. "
+                    "The report covers the opening and most recent portion of the session."
+                    if _eos_truncated else ""
+                )
+                logger.info("[AI] End-of-session report: model=%s, transcript_chars=%d, truncated=%s", _report_model, len(transcript), _eos_truncated)
+                _report_prompt_tokens: Optional[int] = None
+                _report_completion_tokens: Optional[int] = None
+                _report_model_used: Optional[str] = None
+                _oai_client_report = await _get_openai_client(_report_model)
+                try:
+                    resp = await asyncio.to_thread(
+                        _oai_client_report.chat.completions.create,
+                        model=_report_model,
+                        messages=[
+                            {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
+                            {"role": "user", "content": (
+                                f'Generate a comprehensive session report for the workshop "{session_title}".\n'
+                                f"Objective: {objective}\n"
+                                f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
+                                f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
+                                "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
+                                "Use markdown formatting. Be specific and reference actual content from the discussion."
+                                + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _eos_truncated else "")
+                            )},
+                        ],
+                        max_tokens=1500,
+                        temperature=0.5,
                     )
-                    transcript = ""
-                    for msg in all_msgs:
-                        content = msg.get("content", {})
-                        if isinstance(content, str):
-                            try:
-                                content = json.loads(content)
-                            except Exception:
-                                content = {"text": content}
-                        text = content.get("text", str(content))
-                        transcript += f"[{msg.get('name', msg.get('role', 'unknown'))} ({msg.get('role', 'unknown')})]: {text}\n\n"
-                    # Apply per-model context budget truncation
-                    _report_model = _pre_model
-                    transcript, _eos_truncated = _truncate_transcript_to_budget(transcript, _report_model)
-                    _truncation_suffix = (
-                        "\n\n> **Note:** Some earlier messages were omitted to fit the AI model's context window. "
-                        "The report covers the opening and most recent portion of the session."
-                        if _eos_truncated else ""
-                    )
-                    logger.info("[AI] End-of-session report: model=%s, transcript_chars=%d, truncated=%s", _report_model, len(transcript), _eos_truncated)
-                    _report_prompt_tokens: Optional[int] = None
-                    _report_completion_tokens: Optional[int] = None
-                    _report_model_used: Optional[str] = None
-                    _oai_client_report = await _get_openai_client(_report_model)
-                    try:
-                        resp = await asyncio.to_thread(
-                            _oai_client_report.chat.completions.create,
-                            model=_report_model,
-                            messages=[
-                                {"role": "system", "content": "You are an expert at summarizing workshop sessions into clear, actionable reports."},
-                                {"role": "user", "content": (
-                                    f'Generate a comprehensive session report for the workshop "{session_title}".\n'
-                                    f"Objective: {objective}\n"
-                                    f"Participants ({participant_count}): {', '.join(participant_names) if participant_names else 'Anonymous participants'}\n"
-                                    f"Total messages: {message_count}\n\nFull conversation transcript:\n{transcript}\n\n"
-                                    "Create a well-structured report with sections: ## Executive Summary, ## Key Discussion Points, ## Participant Contributions, ## Key Takeaways & Insights, ## Recommended Next Steps\n\n"
-                                    "Use markdown formatting. Be specific and reference actual content from the discussion."
-                                    + ("\n\nNote: Some earlier messages were omitted due to context window limits." if _eos_truncated else "")
-                                )},
-                            ],
-                            max_tokens=1500,
-                            temperature=0.5,
-                        )
-                        report_content = resp.choices[0].message.content.strip() + _truncation_suffix
-                        if resp.usage:
-                            _report_prompt_tokens = resp.usage.prompt_tokens
-                            _report_completion_tokens = resp.usage.completion_tokens
-                            _report_model_used = resp.model or DEFAULT_AI_MODEL
-                    except Exception as e:
-                        logger.error("[AI] Report generation error: %s", e, exc_info=True)
-                        report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
+                    report_content = resp.choices[0].message.content.strip() + _truncation_suffix
+                    if resp.usage:
+                        _report_prompt_tokens = resp.usage.prompt_tokens
+                        _report_completion_tokens = resp.usage.completion_tokens
+                        _report_model_used = resp.model or DEFAULT_AI_MODEL
+                except Exception as e:
+                    logger.error("[AI] Report generation error: %s", e, exc_info=True)
+                    report_content = f"## Session Report: {session_title}\n\n**Objective:** {objective}\n\n**Participants:** {participant_count}\n**Messages exchanged:** {message_count}\n\nThis session has been completed successfully."
 
-                    _report_cost = _calculate_token_cost(_report_model_used or DEFAULT_AI_MODEL, _report_prompt_tokens or 0, _report_completion_tokens or 0)
+                _report_cost = _calculate_token_cost(_report_model_used or DEFAULT_AI_MODEL, _report_prompt_tokens or 0, _report_completion_tokens or 0)
+                # Release the read connection before external model work.
+                # Only the final persistence transaction needs a pool slot.
+                async with _pool.acquire() as conn:
                     async with conn.transaction():
                         _rep_row = await conn.fetchrow(
                             "INSERT INTO session_reports (id, conversation_id, report_content, report_type, generated_by, metadata) VALUES ($1, $2, $3, 'comprehensive', $4, $5) RETURNING id",

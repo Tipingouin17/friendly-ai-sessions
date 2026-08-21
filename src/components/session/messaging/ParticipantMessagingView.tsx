@@ -919,6 +919,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
   const hostDisplayName = resolveHostDisplayName(hostParticipant);
+  const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const facilitatorVideoTile: SessionVideoParticipant = {
     id: 'ai-facilitator',
     name: facilitatorName || 'AI Facilitator',
@@ -941,7 +942,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     isMuted: false,
     isSpeaking: Boolean(hostRemoteStream),
     connectionStatus: hostTileConnectionStatus,
-    connectionStatusLabel: formatPeerTileStatusLabel(hostTileConnectionStatus),
+    connectionStatusLabel: hostRemoteStream
+      ? 'Live video'
+      : hostTileConnectionStatus === 'connected'
+        ? 'Video linked — host camera is off'
+        : formatPeerTileStatusLabel(hostTileConnectionStatus),
     accentColor: 'rgb(217 119 6)',
   };
 
@@ -963,10 +968,17 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       isMuted: !isCurrentUser || !microphoneEnabled,
       isSpeaking: isCurrentUser && microphoneEnabled,
       connectionStatus: tileConnectionStatus,
-      connectionStatusLabel: isCurrentUser ? (microphoneEnabled ? 'Mic on' : 'Muted') : tileConnectionStatus ? formatPeerTileStatusLabel(tileConnectionStatus) : undefined,
+      connectionStatusLabel: isCurrentUser
+        ? (cameraIsOn ? 'Your camera is on' : 'Your camera is off')
+        : remoteStream
+          ? 'Live video'
+          : tileConnectionStatus === 'connected'
+            ? 'Video linked — camera is off'
+            : tileConnectionStatus
+              ? formatPeerTileStatusLabel(tileConnectionStatus)
+              : undefined,
     };
   })];
-  const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const cameraStatusLabel = cameraStatus === 'starting'
     ? 'Starting camera…'
     : cameraStatus === 'on'
@@ -1235,9 +1247,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.45)]" />
             {roomConnectionLabel}
           </div>
-          <div className="session-chip border-slate-200 bg-white text-slate-600">
+          <div
+            className="session-chip border-slate-200 bg-white text-slate-600"
+            title={`${currentParticipantCount} of ${maxParticipants} participant seats joined`}
+            aria-label={`${currentParticipantCount} of ${maxParticipants} participant seats joined`}
+          >
             <Users className="h-3.5 w-3.5 text-slate-500" />
-            {currentParticipantCount}/{maxParticipants}
+            {currentParticipantCount}/{maxParticipants} seats
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -1268,6 +1284,25 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             >
               <Captions className="h-4 w-4" />
             </button>
+          </div>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={handleToggleLocalCameraClick}
+            disabled={cameraStatus === 'starting'}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition active:scale-[0.98] disabled:opacity-60"
+          >
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Your camera</span>
+            <span className={`mt-0.5 block text-xs font-semibold ${cameraIsOn ? 'text-emerald-700' : cameraStatus === 'blocked' ? 'text-rose-700' : 'text-slate-800'}`}>
+              {cameraIsOn ? 'On — tap to turn off' : cameraStatus === 'blocked' ? 'Permission needed — tap to retry' : cameraStatus === 'starting' ? 'Starting camera…' : 'Off — tap to enable'}
+            </span>
+          </button>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm" role="status" aria-live="polite">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Room video</span>
+            <span className={`mt-0.5 block text-xs font-semibold ${hostRemoteStream ? 'text-emerald-700' : connectionStatus === 'failed' ? 'text-rose-700' : 'text-slate-800'}`}>
+              {hostRemoteStream ? 'Host video connected' : connectionStatus === 'failed' ? 'Connection needs retry' : roomConnectionLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -1502,7 +1537,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/40">
           <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5">
             <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Chat'}</span>
-            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount}/${maxParticipants} present` : `${recentChatMessages.length} recent`}</span>
+            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount} of ${maxParticipants} seats joined` : `${recentChatMessages.length} recent`}</span>
           </div>
           {sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}
         </div>

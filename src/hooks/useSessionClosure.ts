@@ -134,19 +134,28 @@ export const useSessionClosure = () => {
       // reads, count queries, and a generic PATCH before participants can leave.
       const { error } = await api.functions.invoke('stop-session', {
         body: { conversation_id: conversationId },
+        // Session stop is intentionally fast, but leave enough headroom for a
+        // Railway wake-up while keeping a browser-level fetch abort bounded.
+        timeoutMs: 12_000,
       });
       if (error) throw new Error(error.message || 'Failed to stop session');
 
       setClosureProgress('Session stopped.');
 
-      // Invalidate all relevant queries
-      await Promise.all([
+      // Cache refresh is best effort. The server has already atomically ended
+      // the session; a stale query or transient network failure must never turn
+      // that successful closure into an alarming “failed to fetch” UI error.
+      void Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] }),
         queryClient.invalidateQueries({ queryKey: ['admin-sessions'] }),
         queryClient.invalidateQueries({ queryKey: ['active-workshops'] }),
         queryClient.invalidateQueries({ queryKey: ['past-workshops'] }),
         queryClient.invalidateQueries({ queryKey: ['session-participants', conversationId] }),
-      ]);
+      ]).then((results) => {
+        if (results.some((result) => result.status === 'rejected')) {
+          console.warn('Some post-stop cache refreshes failed; the session is already closed on the server.');
+        }
+      });
 
       toast({
         title: "Session Stopped",
@@ -163,9 +172,11 @@ export const useSessionClosure = () => {
       clearTimeout(timeoutId);
       console.error('Error in stopSessionWithoutReport:', error);
 
-      let errorMessage = "Failed to stop session";
+      let errorMessage = "The session could not be stopped. Please try again.";
       if (error instanceof Error) {
-        errorMessage = error.message;
+        errorMessage = /failed to fetch|abort|timed out/i.test(error.message)
+          ? 'The connection to the session service was interrupted. Please wait a few seconds and try again.'
+          : error.message;
       }
 
       setClosureProgress('');

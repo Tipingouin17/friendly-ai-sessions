@@ -560,7 +560,9 @@ export function useWebRTCSession({
   }, [isCurrentPeerRecord, schedulePeerRenegotiation]);
 
   const cleanupStaleSignals = useCallback(async () => {
-    if (!conversationId) return;
+    // Participant join tokens may publish only the narrow signaling event; the
+    // host owns retention cleanup for the shared signaling log.
+    if (!conversationId || role !== 'host') return;
     const cutoff = new Date(Date.now() - WEBRTC_SIGNAL_RETENTION_MS).toISOString();
     const { error } = await api
       .from('session_events')
@@ -572,7 +574,7 @@ export function useWebRTCSession({
     if (error) {
       console.warn('Unable to clean up stale WebRTC signals:', error.message);
     }
-  }, [conversationId]);
+  }, [conversationId, role]);
 
   const sendSignal = useCallback(async (toPeerId: string, signal: Omit<WebRTCSignalPayload, 'kind' | 'version' | 'conversationId' | 'fromPeerId' | 'fromParticipantId' | 'toPeerId' | 'timestamp'>): Promise<boolean> => {
     if (!conversationId || !localPeerId) return false;

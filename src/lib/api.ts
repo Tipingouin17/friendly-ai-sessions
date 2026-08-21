@@ -364,6 +364,27 @@ export function clearParticipantSessionData(): void {
 
 // ─── HTTP helper ──────────────────────────────────────────────────────────────
 
+function getParticipantScopedConversationId(path: string, body: RequestInit['body'] | undefined): string | null {
+  if (typeof body !== 'string') return null;
+  try {
+    const payload = JSON.parse(body) as {
+      conversation_id?: string | number;
+      role?: string;
+      event_type?: string;
+      data?: { kind?: string };
+    };
+    const isParticipantMessage = path.startsWith('/rest/v1/messages') && (!payload.role || payload.role === 'user');
+    const isWebRtcSignal = path.startsWith('/rest/v1/session_events')
+      && payload.event_type === 'webrtc_signal'
+      && payload.data?.kind === 'webrtc_signal';
+    if (!isParticipantMessage && !isWebRtcSignal) return null;
+    const conversationId = payload.conversation_id;
+    return conversationId != null && Number.isFinite(Number(conversationId)) ? String(conversationId) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit & { headers?: Record<string, string>; timeoutMs?: number } = {}
@@ -371,21 +392,24 @@ async function apiFetch<T>(
   try {
     const { timeoutMs = 15_000, ...fetchOptions } = options;
     const token = getToken();
-    const joinToken = getJoinToken();
+    // A participant message or WebRTC signal may execute from a browser that
+    // also has a saved app login. Resolve the token from the payload's session
+    // rather than the current URL, which can change during session navigation.
+    const participantScopedConversationId = getParticipantScopedConversationId(path, options.body);
+    const joinToken = getJoinToken(participantScopedConversationId);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       apikey: ANON_KEY,
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Send the join token only when the user is NOT authenticated.
-    // When a JWT is present (host/admin), the backend uses ownership-based
-    // access control. Sending the join token alongside a JWT confuses the
-    // backend into applying participant-path rules for host queries (e.g.
-    // GET /conversations?user_id=eq.xxx), which causes spurious 401 errors.
-    // Unauthenticated participants (no JWT) still get the join token so they
-    // can read the session data they are allowed to access.
-    if (joinToken && !token) headers["X-Join-Token"] = joinToken;
+    // Normal authenticated navigation remains ownership-scoped. The one
+    // exception is an ordinary participant message: its session-bound join
+    // token is the authoritative permission, even when this browser happens
+    // to retain a separate saved app login from earlier testing.
+    if (joinToken && (!token || participantScopedConversationId)) {
+      headers["X-Join-Token"] = joinToken;
+    }
 
     // Apply a bounded timeout so Railway cold-start / network issues fail fast
     // instead of hanging indefinitely. Callers with known long-running backend
@@ -437,7 +461,19 @@ async function apiFetch<T>(
     }
     return { data: body as T, error: null, count };
   } catch (e: unknown) {
-    return { data: null, error: { message: e instanceof Error ? e.message : "Network error" }, count: null };
+    const isAbort = e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message));
+    return {
+      data: null,
+      error: {
+        message: isAbort
+          ? 'The request timed out. Please wait a few seconds and try again.'
+          : e instanceof Error
+            ? e.message
+            : 'Network error',
+        code: isAbort ? 'request_timeout' : undefined,
+      },
+      count: null,
+    };
   }
 }
 
@@ -947,12 +983,13 @@ export const storage = {
 export const functions = {
   async invoke<T = unknown>(
     name: string,
-    opts?: { body?: unknown; headers?: Record<string, string> }
+    opts?: { body?: unknown; headers?: Record<string, string>; timeoutMs?: number }
   ): Promise<{ data: T | null; error: ApiError | null }> {
     const res = await apiFetch<T>(`/functions/v1/${name}`, {
       method: "POST",
       body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
       headers: opts?.headers ?? {},
+      timeoutMs: opts?.timeoutMs,
     });
     return { data: res.data, error: res.error };
   },

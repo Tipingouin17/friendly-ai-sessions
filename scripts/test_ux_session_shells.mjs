@@ -151,7 +151,7 @@ assertContains(hostContent, 'const shouldEnableHostVideoRoom = Boolean(currentCo
 assertContains(hostContent, 'enabled: shouldEnableHostVideoRoom', 'host WebRTC hook uses the pre-start receiver enablement guard');
 assertNotContains(hostContent, 'enabled: isSessionStarted && !isSessionEnded', 'host WebRTC receiver must not stay disabled during pre-start participant camera checks');
 assertContains(hostContent, 'videoRoomStatusLabel', 'host video room exposes WebRTC room connection status for live QA');
-assertContains(hostContent, 'connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus)', 'host participant tiles expose peer connection labels');
+assertContains(hostContent, "Video linked — participant camera is off", 'host participant tiles distinguish connected signaling from a live video stream');
 assertContains(hostContent, 'onApproveMode={onApproveMode}', 'host mode approval plumbing');
 assertContains(preSessionHostView, 'const isSessionStarted = Boolean(conversationData?.session_started);', 'pre-session host view derives live state from conversation data');
 assertContains(preSessionHostView, 'isSessionStarted={isSessionStarted}', 'pre-session host start button reflects active sessions');

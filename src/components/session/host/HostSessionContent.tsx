@@ -351,7 +351,11 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         isMuted: true,
         hasResponded: respondedParticipantIds.has(String(participant.id)),
         connectionStatus: tileConnectionStatus,
-        connectionStatusLabel: formatPeerTileStatusLabel(tileConnectionStatus),
+        connectionStatusLabel: remoteStream
+          ? 'Live video'
+          : tileConnectionStatus === 'connected'
+            ? 'Video linked — participant camera is off'
+            : formatPeerTileStatusLabel(tileConnectionStatus),
       };
     }),
   ];

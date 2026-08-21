@@ -962,6 +962,31 @@ async def _acquire_auth_connection(operation: str):
         ) from exc
 
 
+@asynccontextmanager
+async def _acquire_lifecycle_connection(operation: str):
+    """Acquire a database connection for an interactive session lifecycle action.
+
+    Ending a room is a user-visible, time-sensitive operation. A busy shared
+    pool must yield a retryable 503 within the browser's transport budget rather
+    than making the host wait until fetch is aborted with no useful diagnosis.
+    """
+    if _pool is None:
+        raise HTTPException(
+            503,
+            detail={"code": "session_service_unavailable", "message": "The session service is temporarily unavailable. Please try again shortly."},
+        )
+    try:
+        async with asyncio.timeout(8):
+            async with _pool.acquire() as conn:
+                yield conn
+    except TimeoutError as exc:
+        log_session.warning("session lifecycle database operation timed out: %s", operation)
+        raise HTTPException(
+            503,
+            detail={"code": "session_service_busy", "message": "The session service is busy. Please wait a few seconds and try again."},
+        ) from exc
+
+
 def _build_dsn() -> str:
     """Build a PostgreSQL DSN string from environment variables."""
     if DB_URL:
@@ -6667,7 +6692,23 @@ async def rest_table(table: str, request: Request):
                             and str(mutation_row.get("role") or "user") == "user"
                             and bool(join_token_header)
                         )
-                        if participant_message:
+                        # WebRTC is peer-to-peer, but its short-lived offers,
+                        # answers, and ICE candidates need a server relay. Allow
+                        # only the well-formed signaling event for a participant's
+                        # own joined conversation; all other session-event writes
+                        # remain host/admin-only.
+                        signal_data = mutation_row.get("data") if isinstance(mutation_row, dict) else None
+                        participant_webrtc_signal = (
+                            table == "session_events"
+                            and str(mutation_row.get("event_type") or "") == "webrtc_signal"
+                            and bool(join_token_header)
+                            and isinstance(signal_data, dict)
+                            and signal_data.get("kind") == "webrtc_signal"
+                            and signal_data.get("version") == 1
+                            and str(signal_data.get("conversationId")) == str(conversation_id)
+                            and str(signal_data.get("signalType")) in {"offer", "answer", "ice-candidate", "camera-ready", "camera-stopped"}
+                        )
+                        if participant_message or participant_webrtc_signal:
                             if not await _validate_join_token(join_token_header, conversation_id):
                                 raise HTTPException(403, "Invalid session token")
                         else:
@@ -6769,7 +6810,7 @@ async def rest_table(table: str, request: Request):
                             )
                             if row:
                                 results.append(serialize_row(dict(row)))
-                    if table in ("messages", "session_participants") and results:
+                    if table in ("messages", "session_participants", "session_events") and results:
                         conv_id = str(results[0].get("conversation_id", ""))
                         asyncio.create_task(manager.broadcast(conv_id, {
                             "event": "INSERT", "table": table, "new": results[0]
@@ -6805,7 +6846,7 @@ async def rest_table(table: str, request: Request):
                     sql += " RETURNING *"
                     row = await conn.fetchrow(sql, *_adapt(data))
                     result = serialize_row(dict(row)) if row else {}
-                    if table in ("messages", "session_participants") and result:
+                    if table in ("messages", "session_participants", "session_events") and result:
                         conv_id = str(result.get("conversation_id", ""))
                         asyncio.create_task(manager.broadcast(conv_id, {
                             "event": "INSERT",
@@ -8344,7 +8385,7 @@ async def edge_function(func_name: str, request: Request):
         except (TypeError, ValueError):
             raise HTTPException(400, "A valid conversation_id is required")
 
-        async with _pool.acquire() as conn:
+        async with _acquire_lifecycle_connection("stop session") as conn:
             existing = await conn.fetchrow(
                 "SELECT id, user_id, is_session_ended, ended_at, total_messages, participants "
                 "FROM conversations WHERE id = $1",

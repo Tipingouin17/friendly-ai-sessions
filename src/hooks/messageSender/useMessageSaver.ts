@@ -75,6 +75,19 @@ export const useMessageSaver = () => {
       throw new Error(error.message);
     }
 
+    // Reuse the persisted identity so the optimistic message and the later
+    // realtime INSERT reconcile to one transcript item instead of appearing as
+    // two copies of the participant's answer.
+    const persistedMessage = Array.isArray(data) ? data[0] : data;
+    if (persistedMessage && typeof persistedMessage === 'object') {
+      const persisted = persistedMessage as { id?: string | number; created_at?: string | null };
+      if (persisted.id != null) newMessage.id = String(persisted.id);
+      if (persisted.created_at) {
+        const createdAt = new Date(persisted.created_at);
+        if (!Number.isNaN(createdAt.getTime())) newMessage.timestamp = createdAt;
+      }
+    }
+
     return newMessage;
   };
 

@@ -265,6 +265,50 @@ test('authentication critical path remains bounded and reports retryable service
   assert.match(login, /Sign-in is taking longer than expected\. Please wait a few seconds and try again\./);
 });
 
+test('session stop remains bounded and cannot be falsely failed by post-stop cache refresh', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const closure = readFileSync(resolve(repoRoot, 'src/hooks/useSessionClosure.ts'), 'utf8');
+  const api = readFileSync(resolve(repoRoot, 'src/lib/api.ts'), 'utf8');
+
+  assert.match(server, /async def _acquire_lifecycle_connection\(operation: str\)/);
+  assert.match(server, /_acquire_lifecycle_connection\("stop session"\)/);
+  assert.match(server, /session_service_busy/);
+  assert.match(closure, /timeoutMs: 12_000/);
+  assert.match(closure, /Promise\.allSettled/);
+  assert.match(closure, /failed to fetch\|abort\|timed out/);
+  assert.match(api, /request_timeout/);
+  assert.match(api, /The request timed out\. Please wait a few seconds and try again\./);
+});
+
+test('participant messages and WebRTC signals retain conversation-scoped join-token delivery', () => {
+  const api = readFileSync(resolve(repoRoot, 'src/lib/api.ts'), 'utf8');
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const saver = readFileSync(resolve(repoRoot, 'src/hooks/messageSender/useMessageSaver.ts'), 'utf8');
+  const webrtc = readFileSync(resolve(repoRoot, 'src/hooks/useWebRTCSession.ts'), 'utf8');
+
+  assert.match(api, /getParticipantScopedConversationId/);
+  assert.match(api, /isParticipantMessage/);
+  assert.match(api, /isWebRtcSignal/);
+  assert.match(api, /X-Join-Token/);
+  assert.match(server, /participant_webrtc_signal/);
+  assert.match(server, /signal_data\.get\("kind"\) == "webrtc_signal"/);
+  assert.match(server, /"messages", "session_participants", "session_events"/);
+  assert.match(saver, /persistedMessage/);
+  assert.match(saver, /newMessage\.id = String\(persisted\.id\)/);
+  assert.match(webrtc, /role !== 'host'/);
+});
+
+test('mobile session labels distinguish joined seats from actual live video', () => {
+  const participantView = readFileSync(resolve(repoRoot, 'src/components/session/messaging/ParticipantMessagingView.tsx'), 'utf8');
+  const hostContent = readFileSync(resolve(repoRoot, 'src/components/session/host/HostSessionContent.tsx'), 'utf8');
+
+  assert.match(participantView, /participant seats joined/);
+  assert.match(participantView, /Your camera/);
+  assert.match(participantView, /Room video/);
+  assert.match(participantView, /Video linked — host camera is off/);
+  assert.match(hostContent, /Video linked — participant camera is off/);
+});
+
 test('mobile facilitator voice remains enabled, replayable, and independently audible on every authorized device', () => {
   const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
   const participantView = readFileSync(resolve(repoRoot, 'src/components/session/messaging/ParticipantMessagingView.tsx'), 'utf8');

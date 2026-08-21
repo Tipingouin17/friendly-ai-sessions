@@ -9,7 +9,6 @@
 
 import React, { useEffect, useState } from 'react';
 import api from "@/lib/api";
-import { useToast } from "@/components/ui/use-toast";
 import { removeChannel } from "@/utils/realtimeHelpers";
 import ParticipantLoadingShell from './ParticipantLoadingShell';
 
@@ -28,7 +27,6 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
   facilitatorTitle,
   onSessionStarted,
 }) => {
-  const { toast } = useToast();
   const [participantCount, setParticipantCount] = useState(currentParticipantCount || 0);
 
   // Keep local count in sync with prop (e.g. on initial render)
@@ -52,7 +50,8 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
               setParticipantCount(payload.new.current_participants);
             }
             if (payload.new.session_started && (!payload.old || !payload.old.session_started)) {
-              toast({ title: 'Session Started', description: 'The session has been started by the host.' });
+              // The shared session-status hook owns the single participant
+              // notification.  This listener performs only the visual transition.
               if (onSessionStarted) setTimeout(onSessionStarted, 1000);
             }
           },
@@ -80,7 +79,7 @@ const ParticipantWaitingScreen: React.FC<ParticipantWaitingScreenProps> = ({
     } catch (err) {
       console.error('[ParticipantWaitingScreen] Subscription error:', err);
     }
-  }, [conversationId, onSessionStarted, toast]);
+  }, [conversationId, onSessionStarted]);
 
   return (
     <ParticipantLoadingShell

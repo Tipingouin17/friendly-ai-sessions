@@ -61,8 +61,9 @@ export const useMessageFetching = ({
     messagesRef.current = messages;
   }, [messages]);
 
-  // Welcome message recovery hook
-  const { isRecovering, attemptRecovery, forceRecovery } = useWelcomeMessageRecovery({
+  // Welcome status is observed client-side, but only the server's atomic host
+  // start lifecycle is allowed to create a facilitator greeting.
+  const { isRecovering, forceRecovery } = useWelcomeMessageRecovery({
     conversationId,
     welcomeMessageStatus,
     onRecoverySuccess: () => {
@@ -219,85 +220,26 @@ export const useMessageFetching = ({
     }
   }, [isSessionEnded]);
 
-  // Monitor conversation status for welcome message generation
+  // Observe the server-owned welcome lifecycle.  Participant clients never
+  // invoke the generator or write a fallback message: either action can race
+  // the host start and create duplicate greetings.
   useEffect(() => {
-    if (!conversationId || !conversation) return;
-    // Never generate a welcome message for an already-ended session
-    if (conversation?.is_session_ended) return;
+    if (!conversationId || !conversation || conversation.is_session_ended) return;
 
     const currentStatus = conversation.welcome_message_status || 'pending';
     setWelcomeMessageStatus(currentStatus);
+    const hasAssistantMessage = messagesRef.current.some((message) => message.sender === 'assistant');
+    const waitingForServerWelcome = Boolean(
+      conversation.session_started
+      && !hasAssistantMessage
+      && (currentStatus === 'pending' || currentStatus === 'ai_generating')
+    );
+    setIsGeneratingWelcome(waitingForServerWelcome);
 
-    // If session started but no welcome message, trigger generation
-    // Handle both 'pending' (no trigger) and 'ai_generating' (DB trigger set it but no edge function listener)
-    if (conversation.session_started && (currentStatus === 'pending' || currentStatus === 'ai_generating') && !welcomeGeneratedRef.current && messagesRef.current.length === 0) {
-      setIsGeneratingWelcome(true);
-      welcomeGeneratedRef.current = true;
-
-      // Trigger AI generation
-      api.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false
-        }
-      }).then(async ({ data, error }) => {
-        if (error) {
-          console.error('Welcome message generation failed:', error);
-
-          // Client-side fallback if Edge Function fails
-          try {
-            const fallbackContent = "Welcome to the session! I'm your AI facilitator. I'm here to guide the conversation and help you get the most out of our time together. To begin, could everyone please introduce themselves?";
-
-            const { error: insertError } = await api
-              .from('messages')
-              .insert({
-                conversation_id: conversationId,
-                content: { text: fallbackContent },
-                role: 'assistant',
-                name: 'Facilitator',
-                is_anonymous: false
-              });
-
-            if (insertError) {
-              console.error('Client-side fallback failed:', insertError);
-              setIsGeneratingWelcome(false);
-              setTimeout(() => attemptRecovery(), 5000);
-            } else {
-              setWelcomeMessageStatus('fallback_ready');
-              setIsGeneratingWelcome(false);
-              welcomeGeneratedRef.current = true;
-
-              // Update conversation status
-              await api
-                .from('conversations')
-                .update({ welcome_message_status: 'fallback_ready' })
-                .eq('id', conversationId);
-
-              // Force immediate re-fetch
-              setTimeout(() => fetchMessagesFromDB(), 500);
-            }
-          } catch (e) {
-            console.error('Exception during client-side fallback:', e);
-            setIsGeneratingWelcome(false);
-          }
-        } else {
-          // Edge function succeeded - force immediate re-fetch
-          setIsGeneratingWelcome(false);
-          setTimeout(() => fetchMessagesFromDB(), 500);
-        }
-      });
+    if ((currentStatus === 'ai_ready' || currentStatus === 'template_ready' || currentStatus === 'fallback_ready') && !hasAssistantMessage) {
+      void fetchMessagesFromDB();
     }
-
-    // Handle different welcome message states
-    if (currentStatus === 'ai_ready' || currentStatus === 'fallback_ready') {
-      setIsGeneratingWelcome(false);
-      if (messagesRef.current.length === 0) {
-        fetchMessagesFromDB();
-      }
-    }
-  }, [conversationId, conversation, isGeneratingWelcome, attemptRecovery, fetchMessagesFromDB]);
+  }, [conversationId, conversation, fetchMessagesFromDB]);
 
   // Update response collection status based on messages AND skip/pause counts.
   // NOTE: skippedCount and excludedCount are included as dependencies so this re-runs

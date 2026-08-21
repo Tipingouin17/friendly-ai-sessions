@@ -71,39 +71,10 @@ export const useWelcomeMessageRecovery = ({
     setLastRecoveryTime(Date.now());
 
     try {
-
-      // First, reset the status to pending
-      await api
-        .from('conversations')
-        .update({ 
-          welcome_message_status: 'pending',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
-
-      // Wait a moment for the reset to take effect
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Try to generate the welcome message again
-      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false
-        }
-      });
-
-      if (error) {
-        console.error('Recovery attempt failed:', error);
-      } else {
-        setRecoveryAttempts(0); // Reset on success
-        if (onRecoverySuccess) {
-          onRecoverySuccess();
-        }
-      }
-    } catch (error) {
-      console.error('Exception during recovery:', error);
+      // Welcome generation is claimed atomically by the server at host start.
+      // Clients may refresh their transcript, but must never reset the claim or
+      // invoke another session-start generation because that creates duplicates.
+      onRecoverySuccess?.();
     } finally {
       setIsRecovering(false);
     }
@@ -116,36 +87,9 @@ export const useWelcomeMessageRecovery = ({
     setRecoveryAttempts(prev => prev + 1);
 
     try {
-
-      // Reset conversation status
-      await api
-        .from('conversations')
-        .update({ 
-          welcome_message_status: 'pending',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
-
-      // Try generation again
-      const { data, error } = await api.functions.invoke('handle-facilitator-response', {
-        body: {
-          messages: [],
-          conversationId,
-          sessionStart: true,
-          generateReport: false
-        }
-      });
-
-      if (error) {
-        console.error('Force recovery failed:', error);
-      } else {
-        setRecoveryAttempts(0);
-        if (onRecoverySuccess) {
-          onRecoverySuccess();
-        }
-      }
-    } catch (error) {
-      console.error('Exception during force recovery:', error);
+      // A manual recovery is a transcript refresh only.  The server owns the
+      // welcome lifecycle and provides the single idempotent generation path.
+      onRecoverySuccess?.();
     } finally {
       setIsRecovering(false);
     }

@@ -916,8 +916,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   });
   const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);
   const hostRemoteStream = remoteStreams[HOST_VIDEO_STREAM_KEY] ?? null;
+  const hasHostVideoFrames = Boolean(hostRemoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
-  const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, Boolean(hostRemoteStream));
+  const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, hasHostVideoFrames);
   const hostDisplayName = resolveHostDisplayName(hostParticipant);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const facilitatorVideoTile: SessionVideoParticipant = {
@@ -939,11 +940,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     avatarUrl: hostParticipant?.avatar || undefined,
     avatarSeed: hostParticipant?.avatarSeed || undefined,
     mediaStream: hostRemoteStream,
-    isMuted: false,
-    isSpeaking: Boolean(hostRemoteStream),
+    // Peer-room audio is not the facilitator audio channel.  Keep video muted
+    // so mobile browsers may autoplay the remote camera; ElevenLabs remains
+    // independently controlled by the visible facilitator-audio action.
+    isMuted: true,
+    isSpeaking: false,
     connectionStatus: hostTileConnectionStatus,
-    connectionStatusLabel: hostRemoteStream
-      ? 'Live video'
+    connectionStatusLabel: hasHostVideoFrames
+      ? 'Live camera'
       : hostTileConnectionStatus === 'connected'
         ? 'Video linked — host camera is off'
         : formatPeerTileStatusLabel(hostTileConnectionStatus),
@@ -1301,7 +1305,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm" role="status" aria-live="polite">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Room video</span>
             <span className={`mt-0.5 block text-xs font-semibold ${hostRemoteStream ? 'text-emerald-700' : connectionStatus === 'failed' ? 'text-rose-700' : 'text-slate-800'}`}>
-              {hostRemoteStream ? 'Host video connected' : connectionStatus === 'failed' ? 'Connection needs retry' : roomConnectionLabel}
+              {hasHostVideoFrames
+                ? 'Host camera is live'
+                : connectionStatus === 'failed'
+                  ? 'Connection needs retry'
+                  : 'Waiting for host camera frames'}
             </span>
           </div>
         </div>

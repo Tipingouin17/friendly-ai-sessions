@@ -7150,6 +7150,55 @@ async def edge_function(func_name: str, request: Request):
                 log_session.error("Security check failed for conv=%s: %s", conv_id, _auth_err, exc_info=True)
                 raise HTTPException(500, detail={"error": "Security check failed"})
 
+        # Welcome creation is a one-time server lifecycle action.  Claim it in
+        # the database before any model call so host start, recovery, reconnect,
+        # and multiple browser tabs cannot each write a separate greeting.
+        if conv_id and is_session_start:
+            try:
+                async with _pool.acquire() as _welcome_claim_conn:
+                    _welcome_claim = await _welcome_claim_conn.fetchrow(
+                        """
+                        UPDATE conversations
+                        SET welcome_message_status = 'ai_generating'
+                        WHERE id = $1
+                          AND NOT EXISTS (
+                            SELECT 1 FROM messages
+                            WHERE conversation_id = $1 AND role = 'assistant'
+                          )
+                          AND COALESCE(welcome_message_status, 'pending')
+                              NOT IN ('ai_generating', 'ai_ready', 'template_ready', 'fallback_ready')
+                        RETURNING id
+                        """,
+                        conv_id,
+                    )
+                    if not _welcome_claim:
+                        _existing_welcome = await _welcome_claim_conn.fetchrow(
+                            """
+                            SELECT id, content FROM messages
+                            WHERE conversation_id = $1 AND role = 'assistant'
+                            ORDER BY created_at ASC, id ASC LIMIT 1
+                            """,
+                            conv_id,
+                        )
+                if not _welcome_claim:
+                    _existing_content = _existing_welcome["content"] if _existing_welcome else None
+                    if isinstance(_existing_content, str):
+                        try:
+                            _existing_content = json.loads(_existing_content)
+                        except Exception:
+                            _existing_content = {"text": _existing_content}
+                    _existing_text = (_existing_content or {}).get("text", "") if isinstance(_existing_content, dict) else ""
+                    return {
+                        "success": True,
+                        "skipped": True,
+                        "reason": "welcome_already_claimed",
+                        "id": str(_existing_welcome["id"]) if _existing_welcome else None,
+                        "content": _existing_text,
+                    }
+            except Exception as _welcome_claim_error:
+                log_session.error("Could not claim welcome generation for conv=%s: %s", conv_id, _welcome_claim_error, exc_info=True)
+                raise HTTPException(503, detail={"error": "welcome_claim_unavailable", "message": "Welcome preparation is temporarily unavailable. Please retry shortly."})
+
         # ── SECURITY LAYER 4: Per-Conversation Mutex (Race Condition Prevention) ──
         # Prevents two concurrent requests for the SAME conversation from both
         # triggering AI generation (e.g., Host with two browser tabs open).
@@ -9209,10 +9258,9 @@ async def edge_function(func_name: str, request: Request):
                     "schema": "public",
                 },
             }))
-            # Fire-and-forget: trigger AI welcome message generation only for
-            # first-time joins (not rejoins) to avoid duplicate welcome messages.
-            if not is_host and not is_rejoining:
-                asyncio.create_task(_maybe_generate_welcome_message(conversation_id))
+            # Welcome generation belongs exclusively to the host's atomic
+            # session-start lifecycle.  Joining must stay fast and must never
+            # create a competing greeting before or alongside the host start.
             return {
                 "success": True,
                 "participant_id": new_participant_id,

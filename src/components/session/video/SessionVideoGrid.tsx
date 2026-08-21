@@ -178,7 +178,10 @@ export const SessionVideoTile: React.FC<SessionVideoTileProps> = ({
 }) => {
   const isSpotlight = variant === 'spotlight';
   const accentColor = participant.accentColor || (participant.isAI ? 'rgb(217 119 6)' : 'rgb(79 70 229)');
-  const hasLiveStream = Boolean(participant.mediaStream?.getVideoTracks().some((track) => track.readyState === 'live'));
+  // A receiver can expose a live placeholder track before it has delivered
+  // frames.  Treat video as live only after the browser unmutes it, so a blank
+  // tile is never represented as an active camera feed.
+  const hasLiveStream = Boolean(participant.mediaStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
   const [avatarImageError, setAvatarImageError] = React.useState(false);
   const generatedAvatarSeed = participant.avatarSeed || parseGeneratedAvatarSeed(participant.avatarUrl);
   const isGeneratedAvatarUrl = Boolean(participant.avatarUrl?.includes('/api/avatar'));

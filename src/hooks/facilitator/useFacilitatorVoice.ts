@@ -272,11 +272,13 @@ async function fetchServerTts(params: {
 
   const { data: { session } } = await api.auth.getSession();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (session?.access_token) {
+  // A participant join token is intentionally scoped to this workshop. Prefer
+  // it over any unrelated persistent app login left on a shared mobile device.
+  const joinToken = getJoinToken(params.conversationId != null ? String(params.conversationId) : null);
+  if (joinToken) {
+    headers['X-Join-Token'] = joinToken;
+  } else if (session?.access_token) {
     headers.Authorization = `Bearer ${session.access_token}`;
-  } else {
-    const joinToken = getJoinToken(params.conversationId != null ? String(params.conversationId) : null);
-    if (joinToken) headers['X-Join-Token'] = joinToken;
   }
 
   const response = await fetch(params.endpoint, {

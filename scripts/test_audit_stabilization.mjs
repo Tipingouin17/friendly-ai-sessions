@@ -330,4 +330,35 @@ test('mobile facilitator voice remains enabled, replayable, and independently au
   assert.match(voiceHook, /data:audio\/wav;base64/);
 });
 
+test('welcome generation is server-owned, atomically claimed, and cannot be duplicated by join or participant recovery paths', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const fetcher = readFileSync(resolve(repoRoot, 'src/hooks/session-messages/useMessageFetching.ts'), 'utf8');
+  const recovery = readFileSync(resolve(repoRoot, 'src/hooks/useWelcomeMessageRecovery.ts'), 'utf8');
+
+  assert.match(server, /welcome_already_claimed/);
+  assert.match(server, /SET welcome_message_status = 'ai_generating'/);
+  assert.match(server, /Welcome generation belongs exclusively to the host's atomic/);
+  assert.doesNotMatch(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(conversation_id\)\)/);
+  assert.doesNotMatch(fetcher, /sessionStart:\s*true/);
+  assert.doesNotMatch(fetcher, /Client-side fallback if Edge Function fails/);
+  assert.doesNotMatch(recovery, /api\.functions\.invoke\('handle-facilitator-response'/);
+  assert.doesNotMatch(recovery, /welcome_message_status: 'pending'/);
+});
+
+test('session-start and mobile media feedback remain singular and truthful', () => {
+  const waiting = readFileSync(resolve(repoRoot, 'src/components/session/ParticipantWaitingScreen.tsx'), 'utf8');
+  const voiceHook = readFileSync(resolve(repoRoot, 'src/hooks/facilitator/useFacilitatorVoice.ts'), 'utf8');
+  const participantView = readFileSync(resolve(repoRoot, 'src/components/session/messaging/ParticipantMessagingView.tsx'), 'utf8');
+  const videoGrid = readFileSync(resolve(repoRoot, 'src/components/session/video/SessionVideoGrid.tsx'), 'utf8');
+
+  assert.doesNotMatch(waiting, /title: 'Session Started'/);
+  assert.match(waiting, /shared session-status hook owns the single participant/);
+  assert.ok(voiceHook.indexOf("if (joinToken)") < voiceHook.indexOf('else if (session?.access_token)'));
+  assert.match(videoGrid, /track\.readyState === 'live' && !track\.muted/);
+  assert.match(participantView, /hasHostVideoFrames/);
+  assert.match(participantView, /isMuted: true/);
+  assert.match(participantView, /Host camera is live/);
+  assert.match(participantView, /Waiting for host camera frames/);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

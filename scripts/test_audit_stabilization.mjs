@@ -361,4 +361,19 @@ test('session-start and mobile media feedback remain singular and truthful', () 
   assert.match(participantView, /Waiting for host camera frames/);
 });
 
+test('tokenized Android invitation reads stay bounded and fail with a clear recovery state', () => {
+  const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
+  const conversation = readFileSync(resolve(repoRoot, 'src/hooks/useConversation.ts'), 'utf8');
+  const joinMain = readFileSync(resolve(repoRoot, 'src/components/session/JoinSessionMain.tsx'), 'utf8');
+
+  assert.match(server, /async def _acquire_join_connection\(operation: str\)/);
+  assert.match(server, /join_service_busy/);
+  assert.match(server, /_acquire_join_connection\("participant invitation read"\)/);
+  assert.match(server, /table == "conversations" and join_token_header/);
+  assert.match(conversation, /retry: 1/);
+  assert.match(conversation, /retryDelay: 1_000/);
+  assert.match(joinMain, /setTimeout\(\(\) => setLoadingTimedOut\(true\), 12_000\)/);
+  assert.match(joinMain, /The session is taking longer than expected to load/);
+});
+
 console.log('\nAudit stabilization regression tests passed.');

@@ -987,6 +987,31 @@ async def _acquire_lifecycle_connection(operation: str):
         ) from exc
 
 
+@asynccontextmanager
+async def _acquire_join_connection(operation: str):
+    """Acquire a database connection for the mobile invitation critical path.
+
+    The tokenized conversation read is the first request made after scanning an
+    invite.  It must fail clearly within a short budget when the shared pool is
+    busy; otherwise Android is left on a skeleton until its browser aborts.
+    """
+    if _pool is None:
+        raise HTTPException(
+            503,
+            detail={"code": "join_service_unavailable", "message": "The session is temporarily unavailable. Please try again shortly."},
+        )
+    try:
+        async with asyncio.timeout(6):
+            async with _pool.acquire() as conn:
+                yield conn
+    except TimeoutError as exc:
+        log_session.warning("participant invitation database operation timed out: %s", operation)
+        raise HTTPException(
+            503,
+            detail={"code": "join_service_busy", "message": "The session is busy preparing. Please wait a few seconds and try again."},
+        ) from exc
+
+
 def _build_dsn() -> str:
     """Build a PostgreSQL DSN string from environment variables."""
     if DB_URL:
@@ -6512,7 +6537,15 @@ async def rest_table(table: str, request: Request):
                     )
 
     try:
-        async with _pool.acquire() as conn:
+        # A participant scanning a tokenized invite must not wait indefinitely
+        # behind unrelated workloads that exhaust the shared pool. Other REST
+        # resources retain the standard pool behavior.
+        connection_context = (
+            _acquire_join_connection("participant invitation read")
+            if request.method in ("GET", "HEAD") and table == "conversations" and join_token_header
+            else _pool.acquire()
+        )
+        async with connection_context as conn:
 
             if request.method in ("GET", "HEAD"):
                 select_str = params.get("select", "*")

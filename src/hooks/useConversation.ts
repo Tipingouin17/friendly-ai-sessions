@@ -164,8 +164,11 @@ export const useConversation = (conversationId: number | null) => {
       }
     },
     enabled: !!conversationId,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    // The invite screen is a user-facing critical path. One quick retry covers
+    // transient mobile handoffs without leaving Android on a skeleton for the
+    // 20-second watchdog after a saturated backend has already responded.
+    retry: 1,
+    retryDelay: 1_000,
     // 30 s staleTime: conversation data is stable during an active session.
     // useSessionStatus already calls refetch() on every WebSocket UPDATE event
     // (session_started, is_session_ended, status changes) and falls back to

@@ -130,12 +130,12 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
     if (onJoinSession) await onJoinSession();
   };
 
-  // ── Loading-timeout state: show error after 20 s of skeleton ────────────
+  // ── Loading-timeout state: show a bounded recovery state after 12 s ─────
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (isLoading && !conversation) {
-      loadingTimerRef.current = setTimeout(() => setLoadingTimedOut(true), 20_000);
+      loadingTimerRef.current = setTimeout(() => setLoadingTimedOut(true), 12_000);
     } else {
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
       setLoadingTimedOut(false);
@@ -164,7 +164,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                 </div>
               </div>
               <p className="text-gray-900 font-semibold text-lg mb-1">Unable to reach the session</p>
-              <p className="text-gray-500 text-sm mb-6">The server is taking too long to respond. Please check your connection and try again.</p>
+              <p className="text-gray-500 text-sm mb-6">The session is taking longer than expected to load. Check your connection, then try again.</p>
               <div className="space-y-2.5">
                 <button
                   onClick={onRetry}

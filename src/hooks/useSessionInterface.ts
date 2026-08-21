@@ -11,6 +11,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { ConversationWithSession } from "@/types/database";
 import { useSecureNavigation } from "@/hooks/useSecureNavigation";
 
+const hasStartedSession = (conversationLike: any): boolean => {
+  return conversationLike?.session_started === true || Boolean(conversationLike?.session_started_at);
+};
+
 export function useSessionInterface(
   conversationId: number | null,
   conversation?: ConversationWithSession | null

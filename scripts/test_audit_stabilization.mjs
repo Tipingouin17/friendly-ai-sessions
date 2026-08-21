@@ -358,6 +358,8 @@ test('server-owned session start is immediate, singular, and does not block on a
   assert.match(startHook, /functions\.invoke\(\s*'start-session'/s);
   assert.doesNotMatch(startHook, /handle-facilitator-response/);
   assert.match(sessionInterface, /functions\.invoke\('start-session'/);
+  assert.match(sessionInterface, /const hasStartedSession = \(conversationLike: any\)/);
+  assert.match(sessionInterface, /hasStartedSession\(payload\.new as any\)/);
   assert.doesNotMatch(sessionInterface, /\.from\('conversations'\)\s*\.update\(/s);
   assert.match(statusHook, /const announcedSessionStarts = new Set<number>\(\)/);
   assert.match(statusHook, /!announcedSessionStarts\.has\(conversationId\)/);

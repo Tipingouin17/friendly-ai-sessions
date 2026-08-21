@@ -14,6 +14,13 @@ import { removeChannel } from "@/utils/realtimeHelpers";
 // Keep start notifications browser-local and conversation-scoped so duplicate
 // realtime subscriptions cannot produce duplicate user-facing toasts.
 const announcedSessionStarts = new Set<number>();
+const TERMINAL_SESSION_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'expired', 'ended']);
+
+const isTerminalSession = (conversation: { is_session_ended?: unknown; status?: unknown } | null | undefined) => {
+  if (conversation?.is_session_ended === true) return true;
+  const status = typeof conversation?.status === 'string' ? conversation.status.toLowerCase() : '';
+  return TERMINAL_SESSION_STATUSES.has(status);
+};
 
 export function useSessionStatus(conversationId: number | null, refetch: () => void) {
   const navigate = useNavigate();
@@ -41,11 +48,11 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     toast({ title: "Session Ended", description: "This session has been closed." });
     if (!isJoinPage.current) {
-      // Anonymous participants (join-token only, no JWT) are not authenticated
-      // and cannot access /past-workshops (protected route). Redirect them to
-      // the home page instead to avoid a 401 → Login stale-asset crash.
-      const isAnonymous = !!getJoinToken() && !localStorage.getItem('mf_session');
-      navigate(isAnonymous ? '/' : '/past-workshops', { replace: true });
+      // A tokenized invite remains a participant route even if the browser also
+      // has a host login. Never send that participant into the host dashboard.
+      const params = new URLSearchParams(window.location.search);
+      const isParticipantRoute = Boolean(getJoinToken(String(conversationId))) || params.has('participantId') || params.has('token');
+      navigate(isParticipantRoute ? '/' : '/past-workshops', { replace: true });
     }
   };
 
@@ -61,7 +68,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
           .eq('id', conversationId)
           .single();
         if (error) return;
-        if (data && (data.is_session_ended || data.status !== 'active')) {
+        if (isTerminalSession(data)) {
           handleSessionEnd();
         }
       } catch { /* silent */ }
@@ -83,7 +90,7 @@ export function useSessionStatus(conversationId: number | null, refetch: () => v
         filter: `id=eq.${conversationId}`
       }, (payload) => {
         if (!mountedRef.current || !payload.new) return;
-        if (payload.new.is_session_ended || payload.new.status !== 'active') {
+        if (isTerminalSession(payload.new)) {
           handleSessionEnd();
         }
         if (payload.new.session_started && !payload.old?.session_started && !announcedSessionStarts.has(conversationId)) {

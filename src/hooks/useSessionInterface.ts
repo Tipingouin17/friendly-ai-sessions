@@ -88,10 +88,6 @@ export function useSessionInterface(
             lastSessionStarted.current = true;
             setIsSessionStarted(true);
             setShowQrCodeView(false);
-            toast({
-              title: "Session Started",
-              description: "The host has started the session.",
-            });
           }
         }
       })

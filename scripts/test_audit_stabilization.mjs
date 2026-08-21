@@ -352,6 +352,7 @@ test('server-owned session start is immediate, singular, and does not block on a
   const statusHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionStatus.ts'), 'utf8');
 
   assert.match(server, /elif func_name == "start-session"/);
+  assert.match(server, /SET session_started = TRUE,\s*session_started_at = COALESCE\(session_started_at, NOW\(\)\),\s*status = 'active'/s);
   assert.match(server, /await _require_conversation_host_access\(request, start_conversation_id\)/);
   assert.match(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(start_conversation_id\)\)/);
   assert.match(server, /await asyncio\.to_thread\(_call_facilitator_model\)/);
@@ -363,6 +364,20 @@ test('server-owned session start is immediate, singular, and does not block on a
   assert.doesNotMatch(sessionInterface, /\.from\('conversations'\)\s*\.update\(/s);
   assert.match(statusHook, /const announcedSessionStarts = new Set<number>\(\)/);
   assert.match(statusHook, /!announcedSessionStarts\.has\(conversationId\)/);
+});
+
+test('participant lifecycle treats only genuine terminal states as ended and preserves invite routing', () => {
+  const statusHook = readFileSync(resolve(repoRoot, 'src/hooks/useSessionStatus.ts'), 'utf8');
+  const validation = readFileSync(resolve(repoRoot, 'src/hooks/useSessionValidation.ts'), 'utf8');
+  const sessionInterface = readFileSync(resolve(repoRoot, 'src/hooks/useSessionInterface.ts'), 'utf8');
+
+  assert.match(statusHook, /TERMINAL_SESSION_STATUSES/);
+  assert.match(statusHook, /const isTerminalSession/);
+  assert.doesNotMatch(statusHook, /status !== 'active'/);
+  assert.match(statusHook, /isParticipantRoute \? '\/' : '\/past-workshops'/);
+  assert.match(validation, /TERMINAL_SESSION_STATUSES/);
+  assert.doesNotMatch(validation, /data\.status !== 'active'/);
+  assert.doesNotMatch(sessionInterface, /title: "Session Started"/);
 });
 
 test('session-start and mobile media feedback remain singular and truthful', () => {

@@ -14,6 +14,13 @@ interface UseSessionValidationProps {
   isAdmin?: boolean;
 }
 
+const TERMINAL_SESSION_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'expired', 'ended']);
+const isTerminalSession = (conversation: { is_session_ended?: unknown; status?: unknown }) => {
+  if (conversation.is_session_ended === true) return true;
+  const status = typeof conversation.status === 'string' ? conversation.status.toLowerCase() : '';
+  return TERMINAL_SESSION_STATUSES.has(status);
+};
+
 export const useSessionValidation = ({ conversationId, isAdmin = false }: UseSessionValidationProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -55,14 +62,14 @@ export const useSessionValidation = ({ conversationId, isAdmin = false }: UseSes
         // For participants we allow them to stay on the page and see the transcript
         // in read-only mode — the ParticipantMessagingView renders an ended banner.
         // Only redirect hosts/admins away (they are handled by their own hooks).
-        if ((data.is_session_ended || data.status !== 'active') && isAdmin) {
+        if (isTerminalSession(data) && isAdmin) {
           setIsValid(false);
           navigate('/past-workshops', { replace: true });
           return;
         }
 
         // Participants: mark valid so the session page stays mounted
-        if (data.is_session_ended || data.status !== 'active') {
+        if (isTerminalSession(data)) {
           // Still mark as valid so the page renders; the ended banner handles UX
           setIsValid(true);
           setIsValidating(false);

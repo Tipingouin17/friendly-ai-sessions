@@ -7161,10 +7161,12 @@ async def edge_function(func_name: str, request: Request):
             started_row = await start_conn.fetchrow(
                 """
                 UPDATE conversations
-                SET session_started = TRUE
+                SET session_started = TRUE,
+                    session_started_at = COALESCE(session_started_at, NOW()),
+                    status = 'active'
                 WHERE id = $1
                   AND COALESCE(is_session_ended, FALSE) = FALSE
-                RETURNING id, session_started, is_session_ended, welcome_message_status
+                RETURNING id, session_started, session_started_at, status, is_session_ended, welcome_message_status
                 """,
                 start_conversation_id,
             )

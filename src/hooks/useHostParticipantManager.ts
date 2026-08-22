@@ -244,7 +244,7 @@ export function useHostParticipantManager({
       if (err) { logger.category('admin', 'Error fetching initial data:', err); return; }
       if (data) {
         const cur     = data.current_participants || 0;
-        const max     = data.participants || 0;
+        const max     = Math.max((data.participants || 0) - 1, 0);
         const started = hasStartedSession(data);
         setCurrentCount(cur);
         setMaxCount(max);

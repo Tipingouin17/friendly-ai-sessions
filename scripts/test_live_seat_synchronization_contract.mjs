@@ -33,7 +33,9 @@ excludes(realtime, 'current_participants || 0) - 1', 'participant realtime fulln
 includes(realtime, 'const attendeeCount = Math.max(0, conversation.current_participants || 0);', 'participant realtime compares attendee count directly');
 
 // The host start button has the same capacity semantics and roster fallback.
-includes(hostManager, 'const max     = Math.max((data.participants || 0) - 1, 0);', 'host manager normalizes host-inclusive capacity once');
+const normalizedHostCapacityReads = hostManager.match(/const max\s+= Math\.max\(\(data\.participants \|\| 0\) - 1, 0\);/g) || [];
+assert.equal(normalizedHostCapacityReads.length, 2, 'host manager normalizes host-inclusive capacity in both polling and initial fetch paths');
+includes(hostManager, 'const max     = Math.max((payload.new.participants || 0) - 1, 0);', 'host manager normalizes realtime capacity once');
 includes(hostManager, 'const attendeeCount = updated.filter((participant) => !participant.isHost).length;', 'host manager reconciles delayed count broadcasts from roster data');
 includes(hostLogic, 'const attendeeCountFromConversation = Math.max(currentCount, 0);', 'host readiness uses attendee count directly');
 includes(hostLogic, 'const attendeeCapacityFromManager = Math.max(maxCount, 0);', 'host does not subtract normalized capacity twice');

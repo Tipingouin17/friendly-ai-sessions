@@ -261,7 +261,8 @@ export const useSessionParticipantSetup = ({
     if (conversation) {
       const maxParticipants = Math.max((conversation.participants || 0) - 1, 0);
       const currentCount = conversation.current_participants || 0;
-      const attendeeCount = Math.max(currentCount - 1, 0);
+      // The backend persists non-host attendee rows in current_participants.
+      const attendeeCount = currentCount;
       
       setMaxParticipantsForSession(maxParticipants);
       setCurrentParticipantCount(currentCount);

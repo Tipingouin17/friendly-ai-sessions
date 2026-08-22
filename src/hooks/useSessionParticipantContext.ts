@@ -45,7 +45,9 @@ export const useSessionParticipantContext = ({
     ? participantMap[currentUserParticipantId] 
     : null;
   
-  const attendeeCount = Math.max(participantCount - 1, 0);
+  // `current_participants` counts non-host attendee rows only; capacity is
+  // host-inclusive in `participants`, so it is normalized once above.
+  const attendeeCount = participantCount;
 
   return {
     participantMap,

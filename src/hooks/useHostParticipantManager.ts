@@ -104,6 +104,11 @@ export function useHostParticipantManager({
           joinedAt: new Date(p.created_at),
           lastActive: new Date(p.created_at),
         }));
+        const attendeeCount = updated.filter((participant) => !participant.isHost).length;
+        // The roster is authoritative if a custom endpoint's conversations
+        // broadcast arrives late; keep the Start Session readiness count aligned.
+        setCurrentCount(attendeeCount);
+        onParticipantCountChangeRef.current?.(attendeeCount);
         setParticipants(prev => {
           const changed = prev.length !== updated.length ||
             prev.some((p, i) => p.id !== updated[i]?.id);
@@ -135,7 +140,7 @@ export function useHostParticipantManager({
         if (err) { setPollingActive(false); setIsConnected(false); return; }
         if (data) {
           const cur     = data.current_participants || 0;
-          const max     = data.participants || 0;
+          const max     = Math.max((data.participants || 0) - 1, 0);
           const started = hasStartedSession(data);
           setCurrentCount(cur);
           setMaxCount(max);
@@ -176,7 +181,7 @@ export function useHostParticipantManager({
           if (!mountedRef.current) return;
           if (payload.new) {
             const cur     = payload.new.current_participants || 0;
-            const max     = payload.new.participants || 0;
+            const max     = Math.max((payload.new.participants || 0) - 1, 0);
             const started = hasStartedSession(payload.new as { session_started?: boolean | null; session_started_at?: string | null });
             setCurrentCount(cur);
             setMaxCount(max);

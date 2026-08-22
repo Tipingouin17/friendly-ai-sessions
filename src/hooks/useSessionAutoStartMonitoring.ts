@@ -28,7 +28,8 @@ export const useSessionAutoStartMonitoring = ({
     if (!conversationId || !conversation || sessionStartProcessingRef.current) return;
 
     const currentCount = conversation.current_participants || 0;
-    const attendeeCount = Math.max(currentCount - 1, 0);
+    // current_participants is attendee-only; capacity below is normalized once.
+    const attendeeCount = Math.max(currentCount, 0);
     const maxCount = Math.max((conversation.participants || 0) - 1, 0);
     const sessionStarted = conversation.session_started;
 

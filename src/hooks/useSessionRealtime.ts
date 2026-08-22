@@ -62,9 +62,8 @@ export const useSessionRealtime = ({
         if (onSessionStarted) onSessionStarted();
       }
 
-      // Check if attendee capacity is already full. current_participants and
-      // stored participants both include the host; product capacity is attendees only.
-      const attendeeCount = Math.max(0, (conversation.current_participants || 0) - 1);
+      // current_participants is attendee-only; `participants` is host-inclusive.
+      const attendeeCount = Math.max(0, conversation.current_participants || 0);
       const attendeeCapacity = Math.max((conversation.participants || 0) - 1, 0);
       if (attendeeCount >= attendeeCapacity &&
           attendeeCapacity > 0 &&
@@ -87,8 +86,8 @@ export const useSessionRealtime = ({
               if (onSessionStarted) onSessionStarted();
             }
 
-            // Handle session full using non-host attendee capacity.
-            const attendeeCount = Math.max(0, (payload.new.current_participants || 0) - 1);
+            // Handle session full using attendee-only current count.
+            const attendeeCount = Math.max(0, payload.new.current_participants || 0);
             const attendeeCapacity = Math.max((payload.new.participants || 0) - 1, 0);
             if (attendeeCount >= attendeeCapacity &&
                 attendeeCapacity > 0 &&
@@ -177,9 +176,8 @@ export const useSessionRealtime = ({
         }
       }
 
-      // Check if attendee capacity is full. current_participants and stored
-      // participants include the host; product capacity is attendees only.
-      const attendeeCount = Math.max(0, (conversation.current_participants || 0) - 1);
+      // current_participants is attendee-only; `participants` is host-inclusive.
+      const attendeeCount = Math.max(0, conversation.current_participants || 0);
       const attendeeCapacity = Math.max((conversation.participants || 0) - 1, 0);
       if (attendeeCount >= attendeeCapacity &&
           attendeeCapacity > 0 &&

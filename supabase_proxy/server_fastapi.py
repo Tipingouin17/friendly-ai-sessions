@@ -9331,6 +9331,7 @@ async def edge_function(func_name: str, request: Request):
                                 SELECT COUNT(*)
                                 FROM public.session_participants
                                 WHERE conversation_id = $1
+                                  AND COALESCE(is_host, FALSE) = FALSE
                             )
                             WHERE id = $1 AND EXISTS (SELECT 1 FROM chosen)
                             RETURNING current_participants
@@ -9342,6 +9343,7 @@ async def edge_function(func_name: str, request: Request):
                             (SELECT access_revoked FROM decision) AS access_revoked,
                             (SELECT token_valid FROM decision) AS token_valid,
                             (SELECT is_full FROM decision) AS is_full,
+                            (SELECT participant_capacity FROM decision) AS participant_capacity,
                             (SELECT participant_id FROM chosen) AS participant_id,
                             (SELECT is_rejoining FROM chosen) AS is_rejoining,
                             (SELECT current_participants FROM updated_conversation) AS current_participants
@@ -9372,6 +9374,10 @@ async def edge_function(func_name: str, request: Request):
 
                     new_participant_id = join_row["participant_id"]
                     existing_slot = bool(join_row["is_rejoining"])
+                    # `current_participants` is deliberately attendee-only:
+                    # host-inclusive capacity is stored separately in `participants`.
+                    current_participant_count = int(join_row["current_participants"] or 0)
+                    attendee_capacity = int(join_row["participant_capacity"] or 0)
 
                 # Log the join event after releasing the participant-slot lock.  The
                 # event is useful for audit/debugging but should not delay or block
@@ -9389,6 +9395,8 @@ async def edge_function(func_name: str, request: Request):
                         "avatar_seed": avatar_seed,
                         "is_anonymous": is_anonymous,
                         "is_host": is_host,
+                        "current_count": current_participant_count,
+                        "attendee_capacity": attendee_capacity,
                         "timestamp": datetime.utcnow().isoformat(),
                     }),
                 )
@@ -9408,6 +9416,8 @@ async def edge_function(func_name: str, request: Request):
                 "is_anonymous": is_anonymous,
                 "is_host": is_host,
                 "is_rejoining": is_rejoining,
+                "current_participants": current_participant_count,
+                "attendee_capacity": attendee_capacity,
                 "created_at": datetime.utcnow().isoformat(),
             }
             asyncio.create_task(manager.broadcast(str(conversation_id), {
@@ -9417,6 +9427,23 @@ async def edge_function(func_name: str, request: Request):
                     "new": _participant_broadcast,
                     "old": {},
                     "table": "session_participants",
+                    "schema": "public",
+                },
+            }))
+            # The host count and start control subscribe to conversations.
+            # This explicit UPDATE event mirrors the atomic SQL update because
+            # the custom endpoint bypasses database-triggered realtime events.
+            asyncio.create_task(manager.broadcast(str(conversation_id), {
+                "event": "UPDATE",
+                "payload": {
+                    "eventType": "UPDATE",
+                    "new": {
+                        "id": conversation_id,
+                        "current_participants": current_participant_count,
+                        "participants": attendee_capacity + 1,
+                    },
+                    "old": {},
+                    "table": "conversations",
                     "schema": "public",
                 },
             }))
@@ -9430,6 +9457,8 @@ async def edge_function(func_name: str, request: Request):
                 "avatar_seed": avatar_seed,
                 "is_host": is_host,
                 "is_rejoining": is_rejoining,
+                "current_participants": current_participant_count,
+                "attendee_capacity": attendee_capacity,
             }
         except HTTPException:
             raise

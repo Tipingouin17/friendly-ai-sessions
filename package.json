@@ -20,7 +20,9 @@
     "test:audit-stabilization": "node scripts/test_audit_stabilization.mjs",
     "test:full-session-lifecycle": "node scripts/test_full_session_lifecycle_contract.mjs",
     "test:active-session-response-media": "node scripts/test_active_session_response_media_contract.mjs",
-    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:facilitation-mode-approval && pnpm test:generate-ai-welcome && pnpm test:welcome-client-fallback && pnpm test:auth-resend && pnpm test:auth-signup-default-plan && pnpm test:auth-mfa && pnpm test:auth-mfa-management && pnpm test:phase3-hardening && pnpm test:ux-session-shells && pnpm test:full-session-lifecycle && pnpm test:active-session-response-media",
+    "test:live-seat-synchronization": "node scripts/test_live_seat_synchronization_contract.mjs",
+    "test:join-seat-sync-backend": "python3 scripts/test_join_seat_sync_backend.py",
+    "test:facilitator-runtime": "pnpm test:stream-interpreter && pnpm test:facilitator-ingest && pnpm test:facilitation-mode-approval && pnpm test:generate-ai-welcome && pnpm test:welcome-client-fallback && pnpm test:join-seat-sync-backend && pnpm test:auth-resend && pnpm test:auth-signup-default-plan && pnpm test:auth-mfa && pnpm test:auth-mfa-management && pnpm test:phase3-hardening && pnpm test:ux-session-shells && pnpm test:full-session-lifecycle && pnpm test:active-session-response-media && pnpm test:live-seat-synchronization",
     "preview": "vite preview",
     "test:auth-mfa": "python3 scripts/test_auth_mfa_backend.py",
     "test:auth-mfa-management": "python3 scripts/test_auth_mfa_management_backend.py"

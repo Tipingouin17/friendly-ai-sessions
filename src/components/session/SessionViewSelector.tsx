@@ -231,7 +231,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
     return (
       <AdminQrView
         conversationId={props.currentConversationId as number}
-        currentParticipantCount={Math.max((props.conversation?.current_participants || 0) - 1, 0)}
+        currentParticipantCount={Math.max(props.conversation?.current_participants || 0, 0)}
         maxParticipants={Math.max((props.conversation?.participants || 0) - 1, 0)}
         facilitatorTitle={props.conversation.sessions?.facilitator_details?.title}
         joinToken={props.conversation?.join_token}
@@ -297,7 +297,7 @@ const SessionViewSelector: React.FC<SessionViewSelectorProps> = ({
         sessionObjective={props.conversation.sessions?.objective}
         languageLabel={languageLabel}
         participants={props.participants}
-        currentParticipantCount={Math.max((props.conversation?.current_participants || 0) - 1, 0)}
+        currentParticipantCount={Math.max(props.conversation?.current_participants || 0, 0)}
         maxParticipants={Math.max((props.conversation?.participants || 0) - 1, 0)}
         onRetryGeneration={timeoutReached ? waitForWelcomeMessage : undefined}
       />

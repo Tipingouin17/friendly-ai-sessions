@@ -162,12 +162,11 @@ export function useSessionHostLogic() {
         isManagerSessionStarted
     );
 
-    // The conversations table stores participant capacity/counts as host-inclusive
-    // because database-side capacity enforcement counts the host row. Product-facing
-    // waiting-room metrics should only describe human attendee seats; the AI
-    // facilitator is never a seat, and the host should not consume an attendee slot.
-    const attendeeCountFromConversation = currentCount > 0 ? Math.max(currentCount - 1, 0) : 0;
-    const attendeeCapacityFromManager = maxCount > 0 ? Math.max(maxCount - 1, 0) : 0;
+    // Capacity is host-inclusive in `participants`, while current_participants
+    // stores non-host attendee rows. Product-facing room metrics therefore use
+    // the current count directly and normalize capacity once.
+    const attendeeCountFromConversation = Math.max(currentCount, 0);
+    const attendeeCapacityFromManager = Math.max(maxCount, 0);
     const attendeeCapacityFromConversation = (conversationData?.participants || 0) > 0
         ? Math.max((conversationData?.participants || 0) - 1, 0)
         : 0;

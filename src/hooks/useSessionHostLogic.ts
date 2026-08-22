@@ -126,9 +126,9 @@ export function useSessionHostLogic() {
             // consumers that still read persisted start fields directly.
             void refetchConversation();
         },
-        onSessionFull: (currentCount, maxCount) => {
-            void triggerAutoStart(currentCount, maxCount);
-        }
+        // Full capacity enables a ready start state; it must not start the
+        // session until the host explicitly presses Start Session.
+        onSessionFull: () => undefined
     });
 
     // 3. Messages Management
@@ -190,11 +190,6 @@ export function useSessionHostLogic() {
             setHostSessionStartedOverride(true);
         }
     }, [hasPersistedStartMarker, hostSessionStartedOverride, isInterfaceSessionStarted, isManagerSessionStarted]);
-
-    useEffect(() => {
-        if (!isDataLoaded || effectiveIsSessionStarted) return;
-        void triggerAutoStart(currentCount, maxCount);
-    }, [currentCount, effectiveIsSessionStarted, isDataLoaded, maxCount, triggerAutoStart]);
 
     // 5. Loading State Management (Preserving "Safe Mode" logic)
     const [isLoading, setIsLoading] = useState(true);

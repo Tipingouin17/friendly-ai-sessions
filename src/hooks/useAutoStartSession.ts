@@ -1,11 +1,12 @@
 /**
- * use Auto Start Session
+ * Explicit host-start compatibility hook.
  *
- * Hook for the AIfacilitator application.
+ * Full attendance is a readiness signal only. It must never transition a
+ * workshop into the live state: the host is the sole authority that invokes
+ * the atomic start-session endpoint.
  */
 
-import { useState, useCallback, useRef } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { useCallback } from 'react';
 
 interface UseAutoStartSessionProps {
   onStartSession: () => Promise<void>;
@@ -13,109 +14,23 @@ interface UseAutoStartSessionProps {
   maxParticipants: number;
 }
 
-export const useAutoStartSession = ({
-  onStartSession,
-  isSessionStarted,
-  maxParticipants
-}: UseAutoStartSessionProps) => {
-  const [isAutoStarting, setIsAutoStarting] = useState(false);
-  const [autoStartCountdown, setAutoStartCountdown] = useState(0);
-  const { toast } = useToast();
-  const autoStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const clearAutoStartTimer = useCallback(() => {
-    if (autoStartTimeoutRef.current) {
-      clearTimeout(autoStartTimeoutRef.current);
-      autoStartTimeoutRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-    setIsAutoStarting(false);
-    setAutoStartCountdown(0);
-  }, []);
-
+export const useAutoStartSession = (_props: UseAutoStartSessionProps) => {
+  // Retain the public hook shape while deliberately making legacy callers
+  // inert. This prevents old realtime and capacity callbacks from bypassing
+  // the host’s explicit Start Session action.
   const triggerAutoStart = useCallback(async (
-    currentParticipantCount: number,
-    maxParticipantsOverride?: number
-  ) => {
-    // Don't auto-start if session is already started or starting
-    if (isSessionStarted || isAutoStarting) {
-      return;
-    }
+    _currentParticipantCount: number,
+    _maxParticipantsOverride?: number,
+  ) => undefined, []);
 
-    const capacity = maxParticipantsOverride ?? maxParticipants;
-
-    // Only auto-start if we've reached a known max capacity
-    if (capacity <= 0 || currentParticipantCount < capacity) {
-      return;
-    }
-
-    setIsAutoStarting(true);
-    setAutoStartCountdown(3);
-
-    // Show toast notification
-    toast({
-      title: "Session Full",
-      description: `Maximum capacity reached (${capacity} participants). Auto-starting in 3 seconds...`,
-    });
-
-    // Start countdown
-    countdownIntervalRef.current = setInterval(() => {
-      setAutoStartCountdown((prev) => {
-        if (prev <= 1) {
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Set auto-start timer
-    autoStartTimeoutRef.current = setTimeout(async () => {
-      try {
-        await onStartSession();
-        toast({
-          title: "Session Started",
-          description: "Session has been automatically started at full capacity.",
-        });
-      } catch (error) {
-        console.error('Auto-start failed:', error);
-        toast({
-          title: "Auto-start Failed",
-          description: "Failed to auto-start session. Please start manually.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsAutoStarting(false);
-        setAutoStartCountdown(0);
-      }
-    }, 3000);
-  }, [isSessionStarted, isAutoStarting, maxParticipants, onStartSession, toast]);
-
-  const cancelAutoStart = useCallback(() => {
-    clearAutoStartTimer();
-    toast({
-      title: "Auto-start Cancelled",
-      description: "Auto-start has been cancelled. You can still start manually.",
-    });
-  }, [clearAutoStartTimer, toast]);
-
-  // Cleanup on unmount
-  const cleanup = useCallback(() => {
-    clearAutoStartTimer();
-  }, [clearAutoStartTimer]);
+  const cancelAutoStart = useCallback(() => undefined, []);
+  const cleanup = useCallback(() => undefined, []);
 
   return {
-    isAutoStarting,
-    autoStartCountdown,
+    isAutoStarting: false,
+    autoStartCountdown: 0,
     triggerAutoStart,
     cancelAutoStart,
-    cleanup
+    cleanup,
   };
 };

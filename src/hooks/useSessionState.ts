@@ -10,11 +10,9 @@ export function useSessionState() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [hasInitializedProvider, setHasInitializedProvider] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Handle session full state
-  const handleSessionFull = useCallback(() => {
-    // Auto-start session when it's full
-    setSessionStarted(true);
-  }, []);
+  // Full capacity is informational. Only the host-owned, persisted
+  // start-session mutation may transition a room into the live state.
+  const handleSessionFull = useCallback(() => undefined, []);
 
   return { 
     sessionStarted, 

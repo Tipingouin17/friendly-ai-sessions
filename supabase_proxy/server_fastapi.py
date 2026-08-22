@@ -7184,40 +7184,122 @@ async def edge_function(func_name: str, request: Request):
         # Only the owning host or an administrator can make a room live.  A
         # participant join token deliberately cannot start a workshop.
         await _require_conversation_host_access(request, start_conversation_id)
+        # Start and the first transcript row are one lifecycle transaction. The
+        # room must never be observable as active while its greeting is merely a
+        # detached task that can stall on context, provider, or worker failures.
+        welcome_message_payload = None
         async with _acquire_lifecycle_connection("start session") as start_conn:
-            started_row = await start_conn.fetchrow(
-                """
-                UPDATE conversations
-                SET session_started = TRUE,
-                    status = 'active'
-                WHERE id = $1
-                  AND COALESCE(is_session_ended, FALSE) = FALSE
-                RETURNING id, session_started, status, is_session_ended, welcome_message_status
-                """,
-                start_conversation_id,
-            )
-        if not started_row:
-            raise HTTPException(404, detail={"code": "session_not_startable", "message": "This session could not be started because it is unavailable or already closed."})
+            async with start_conn.transaction():
+                started_row = await start_conn.fetchrow(
+                    """
+                    UPDATE conversations
+                    SET session_started = TRUE,
+                        status = 'active'
+                    WHERE id = $1
+                      AND COALESCE(is_session_ended, FALSE) = FALSE
+                    RETURNING id, session_started, status, is_session_ended, welcome_message_status
+                    """,
+                    start_conversation_id,
+                )
+                if not started_row:
+                    raise HTTPException(404, detail={"code": "session_not_startable", "message": "This session could not be started because it is unavailable or already closed."})
+
+                existing_welcome = await start_conn.fetchrow(
+                    """
+                    SELECT id, content, name, created_at
+                    FROM messages
+                    WHERE conversation_id = $1 AND role = 'assistant'
+                    ORDER BY created_at ASC, id ASC
+                    LIMIT 1
+                    """,
+                    start_conversation_id,
+                )
+                if existing_welcome:
+                    existing_content = existing_welcome["content"]
+                    if isinstance(existing_content, str):
+                        try:
+                            existing_content = json.loads(existing_content)
+                        except Exception:
+                            existing_content = {"text": existing_content}
+                    welcome_message_payload = {
+                        "id": str(existing_welcome["id"]),
+                        "conversation_id": str(start_conversation_id),
+                        "content": existing_content or {"text": "Welcome to the session."},
+                        "role": "assistant",
+                        "name": existing_welcome["name"] or "Facilitator",
+                        "created_at": existing_welcome["created_at"].isoformat() if existing_welcome["created_at"] else None,
+                    }
+                else:
+                    welcome_context = await start_conn.fetchrow(
+                        """
+                        SELECT s.title, s.objective, f.title AS facilitator_name
+                        FROM conversations c
+                        LEFT JOIN sessions s ON s.id = c.sessions_id
+                        LEFT JOIN facilitators f ON f.id = s.facilitator
+                        WHERE c.id = $1
+                        """,
+                        start_conversation_id,
+                    )
+                    session_title = (welcome_context["title"] if welcome_context else None) or "this workshop"
+                    objective = (welcome_context["objective"] if welcome_context else None) or "work together productively"
+                    facilitator_name = (welcome_context["facilitator_name"] if welcome_context else None) or "Facilitator"
+                    welcome_content = {
+                        "text": (
+                            f'Welcome to "{session_title}"! I\'m {facilitator_name}, and I\'m glad you are here. '
+                            f'Our focus today is {objective}. To begin, what is the most important thing you want this session to clarify or improve?'
+                        )
+                    }
+                    welcome_row = await start_conn.fetchrow(
+                        """
+                        INSERT INTO messages (conversation_id, content, role, name)
+                        VALUES ($1, $2::jsonb, 'assistant', $3)
+                        RETURNING id, created_at
+                        """,
+                        start_conversation_id,
+                        json.dumps(welcome_content),
+                        facilitator_name,
+                    )
+                    await start_conn.execute(
+                        "UPDATE conversations SET welcome_message_status = 'fallback_ready' WHERE id = $1",
+                        start_conversation_id,
+                    )
+                    welcome_message_payload = {
+                        "id": str(welcome_row["id"]),
+                        "conversation_id": str(start_conversation_id),
+                        "content": welcome_content,
+                        "role": "assistant",
+                        "name": facilitator_name,
+                        "created_at": welcome_row["created_at"].isoformat() if welcome_row["created_at"] else None,
+                    }
 
         started_payload = serialize_row(dict(started_row))
-        # The first opening is now deterministic and database-only, so commit it
-        # before reporting a room as active. This prevents an active participant
-        # shell from observing an empty transcript while a detached task stalls.
-        await _maybe_generate_welcome_message(start_conversation_id)
-        asyncio.create_task(manager.broadcast(str(start_conversation_id), {
-            "event": "UPDATE",
-            "payload": {
-                "eventType": "UPDATE",
-                "new": started_payload,
-                "old": {"session_started": False},
-                "table": "conversations",
-                "schema": "public",
-            },
-        }))
+        started_payload["welcome_message_status"] = "fallback_ready" if welcome_message_payload else started_payload.get("welcome_message_status")
+        try:
+            await manager.broadcast(str(start_conversation_id), {
+                "event": "INSERT",
+                "payload": {
+                    "eventType": "INSERT",
+                    "new": welcome_message_payload,
+                    "table": "messages",
+                    "schema": "public",
+                },
+            })
+            await manager.broadcast(str(start_conversation_id), {
+                "event": "UPDATE",
+                "payload": {
+                    "eventType": "UPDATE",
+                    "new": started_payload,
+                    "old": {"session_started": False},
+                    "table": "conversations",
+                    "schema": "public",
+                },
+            })
+        except Exception as broadcast_error:
+            log_session.warning("start-session broadcast recovery required for conv=%s: %s", start_conversation_id, broadcast_error)
         return {
             "success": True,
             "conversation": started_payload,
-            "welcome": "scheduled",
+            "welcome": "committed",
         }
 
     # ── handle-facilitator-response ────────────────────────────

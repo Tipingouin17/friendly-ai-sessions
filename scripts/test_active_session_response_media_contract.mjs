@@ -23,6 +23,9 @@ const hostMessaging = read('src/components/session/messaging/SimplifiedHostMessa
 const participantLoadingShell = read('src/components/session/ParticipantLoadingShell.tsx');
 const webRTCSession = read('src/hooks/useWebRTCSession.ts');
 const fastApiServer = read('supabase_proxy/server_fastapi.py');
+const autoStartSession = read('src/hooks/useAutoStartSession.ts');
+const hostLogic = read('src/hooks/useSessionHostLogic.ts');
+const sessionState = read('src/hooks/useSessionState.ts');
 
 // Voice and typed turns share one durable message boundary.
 assertContains(chatInput, 'message: finalizedMessage', 'speech final callback exports an explicit finalized message snapshot');
@@ -46,7 +49,10 @@ assertContains(fastApiServer, 'claim_acquired = False', 'welcome claim has recov
 assertContains(fastApiServer, 'The first visible room message is availability-critical.', 'welcome documents its non-provider critical path');
 assertContains(fastApiServer, "_used_fallback = True", 'welcome marks its deterministic opening as terminal fallback-ready');
 assertContains(fastApiServer, 'Welcome to "{_session_title}"!', 'welcome uses a facilitator-specific deterministic opening');
-assertContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session commits the opening before reporting the room active');
+assertContains(fastApiServer, 'async with start_conn.transaction():', 'start-session wraps activation and welcome persistence in one transaction');
+assertContains(fastApiServer, "INSERT INTO messages (conversation_id, content, role, name)", 'start-session writes the deterministic welcome row directly');
+assertContains(fastApiServer, '"welcome": "committed"', 'start-session reports a committed rather than scheduled opening');
+assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
 assertContains(fastApiServer, "'fallback_ready' if _used_fallback else 'ai_ready'", 'welcome persists a terminal fallback-ready status');
 assertContains(fastApiServer, "WHERE id = $1 AND welcome_message_status = 'ai_generating'", 'welcome failure releases only its active generation claim');
 assertNotContains(fastApiServer, '_oai_client_welcome', 'welcome must not wait on a provider client');
@@ -57,6 +63,12 @@ assertContains(fastApiServer, 'facilitator provider returned an empty response',
 assertContains(fastApiServer, 'provider unavailable for conv=%s; persisting fallback', 'reply provider failure produces persisted fallback copy');
 assertContains(fastApiServer, 'INSERT INTO messages (conversation_id, content, role, name, ', 'assistant fallback uses the standard persisted messages contract');
 assertContains(fastApiServer, 'manager.broadcast(str(conv_id)', 'persisted assistant fallback broadcasts to room clients');
+
+// A full room may become ready, but only the host may call the atomic start endpoint.
+assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');
+assertNotContains(autoStartSession, 'autoStartTimeoutRef', 'legacy auto-start timer has been removed');
+assertNotContains(hostLogic, 'void triggerAutoStart(', 'host capacity callbacks never initiate session start');
+assertNotContains(sessionState, 'setSessionStarted(true)', 'participant capacity state cannot locally mark the room live');
 
 // Host camera changes must request renegotiation from the designated participant offerer,
 // without restarting ICE for ordinary camera-ready SDP changes.
